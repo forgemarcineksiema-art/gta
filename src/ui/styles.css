@@ -1,0 +1,374 @@
+/* Style guide: docs/STYLE.md. UI is plain DOM over the canvas. */
+:root {
+  --ui-accent: #ffd23f;
+  --ui-accent-2: #2bd1ff;
+  --ui-danger: #ff3b5c;
+  --ui-ink: #f7f3ea;
+  --ui-ink-dim: rgba(247, 243, 234, 0.7);
+  --ui-panel: rgba(22, 14, 40, 0.78);
+  --ui-panel-line: rgba(255, 210, 63, 0.35);
+  --font-display: 'Segoe UI', 'Helvetica Neue', Arial, system-ui, sans-serif;
+  --font-body: 'Segoe UI', system-ui, Arial, sans-serif;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #2b1b5a;
+  color: var(--ui-ink);
+  font-family: var(--font-body);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
+#game {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  outline: none;
+}
+
+.hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  padding: calc(16px + var(--safe-top)) calc(16px + var(--safe-right)) calc(16px + var(--safe-bottom)) calc(16px + var(--safe-left));
+  font-family: var(--font-display);
+}
+
+/* speedometer, bottom right */
+.hud__speedo {
+  position: absolute;
+  right: calc(24px + var(--safe-right));
+  bottom: calc(20px + var(--safe-bottom));
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-areas:
+    'gear speed'
+    'gear unit'
+    'boost boost';
+  align-items: end;
+  column-gap: 10px;
+  text-align: right;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45), 0 0 18px rgba(0, 0, 0, 0.35);
+}
+.hud__speed {
+  grid-area: speed;
+  font-size: clamp(44px, 7.5vh, 76px);
+  font-weight: 900;
+  font-style: italic;
+  line-height: 0.9;
+  letter-spacing: -0.02em;
+  min-width: 2.2ch;
+  font-variant-numeric: tabular-nums;
+}
+.hud__unit {
+  grid-area: unit;
+  font-size: clamp(12px, 1.8vh, 16px);
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--ui-ink-dim);
+  margin-top: 4px;
+}
+.hud__gear {
+  grid-area: gear;
+  align-self: start;
+  font-size: clamp(22px, 3.6vh, 34px);
+  font-weight: 900;
+  font-style: italic;
+  color: var(--ui-accent);
+  padding-top: 4px;
+}
+.hud__boost {
+  grid-area: boost;
+  position: relative;
+  margin-top: 10px;
+  width: clamp(150px, 22vh, 220px);
+  height: 12px;
+  border: 2px solid var(--ui-ink);
+  border-radius: 3px;
+  transform: skewX(-14deg);
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.35);
+}
+.hud__boost-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--ui-accent-2);
+  transform-origin: left;
+  transform: scaleX(0);
+}
+.hud__boost.is-full .hud__boost-fill {
+  background: var(--ui-accent);
+}
+.hud__boost.is-active .hud__boost-fill {
+  background: #fff;
+}
+.hud__boost-label {
+  position: absolute;
+  right: 6px;
+  top: -18px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.25em;
+  color: var(--ui-ink-dim);
+}
+
+/* drift readout, bottom centre */
+.hud__drift {
+  position: absolute;
+  left: 50%;
+  bottom: calc(28px + var(--safe-bottom));
+  transform: translateX(-50%) skewX(-8deg);
+  display: none;
+  align-items: baseline;
+  gap: 10px;
+  font-weight: 900;
+  font-style: italic;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+}
+.hud__drift.is-visible {
+  display: flex;
+}
+.hud__drift-label {
+  font-size: clamp(18px, 3vh, 26px);
+  color: var(--ui-accent);
+  letter-spacing: 0.18em;
+}
+.hud__drift-angle {
+  font-size: clamp(16px, 2.6vh, 22px);
+  font-variant-numeric: tabular-nums;
+}
+
+/* debug block, top left */
+.hud__debug {
+  position: absolute;
+  left: calc(12px + var(--safe-left));
+  top: calc(12px + var(--safe-top));
+  margin: 0;
+  display: none;
+  font: 12px/1.45 Consolas, 'Courier New', monospace;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 6px 8px;
+  border-radius: 4px;
+  white-space: pre;
+}
+.hud__debug.is-visible {
+  display: block;
+}
+
+/* pause */
+.hud__pause {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 10, 40, 0.55);
+  backdrop-filter: blur(2px);
+}
+.hud__pause.is-visible {
+  display: flex;
+}
+.hud__pause-title {
+  font-size: clamp(40px, 8vh, 80px);
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.1em;
+  color: var(--ui-accent);
+  text-shadow: 0 4px 0 rgba(0, 0, 0, 0.5);
+}
+.hud__pause-sub {
+  margin-top: 8px;
+  font-size: clamp(14px, 2.2vh, 20px);
+  font-weight: 600;
+  color: var(--ui-ink-dim);
+}
+
+/* keycap hints, top centre */
+.hud__hints {
+  position: absolute;
+  left: 50%;
+  top: calc(14px + var(--safe-top));
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 16px;
+  max-width: 92vw;
+  transition: opacity 0.5s;
+}
+.hud__hints.is-hidden {
+  opacity: 0;
+}
+.hud__hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-ink-dim);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+}
+.hud__hint-label {
+  margin-left: 4px;
+}
+kbd.key {
+  display: inline-block;
+  min-width: 14px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--ui-ink);
+  color: #1c1b22;
+  font: 700 12px/1.2 var(--font-display);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
+  text-align: center;
+}
+
+/* toast, upper centre */
+.hud__toast {
+  position: absolute;
+  left: 50%;
+  top: 22%;
+  transform: translateX(-50%);
+  font-size: clamp(20px, 3.6vh, 34px);
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.06em;
+  color: var(--ui-accent);
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.hud__toast.is-visible {
+  opacity: 1;
+}
+
+/* dev tuning panel */
+.devpanel {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 320px;
+  display: none;
+  flex-direction: column;
+  background: var(--ui-panel);
+  border-left: 1px solid var(--ui-panel-line);
+  color: var(--ui-ink);
+  font: 12px/1.3 Consolas, 'Courier New', monospace;
+  z-index: 20;
+}
+.devpanel.is-visible {
+  display: flex;
+}
+.devpanel__head {
+  padding: 8px 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--ui-accent);
+}
+.devpanel__bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 8px 6px;
+}
+.devpanel button {
+  font: inherit;
+  padding: 3px 7px;
+  border: 1px solid var(--ui-panel-line);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ui-ink);
+  cursor: pointer;
+}
+.devpanel button:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+.devpanel__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 8px 12px;
+}
+.devpanel__section {
+  margin: 8px 0 4px;
+  font-weight: 700;
+  color: var(--ui-accent-2);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+.devpanel__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 1px 0;
+}
+.devpanel__row.is-changed span {
+  color: var(--ui-accent);
+}
+.devpanel__row input {
+  width: 96px;
+  font: inherit;
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--ui-ink);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+
+/* simulated ad overlay (LocalPlatform) */
+.fake-ad {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: repeating-linear-gradient(45deg, #1c1b22 0 20px, #2a2833 20px 40px);
+  color: #fff;
+  font: 700 22px/1.2 var(--font-display);
+  letter-spacing: 0.1em;
+}
+.fake-ad__label {
+  padding: 16px 28px;
+  border: 3px solid var(--ui-accent);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+/* loading */
+.loading {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #2b1b5a;
+  color: var(--ui-accent);
+  font: 900 italic 28px/1 var(--font-display);
+  letter-spacing: 0.2em;
+  z-index: 30;
+  transition: opacity 0.25s;
+}
+.loading.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}

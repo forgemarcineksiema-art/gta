@@ -1,0 +1,199 @@
+/**
+ * Synthesized engine, wind and tyre-skid audio in WebAudio. No samples: two
+ * detuned oscillators plus a noise bed shaped by RPM and load, wind noise by
+ * speed, a band-passed noise for skids. One master gain for the ad-mute hook.
+ *
+ * The AudioContext is created lazily on the first user gesture (browser policy;
+ * on iOS it must also be resumed inside a gesture).
+ */
+import type { VehicleTelemetry } from '../sim';
+
+export class EngineAudio {
+  private ctx: AudioContext | null = null;
+  private master: GainNode | null = null;
+  private engineGain: GainNode | null = null;
+  private windGain: GainNode | null = null;
+  private skidGain: GainNode | null = null;
+  private oscA: OscillatorNode | null = null;
+  private oscB: OscillatorNode | null = null;
+  private oscSub: OscillatorNode | null = null;
+  private engineFilter: BiquadFilterNode | null = null;
+  private windFilter: BiquadFilterNode | null = null;
+  private skidFilter: BiquadFilterNode | null = null;
+  private muted = false;
+  private userMuted = false;
+  private volume = 0.5;
+  private rpmSmooth = 900;
+  private loadSmooth = 0;
+  private readonly onGesture: () => void;
+
+  constructor() {
+    this.onGesture = () => void this.unlock();
+    window.addEventListener('keydown', this.onGesture);
+    window.addEventListener('pointerdown', this.onGesture);
+    window.addEventListener('touchstart', this.onGesture);
+  }
+
+  get ready(): boolean {
+    return this.ctx !== null && this.ctx.state === 'running';
+  }
+
+  /** Create or resume the context. Must run inside a user gesture the first time. */
+  async unlock(): Promise<void> {
+    try {
+      if (!this.ctx) this.build();
+      if (this.ctx && this.ctx.state !== 'running') await this.ctx.resume();
+    } catch (e) {
+      console.warn('audio unlock failed', e);
+    }
+  }
+
+  private build(): void {
+    const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AC) return;
+    const ctx = new AC({ latencyHint: 'interactive' });
+    this.ctx = ctx;
+    this.master = ctx.createGain();
+    this.master.gain.value = this.effectiveVolume();
+    this.master.connect(ctx.destination);
+
+    // engine: saw + square an octave down + sub sine, through a lowpass driven by load
+    this.engineFilter = ctx.createBiquadFilter();
+    this.engineFilter.type = 'lowpass';
+    this.engineFilter.frequency.value = 600;
+    this.engineFilter.Q.value = 1.2;
+    this.engineGain = ctx.createGain();
+    this.engineGain.gain.value = 0;
+    this.engineFilter.connect(this.engineGain).connect(this.master);
+
+    this.oscA = ctx.createOscillator();
+    this.oscA.type = 'sawtooth';
+    this.oscB = ctx.createOscillator();
+    this.oscB.type = 'square';
+    this.oscSub = ctx.createOscillator();
+    this.oscSub.type = 'sine';
+    const gA = ctx.createGain();
+    gA.gain.value = 0.35;
+    const gB = ctx.createGain();
+    gB.gain.value = 0.18;
+    const gS = ctx.createGain();
+    gS.gain.value = 0.3;
+    this.oscA.connect(gA).connect(this.engineFilter);
+    this.oscB.connect(gB).connect(this.engineFilter);
+    this.oscSub.connect(gS).connect(this.engineFilter);
+    // a little grit: waveshaper on the saw
+    const shaper = ctx.createWaveShaper();
+    shaper.curve = makeDistortionCurve(18);
+    gA.disconnect();
+    gA.connect(shaper).connect(this.engineFilter);
+    this.oscA.start();
+    this.oscB.start();
+    this.oscSub.start();
+
+    // shared noise source
+    const noise = ctx.createBufferSource();
+    noise.buffer = makeNoiseBuffer(ctx, 2);
+    noise.loop = true;
+    noise.start();
+
+    // wind
+    this.windFilter = ctx.createBiquadFilter();
+    this.windFilter.type = 'bandpass';
+    this.windFilter.frequency.value = 500;
+    this.windFilter.Q.value = 0.5;
+    this.windGain = ctx.createGain();
+    this.windGain.gain.value = 0;
+    noise.connect(this.windFilter).connect(this.windGain).connect(this.master);
+
+    // skid
+    this.skidFilter = ctx.createBiquadFilter();
+    this.skidFilter.type = 'bandpass';
+    this.skidFilter.frequency.value = 1100;
+    this.skidFilter.Q.value = 2.5;
+    this.skidGain = ctx.createGain();
+    this.skidGain.gain.value = 0;
+    noise.connect(this.skidFilter).connect(this.skidGain).connect(this.master);
+  }
+
+  update(tm: VehicleTelemetry, dt: number): void {
+    if (!this.ctx || !this.oscA || !this.oscB || !this.oscSub || !this.engineFilter || !this.engineGain || !this.windGain || !this.skidGain || !this.skidFilter) return;
+    const k = 1 - Math.exp(-dt * 10);
+    this.rpmSmooth += (tm.rpm - this.rpmSmooth) * k;
+    this.loadSmooth += (tm.load - this.loadSmooth) * k;
+    const t = this.ctx.currentTime;
+    const tc = 0.03;
+
+    // 4 firing pulses per rev for a V8-ish tone
+    const f = (this.rpmSmooth / 60) * 4;
+    this.oscA.frequency.setTargetAtTime(f, t, tc);
+    this.oscB.frequency.setTargetAtTime(f * 0.5 * 1.005, t, tc);
+    this.oscSub.frequency.setTargetAtTime(f * 0.25, t, tc);
+    this.engineFilter.frequency.setTargetAtTime(350 + this.loadSmooth * 2400 + this.rpmSmooth * 0.15, t, tc);
+    const boostBite = tm.boosting ? 0.12 : 0;
+    this.engineGain.gain.setTargetAtTime(0.16 + this.loadSmooth * 0.22 + boostBite, t, tc);
+
+    const speed = Math.abs(tm.speed);
+    const wind = Math.pow(Math.min(1, speed / 65), 2) * 0.6;
+    this.windGain.gain.setTargetAtTime(wind, t, 0.08);
+    if (this.windFilter) this.windFilter.frequency.setTargetAtTime(300 + speed * 12, t, 0.1);
+
+    const slip = tm.groundedWheels > 0 ? Math.max(0, (tm.maxSlipDeg - 8) / 25) : 0;
+    const skid = Math.min(1, slip) * Math.min(1, speed / 12) * 0.35;
+    this.skidGain.gain.setTargetAtTime(skid, t, 0.05);
+    this.skidFilter.frequency.setTargetAtTime(900 + Math.min(1, slip) * 500, t, 0.05);
+  }
+
+  /** Ad-mute hook (adStarted / adFinished). Independent from the player's own mute. */
+  setMuted(muted: boolean): void {
+    this.muted = muted;
+    this.applyVolume();
+  }
+
+  toggleUserMute(): boolean {
+    this.userMuted = !this.userMuted;
+    this.applyVolume();
+    return this.userMuted;
+  }
+
+  get isUserMuted(): boolean {
+    return this.userMuted;
+  }
+
+  private effectiveVolume(): number {
+    return this.muted || this.userMuted ? 0 : this.volume;
+  }
+
+  private applyVolume(): void {
+    if (this.master && this.ctx) this.master.gain.setTargetAtTime(this.effectiveVolume(), this.ctx.currentTime, 0.02);
+  }
+
+  dispose(): void {
+    window.removeEventListener('keydown', this.onGesture);
+    window.removeEventListener('pointerdown', this.onGesture);
+    window.removeEventListener('touchstart', this.onGesture);
+    void this.ctx?.close();
+    this.ctx = null;
+  }
+}
+
+function makeNoiseBuffer(ctx: AudioContext, seconds: number): AudioBuffer {
+  const len = Math.floor(ctx.sampleRate * seconds);
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  let s = 22222;
+  for (let i = 0; i < len; i++) {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    data[i] = (s / 4294967296) * 2 - 1;
+  }
+  return buf;
+}
+
+function makeDistortionCurve(amount: number): Float32Array<ArrayBuffer> {
+  const n = 256;
+  const curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i * 2) / n - 1;
+    curve[i] = ((3 + amount) * x * 20 * (Math.PI / 180)) / (Math.PI + amount * Math.abs(x));
+  }
+  return curve;
+}

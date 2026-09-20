@@ -80,6 +80,14 @@ TypeScript 5.9 (strict + `noUncheckedIndexedAccess` + `exactOptionalPropertyType
 
 Pinned by `tests/sim/handling.test.ts` (22 tests): no creep at rest, 0–100 in 4.2–5.8 s, launch slip within traction-control bounds, gears in order with rpm between idle and the limiter, plateau top speeds 160–180 / 220–240 km/h, braking 22–42 m from 100 with the fronts never fully locked, reverse capped, handbrake locks the rears without turning the car, drift band 18–42° with visible counter-steer and speed kept, half steer gives a smaller angle, centring straightens within a second, kerb clip and steer taps at 150 km/h stay composed, ramps land and settle, flip recovery, reset, live mass change.
 
+## Instrumentation (M1)
+
+- `sim/recorder.ts`: per-step controls, pose and telemetry in typed arrays; JSON round trip; `controlsAt` replays a run on a fresh world (the sim is deterministic).
+- `sim/track.ts`: the test track (closed Catmull-Rom loop sampled every 3 m with curvature), gates and `LapTimer`; `SimWorld` keeps the best lap's pose stream and serves `ghostPose()` to the renderer.
+- `app/trackBot.ts`: pure pursuit + curvature speed plan; the benchmark driver and the seed of the city road bot.
+- `ui/telemetryGraph.ts`: 10 s scrolling traces in the dev panel.
+- `sim/vehicle/presets.ts` + `render/carProfiles.ts`: vehicle classes as tuning overrides and loft profiles under one id; `tests/sim/cars.test.ts` pins each class.
+
 ## Platform adapter
 
 `Platform` (`src/platform/Platform.ts`): init/info, loading + gameplay brackets, `happyTime`, `adsAvailable`, `requestAd` (typed `AdResult`, never rejects), `onAdEvent` (mute hook), `hasAdblock`, save/load/clear. `LocalPlatform` simulates ads with a DOM overlay and can force every SDK error code from the URL (`?ad=error&adError=adblock`, `?ad=off`, `?adblock=1`). `CrazyGamesPlatform` arrives in M6.

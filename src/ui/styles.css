@@ -153,6 +153,44 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* lap timer, top left (below the debug block when both show) */
+.hud__lap {
+  position: absolute;
+  left: calc(20px + var(--safe-left));
+  top: calc(60px + var(--safe-top));
+  display: none;
+  flex-direction: column;
+  font-weight: 900;
+  font-style: italic;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+  font-variant-numeric: tabular-nums;
+}
+.hud__lap.is-visible {
+  display: flex;
+}
+.hud__lap-current {
+  font-size: clamp(26px, 4.4vh, 44px);
+  line-height: 1;
+  color: var(--ui-ink);
+}
+.hud__lap-row {
+  display: flex;
+  gap: 10px;
+  font-size: clamp(13px, 2vh, 18px);
+  color: var(--ui-ink-dim);
+  margin-top: 4px;
+}
+.hud__lap-label {
+  color: var(--ui-accent);
+  letter-spacing: 0.15em;
+  min-width: 3.2em;
+}
+.devpanel__graph {
+  display: block;
+  margin: 6px 8px;
+  border-radius: 4px;
+}
+
 /* debug block, top left */
 .hud__debug {
   position: absolute;

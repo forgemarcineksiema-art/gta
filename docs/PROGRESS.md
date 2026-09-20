@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-21 — Session 5: M1 deepened (instrumentation, test track, three cars)
+
+Marcin's call: stay on M1 and do the three highest-leverage items instead of moving on.
+
+- **Instrumentation.** `Recorder` logs every fixed step: controls (6), pose (7) and telemetry (10 values) in growing typed arrays; `toJSON`/`fromJSON` for saving. Because the sim is deterministic, the control stream replays a run: pinned bitwise for an exact stream and to 1 cm after JSON rounding. Telemetry gained `gLong`/`gLat`/`gVert` (from the velocity change over the last step). The dev panel has a scrolling telemetry graph (speed, lateral and longitudinal g, slip, steer, throttle, brake; 10 s of history), "save recording", "load ghost" and "clear ghost".
+- **Test track.** `src/sim/track.ts`: a closed Catmull-Rom loop west of the lot (~990 m: start straight, right sweeper, chicane on the east side, hairpin at the south-east, a back straight with a 7° kicker, a 40 m right-hander back onto the straight), sampled every 3 m with heading and curvature; kerbs where it bends, edge posts, a start gantry and gate markers. `LapTimer` with 8 gates: laps count only when every gate is crossed in order (pinned); current / last / best on the HUD with a toast. The best lap's pose stream becomes a translucent **ghost** of the same car. First layout had a hairpin at the start line and 10 m apexes; fixed by re-drawing the loop in the driving direction and easing the chicane (all radii ≥ 12 m, pinned).
+- **Track bot** (`src/app/trackBot.ts`): pure pursuit on the centreline with a speed plan from the curvature ahead (allowed speed = min over the next 90 m of sqrt(v_corner² + 2·a_brake·d)). Muscle laps in ~40–56 s with no resets; pinned 30–70 s. `?bot=track&spawn=track`. This is the core the city road bot will reuse.
+- **Three cars.** `CAR_PRESETS` (`muscle`, `compact` FWD hatch, `heavy` delivery van) as tuning overrides on the default, matching `CAR_PROFILES` for the loft (hatch: short bonnet, tall greenhouse; van: flat nose, one long box). `?car=compact|heavy`, panel buttons reload with the choice. `tests/sim/cars.test.ts` runs the same six pins per class with per-class numbers (rest, 0–100 and top, braking, handbrake drift band, pulse response at 60/120, kerb + 16° ramp). 52 sim tests.
+
 ## 2026-09-20 — Session 4: step cost, tyre load sensitivity, LSD, streak quads
 
 - **Sim step measured** (Node, 3,000 steps with a driving script): 0.27 ms per step = vehicle 0.18 + Rapier 0.06 + rest 0.03. The throttled browser p95 of 8.3 ms was frames with 2–3 substeps after a hitch, not the step itself. Moved the per-wheel velocity and force maths into JS (`velAt`, `forceAt`: one `addForce` and one `addTorque` per step instead of 23 WASM calls): vehicle 0.18 → 0.14 ms. Rays cost 4 × 7.7 µs and are not worth more work before M3.

@@ -2,13 +2,19 @@
  * The headless game simulation. Owns the Rapier world, the player's vehicle and
  * every simulated object. Runs on a fixed 60 Hz step and never touches Three.js
  * or the DOM, so it is testable in Node and independent of the render rate.
+ *
+ * Also owns the instrumentation: a lap timer on the test track, a recorder of
+ * every step (controls, pose, telemetry) and the ghost of the best lap.
  */
 import RAPIER from '@dimforge/rapier3d-compat';
 import { createControls, type VehicleControls } from './controls';
 import { buildPlayground, type PlaygroundLayout, type SpawnPoint } from './playground';
+import { POSE_STRIDE, Recorder } from './recorder';
 import type { DynamicDesc, StaticDesc } from './scene';
+import { LapTimer, type LapState, type TrackDef } from './track';
 import { TransformBuffer } from './transforms';
-import { DEFAULT_TUNING, cloneTuning, type VehicleTuning } from './vehicle/tuning';
+import { CAR_PRESETS, type CarId } from './vehicle/presets';
+import { cloneTuning, type VehicleTuning } from './vehicle/tuning';
 import { Vehicle } from './vehicle/Vehicle';
 
 export const FIXED_DT = 1 / 60;
@@ -27,11 +33,24 @@ export function initPhysics(): Promise<void> {
 export interface SimWorldOptions {
   tuning?: VehicleTuning;
   spawn?: string;
+  car?: CarId;
+  /** Record every step (default true; costs a few typed-array writes per step). */
+  record?: boolean;
 }
 
 interface TrackedBody {
   body: RAPIER.RigidBody;
   slot: number;
+}
+
+export interface GhostPose {
+  x: number;
+  y: number;
+  z: number;
+  qx: number;
+  qy: number;
+  qz: number;
+  qw: number;
 }
 
 export class SimWorld {
@@ -41,11 +60,18 @@ export class SimWorld {
   readonly dynamics: DynamicDesc[] = [];
   readonly spawns: SpawnPoint[];
   readonly vehicle: Vehicle;
+  readonly carId: CarId;
   readonly controls: VehicleControls = createControls();
   readonly layout: PlaygroundLayout;
+  readonly track: TrackDef;
+  readonly lapTimer: LapTimer;
+  readonly recorder: Recorder | null;
+  readonly spawnName: string;
   private readonly tracked: TrackedBody[] = [];
   private readonly scratchPos = { x: 0, y: 0, z: 0 };
   private readonly scratchRot = { x: 0, y: 0, z: 0, w: 1 };
+  /** Pose stream of the best lap (x, y, z, qx, qy, qz, qw per tick), for the ghost. */
+  bestLapPoses: Float32Array | null = null;
 
   tick = 0;
   time = 0;
@@ -59,6 +85,9 @@ export class SimWorld {
     this.layout = buildPlayground(this.world);
     this.statics = this.layout.statics;
     this.spawns = this.layout.spawns;
+    this.track = this.layout.track;
+    this.lapTimer = new LapTimer(this.track);
+    this.recorder = opts.record === false ? null : new Recorder();
 
     for (const p of this.layout.props) {
       const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
@@ -79,15 +108,19 @@ export class SimWorld {
       this.transforms.writeBoth(slot, p.position.x, p.position.y, p.position.z, p.rotation.x, p.rotation.y, p.rotation.z, p.rotation.w);
     }
 
-    const spawn = this.spawns.find((s) => s.name === (opts.spawn ?? 'lot')) ?? this.spawns[0];
+    this.spawnName = opts.spawn ?? 'lot';
+    const spawn = this.spawns.find((s) => s.name === this.spawnName) ?? this.spawns[0];
     if (!spawn) throw new Error('playground has no spawn points');
-    this.vehicle = new Vehicle(this.world, this.transforms, opts.tuning ?? cloneTuning(DEFAULT_TUNING), spawn.position, spawn.yaw);
+    this.carId = opts.car ?? 'muscle';
+    const tuning = opts.tuning ?? cloneTuning(CAR_PRESETS[this.carId]);
+    this.vehicle = new Vehicle(this.world, this.transforms, tuning, spawn.position, spawn.yaw);
   }
 
   /** Advance the simulation by exactly one fixed step using the current `controls`. */
   step(): void {
     this.transforms.swap();
     this.respawned = false;
+    const reset = this.controls.reset;
     this.vehicle.update(this.controls, FIXED_DT);
     this.controls.reset = false;
     this.world.step();
@@ -106,8 +139,44 @@ export class SimWorld {
       this.vehicle.teleport(nearest.position, nearest.yaw);
       this.respawned = true;
     }
+    if (reset) this.lapTimer.reset();
     this.tick++;
     this.time += FIXED_DT;
+
+    // lap timing and the best-lap ghost
+    const lap = this.lapTimer.state;
+    this.lapTimer.update(pos.x, pos.z, this.tick, this.time, FIXED_DT);
+    if (this.recorder) {
+      const slot = this.vehicle.slot;
+      this.recorder.record(this.controls, reset, this.transforms.currPos, slot * 3, this.transforms.currRot, slot * 4, this.vehicle.telemetry);
+      if (lap.lapStartTick === this.tick) this.recorder.lapStarts.push(this.tick);
+      if (lap.justBest && lap.completedLapStartTick >= 0) {
+        this.bestLapPoses = this.recorder.slicePoses(lap.completedLapStartTick, this.tick);
+      }
+    }
+  }
+
+  get lap(): LapState {
+    return this.lapTimer.state;
+  }
+
+  /** Pose of the best-lap ghost for the current lap progress; false when there is none to show. */
+  ghostPose(out: GhostPose): boolean {
+    const lap = this.lapTimer.state;
+    if (!this.bestLapPoses || lap.lapStartTick < 0) return false;
+    const i = this.tick - lap.lapStartTick;
+    const n = this.bestLapPoses.length / POSE_STRIDE;
+    if (i < 0 || i >= n) return false;
+    const o = i * POSE_STRIDE;
+    const p = this.bestLapPoses;
+    out.x = p[o] as number;
+    out.y = p[o + 1] as number;
+    out.z = p[o + 2] as number;
+    out.qx = p[o + 3] as number;
+    out.qy = p[o + 4] as number;
+    out.qz = p[o + 5] as number;
+    out.qw = p[o + 6] as number;
+    return true;
   }
 
   nearestSpawn(x: number, z: number): SpawnPoint {
@@ -130,6 +199,7 @@ export class SimWorld {
     const s = this.spawns.find((sp) => sp.name === name);
     if (!s) return;
     this.vehicle.teleport(s.position, s.yaw);
+    this.lapTimer.reset();
     this.respawned = true;
   }
 

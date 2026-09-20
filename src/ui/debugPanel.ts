@@ -4,7 +4,8 @@
  * patch" copies only the values that differ from the defaults, ready to paste
  * into src/sim/vehicle/tuning.ts.
  */
-import { DEFAULT_TUNING, type SimWorld } from '../sim';
+import { DEFAULT_TUNING, type SimWorld, type VehicleTelemetry } from '../sim';
+import { TelemetryGraph } from './telemetryGraph';
 
 type Leaf = { path: string; get: () => number; set: (v: number) => void; def: number };
 
@@ -13,6 +14,12 @@ export interface DebugPanelActions {
   refillBoost(): void;
   /** Called after any vehicle value changes (structural values need a rebuild). */
   onVehicleChange?: () => void;
+  cars?: readonly string[];
+  currentCar?: string;
+  selectCar?: (car: string) => void;
+  saveRecording?: () => void;
+  loadGhost?: (text: string) => void;
+  clearGhost?: () => void;
   /** Extra numeric objects to expose (e.g. camera tuning), keyed by section title. */
   extra?: Record<string, Record<string, number>>;
 }
@@ -23,6 +30,7 @@ export class DebugPanel {
   private readonly inputs = new Map<string, HTMLInputElement>();
   private readonly leaves: Leaf[] = [];
   private onChange: () => void = () => undefined;
+  private readonly graph: TelemetryGraph;
 
   constructor(parent: HTMLElement, sim: SimWorld, actions: DebugPanelActions) {
     this.root = document.createElement('div');
@@ -57,6 +65,36 @@ export class DebugPanel {
     spawns.className = 'devpanel__bar';
     for (const s of sim.spawns) spawns.appendChild(button(s.name, () => actions.spawnAt(s.name)));
     this.root.appendChild(spawns);
+
+    if (actions.cars && actions.selectCar) {
+      const cars = document.createElement('div');
+      cars.className = 'devpanel__bar';
+      for (const c of actions.cars) {
+        const b = button(c === actions.currentCar ? `[${c}]` : c, () => actions.selectCar?.(c));
+        cars.appendChild(b);
+      }
+      this.root.appendChild(cars);
+    }
+    const rec = document.createElement('div');
+    rec.className = 'devpanel__bar';
+    if (actions.saveRecording) rec.appendChild(button('save recording', () => actions.saveRecording?.()));
+    if (actions.loadGhost) {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'application/json';
+      input.style.display = 'none';
+      input.addEventListener('change', () => {
+        const f = input.files?.[0];
+        if (!f) return;
+        void f.text().then((text) => actions.loadGhost?.(text));
+        input.value = '';
+      });
+      rec.appendChild(input);
+      rec.appendChild(button('load ghost', () => input.click()));
+    }
+    if (actions.clearGhost) rec.appendChild(button('clear ghost', () => actions.clearGhost?.()));
+    this.root.appendChild(rec);
+    this.graph = new TelemetryGraph(this.root);
 
     const body = document.createElement('div');
     body.className = 'devpanel__body';
@@ -130,6 +168,14 @@ export class DebugPanel {
         input.parentElement?.classList.toggle('is-changed', l.get() !== l.def);
       }
     }
+  }
+
+  graphPush(tm: VehicleTelemetry): void {
+    if (this.visible) this.graph.push(tm);
+  }
+
+  graphDraw(now: number): void {
+    if (this.visible) this.graph.draw(now);
   }
 
   toggle(): boolean {

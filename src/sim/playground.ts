@@ -7,6 +7,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { GROUPS_SOLID, GROUPS_TERRAIN } from './collision';
 import { PALETTE } from './palette';
 import { IDENTITY_QUAT, quatFromAxisAngle, quatFromYaw, type Quat, type StaticDesc, type Vec3 } from './scene';
+import { buildTrackDef, buildTrackGeometry, type TrackDef } from './track';
 
 export interface SpawnPoint {
   position: Vec3;
@@ -26,6 +27,7 @@ export interface PlaygroundLayout {
   statics: StaticDesc[];
   spawns: SpawnPoint[];
   props: PropSpawn[];
+  track: TrackDef;
   /** Ground size (square, centred on origin). */
   groundSize: number;
 }
@@ -192,6 +194,10 @@ export function buildPlayground(world: RAPIER.World): PlaygroundLayout {
     });
   }
 
+  // ---- the test track (west of the lot) ----------------------------------------------
+  const track = buildTrackDef({ x: -420, z: 40 });
+  buildTrackGeometry(track, world, statics);
+
   // ---- spawn points ---------------------------------------------------------------
   spawns.push({ name: 'lot', position: { x: 0, y: 0.6, z: -40 }, yaw: 0 });
   spawns.push({ name: 'straight', position: { x: STRAIGHT.x, y: 0.6, z: STRAIGHT.zStart + 10 }, yaw: 0 });
@@ -201,6 +207,8 @@ export function buildPlayground(world: RAPIER.World): PlaygroundLayout {
   spawns.push({ name: 'skidpad', position: { x: skid.x, y: 0.6, z: skid.z - skid.r - 20 }, yaw: 0 });
   spawns.push({ name: 'ramps', position: { x: rampX, y: 0.6, z: 0 }, yaw: 0 });
   spawns.push({ name: 'bigjump', position: { x: rampX, y: 0.6, z: 250 }, yaw: 0 });
+  // 12 m before the start line so the first crossing starts the clock
+  spawns.push({ name: 'track', position: { x: track.start.x - Math.sin(track.start.yaw) * 12, y: 0.6, z: track.start.z - Math.cos(track.start.yaw) * 12 }, yaw: track.start.yaw });
 
-  return { statics, spawns, props, groundSize };
+  return { statics, spawns, props, groundSize, track };
 }

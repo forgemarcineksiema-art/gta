@@ -41,6 +41,11 @@ export class Hud {
   private readonly pause: HTMLElement;
   private readonly hints: HTMLElement;
   private readonly toast: HTMLElement;
+  private readonly lap: HTMLElement;
+  private readonly lapCurrent: HTMLElement;
+  private readonly lapLast: HTMLElement;
+  private readonly lapBest: HTMLElement;
+  private lapVisible = false;
   private debugVisible = false;
   private toastTimer = 0;
   private lastDebugAt = 0;
@@ -83,6 +88,24 @@ export class Hud {
 
     this.toast = el('div', 'hud__toast');
     this.root.appendChild(this.toast);
+
+    this.lap = el('div', 'hud__lap');
+    this.lapCurrent = el('div', 'hud__lap-current', '--:--.--');
+    const rowLast = el('div', 'hud__lap-row');
+    this.lapLast = el('span', '', '--');
+    rowLast.append(el('span', 'hud__lap-label', 'LAST'), this.lapLast);
+    const rowBest = el('div', 'hud__lap-row');
+    this.lapBest = el('span', '', '--');
+    rowBest.append(el('span', 'hud__lap-label', 'BEST'), this.lapBest);
+    this.lap.append(this.lapCurrent, rowLast, rowBest);
+    this.root.appendChild(this.lap);
+  }
+
+  /** Show the lap timer (on the test track). */
+  setLapVisible(v: boolean): void {
+    if (v === this.lapVisible) return;
+    this.lapVisible = v;
+    this.lap.classList.toggle('is-visible', v);
   }
 
   setHints(k: KeyHints): void {
@@ -151,6 +174,15 @@ export class Hud {
       if (this.toastTimer <= 0) this.toast.classList.remove('is-visible');
     }
 
+    const lap = sim.lap;
+    this.setLapVisible(lap.lapStartTick >= 0 || lap.best >= 0);
+    if (this.lapVisible) {
+      this.lapCurrent.textContent = lap.current >= 0 ? fmtLap(lap.current) : '--:--.--';
+      this.lapLast.textContent = lap.last >= 0 ? fmtLap(lap.last) : '--';
+      this.lapBest.textContent = lap.best >= 0 ? fmtLap(lap.best) : '--';
+      if (lap.justCompleted) this.showToast(lap.justBest ? `BEST LAP ${fmtLap(lap.last)}` : `LAP ${fmtLap(lap.last)}`, 2);
+    }
+
     if (this.debugVisible && info && now - this.lastDebugAt > 120) {
       this.lastDebugAt = now;
       this.debug.textContent =
@@ -162,6 +194,12 @@ export class Hud {
         `wheels ${tm.groundedWheels}/4  air ${tm.airTime.toFixed(2)} s  boost ${tm.boost.toFixed(2)}${tm.boosting ? ' ON' : ''}`;
     }
   }
+}
+
+function fmtLap(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds - m * 60;
+  return `${m}:${s.toFixed(2).padStart(5, '0')}`;
 }
 
 function el(tag: string, className: string, text?: string): HTMLElement {

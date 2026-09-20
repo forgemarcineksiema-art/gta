@@ -8,10 +8,11 @@ import { InputManager } from '../input/InputManager';
 import { KeyboardDevice } from '../input/KeyboardDevice';
 import { createPlatform, type Platform } from '../platform';
 import { Renderer } from '../render/Renderer';
-import { FIXED_DT, SimWorld, initPhysics } from '../sim';
+import { CAR_IDS, FIXED_DT, Recorder, SimWorld, initPhysics, type CarId, type RecordingJSON } from '../sim';
 import { DebugPanel } from '../ui/debugPanel';
 import { Hud } from '../ui/hud';
 import { BotDriver } from './bot';
+import { TrackBot } from './trackBot';
 import { FixedStepLoop } from './loop';
 import { PerfProbe, heapMb } from './perf';
 
@@ -42,7 +43,7 @@ export class App {
   private readonly audio: EngineAudio;
   private readonly panel: DebugPanel | null;
   private readonly loop = new FixedStepLoop(FIXED_DT, 5);
-  private readonly bot: BotDriver | null;
+  private readonly bot: BotDriver | TrackBot | null;
   private readonly perf: PerfProbe | null;
   private readonly handle: GameHandle;
   private readonly hintsUntil: number;
@@ -82,13 +83,46 @@ export class App {
       spawnAt: (name) => sim.spawnAt(name),
       refillBoost: () => (sim.vehicle.boostMeter = 1),
       onVehicleChange: () => sim.vehicle.applyTuning(),
+      cars: CAR_IDS,
+      currentCar: sim.carId,
+      selectCar: (car) => {
+        const url = new URL(location.href);
+        url.searchParams.set('car', car);
+        url.searchParams.set('dev', '1');
+        location.href = url.toString();
+      },
+      saveRecording: () => {
+        if (!sim.recorder) return;
+        const json = JSON.stringify(sim.recorder.toJSON(sim.carId, sim.spawnName));
+        const blob = new Blob([json], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `recording-${sim.carId}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      },
+      loadGhost: (text) => {
+        try {
+          const rec = Recorder.fromJSON(JSON.parse(text) as RecordingJSON);
+          // the ghost is the first full lap of the recording, or the whole stream when there is none
+          const from = rec.lapStarts[0] ?? 0;
+          const to = rec.lapStarts[1] ?? rec.ticks;
+          sim.bestLapPoses = rec.slicePoses(from, to);
+          this.hud.showToast('GHOST LOADED', 1.5);
+        } catch (e) {
+          console.warn('ghost load failed', e);
+          this.hud.showToast('BAD RECORDING', 1.5);
+        }
+      },
+      clearGhost: () => (sim.bestLapPoses = null),
       extra: { camera: this.renderer.chase.tuning as unknown as Record<string, number> },
     });
     this.hud.setDebugVisible(dev);
     if (dev) this.panel.setVisible(true);
 
-    const botOn = params.get('bot') === '1';
-    this.bot = botOn ? new BotDriver(Number(params.get('seed') ?? '42')) : null;
+    const botParam = params.get('bot');
+    const botOn = botParam === '1' || botParam === 'track';
+    this.bot = botParam === 'track' ? new TrackBot() : botOn ? new BotDriver(Number(params.get('seed') ?? '42')) : null;
     const duration = Number(params.get('duration') ?? '0');
     this.perf = botOn && duration > 0 ? new PerfProbe(duration) : null;
 
@@ -135,7 +169,9 @@ export class App {
     platform.loadingStart();
     await initPhysics();
     const spawn = params.get('spawn') ?? undefined;
-    const sim = new SimWorld(spawn ? { spawn } : {});
+    const carParam = params.get('car');
+    const car = (CAR_IDS as string[]).includes(carParam ?? '') ? (carParam as CarId) : undefined;
+    const sim = new SimWorld({ ...(spawn ? { spawn } : {}), ...(car ? { car } : {}) });
     const app = new App(platform, sim, canvas, params);
     platform.loadingStop();
     app.start();
@@ -206,6 +242,7 @@ export class App {
           if (st.pressed.reset) c.reset = true;
         }
         this.sim.step();
+        this.panel?.graphPush(this.sim.vehicle.telemetry);
       });
       this.stepMsLast = performance.now() - stepStart;
     }
@@ -220,6 +257,7 @@ export class App {
       this.platform.gameplayStart();
     }
 
+    this.panel?.graphDraw(now);
     const frameMs = performance.now() - frameStart;
     this.frameMsSmooth += (frameMs - this.frameMsSmooth) * 0.05;
     const stats = this.renderer.stats;

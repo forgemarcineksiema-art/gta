@@ -1,8 +1,11 @@
-export { SimWorld, FIXED_DT, FIXED_HZ, initPhysics, type SimWorldOptions } from './SimWorld';
+export { SimWorld, FIXED_DT, FIXED_HZ, initPhysics, type SimWorldOptions, type GhostPose } from './SimWorld';
 export { createControls, clearControls, type VehicleControls } from './controls';
 export { TransformBuffer } from './transforms';
 export { PALETTE } from './palette';
 export { STRAIGHT, type SpawnPoint } from './playground';
 export type { StaticDesc, DynamicDesc, ShapeDesc, Vec3, Quat } from './scene';
 export { DEFAULT_TUNING, cloneTuning, type VehicleTuning } from './vehicle/tuning';
+export { CAR_PRESETS, CAR_IDS, type CarId } from './vehicle/presets';
+export { Recorder, POSE_STRIDE, TELEMETRY_STRIDE, CONTROL_STRIDE, type RecordingJSON } from './recorder';
+export { LapTimer, type LapState, type TrackDef, type TrackSample } from './track';
 export { Vehicle, type VehicleTelemetry, type WheelState } from './vehicle/Vehicle';

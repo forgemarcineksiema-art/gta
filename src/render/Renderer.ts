@@ -4,8 +4,9 @@
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { PALETTE, type DynamicDesc, type ShapeDesc, type SimWorld, type StaticDesc } from '../sim';
+import { PALETTE, type DynamicDesc, type GhostPose, type ShapeDesc, type SimWorld, type StaticDesc } from '../sim';
 import { ChaseCamera } from './ChaseCamera';
+import { CAR_PROFILES } from './carProfiles';
 import { SpeedLines } from './SpeedLines';
 import { buildCarMesh, type CarMesh } from './carMesh';
 
@@ -35,6 +36,8 @@ export class Renderer {
   private readonly sim: SimWorld;
   private readonly dynamics: DynamicView[] = [];
   private readonly car: CarMesh;
+  private readonly ghost: CarMesh;
+  private readonly ghostPose: GhostPose = { x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1 };
   private readonly sun: THREE.DirectionalLight;
   private readonly speedLines: SpeedLines;
   private readonly tmpPos = new THREE.Vector3();
@@ -88,9 +91,37 @@ export class Renderer {
 
     this.buildStatics(sim.statics);
     for (const d of sim.dynamics) this.addDynamic(d);
-    this.car = buildCarMesh(sim.vehicle.tuning);
+    const profile = CAR_PROFILES[sim.carId];
+    this.car = buildCarMesh(sim.vehicle.tuning, profile);
     this.scene.add(this.car.root);
     for (const w of this.car.wheels) this.scene.add(w);
+    // the best-lap ghost: the same car, translucent, no shadow, wheels carried by the body
+    this.ghost = buildCarMesh(sim.vehicle.tuning, profile, PALETTE.carBlue);
+    this.ghost.root.traverse((o) => {
+      if (o instanceof THREE.Mesh) {
+        const m = (o.material as THREE.Material).clone();
+        m.transparent = true;
+        m.opacity = 0.35;
+        m.depthWrite = false;
+        o.material = m;
+        o.castShadow = false;
+      }
+    });
+    for (const w of this.ghost.wheels) {
+      w.traverse((o) => {
+        if (o instanceof THREE.Mesh) {
+          const m = (o.material as THREE.Material).clone();
+          m.transparent = true;
+          m.opacity = 0.35;
+          m.depthWrite = false;
+          o.material = m;
+          o.castShadow = false;
+        }
+      });
+      this.ghost.root.add(w);
+    }
+    this.ghost.root.visible = false;
+    this.scene.add(this.ghost.root);
 
     this.speedLines = new SpeedLines();
     this.scene.add(this.speedLines.object);
@@ -186,6 +217,16 @@ export class Renderer {
 
     this.chase.update(this.car.root, this.carVel, tm, dt, this.sim.respawned);
     this.car.update(tm);
+    // ghost of the best lap
+    if (this.sim.ghostPose(this.ghostPose)) {
+      const g = this.ghostPose;
+      this.ghost.root.visible = true;
+      this.ghost.root.position.set(g.x, g.y, g.z);
+      this.ghost.root.quaternion.set(g.qx, g.qy, g.qz, g.qw);
+      this.placeGhostWheels();
+    } else {
+      this.ghost.root.visible = false;
+    }
     // shadow frustum follows the car and widens with speed so fast driving keeps shadowed ground ahead
     const speed = Math.abs(tm.speed);
     const half = 40 + Math.min(60, speed * 1.2);
@@ -208,6 +249,20 @@ export class Renderer {
     this.renderer.render(this.scene, this.camera);
     this.stats.drawCalls = this.renderer.info.render.calls;
     this.stats.triangles = this.renderer.info.render.triangles;
+  }
+
+  /** Ghost wheels ride at their static positions relative to the ghost body. */
+  private placeGhostWheels(): void {
+    const t = this.sim.vehicle.tuning;
+    const wheels = this.sim.vehicle.wheels;
+    for (let i = 0; i < 4; i++) {
+      const w = this.ghost.wheels[i];
+      const ws = wheels[i];
+      if (!w || !ws) continue;
+      const drop = t.suspensionRestLength - (t.mass * (9.81 + t.extraGravity)) / 4 / t.suspensionStiffness;
+      w.position.set(ws.local.x, ws.local.y - drop, ws.local.z);
+      w.quaternion.identity();
+    }
   }
 
   dispose(): void {

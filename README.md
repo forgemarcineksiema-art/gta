@@ -14,7 +14,10 @@ Useful URLs:
 | URL | What |
 |---|---|
 | `/?dev=1` | debug HUD + live tuning panel (also the backtick key) |
-| `/?spawn=ramps` | start at a named spawn: `lot`, `straight`, `straight-far`, `kerbs`, `slalom`, `skidpad`, `ramps`, `bigjump` |
+| `/?spawn=ramps` | start at a named spawn: `lot`, `straight`, `straight-far`, `kerbs`, `slalom`, `skidpad`, `ramps`, `bigjump`, `track` |
+| `/?spawn=track&dev=1` | the test track: lap timer, best-lap ghost, telemetry graph, save recording / load ghost in the panel |
+| `/?car=compact` | vehicle class: `muscle` (default), `compact`, `heavy` (also buttons in the panel) |
+| `/?bot=track&spawn=track` | the track autopilot (its lap time is the tuning benchmark) |
 | `/?bot=1&seed=42&duration=60` | autopilot with the perf probe (`window.__perf`) |
 | `/?ad=error&adError=adblock` | force an ad error code in `LocalPlatform` (`?ad=off`, `?adblock=1` also work) |
 

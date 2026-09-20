@@ -104,6 +104,10 @@ export interface VehicleTelemetry {
   vx: number;
   vy: number;
   vz: number;
+  /** Acceleration in the car's frame, in g (longitudinal + = forward, lateral + = left). */
+  gLong: number;
+  gLat: number;
+  gVert: number;
 }
 
 const AXIS_Y: Readonly<Vec3> = { x: 0, y: 1, z: 0 };
@@ -184,6 +188,7 @@ export class Vehicle {
   private driftExitTimer = 0;
   private wasAirborne = false;
   private collidesWithTerrain = false;
+  private readonly prevVel = M.v3();
   readonly telemetry: VehicleTelemetry;
   /** Where `reset` puts the car: updated by the world (nearest spawn point). */
   resetPose: { position: Vec3; yaw: number };
@@ -269,6 +274,9 @@ export class Vehicle {
       vx: 0,
       vy: 0,
       vz: 0,
+      gLong: 0,
+      gLat: 0,
+      gVert: 0,
     };
     this.writeTransforms(true);
   }
@@ -824,6 +832,13 @@ export class Vehicle {
     tm.vx = s.vel.x;
     tm.vy = s.vel.y;
     tm.vz = s.vel.z;
+    // accelerations from the velocity change over the last step, in the car's frame
+    M.sub(s.a, s.vel, this.prevVel);
+    M.scale(s.a, s.a, 1 / (dt * 9.81));
+    tm.gLong = M.dot(s.a, s.fwd);
+    tm.gLat = -M.dot(s.a, s.right);
+    tm.gVert = s.a.y;
+    M.copy(this.prevVel, s.vel);
   }
 
   private spinFreeWheel(w: WheelState, driveTorque: number, brakeTorque: number, dt: number): void {
@@ -872,6 +887,7 @@ export class Vehicle {
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     this.steer = 0;
     this.steerRaw = 0;
+    M.set(this.prevVel, 0, 0, 0);
     this.drifting = false;
     this.bodySlipPrev = 0;
     this.airTime = 0;

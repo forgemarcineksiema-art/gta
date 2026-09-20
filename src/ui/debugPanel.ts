@@ -11,6 +11,8 @@ type Leaf = { path: string; get: () => number; set: (v: number) => void; def: nu
 export interface DebugPanelActions {
   spawnAt(name: string): void;
   refillBoost(): void;
+  /** Called after any vehicle value changes (structural values need a rebuild). */
+  onVehicleChange?: () => void;
   /** Extra numeric objects to expose (e.g. camera tuning), keyed by section title. */
   extra?: Record<string, Record<string, number>>;
 }
@@ -20,6 +22,7 @@ export class DebugPanel {
   private visible = false;
   private readonly inputs = new Map<string, HTMLInputElement>();
   private readonly leaves: Leaf[] = [];
+  private onChange: () => void = () => undefined;
 
   constructor(parent: HTMLElement, sim: SimWorld, actions: DebugPanelActions) {
     this.root = document.createElement('div');
@@ -58,7 +61,9 @@ export class DebugPanel {
     const body = document.createElement('div');
     body.className = 'devpanel__body';
     this.root.appendChild(body);
+    this.onChange = actions.onVehicleChange ?? (() => undefined);
     this.buildSection(body, 'vehicle', sim.vehicle.tuning as unknown as Record<string, unknown>, DEFAULT_TUNING as unknown as Record<string, unknown>, '');
+    this.onChange = () => undefined;
     if (actions.extra) {
       for (const [title, obj] of Object.entries(actions.extra)) {
         const defaults = { ...obj };
@@ -82,7 +87,16 @@ export class DebugPanel {
       const path = prefix ? `${prefix}.${key}` : key;
       if (typeof v === 'number') {
         const def = typeof defaults[key] === 'number' ? (defaults[key]) : v;
-        const leaf: Leaf = { path, get: () => obj[key] as number, set: (n) => (obj[key] = n), def };
+        const changed = this.onChange;
+        const leaf: Leaf = {
+          path,
+          get: () => obj[key] as number,
+          set: (n) => {
+            obj[key] = n;
+            changed();
+          },
+          def,
+        };
         this.leaves.push(leaf);
         const row = document.createElement('label');
         row.className = 'devpanel__row';

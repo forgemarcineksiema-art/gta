@@ -135,7 +135,7 @@ export class Hud {
       this.speed.textContent = speedText;
       this.lastSpeedText = speedText;
     }
-    const gearText = tm.speed < -0.5 ? 'R' : String(tm.gear);
+    const gearText = tm.gear === -1 ? 'R' : String(tm.gear);
     if (gearText !== this.lastGearText) {
       this.gear.textContent = gearText;
       this.lastGearText = gearText;
@@ -157,7 +157,7 @@ export class Hud {
         `fps ${info.fps.toFixed(0)}  frame ${info.frameMs.toFixed(2)} ms  step ${info.stepMs.toFixed(2)} ms  steps/frame ${info.steps}\n` +
         `draw ${info.drawCalls}  tris ${(info.triangles / 1000).toFixed(1)}k  heap ${info.heapMb.toFixed(0)} MB  dpr ${info.dpr.toFixed(2)}\n` +
         `tick ${info.tick}  t ${sim.time.toFixed(1)} s\n` +
-        `speed ${tm.speedKmh.toFixed(1)} km/h  gear ${tm.gear}  rpm ${tm.rpm.toFixed(0)}  load ${tm.load.toFixed(2)}\n` +
+        `speed ${tm.speedKmh.toFixed(1)} km/h  gear ${tm.gear}${tm.shifting ? '*' : ''}  rpm ${tm.rpm.toFixed(0)}  load ${tm.load.toFixed(2)}  slip ratio ${tm.minSlipRatio.toFixed(2)}..${tm.maxSlipRatio.toFixed(2)}\n` +
         `steer ${tm.steerDeg.toFixed(1)}°  slip ${tm.maxSlipDeg.toFixed(1)}°  drift ${tm.drifting ? 'YES' : 'no'} ${tm.driftAngleDeg.toFixed(0)}°\n` +
         `wheels ${tm.groundedWheels}/4  air ${tm.airTime.toFixed(2)} s  boost ${tm.boost.toFixed(2)}${tm.boosting ? ' ON' : ''}`;
     }

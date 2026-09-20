@@ -1,10 +1,22 @@
 /**
- * Arcade raycast car on a Rapier rigid body.
+ * Arcade car on a Rapier rigid body, built from physical parts with explicit,
+ * tunable assists on top.
  *
- * One dynamic body (the chassis) with four raycast suspensions. Each grounded
- * wheel pushes the chassis up with a spring-damper and applies lateral /
- * longitudinal tyre forces from a simplified slip model with an explicit drift
- * state. No wheel bodies, no joints: cheap, stable, and fully tunable.
+ *  - Chassis: one dynamic body with a cuboid collider and explicit mass properties.
+ *  - Suspension: four raycasts, spring + split damping + bump stop + anti-roll.
+ *  - Engine: torque curve over rpm, five automatic gears, reverse, rev limiter,
+ *    engine braking. Engine rpm follows the driven wheels.
+ *  - Wheels: each wheel has its own angular velocity. Longitudinal tyre force
+ *    comes from the slip ratio and drives the wheel ODE, integrated implicitly so
+ *    it is stable at 60 Hz even at standstill (burnouts and lock-ups emerge).
+ *  - Tyres: lateral force from the slip angle with a peak-and-tail curve, a
+ *    friction circle with the longitudinal force, and an impulse clamp so slow
+ *    manoeuvres never chatter.
+ *  - Assists: traction control, ABS, and a drift controller (yaw-rate command +
+ *    velocity follow) that can each be scaled down to 0 to feel the raw model.
+ *
+ * Frame: +Z forward, +Y up, +X is the car's LEFT (right-handed). A positive
+ * rotation about +Y turns the nose to the left, so "steer right" rotates by -steer.
  */
 import RAPIER from '@dimforge/rapier3d-compat';
 import type { VehicleControls } from '../controls';
@@ -13,11 +25,15 @@ import type { Vec3 } from '../math';
 import type { TransformBuffer } from '../transforms';
 import type { VehicleTuning } from './tuning';
 
+const WHEEL_FR = 0;
+const WHEEL_FL = 1;
 const WHEEL_RR = 2;
 const WHEEL_RL = 3;
+const WHEEL_SUBSTEPS = 2;
+const RPM_PER_RAD_S = 60 / (2 * Math.PI);
 
 export interface WheelState {
-  /** Local attach point. */
+  /** Local attach point (recomputed by applyTuning). */
   local: Vec3;
   isFront: boolean;
   isLeft: boolean;
@@ -32,9 +48,15 @@ export interface WheelState {
   normal: Vec3;
   /** Wheel centre (world) for the renderer. */
   center: Vec3;
+  /** Steering angle of this wheel (rad, + = right). */
+  steer: number;
+  /** Wheel angular velocity, rad/s (+ = rolling forward). */
+  omega: number;
   /** Slip angle in radians (unsigned). */
   slipAngle: number;
-  /** Forward speed of the contact patch along the wheel plane, m/s. */
+  /** Longitudinal slip ratio (+ driving, - braking; -1 = locked). */
+  slipRatio: number;
+  /** Contact patch speeds along the wheel plane, m/s. */
   forwardSpeed: number;
   lateralSpeed: number;
   /** Rolling angle for the visual wheel. */
@@ -55,6 +77,7 @@ export interface VehicleTelemetry {
   groundedWheels: number;
   steer: number;
   steerDeg: number;
+  /** Current gear: 1..n, or -1 in reverse. */
   gear: number;
   rpm: number;
   /** 0..1 engine load for audio. */
@@ -65,18 +88,20 @@ export interface VehicleTelemetry {
   driftTime: number;
   /** Largest tyre slip angle this step, degrees (for skid audio). */
   maxSlipDeg: number;
+  /** Largest driven-wheel slip ratio this step (wheelspin), and the most negative of all wheels (lock-up). */
+  maxSlipRatio: number;
+  minSlipRatio: number;
+  /** True during the torque cut of a gear change. */
+  shifting: boolean;
   /** World velocity, m/s. */
   vx: number;
   vy: number;
   vz: number;
 }
 
-// Right-handed frame with +Z forward and +Y up puts +X on the car's LEFT, so right is -X.
-// Consequently a positive rotation about +Y turns the nose to the left; steering right
-// therefore rotates by -steer (see `steerYaw`).
-const AXIS_RIGHT: Readonly<Vec3> = { x: -1, y: 0, z: 0 };
 const AXIS_Y: Readonly<Vec3> = { x: 0, y: 1, z: 0 };
 const AXIS_Z: Readonly<Vec3> = { x: 0, y: 0, z: 1 };
+const AXIS_RIGHT: Readonly<Vec3> = { x: -1, y: 0, z: 0 };
 
 const scratch = {
   pos: M.v3(),
@@ -100,12 +125,12 @@ const scratch = {
 
 export class Vehicle {
   readonly body: RAPIER.RigidBody;
-  readonly collider: RAPIER.Collider;
+  collider: RAPIER.Collider;
   readonly wheels: WheelState[] = [];
   readonly slot: number;
   tuning: VehicleTuning;
 
-  /** Current steering angle at the front wheels, radians (+ = right). */
+  /** Commanded steering angle at the front axle (bicycle model), radians (+ = right). */
   steer = 0;
   drifting = false;
   driftTime = 0;
@@ -113,11 +138,15 @@ export class Vehicle {
   boosting = false;
   airTime = 0;
   flippedTime = 0;
+  /** 1..n forward, -1 reverse. */
   gear = 1;
   rpm: number;
+  shiftTimer = 0;
   /** Blended grip multipliers (drop instantly, recover at gripBlendRate). */
   rearGripMul = 1;
   frontGripMul = 1;
+  /** Body slip angle of the previous step, radians (drift controller damping). */
+  private bodySlipPrev = 0;
   readonly telemetry: VehicleTelemetry;
   /** Where `reset` puts the car: updated by the world (nearest spawn point). */
   resetPose: { position: Vec3; yaw: number };
@@ -143,29 +172,19 @@ export class Vehicle {
       .setCcdEnabled(true)
       .setCanSleep(false);
     this.body = world.createRigidBody(desc);
-
-    const he = tuning.chassisHalfExtents;
-    const colliderDesc = RAPIER.ColliderDesc.cuboid(he.x, he.y, he.z)
-      .setTranslation(0, tuning.chassisOffsetY, 0)
-      .setFriction(0.3)
-      .setRestitution(0.05)
-      .setMassProperties(tuning.mass, { x: 0, y: tuning.centerOfMassY, z: 0 }, boxInertia(tuning), { x: 0, y: 0, z: 0, w: 1 });
-    this.collider = world.createCollider(colliderDesc, this.body);
+    this.collider = world.createCollider(this.colliderDesc(), this.body);
 
     this.slot = transforms.allocate();
-    const hb = tuning.wheelBase * 0.5;
-    const ht = tuning.trackWidth * 0.5;
-    const ay = tuning.suspensionAttachY;
     // order: FR, FL, RR, RL (x = -ht is the right side)
-    const defs: Array<[number, number, boolean, boolean]> = [
-      [-ht, hb, true, false],
-      [ht, hb, true, true],
-      [-ht, -hb, false, false],
-      [ht, -hb, false, true],
+    const defs: Array<[boolean, boolean]> = [
+      [true, false],
+      [true, true],
+      [false, false],
+      [false, true],
     ];
-    for (const [x, z, isFront, isLeft] of defs) {
+    for (const [isFront, isLeft] of defs) {
       this.wheels.push({
-        local: M.v3(x, ay, z),
+        local: M.v3(),
         isFront,
         isLeft,
         grounded: false,
@@ -174,13 +193,17 @@ export class Vehicle {
         contact: M.v3(),
         normal: M.v3(0, 1, 0),
         center: M.v3(),
+        steer: 0,
+        omega: 0,
         slipAngle: 0,
+        slipRatio: 0,
         forwardSpeed: 0,
         lateralSpeed: 0,
         spin: 0,
         slot: transforms.allocate(),
       });
     }
+    this.placeWheels();
     this.ray = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
     this.telemetry = {
       speed: 0,
@@ -200,11 +223,41 @@ export class Vehicle {
       airTime: 0,
       driftTime: 0,
       maxSlipDeg: 0,
+      maxSlipRatio: 0,
+      minSlipRatio: 0,
+      shifting: false,
       vx: 0,
       vy: 0,
       vz: 0,
     };
     this.writeTransforms(true);
+  }
+
+  private colliderDesc(): RAPIER.ColliderDesc {
+    const t = this.tuning;
+    const he = t.chassisHalfExtents;
+    return RAPIER.ColliderDesc.cuboid(he.x, he.y, he.z)
+      .setTranslation(0, t.chassisOffsetY, 0)
+      .setFriction(0.3)
+      .setRestitution(0.05)
+      .setMassProperties(t.mass, { x: 0, y: t.centerOfMassY, z: 0 }, boxInertia(t), { x: 0, y: 0, z: 0, w: 1 });
+  }
+
+  private placeWheels(): void {
+    const t = this.tuning;
+    const hb = t.wheelBase * 0.5;
+    const ht = t.trackWidth * 0.5;
+    for (const w of this.wheels) {
+      M.set(w.local, w.isLeft ? ht : -ht, t.suspensionAttachY, w.isFront ? hb : -hb);
+    }
+  }
+
+  /** Re-applies structural tuning (mass, inertia, collider size, wheel positions) to the live body. */
+  applyTuning(): void {
+    this.world.removeCollider(this.collider, false);
+    this.collider = this.world.createCollider(this.colliderDesc(), this.body);
+    this.body.setAngularDamping(this.tuning.angularDamping);
+    this.placeWheels();
   }
 
   /** Apply one fixed step of vehicle forces. Call before `world.step()`. */
@@ -231,11 +284,13 @@ export class Vehicle {
     const forwardSpeed = M.dot(s.vel, s.fwd);
     const speed = M.length(s.vel);
     const absFwd = Math.abs(forwardSpeed);
+    const throttle = M.clamp01(controls.throttle);
+    const brakeIn = M.clamp01(controls.brake);
+    const handbrake = controls.handbrake > 0.5;
 
-    // ---- steering: rate limited, speed sensitive ---------------------------
+    // ---- steering: rate limited, speed sensitive, Ackermann ------------------
     const authority = M.smoothstep(absFwd / t.steerSpeedRef);
-    let maxSteer = M.lerp(t.maxSteerDegLow, t.maxSteerDegHigh, authority) * M.DEG;
-    if (this.drifting) maxSteer = Math.min(t.driftMaxSteerDeg * M.DEG, maxSteer * t.driftSteerMul);
+    const maxSteer = M.lerp(t.maxSteerDegLow, t.maxSteerDegHigh, authority) * M.DEG;
     const target = M.clamp(controls.steer, -1, 1) * maxSteer;
     const returning = Math.abs(target) < Math.abs(this.steer) || Math.sign(target) !== Math.sign(this.steer);
     const rate = (returning ? t.steerReturnRate : t.steerRate) * (t.maxSteerDegLow * M.DEG);
@@ -243,11 +298,7 @@ export class Vehicle {
 
     // ---- boost --------------------------------------------------------------
     this.boosting = controls.boost > 0.5 && this.boostMeter > 0;
-    if (this.boosting) {
-      this.boostMeter = Math.max(0, this.boostMeter - t.boostDrain * dt);
-    }
-    const driveMul = this.boosting ? t.boostForceMul : 1;
-    const vmax = this.boosting ? t.boostMaxSpeed : t.maxSpeed;
+    if (this.boosting) this.boostMeter = Math.max(0, this.boostMeter - t.boostDrain * dt);
 
     // ---- suspension raycasts --------------------------------------------------
     M.scale(s.rayDir, s.up, -1);
@@ -296,7 +347,6 @@ export class Vehicle {
       f += (vAlongRay > 0 ? t.suspensionDampingCompression : t.suspensionDampingRebound) * vAlongRay;
       const over = w.compression - t.suspensionRestLength;
       if (over > 0) f += t.bumpStopStiffness * over;
-      // anti-roll bar: couple with the other wheel on the same axle
       const other = this.wheels[i ^ 1] as WheelState;
       if (other.grounded) f += t.antiRollStiffness * (w.compression - other.compression);
       if (f < 0) f = 0;
@@ -308,7 +358,6 @@ export class Vehicle {
     // ---- drift state ----------------------------------------------------------
     const rl = this.wheels[WHEEL_RL] as WheelState;
     const rr = this.wheels[WHEEL_RR] as WheelState;
-    const handbrake = controls.handbrake > 0.5;
     const rearGrounded = rl.grounded || rr.grounded;
     M.set(s.rearLocal, 0, 0, -t.wheelBase * 0.5);
     M.rotate(s.a, s.q, s.rearLocal);
@@ -325,35 +374,116 @@ export class Vehicle {
       } else if (this.drifting && !handbrake && this.driftTime > t.driftMinTime && rearSlip < t.driftExitDeg * M.DEG) {
         this.drifting = false;
       }
-    } else if (absFwd <= t.driftMinSpeed * 0.7 || !rearGrounded) {
+    } else if (absFwd <= t.driftMinSpeed * 0.7 || grounded === 0) {
+      // too slow, or fully airborne; a briefly lifted inner rear wheel does not end a drift
       this.drifting = false;
     }
     if (this.drifting) this.driftTime += dt;
-    // grip multipliers blend so a released handbrake or an ending drift never snaps the rear
+    // front wheels: Ackermann on the commanded angle; in a drift they align with the velocity
+    // (automatic counter-steer, what a drifting car visibly does) plus a share of the input
+    const bodySlip = bodySlipDeg * M.DEG;
+    if (this.drifting && t.driftAutoCounterSteer > 0 && absFwd > t.driftMinSpeed) {
+      // velocity left of the nose (bodySlip > 0) -> wheels turn left (negative steer): steer = bodySlip... sign: + is right
+      const aligned = bodySlip + M.clamp(controls.steer, -1, 1) * 0.25 * t.maxSteerDegLow * M.DEG;
+      this.applyAckermann(M.lerp(this.steer, M.clamp(aligned, -0.9, 0.9), t.driftAutoCounterSteer));
+    } else {
+      this.applyAckermann(this.steer);
+    }
     const rearTarget = handbrake ? t.handbrakeGripMul : this.drifting ? t.driftGripMul : 1;
     const frontTarget = this.drifting ? t.driftFrontGripMul : 1;
     const blend = t.gripBlendRate * dt;
     this.rearGripMul = rearTarget < this.rearGripMul ? rearTarget : M.moveToward(this.rearGripMul, rearTarget, blend);
     this.frontGripMul = frontTarget < this.frontGripMul ? frontTarget : M.moveToward(this.frontGripMul, frontTarget, blend);
 
-    // ---- tyre forces --------------------------------------------------------
-    const throttle = M.clamp01(controls.throttle);
-    const brake = M.clamp01(controls.brake);
-    const speedRatio = M.clamp01(absFwd / vmax);
-    const driveAvailable = t.driveForce * driveMul * (1 - Math.pow(speedRatio, t.driveFalloffExp));
-    const comHeight = t.chassisOffsetY + t.centerOfMassY;
-    let maxSlip = 0;
+    // ---- engine, gearbox, brakes: torques per wheel -----------------------------
+    // reverse engages from a near-standstill with the brake pedal; throttle leaves it
+    if (this.gear !== -1 && brakeIn > 0.5 && throttle === 0 && absFwd < 0.5) this.gear = -1;
+    if (this.gear === -1 && (throttle > 0 || forwardSpeed > 0.5)) {
+      this.gear = 1;
+      this.shiftTimer = 0;
+    }
+    const drivePedal = this.gear === -1 ? brakeIn : throttle;
+    const brakePedal = this.gear === -1 ? 0 : brakeIn;
+    const ratio = (this.gear === -1 ? -t.reverseRatio : (t.gearRatios[this.gear - 1] ?? 1)) * t.finalDrive;
+
+    // engine rpm follows the driven wheels; below idle the clutch slips
+    let drivenOmega = 0;
+    let drivenCount = 0;
     for (const w of this.wheels) {
+      const share = w.isFront ? t.driveFrontShare : 1 - t.driveFrontShare;
+      if (share > 0) {
+        drivenOmega += w.omega;
+        drivenCount++;
+      }
+    }
+    drivenOmega = drivenCount > 0 ? drivenOmega / drivenCount : 0;
+    const wheelRpm = Math.abs(drivenOmega * ratio) * RPM_PER_RAD_S;
+    const targetRpm = Math.max(t.idleRpm, Math.min(t.redlineRpm * 1.05, wheelRpm));
+    // small lag on the reported rpm (engine inertia) so the note does not jitter
+    this.rpm += (targetRpm - this.rpm) * (1 - Math.exp(-dt / Math.max(0.01, t.engineInertia * 0.2)));
+
+    // automatic shifting with a torque cut
+    if (this.shiftTimer > 0) this.shiftTimer = Math.max(0, this.shiftTimer - dt);
+    if (this.gear > 0 && this.shiftTimer === 0 && grounded > 0) {
+      if (wheelRpm > t.redlineRpm * t.shiftUpAt && this.gear < t.gearRatios.length) {
+        this.gear++;
+        this.shiftTimer = t.shiftTime;
+      } else if (wheelRpm < t.redlineRpm * t.shiftDownAt && this.gear > 1) {
+        this.gear--;
+        this.shiftTimer = t.shiftTime;
+      }
+    }
+    const shifting = this.shiftTimer > 0;
+
+    // engine torque at the crank
+    let crankTorque = 0;
+    if (drivePedal > 0 && !shifting && wheelRpm < t.redlineRpm) {
+      crankTorque = drivePedal * t.torqueMax * torqueCurve(t, Math.max(t.idleRpm, wheelRpm)) * (this.boosting ? t.boostTorqueMul : 1);
+      if (this.gear === -1 && absFwd > t.maxReverseSpeed) crankTorque = 0;
+    } else if (drivePedal === 0) {
+      crankTorque = -t.engineBrakeTorque * (wheelRpm / t.redlineRpm);
+    }
+    // traction control: ease off when the driven wheels spin
+    let tcCut = 1;
+    if (t.tractionControl > 0 && crankTorque > 0) {
+      let worst = 0;
+      for (const w of this.wheels) {
+        const share = w.isFront ? t.driveFrontShare : 1 - t.driveFrontShare;
+        if (share > 0 && w.grounded) worst = Math.max(worst, w.slipRatio);
+      }
+      const excess = (worst - t.slipRatioPeak * 1.5) / (t.slipRatioPeak * 2);
+      if (excess > 0) tcCut = Math.max(1 - t.tractionControl, 1 - excess * t.tractionControl);
+    }
+    const axleTorque = crankTorque * ratio * t.drivetrainEfficiency * tcCut;
+
+    // ---- tyres: per wheel, with the wheel ODE integrated implicitly -------------
+    const comHeight = t.chassisOffsetY + t.centerOfMassY;
+    let maxSlipAng = 0;
+    let maxSlipRatio = -1;
+    let minSlipRatio = 1;
+    const h = dt / WHEEL_SUBSTEPS;
+    const wheelMass = t.mass * 0.25 * 0.6; // effective mass behind one contact patch, conservative
+    for (const w of this.wheels) {
+      const share = w.isFront ? t.driveFrontShare : 1 - t.driveFrontShare;
+      const driveTorque = axleTorque * share * 0.5; // open differential: equal split
+      const bias = w.isFront ? t.brakeFrontBias : 1 - t.brakeFrontBias;
+      const pedalTorque = brakePedal * t.brakeTorque * bias * 0.5;
+      const handTorque = handbrake && !w.isFront ? t.handbrakeTorque : 0;
+      const brakeTorque = pedalTorque + handTorque;
+
       if (!w.grounded) {
+        this.spinFreeWheel(w, driveTorque, brakeTorque, dt);
         w.slipAngle = 0;
+        w.slipRatio = 0;
         w.forwardSpeed = forwardSpeed;
         w.lateralSpeed = 0;
-        w.spin += (forwardSpeed / t.wheelRadius) * dt;
+        w.spin += w.omega * dt;
         continue;
       }
-      // wheel frame on the contact plane
-      if (w.isFront && this.steer !== 0) {
-        M.quatSetAxisAngle(s.q2, s.up.x, s.up.y, s.up.z, -this.steer);
+
+      // wheel frame on the contact plane (fronts steered; right = -steer about up)
+      if (w.isFront && w.steer !== 0) {
+        M.quatSetAxisAngle(s.q2, s.up.x, s.up.y, s.up.z, -w.steer);
         M.rotate(s.wheelFwd, s.q2, s.fwd);
       } else {
         M.copy(s.wheelFwd, s.fwd);
@@ -369,50 +499,51 @@ export class Vehicle {
       const vLat = M.dot(s.b, s.wheelRight);
       w.forwardSpeed = vFwd;
       w.lateralSpeed = vLat;
-      w.slipAngle = Math.atan2(Math.abs(vLat), Math.max(0.3, Math.abs(vFwd)));
-      if (w.slipAngle > maxSlip) maxSlip = w.slipAngle;
-      w.spin += (vFwd / t.wheelRadius) * dt;
 
-      // grip budget
       const mu = w.isFront ? t.muFront * this.frontGripMul : t.muRear * this.rearGripMul;
-      // slip curve: linear to the peak, then decays to the tail (a sliding tyre grips less)
-      const peak = t.slipPeakDeg * M.DEG;
-      const over = w.slipAngle - peak;
-      const curve = over <= 0 ? 1 : 1 - (1 - t.slipTail) * M.clamp01(over / (60 * M.DEG - peak));
-      const maxF = mu * w.load * curve;
+      const muLoad = mu * w.load;
+      const r = t.wheelRadius;
+      const vRef = Math.max(Math.abs(vFwd), t.slipLowSpeed);
 
-      // lateral
-      let fLat = -vLat * t.latStiffness * w.load;
+      // --- lateral: slip angle -> force, peak/tail curve, impulse clamp
+      w.slipAngle = Math.atan2(Math.abs(vLat), Math.max(Math.abs(vFwd), 0.5));
+      if (w.slipAngle > maxSlipAng) maxSlipAng = w.slipAngle;
+      const peakA = t.slipAngPeakDeg * M.DEG;
+      const latCurve = w.slipAngle <= peakA ? w.slipAngle / peakA : 1 - (1 - t.slipAngTail) * M.clamp01((w.slipAngle - peakA) / (60 * M.DEG - peakA));
+      let fLat = -Math.sign(vLat) * muLoad * latCurve;
+      const latImpulseCap = (wheelMass * Math.abs(vLat)) / dt;
+      if (Math.abs(fLat) > latImpulseCap) fLat = -Math.sign(vLat) * latImpulseCap;
 
-      // longitudinal
+      // --- longitudinal: wheel angular velocity solved per substep against the slip-ratio tyre
       let fLong = 0;
-      const share = w.isFront ? t.driveFrontShare : 1 - t.driveFrontShare;
-      if (share > 0 && throttle > 0) {
-        fLong += throttle * driveAvailable * share * 0.5;
+      for (let sub = 0; sub < WHEEL_SUBSTEPS; sub++) {
+        const kappaPrev = (w.omega * r - vFwd) / vRef;
+        let bt = brakeTorque;
+        // ABS: release the pedal brake on a wheel that is locking (the handbrake is meant to lock)
+        if (t.abs > 0 && pedalTorque > 0 && kappaPrev < -t.slipRatioPeak * 2) bt = pedalTorque * (1 - t.abs) + handTorque;
+        const dir = w.omega !== 0 ? Math.sign(w.omega) : Math.sign(vFwd || 1);
+        const torque = driveTorque - dir * bt;
+        let omegaNew = solveWheel(t, w.omega, torque, vFwd, vRef, muLoad, h);
+        // a brake can stop a wheel but never spin it the other way
+        if (bt > 0 && omegaNew * dir < 0) omegaNew = 0;
+        w.omega = omegaNew;
+        w.slipRatio = (w.omega * r - vFwd) / vRef;
+        longForce(t, w.slipRatio, muLoad);
+        fLong = lfForce;
       }
-      if (brake > 0) {
-        if (forwardSpeed > 0.5) {
-          fLong -= brake * t.brakeForce * 0.25;
-        } else if (share > 0) {
-          const revRatio = M.clamp01(absFwd / t.maxReverseSpeed);
-          fLong -= brake * t.reverseForce * share * 0.5 * (1 - revRatio);
-        }
-      }
-      if (throttle === 0 && brake === 0) {
-        fLong -= Math.sign(vFwd) * Math.min(Math.abs(vFwd) * 400, t.engineBrakeForce * 0.25);
-      }
-      if (handbrake && !w.isFront) {
-        fLong -= Math.sign(vFwd) * Math.min(Math.abs(vFwd) * 2500, t.handbrakeForce * 0.5);
-      }
-      fLong -= Math.sign(vFwd) * Math.min(Math.abs(vFwd) * 100, t.rollingResistance * 0.25);
+      if (share > 0 && w.slipRatio > maxSlipRatio) maxSlipRatio = w.slipRatio;
+      if (w.slipRatio < minSlipRatio) minSlipRatio = w.slipRatio;
+      // rolling resistance
+      fLong -= Math.sign(vFwd) * Math.min(Math.abs(vFwd) * 200, t.rollingResistance * w.load);
 
-      // friction circle
+      // --- friction circle
       const mag = Math.hypot(fLat, fLong);
-      if (mag > maxF && mag > 0) {
-        const k = maxF / mag;
-        fLat *= k;
-        fLong *= k;
+      if (mag > muLoad && mag > 0) {
+        const kk = muLoad / mag;
+        fLat *= kk;
+        fLong *= kk;
       }
+      w.spin += w.omega * dt;
 
       M.scale(s.force, s.wheelRight, fLat);
       M.addScaled(s.force, s.force, s.wheelFwd, fLong);
@@ -421,43 +552,45 @@ export class Vehicle {
       body.addForceAtPoint(s.force, s.point, true);
     }
 
-    // ---- drift assists ---------------------------------------------------------
-    // While drifting the car is steered by a yaw-rate controller and the velocity
-    // vector is pulled toward the nose: holding steer gives a stable angle, centring
-    // straightens out, counter-steer straightens faster. Speed is kept on purpose.
-    if (this.drifting) {
-      const yawRate = M.dot(s.angvel, s.up);
-      const targetYaw = -M.clamp(controls.steer, -1, 1) * t.driftYawRate; // right = negative yaw
-      const torque = M.clamp((targetYaw - yawRate) * t.driftYawGain, -t.driftYawTorqueMax, t.driftYawTorqueMax);
+    // ---- boost thrust ---------------------------------------------------------
+    if (this.boosting && grounded > 0) {
+      M.scale(s.force, s.fwd, t.boostThrust);
+      body.addForce(s.force, true);
+    }
+
+    // ---- drift assists (arcade layer) -------------------------------------------
+    if (this.drifting && t.driftAssist > 0) {
+      // the stick sets the drift angle: steer right (+) -> nose right of the velocity -> negative body slip
+      const targetSlip = -M.clamp(controls.steer, -1, 1) * t.driftMaxAngleDeg * M.DEG;
+      const err = targetSlip - bodySlip;
+      const slipRate = (bodySlip - this.bodySlipPrev) / dt;
+      const torque = M.clamp(err * t.driftAngleGain - slipRate * t.driftAngleDamping, -t.driftYawTorqueMax, t.driftYawTorqueMax) * t.driftAssist;
       M.scale(s.force, s.up, torque);
       body.addTorque(s.force, true);
 
-      // horizontal velocity and horizontal nose direction
       M.set(s.a, s.vel.x, 0, s.vel.z);
       const speedH = M.length(s.a);
       M.set(s.b, s.fwd.x, 0, s.fwd.z);
       M.normalize(s.b, s.b);
       if (speedH > 1 && M.dot(s.a, s.b) > 0) {
-        // velocity follow: accelerate toward (nose * speedH), capped
         M.scale(s.b, s.b, speedH);
         M.sub(s.b, s.b, s.a);
-        M.scale(s.b, s.b, t.driftVelocityFollow);
+        M.scale(s.b, s.b, t.driftVelocityFollow * t.driftAssist);
         const accel = M.length(s.b);
         if (accel > t.driftFollowAccelMax) M.scale(s.b, s.b, t.driftFollowAccelMax / accel);
         M.scale(s.force, s.b, t.mass);
         body.addForce(s.force, true);
-        // scrub: lose speed with the slip angle
         const slip = Math.abs(Math.sin(bodySlipDeg * M.DEG));
         M.scale(s.force, s.a, -t.mass * t.driftSpeedLoss * slip);
         body.addForce(s.force, true);
       }
-      if (throttle > 0 && absFwd < vmax) {
-        M.scale(s.force, s.fwd, throttle * driveAvailable * t.driftThrottleGain);
+      if (throttle > 0 && grounded > 0) {
+        M.scale(s.force, s.fwd, throttle * t.driftThrottlePush * t.driftAssist);
         body.addForce(s.force, true);
       }
     }
 
-    // ---- aero, extra gravity --------------------------------------------------
+    // ---- aero, extra gravity, rest damping --------------------------------------
     if (speed > 0.1) {
       M.scale(s.force, s.vel, -t.drag * speed);
       body.addForce(s.force, true);
@@ -468,13 +601,18 @@ export class Vehicle {
     }
     M.set(s.force, 0, -t.extraGravity * t.mass, 0);
     body.addForce(s.force, true);
+    if (grounded > 0 && speed < 0.5 && throttle === 0 && brakeIn === 0 && !handbrake) {
+      M.scale(s.force, s.vel, -t.restDamping * t.mass);
+      body.addForce(s.force, true);
+      M.scale(s.force, s.angvel, -t.restDamping * t.mass * 0.5);
+      body.addTorque(s.force, true);
+    }
 
     // ---- air control and levelling -------------------------------------------
     const airborne = grounded === 0;
     if (airborne) {
       this.airTime += dt;
-      // throttle lifts the nose, brake drops it; steer rolls. Levelling always acts.
-      const pitchIn = throttle - brake; // positive torque about `right` (-X) lifts the nose
+      const pitchIn = throttle - brakeIn; // positive torque about `right` (-X) lifts the nose
       const rollIn = controls.steer; // positive roll about +Z drops the right side
       M.scale(s.force, s.right, pitchIn * t.airPitchTorque);
       M.addScaled(s.force, s.force, s.fwd, rollIn * t.airRollTorque);
@@ -502,7 +640,7 @@ export class Vehicle {
       this.flippedTime = 0;
     }
 
-    this.updateGearbox(absFwd, throttle, vmax, dt);
+    this.bodySlipPrev = bodySlip;
 
     // ---- telemetry ----------------------------------------------------------
     const tm = this.telemetry;
@@ -519,27 +657,54 @@ export class Vehicle {
     tm.gear = this.gear;
     tm.rpm = this.rpm;
     tm.throttle = throttle;
-    tm.load = M.clamp01(throttle * (1 - 0.6 * speedRatio) + (this.boosting ? 0.3 : 0));
+    tm.load = shifting ? 0 : M.clamp01((crankTorque > 0 ? drivePedal : 0) * (0.5 + 0.5 * torqueCurve(t, this.rpm)) + (this.boosting ? 0.3 : 0));
     tm.airTime = this.airTime;
     tm.driftTime = this.driftTime;
-    tm.maxSlipDeg = maxSlip / M.DEG;
+    tm.maxSlipDeg = maxSlipAng / M.DEG;
+    tm.maxSlipRatio = maxSlipRatio;
+    tm.minSlipRatio = minSlipRatio;
+    tm.shifting = shifting;
     tm.vx = s.vel.x;
     tm.vy = s.vel.y;
     tm.vz = s.vel.z;
   }
 
-  private updateGearbox(absFwd: number, throttle: number, vmax: number, dt: number): void {
+  private spinFreeWheel(w: WheelState, driveTorque: number, brakeTorque: number, dt: number): void {
     const t = this.tuning;
-    const n = t.gearCount;
-    const top = (g: number) => vmax * Math.pow(g / n, 0.8);
-    while (this.gear < n && absFwd > top(this.gear) * 0.97) this.gear++;
-    while (this.gear > 1 && absFwd < top(this.gear - 1) * 0.8) this.gear--;
-    const lo = this.gear === 1 ? 0 : top(this.gear - 1) * 0.8;
-    const hi = top(this.gear);
-    const ratio = M.clamp01((absFwd - lo) / Math.max(0.1, hi - lo));
-    let targetRpm = t.idleRpm + (t.redlineRpm - t.idleRpm) * ratio;
-    if (absFwd < 0.5) targetRpm = t.idleRpm + throttle * (t.redlineRpm - t.idleRpm) * 0.6;
-    this.rpm = M.lerp(this.rpm, targetRpm, 1 - Math.exp(-dt * 12));
+    const brakeSigned = -Math.sign(w.omega) * Math.min(brakeTorque, (Math.abs(w.omega) * t.wheelInertia) / dt);
+    w.omega += ((driveTorque + brakeSigned) / t.wheelInertia) * dt;
+    // the driveline cannot spin a free wheel past the rev limiter
+    const share = w.isFront ? t.driveFrontShare : 1 - t.driveFrontShare;
+    if (share > 0) {
+      const ratio = Math.abs((this.gear === -1 ? t.reverseRatio : (t.gearRatios[this.gear - 1] ?? 1)) * t.finalDrive);
+      const omegaMax = t.redlineRpm / RPM_PER_RAD_S / ratio;
+      w.omega = M.clamp(w.omega, -omegaMax, omegaMax);
+    }
+  }
+
+  /** Inner wheel steers more than the outer one by the wheelbase/track geometry. */
+  private applyAckermann(d: number): void {
+    const t = this.tuning;
+    const fr = this.wheels[WHEEL_FR] as WheelState;
+    const fl = this.wheels[WHEEL_FL] as WheelState;
+    if (Math.abs(d) < 1e-4 || t.ackermann <= 0) {
+      fr.steer = d;
+      fl.steer = d;
+      return;
+    }
+    const R = t.wheelBase / Math.tan(Math.abs(d));
+    const inner = Math.atan(t.wheelBase / (R - t.trackWidth * 0.5));
+    const outer = Math.atan(t.wheelBase / (R + t.trackWidth * 0.5));
+    const innerA = M.lerp(Math.abs(d), inner, t.ackermann);
+    const outerA = M.lerp(Math.abs(d), outer, t.ackermann);
+    // steering right (+): the right wheel is inner
+    if (d > 0) {
+      fr.steer = innerA;
+      fl.steer = outerA;
+    } else {
+      fr.steer = -outerA;
+      fl.steer = -innerA;
+    }
   }
 
   teleport(position: Vec3, yaw: number): void {
@@ -550,10 +715,17 @@ export class Vehicle {
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     this.steer = 0;
     this.drifting = false;
+    this.bodySlipPrev = 0;
     this.airTime = 0;
+    this.gear = 1;
+    this.shiftTimer = 0;
+    this.rpm = this.tuning.idleRpm;
     for (const w of this.wheels) {
       w.grounded = false;
       w.compression = 0;
+      w.omega = 0;
+      w.steer = 0;
+      w.slipRatio = 0;
     }
     this.writeTransforms(true);
   }
@@ -569,13 +741,11 @@ export class Vehicle {
     else tb.write(this.slot, s.pos.x, s.pos.y, s.pos.z, s.q.x, s.q.y, s.q.z, s.q.w);
     M.rotate(s.up, s.q, AXIS_Y);
     for (const wh of this.wheels) {
-      // wheel rotation = body * steer(yaw) * spin(pitch)
-      const steer = wh.isFront ? this.steer : 0;
-      M.quatSetAxisAngle(s.q2, 0, 1, 0, -steer);
+      // wheel rotation = body * steer(yaw, right = -steer) * spin(pitch)
+      M.quatSetAxisAngle(s.q2, 0, 1, 0, -wh.steer);
       M.quatMul(s.q3, s.q, s.q2);
       M.quatSetAxisAngle(s.q2, 1, 0, 0, wh.spin);
       M.quatMul(s.q3, s.q3, s.q2);
-      // wheel centre from the current body pose so the wheels never float
       const drop = wh.grounded ? t.suspensionRestLength - wh.compression : t.suspensionRestLength;
       M.rotate(s.a, s.q, wh.local);
       M.add(s.point, s.pos, s.a);
@@ -584,6 +754,72 @@ export class Vehicle {
       else tb.write(wh.slot, wh.center.x, wh.center.y, wh.center.z, s.q3.x, s.q3.y, s.q3.z, s.q3.w);
     }
   }
+}
+
+/** Engine torque fraction at an rpm, piecewise linear over the tuning's curve. */
+export function torqueCurve(t: VehicleTuning, rpm: number): number {
+  const x = M.clamp(rpm / t.redlineRpm, 0, 1.05);
+  const x0 = t.idleRpm / t.redlineRpm;
+  const xs = [x0, 0.35, 0.65, 0.9, 1.0];
+  const ys = t.torqueCurve;
+  if (x <= x0) return ys[0];
+  for (let i = 1; i < 5; i++) {
+    const x1 = xs[i] as number;
+    if (x <= x1) {
+      const xa = xs[i - 1] as number;
+      return M.lerp(ys[i - 1] as number, ys[i] as number, (x - xa) / (x1 - xa));
+    }
+  }
+  return ys[4];
+}
+
+/**
+ * One substep of the wheel rotation: find ω such that
+ *   I (ω - ω₀) / h = T - r·F(κ(ω)),   κ = (ω r - v) / vRef.
+ * F is piecewise linear in κ (slope muLoad/peak up to the peak, then a decaying
+ * plateau), so the linear-regime solution is closed-form and unconditionally
+ * stable; if it lands past the peak the plateau solution is used, and if the two
+ * disagree the answer sits on the boundary. No stiff ODE, no explicit overshoot.
+ */
+function solveWheel(t: VehicleTuning, omega0: number, torque: number, vFwd: number, vRef: number, muLoad: number, h: number): number {
+  const r = t.wheelRadius;
+  const I = t.wheelInertia;
+  const peak = t.slipRatioPeak;
+  const slope = muLoad / peak;
+  const A = I / h;
+  const B = (slope * r * r) / vRef;
+  const omegaLin = (A * omega0 + torque + (slope * r * vFwd) / vRef) / (A + B);
+  const kLin = (omegaLin * r - vFwd) / vRef;
+  if (Math.abs(kLin) <= peak) return omegaLin;
+  const sgn = Math.sign(kLin);
+  const kPrev = Math.abs((omega0 * r - vFwd) / vRef);
+  const tail = 1 - (1 - t.slipRatioTail) * M.clamp01((Math.max(kPrev, peak) - peak) / (1 - peak));
+  const omegaSat = omega0 + (h * (torque - sgn * muLoad * tail * r)) / I;
+  const kSat = (omegaSat * r - vFwd) / vRef;
+  if (sgn * kSat >= peak) return omegaSat;
+  return (sgn * peak * vRef + vFwd) / r;
+}
+
+/** Outputs of `longForce` (module scratch: no allocation in the wheel loop). */
+let lfForce = 0;
+let lfSlope = 0;
+
+/**
+ * Longitudinal tyre force from the slip ratio: linear up to the peak, then a
+ * decay to the tail. Leaves the force and the local slope dF/dκ (0 when
+ * saturated, which the implicit wheel integrator needs) in `lfForce` / `lfSlope`.
+ */
+function longForce(t: VehicleTuning, kappa: number, muLoad: number): void {
+  const peak = t.slipRatioPeak;
+  const a = Math.abs(kappa);
+  if (a <= peak) {
+    lfSlope = muLoad / peak;
+    lfForce = lfSlope * kappa;
+    return;
+  }
+  const tail = 1 - (1 - t.slipRatioTail) * M.clamp01((a - peak) / (1 - peak));
+  lfForce = Math.sign(kappa) * muLoad * tail;
+  lfSlope = 0;
 }
 
 function boxInertia(t: VehicleTuning): Vec3 {

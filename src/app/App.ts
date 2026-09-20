@@ -81,6 +81,7 @@ export class App {
     this.panel = new DebugPanel(uiRoot, sim, {
       spawnAt: (name) => sim.spawnAt(name),
       refillBoost: () => (sim.vehicle.boostMeter = 1),
+      onVehicleChange: () => sim.vehicle.applyTuning(),
       extra: { camera: this.renderer.chase.tuning as unknown as Record<string, number> },
     });
     this.hud.setDebugVisible(dev);

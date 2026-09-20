@@ -138,8 +138,11 @@ export class EngineAudio {
     this.windGain.gain.setTargetAtTime(wind, t, 0.08);
     if (this.windFilter) this.windFilter.frequency.setTargetAtTime(300 + speed * 12, t, 0.1);
 
-    const slip = tm.groundedWheels > 0 ? Math.max(0, (tm.maxSlipDeg - 8) / 25) : 0;
-    const skid = Math.min(1, slip) * Math.min(1, speed / 12) * 0.35;
+    // squeal from sideways slip past the tyre's peak, and from wheelspin / lock-up
+    const angSlip = tm.groundedWheels > 0 ? Math.max(0, (tm.maxSlipDeg - 8) / 25) : 0;
+    const ratioSlip = tm.groundedWheels > 0 ? Math.max(0, (Math.max(tm.maxSlipRatio, -tm.minSlipRatio) - 0.25) / 0.6) : 0;
+    const slip = Math.max(angSlip, ratioSlip);
+    const skid = Math.min(1, slip) * Math.min(1, Math.max(speed, ratioSlip * 12) / 12) * 0.35;
     this.skidGain.gain.setTargetAtTime(skid, t, 0.05);
     this.skidFilter.frequency.setTargetAtTime(900 + Math.min(1, slip) * 500, t, 0.05);
   }

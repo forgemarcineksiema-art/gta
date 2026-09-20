@@ -1,9 +1,15 @@
 /**
  * Every handling tunable in one typed object. Editable live in the dev panel
- * (`?dev=1`, key `\``); the panel's "copy JSON" button prints a patch to paste here.
+ * (`?dev=1`, key `\``); the panel's "copy patch" button prints a patch to paste here.
  *
- * Units: metres, seconds, kilograms, newtons, radians unless the name says `Deg`.
- * The car's local axes are +Z forward, +X right, +Y up.
+ * Units: metres, seconds, kilograms, newtons, N·m, radians unless the name says `Deg`.
+ * The car's local axes are +Z forward, +Y up; +X is the car's LEFT (right-handed frame).
+ *
+ * Layers, from physical to arcade:
+ *   chassis + suspension  -> plain rigid-body mechanics
+ *   engine + gearbox      -> torque curve, ratios, automatic shifting
+ *   tyres                 -> slip-angle / slip-ratio model with a friction circle
+ *   assists               -> traction control, ABS, drift controller (each can be turned down to 0)
  */
 export interface VehicleTuning {
   // --- chassis -------------------------------------------------------------
@@ -45,46 +51,83 @@ export interface VehicleTuning {
   maxSteerDegHigh: number;
   /** Speed at which steering authority reaches `maxSteerDegHigh`. */
   steerSpeedRef: number;
-  /** How fast the wheel turns toward the input, rad/s. */
+  /** How fast the wheel turns toward the input, in full locks per second. */
   steerRate: number;
-  /** How fast it returns to centre, rad/s. */
+  /** How fast it returns to centre, in full locks per second. */
   steerReturnRate: number;
-  /** Extra steering authority while drifting (multiplier on maxSteer). */
-  driftSteerMul: number;
+  /** Ackermann: 0 = both fronts steer the same, 1 = geometrically correct inner/outer angles. */
+  ackermann: number;
 
-  // --- drive ---------------------------------------------------------------
-  /** Peak driving force at the tyres, N (all driven wheels together). */
-  driveForce: number;
-  /** Fraction of drive force sent to the front axle (0 = RWD, 1 = FWD). */
+  // --- engine --------------------------------------------------------------
+  /** Peak engine torque, N·m. */
+  torqueMax: number;
+  idleRpm: number;
+  redlineRpm: number;
+  /** Torque curve as fractions of torqueMax at rpm fractions [idle, 0.35, 0.65, 0.9, 1.0] of the redline. */
+  torqueCurve: [number, number, number, number, number];
+  /** Engine braking torque at the redline when coasting, N·m (scales with rpm). */
+  engineBrakeTorque: number;
+  /** Engine rotational inertia seen at the crank (rpm response), kg·m². */
+  engineInertia: number;
+
+  // --- drivetrain ----------------------------------------------------------
+  gearRatios: number[];
+  reverseRatio: number;
+  finalDrive: number;
+  drivetrainEfficiency: number;
+  /** Fraction of drive torque sent to the front axle (0 = RWD, 1 = FWD). */
   driveFrontShare: number;
-  /** Speed where the drive force runs out without boost, m/s. */
-  maxSpeed: number;
-  /** Shape of the force fall-off toward maxSpeed (higher = flatter, then a cliff). */
-  driveFalloffExp: number;
-  reverseForce: number;
+  /** Upshift when rpm exceeds this fraction of the redline. */
+  shiftUpAt: number;
+  /** Downshift when rpm falls below this fraction of the redline. */
+  shiftDownAt: number;
+  /** Torque cut during a shift, seconds. */
+  shiftTime: number;
+  /** Reverse is cut above this speed, m/s. */
   maxReverseSpeed: number;
-  brakeForce: number;
-  /** Force opposing motion when coasting, N. */
-  engineBrakeForce: number;
-  /** Rear-wheel brake force from the handbrake, N. */
-  handbrakeForce: number;
+
+  // --- brakes --------------------------------------------------------------
+  /** Total brake torque at full pedal, N·m, split by `brakeFrontBias`. */
+  brakeTorque: number;
+  brakeFrontBias: number;
+  /** Handbrake torque on each rear wheel, N·m. */
+  handbrakeTorque: number;
+
+  // --- wheels --------------------------------------------------------------
+  /** Rotational inertia per wheel (including its share of the drivetrain), kg·m². */
+  wheelInertia: number;
+  /** Speed floor used to regularise slip at low speed, m/s. */
+  slipLowSpeed: number;
 
   // --- tyres ---------------------------------------------------------------
-  /** Lateral force per (m/s of lateral slip) per N of load. */
-  latStiffness: number;
-  /** Peak grip coefficient (friction circle radius = mu * load). */
   muFront: number;
   muRear: number;
-  /** Rear grip multiplier while the handbrake is held. */
-  handbrakeGripMul: number;
   /** Slip angle at which lateral grip peaks, degrees. */
-  slipPeakDeg: number;
+  slipAngPeakDeg: number;
   /** Lateral grip left at large slip angles (fraction of peak). */
-  slipTail: number;
-  /** Fraction (0 contact patch .. 1 centre of mass) at which tyre forces are applied. */
+  slipAngTail: number;
+  /** Slip ratio at which longitudinal grip peaks. */
+  slipRatioPeak: number;
+  /** Longitudinal grip left when the wheel is fully spinning or locked (fraction of peak). */
+  slipRatioTail: number;
+  /** Rolling resistance force per wheel per N of load. */
+  rollingResistance: number;
+  /** Fraction (0 contact patch .. 1 centre of mass) at which tyre forces are applied. Arcade roll control. */
   tireForceHeight: number;
 
-  // --- drift state ---------------------------------------------------------
+  // --- assists -------------------------------------------------------------
+  /** 0..1: cuts drive torque when driven wheels spin past 1.5x the peak slip ratio. */
+  tractionControl: number;
+  /** 0..1: releases brake torque on a wheel that is about to lock. */
+  abs: number;
+  /** Extra damping on the whole body below 0.5 m/s with no input, 1/s (kills creep). */
+  restDamping: number;
+
+  // --- drift state (arcade layer) ------------------------------------------
+  /** 0..1 master scale for the drift controller (yaw command + velocity follow). */
+  driftAssist: number;
+  /** Rear grip multiplier while the handbrake is held. */
+  handbrakeGripMul: number;
   /** Rear grip multiplier while in the drift state (handbrake released). */
   driftGripMul: number;
   /** Front grip multiplier while drifting. */
@@ -97,31 +140,32 @@ export interface VehicleTuning {
   driftMinSpeed: number;
   /** A drift cannot end before this many seconds (lets the angle build after a handbrake tap). */
   driftMinTime: number;
-  /** Steering lock cap while drifting, degrees. */
-  driftMaxSteerDeg: number;
-  /** How fast rear grip returns after a drift / handbrake, per second (blend of the multiplier). */
+  /** How fast grip returns after a drift / handbrake, per second (blend of the multiplier). */
   gripBlendRate: number;
-  /** Yaw rate commanded by full steer while drifting, rad/s. */
-  driftYawRate: number;
-  /** Yaw controller gain, N·m per rad/s of error. */
-  driftYawGain: number;
-  /** Yaw controller torque cap, N·m. */
+  /** Drift angle commanded by full steer, degrees (steer sets the angle; centre straightens; counter-steer swaps sides). */
+  driftMaxAngleDeg: number;
+  /** Angle controller: yaw torque per radian of angle error, N·m/rad. */
+  driftAngleGain: number;
+  /** Angle controller damping: yaw torque per rad/s of angle rate, N·m·s/rad. */
+  driftAngleDamping: number;
+  /** Angle controller torque cap, N·m. */
   driftYawTorqueMax: number;
+  /** 0..1: in a drift the front wheels align with the velocity (automatic counter-steer), plus a little player input. */
+  driftAutoCounterSteer: number;
   /** How fast the velocity vector turns to follow the nose while drifting (1/s). */
   driftVelocityFollow: number;
   /** Cap on the velocity-follow acceleration, m/s². */
   driftFollowAccelMax: number;
   /** Speed lost per second at 90° of slip, as a fraction of speed. */
   driftSpeedLoss: number;
-  /** Throttle push along the nose while drifting (fraction of available drive force). */
-  driftThrottleGain: number;
+  /** Push along the nose at full throttle while drifting, N (what the spinning rears cannot deliver). */
+  driftThrottlePush: number;
 
   // --- aero & gravity ------------------------------------------------------
   /** Aerodynamic drag: F = drag * v². */
   drag: number;
   /** Downforce: F = downforce * v², pressing the car onto the road. */
   downforce: number;
-  rollingResistance: number;
   /** Extra gravity applied to the car only, m/s². */
   extraGravity: number;
 
@@ -138,19 +182,16 @@ export interface VehicleTuning {
   flipRecoverySeconds: number;
 
   // --- boost ---------------------------------------------------------------
-  boostForceMul: number;
-  boostMaxSpeed: number;
+  /** Engine torque multiplier while boosting. */
+  boostTorqueMul: number;
+  /** Extra thrust along the nose while boosting and grounded, N. */
+  boostThrust: number;
   /** Meter units per second while boosting (meter is 0..1). */
   boostDrain: number;
   boostGainDrift: number;
   boostGainAir: number;
   /** Starting meter in the playground. */
   boostInitial: number;
-
-  // --- fake gearbox for audio/HUD ------------------------------------------
-  gearCount: number;
-  idleRpm: number;
-  redlineRpm: number;
 }
 
 export const DEFAULT_TUNING: VehicleTuning = {
@@ -159,7 +200,7 @@ export const DEFAULT_TUNING: VehicleTuning = {
   chassisOffsetY: 0.42,
   centerOfMassY: -0.05,
   inertiaScale: { x: 1.0, y: 1.0, z: 1.0 },
-  angularDamping: 1.2,
+  angularDamping: 1.0,
 
   wheelBase: 2.9,
   trackWidth: 1.72,
@@ -179,45 +220,66 @@ export const DEFAULT_TUNING: VehicleTuning = {
   steerSpeedRef: 42,
   steerRate: 5.5,
   steerReturnRate: 9,
-  driftSteerMul: 1.6,
+  ackermann: 1,
 
-  driveForce: 8200,
-  driveFrontShare: 0.0,
-  maxSpeed: 50,
-  driveFalloffExp: 3.0,
-  reverseForce: 5000,
-  maxReverseSpeed: 9,
-  brakeForce: 16000,
-  engineBrakeForce: 700,
-  handbrakeForce: 9000,
+  torqueMax: 340,
+  idleRpm: 900,
+  redlineRpm: 7200,
+  torqueCurve: [0.6, 0.86, 1.0, 0.93, 0.8],
+  engineBrakeTorque: 55,
+  engineInertia: 0.25,
 
-  latStiffness: 0.55,
+  gearRatios: [3.6, 2.2, 1.55, 1.2, 0.95],
+  reverseRatio: 3.2,
+  finalDrive: 4.1,
+  drivetrainEfficiency: 0.9,
+  driveFrontShare: 0,
+  shiftUpAt: 0.96,
+  shiftDownAt: 0.5,
+  shiftTime: 0.12,
+  maxReverseSpeed: 7,
+
+  brakeTorque: 5600,
+  brakeFrontBias: 0.62,
+  handbrakeTorque: 4000,
+
+  wheelInertia: 1.2,
+  slipLowSpeed: 2.0,
+
   muFront: 1.45,
   muRear: 1.5,
-  handbrakeGripMul: 0.3,
-  slipPeakDeg: 9,
-  slipTail: 0.55,
+  slipAngPeakDeg: 8,
+  slipAngTail: 0.7,
+  slipRatioPeak: 0.12,
+  slipRatioTail: 0.7,
+  rollingResistance: 0.012,
   tireForceHeight: 0.85,
 
+  tractionControl: 0.6,
+  abs: 0.8,
+  restDamping: 6,
+
+  driftAssist: 1,
+  handbrakeGripMul: 0.45,
   driftGripMul: 0.42,
-  driftFrontGripMul: 0.8,
+  driftFrontGripMul: 0.7,
   driftEnterDeg: 20,
   driftExitDeg: 7,
   driftMinSpeed: 8,
   driftMinTime: 0.6,
-  driftMaxSteerDeg: 46,
   gripBlendRate: 4,
-  driftYawRate: 1.7,
-  driftYawGain: 14000,
-  driftYawTorqueMax: 22000,
+  driftMaxAngleDeg: 35,
+  driftAngleGain: 70000,
+  driftAngleDamping: 9000,
+  driftYawTorqueMax: 26000,
+  driftAutoCounterSteer: 1,
   driftVelocityFollow: 2.6,
-  driftFollowAccelMax: 14,
-  driftSpeedLoss: 0.22,
-  driftThrottleGain: 0.9,
+  driftFollowAccelMax: 8,
+  driftSpeedLoss: 0.15,
+  driftThrottlePush: 4000,
 
-  drag: 0.45,
+  drag: 1.6,
   downforce: 1.8,
-  rollingResistance: 220,
   extraGravity: 4,
 
   airPitchTorque: 6000,
@@ -226,16 +288,12 @@ export const DEFAULT_TUNING: VehicleTuning = {
   airAngularDamping: 5000,
   flipRecoverySeconds: 1.5,
 
-  boostForceMul: 1.8,
-  boostMaxSpeed: 67,
+  boostTorqueMul: 1.25,
+  boostThrust: 3200,
   boostDrain: 0.28,
   boostGainDrift: 0.16,
   boostGainAir: 0.35,
   boostInitial: 0.6,
-
-  gearCount: 5,
-  idleRpm: 900,
-  redlineRpm: 7200,
 };
 
 export function cloneTuning(t: VehicleTuning): VehicleTuning {

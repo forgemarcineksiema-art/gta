@@ -147,17 +147,9 @@ export function buildPlayground(world: RAPIER.World): PlaygroundLayout {
     void a0;
   }
   addBox(skid.r + 12, 0.012, skid.r + 12, { x: skid.x, y: 0.0, z: skid.z }, IDENTITY_QUAT, PALETTE.asphaltLight, { collide: false, tag: 'road' });
-  // inner cones
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2;
-    props.push({
-      position: { x: skid.x + Math.cos(a) * 6, y: 0.45, z: skid.z + Math.sin(a) * 6 },
-      rotation: IDENTITY_QUAT,
-      shape: { kind: 'cylinder', radius: 0.28, halfHeight: 0.45 },
-      color: PALETTE.cone,
-      mass: 4,
-    });
-  }
+  // centre mark (no props on the pad: a cone under a drifting car reads as a kerb to the suspension rays)
+  addBox(1.5, 0.02, 0.15, { x: skid.x, y: 0.005, z: skid.z }, IDENTITY_QUAT, PALETTE.laneMark, { collide: false, tag: 'mark' });
+  addBox(0.15, 0.02, 1.5, { x: skid.x, y: 0.005, z: skid.z }, IDENTITY_QUAT, PALETTE.laneMark, { collide: false, tag: 'mark' });
 
   // ---- ramps -----------------------------------------------------------------
   const rampX = -150;

@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PALETTE, type DynamicDesc, type ShapeDesc, type SimWorld, type StaticDesc } from '../sim';
 import { ChaseCamera } from './ChaseCamera';
-import { SpeedStreaks } from './SpeedStreaks';
+import { SpeedLines } from './SpeedLines';
 import { buildCarMesh, type CarMesh } from './carMesh';
 
 export interface RenderStats {
@@ -36,7 +36,7 @@ export class Renderer {
   private readonly dynamics: DynamicView[] = [];
   private readonly car: CarMesh;
   private readonly sun: THREE.DirectionalLight;
-  private readonly streaks: SpeedStreaks;
+  private readonly speedLines: SpeedLines;
   private readonly tmpPos = new THREE.Vector3();
   private readonly carVel = new THREE.Vector3();
   private readonly sky: THREE.Mesh;
@@ -92,8 +92,8 @@ export class Renderer {
     this.scene.add(this.car.root);
     for (const w of this.car.wheels) this.scene.add(w);
 
-    this.streaks = new SpeedStreaks();
-    this.scene.add(this.streaks.object);
+    this.speedLines = new SpeedLines();
+    this.scene.add(this.speedLines.object);
 
     this.resize();
   }
@@ -202,7 +202,7 @@ export class Renderer {
     this.sun.position.set(this.tmpPos.x - 60, this.tmpPos.y + 90, this.tmpPos.z - 40);
     // the sky dome rides with the camera so the horizon never comes closer
     this.sky.position.copy(this.camera.position);
-    this.streaks.update(this.camera.position, carPos, this.carVel, tm, dt);
+    this.speedLines.update(tm, Math.hypot(this.carVel.x, this.carVel.z), this.camera.aspect, dt);
 
     this.renderer.info.reset();
     this.renderer.render(this.scene, this.camera);

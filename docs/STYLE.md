@@ -52,7 +52,7 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 ## Camera and motion
 
 - Chase camera behind and above, FOV 60 → up to ~92 with speed and boost, pulls back and drops with speed, follows the velocity direction so drifts show the car sideways. Tiny shake at high speed. See `src/render/ChaseCamera.ts`.
-- Speed streaks: thin light lines rushing past above ~100 km/h and during boost.
+- Speed lines: a screen-space pass of short streaks rushing outward from the frame's periphery above ~100 km/h and under boost (cyan lean). The centre of the frame, where the road is, is masked out; nothing is ever drawn in front of the car. This is how Burnout/NFS/Mario Kart do it: FOV, camera, peripheral blur or lines, sound; world particles only behind or beside the car.
 
 ## Tone
 

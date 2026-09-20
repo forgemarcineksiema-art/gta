@@ -8,7 +8,7 @@ Free-form session log: done, decided and why, next, open problems. Newest sessio
 - **Tyre load sensitivity** (`loadSensitivity` 0.15): grip per newton falls with load above the static share, so weight transfer costs total grip, as it should.
 - **Limited-slip differential** (`lsdLock` 0.5, `lsdPreload` 60 N·m, `lsdStiffness` 220 N·m·s): torque moves from the faster driven wheel to the slower one, capped by preload plus half the axle torque. No one-wheel-peel; power slides are cleaner.
 - **No clutch**: decided with Marcin; an automatic arcade car does not need one.
-- **Streaks rebuilt as quads**: brightest in the middle and fading at both ends, constant on-screen width, brighter near the camera, 40% of them dust just above the tarmac, cyan lean under boost. Still world-anchored, one draw call.
+- **Streaks rebuilt as quads**, then **replaced**: Marcin objected to anything drawn in front of the car; checked how the big arcade racers do it (FOV, camera, peripheral radial blur or edge speed lines, shake, sound; world particles only behind/beside the car). Now `SpeedLines`: a fullscreen additive shader with streaks rushing outward from the periphery in random sectors, the centre masked out, intensity from speed and boost, cyan lean under boost. One draw call, no geometry updates.
 - Wheels merged into one vertex-coloured geometry each (was 9 meshes per wheel). Perf run on the MX330 laptop, 4× CPU throttle: 59.8 fps, frame p95 16.8 ms, sim step p50/p95 1.2/3.0 ms (was 2.2/8.3), draw calls max 69 (was 80), 17k tris, 16 MB heap.
 - 29 sim tests pass with the new tyre and differential.
 

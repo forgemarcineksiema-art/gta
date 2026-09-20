@@ -22,6 +22,9 @@ export class EngineAudio {
   private engineFilter: BiquadFilterNode | null = null;
   private windFilter: BiquadFilterNode | null = null;
   private skidFilter: BiquadFilterNode | null = null;
+  private crashGain: GainNode | null = null;
+  private scrapeGain: GainNode | null = null;
+  private scrapeFilter: BiquadFilterNode | null = null;
   private muted = false;
   private userMuted = false;
   private volume = 0.5;
@@ -114,10 +117,25 @@ export class EngineAudio {
     this.skidGain = ctx.createGain();
     this.skidGain.gain.value = 0;
     noise.connect(this.skidFilter).connect(this.skidGain).connect(this.master);
+
+    // body: a low thump on impact, a metallic grind while scraping a wall
+    const crashFilter = ctx.createBiquadFilter();
+    crashFilter.type = 'lowpass';
+    crashFilter.frequency.value = 260;
+    this.crashGain = ctx.createGain();
+    this.crashGain.gain.value = 0;
+    noise.connect(crashFilter).connect(this.crashGain).connect(this.master);
+    this.scrapeFilter = ctx.createBiquadFilter();
+    this.scrapeFilter.type = 'bandpass';
+    this.scrapeFilter.frequency.value = 2600;
+    this.scrapeFilter.Q.value = 1.2;
+    this.scrapeGain = ctx.createGain();
+    this.scrapeGain.gain.value = 0;
+    noise.connect(this.scrapeFilter).connect(this.scrapeGain).connect(this.master);
   }
 
   update(tm: VehicleTelemetry, dt: number): void {
-    if (!this.ctx || !this.oscA || !this.oscB || !this.oscSub || !this.engineFilter || !this.engineGain || !this.windGain || !this.skidGain || !this.skidFilter) return;
+    if (!this.ctx || !this.oscA || !this.oscB || !this.oscSub || !this.engineFilter || !this.engineGain || !this.windGain || !this.skidGain || !this.skidFilter || !this.crashGain || !this.scrapeGain || !this.scrapeFilter) return;
     const k = 1 - Math.exp(-dt * 10);
     this.rpmSmooth += (tm.rpm - this.rpmSmooth) * k;
     this.loadSmooth += (tm.load - this.loadSmooth) * k;
@@ -145,6 +163,16 @@ export class EngineAudio {
     const skid = Math.min(1, slip) * Math.min(1, Math.max(speed, ratioSlip * 12) / 12) * 0.35;
     this.skidGain.gain.setTargetAtTime(skid, t, 0.05);
     this.skidFilter.frequency.setTargetAtTime(900 + Math.min(1, slip) * 500, t, 0.05);
+
+    // a hit is a one-shot thump scaled by the speed lost; scraping is a sustained grind
+    if (tm.impact > 0.6) {
+      const hit = Math.min(1, tm.impact / 14);
+      this.crashGain.gain.cancelScheduledValues(t);
+      this.crashGain.gain.setValueAtTime(0.25 + hit * 0.9, t);
+      this.crashGain.gain.setTargetAtTime(0, t + 0.02, 0.09 + hit * 0.1);
+    }
+    this.scrapeGain.gain.setTargetAtTime(tm.scrape * 0.3, t, 0.04);
+    this.scrapeFilter.frequency.setTargetAtTime(1800 + speed * 25, t, 0.05);
   }
 
   /** Ad-mute hook (adStarted / adFinished). Independent from the player's own mute. */

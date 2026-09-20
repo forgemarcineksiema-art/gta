@@ -4,6 +4,7 @@
  */
 import { describe, expect, test } from 'vitest';
 import type { CarId } from '../../src/sim';
+import { TrackBot } from '../../src/app/trackBot';
 import { createWorld, fullThrottle, kmh, position, run, runUntil, upness } from './helpers';
 
 interface Expectations {
@@ -14,12 +15,14 @@ interface Expectations {
   driftMinSpeed: number;
   /** Heading change of a 0.35 s full-lock pulse at 60 km/h, minimum degrees. */
   pulse60: number;
+  /** Track bot flying lap, seconds (the class benchmark). */
+  botLap: [number, number];
 }
 
 const CARS: Record<CarId, Expectations> = {
-  muscle: { to100: [5.8, 7.2], top: [160, 180], brake100: [22, 42], driftBand: [18, 42], driftMinSpeed: 50, pulse60: 20 },
-  compact: { to100: [9, 13], top: [130, 165], brake100: [22, 42], driftBand: [12, 40], driftMinSpeed: 40, pulse60: 20 },
-  heavy: { to100: [10, 16], top: [105, 140], brake100: [24, 48], driftBand: [10, 40], driftMinSpeed: 35, pulse60: 12 },
+  muscle: { to100: [5.8, 7.2], top: [160, 180], brake100: [22, 42], driftBand: [18, 42], driftMinSpeed: 50, pulse60: 20, botLap: [30, 40] },
+  compact: { to100: [9, 13], top: [130, 165], brake100: [22, 42], driftBand: [12, 40], driftMinSpeed: 40, pulse60: 20, botLap: [33, 43] },
+  heavy: { to100: [10, 16], top: [105, 140], brake100: [24, 48], driftBand: [10, 40], driftMinSpeed: 35, pulse60: 12, botLap: [35, 46] },
 };
 
 for (const [id, e] of Object.entries(CARS) as Array<[CarId, Expectations]>) {
@@ -153,5 +156,25 @@ for (const [id, e] of Object.entries(CARS) as Array<[CarId, Expectations]>) {
       expect(upness(jump)).toBeGreaterThan(0.97);
       expect(jump.vehicle.telemetry.groundedWheels).toBe(4);
     });
+  });
+}
+
+for (const [id, e] of Object.entries(CARS) as Array<[CarId, Expectations]>) {
+  test(`car: ${id} laps the test track in its benchmark window`, async () => {
+    const sim = await createWorld({ spawn: 'track', car: id });
+    const bot = new TrackBot(id);
+    let laps = 0;
+    let minUp = 1;
+    for (let i = 0; i < 60 * 110 && laps < 2; i++) {
+      bot.drive(sim, sim.controls, 1 / 60);
+      sim.step();
+      minUp = Math.min(minUp, upness(sim));
+      laps = sim.lap.lapCount;
+    }
+    expect(laps).toBe(2);
+    expect(bot.resets).toBe(0);
+    expect(minUp).toBeGreaterThan(0.93);
+    expect(sim.lap.last).toBeGreaterThan(e.botLap[0]);
+    expect(sim.lap.last).toBeLessThan(e.botLap[1]);
   });
 }

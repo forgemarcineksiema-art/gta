@@ -4,7 +4,7 @@
  * change, and its core (follow a polyline, brake for what is coming) is what the
  * road bot in the city will reuse.
  */
-import type { SimWorld, TrackSample, VehicleControls } from '../sim';
+import type { CarId, SimWorld, TrackSample, VehicleControls } from '../sim';
 
 export interface TrackBotTuning {
   /** Lookahead distance = base + speed * perSpeed, clamped. */
@@ -39,14 +39,26 @@ export const DEFAULT_TRACK_BOT: TrackBotTuning = {
   boostAbove: 0,
 };
 
+/**
+ * Per-class overrides. The lateral budget is the largest that keeps the class on
+ * the road and on four wheels on the test track (sweep in docs/PROGRESS.md);
+ * above it the bot cuts corners or lifts the inside wheels and the lap time
+ * stops measuring the car.
+ */
+export const TRACK_BOT_BY_CAR: Record<CarId, Partial<TrackBotTuning>> = {
+  muscle: {},
+  compact: { latAccel: 13 },
+  heavy: { latAccel: 11, brakeAccel: 8 },
+};
+
 export class TrackBot {
   tuning: TrackBotTuning;
   private idx = 0;
   private stuckTime = 0;
   resets = 0;
 
-  constructor(tuning: TrackBotTuning = DEFAULT_TRACK_BOT) {
-    this.tuning = { ...tuning };
+  constructor(car: CarId = 'muscle', overrides: Partial<TrackBotTuning> = {}) {
+    this.tuning = { ...DEFAULT_TRACK_BOT, ...TRACK_BOT_BY_CAR[car], ...overrides };
   }
 
   /** Fill `controls` for one fixed step. */

@@ -72,7 +72,7 @@ describe('track', () => {
 
   test('the bot laps the circuit, laps are timed and the ghost is captured', async () => {
     const sim = await createWorld({ spawn: 'track' });
-    const bot = new TrackBot();
+    const bot = new TrackBot(sim.carId);
     let laps = 0;
     let firstLap = -1;
     for (let i = 0; i < 60 * 130 && laps < 2; i++) {

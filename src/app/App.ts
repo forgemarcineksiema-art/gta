@@ -24,6 +24,8 @@ export interface GameHandle {
   errors: string[];
   bot: boolean;
   version: string;
+  /** The renderer, for headless probes (draw stats) and scene inspection from the console. */
+  renderer: Renderer;
 }
 
 declare global {
@@ -122,7 +124,7 @@ export class App {
 
     const botParam = params.get('bot');
     const botOn = botParam === '1' || botParam === 'track';
-    this.bot = botParam === 'track' ? new TrackBot() : botOn ? new BotDriver(Number(params.get('seed') ?? '42')) : null;
+    this.bot = botParam === 'track' ? new TrackBot(this.sim.carId) : botOn ? new BotDriver(Number(params.get('seed') ?? '42')) : null;
     const duration = Number(params.get('duration') ?? '0');
     this.perf = botOn && duration > 0 ? new PerfProbe(duration) : null;
 
@@ -134,6 +136,7 @@ export class App {
       errors: [],
       bot: botOn,
       version: __APP_VERSION__,
+      renderer: this.renderer,
     };
     window.__game = this.handle;
     window.addEventListener('error', (e) => this.handle.errors.push(String(e.message)));

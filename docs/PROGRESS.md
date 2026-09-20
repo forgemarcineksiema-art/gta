@@ -2,6 +2,23 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-21 — Session 6: per-class bot budget, wall collisions
+
+Marcin's call: give the track bot a per-car lateral budget, then fix collisions with walls at speed.
+
+- **Track bot per class.** Swept the bot's lateral budget 9–21 m/s² per car. The muscle's laps fall all the way to 21 but above 17 it runs 3 m off the road; the compact lifts its inside wheels above 13 (rolls to 37°); the van runs 12 m wide above 15 and rolls at 13 and 17. Chosen: muscle 17, compact 13, heavy 11 with braking 8 (`TRACK_BOT_BY_CAR` in `src/app/trackBot.ts`; the constructor takes the car id). Per-class lap pins in `cars.test.ts` (muscle 30–40 s, compact 33–43, heavy 35–46); flying laps measured 34.2 / 37.3 / 39.7 s.
+- **Walls, measured first.** With the old 0.65 combined friction and no assist, a glancing hit up to 30° slid along the wall, but from 45° up the corner friction pivoted the nose into the wall and the car stopped dead; at 60° it swung past 90° and ended facing backwards; head-on was a dead stop with no bounce and no feedback of any kind.
+- **Walls, now** (`Vehicle.ts` "body contacts", numbers `wall*` in `tuning.ts`, decision record 11):
+  - the chassis reads Rapier's contact manifolds back every step (`contactPairsWith` / `contactPair`, bound callbacks, no JS allocation): summed normal impulse → `telemetry.impact` (m/s of speed change this step), contact point and normal, `scrape` 0..1 and `contactSide`;
+  - chassis friction 0.15 with the Min combine rule (walls are slippery), restitution 0.2 with Max (a head-on hit bounces back a little);
+  - on the step of a hit only 15% of the body spin survives: a corner impulse otherwise spins the car round;
+  - while sliding along a wall a yaw controller (20 rad/s² per rad, damping 7/s, scaled by the yaw inertia so every class turns alike) turns the nose toward the direction of travel, and keeps working for 0.5 s after the body leaves the wall so the bounce cannot undo it; above an 80° nose angle it is a crash and nothing aligns;
+  - nearly stopped with the nose in: throttle + steer peels the car off to the steered side, throttle alone with the nose under 60° slides it out, no input never turns a stopped car.
+  Results at 100 km/h (muscle / compact / heavy, speed one second after the hit): 20° keeps 96/93/92%, 45° 69/64/60%, 75° comes out aligned within 3° at 44/47/32 km/h; a 60° hit at 150 km/h comes out straight at 65–70 km/h; head-on stops, bounces 6–11 m and stays square; every case minUp ≥ 0.99. 22 pins in `tests/sim/walls.test.ts` (7 per class plus props).
+- **Feedback.** Camera: impact shake (`impactShake` per m/s, capped) and a scrape shake. Audio: a low thump per hit scaled by the speed lost, a band-passed grind while scraping.
+- **Playground.** `walls` lane at x 250: barriers both sides for 300 m, an angled barrier crossing the lane at 7°, two pillars, a head-on wall. `?spawn=walls`. The renderer is on the debug handle (`window.__game.renderer`) for scene inspection.
+- **Known.** A car nose-in at exactly 90° with the throttle held and no steering pushes the wall and revs; that is by design (steer or reverse). No sparks yet: the contact point and normal are in the telemetry for the VFX pass.
+
 ## 2026-09-21 — Session 5: M1 deepened (instrumentation, test track, three cars)
 
 Marcin's call: stay on M1 and do the three highest-leverage items instead of moving on.

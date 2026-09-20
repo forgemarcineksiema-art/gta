@@ -12,6 +12,8 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 - Wheel visuals use body pose + spring compression; no camber/toe. (M1)
 - No clutch model (decided with Marcin: an automatic arcade car does not need one; launch revving, if ever wanted, is an audio effect). (M1)
+- Sparks and scrape VFX: the contact point and normal are in `VehicleTelemetry` (`contactX/Y/Z`, `contactNx/Ny/Nz`, `scrape`, `impact`); the particle system is not written. (M1)
+- The track bot plans each class with a hand-set lateral budget (`TRACK_BOT_BY_CAR`); deriving it from mu, mass and downforce would make new classes self-tuning. (M1)
 - Sim step measured in Node at 0.24 ms (0.14 vehicle, 0.06 Rapier, 0.03 rest) after moving per-wheel force/velocity math into JS; the throttled browser p95 was multi-substep frames, not the step. Rays cost 4 × 7.7 µs; not worth more work before M3. (M1)
 
 ## Rendering

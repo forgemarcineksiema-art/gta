@@ -44,6 +44,9 @@ export interface CameraTuning {
   heightRateAir: number;
   /** Shake per m/s of landing impact. */
   landingShake: number;
+  /** Shake per m/s of a wall or prop hit, and at full scrape. */
+  impactShake: number;
+  scrapeShake: number;
   /** Seconds of reversing before the camera swings round. */
   reverseDelay: number;
   /** Seconds of forward driving, or of standing still, before it swings back. */
@@ -82,6 +85,8 @@ export const DEFAULT_CAMERA: CameraTuning = {
   heightRateGround: 9,
   heightRateAir: 2.5,
   landingShake: 0.03,
+  impactShake: 0.02,
+  scrapeShake: 0.012,
   reverseDelay: 0.7,
   reverseReturnDelay: 0.3,
   reverseStillDelay: 1.2,
@@ -210,9 +215,10 @@ export class ChaseCamera {
 
     // shake: speed² plus a landing burst that decays
     if (tm.landingImpact > 0) this.shakeEnergy = Math.min(0.6, this.shakeEnergy + tm.landingImpact * t.landingShake);
+    if (tm.impact > 0.5) this.shakeEnergy = Math.min(0.7, this.shakeEnergy + tm.impact * t.impactShake);
     this.shakeEnergy *= Math.exp(-dt * 7);
     this.shakeT += dt * 37;
-    const shake = t.shakeAmount * Math.pow(Math.min(1, speed / t.shakeSpeedRef), 2) * (tm.boosting ? 1.6 : 1) + this.shakeEnergy;
+    const shake = t.shakeAmount * Math.pow(Math.min(1, speed / t.shakeSpeedRef), 2) * (tm.boosting ? 1.6 : 1) + this.shakeEnergy + tm.scrape * t.scrapeShake;
     const sx = Math.sin(this.shakeT * 1.3) * shake;
     const sy = Math.cos(this.shakeT * 1.7) * shake * 0.7;
 

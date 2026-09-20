@@ -216,6 +216,24 @@ export interface VehicleTuning {
   landingRetainSpin: number;
   /** Fraction of the total speed kept through a landing: the absorbed vertical part is redirected along the ground. */
   landingKeepMomentum: number;
+
+  // ---- walls (arcade). The chassis only meets walls, buildings and props.
+  /** Chassis friction against what it touches (Min combine rule: walls are slippery). */
+  wallFriction: number;
+  /** Chassis restitution (Max combine rule): the bounce of a head-on hit. */
+  wallRestitution: number;
+  /** Yaw acceleration per radian of misalignment while sliding along a wall, rad/s² per rad (times the yaw inertia). */
+  wallAlignGain: number;
+  /** Yaw-rate damping of that controller, 1/s (7 with a gain of 20 is near critical). */
+  wallAlignDamping: number;
+  /** Beyond this angle between the nose and the wall the hit is a crash and nothing aligns. */
+  wallAlignMaxDeg: number;
+  /** A body contact that changes the speed by more than this in one step is a hit, not a scrape, m/s. */
+  wallHitSpeed: number;
+  /** Fraction of the yaw rate kept on the step of a hit: a corner impulse spins a car round otherwise. */
+  wallHitRetainSpin: number;
+  /** Seconds the alignment keeps working after the body leaves the wall (the bounce). */
+  wallMemory: number;
   /** Seconds upside-down and stopped before the car rights itself. */
   flipRecoverySeconds: number;
 
@@ -343,6 +361,14 @@ export const DEFAULT_TUNING: VehicleTuning = {
   landingRetainVertical: 0.35,
   landingRetainSpin: 0.5,
   landingKeepMomentum: 0.92,
+  wallFriction: 0.15,
+  wallRestitution: 0.2,
+  wallAlignGain: 20,
+  wallAlignDamping: 7,
+  wallAlignMaxDeg: 80,
+  wallHitSpeed: 3,
+  wallHitRetainSpin: 0.15,
+  wallMemory: 0.5,
   flipRecoverySeconds: 1.5,
 
   boostTorqueMul: 1.25,

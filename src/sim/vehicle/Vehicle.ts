@@ -108,6 +108,19 @@ export interface VehicleTelemetry {
   gLong: number;
   gLat: number;
   gVert: number;
+  /** Speed change from body contacts (walls, props) this step, m/s; 0 when free. */
+  impact: number;
+  /** 0..1 how hard the body is scraping along a wall right now. */
+  scrape: number;
+  /** Side of the current wall contact: +1 left, -1 right, 0 none. */
+  contactSide: number;
+  /** World point and normal (from the wall into the car) of the current body contact. */
+  contactX: number;
+  contactY: number;
+  contactZ: number;
+  contactNx: number;
+  contactNy: number;
+  contactNz: number;
 }
 
 const AXIS_Y: Readonly<Vec3> = { x: 0, y: 1, z: 0 };
@@ -136,6 +149,8 @@ const scratch = {
   q: { x: 0, y: 0, z: 0, w: 1 },
   q2: { x: 0, y: 0, z: 0, w: 1 },
   q3: { x: 0, y: 0, z: 0, w: 1 },
+  n: M.v3(),
+  cp: M.v3(),
 };
 
 /** Velocity of a world point on the body: v + ω × (p − com). Pure JS, no WASM call. */
@@ -189,6 +204,39 @@ export class Vehicle {
   private wasAirborne = false;
   private collidesWithTerrain = false;
   private readonly prevVel = M.v3();
+  // body contacts (walls, props), read back from Rapier's narrow phase each step
+  private contactImpulse = 0;
+  private contactCount = 0;
+  private wallTouch = false;
+  private pairFixed = false;
+  private contactSide = 0;
+  private wallTimer = 0;
+  private readonly wallNormal = M.v3();
+  private readonly contactNormal = M.v3();
+  private readonly contactPoint = M.v3();
+  private readonly onManifold = (m: RAPIER.TempContactManifold, flipped: boolean): void => {
+    let imp = 0;
+    const n = m.numContacts();
+    for (let i = 0; i < n; i++) imp += m.contactImpulse(i);
+    if (imp <= 0) return;
+    const nrm = scratch.n;
+    m.normal(nrm);
+    // the manifold normal points from the first collider to the second; make it point into the car
+    if (!flipped) M.scale(nrm, nrm, -1);
+    M.addScaled(this.contactNormal, this.contactNormal, nrm, imp);
+    this.contactImpulse += imp;
+    if (this.contactCount === 0) {
+      const p = m.solverContactPoint(0, scratch.cp);
+      if (p) M.copy(this.contactPoint, p);
+    }
+    this.contactCount++;
+    if (this.pairFixed && Math.abs(nrm.y) < 0.5) this.wallTouch = true;
+  };
+  private readonly onPair = (other: RAPIER.Collider): void => {
+    const parent = other.parent();
+    this.pairFixed = parent === null || parent.isFixed();
+    this.world.contactPair(this.collider, other, this.onManifold);
+  };
   readonly telemetry: VehicleTelemetry;
   /** Where `reset` puts the car: updated by the world (nearest spawn point). */
   resetPose: { position: Vec3; yaw: number };
@@ -277,6 +325,15 @@ export class Vehicle {
       gLong: 0,
       gLat: 0,
       gVert: 0,
+      impact: 0,
+      scrape: 0,
+      contactSide: 0,
+      contactX: 0,
+      contactY: 0,
+      contactZ: 0,
+      contactNx: 0,
+      contactNy: 0,
+      contactNz: 0,
     };
     this.writeTransforms(true);
   }
@@ -286,8 +343,10 @@ export class Vehicle {
     const he = t.chassisHalfExtents;
     return RAPIER.ColliderDesc.cuboid(he.x, he.y, he.z)
       .setTranslation(0, t.chassisOffsetY, 0)
-      .setFriction(0.3)
-      .setRestitution(0.05)
+      .setFriction(t.wallFriction)
+      .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min)
+      .setRestitution(t.wallRestitution)
+      .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Max)
       .setCollisionGroups(GROUPS_CHASSIS_UPRIGHT)
       .setMassProperties(t.mass, { x: 0, y: t.centerOfMassY, z: 0 }, boxInertia(t), { x: 0, y: 0, z: 0, w: 1 });
   }
@@ -418,6 +477,79 @@ export class Vehicle {
         body.angvel(s.angvel);
       }
     }
+    // ---- body contacts: walls, buildings, props ----------------------------------
+    // Rapier solved these during the last step; the impulses are read back for the
+    // impact telemetry, and while the body scrapes a vertical face a yaw torque turns
+    // the nose along the wall. Left alone, corner friction does the opposite: the nose
+    // digs in, the car pivots into the wall and stops dead from 45 degrees up.
+    this.contactImpulse = 0;
+    this.contactCount = 0;
+    this.wallTouch = false;
+    this.contactSide = 0;
+    M.set(this.contactNormal, 0, 0, 0);
+    this.world.contactPairsWith(this.collider, this.onPair);
+    const impact = this.contactImpulse / t.mass;
+    let scrape = 0;
+    const touching = this.wallTouch && this.contactImpulse > 0;
+    if (touching) {
+      M.normalize(this.wallNormal, this.contactNormal); // from the wall into the car
+      this.wallTimer = t.wallMemory;
+      if (impact > t.wallHitSpeed) {
+        // the hit itself: keep only part of the spin the corner impulse gave the body
+        body.setAngvel({ x: s.angvel.x * t.wallHitRetainSpin, y: s.angvel.y * t.wallHitRetainSpin, z: s.angvel.z * t.wallHitRetainSpin }, true);
+        body.angvel(s.angvel);
+      }
+    } else if (this.wallTimer > 0) {
+      // the bounce: the car leaves the wall for a few steps and comes back; keep aligning
+      this.wallTimer -= dt;
+    }
+    if (touching || this.wallTimer > 0) {
+      M.copy(s.a, this.wallNormal);
+      const into = -M.dot(s.fwd, s.a); // + when the nose points into the wall
+      const noseDeg = Math.asin(M.clamp(Math.abs(into), 0, 1)) / M.DEG;
+      // Sliding: the nose is turned toward the direction of travel along the wall, so
+      // the car ends up pointing where it is going and never swings the long way round.
+      // Nearly stopped: the driver's intent decides. Throttle with the nose in peels the
+      // car off along the wall, to the steered side when it is square on (contact is
+      // intermittent while it turns, hence the memory); with no input a stopped car
+      // never turns on its own.
+      M.addScaled(s.b, s.vel, s.a, -M.dot(s.vel, s.a));
+      const vt = M.length(s.b);
+      let active = M.clamp01(vt / 5);
+      let aligning = false;
+      if (vt >= 2) {
+        if (noseDeg < t.wallAlignMaxDeg) {
+          M.scale(s.b, s.b, 1 / vt);
+          aligning = true;
+        }
+      } else if (throttle > 0.3 && into > 0) {
+        active = 1;
+        const steer = M.clamp(controls.steer, -1, 1);
+        M.addScaled(s.b, s.fwd, s.a, -M.dot(s.fwd, s.a));
+        const tl = M.length(s.b);
+        if (Math.abs(steer) >= 0.2) {
+          M.cross(s.b, s.a, s.up);
+          M.normalize(s.b, s.b);
+          if (M.dot(s.b, s.right) * steer < 0) M.scale(s.b, s.b, -1);
+          aligning = true;
+        } else if (tl > 1e-3 && noseDeg < 60) {
+          M.scale(s.b, s.b, 1 / tl);
+          aligning = true;
+        }
+      }
+      if (aligning && grounded > 0) {
+        M.cross(s.point, s.b, s.fwd);
+        const err = Math.atan2(M.dot(s.point, s.up), M.dot(s.b, s.fwd));
+        const yawInertia = boxInertia(t).y;
+        const accel = M.clamp(-t.wallAlignGain * err - t.wallAlignDamping * s.angvel.y, -t.wallAlignGain, t.wallAlignGain);
+        s.tSum.y += yawInertia * accel * active;
+      }
+      if (touching) {
+        scrape = M.clamp01(vt / 12) * M.clamp01(impact / 0.08);
+        this.contactSide = M.dot(s.a, s.right) > 0 ? 1 : -1; // the normal points away from the wall
+      }
+    }
+
     this.wasAirborne = grounded === 0;
 
     // ---- spring + damper (with anti-roll) ---------------------------------
@@ -829,6 +961,18 @@ export class Vehicle {
     tm.landingImpact = landingImpact;
     tm.brake = brakeIn;
     tm.driftDistance = this.driftDistance;
+    tm.impact = impact;
+    tm.scrape = scrape;
+    tm.contactSide = this.wallTouch ? this.contactSide : 0;
+    if (this.contactImpulse > 0) {
+      M.normalize(s.b, this.contactNormal);
+      tm.contactX = this.contactPoint.x;
+      tm.contactY = this.contactPoint.y;
+      tm.contactZ = this.contactPoint.z;
+      tm.contactNx = s.b.x;
+      tm.contactNy = s.b.y;
+      tm.contactNz = s.b.z;
+    }
     tm.vx = s.vel.x;
     tm.vy = s.vel.y;
     tm.vz = s.vel.z;

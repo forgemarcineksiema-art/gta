@@ -183,6 +183,29 @@ export function buildPlayground(world: RAPIER.World): PlaygroundLayout {
     addBox(5, 0.02, 12, { x: rampX, y: 0.006, z: big.z + 70 }, IDENTITY_QUAT, PALETTE.carLime, { collide: false, tag: 'mark' });
   }
 
+  // ---- walls lane: concrete barriers to scrape, an angled barrier to glance, a head-on wall ----
+  // Barriers are tall and thick so the chassis meets a vertical face and never climbs them.
+  const wallX = 250;
+  const wallHalf = 7;
+  addBox(wallHalf + 1, 0.015, 160, { x: wallX, y: 0.0, z: 110 }, IDENTITY_QUAT, PALETTE.asphaltLight, { collide: false, tag: 'road' });
+  for (const side of [-1, 1]) {
+    addBox(0.3, 0.6, 150, { x: wallX + side * (wallHalf + 0.3), y: 0.6, z: 100 }, IDENTITY_QUAT, PALETTE.concrete, { tag: 'wall' });
+  }
+  // angled barrier: from the left wall at z 190 to the lane centre at z 250 (about 7 degrees)
+  {
+    const x0 = wallX - wallHalf;
+    const x1 = wallX + 0.5;
+    const z0 = 190;
+    const z1 = 250;
+    const len = Math.hypot(x1 - x0, z1 - z0);
+    const yaw = Math.atan2(x1 - x0, z1 - z0);
+    addBox(0.3, 0.6, len / 2, { x: (x0 + x1) / 2, y: 0.6, z: (z0 + z1) / 2 }, quatFromYaw(yaw), PALETTE.concrete, { tag: 'wall' });
+  }
+  // pillars: a building corner at speed
+  for (const z of [140, 160]) addBox(0.5, 1.5, 0.5, { x: wallX - 2.5, y: 1.5, z }, IDENTITY_QUAT, PALETTE.concrete, { tag: 'wall' });
+  // head-on wall closing the lane
+  addBox(wallHalf + 0.6, 1.0, 0.5, { x: wallX, y: 1.0, z: 270 }, IDENTITY_QUAT, PALETTE.barrier, { tag: 'wall' });
+
   // ---- scattered props on the lot: soft boxes to bump ---------------------------
   for (let i = 0; i < 10; i++) {
     props.push({
@@ -206,6 +229,7 @@ export function buildPlayground(world: RAPIER.World): PlaygroundLayout {
   spawns.push({ name: 'slalom', position: { x: slalomX, y: 0.6, z: -10 }, yaw: 0 });
   spawns.push({ name: 'skidpad', position: { x: skid.x, y: 0.6, z: skid.z - skid.r - 20 }, yaw: 0 });
   spawns.push({ name: 'ramps', position: { x: rampX, y: 0.6, z: 0 }, yaw: 0 });
+  spawns.push({ name: 'walls', position: { x: wallX, y: 0.6, z: -30 }, yaw: 0 });
   spawns.push({ name: 'bigjump', position: { x: rampX, y: 0.6, z: 250 }, yaw: 0 });
   // 12 m before the start line so the first crossing starts the clock
   spawns.push({ name: 'track', position: { x: track.start.x - Math.sin(track.start.yaw) * 12, y: 0.6, z: track.start.z - Math.cos(track.start.yaw) * 12 }, yaw: track.start.yaw });

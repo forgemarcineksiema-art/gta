@@ -346,7 +346,7 @@ export class Vehicle {
       .setFriction(t.wallFriction)
       .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min)
       .setRestitution(t.wallRestitution)
-      .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Max)
+      .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Multiply)
       .setCollisionGroups(GROUPS_CHASSIS_UPRIGHT)
       .setMassProperties(t.mass, { x: 0, y: t.centerOfMassY, z: 0 }, boxInertia(t), { x: 0, y: 0, z: 0, w: 1 });
   }

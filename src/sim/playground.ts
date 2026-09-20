@@ -57,6 +57,8 @@ export function buildPlayground(world: RAPIER.World): PlaygroundLayout {
         .setTranslation(position.x, position.y, position.z)
         .setRotation(rotation)
         .setFriction(opts.friction ?? 1.0)
+        // walls carry full restitution: the chassis multiplies it by its own (props carry none)
+        .setRestitution(terrain ? 0 : 1.0)
         .setCollisionGroups(terrain ? GROUPS_TERRAIN : GROUPS_SOLID);
       world.createCollider(desc, ground);
     }

@@ -100,7 +100,14 @@ export class SimWorld {
         p.shape.kind === 'cylinder'
           ? RAPIER.ColliderDesc.cylinder(p.shape.halfHeight, p.shape.radius)
           : RAPIER.ColliderDesc.cuboid(p.shape.hx, p.shape.hy, p.shape.hz);
-      colliderDesc.setMass(p.mass).setFriction(0.8).setRestitution(0.2);
+      // props keep their old contact numbers against the slippery chassis: the Max rule wins
+      // over the chassis Min for friction (0.55 was the previous average), Multiply gives 0.12 bounce
+      colliderDesc
+        .setMass(p.mass)
+        .setFriction(0.55)
+        .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Max)
+        .setRestitution(0.6)
+        .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Multiply);
       this.world.createCollider(colliderDesc, body);
       const slot = this.transforms.allocate();
       this.tracked.push({ body, slot });

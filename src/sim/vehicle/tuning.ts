@@ -220,7 +220,7 @@ export interface VehicleTuning {
   // ---- walls (arcade). The chassis only meets walls, buildings and props.
   /** Chassis friction against what it touches (Min combine rule: walls are slippery). */
   wallFriction: number;
-  /** Chassis restitution (Max combine rule): the bounce of a head-on hit. */
+  /** Chassis restitution (Multiply combine rule): walls carry 1.0 so a head-on hit bounces by this; props carry 0 and do not. */
   wallRestitution: number;
   /** Yaw acceleration per radian of misalignment while sliding along a wall, rad/s² per rad (times the yaw inertia). */
   wallAlignGain: number;

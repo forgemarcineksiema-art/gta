@@ -145,16 +145,17 @@ export class LocalPlatform implements Platform {
       el.appendChild(label);
       document.body.appendChild(el);
       const started = performance.now();
-      const tickFn = () => {
+      // setInterval, not rAF: a simulated ad must finish even in a hidden tab
+      const timer = setInterval(() => {
         const left = Math.max(0, seconds - (performance.now() - started) / 1000);
         label.textContent = `SIMULATED ${type.toUpperCase()} AD  ·  ${left.toFixed(1)} s`;
-        if (left > 0) requestAnimationFrame(tickFn);
-        else {
+        if (left <= 0) {
+          clearInterval(timer);
           el.remove();
           resolve();
         }
-      };
-      tickFn();
+      }, 100);
+      label.textContent = `SIMULATED ${type.toUpperCase()} AD  ·  ${seconds.toFixed(1)} s`;
     });
   }
 }

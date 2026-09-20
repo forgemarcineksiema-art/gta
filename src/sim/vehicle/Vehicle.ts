@@ -13,8 +13,8 @@ import type { Vec3 } from '../math';
 import type { TransformBuffer } from '../transforms';
 import type { VehicleTuning } from './tuning';
 
-const WHEEL_RL = 2;
-const WHEEL_RR = 3;
+const WHEEL_RR = 2;
+const WHEEL_RL = 3;
 
 export interface WheelState {
   /** Local attach point. */
@@ -65,9 +65,16 @@ export interface VehicleTelemetry {
   driftTime: number;
   /** Largest tyre slip angle this step, degrees (for skid audio). */
   maxSlipDeg: number;
+  /** World velocity, m/s. */
+  vx: number;
+  vy: number;
+  vz: number;
 }
 
-const AXIS_X: Readonly<Vec3> = { x: 1, y: 0, z: 0 };
+// Right-handed frame with +Z forward and +Y up puts +X on the car's LEFT, so right is -X.
+// Consequently a positive rotation about +Y turns the nose to the left; steering right
+// therefore rotates by -steer (see `steerYaw`).
+const AXIS_RIGHT: Readonly<Vec3> = { x: -1, y: 0, z: 0 };
 const AXIS_Y: Readonly<Vec3> = { x: 0, y: 1, z: 0 };
 const AXIS_Z: Readonly<Vec3> = { x: 0, y: 0, z: 1 };
 
@@ -149,11 +156,12 @@ export class Vehicle {
     const hb = tuning.wheelBase * 0.5;
     const ht = tuning.trackWidth * 0.5;
     const ay = tuning.suspensionAttachY;
+    // order: FR, FL, RR, RL (x = -ht is the right side)
     const defs: Array<[number, number, boolean, boolean]> = [
-      [-ht, hb, true, true],
-      [ht, hb, true, false],
-      [-ht, -hb, false, true],
-      [ht, -hb, false, false],
+      [-ht, hb, true, false],
+      [ht, hb, true, true],
+      [-ht, -hb, false, false],
+      [ht, -hb, false, true],
     ];
     for (const [x, z, isFront, isLeft] of defs) {
       this.wheels.push({
@@ -192,6 +200,9 @@ export class Vehicle {
       airTime: 0,
       driftTime: 0,
       maxSlipDeg: 0,
+      vx: 0,
+      vy: 0,
+      vz: 0,
     };
     this.writeTransforms(true);
   }
@@ -214,7 +225,7 @@ export class Vehicle {
     body.linvel(s.vel);
     body.angvel(s.angvel);
     M.rotate(s.fwd, s.q, AXIS_Z);
-    M.rotate(s.right, s.q, AXIS_X);
+    M.rotate(s.right, s.q, AXIS_RIGHT);
     M.rotate(s.up, s.q, AXIS_Y);
 
     const forwardSpeed = M.dot(s.vel, s.fwd);
@@ -342,7 +353,7 @@ export class Vehicle {
       }
       // wheel frame on the contact plane
       if (w.isFront && this.steer !== 0) {
-        M.quatSetAxisAngle(s.q2, s.up.x, s.up.y, s.up.z, this.steer);
+        M.quatSetAxisAngle(s.q2, s.up.x, s.up.y, s.up.z, -this.steer);
         M.rotate(s.wheelFwd, s.q2, s.fwd);
       } else {
         M.copy(s.wheelFwd, s.fwd);
@@ -416,7 +427,7 @@ export class Vehicle {
     // straightens out, counter-steer straightens faster. Speed is kept on purpose.
     if (this.drifting) {
       const yawRate = M.dot(s.angvel, s.up);
-      const targetYaw = M.clamp(controls.steer, -1, 1) * t.driftYawRate;
+      const targetYaw = -M.clamp(controls.steer, -1, 1) * t.driftYawRate; // right = negative yaw
       const torque = M.clamp((targetYaw - yawRate) * t.driftYawGain, -t.driftYawTorqueMax, t.driftYawTorqueMax);
       M.scale(s.force, s.up, torque);
       body.addTorque(s.force, true);
@@ -463,8 +474,8 @@ export class Vehicle {
     if (airborne) {
       this.airTime += dt;
       // throttle lifts the nose, brake drops it; steer rolls. Levelling always acts.
-      const pitchIn = brake - throttle;
-      const rollIn = -controls.steer;
+      const pitchIn = throttle - brake; // positive torque about `right` (-X) lifts the nose
+      const rollIn = controls.steer; // positive roll about +Z drops the right side
       M.scale(s.force, s.right, pitchIn * t.airPitchTorque);
       M.addScaled(s.force, s.force, s.fwd, rollIn * t.airRollTorque);
       M.cross(s.a, s.up, AXIS_Y);
@@ -512,6 +523,9 @@ export class Vehicle {
     tm.airTime = this.airTime;
     tm.driftTime = this.driftTime;
     tm.maxSlipDeg = maxSlip / M.DEG;
+    tm.vx = s.vel.x;
+    tm.vy = s.vel.y;
+    tm.vz = s.vel.z;
   }
 
   private updateGearbox(absFwd: number, throttle: number, vmax: number, dt: number): void {
@@ -557,7 +571,7 @@ export class Vehicle {
     for (const wh of this.wheels) {
       // wheel rotation = body * steer(yaw) * spin(pitch)
       const steer = wh.isFront ? this.steer : 0;
-      M.quatSetAxisAngle(s.q2, 0, 1, 0, steer);
+      M.quatSetAxisAngle(s.q2, 0, 1, 0, -steer);
       M.quatMul(s.q3, s.q, s.q2);
       M.quatSetAxisAngle(s.q2, 1, 0, 0, wh.spin);
       M.quatMul(s.q3, s.q3, s.q2);

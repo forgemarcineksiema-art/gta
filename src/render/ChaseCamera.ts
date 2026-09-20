@@ -58,7 +58,9 @@ export class ChaseCamera {
   private readonly fwd = new THREE.Vector3();
   private readonly velDir = new THREE.Vector3();
   private readonly heading = new THREE.Vector3(0, 0, 1);
-  private readonly lastCarPos = new THREE.Vector3();
+  /** +1 looking forward, -1 looking back (reverse camera). */
+  private facing = 1;
+  private reverseTime = 0;
   private readonly up = new THREE.Vector3(0, 1, 0);
   private readonly tmp = new THREE.Vector3();
   private fov: number;
@@ -75,7 +77,7 @@ export class ChaseCamera {
     this.mode = this.mode === 'chase' ? 'far' : 'chase';
   }
 
-  update(car: THREE.Object3D, tm: VehicleTelemetry, dt: number, snap: boolean): void {
+  update(car: THREE.Object3D, carVel: THREE.Vector3, tm: VehicleTelemetry, dt: number, snap: boolean): void {
     const t = this.tuning;
     const speed = Math.abs(tm.speed);
     const modeMul = this.mode === 'far' ? 1.6 : 1;
@@ -86,18 +88,17 @@ export class ChaseCamera {
     if (this.fwd.lengthSq() < 1e-4) this.fwd.set(0, 0, 1);
     this.fwd.normalize();
 
-    // velocity direction from the interpolated car position
-    if (this.initialised && dt > 0) {
-      this.velDir.copy(car.position).sub(this.lastCarPos);
-      this.velDir.y = 0;
-    } else {
-      this.velDir.set(0, 0, 0);
-    }
-    this.lastCarPos.copy(car.position);
+    // reverse camera after a second of backing up; back to forward as soon as the car goes forward
+    if (tm.speed < -1.5) this.reverseTime += dt;
+    else this.reverseTime = 0;
+    const facingTarget = this.reverseTime > 1 ? -1 : tm.speed > 0.5 || speed < 0.2 ? 1 : this.facing;
+    if (facingTarget !== this.facing) this.facing = facingTarget;
+    if (this.facing < 0) this.fwd.negate();
+
+    this.velDir.set(carVel.x, 0, carVel.z);
     let headingTarget = this.tmp.copy(this.fwd);
     if (this.velDir.lengthSq() > 1e-6 && speed > 3) {
       this.velDir.normalize();
-      // reversing: keep looking forward
       if (this.velDir.dot(this.fwd) > -0.2) {
         const k = t.velocityFollow * Math.min(1, speed / 15);
         headingTarget = this.tmp.copy(this.fwd).lerp(this.velDir, k).normalize();

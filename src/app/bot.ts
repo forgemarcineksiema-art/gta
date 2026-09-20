@@ -101,7 +101,7 @@ export class BotDriver {
       let d = desired - yaw;
       while (d > Math.PI) d -= Math.PI * 2;
       while (d < -Math.PI) d += Math.PI * 2;
-      controls.steer = Math.max(-1, Math.min(1, d * 1.5));
+      controls.steer = Math.max(-1, Math.min(1, -d * 1.5)); // positive steer = right = negative yaw
       controls.handbrake = 0;
       controls.boost = 0;
       if (r > 260) {

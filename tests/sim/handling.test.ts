@@ -153,7 +153,7 @@ describe('stability', () => {
     let minUp = 1;
     run(sim, 4, (_t, c, s) => {
       c.throttle = 1;
-      c.steer = position(s).x < 63.4 ? 0.25 : -0.1;
+      c.steer = position(s).x < 63.4 ? -0.25 : 0.1; // the right-hand kerb sits at +X, which is the car's left
       minUp = Math.min(minUp, upness(s));
     });
     expect(minUp).toBeGreaterThan(0.9);

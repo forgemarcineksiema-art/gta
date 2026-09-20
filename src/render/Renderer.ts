@@ -38,6 +38,8 @@ export class Renderer {
   private readonly sun: THREE.DirectionalLight;
   private readonly streaks: SpeedStreaks;
   private readonly tmpPos = new THREE.Vector3();
+  private readonly carVel = new THREE.Vector3();
+  private readonly sky: THREE.Mesh;
   private readonly tmpQa = new THREE.Quaternion();
   private readonly tmpQb = new THREE.Quaternion();
   private readonly shadowTarget = new THREE.Object3D();
@@ -81,7 +83,8 @@ export class Renderer {
     this.sun.shadow.normalBias = 0.05;
     this.sun.target = this.shadowTarget;
     this.scene.add(this.sun, this.shadowTarget);
-    this.scene.add(buildSkyDome());
+    this.sky = buildSkyDome();
+    this.scene.add(this.sky);
 
     this.buildStatics(sim.statics);
     for (const d of sim.dynamics) this.addDynamic(d);
@@ -178,13 +181,28 @@ export class Renderer {
   render(alpha: number, dt: number): void {
     this.applyTransforms(alpha);
     const tm = this.sim.vehicle.telemetry;
-    this.chase.update(this.car.root, tm, dt, this.sim.respawned);
+    const carPos = this.car.root.position;
+    this.carVel.set(tm.vx, tm.vy, tm.vz);
+
+    this.chase.update(this.car.root, this.carVel, tm, dt, this.sim.respawned);
     this.car.update(tm);
-    // keep the shadow frustum on the car
-    this.tmpPos.copy(this.car.root.position);
+    // shadow frustum follows the car and widens with speed so fast driving keeps shadowed ground ahead
+    const speed = Math.abs(tm.speed);
+    const half = 40 + Math.min(60, speed * 1.2);
+    const sc = this.sun.shadow.camera;
+    if (Math.abs(sc.right - half) > 2) {
+      sc.left = -half;
+      sc.right = half;
+      sc.top = half;
+      sc.bottom = -half;
+      sc.updateProjectionMatrix();
+    }
+    this.tmpPos.copy(carPos);
     this.shadowTarget.position.copy(this.tmpPos);
     this.sun.position.set(this.tmpPos.x - 60, this.tmpPos.y + 90, this.tmpPos.z - 40);
-    this.streaks.update(this.camera, tm, dt);
+    // the sky dome rides with the camera so the horizon never comes closer
+    this.sky.position.copy(this.camera.position);
+    this.streaks.update(carPos, this.carVel, tm);
 
     this.renderer.info.reset();
     this.renderer.render(this.scene, this.camera);

@@ -53,19 +53,18 @@ body {
   position: absolute;
   right: calc(24px + var(--safe-right));
   bottom: calc(20px + var(--safe-bottom));
-  display: grid;
-  grid-template-columns: auto auto;
-  grid-template-areas:
-    'gear speed'
-    'gear unit'
-    'boost boost';
-  align-items: end;
-  column-gap: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   text-align: right;
   text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45), 0 0 18px rgba(0, 0, 0, 0.35);
 }
+.hud__speed-row {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
 .hud__speed {
-  grid-area: speed;
   font-size: clamp(44px, 7.5vh, 76px);
   font-weight: 900;
   font-style: italic;
@@ -75,26 +74,34 @@ body {
   font-variant-numeric: tabular-nums;
 }
 .hud__unit {
-  grid-area: unit;
   font-size: clamp(12px, 1.8vh, 16px);
   font-weight: 700;
   letter-spacing: 0.2em;
   color: var(--ui-ink-dim);
-  margin-top: 4px;
+  margin-top: 6px;
 }
 .hud__gear {
-  grid-area: gear;
-  align-self: start;
-  font-size: clamp(22px, 3.6vh, 34px);
+  font-size: clamp(24px, 4vh, 38px);
   font-weight: 900;
   font-style: italic;
   color: var(--ui-accent);
-  padding-top: 4px;
 }
 .hud__boost {
-  grid-area: boost;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+.hud__boost-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.25em;
+  color: var(--ui-ink-dim);
+  margin-right: 4px;
+}
+.hud__boost-track {
   position: relative;
-  margin-top: 10px;
   width: clamp(150px, 22vh, 220px);
   height: 12px;
   border: 2px solid var(--ui-ink);
@@ -116,14 +123,8 @@ body {
 .hud__boost.is-active .hud__boost-fill {
   background: #fff;
 }
-.hud__boost-label {
-  position: absolute;
-  right: 6px;
-  top: -18px;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.25em;
-  color: var(--ui-ink-dim);
+.hud__boost.is-active .hud__boost-label {
+  color: #fff;
 }
 
 /* drift readout, bottom centre */

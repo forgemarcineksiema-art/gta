@@ -52,16 +52,18 @@ export class Hud {
     parent.appendChild(this.root);
 
     const speedo = el('div', 'hud__speedo');
-    this.speed = el('div', 'hud__speed', '0');
-    const unit = el('div', 'hud__unit', 'km/h');
+    const speedRow = el('div', 'hud__speed-row');
     this.gear = el('div', 'hud__gear', '1');
-    speedo.append(this.gear, this.speed, unit);
+    this.speed = el('div', 'hud__speed', '0');
+    speedRow.append(this.gear, this.speed);
+    const unit = el('div', 'hud__unit', 'km/h');
     this.boostWrap = el('div', 'hud__boost');
-    this.boostFill = el('div', 'hud__boost-fill');
-    this.boostWrap.appendChild(this.boostFill);
     const boostLabel = el('div', 'hud__boost-label', 'BOOST');
-    this.boostWrap.appendChild(boostLabel);
-    speedo.appendChild(this.boostWrap);
+    const boostTrack = el('div', 'hud__boost-track');
+    this.boostFill = el('div', 'hud__boost-fill');
+    boostTrack.appendChild(this.boostFill);
+    this.boostWrap.append(boostLabel, boostTrack);
+    speedo.append(speedRow, unit, this.boostWrap);
     this.root.appendChild(speedo);
 
     this.drift = el('div', 'hud__drift');

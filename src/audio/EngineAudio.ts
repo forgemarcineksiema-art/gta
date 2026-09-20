@@ -8,6 +8,8 @@
  */
 import type { VehicleTelemetry } from '../sim';
 
+const GESTURES = ['keydown', 'pointerdown', 'touchstart', 'touchend', 'click'] as const;
+
 export class EngineAudio {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -29,9 +31,8 @@ export class EngineAudio {
 
   constructor() {
     this.onGesture = () => void this.unlock();
-    window.addEventListener('keydown', this.onGesture);
-    window.addEventListener('pointerdown', this.onGesture);
-    window.addEventListener('touchstart', this.onGesture);
+    // keydown/pointerdown for desktop; touchend/click are what iOS needs to recover a suspended context
+    for (const ev of GESTURES) window.addEventListener(ev, this.onGesture);
   }
 
   get ready(): boolean {
@@ -168,9 +169,7 @@ export class EngineAudio {
   }
 
   dispose(): void {
-    window.removeEventListener('keydown', this.onGesture);
-    window.removeEventListener('pointerdown', this.onGesture);
-    window.removeEventListener('touchstart', this.onGesture);
+    for (const ev of GESTURES) window.removeEventListener(ev, this.onGesture);
     void this.ctx?.close();
     this.ctx = null;
   }

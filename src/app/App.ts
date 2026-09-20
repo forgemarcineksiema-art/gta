@@ -114,6 +114,9 @@ export class App {
       }
     });
 
+    // CrazyGames common fixes: no page scroll from the wheel, no context menu on the canvas
+    window.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
+    document.addEventListener('contextmenu', (e) => e.preventDefault());
     window.addEventListener('resize', () => this.renderer.resize());
     window.addEventListener('blur', () => this.setFocusPaused(true));
     window.addEventListener('focus', () => this.setFocusPaused(false));

@@ -40,6 +40,8 @@ declare global {
   }
 }
 
+const WARMUP_FRAMES = 5;
+
 export class PerfProbe {
   readonly duration: number;
   private readonly frameMs: number[] = [];
@@ -58,8 +60,15 @@ export class PerfProbe {
     this.frameMs.length = 0;
   }
 
+  private warmup = WARMUP_FRAMES;
+
   frame(frameMs: number, stepMs: number, stats: RenderStats, dropped: number, botResets: number): void {
     if (this.done) return;
+    // the first frames pay for shader compilation and buffer uploads; they are not steady state
+    if (this.warmup > 0) {
+      this.warmup--;
+      return;
+    }
     const heap = heapMb();
     if (this.frameMs.length === 0) this.heapStart = heap;
     this.heapMax = Math.max(this.heapMax, heap);

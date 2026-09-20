@@ -12,19 +12,19 @@ Launch model (requirements/intro): **Basic Launch** = live without SDK, no monet
 
 | # | Requirement | Source | Status | Notes |
 |---|---|---|---|---|
-| T1 | Total bundle size <= 250 MB. | requirements/technical | todo | |
-| T2 | File count <= 1500 files. | requirements/technical | todo | |
-| T3 | Initial download size <= 50 MB, measured "between the start of loading and the occurence of the first `Gameplay start` event" (`gameplayStart()`); <= 20 MB to be eligible for the mobile homepage. | requirements/technical | todo | Menus do not count as gameplay; the first `gameplayStart()` defines the cut-off. |
+| T1 | Total bundle size <= 250 MB. | requirements/technical | done | 3.3 MB total after M1; `npm run budget` enforces 40 MB (our target) < 250 MB. |
+| T2 | File count <= 1500 files. | requirements/technical | done | 5 files after M1; budget enforces 200. |
+| T3 | Initial download size <= 50 MB, measured "between the start of loading and the occurence of the first `Gameplay start` event" (`gameplayStart()`); <= 20 MB to be eligible for the mobile homepage. | requirements/technical | done | Measured by the smoke test into perf/startup.json: 3.29 MB before the first gameplayStart() (target 8 MB, CI fails at 12 MB). |
 | T4 | If the SDK is NOT integrated, the total file size is used instead and must be <= 50 MB (20 MB for mobile homepage). | requirements/technical | info | Applies to Basic Launch without SDK only. |
 | T5 | Externally hosted/loaded files: QA measures time to reach gameplay, must be <= 20 seconds. | requirements/technical | todo | |
-| T6 | Use only relative paths inside the bundle; never absolute paths. | requirements/technical | todo | |
+| T6 | Use only relative paths inside the bundle; never absolute paths. | requirements/technical | done | `base: './'` in vite.config.ts; `npm run budget` scans the build for absolute paths. |
 | T7 | Must work in Chrome and Edge; Safari support expected (game is disabled on Safari if it does not work well). | requirements/technical | todo | |
 | T8 | Chromebook: must run smoothly on a Chromium OS device with 4 GB RAM, otherwise the game is disabled on Chromium OS. | requirements/technical | todo | Perf budget target. |
 | T9 | Support mouse and keyboard; touch if mobile is supported. | requirements/technical | todo | |
 | T10 | Landscape must be playable on desktop; portrait games allowed only with black bars or side background images. | requirements/technical | todo | |
-| T11 | Mobile: add `-webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;` to prevent unwanted selection/interactions. | requirements/technical | todo | |
+| T11 | Mobile: add `-webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;` to prevent unwanted selection/interactions. | requirements/technical | done | `user-select: none` + vendor prefixes on body in src/ui/styles.css. |
 | T12 | Mobile: platform forces DPR=1 on iOS and low-memory Android, native `window.devicePixelRatio` elsewhere; rendering must look right at both. | requirements/technical | info | Test at DPR 1 explicitly. |
-| T13 | iOS audio: call `AudioContext.resume()` inside a user gesture (`touchend`/`click`) to recover suspended audio after interruptions. | requirements/technical | todo | |
+| T13 | iOS audio: call `AudioContext.resume()` inside a user gesture (`touchend`/`click`) to recover suspended audio after interruptions. | requirements/technical | done | EngineAudio resumes the context on keydown/pointerdown/touchstart/touchend/click. |
 | T14 | Unity builds are disabled on iOS by default until enough plays; not relevant for a pure HTML5 build. | requirements/technical | n/a | |
 | T15 | Basic Launch with SDK: trigger `gameplayStart()`; ads are prohibited. Full Launch: `gameplayStart`/`gameplayStop` mandatory, Data module (if saving progress), User module (if accounts), `loadingStart`/`loadingStop` optional. | requirements/technical | todo | |
 | T16 | Sitelock/CSP must whitelist all CrazyGames domains plus the iOS/Android app origins (see section 14). | requirements/technical | todo | |
@@ -35,13 +35,13 @@ Launch model (requirements/intro): **Basic Launch** = live without SDK, no monet
 | # | Requirement | Source | Status | Notes |
 |---|---|---|---|---|
 | G1 | Text and images must be legible at `devicePixelRatio: 1` in a responsive 16:9 iframe at: 821x462, 907x510, 1077x606, 1216x684 (desktop non-fullscreen); 1280x720, 1366x768, 1536x864, 1920x1080 (desktop fullscreen); 800x450 (mobile); 1080x607 (tablet). | requirements/gameplay | todo | Add these to the QA matrix. |
-| G2 | Physics/gameplay must behave identically at different refresh rates (e.g. 144 Hz, 165 Hz); do not tie simulation to frame count. | requirements/gameplay | todo | Fixed timestep. |
+| G2 | Physics/gameplay must behave identically at different refresh rates (e.g. 144 Hz, 165 Hz); do not tie simulation to frame count. | requirements/gameplay | done | Fixed 60 Hz step with accumulator; tests/sim/loop.test.ts proves bitwise-equal results at 30/60/144/165 Hz. |
 | G3 | English localization required; extra languages must be accurate; detect language from SDK `systemInfo.locale`, fall back to English. | requirements/gameplay | todo | |
-| G4 | Controls intuitive on every supported device; avoid restricted keys (`Escape`, `Ctrl/Cmd+W`); consider AZERTY layouts. | requirements/gameplay, requirements/quality | todo | Use `event.code` and offer remap or layout-agnostic bindings. |
+| G4 | Controls intuitive on every supported device; avoid restricted keys (`Escape`, `Ctrl/Cmd+W`); consider AZERTY layouts. | requirements/gameplay, requirements/quality | done | KeyboardEvent.code bindings (WASD positions + arrows), labels via getLayoutMap(); nothing on Escape; pause on P. |
 | G5 | Game loads quickly and plays without errors or crashes. | requirements/gameplay | todo | |
 | G6 | Name, assets and content must be original. | requirements/gameplay | todo | |
-| G7 | No in-game fullscreen button; CrazyGames provides fullscreen itself. | requirements/gameplay | todo | Remove any fullscreen toggle. |
-| G8 | No cross-promotion/external links except: privacy/terms, community links on menus, store links (desktop only), CrazyGames backlinks, same-series game links. App Store links are never allowed in-game. | requirements/gameplay | todo | |
+| G7 | No in-game fullscreen button; CrazyGames provides fullscreen itself. | requirements/gameplay | done | No fullscreen button in the UI. |
+| G8 | No cross-promotion/external links except: privacy/terms, community links on menus, store links (desktop only), CrazyGames backlinks, same-series game links. App Store links are never allowed in-game. | requirements/gameplay | done | No external links in the game. |
 | G9 | PEGI 12 compliant (audience aged 13+). | requirements/gameplay | todo | |
 | G10 | Full Launch: player lands directly in gameplay or at most one click away from playing. | requirements/gameplay | todo | Auto-start into the tutorial. |
 
@@ -120,7 +120,7 @@ Launch model (requirements/intro): **Basic Launch** = live without SDK, no monet
 
 | # | Requirement | Source | Status | Notes |
 |---|---|---|---|---|
-| L1 | Load time and size are measured up to the first `gameplayStart()`, which must be real gameplay, not a loading screen. | resources/getting-to-the-first-frame | todo | Same rule as T3. |
+| L1 | Load time and size are measured up to the first `gameplayStart()`, which must be real gameplay, not a loading screen. | resources/getting-to-the-first-frame | done | gameplayStart() fires on the first rendered frame with the car controllable (App.frame); loadingStart/Stop bracket physics init + scene build. |
 | L2 | Perception targets: < 100 ms instant; 1 s fine; 10 s attention wanders (must show feedback). Show immediate feedback rather than chase zero. | resources/getting-to-the-first-frame | info | |
 | L3 | Load tutorial-critical assets first, call `gameplayStart()` when the tutorial is playable, stream the rest during the tutorial. | resources/getting-to-the-first-frame | todo | |
 | L4 | Reduce build: Brotli compression, compressed textures (ASTC), Vorbis audio, compressed models; keep startup code light and defer heavy work to async tasks. | resources/getting-to-the-first-frame | todo | |
@@ -157,10 +157,10 @@ Launch model (requirements/intro): **Basic Launch** = live without SDK, no monet
 
 | # | Requirement | Source | Status | Notes |
 |---|---|---|---|---|
-| F1 | Prevent page scroll: `window.addEventListener("wheel", e => e.preventDefault(), { passive: false })`. | resources/html5/common-fixes | todo | |
-| F2 | Prevent key scrolling: `preventDefault()` on `keydown` for `ArrowUp`, `ArrowDown`, `" "` (space). | resources/html5/common-fixes | todo | |
-| F3 | Handle `visibilitychange` (`hidden`/`visible`) to pause/resume; reported broken on the Samsung app webview. | resources/html5/common-fixes | todo | |
-| F4 | Disable the right-click context menu: `document.addEventListener("contextmenu", e => e.preventDefault())`. | resources/html5/common-fixes | todo | |
+| F1 | Prevent page scroll: `window.addEventListener("wheel", e => e.preventDefault(), { passive: false })`. | resources/html5/common-fixes | done | App: wheel listener with preventDefault (passive: false). |
+| F2 | Prevent key scrolling: `preventDefault()` on `keydown` for `ArrowUp`, `ArrowDown`, `" "` (space). | resources/html5/common-fixes | done | KeyboardDevice prevents default on Space and all four arrows (also on repeat). |
+| F3 | Handle `visibilitychange` (`hidden`/`visible`) to pause/resume; reported broken on the Samsung app webview. | resources/html5/common-fixes | done | App pauses the sim on blur/visibilitychange without calling gameplayStop; resumes on focus/click. |
+| F4 | Disable the right-click context menu: `document.addEventListener("contextmenu", e => e.preventDefault())`. | resources/html5/common-fixes | done | App: contextmenu preventDefault on document. |
 
 ## 14. Sitelock
 

@@ -105,7 +105,8 @@ export class BotDriver {
       controls.handbrake = 0;
       controls.boost = 0;
       if (r > 260) {
-        controls.reset = true;
+        // far off the lot: go back to the lot spawn, not the nearest one (which may be far out too)
+        sim.spawnAt('lot');
         this.resets++;
       }
     }
@@ -114,7 +115,7 @@ export class BotDriver {
     if (speed < 0.8 && controls.throttle > 0) {
       this.stuckTime += dt;
       if (this.stuckTime > 2.5) {
-        controls.reset = true;
+        sim.spawnAt('lot');
         this.resets++;
         this.stuckTime = 0;
       }

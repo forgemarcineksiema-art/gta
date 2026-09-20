@@ -28,7 +28,7 @@ Free-form session log: done, decided and why, next, open problems. Newest sessio
 - Custom raycast vehicle instead of Rapier's controller: the drift state, slip curve and arcade assists the brief asks for do not exist in the built-in controller.
 - Drift is a controlled state (yaw-rate controller + velocity-follow + scrub), because the emergent version either spun out or lost all speed in a second. Holding steer now gives a stable ~25° drift; centring straightens in ~0.3 s.
 - Handling numbers were set by the headless probe, not by feel (which only Marcin can judge): 0–100 in 4.9 s, 163 km/h at 12 s / ~170 asymptotic, 228 km/h with boost, 31 m braking from 100.
-- Headless Chromium uses SwiftShader (~5 fps); frame-time budgets are enforced only on a real GPU, sim-step time (< 12 ms p95) everywhere. Playwright launches with GPU-friendly flags in case the OS allows hardware GL headless.
+- Headless Chromium defaulted to SwiftShader (~5 fps). With `--ignore-gpu-blocklist --enable-gpu-rasterization --use-angle=default` in `playwright.config.ts` it uses the real GPU on this machine (NVIDIA MX330 via ANGLE D3D11): 58.7 fps mean, p95 16.8 ms in the smoke run. Frame-time budgets are enforced only when the GL renderer is not a software rasterizer; sim-step time (< 12 ms p95) is enforced everywhere.
 - Sky dome fixed at the origin for now (850 m radius); moves with the camera in M2.
 - Title: "Untitled Driving Game" in the build until Marcin picks from `docs/TITLES.md`.
 
@@ -44,4 +44,4 @@ Free-form session log: done, decided and why, next, open problems. Newest sessio
 ### Open problems
 
 - Feel is unverified by a human. The M1 gate is Marcin's playtest; the tuning panel exists for that session.
-- No real-GPU perf numbers yet (`npm run perf:headed`).
+- Perf numbers so far come from this machine's MX330 through headless Chromium; the Chromebook/low tier is unmeasured until Marcin runs `npm run perf:headed` there.

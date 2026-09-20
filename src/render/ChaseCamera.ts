@@ -44,9 +44,15 @@ export interface CameraTuning {
   heightRateAir: number;
   /** Shake per m/s of landing impact. */
   landingShake: number;
-  /** Seconds of reversing before the camera swings round, and the swing speed in degrees per second. */
+  /** Seconds of reversing before the camera swings round. */
   reverseDelay: number;
-  reverseOrbitRateDeg: number;
+  /** Seconds of forward driving, or of standing still, before it swings back. */
+  reverseReturnDelay: number;
+  reverseStillDelay: number;
+  /** Natural frequency of the critically damped swing (rad/s): 4.5 settles in about a second. */
+  reverseOrbitOmega: number;
+  /** Extra camera height while looking back, m. */
+  reverseHeight: number;
 }
 
 export const DEFAULT_CAMERA: CameraTuning = {
@@ -76,8 +82,11 @@ export const DEFAULT_CAMERA: CameraTuning = {
   heightRateGround: 9,
   heightRateAir: 2.5,
   landingShake: 0.03,
-  reverseDelay: 0.6,
-  reverseOrbitRateDeg: 260,
+  reverseDelay: 0.7,
+  reverseReturnDelay: 0.3,
+  reverseStillDelay: 1.2,
+  reverseOrbitOmega: 4.5,
+  reverseHeight: 0.3,
 };
 
 export type CameraMode = 'chase' | 'far';
@@ -102,9 +111,13 @@ export class ChaseCamera {
   private readonly up = new THREE.Vector3(0, 1, 0);
   /** Camera yaw, radians: forward = (sin, 0, cos). */
   private heading = 0;
-  /** 0 = forward view, 1 = reverse view; eases between them. */
-  private reverseBlend = 0;
+  /** Orbit parameter: 0 = forward view, 1 = reverse view. Driven by a critically damped spring. */
+  private reverseU = 0;
+  private reverseVel = 0;
+  private reverseTarget = 0;
   private reverseTime = 0;
+  private forwardTime = 0;
+  private stillTime = 0;
   private carY = 0;
   private fov: number;
   private shakeT = 0;
@@ -136,18 +149,36 @@ export class ChaseCamera {
       yawTarget = yawNose + wrapAngle(yawVel - yawNose) * k;
     }
 
-    // reverse view: after a moment of backing up, orbit the camera round to the front
-    if (tm.speed < -1.5) this.reverseTime += dt;
-    else if (tm.speed > 0.5 || speed < 0.2) this.reverseTime = 0;
-    const reverseWanted = this.reverseTime > t.reverseDelay ? 1 : 0;
-    const orbitStep = (t.reverseOrbitRateDeg * DEG * dt) / Math.PI;
-    this.reverseBlend += Math.max(-orbitStep, Math.min(orbitStep, reverseWanted - this.reverseBlend));
+    // reverse view: after a moment of backing up the camera orbits round to the front of the car,
+    // and returns after a moment of driving forward or of standing still. The orbit parameter is a
+    // critically damped spring: no jerk at either end, and a change of mind mid-swing eases back.
+    if (tm.speed < -1.5) {
+      this.reverseTime += dt;
+      this.forwardTime = 0;
+      this.stillTime = 0;
+    } else if (tm.speed > 0.8) {
+      this.forwardTime += dt;
+      this.reverseTime = 0;
+      this.stillTime = 0;
+    } else {
+      this.stillTime += dt;
+    }
+    if (this.reverseTime > t.reverseDelay) this.reverseTarget = 1;
+    if (this.forwardTime > t.reverseReturnDelay || this.stillTime > t.reverseStillDelay) this.reverseTarget = 0;
+    const w = t.reverseOrbitOmega;
+    const acc = (this.reverseTarget - this.reverseU) * w * w - 2 * w * this.reverseVel;
+    this.reverseVel += acc * dt;
+    this.reverseU = Math.max(0, Math.min(1, this.reverseU + this.reverseVel * dt));
 
     if (!this.initialised || snap) {
       this.heading = yawTarget;
       this.carY = car.position.y;
-      this.reverseBlend = 0;
+      this.reverseU = 0;
+      this.reverseVel = 0;
+      this.reverseTarget = 0;
       this.reverseTime = 0;
+      this.forwardTime = 0;
+      this.stillTime = 0;
       this.initialised = true;
     } else {
       const rate = 1 - Math.exp(-dt * (tm.drifting ? t.headingRateDrift : t.headingRate));
@@ -158,7 +189,7 @@ export class ChaseCamera {
     }
 
     // view yaw includes the reverse orbit
-    const viewYaw = this.heading + Math.PI * this.reverseBlend;
+    const viewYaw = this.heading + Math.PI * this.reverseU;
     this.dir.set(Math.sin(viewYaw), 0, Math.cos(viewYaw));
 
     // height follows the car with lag in the air so a jump reads as height
@@ -166,7 +197,7 @@ export class ChaseCamera {
     this.carY += (car.position.y - this.carY) * (snap ? 1 : hRate);
 
     const dist = (t.distance + speed * t.distancePerSpeed + (tm.drifting ? t.driftDistanceBonus : 0)) * modeMul;
-    const height = Math.max(1.4, t.height - speed * t.heightDropPerSpeed - (tm.drifting ? t.driftHeightDrop : 0)) * modeMul;
+    const height = Math.max(1.4, t.height - speed * t.heightDropPerSpeed - (tm.drifting ? t.driftHeightDrop : 0) + t.reverseHeight * this.reverseU) * modeMul;
     this.target.set(car.position.x - this.dir.x * dist, this.carY + height, car.position.z - this.dir.z * dist);
 
     if (snap || !this.initialised) {

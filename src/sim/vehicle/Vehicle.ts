@@ -96,6 +96,10 @@ export interface VehicleTelemetry {
   shifting: boolean;
   /** Vertical speed absorbed on the step the car touched down after a flight, m/s (0 otherwise). */
   landingImpact: number;
+  /** Brake pedal 0..1 (the input, for brake lights). */
+  brake: number;
+  /** Metres covered in the current drift. */
+  driftDistance: number;
   /** World velocity, m/s. */
   vx: number;
   vy: number;
@@ -155,6 +159,7 @@ export class Vehicle {
   /** Drift side (+1 right) and the rate-limited commanded angle in degrees (+ = right). */
   driftDir = 1;
   driftTargetDeg = 0;
+  driftDistance = 0;
   private driftExitTimer = 0;
   private wasAirborne = false;
   private collidesWithTerrain = false;
@@ -238,6 +243,8 @@ export class Vehicle {
       minSlipRatio: 0,
       shifting: false,
       landingImpact: 0,
+      brake: 0,
+      driftDistance: 0,
       vx: 0,
       vy: 0,
       vz: 0,
@@ -425,6 +432,7 @@ export class Vehicle {
       if (!this.drifting && ((handbrake && turning) || brakeEntry || rearSlip > t.driftEnterDeg * M.DEG)) {
         this.drifting = true;
         this.driftTime = 0;
+        this.driftDistance = 0;
         this.driftExitTimer = 0;
         // + = drifting to the right (nose right of the velocity, negative body slip)
         this.driftDir = Math.abs(controls.steer) > 0.05 ? Math.sign(controls.steer) : bodySlipDeg < 0 ? 1 : -1;
@@ -441,6 +449,7 @@ export class Vehicle {
     }
     if (this.drifting) {
       this.driftTime += dt;
+      this.driftDistance += speed * dt;
       // commanded drift angle (+ = right), rate limited so keyboard taps modulate instead of cancelling
       const st = M.clamp(controls.steer, -1, 1);
       let cmd: number;
@@ -772,6 +781,8 @@ export class Vehicle {
     tm.minSlipRatio = minSlipRatio;
     tm.shifting = shifting;
     tm.landingImpact = landingImpact;
+    tm.brake = brakeIn;
+    tm.driftDistance = this.driftDistance;
     tm.vx = s.vel.x;
     tm.vy = s.vel.y;
     tm.vz = s.vel.z;

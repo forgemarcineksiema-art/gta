@@ -31,12 +31,13 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 | concrete | `#9a938a` | car magenta | `#f45bff` |
 | sand | `#d9b57a` | car white | `#f7f3ea` |
 | grass | `#7fae5a` | car black | `#1c1b22` |
-| water | `#3fa7c9` | tyre / rim | `#1a1a1f` / `#d9d9e0` |
+| water | `#3fa7c9` | tyre / rim | `#15151a` / `#c4c4cd` |
 | glass | `#9fd8ff` | police | `#f7f3ea` + `#1d4ed8` |
 | ramp | `#e5533d` | sky top | `#2b1b5a` |
 | cone | `#ff8a2b` | sky horizon | `#ff8a5b` |
 | barrier | `#f7f3ea` | sun / fog | `#ffd27a` / `#e8a07a` |
 
+- Blacks and greys for trim, rubber and metal, darkest to lightest: ink `#0c0c10`, rubber `#15151a`, charcoal `#25252c`, graphite `#35353e`, slate `#4a4a55`, steel `#6d6d78`, silver `#9d9da8`, light grey `#c4c4cd`, chrome `#e4e4ea`. A car uses at least three of them (pillars/seams in ink or charcoal, rims in graphite with light-grey spokes, badges and exhaust tips in chrome) so it does not read as one flat block of paint.
 - Districts (M2) each get one dominant building hue family from this palette plus one accent, so they read as different places from the minimap and from the road.
 
 ## UI

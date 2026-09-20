@@ -23,8 +23,20 @@ export const PALETTE = {
   carMagenta: 0xf45bff,
   carWhite: 0xf7f3ea,
   carBlack: 0x1c1b22,
-  tyre: 0x1a1a1f,
-  rim: 0xd9d9e0,
+
+  // blacks and greys (trim, rubber, metal)
+  ink: 0x0c0c10,
+  rubber: 0x15151a,
+  charcoal: 0x25252c,
+  graphite: 0x35353e,
+  slate: 0x4a4a55,
+  steel: 0x6d6d78,
+  silver: 0x9d9da8,
+  lightGrey: 0xc4c4cd,
+  chrome: 0xe4e4ea,
+  tyre: 0x15151a,
+  rim: 0xc4c4cd,
+  glassDark: 0x4f6672,
 
   policeWhite: 0xf7f3ea,
   policeBlue: 0x1d4ed8,

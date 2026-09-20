@@ -144,7 +144,7 @@ export class Hud {
     this.boostWrap.classList.toggle('is-active', tm.boosting);
     this.boostWrap.classList.toggle('is-full', tm.boost >= 0.999);
     this.drift.classList.toggle('is-visible', tm.drifting);
-    if (tm.drifting) this.driftAngle.textContent = `${Math.abs(Math.round(tm.driftAngleDeg))}°  ${tm.driftTime.toFixed(1)}s`;
+    if (tm.drifting) this.driftAngle.textContent = `${Math.abs(Math.round(tm.driftAngleDeg))}°  ${tm.driftTime.toFixed(1)}s  ${Math.round(tm.driftDistance)}m`;
 
     if (this.toastTimer > 0) {
       this.toastTimer -= dt;

@@ -6,7 +6,10 @@
  * looks along it (so a drifting car stays centred while the view shows where it
  * is going). Reversing swings the camera around the car in a smooth orbit rather
  * than snapping. In flight the camera's height lags the car so the jump reads,
- * and a landing gives a short shake scaled by the impact.
+ * and a landing gives a short shake scaled by the impact. Look-ahead: the view
+ * leads the car into a turn (the heading gains a share of the yaw rate) and the
+ * look point slides toward the inside of the turn from the yaw rate and the
+ * steering, so the corner exit is on screen before the car gets there.
  */
 import * as THREE from 'three';
 import type { VehicleTelemetry } from '../sim';
@@ -56,6 +59,15 @@ export interface CameraTuning {
   reverseOrbitOmega: number;
   /** Extra camera height while looking back, m. */
   reverseHeight: number;
+  /** Look-ahead: seconds of yaw rate added to the heading (not while drifting). */
+  headingLead: number;
+  /** Look-ahead: lateral look offset per rad/s of yaw rate, and at full steering lock, m. */
+  lookSideYaw: number;
+  lookSideSteer: number;
+  lookSideMax: number;
+  /** Look-ahead smoothing (1/s) and the speed at which it is fully active (m/s). */
+  lookSideRate: number;
+  lookSideSpeedRef: number;
 }
 
 export const DEFAULT_CAMERA: CameraTuning = {
@@ -92,6 +104,12 @@ export const DEFAULT_CAMERA: CameraTuning = {
   reverseStillDelay: 1.2,
   reverseOrbitOmega: 3.5,
   reverseHeight: 0.3,
+  headingLead: 0.22,
+  lookSideYaw: 1.8,
+  lookSideSteer: 2.2,
+  lookSideMax: 4.5,
+  lookSideRate: 6,
+  lookSideSpeedRef: 14,
 };
 
 export type CameraMode = 'chase' | 'far';
@@ -124,6 +142,8 @@ export class ChaseCamera {
   private forwardTime = 0;
   private stillTime = 0;
   private carY = 0;
+  /** Smoothed lateral look offset, metres to the car's left. */
+  private lookSide = 0;
   private fov: number;
   private shakeT = 0;
   private shakeEnergy = 0;
@@ -153,6 +173,12 @@ export class ChaseCamera {
       const k = (tm.drifting ? t.driftVelocityFollow : t.velocityFollow) * Math.min(1, speed / 12);
       yawTarget = yawNose + wrapAngle(yawVel - yawNose) * k;
     }
+    // look-ahead: lead the heading into the turn, and slide the look point to the inside
+    const lookActive = Math.min(1, speed / t.lookSideSpeedRef) * (1 - this.reverseU);
+    if (!tm.drifting) yawTarget += tm.yawRate * t.headingLead * lookActive;
+    const steerNorm = tm.steer / 0.6; // radians at the axle over the low-speed lock; + = right
+    const sideTarget = Math.max(-t.lookSideMax, Math.min(t.lookSideMax, (tm.yawRate * t.lookSideYaw - steerNorm * t.lookSideSteer) * lookActive));
+    this.lookSide += (sideTarget - this.lookSide) * (snap ? 1 : 1 - Math.exp(-dt * t.lookSideRate));
 
     // reverse view: after a moment of backing up the camera orbits round to the front of the car,
     // and returns after a moment of driving forward or of standing still. The orbit parameter is a
@@ -178,6 +204,7 @@ export class ChaseCamera {
     if (!this.initialised || snap) {
       this.heading = yawTarget;
       this.carY = car.position.y;
+      this.lookSide = 0;
       this.reverseU = 0;
       this.reverseVel = 0;
       this.reverseTarget = 0;
@@ -224,7 +251,12 @@ export class ChaseCamera {
 
     this.camera.position.set(this.pos.x + sx, this.pos.y + sy, this.pos.z);
     const ahead = (t.lookAhead + speed * t.lookAheadPerSpeed) * (tm.airborne ? 0.5 : 1);
-    this.look.set(car.position.x + this.dir.x * ahead, car.position.y + t.lookHeight, car.position.z + this.dir.z * ahead);
+    // left of the view direction is (cos yaw, 0, -sin yaw)
+    this.look.set(
+      car.position.x + this.dir.x * ahead + this.dir.z * this.lookSide,
+      car.position.y + t.lookHeight,
+      car.position.z + this.dir.z * ahead - this.dir.x * this.lookSide,
+    );
     this.camera.up.copy(this.up);
     this.camera.lookAt(this.look);
 

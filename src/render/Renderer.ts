@@ -7,6 +7,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PALETTE, type DynamicDesc, type GhostPose, type ShapeDesc, type SimWorld, type StaticDesc } from '../sim';
 import { ChaseCamera } from './ChaseCamera';
 import { CAR_PROFILES } from './carProfiles';
+import { Sparks } from './Sparks';
 import { SpeedLines } from './SpeedLines';
 import { buildCarMesh, type CarMesh } from './carMesh';
 
@@ -40,6 +41,7 @@ export class Renderer {
   private readonly ghostPose: GhostPose = { x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1 };
   private readonly sun: THREE.DirectionalLight;
   private readonly speedLines: SpeedLines;
+  private readonly sparks: Sparks;
   private readonly tmpPos = new THREE.Vector3();
   private readonly carVel = new THREE.Vector3();
   private readonly sky: THREE.Mesh;
@@ -125,6 +127,9 @@ export class Renderer {
 
     this.speedLines = new SpeedLines();
     this.scene.add(this.speedLines.object);
+    this.sparks = new Sparks();
+    this.scene.add(this.sparks.object);
+    this.scene.add(this.sparks.heads);
 
     this.resize();
   }
@@ -244,6 +249,7 @@ export class Renderer {
     // the sky dome rides with the camera so the horizon never comes closer
     this.sky.position.copy(this.camera.position);
     this.speedLines.update(tm, Math.hypot(this.carVel.x, this.carVel.z), this.camera.aspect, dt);
+    this.sparks.update(tm, this.carVel, dt);
 
     this.renderer.info.reset();
     this.renderer.render(this.scene, this.camera);

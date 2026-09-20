@@ -9,12 +9,13 @@ index.html            entry page: one canvas, one UI root, a loading overlay
 src/main.ts           boots App
 src/app/              App (glue), loop.ts (fixed-step accumulator), bot.ts (autopilot), perf.ts (probe)
 src/sim/              headless simulation: SimWorld, Vehicle, playground, transforms, palette, math
-src/render/           Three.js: Renderer, ChaseCamera, SpeedStreaks, carMesh
+src/render/           Three.js: Renderer, ChaseCamera (look-ahead, reverse orbit, shake), SpeedLines, Sparks, carMesh, carProfiles
 src/audio/            EngineAudio (WebAudio synthesis)
 src/ui/               Hud, DebugPanel, styles.css
 src/input/            actions, InputManager, KeyboardDevice
 src/platform/         Platform interface, LocalPlatform, createPlatform()
-tests/sim/            Vitest headless sim tests (handling pins, loop, soak)
+tests/sim/            Vitest headless sim tests (handling, cars, walls, instrumentation, loop)
+tests/render/         Vitest camera pins (three.js math in Node, no WebGL)
 e2e/                  Playwright: smoke, perf, screens
 tools/                verify.mjs, budget.mjs
 docs/                 BRIEF, PROGRESS, ARCHITECTURE, BACKLOG, CRAZYGAMES, STYLE, TITLES, ASSETS

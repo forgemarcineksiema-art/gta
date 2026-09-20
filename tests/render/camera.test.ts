@@ -1,0 +1,74 @@
+/**
+ * Chase camera look-ahead pins: in a steady turn the view leads the car and the
+ * look point moves to the inside of the turn; straight ahead nothing shifts.
+ * Pure math in Node: a synthetic car object and telemetry, no WebGL.
+ */
+import * as THREE from 'three';
+import { describe, expect, test } from 'vitest';
+import { ChaseCamera } from '../../src/render/ChaseCamera';
+import type { VehicleTelemetry } from '../../src/sim';
+
+function telemetry(over: Partial<VehicleTelemetry> = {}): VehicleTelemetry {
+  return {
+    speed: 20, speedKmh: 72, drifting: false, driftAngleDeg: 0, boost: 0, boosting: false, airborne: false, groundedWheels: 4,
+    steer: 0, steerDeg: 0, gear: 3, rpm: 3000, load: 0.5, throttle: 1, airTime: 0, driftTime: 0, maxSlipDeg: 0, maxSlipRatio: 0,
+    minSlipRatio: 0, shifting: false, landingImpact: 0, brake: 0, driftDistance: 0, vx: 0, vy: 0, vz: 20, yawRate: 0, gLong: 0, gLat: 0, gVert: 0,
+    impact: 0, scrape: 0, contactSide: 0, contactX: 0, contactY: 0, contactZ: 0, contactNx: 0, contactNy: 0, contactNz: 0,
+    ...over,
+  };
+}
+
+/** Runs the camera for `seconds` on a car moving at 20 m/s with the given yaw rate and steer. */
+function settle(yawRate: number, steer: number, seconds = 3): { yawOffsetDeg: number; sideOffset: number } {
+  const cam = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 1000);
+  const chase = new ChaseCamera(cam);
+  const car = new THREE.Object3D();
+  const vel = new THREE.Vector3();
+  let yaw = 0;
+  const dt = 1 / 60;
+  for (let i = 0; i < seconds * 60; i++) {
+    yaw += yawRate * dt;
+    car.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+    vel.set(Math.sin(yaw) * 20, 0, Math.cos(yaw) * 20);
+    car.position.addScaledVector(vel, dt);
+    chase.update(car, vel, telemetry({ yawRate, steer, vx: vel.x, vz: vel.z }), dt, i === 0);
+  }
+  // the view direction's yaw relative to the car's nose, and the look point's offset to the car's left
+  const dir = new THREE.Vector3();
+  cam.getWorldDirection(dir);
+  const viewYaw = Math.atan2(dir.x, dir.z);
+  let d = viewYaw - yaw;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  // project the point 8 m along the view ray onto the car's left axis
+  const left = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+  const toPoint = dir.clone().multiplyScalar(cam.position.distanceTo(car.position) + 4).add(cam.position).sub(car.position);
+  return { yawOffsetDeg: (d * 180) / Math.PI, sideOffset: toPoint.dot(left) };
+}
+
+describe('chase camera look-ahead', () => {
+  test('straight ahead the view is centred on the nose', () => {
+    const r = settle(0, 0);
+    expect(Math.abs(r.yawOffsetDeg)).toBeLessThan(0.5);
+    expect(Math.abs(r.sideOffset)).toBeLessThan(0.05);
+  });
+
+  test('a left turn leads the view left and slides the look point to the inside', () => {
+    const r = settle(0.6, -0.4);
+    expect(r.yawOffsetDeg).toBeGreaterThan(1);
+    expect(r.yawOffsetDeg).toBeLessThan(25);
+    expect(r.sideOffset).toBeGreaterThan(1);
+  });
+
+  test('a right turn mirrors it', () => {
+    const l = settle(0.6, -0.4);
+    const r = settle(-0.6, 0.4);
+    expect(r.yawOffsetDeg).toBeCloseTo(-l.yawOffsetDeg, 1);
+    expect(r.sideOffset).toBeCloseTo(-l.sideOffset, 1);
+  });
+
+  test('steering alone at speed already turns the view toward the corner', () => {
+    const r = settle(0, -0.4);
+    expect(r.sideOffset).toBeGreaterThan(0.5);
+  });
+});

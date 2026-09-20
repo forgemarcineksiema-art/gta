@@ -104,6 +104,8 @@ export interface VehicleTelemetry {
   vx: number;
   vy: number;
   vz: number;
+  /** Yaw rate about world up, rad/s (+ = nose turning left). */
+  yawRate: number;
   /** Acceleration in the car's frame, in g (longitudinal + = forward, lateral + = left). */
   gLong: number;
   gLat: number;
@@ -322,6 +324,7 @@ export class Vehicle {
       vx: 0,
       vy: 0,
       vz: 0,
+      yawRate: 0,
       gLong: 0,
       gLat: 0,
       gVert: 0,
@@ -545,7 +548,7 @@ export class Vehicle {
         s.tSum.y += yawInertia * accel * active;
       }
       if (touching) {
-        scrape = M.clamp01(vt / 12) * M.clamp01(impact / 0.08);
+        scrape = M.clamp01(vt / 12) * M.clamp01(impact / 0.04);
         this.contactSide = M.dot(s.a, s.right) > 0 ? 1 : -1; // the normal points away from the wall
       }
     }
@@ -979,6 +982,7 @@ export class Vehicle {
     // accelerations from the velocity change over the last step, in the car's frame
     M.sub(s.a, s.vel, this.prevVel);
     M.scale(s.a, s.a, 1 / (dt * 9.81));
+    tm.yawRate = s.angvel.y;
     tm.gLong = M.dot(s.a, s.fwd);
     tm.gLat = -M.dot(s.a, s.right);
     tm.gVert = s.a.y;

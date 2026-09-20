@@ -2,6 +2,14 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-21 — Session 7: sparks, camera look-ahead
+
+Marcin's call: sparks while scraping, and a look-ahead camera.
+
+- **Sparks** (`src/render/Sparks.ts`). A fixed pool of 192 particles drawn as point heads (3.5 px, resolution-independent) plus streak tails along their velocity: two draw calls for the whole pool, typed arrays updated in place, no allocation per frame. Emitted at the contact point from `telemetry` (`contactX/Y/Z`, normal, `scrape`, `contactSide`): 60/s while touching plus 300/s at full scrape, and a burst of 4 per m/s of impact (cap 70) on a hit. Thrown along the wall behind the car with part of its speed, a random spread, gravity, life 0.18–0.5 s, hot white-yellow fading to orange, dying on the ground. Always on the car's flank, never in front of it. The scrape threshold in the sim dropped from 0.08 to 0.04 m/s per step so a light lean on a wall already shows (and grinds).
+- **Camera look-ahead** (`ChaseCamera.ts`, numbers `headingLead`, `lookSide*`). The heading gains 0.22 s of the car's yaw rate (not while drifting, where the velocity follow already frames the exit) and the look point slides toward the inside of the turn: 1.8 m per rad/s of yaw rate plus 2.2 m at full steering lock, capped at 4.5 m, smoothed at 6/s, fading in up to 14 m/s and out during the reverse orbit. `yawRate` added to the telemetry (rad/s, + = nose left). Pinned in `tests/render/camera.test.ts` (Node, no WebGL): straight = centred, a left turn leads the view 1–25° left and slides the look point ≥ 1 m to the inside, right mirrors it, steering alone at speed already turns the view.
+- Real-time screenshots for judging effects: a Playwright script from the project root (the in-app pane runs at ~4 fps and cannot show particles).
+
 ## 2026-09-21 — Session 6: per-class bot budget, wall collisions
 
 Marcin's call: give the track bot a per-car lateral budget, then fix collisions with walls at speed.

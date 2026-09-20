@@ -125,10 +125,31 @@ const scratch = {
   wheelRight: M.v3(),
   rayDir: M.v3(),
   rearLocal: M.v3(),
+  com: M.v3(),
+  rel: M.v3(),
+  fSum: M.v3(),
+  tSum: M.v3(),
   q: { x: 0, y: 0, z: 0, w: 1 },
   q2: { x: 0, y: 0, z: 0, w: 1 },
   q3: { x: 0, y: 0, z: 0, w: 1 },
 };
+
+/** Velocity of a world point on the body: v + ω × (p − com). Pure JS, no WASM call. */
+function velAt(p: Vec3, out: Vec3): Vec3 {
+  const s = scratch;
+  M.sub(s.rel, p, s.com);
+  M.cross(out, s.angvel, s.rel);
+  return M.add(out, out, s.vel);
+}
+
+/** Accumulate a force at a world point (force + torque about the centre of mass). */
+function forceAt(f: Vec3, p: Vec3): void {
+  const s = scratch;
+  M.add(s.fSum, s.fSum, f);
+  M.sub(s.rel, p, s.com);
+  M.cross(s.rel, s.rel, f);
+  M.add(s.tSum, s.tSum, s.rel);
+}
 
 export class Vehicle {
   readonly body: RAPIER.RigidBody;
@@ -297,6 +318,9 @@ export class Vehicle {
     body.rotation(s.q);
     body.linvel(s.vel);
     body.angvel(s.angvel);
+    body.worldCom(s.com);
+    M.set(s.fSum, 0, 0, 0);
+    M.set(s.tSum, 0, 0, 0);
     M.rotate(s.fwd, s.q, AXIS_Z);
     M.rotate(s.right, s.q, AXIS_RIGHT);
     M.rotate(s.up, s.q, AXIS_Y);
@@ -394,7 +418,7 @@ export class Vehicle {
       if (!w.grounded) continue;
       M.rotate(s.a, s.q, w.local);
       M.add(s.point, s.pos, s.a);
-      body.velocityAtPoint(s.point, s.b);
+      velAt(s.point, s.b);
       const vAlongRay = M.dot(s.b, s.rayDir); // + = compressing
       let f = t.suspensionStiffness * w.compression;
       f += (vAlongRay > 0 ? t.suspensionDampingCompression : t.suspensionDampingRebound) * vAlongRay;
@@ -410,7 +434,7 @@ export class Vehicle {
       if (f < 0) f = 0;
       w.load = f;
       M.scale(s.force, s.up, f);
-      body.addForceAtPoint(s.force, s.point, true);
+      forceAt(s.force, s.point);
     }
 
     // ---- drift state ----------------------------------------------------------
@@ -420,7 +444,7 @@ export class Vehicle {
     M.set(s.rearLocal, 0, 0, -t.wheelBase * 0.5);
     M.rotate(s.a, s.q, s.rearLocal);
     M.add(s.point, s.pos, s.a);
-    body.velocityAtPoint(s.point, s.b);
+    velAt(s.point, s.b);
     const rearFwd = M.dot(s.b, s.fwd);
     const rearLat = M.dot(s.b, s.right);
     const rearSlip = Math.atan2(Math.abs(rearLat), Math.max(0.5, Math.abs(rearFwd)));
@@ -541,7 +565,14 @@ export class Vehicle {
     }
     const axleTorque = crankTorque * ratio * t.drivetrainEfficiency * tcCut;
 
+    // limited-slip differential: torque moves from the faster wheel of a driven axle to the slower one
+    const lsdCap = t.lsdPreload + t.lsdLock * 0.5 * Math.abs(axleTorque);
+    const lsdTorque = (left: WheelState, right: WheelState): number => M.clamp((left.omega - right.omega) * t.lsdStiffness, -lsdCap, lsdCap);
+    const lsdFront = t.driveFrontShare > 0 ? lsdTorque(this.wheels[WHEEL_FL] as WheelState, this.wheels[WHEEL_FR] as WheelState) : 0;
+    const lsdRear = t.driveFrontShare < 1 ? lsdTorque(this.wheels[WHEEL_RL] as WheelState, this.wheels[WHEEL_RR] as WheelState) : 0;
+
     // ---- tyres: per wheel, with the wheel ODE integrated implicitly -------------
+    const staticLoad = (t.mass * (9.81 + t.extraGravity)) / 4;
     const comHeight = t.chassisOffsetY + t.centerOfMassY;
     let maxSlipAng = 0;
     let maxSlipRatio = -1;
@@ -550,7 +581,8 @@ export class Vehicle {
     const wheelMass = t.mass * 0.25 * 0.6; // effective mass behind one contact patch, conservative
     for (const w of this.wheels) {
       const share = w.isFront ? t.driveFrontShare : 1 - t.driveFrontShare;
-      const driveTorque = axleTorque * share * 0.5; // open differential: equal split
+      const lsd = w.isFront ? lsdFront : lsdRear;
+      const driveTorque = axleTorque * share * 0.5 + (w.isLeft ? -lsd : lsd); // equal split plus the diff's transfer
       const bias = w.isFront ? t.brakeFrontBias : 1 - t.brakeFrontBias;
       // in a drift at speed the handbrake is the drift button (rear grip is already cut); it brakes on a straight or when slow
       const handIsBrake = handbrake && !w.isFront && !(this.drifting && absFwd > t.driftMinSpeed);
@@ -581,13 +613,15 @@ export class Vehicle {
       M.cross(s.wheelRight, w.normal, s.wheelFwd);
       M.normalize(s.wheelRight, s.wheelRight);
 
-      body.velocityAtPoint(w.contact, s.b);
+      velAt(w.contact, s.b);
       const vFwd = M.dot(s.b, s.wheelFwd);
       const vLat = M.dot(s.b, s.wheelRight);
       w.forwardSpeed = vFwd;
       w.lateralSpeed = vLat;
 
-      const mu = w.isFront ? t.muFront * this.frontGripMul : t.muRear * this.rearGripMul;
+      // load sensitivity: a heavily loaded tyre gives less grip per newton
+      const loadMul = M.clamp(1 - t.loadSensitivity * (w.load / staticLoad - 1), 0.6, 1.3);
+      const mu = (w.isFront ? t.muFront * this.frontGripMul : t.muRear * this.rearGripMul) * loadMul;
       const muLoad = mu * w.load;
       const r = t.wheelRadius;
       const vRef = Math.max(Math.abs(vFwd), t.slipLowSpeed);
@@ -636,13 +670,13 @@ export class Vehicle {
       M.addScaled(s.force, s.force, s.wheelFwd, fLong);
       // apply above the contact patch to limit body roll (arcade)
       M.addScaled(s.point, w.contact, s.up, (comHeight + t.wheelRadius) * t.tireForceHeight);
-      body.addForceAtPoint(s.force, s.point, true);
+      forceAt(s.force, s.point);
     }
 
     // ---- boost thrust ---------------------------------------------------------
     if (this.boosting && grounded > 0) {
       M.scale(s.force, s.fwd, t.boostThrust);
-      body.addForce(s.force, true);
+      M.add(s.fSum, s.fSum, s.force);
     }
 
     // ---- drift assists (arcade layer) -------------------------------------------
@@ -653,7 +687,7 @@ export class Vehicle {
       const slipRate = (bodySlip - this.bodySlipPrev) / dt;
       const torque = M.clamp(err * t.driftAngleGain - slipRate * t.driftAngleDamping, -t.driftYawTorqueMax, t.driftYawTorqueMax) * t.driftAssist;
       M.scale(s.force, s.up, torque);
-      body.addTorque(s.force, true);
+      M.add(s.tSum, s.tSum, s.force);
 
       M.set(s.a, s.vel.x, 0, s.vel.z);
       const speedH = M.length(s.a);
@@ -666,33 +700,33 @@ export class Vehicle {
         const accel = M.length(s.b);
         if (accel > t.driftFollowAccelMax) M.scale(s.b, s.b, t.driftFollowAccelMax / accel);
         M.scale(s.force, s.b, t.mass);
-        body.addForce(s.force, true);
+        M.add(s.fSum, s.fSum, s.force);
         const slip = Math.abs(Math.sin(bodySlipDeg * M.DEG));
         M.scale(s.force, s.a, -t.mass * t.driftSpeedLoss * slip);
-        body.addForce(s.force, true);
+        M.add(s.fSum, s.fSum, s.force);
       }
       if (throttle > 0 && grounded > 0) {
         M.scale(s.force, s.fwd, throttle * t.driftThrottlePush * t.driftAssist);
-        body.addForce(s.force, true);
+        M.add(s.fSum, s.fSum, s.force);
       }
     }
 
     // ---- aero, extra gravity, rest damping --------------------------------------
     if (speed > 0.1) {
       M.scale(s.force, s.vel, -t.drag * speed);
-      body.addForce(s.force, true);
+      M.add(s.fSum, s.fSum, s.force);
     }
     if (grounded > 0) {
       M.scale(s.force, s.up, -t.downforce * forwardSpeed * forwardSpeed);
-      body.addForce(s.force, true);
+      M.add(s.fSum, s.fSum, s.force);
     }
     M.set(s.force, 0, -t.extraGravity * t.mass, 0);
-    body.addForce(s.force, true);
+    M.add(s.fSum, s.fSum, s.force);
     if (grounded > 0 && speed < 0.5 && throttle === 0 && brakeIn === 0 && !handbrake) {
       M.scale(s.force, s.vel, -t.restDamping * t.mass);
-      body.addForce(s.force, true);
+      M.add(s.fSum, s.fSum, s.force);
       M.scale(s.force, s.angvel, -t.restDamping * t.mass * 0.5);
-      body.addTorque(s.force, true);
+      M.add(s.tSum, s.tSum, s.force);
     }
 
     // ---- air control and levelling -------------------------------------------
@@ -728,7 +762,7 @@ export class Vehicle {
       M.cross(s.a, s.up, s.b);
       M.addScaled(s.force, s.force, s.a, t.airLevelTorque);
       M.addScaled(s.force, s.force, s.angvel, -t.airAngularDamping);
-      body.addTorque(s.force, true);
+      M.add(s.tSum, s.tSum, s.force);
       this.boostMeter = Math.min(1, this.boostMeter + t.boostGainAir * dt);
     } else {
       this.airTime = 0;
@@ -757,6 +791,10 @@ export class Vehicle {
     }
 
     this.bodySlipPrev = bodySlip;
+
+    // one force and one torque into Rapier instead of a WASM call per wheel and effect
+    body.addForce(s.fSum, true);
+    body.addTorque(s.tSum, true);
 
     // ---- telemetry ----------------------------------------------------------
     const tm = this.telemetry;

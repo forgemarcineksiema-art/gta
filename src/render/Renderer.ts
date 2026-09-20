@@ -202,7 +202,7 @@ export class Renderer {
     this.sun.position.set(this.tmpPos.x - 60, this.tmpPos.y + 90, this.tmpPos.z - 40);
     // the sky dome rides with the camera so the horizon never comes closer
     this.sky.position.copy(this.camera.position);
-    this.streaks.update(carPos, this.carVel, tm);
+    this.streaks.update(this.camera.position, carPos, this.carVel, tm, dt);
 
     this.renderer.info.reset();
     this.renderer.render(this.scene, this.camera);

@@ -81,6 +81,12 @@ export interface VehicleTuning {
   drivetrainEfficiency: number;
   /** Fraction of drive torque sent to the front axle (0 = RWD, 1 = FWD). */
   driveFrontShare: number;
+  /** Limited-slip differential: 0 = open (equal torque), 1 = the lock torque can reach half the axle torque. */
+  lsdLock: number;
+  /** Lock torque available with no drive torque, N·m (keeps both wheels turning together off throttle). */
+  lsdPreload: number;
+  /** How hard the diff resists a speed difference, N·m per rad/s. */
+  lsdStiffness: number;
   /** Upshift when rpm exceeds this fraction of the redline. */
   shiftUpAt: number;
   /** Downshift when rpm falls below this fraction of the redline. */
@@ -116,6 +122,8 @@ export interface VehicleTuning {
   slipRatioTail: number;
   /** Rolling resistance force per wheel per N of load. */
   rollingResistance: number;
+  /** Load sensitivity: grip per N drops by this fraction per unit of load above the static share (weight transfer costs total grip). */
+  loadSensitivity: number;
   /** Fraction (0 contact patch .. 1 centre of mass) at which tyre forces are applied. Arcade roll control. */
   tireForceHeight: number;
 
@@ -266,6 +274,9 @@ export const DEFAULT_TUNING: VehicleTuning = {
   finalDrive: 4.1,
   drivetrainEfficiency: 0.9,
   driveFrontShare: 0,
+  lsdLock: 0.5,
+  lsdPreload: 60,
+  lsdStiffness: 220,
   shiftUpAt: 0.96,
   shiftDownAt: 0.5,
   shiftTime: 0.12,
@@ -285,6 +296,7 @@ export const DEFAULT_TUNING: VehicleTuning = {
   slipRatioPeak: 0.12,
   slipRatioTail: 0.7,
   rollingResistance: 0.012,
+  loadSensitivity: 0.15,
   tireForceHeight: 0.85,
 
   tractionControl: 0.6,

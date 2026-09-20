@@ -10,15 +10,12 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 ## Vehicle / feel
 
-- Tyre model has no load sensitivity curve (grip scales linearly with load); the anti-roll bar does the load transfer work. Good enough for arcade. (M1)
 - Wheel visuals use body pose + spring compression; no camber/toe. (M1)
-- Open differential only (equal torque split); a limited-slip knob would let one-wheel-peel be tuned away or in. (M1 physics pass)
-- Engine rpm has no separate state when the clutch would slip (a launch from standstill reads as idle until the wheels turn); a clutch model would add launch revving. (M1 physics pass)
-- Sim step p95 rose from 4.9 to 8.3 ms under 4× CPU throttle with the per-wheel solver (budget 12 ms). Most of it is Rapier binding overhead (`castRayAndGetNormal`, `velocityAtPoint`); worth a look before traffic adds bodies in M3. (M1 physics pass)
+- No clutch model (decided with Marcin: an automatic arcade car does not need one; launch revving, if ever wanted, is an audio effect). (M1)
+- Sim step measured in Node at 0.24 ms (0.14 vehicle, 0.06 Rapier, 0.03 rest) after moving per-wheel force/velocity math into JS; the throttled browser p95 was multi-substep frames, not the step. Rays cost 4 × 7.7 µs; not worth more work before M3. (M1)
 
 ## Rendering
 
-- Speed streaks are 1 px lines (WebGL line width); stretched quads would let them get thicker near the camera. (M1 polish)
 
 ## UI
 

@@ -18,6 +18,7 @@
  * with the car at rest; the builder converts to the body origin.
  */
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PALETTE, type VehicleTelemetry, type VehicleTuning } from '../sim';
 
 export interface CarMesh {
@@ -380,35 +381,35 @@ export function buildCarMesh(t: VehicleTuning, profile: CarProfile = MUSCLE, col
   }
   if (profile.lipSpoiler) add(new THREE.BoxGeometry(tail.hwRoof * 2 - 0.2, 0.035, 0.14), flat(paintDark), 0, tail.roof + 0.015, tail.z + 0.05);
 
-  // ---- wheels: tyre, sidewall, rim, spokes, cap -------------------------------------------
+  // ---- wheels: tyre, sidewall, rim, spokes, cap merged into one vertex-coloured geometry per wheel ----
   const wheels: THREE.Object3D[] = [];
   const r = t.wheelRadius;
   const w = t.wheelWidth;
-  const tyreGeom = new THREE.CylinderGeometry(r, r, w, 18).rotateZ(Math.PI / 2);
-  const sidewallGeom = new THREE.CylinderGeometry(r * 0.8, r * 0.8, w + 0.012, 18).rotateZ(Math.PI / 2);
-  const rimGeom = new THREE.CylinderGeometry(r * 0.64, r * 0.64, w * 0.55, 12).rotateZ(Math.PI / 2);
-  const spokeGeom = new THREE.BoxGeometry(w * 0.6, r * 1.16, r * 0.15);
-  const capGeom = new THREE.CylinderGeometry(r * 0.15, r * 0.15, w * 0.72, 8).rotateZ(Math.PI / 2);
-  const matTyre = flat(PALETTE.tyre);
-  const matSidewall = flat(PALETTE.rubber);
-  const matRim = flat(PALETTE.graphite);
-  const matSpoke = flat(PALETTE.lightGrey);
-  const matCap = flat(PALETTE.chrome);
+  const coloured = (g: THREE.BufferGeometry, hex: number): THREE.BufferGeometry => {
+    const c = new THREE.Color(hex);
+    const n = g.getAttribute('position').count;
+    const colors = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) colors.set([c.r, c.g, c.b], i * 3);
+    g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    return g.toNonIndexed();
+  };
+  const parts: THREE.BufferGeometry[] = [
+    coloured(new THREE.CylinderGeometry(r, r, w, 18).rotateZ(Math.PI / 2), PALETTE.tyre),
+    coloured(new THREE.CylinderGeometry(r * 0.8, r * 0.8, w + 0.012, 18).rotateZ(Math.PI / 2), PALETTE.rubber),
+    coloured(new THREE.CylinderGeometry(r * 0.64, r * 0.64, w * 0.55, 12).rotateZ(Math.PI / 2), PALETTE.graphite),
+    coloured(new THREE.CylinderGeometry(r * 0.15, r * 0.15, w * 0.72, 8).rotateZ(Math.PI / 2), PALETTE.chrome),
+  ];
+  for (let k = 0; k < 5; k++) parts.push(coloured(new THREE.BoxGeometry(w * 0.6, r * 1.16, r * 0.15).rotateX((k / 5) * Math.PI), PALETTE.lightGrey));
+  const wheelGeom = mergeGeometries(parts, false);
+  for (const g of parts) g.dispose();
+  const wheelMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
   for (let i = 0; i < 4; i++) {
     // order matches the sim: FR, FL, RR, RL (left = odd, +x)
     const g = new THREE.Group();
-    const inner = new THREE.Group();
-    const tyre = new THREE.Mesh(tyreGeom, matTyre);
-    tyre.castShadow = true;
-    inner.add(tyre, new THREE.Mesh(sidewallGeom, matSidewall), new THREE.Mesh(rimGeom, matRim));
-    for (let k = 0; k < 5; k++) {
-      const spoke = new THREE.Mesh(spokeGeom, matSpoke);
-      spoke.rotation.x = (k / 5) * Math.PI;
-      inner.add(spoke);
-    }
-    inner.add(new THREE.Mesh(capGeom, matCap));
-    inner.position.x = (i % 2 === 1 ? -1 : 1) * profile.wheelInset;
-    g.add(inner);
+    const mesh = new THREE.Mesh(wheelGeom, wheelMat);
+    mesh.castShadow = true;
+    mesh.position.x = (i % 2 === 1 ? -1 : 1) * profile.wheelInset;
+    g.add(mesh);
     wheels.push(g);
   }
 

@@ -49,7 +49,7 @@ export interface CameraTuning {
   /** Seconds of forward driving, or of standing still, before it swings back. */
   reverseReturnDelay: number;
   reverseStillDelay: number;
-  /** Natural frequency of the critically damped swing (rad/s): 4.5 settles in about a second. */
+  /** Natural frequency of the critically damped swing (rad/s): 3.5 settles in about 1.3 s. */
   reverseOrbitOmega: number;
   /** Extra camera height while looking back, m. */
   reverseHeight: number;
@@ -85,7 +85,7 @@ export const DEFAULT_CAMERA: CameraTuning = {
   reverseDelay: 0.7,
   reverseReturnDelay: 0.3,
   reverseStillDelay: 1.2,
-  reverseOrbitOmega: 4.5,
+  reverseOrbitOmega: 3.5,
   reverseHeight: 0.3,
 };
 

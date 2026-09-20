@@ -51,10 +51,12 @@ export interface VehicleTuning {
   maxSteerDegHigh: number;
   /** Speed at which steering authority reaches `maxSteerDegHigh`. */
   steerSpeedRef: number;
-  /** How fast the wheel turns toward the input, in full locks per second. */
+  /** How fast the input ramps toward full lock, in locks per second (a 100 ms tap reaches steerRate/10 of the lock before the curve). */
   steerRate: number;
-  /** How fast it returns to centre, in full locks per second. */
+  /** How fast it returns to centre, in locks per second. */
   steerReturnRate: number;
+  /** Sensitivity curve exponent on the ramped input: 1 = linear, higher = gentle taps, full lock when held. */
+  steerCurve: number;
   /** Ackermann: 0 = both fronts steer the same, 1 = geometrically correct inner/outer angles. */
   ackermann: number;
 
@@ -216,10 +218,11 @@ export const DEFAULT_TUNING: VehicleTuning = {
   antiRollStiffness: 26000,
 
   maxSteerDegLow: 34,
-  maxSteerDegHigh: 7,
-  steerSpeedRef: 42,
-  steerRate: 5.5,
-  steerReturnRate: 9,
+  maxSteerDegHigh: 5,
+  steerSpeedRef: 36,
+  steerRate: 3,
+  steerReturnRate: 7,
+  steerCurve: 1.7,
   ackermann: 1,
 
   torqueMax: 340,

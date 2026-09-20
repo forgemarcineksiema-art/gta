@@ -130,7 +130,9 @@ export class Vehicle {
   readonly slot: number;
   tuning: VehicleTuning;
 
-  /** Commanded steering angle at the front axle (bicycle model), radians (+ = right). */
+  /** Ramped steering input in [-1, 1] before the sensitivity curve. */
+  steerRaw = 0;
+  /** Steering angle at the front axle (bicycle model), radians (+ = right). */
   steer = 0;
   drifting = false;
   driftTime = 0;
@@ -288,13 +290,16 @@ export class Vehicle {
     const brakeIn = M.clamp01(controls.brake);
     const handbrake = controls.handbrake > 0.5;
 
-    // ---- steering: rate limited, speed sensitive, Ackermann ------------------
+    // ---- steering: ramped input, sensitivity curve, speed-sensitive lock, Ackermann ----
+    // The keyboard is digital, so the input itself is shaped: it ramps at steerRate locks/s,
+    // passes through a power curve (a short tap is a small correction, holding is full lock),
+    // and the lock shrinks with speed. `steer` is the resulting angle at the front axle.
     const authority = M.smoothstep(absFwd / t.steerSpeedRef);
     const maxSteer = M.lerp(t.maxSteerDegLow, t.maxSteerDegHigh, authority) * M.DEG;
-    const target = M.clamp(controls.steer, -1, 1) * maxSteer;
-    const returning = Math.abs(target) < Math.abs(this.steer) || Math.sign(target) !== Math.sign(this.steer);
-    const rate = (returning ? t.steerReturnRate : t.steerRate) * (t.maxSteerDegLow * M.DEG);
-    this.steer = M.moveToward(this.steer, target, rate * dt);
+    const target = M.clamp(controls.steer, -1, 1);
+    const returning = Math.abs(target) < Math.abs(this.steerRaw) || Math.sign(target) !== Math.sign(this.steerRaw);
+    this.steerRaw = M.moveToward(this.steerRaw, target, (returning ? t.steerReturnRate : t.steerRate) * dt);
+    this.steer = Math.sign(this.steerRaw) * Math.pow(Math.abs(this.steerRaw), t.steerCurve) * maxSteer;
 
     // ---- boost --------------------------------------------------------------
     this.boosting = controls.boost > 0.5 && this.boostMeter > 0;
@@ -714,6 +719,7 @@ export class Vehicle {
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     this.steer = 0;
+    this.steerRaw = 0;
     this.drifting = false;
     this.bodySlipPrev = 0;
     this.airTime = 0;

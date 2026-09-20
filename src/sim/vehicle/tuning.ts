@@ -128,6 +128,10 @@ export interface VehicleTuning {
   // --- drift state (arcade layer) ------------------------------------------
   /** 0..1 master scale for the drift controller (yaw command + velocity follow). */
   driftAssist: number;
+  /** Rear grip lost under full throttle at full lock at highway speed (ramps in from 20 to 32 m/s): steering alone can start a slide. */
+  powerOversteer: number;
+  /** 1: a brake tap while turning hard at speed starts a drift (NFS style); 0: brakes only brake. */
+  brakeDriftEntry: number;
   /** Rear grip multiplier while the handbrake is held. */
   handbrakeGripMul: number;
   /** Rear grip multiplier while in the drift state (handbrake released). */
@@ -219,10 +223,10 @@ export const DEFAULT_TUNING: VehicleTuning = {
 
   maxSteerDegLow: 34,
   maxSteerDegHigh: 5,
-  steerSpeedRef: 36,
-  steerRate: 3,
-  steerReturnRate: 7,
-  steerCurve: 1.7,
+  steerSpeedRef: 34,
+  steerRate: 6,
+  steerReturnRate: 8,
+  steerCurve: 2.4,
   ackermann: 1,
 
   torqueMax: 340,
@@ -249,8 +253,8 @@ export const DEFAULT_TUNING: VehicleTuning = {
   wheelInertia: 1.2,
   slipLowSpeed: 2.0,
 
-  muFront: 1.45,
-  muRear: 1.5,
+  muFront: 2.2,
+  muRear: 2.3,
   slipAngPeakDeg: 8,
   slipAngTail: 0.7,
   slipRatioPeak: 0.12,
@@ -263,10 +267,12 @@ export const DEFAULT_TUNING: VehicleTuning = {
   restDamping: 6,
 
   driftAssist: 1,
+  powerOversteer: 0.14,
+  brakeDriftEntry: 1,
   handbrakeGripMul: 0.45,
-  driftGripMul: 0.42,
-  driftFrontGripMul: 0.7,
-  driftEnterDeg: 20,
+  driftGripMul: 0.35,
+  driftFrontGripMul: 0.9,
+  driftEnterDeg: 14,
   driftExitDeg: 7,
   driftMinSpeed: 8,
   driftMinTime: 0.6,
@@ -278,8 +284,8 @@ export const DEFAULT_TUNING: VehicleTuning = {
   driftAutoCounterSteer: 1,
   driftVelocityFollow: 2.6,
   driftFollowAccelMax: 8,
-  driftSpeedLoss: 0.15,
-  driftThrottlePush: 4000,
+  driftSpeedLoss: 0.05,
+  driftThrottlePush: 5000,
 
   drag: 1.6,
   downforce: 1.8,

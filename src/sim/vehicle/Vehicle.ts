@@ -372,8 +372,11 @@ export class Vehicle {
     const rearLat = M.dot(s.b, s.right);
     const rearSlip = Math.atan2(Math.abs(rearLat), Math.max(0.5, Math.abs(rearFwd)));
     const bodySlipDeg = (Math.atan2(M.dot(s.vel, s.right), Math.max(0.5, forwardSpeed)) * 180) / Math.PI;
+    // entry: handbrake while turning, a brake tap while turning hard at speed, or the rear stepping out
+    const turning = Math.abs(controls.steer) > 0.2;
+    const brakeEntry = t.brakeDriftEntry > 0 && brakeIn > 0.5 && Math.abs(controls.steer) > 0.6 && absFwd > 14;
     if (rearGrounded && absFwd > t.driftMinSpeed) {
-      if (!this.drifting && (handbrake || rearSlip > t.driftEnterDeg * M.DEG)) {
+      if (!this.drifting && ((handbrake && turning) || brakeEntry || rearSlip > t.driftEnterDeg * M.DEG)) {
         this.drifting = true;
         this.driftTime = 0;
       } else if (this.drifting && !handbrake && this.driftTime > t.driftMinTime && rearSlip < t.driftExitDeg * M.DEG) {
@@ -394,7 +397,9 @@ export class Vehicle {
     } else {
       this.applyAckermann(this.steer);
     }
-    const rearTarget = handbrake ? t.handbrakeGripMul : this.drifting ? t.driftGripMul : 1;
+    // power oversteer: full throttle at full lock above drift speed loosens the rear so steering alone can start a slide
+    const powerOver = 1 - t.powerOversteer * throttle * Math.min(1, Math.abs(this.steerRaw)) * M.clamp01((absFwd - 20) / 12);
+    const rearTarget = handbrake ? t.handbrakeGripMul : this.drifting ? t.driftGripMul : powerOver;
     const frontTarget = this.drifting ? t.driftFrontGripMul : 1;
     const blend = t.gripBlendRate * dt;
     this.rearGripMul = rearTarget < this.rearGripMul ? rearTarget : M.moveToward(this.rearGripMul, rearTarget, blend);
@@ -472,8 +477,10 @@ export class Vehicle {
       const share = w.isFront ? t.driveFrontShare : 1 - t.driveFrontShare;
       const driveTorque = axleTorque * share * 0.5; // open differential: equal split
       const bias = w.isFront ? t.brakeFrontBias : 1 - t.brakeFrontBias;
-      const pedalTorque = brakePedal * t.brakeTorque * bias * 0.5;
-      const handTorque = handbrake && !w.isFront ? t.handbrakeTorque : 0;
+      // in a drift at speed the handbrake is the drift button (rear grip is already cut); it brakes on a straight or when slow
+      const handIsBrake = handbrake && !w.isFront && !(this.drifting && absFwd > t.driftMinSpeed);
+      const pedalTorque = (this.drifting && brakeEntry ? 0 : brakePedal) * t.brakeTorque * bias * 0.5;
+      const handTorque = handIsBrake ? t.handbrakeTorque : 0;
       const brakeTorque = pedalTorque + handTorque;
 
       if (!w.grounded) {

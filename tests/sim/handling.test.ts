@@ -184,7 +184,79 @@ describe('braking', () => {
   });
 });
 
+describe('responsiveness', () => {
+  /** Hold full lock for 0.35 s at a speed, then let go; return the heading change after a second. */
+  const pulse = async (target: number): Promise<{ turned: number; drifted: boolean; minSpeed: number }> => {
+    const sim = await createWorld({ spawn: 'straight' });
+    run(sim, 1);
+    runUntil(sim, 30, (s) => kmh(s) >= target, fullThrottle);
+    const y0 = yawDeg(sim);
+    let drifted = false;
+    let minSpeed = Infinity;
+    run(sim, 0.35, (_t, c, s) => {
+      c.steer = 1;
+      c.throttle = 1;
+      drifted = drifted || s.vehicle.drifting;
+      minSpeed = Math.min(minSpeed, kmh(s));
+    });
+    run(sim, 1, (_t, c, s) => {
+      c.throttle = 1;
+      drifted = drifted || s.vehicle.drifting;
+      minSpeed = Math.min(minSpeed, kmh(s));
+    });
+    return { turned: Math.abs(yawDeg(sim) - y0), drifted, minSpeed };
+  };
+
+  test('a short full-lock pulse at 60 km/h turns the car sharply on grip (no bus, no slide)', async () => {
+    const r = await pulse(60);
+    expect(r.turned).toBeGreaterThan(20);
+    expect(r.drifted).toBe(false);
+    expect(r.minSpeed).toBeGreaterThan(52);
+  });
+
+  test('the same pulse at 120 km/h is a lane change, not a spin', async () => {
+    const r = await pulse(120);
+    expect(r.turned).toBeGreaterThan(3);
+    expect(r.turned).toBeLessThan(16);
+    expect(r.drifted).toBe(false);
+  });
+});
+
 describe('drift', () => {
+  test('holding the handbrake at speed is a drift button: no braking, angle held, speed kept', async () => {
+    const sim = await createWorld({ spawn: 'skidpad' });
+    run(sim, 1);
+    runUntil(sim, 10, (s) => kmh(s) >= 70, fullThrottle);
+    let minSpeed = Infinity;
+    run(sim, 3, (_t, c, s) => {
+      c.throttle = 1;
+      c.steer = 1;
+      c.handbrake = 1;
+      if (s.vehicle.driftTime > 0.8) minSpeed = Math.min(minSpeed, kmh(s));
+    });
+    expect(sim.vehicle.drifting).toBe(true);
+    expect(minSpeed).toBeGreaterThan(55);
+    expect(Math.abs(sim.vehicle.telemetry.driftAngleDeg)).toBeGreaterThan(22);
+    expect(Math.abs(sim.vehicle.telemetry.driftAngleDeg)).toBeLessThan(42);
+  });
+
+  test('a brake tap while turning hard at 90 km/h starts a drift', async () => {
+    const sim = await createWorld({ spawn: 'skidpad' });
+    run(sim, 1);
+    runUntil(sim, 15, (s) => kmh(s) >= 90, fullThrottle);
+    run(sim, 0.3, (_t, c) => {
+      c.steer = 1;
+      c.brake = 1;
+    });
+    expect(sim.vehicle.drifting).toBe(true);
+    run(sim, 1.5, (_t, c) => {
+      c.steer = 1;
+      c.throttle = 1;
+    });
+    expect(sim.vehicle.drifting).toBe(true);
+    expect(kmh(sim)).toBeGreaterThan(55);
+  });
+
   test('a handbrake tap with throttle and steer holds a drift in the 18..42 degree band without spinning out', async () => {
     const sim = await createWorld({ spawn: 'skidpad' });
     run(sim, 1);

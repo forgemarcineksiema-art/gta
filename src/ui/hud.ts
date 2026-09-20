@@ -95,7 +95,7 @@ export class Hud {
     };
     this.hints.append(
       row([k.throttle, k.steerLeft, k.brake, k.steerRight], 'drive'),
-      row([k.handbrake], 'handbrake / drift'),
+      row([k.handbrake], 'drift (or brake + turn)'),
       row([k.boost], 'boost'),
       row([k.reset], 'reset'),
       row([k.camera], 'camera'),

@@ -35,8 +35,8 @@ describe('acceleration and top speed', () => {
     const sim = await createWorld({ spawn: 'straight' });
     run(sim, 1);
     const t = runUntil(sim, 15, (s) => kmh(s) >= 100, fullThrottle);
-    expect(t).toBeGreaterThan(4.2);
-    expect(t).toBeLessThan(5.8);
+    expect(t).toBeGreaterThan(5.8);
+    expect(t).toBeLessThan(7.2);
   });
 
   test('launch: the rears work the tyre but traction control keeps it usable', async () => {
@@ -47,9 +47,9 @@ describe('acceleration and top speed', () => {
       c.throttle = 1;
       maxKappa = Math.max(maxKappa, s.vehicle.telemetry.maxSlipRatio);
     });
-    expect(maxKappa).toBeGreaterThan(sim.vehicle.tuning.slipRatioPeak * 0.5);
+    expect(maxKappa).toBeGreaterThan(0.02); // the tyre is worked, if not past its peak
     expect(maxKappa).toBeLessThan(0.6);
-    expect(kmh(sim)).toBeGreaterThan(45);
+    expect(kmh(sim)).toBeGreaterThan(30);
   });
 
   test('gears shift up in order and the engine stays between idle and the limiter', async () => {
@@ -240,6 +240,40 @@ describe('drift', () => {
     expect(Math.abs(sim.vehicle.telemetry.driftAngleDeg)).toBeLessThan(42);
   });
 
+  test('keyboard taps modulate a drift instead of ending it', async () => {
+    const sim = await createWorld({ spawn: 'skidpad' });
+    run(sim, 1);
+    runUntil(sim, 10, (s) => kmh(s) >= 70, fullThrottle);
+    let minSpeed = Infinity;
+    let minAngle = Infinity;
+    run(sim, 4, (t, c, s) => {
+      c.throttle = 1;
+      c.handbrake = s.vehicle.driftTime < 0.3 ? 1 : 0;
+      // steer held, released for 150 ms every half second (how a keyboard player modulates)
+      c.steer = t % 30 < 21 ? 1 : 0;
+      if (s.vehicle.driftTime > 1) {
+        expect(s.vehicle.drifting).toBe(true);
+        minSpeed = Math.min(minSpeed, kmh(s));
+        minAngle = Math.min(minAngle, Math.abs(s.vehicle.telemetry.driftAngleDeg));
+      }
+    });
+    expect(minSpeed).toBeGreaterThan(50);
+    expect(minAngle).toBeGreaterThan(18);
+  });
+
+  test('with the drift button held, a centred stick keeps a mild drift alive', async () => {
+    const sim = await createWorld({ spawn: 'skidpad' });
+    run(sim, 1);
+    runUntil(sim, 10, (s) => kmh(s) >= 70, fullThrottle);
+    run(sim, 3, (_t, c, s) => {
+      c.throttle = 1;
+      c.handbrake = 1;
+      c.steer = s.vehicle.driftTime < 0.6 ? 1 : 0;
+    });
+    expect(sim.vehicle.drifting).toBe(true);
+    expect(Math.abs(sim.vehicle.telemetry.driftAngleDeg)).toBeGreaterThan(5);
+  });
+
   test('a brake tap while turning hard at 90 km/h starts a drift', async () => {
     const sim = await createWorld({ spawn: 'skidpad' });
     run(sim, 1);
@@ -326,8 +360,8 @@ describe('drift', () => {
       c.throttle = 1;
       c.steer = 0;
     });
-    expect(t).toBeGreaterThan(0);
-    expect(t).toBeLessThan(1.0);
+    expect(t).toBeGreaterThan(0.5); // never instant: the exit hold and the angle ramp-down are deliberate
+    expect(t).toBeLessThan(1.6);
   });
 });
 
@@ -405,6 +439,49 @@ describe('stability', () => {
     expect(minUpInAir).toBeGreaterThan(0.75);
     expect(upness(sim)).toBeGreaterThan(0.98);
     for (const t of settleTimes) expect(t).toBeLessThan(1.0);
+  });
+
+  test('flight: nose up on the way up, planted on landing, most of the speed kept', async () => {
+    const sim = await createWorld({ spawn: 'ramps' });
+    run(sim, 1);
+    // the 26 degree ramp at z = 210
+    runUntil(sim, 30, (s) => position(s).z > 205, fullThrottle);
+    const vRunUp = kmh(sim);
+    const tAir = runUntil(sim, 5, (s) => s.vehicle.telemetry.airborne, fullThrottle);
+    expect(tAir).toBeGreaterThan(0);
+    // the climb costs gravity energy (a slow approach means a short jump), but no more than that
+    const vLip = kmh(sim);
+    expect(vLip).toBeGreaterThan(vRunUp * 0.8);
+    let minUp = 1;
+    let maxPitch = -99;
+    let impact = 0;
+    const pitchOf = (s: SimWorld): number => {
+      const q = s.transforms.currRot;
+      const i = s.vehicle.slot * 4;
+      const fy = 2 * ((q[i + 1] as number) * (q[i + 2] as number) - (q[i + 3] as number) * (q[i] as number));
+      return (Math.asin(Math.max(-1, Math.min(1, fy))) * 180) / Math.PI;
+    };
+    const tLand = runUntil(sim, 5, (s) => !s.vehicle.telemetry.airborne, (_t, c, s) => {
+      c.throttle = 1;
+      minUp = Math.min(minUp, upness(s));
+      maxPitch = Math.max(maxPitch, pitchOf(s));
+      impact = s.vehicle.telemetry.landingImpact;
+    });
+    expect(tLand).toBeGreaterThan(0.4);
+    expect(maxPitch).toBeGreaterThan(5); // nose rises after the lip
+    expect(maxPitch).toBeLessThan(32); // but never past the ramp's own angle plus a little
+    expect(minUp).toBeGreaterThan(0.85);
+    expect(sim.vehicle.telemetry.landingImpact).toBeGreaterThan(2);
+    void impact;
+    // planted: no rebound hop, level, and at most 15% of the speed lost over the whole jump
+    let hopSteps = 0;
+    run(sim, 1, (_t, c, s) => {
+      c.throttle = 1;
+      if (s.vehicle.telemetry.airborne) hopSteps++;
+    });
+    expect(hopSteps).toBeLessThan(10);
+    expect(upness(sim)).toBeGreaterThan(0.98);
+    expect(kmh(sim)).toBeGreaterThan(vLip * 0.85);
   });
 
   test('an upside-down car rights itself', async () => {

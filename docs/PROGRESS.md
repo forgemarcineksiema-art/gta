@@ -2,6 +2,27 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-20 — Session 3: feel passes 2 and 3 (drift, flight, camera, acceleration)
+
+Marcin's playtest notes, in order: straight-line twitchy → drift hard to start and dies with the handbrake, slalom "like a bus" → drift still releases too soon, flight/landing needs rules, reverse and drift cameras poor, acceleration too quick for the Vmax.
+
+### Done
+
+- **Steering for a keyboard:** input ramps at 6 locks/s through a 2.4 sensitivity curve (a 100 ms tap is a small correction, a hold is full lock); lock shrinks to 5° from 34 m/s. Pinned: a 0.35 s full-lock pulse turns > 20° at 60 km/h on grip and < 16° at 120 km/h.
+- **Arcade grip:** mu 2.2/2.3 (~3 g), so the slalom is driven on the throttle.
+- **Drift entries:** Space while turning (a drift button: rear grip cut, no brake torque; on a straight or slow it still brakes/locks), a brake tap while turning hard above 50 km/h, or the rear stepping out under power above ~100 km/h.
+- **Drift persistence:** the commanded angle is rate limited (in 90°/s, out 45°/s), a centred stick with Space held keeps 40% of the angle, exit needs 0.3 s below the exit slip, counter-steer shrinks then swaps. Pinned: taps every half second keep the drift for 4 s above 50 km/h and 18°.
+- **Flight rules:** ramp climb costs only gravity (the chassis no longer collides with terrain; it rides on the suspension, and the terrain group is switched on only when the car is on its side or roof); a kink in the road redirects the velocity without loss; in the air the nose follows the flight path (nose up rising, bias +4°, ±25°), and levels to the ground normal 0.45 s before touchdown; a landing keeps 35% of the vertical speed and 50% of the spin, and 92% of the total speed is kept by redirecting the absorbed part along the ground (Burnout rule); the damper impulse is capped so a landing can stop the chassis but never throw it back up. Pinned on the 26° ramp: lip ≥ 80% of the run-up speed, nose 5–32° up, ≤ 10 airborne steps in the second after touchdown, ≥ 85% of the lip speed kept.
+- **Camera rewritten:** yaw is an angle with a rate cap; the view looks along the camera heading (a drifting car stays centred, the view shows where it goes); reversing orbits smoothly to the front after 0.6 s; height lags in the air; landing shake from the impact; drift pulls the camera back and down slightly.
+- **Starter car pacing:** torque 245 N·m, drag 1.12: 0–60 in 3.1 s, 0–100 in 6.5 s, 169 km/h, 234 with boost, 29 m from 100.
+- 29 sim tests.
+
+### Decided and why
+
+- The drift is a held state that the player modulates, not a condition that is re-evaluated every frame. On a keyboard every modulation is a release, so releases must not be exits.
+- No chassis–terrain collision while upright (decision record 9). Scraping a bumper on a ramp lip is realistic and feels terrible.
+- The landing keeps momentum on purpose: a jump that costs speed is a jump nobody takes twice.
+
 ## 2026-09-20 — Session 2: M1 polish after Marcin's first playtest
 
 Marcin's feedback: A/D reversed; physics must be rigorous and tuned by numbers; the speed streaks looked generic ("AI slop": improve, do not remove); work off the known-issues list; then M2. His laptop (weak CPU + MX330) is the low-tier reference and it felt smooth.

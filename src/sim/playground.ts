@@ -4,6 +4,7 @@
  * Everything here is deterministic and allocation-free after construction.
  */
 import RAPIER from '@dimforge/rapier3d-compat';
+import { GROUPS_SOLID, GROUPS_TERRAIN } from './collision';
 import { PALETTE } from './palette';
 import { IDENTITY_QUAT, quatFromAxisAngle, quatFromYaw, type Quat, type StaticDesc, type Vec3 } from './scene';
 
@@ -49,10 +50,12 @@ export function buildPlayground(world: RAPIER.World): PlaygroundLayout {
   ): void => {
     statics.push({ shape: { kind: 'box', hx, hy, hz }, position, rotation, color, tag: opts.tag ?? 'prop' });
     if (opts.collide !== false) {
+      const terrain = opts.tag !== 'wall';
       const desc = RAPIER.ColliderDesc.cuboid(hx, hy, hz)
         .setTranslation(position.x, position.y, position.z)
         .setRotation(rotation)
-        .setFriction(opts.friction ?? 1.0);
+        .setFriction(opts.friction ?? 1.0)
+        .setCollisionGroups(terrain ? GROUPS_TERRAIN : GROUPS_SOLID);
       world.createCollider(desc, ground);
     }
   };
@@ -153,11 +156,11 @@ export function buildPlayground(world: RAPIER.World): PlaygroundLayout {
 
   // ---- ramps -----------------------------------------------------------------
   const rampX = -150;
-  addBox(10, 0.015, 150, { x: rampX, y: 0.0, z: 100 }, IDENTITY_QUAT, PALETTE.asphaltLight, { collide: false, tag: 'road' });
+  addBox(10, 0.015, 220, { x: rampX, y: 0.0, z: 180 }, IDENTITY_QUAT, PALETTE.asphaltLight, { collide: false, tag: 'road' });
   const ramps: Array<{ z: number; deg: number; len: number }> = [
     { z: 40, deg: 8, len: 10 },
-    { z: 90, deg: 16, len: 10 },
-    { z: 150, deg: 26, len: 12 },
+    { z: 110, deg: 16, len: 10 },
+    { z: 210, deg: 26, len: 12 },
   ];
   for (const r of ramps) {
     const rad = (r.deg * Math.PI) / 180;
@@ -169,7 +172,7 @@ export function buildPlayground(world: RAPIER.World): PlaygroundLayout {
     addBox(4, 0.02, 0.5, { x: rampX, y: 0.005, z: r.z + r.len + 20 + r.deg * 1.5 }, IDENTITY_QUAT, PALETTE.laneMark, { collide: false, tag: 'mark' });
   }
   // a big jump with a gap and a landing pad
-  const big = { z: 230, deg: 22, len: 16 };
+  const big = { z: 320, deg: 22, len: 16 };
   {
     const rad = (big.deg * Math.PI) / 180;
     const cz = big.z + (Math.cos(rad) * big.len) / 2;
@@ -197,7 +200,7 @@ export function buildPlayground(world: RAPIER.World): PlaygroundLayout {
   spawns.push({ name: 'slalom', position: { x: slalomX, y: 0.6, z: -10 }, yaw: 0 });
   spawns.push({ name: 'skidpad', position: { x: skid.x, y: 0.6, z: skid.z - skid.r - 20 }, yaw: 0 });
   spawns.push({ name: 'ramps', position: { x: rampX, y: 0.6, z: 0 }, yaw: 0 });
-  spawns.push({ name: 'bigjump', position: { x: rampX, y: 0.6, z: 180 }, yaw: 0 });
+  spawns.push({ name: 'bigjump', position: { x: rampX, y: 0.6, z: 250 }, yaw: 0 });
 
   return { statics, spawns, props, groundSize };
 }

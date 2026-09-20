@@ -43,6 +43,8 @@ export interface VehicleTuning {
   suspensionDampingRebound: number;
   /** Extra stiffness once the spring is fully compressed. */
   bumpStopStiffness: number;
+  /** Progressive damping, N·s²/m²: a hard landing is absorbed by the damper instead of the bump stop. */
+  suspensionDampingProgressive: number;
   /** Anti-roll: transfers load between the wheels of one axle (N per metre of travel difference). */
   antiRollStiffness: number;
 
@@ -146,6 +148,14 @@ export interface VehicleTuning {
   driftMinSpeed: number;
   /** A drift cannot end before this many seconds (lets the angle build after a handbrake tap). */
   driftMinTime: number;
+  /** The rear must stay below driftExitDeg for this long before the drift ends (keyboard taps do not kill it). */
+  driftExitHold: number;
+  /** With the drift button held and the stick centred, this fraction of driftMaxAngleDeg is held. */
+  driftCentreHold: number;
+  /** How fast the commanded angle grows, degrees per second. */
+  driftAngleRateIn: number;
+  /** How fast the commanded angle shrinks toward straight, degrees per second. */
+  driftAngleRateOut: number;
   /** How fast grip returns after a drift / handbrake, per second (blend of the multiplier). */
   gripBlendRate: number;
   /** Drift angle commanded by full steer, degrees (steer sets the angle; centre straightens; counter-steer swaps sides). */
@@ -184,6 +194,20 @@ export interface VehicleTuning {
   airLevelTorque: number;
   /** Angular damping in the air, N·m per rad/s. */
   airAngularDamping: number;
+  /** In flight the nose follows this fraction of the flight-path angle (nose up on the way up, down on the way down). */
+  airFollowTrajectory: number;
+  /** Extra nose-up in flight, degrees. */
+  airPitchBiasDeg: number;
+  /** Pitch limit in flight, degrees. */
+  airPitchMaxDeg: number;
+  /** Seconds before the predicted touchdown when the car levels to the ground it will land on. */
+  airLandingLevelTime: number;
+  /** Fraction of the vertical speed kept at touchdown (the rest is absorbed: no rebound hop). */
+  landingRetainVertical: number;
+  /** Fraction of the angular velocity kept at touchdown. */
+  landingRetainSpin: number;
+  /** Fraction of the total speed kept through a landing: the absorbed vertical part is redirected along the ground. */
+  landingKeepMomentum: number;
   /** Seconds upside-down and stopped before the car rights itself. */
   flipRecoverySeconds: number;
 
@@ -219,6 +243,7 @@ export const DEFAULT_TUNING: VehicleTuning = {
   suspensionDampingCompression: 5200,
   suspensionDampingRebound: 6800,
   bumpStopStiffness: 250000,
+  suspensionDampingProgressive: 400,
   antiRollStiffness: 26000,
 
   maxSteerDegLow: 34,
@@ -229,7 +254,7 @@ export const DEFAULT_TUNING: VehicleTuning = {
   steerCurve: 2.4,
   ackermann: 1,
 
-  torqueMax: 340,
+  torqueMax: 245,
   idleRpm: 900,
   redlineRpm: 7200,
   torqueCurve: [0.6, 0.86, 1.0, 0.93, 0.8],
@@ -269,36 +294,47 @@ export const DEFAULT_TUNING: VehicleTuning = {
   driftAssist: 1,
   powerOversteer: 0.14,
   brakeDriftEntry: 1,
-  handbrakeGripMul: 0.45,
-  driftGripMul: 0.35,
+  handbrakeGripMul: 0.3,
+  driftGripMul: 0.25,
   driftFrontGripMul: 0.9,
   driftEnterDeg: 14,
   driftExitDeg: 7,
   driftMinSpeed: 8,
   driftMinTime: 0.6,
+  driftExitHold: 0.3,
+  driftCentreHold: 0.4,
+  driftAngleRateIn: 90,
+  driftAngleRateOut: 45,
   gripBlendRate: 4,
   driftMaxAngleDeg: 35,
-  driftAngleGain: 70000,
+  driftAngleGain: 140000,
   driftAngleDamping: 9000,
-  driftYawTorqueMax: 26000,
+  driftYawTorqueMax: 30000,
   driftAutoCounterSteer: 1,
   driftVelocityFollow: 2.6,
   driftFollowAccelMax: 8,
   driftSpeedLoss: 0.05,
   driftThrottlePush: 5000,
 
-  drag: 1.6,
+  drag: 1.12,
   downforce: 1.8,
-  extraGravity: 4,
+  extraGravity: 3.5,
 
-  airPitchTorque: 6000,
-  airRollTorque: 5000,
+  airPitchTorque: 3500,
+  airRollTorque: 3000,
   airLevelTorque: 22000,
   airAngularDamping: 5000,
+  airFollowTrajectory: 0.8,
+  airPitchBiasDeg: 4,
+  airPitchMaxDeg: 25,
+  airLandingLevelTime: 0.45,
+  landingRetainVertical: 0.35,
+  landingRetainSpin: 0.5,
+  landingKeepMomentum: 0.92,
   flipRecoverySeconds: 1.5,
 
   boostTorqueMul: 1.25,
-  boostThrust: 3200,
+  boostThrust: 2500,
   boostDrain: 0.28,
   boostGainDrift: 0.16,
   boostGainAir: 0.35,

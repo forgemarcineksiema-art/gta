@@ -19,6 +19,7 @@
  * rotation about +Y turns the nose to the left, so "steer right" rotates by -steer.
  */
 import RAPIER from '@dimforge/rapier3d-compat';
+import { GROUPS_CHASSIS_FLIPPED, GROUPS_CHASSIS_UPRIGHT } from '../collision';
 import type { VehicleControls } from '../controls';
 import * as M from '../math';
 import type { Vec3 } from '../math';
@@ -93,6 +94,8 @@ export interface VehicleTelemetry {
   minSlipRatio: number;
   /** True during the torque cut of a gear change. */
   shifting: boolean;
+  /** Vertical speed absorbed on the step the car touched down after a flight, m/s (0 otherwise). */
+  landingImpact: number;
   /** World velocity, m/s. */
   vx: number;
   vy: number;
@@ -149,6 +152,12 @@ export class Vehicle {
   frontGripMul = 1;
   /** Body slip angle of the previous step, radians (drift controller damping). */
   private bodySlipPrev = 0;
+  /** Drift side (+1 right) and the rate-limited commanded angle in degrees (+ = right). */
+  driftDir = 1;
+  driftTargetDeg = 0;
+  private driftExitTimer = 0;
+  private wasAirborne = false;
+  private collidesWithTerrain = false;
   readonly telemetry: VehicleTelemetry;
   /** Where `reset` puts the car: updated by the world (nearest spawn point). */
   resetPose: { position: Vec3; yaw: number };
@@ -228,6 +237,7 @@ export class Vehicle {
       maxSlipRatio: 0,
       minSlipRatio: 0,
       shifting: false,
+      landingImpact: 0,
       vx: 0,
       vy: 0,
       vz: 0,
@@ -242,6 +252,7 @@ export class Vehicle {
       .setTranslation(0, t.chassisOffsetY, 0)
       .setFriction(0.3)
       .setRestitution(0.05)
+      .setCollisionGroups(GROUPS_CHASSIS_UPRIGHT)
       .setMassProperties(t.mass, { x: 0, y: t.centerOfMassY, z: 0 }, boxInertia(t), { x: 0, y: 0, z: 0, w: 1 });
   }
 
@@ -340,6 +351,36 @@ export class Vehicle {
       }
     }
 
+    // ---- touchdown: sticky landing before the suspension sees the impact -----------
+    // most of the vertical speed and spin is absorbed at the instant of contact, so the
+    // dampers work on what is left and the car plants instead of being thrown back up
+    // The same rule handles a landing and the kink at the foot of a ramp: the speed
+    // into the surface is mostly absorbed, and the total speed is kept (arcade momentum)
+    // by redirecting it along the surface.
+    let landingImpact = 0;
+    if (grounded > 0) {
+      M.set(s.a, 0, 0, 0);
+      for (const w of this.wheels) if (w.grounded) M.add(s.a, s.a, w.normal);
+      M.normalize(s.a, s.a);
+      const vn = M.dot(s.vel, s.a);
+      if (vn < -2 && (this.wasAirborne || vn < -3.5)) {
+        landingImpact = -vn;
+        // a landing from a flight costs a little; a kink in the road only redirects
+        const total = M.length(s.vel) * (this.wasAirborne ? t.landingKeepMomentum : 1);
+        const vnKept = vn * t.landingRetainVertical;
+        M.addScaled(s.b, s.vel, s.a, -vn); // tangential part
+        const ht = M.length(s.b);
+        const htNew = Math.max(ht, Math.sqrt(Math.max(0, total * total - vnKept * vnKept)));
+        if (ht > 0.5) M.scale(s.b, s.b, htNew / ht);
+        M.addScaled(s.b, s.b, s.a, vnKept);
+        body.setLinvel(s.b, true);
+        body.setAngvel({ x: s.angvel.x * t.landingRetainSpin, y: s.angvel.y, z: s.angvel.z * t.landingRetainSpin }, true);
+        body.linvel(s.vel);
+        body.angvel(s.angvel);
+      }
+    }
+    this.wasAirborne = grounded === 0;
+
     // ---- spring + damper (with anti-roll) ---------------------------------
     for (let i = 0; i < 4; i++) {
       const w = this.wheels[i] as WheelState;
@@ -350,10 +391,15 @@ export class Vehicle {
       const vAlongRay = M.dot(s.b, s.rayDir); // + = compressing
       let f = t.suspensionStiffness * w.compression;
       f += (vAlongRay > 0 ? t.suspensionDampingCompression : t.suspensionDampingRebound) * vAlongRay;
+      // progressive damping on compression: a landing is absorbed by the damper, not by the bump stop
+      if (vAlongRay > 0) f += t.suspensionDampingProgressive * vAlongRay * vAlongRay;
       const over = w.compression - t.suspensionRestLength;
       if (over > 0) f += t.bumpStopStiffness * over;
       const other = this.wheels[i ^ 1] as WheelState;
       if (other.grounded) f += t.antiRollStiffness * (w.compression - other.compression);
+      // impulse cap: a wheel may stop its share of the chassis within the step, never reverse it
+      const stopForce = t.suspensionStiffness * w.compression + (t.mass * 0.25 * Math.max(0, vAlongRay)) / dt;
+      if (f > stopForce) f = stopForce;
       if (f < 0) f = 0;
       w.load = f;
       M.scale(s.force, s.up, f);
@@ -379,14 +425,34 @@ export class Vehicle {
       if (!this.drifting && ((handbrake && turning) || brakeEntry || rearSlip > t.driftEnterDeg * M.DEG)) {
         this.drifting = true;
         this.driftTime = 0;
-      } else if (this.drifting && !handbrake && this.driftTime > t.driftMinTime && rearSlip < t.driftExitDeg * M.DEG) {
-        this.drifting = false;
+        this.driftExitTimer = 0;
+        // + = drifting to the right (nose right of the velocity, negative body slip)
+        this.driftDir = Math.abs(controls.steer) > 0.05 ? Math.sign(controls.steer) : bodySlipDeg < 0 ? 1 : -1;
+        this.driftTargetDeg = -bodySlipDeg;
+      } else if (this.drifting) {
+        // the drift ends only after the car has been asked to straighten and has done so for a while
+        const wantsOut = !handbrake && Math.abs(this.driftTargetDeg) < 2 && rearSlip < t.driftExitDeg * M.DEG;
+        this.driftExitTimer = wantsOut ? this.driftExitTimer + dt : 0;
+        if (this.driftTime > t.driftMinTime && this.driftExitTimer > t.driftExitHold) this.drifting = false;
       }
     } else if (absFwd <= t.driftMinSpeed * 0.7 || grounded === 0) {
       // too slow, or fully airborne; a briefly lifted inner rear wheel does not end a drift
       this.drifting = false;
     }
-    if (this.drifting) this.driftTime += dt;
+    if (this.drifting) {
+      this.driftTime += dt;
+      // commanded drift angle (+ = right), rate limited so keyboard taps modulate instead of cancelling
+      const st = M.clamp(controls.steer, -1, 1);
+      let cmd: number;
+      if (st * this.driftDir > 0.05) cmd = st * t.driftMaxAngleDeg;
+      else if (Math.abs(st) <= 0.05) cmd = handbrake ? this.driftDir * t.driftCentreHold * t.driftMaxAngleDeg : 0;
+      else cmd = st * t.driftMaxAngleDeg; // counter-steer: shrinks the angle, swaps sides if held
+      const growing = Math.abs(cmd) > Math.abs(this.driftTargetDeg) && cmd * this.driftTargetDeg >= 0;
+      this.driftTargetDeg = M.moveToward(this.driftTargetDeg, cmd, (growing ? t.driftAngleRateIn : t.driftAngleRateOut) * dt);
+      if (this.driftTargetDeg * this.driftDir < -1) this.driftDir = -this.driftDir;
+    } else {
+      this.driftTargetDeg = 0;
+    }
     // front wheels: Ackermann on the commanded angle; in a drift they align with the velocity
     // (automatic counter-steer, what a drifting car visibly does) plus a share of the input
     const bodySlip = bodySlipDeg * M.DEG;
@@ -545,8 +611,8 @@ export class Vehicle {
       }
       if (share > 0 && w.slipRatio > maxSlipRatio) maxSlipRatio = w.slipRatio;
       if (w.slipRatio < minSlipRatio) minSlipRatio = w.slipRatio;
-      // rolling resistance
-      fLong -= Math.sign(vFwd) * Math.min(Math.abs(vFwd) * 200, t.rollingResistance * w.load);
+      // rolling resistance (on a load capped at twice the static share, so a landing spike does not brake the car)
+      fLong -= Math.sign(vFwd) * Math.min(Math.abs(vFwd) * 200, t.rollingResistance * Math.min(w.load, 0.5 * t.mass * 9.81));
 
       // --- friction circle
       const mag = Math.hypot(fLat, fLong);
@@ -572,8 +638,8 @@ export class Vehicle {
 
     // ---- drift assists (arcade layer) -------------------------------------------
     if (this.drifting && t.driftAssist > 0) {
-      // the stick sets the drift angle: steer right (+) -> nose right of the velocity -> negative body slip
-      const targetSlip = -M.clamp(controls.steer, -1, 1) * t.driftMaxAngleDeg * M.DEG;
+      // the commanded angle (+ = right) -> nose right of the velocity -> negative body slip
+      const targetSlip = -this.driftTargetDeg * M.DEG;
       const err = targetSlip - bodySlip;
       const slipRate = (bodySlip - this.bodySlipPrev) / dt;
       const torque = M.clamp(err * t.driftAngleGain - slipRate * t.driftAngleDamping, -t.driftYawTorqueMax, t.driftYawTorqueMax) * t.driftAssist;
@@ -628,7 +694,29 @@ export class Vehicle {
       const rollIn = controls.steer; // positive roll about +Z drops the right side
       M.scale(s.force, s.right, pitchIn * t.airPitchTorque);
       M.addScaled(s.force, s.force, s.fwd, rollIn * t.airRollTorque);
-      M.cross(s.a, s.up, AXIS_Y);
+      // attitude target: the nose follows the flight path (up while rising, down while falling),
+      // and levels to the ground it is about to land on when touchdown is near
+      const hs = Math.hypot(s.vel.x, s.vel.z);
+      const flight = Math.atan2(s.vel.y, Math.max(hs, 1));
+      const pitch = M.clamp(flight * t.airFollowTrajectory + t.airPitchBiasDeg * M.DEG, -t.airPitchMaxDeg * M.DEG, t.airPitchMaxDeg * M.DEG);
+      M.set(s.a, s.fwd.x, 0, s.fwd.z);
+      M.normalize(s.a, s.a);
+      // target up = worldUp*cos(pitch) - horizontalForward*sin(pitch) (nose up tilts the roof backward)
+      M.set(s.b, -s.a.x * Math.sin(pitch), Math.cos(pitch), -s.a.z * Math.sin(pitch));
+      if (s.vel.y < 0) {
+        this.ray.origin.x = s.pos.x;
+        this.ray.origin.y = s.pos.y;
+        this.ray.origin.z = s.pos.z;
+        this.ray.dir.x = 0;
+        this.ray.dir.y = -1;
+        this.ray.dir.z = 0;
+        const hit = this.world.castRayAndGetNormal(this.ray, 14, true, undefined, undefined, undefined, body);
+        if (hit) {
+          const gap = Math.max(0, hit.timeOfImpact - (t.suspensionRestLength + t.wheelRadius));
+          if (gap / Math.max(0.5, -s.vel.y) < t.airLandingLevelTime) M.set(s.b, hit.normal.x, hit.normal.y, hit.normal.z);
+        }
+      }
+      M.cross(s.a, s.up, s.b);
       M.addScaled(s.force, s.force, s.a, t.airLevelTorque);
       M.addScaled(s.force, s.force, s.angvel, -t.airAngularDamping);
       body.addTorque(s.force, true);
@@ -638,6 +726,13 @@ export class Vehicle {
     }
     if (this.drifting && absFwd > t.driftMinSpeed) {
       this.boostMeter = Math.min(1, this.boostMeter + t.boostGainDrift * dt);
+    }
+
+    // ---- body vs terrain: only when the car is on its side or roof -------------------
+    const flipped = s.up.y < 0.35;
+    if (flipped !== this.collidesWithTerrain) {
+      this.collidesWithTerrain = flipped;
+      this.collider.setCollisionGroups(flipped ? GROUPS_CHASSIS_FLIPPED : GROUPS_CHASSIS_UPRIGHT);
     }
 
     // ---- flip recovery ----------------------------------------------------------
@@ -676,6 +771,7 @@ export class Vehicle {
     tm.maxSlipRatio = maxSlipRatio;
     tm.minSlipRatio = minSlipRatio;
     tm.shifting = shifting;
+    tm.landingImpact = landingImpact;
     tm.vx = s.vel.x;
     tm.vy = s.vel.y;
     tm.vz = s.vel.z;

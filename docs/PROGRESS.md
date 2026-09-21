@@ -2,6 +2,10 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-21 — M3 session 15: status report
+
+Marcin asked for the work-so-far report in a document. `docs/M3_STATUS.md` records slices 0–3. It is not the gate report; `docs/M3_REPORT.md` is still written at the gate.
+
 ## 2026-09-21 — M3 session 15: slice 3
 
 ### Done

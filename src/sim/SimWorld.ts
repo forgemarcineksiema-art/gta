@@ -16,6 +16,7 @@ import { TransformBuffer } from './transforms';
 import { CAR_PRESETS, type CarId } from './vehicle/presets';
 import { cloneTuning, type VehicleTuning } from './vehicle/tuning';
 import { Vehicle } from './vehicle/Vehicle';
+import { City } from './city/City';
 
 export const FIXED_DT = 1 / 60;
 export const FIXED_HZ = 60;
@@ -31,10 +32,12 @@ export function initPhysics(): Promise<void> {
 }
 
 export interface SimWorldOptions {
+  map?: 'city' | 'playground';
+  seed?: number;
   tuning?: VehicleTuning;
   spawn?: string;
   car?: CarId;
-  /** Record every step (default true; costs a few typed-array writes per step). */
+  /** Record every step (default true on playground, false in the city). */
   record?: boolean;
 }
 
@@ -54,6 +57,8 @@ export interface GhostPose {
 }
 
 export class SimWorld {
+  readonly city: City | null;
+  private readonly roadReset: SpawnPoint = { name: 'nearest-road', position: { x: 0, y: 1, z: 0 }, yaw: 0 };
   readonly world: RAPIER.World;
   readonly transforms = new TransformBuffer(512);
   readonly statics: StaticDesc[];
@@ -82,12 +87,13 @@ export class SimWorld {
   constructor(opts: SimWorldOptions = {}) {
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
     this.world.timestep = FIXED_DT;
-    this.layout = buildPlayground(this.world);
+    this.city = opts.map === 'city' ? new City(this.world, opts.seed) : null;
+    this.layout = this.city ? { statics: [], props: [], spawns: this.city.spawns, track: this.city.route, groundSize: 1575 } : buildPlayground(this.world);
     this.statics = this.layout.statics;
     this.spawns = this.layout.spawns;
     this.track = this.layout.track;
     this.lapTimer = new LapTimer(this.track);
-    this.recorder = opts.record === false ? null : new Recorder();
+    this.recorder = (opts.record ?? !this.city) ? new Recorder() : null;
 
     for (const p of this.layout.props) {
       const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
@@ -115,20 +121,29 @@ export class SimWorld {
       this.transforms.writeBoth(slot, p.position.x, p.position.y, p.position.z, p.rotation.x, p.rotation.y, p.rotation.z, p.rotation.w);
     }
 
-    this.spawnName = opts.spawn ?? 'lot';
+    this.spawnName = opts.spawn ?? (this.city ? 'city' : 'lot');
     const spawn = this.spawns.find((s) => s.name === this.spawnName) ?? this.spawns[0];
-    if (!spawn) throw new Error('playground has no spawn points');
+    if (!spawn) throw new Error('map has no spawn points');
     this.carId = opts.car ?? 'muscle';
     const tuning = opts.tuning ?? cloneTuning(CAR_PRESETS[this.carId]);
     this.vehicle = new Vehicle(this.world, this.transforms, tuning, spawn.position, spawn.yaw);
+    this.city?.sync(spawn.position.x, spawn.position.z);
   }
 
   /** Advance the simulation by exactly one fixed step using the current `controls`. */
   step(): void {
+    if (this.city) {
+      const pos = this.vehicle.body.translation(this.scratchPos);
+      const nearest = this.nearestSpawn(pos.x, pos.z);
+      this.vehicle.resetPose.position = nearest.position;
+      this.vehicle.resetPose.yaw = nearest.yaw;
+      this.city.sync(pos.x, pos.z);
+    }
     this.transforms.swap();
     this.respawned = false;
     const reset = this.controls.reset;
     this.vehicle.update(this.controls, FIXED_DT);
+    if (reset) this.respawned = true;
     this.controls.reset = false;
     this.world.step();
     this.vehicle.writeTransforms();
@@ -152,7 +167,7 @@ export class SimWorld {
 
     // lap timing and the best-lap ghost
     const lap = this.lapTimer.state;
-    this.lapTimer.update(pos.x, pos.z, this.tick, this.time, FIXED_DT);
+    if (!this.city) this.lapTimer.update(pos.x, pos.z, this.tick, this.time, FIXED_DT);
     if (this.recorder) {
       const slot = this.vehicle.slot;
       this.recorder.record(this.controls, reset, this.transforms.currPos, slot * 3, this.transforms.currRot, slot * 4, this.vehicle.telemetry);
@@ -187,6 +202,7 @@ export class SimWorld {
   }
 
   nearestSpawn(x: number, z: number): SpawnPoint {
+    if (this.city) return this.city.nearestRoad(x, z, this.roadReset);
     let best = this.spawns[0] as SpawnPoint;
     let bestD = Infinity;
     for (const s of this.spawns) {
@@ -206,6 +222,7 @@ export class SimWorld {
     const s = this.spawns.find((sp) => sp.name === name);
     if (!s) return;
     this.vehicle.teleport(s.position, s.yaw);
+    this.city?.sync(s.position.x, s.position.z);
     this.lapTimer.reset();
     this.respawned = true;
   }

@@ -51,10 +51,17 @@ export const TRACK_BOT_BY_CAR: Record<CarId, Partial<TrackBotTuning>> = {
   heavy: { latAccel: 11, brakeAccel: 8 },
 };
 
+/** Conservative junction speeds; this is a coverage driver, not a racing opponent. */
+export const CITY_BOT_TUNING: Partial<TrackBotTuning> = {
+  latAccel: 7, brakeAccel: 7, vMax: 32, lookBase: 3, lookPerSpeed: 0.3, lookMin: 5, lookMax: 15,
+};
+
 export class TrackBot {
   tuning: TrackBotTuning;
   private idx = 0;
   private stuckTime = 0;
+  readonly visitedLanes = new Set<number>();
+  tourComplete = false;
   resets = 0;
 
   constructor(car: CarId = 'muscle', overrides: Partial<TrackBotTuning> = {}) {
@@ -75,7 +82,7 @@ export class TrackBot {
     // nearest sample: local search from the last index, with a global fallback
     let best = this.idx;
     let bestD = Infinity;
-    for (let k = -8; k <= 24; k++) {
+    for (let k = sim.city ? -4 : -8; k <= (sim.city ? 16 : 24); k++) {
       const i = (this.idx + k + m) % m;
       const s = S[i] as TrackSample;
       const d = (s.x - px) ** 2 + (s.z - pz) ** 2;
@@ -95,6 +102,11 @@ export class TrackBot {
       }
     }
     this.idx = best;
+    if (sim.city) {
+      const lane = sim.city.route.laneAtSample[best];
+      if (lane !== undefined) this.visitedLanes.add(lane);
+      this.tourComplete = this.visitedLanes.size === sim.city.graph.lanes.length;
+    }
 
     // pursuit target: the sample `look` metres ahead along the track
     const look = Math.max(t.lookMin, Math.min(t.lookMax, t.lookBase + speed * t.lookPerSpeed));
@@ -133,7 +145,8 @@ export class TrackBot {
     if (speed < 0.8 && controls.throttle > 0) {
       this.stuckTime += dt;
       if (this.stuckTime > 2.5) {
-        sim.spawnAt('track');
+        sim.spawnAt(sim.city ? 'city' : 'track');
+        this.idx = 0;
         this.resets++;
         this.stuckTime = 0;
       }

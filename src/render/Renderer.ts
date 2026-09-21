@@ -10,6 +10,7 @@ import { CAR_PROFILES } from './carProfiles';
 import { Sparks } from './Sparks';
 import { SpeedLines } from './SpeedLines';
 import { buildCarMesh, type CarMesh } from './carMesh';
+import { CityView, QUALITY, type QualityTier } from './CityView';
 
 export interface RenderStats {
   drawCalls: number;
@@ -29,6 +30,14 @@ interface DynamicView {
 const MAX_DPR = 1.5;
 
 export class Renderer {
+  readonly cityView: CityView | null;
+  quality: QualityTier = 'low';
+  private qualityElapsed = 0;
+  private qualityFrames = 0;
+  private qualityTotal = 0;
+  private qualityCooldown = 3;
+  private resolutionScale = 1;
+  private readonly qualityLocked: boolean;
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
   readonly camera: THREE.PerspectiveCamera;
@@ -43,14 +52,17 @@ export class Renderer {
   private readonly speedLines: SpeedLines;
   private readonly sparks: Sparks;
   private readonly tmpPos = new THREE.Vector3();
+  private readonly lastCarPos = new THREE.Vector3(Infinity, Infinity, Infinity);
   private readonly carVel = new THREE.Vector3();
   private readonly sky: THREE.Mesh;
   private readonly tmpQa = new THREE.Quaternion();
   private readonly tmpQb = new THREE.Quaternion();
   private readonly shadowTarget = new THREE.Object3D();
 
-  constructor(canvas: HTMLCanvasElement, sim: SimWorld) {
+  constructor(canvas: HTMLCanvasElement, sim: SimWorld, quality?: QualityTier) {
     this.sim = sim;
+    this.qualityLocked = quality !== undefined;
+    this.quality = quality ?? 'low';
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', stencil: false });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NoToneMapping;
@@ -91,7 +103,13 @@ export class Renderer {
     this.sky = buildSkyDome();
     this.scene.add(this.sky);
 
-    this.buildStatics(sim.statics);
+    this.cityView = sim.city ? new CityView(this.scene, sim.city) : null;
+    if (sim.statics.length) this.buildStatics(sim.statics);
+    this.setQuality(this.quality);
+    if (this.cityView) {
+      const p = sim.vehicle.body.translation();
+      this.cityView.sync(p.x, p.z, this.quality, true);
+    }
     for (const d of sim.dynamics) this.addDynamic(d);
     const profile = CAR_PROFILES[sim.carId];
     this.car = buildCarMesh(sim.vehicle.tuning, profile);
@@ -179,7 +197,7 @@ export class Renderer {
   resize(): void {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
+    const dpr = Math.min(window.devicePixelRatio || 1, this.sim.city ? QUALITY[this.quality].dpr : MAX_DPR) * this.resolutionScale;
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
@@ -218,9 +236,14 @@ export class Renderer {
     this.applyTransforms(alpha);
     const tm = this.sim.vehicle.telemetry;
     const carPos = this.car.root.position;
+    // A fixed step can clear the sim's respawn flag before the next render frame.
+    const snap = this.sim.respawned || this.lastCarPos.distanceToSquared(carPos) > 80 * 80;
+    this.lastCarPos.copy(carPos);
+    this.cityView?.sync(carPos.x, carPos.z, this.quality, snap);
+    if (this.cityView && dt > 0 && dt <= 0.25) this.adaptQuality(dt);
     this.carVel.set(tm.vx, tm.vy, tm.vz);
 
-    this.chase.update(this.car.root, this.carVel, tm, dt, this.sim.respawned);
+    this.chase.update(this.car.root, this.carVel, tm, dt, snap);
     this.car.update(tm);
     // ghost of the best lap
     if (this.sim.ghostPose(this.ghostPose)) {
@@ -272,7 +295,32 @@ export class Renderer {
   }
 
   dispose(): void {
+    this.cityView?.dispose();
     this.renderer.dispose();
+  }
+
+  private setQuality(tier: QualityTier): void {
+    this.quality = tier;
+    if (!this.sim.city) return;
+    const q = QUALITY[tier];
+    this.scene.fog = new THREE.Fog(PALETTE.fog, q.near, q.far);
+    this.sun.shadow.mapSize.set(q.shadow, q.shadow);
+    this.sun.shadow.map?.dispose(); this.sun.shadow.map = null;
+    this.resize();
+  }
+
+  /** Start conservatively, benchmark real frames, then use hysteresis and dynamic resolution. */
+  private adaptQuality(dt: number): void {
+    if (this.qualityLocked) return;
+    if (this.qualityCooldown > 0) { this.qualityCooldown -= dt; return; }
+    this.qualityElapsed += dt; this.qualityFrames++; this.qualityTotal += dt;
+    if (this.qualityElapsed < 3) return;
+    const ms = this.qualityTotal * 1000 / this.qualityFrames;
+    if (ms > 24 && this.quality === 'high') { this.setQuality('low'); this.qualityCooldown = 15; }
+    else if (ms > 27 && this.resolutionScale > 0.65) { this.resolutionScale = Math.max(0.65, this.resolutionScale - 0.1); this.resize(); }
+    else if (ms < 18 && this.resolutionScale < 1) { this.resolutionScale = Math.min(1, this.resolutionScale + 0.05); this.resize(); }
+    else if (ms < 17.2 && this.quality === 'low') { this.setQuality('high'); this.qualityCooldown = 15; }
+    this.qualityElapsed = 0; this.qualityFrames = 0; this.qualityTotal = 0;
   }
 }
 

@@ -15,6 +15,12 @@
   --safe-left: env(safe-area-inset-left, 0px);
 }
 
+.minimap { position: absolute; top: calc(16px + var(--safe-top)); right: calc(16px + var(--safe-right)); width: clamp(132px, 21vh, 184px); background: var(--ui-panel); border: 1px solid var(--ui-panel-line); border-radius: 8px; overflow: hidden; }
+.minimap svg { display: block; width: 100%; aspect-ratio: 1; }
+.minimap__north { position: absolute; top: 3px; left: calc(50% - 5px); font-size: 12px; font-weight: 800; text-shadow: 0 1px 3px black; }
+.minimap__district { padding: 4px 5px 0; text-align: center; font-size: 12px; font-weight: 800; letter-spacing: .03em; }
+.minimap__landmark { padding: 1px 4px 7px; text-align: center; font-size: 12px; color: var(--ui-ink-dim); }
+
 html,
 body {
   margin: 0;

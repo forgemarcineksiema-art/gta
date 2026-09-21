@@ -9,3 +9,5 @@ export { CAR_PRESETS, CAR_IDS, type CarId } from './vehicle/presets';
 export { Recorder, POSE_STRIDE, TELEMETRY_STRIDE, CONTROL_STRIDE, type RecordingJSON } from './recorder';
 export { LapTimer, type LapState, type TrackDef, type TrackSample } from './track';
 export { Vehicle, type VehicleTelemetry, type WheelState } from './vehicle/Vehicle';
+export { City, DISTRICTS, districtAt, chunkCoord, type CityChunk } from './city/City';
+export { BLOCK, CITY_HALF, type RoadGraph, type Lane, type RoadNode } from './city/roads';

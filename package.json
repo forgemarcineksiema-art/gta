@@ -17,6 +17,7 @@
     "perf": "playwright test e2e/perf.spec.ts",
     "perf:headed": "playwright test e2e/perf.spec.ts --headed",
     "screens": "playwright test e2e/screens.spec.ts",
+    "city": "playwright test e2e/city.spec.ts",
     "verify": "node tools/verify.mjs"
   },
   "dependencies": {

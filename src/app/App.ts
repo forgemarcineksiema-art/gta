@@ -8,11 +8,11 @@ import { InputManager } from '../input/InputManager';
 import { KeyboardDevice } from '../input/KeyboardDevice';
 import { createPlatform, type Platform } from '../platform';
 import { Renderer } from '../render/Renderer';
-import { CAR_IDS, FIXED_DT, Recorder, SimWorld, initPhysics, type CarId, type RecordingJSON } from '../sim';
+import { CAR_IDS, FIXED_DT, Recorder, SimWorld, districtAt, initPhysics, type CarId, type RecordingJSON } from '../sim';
 import { DebugPanel } from '../ui/debugPanel';
 import { Hud } from '../ui/hud';
 import { BotDriver } from './bot';
-import { TrackBot } from './trackBot';
+import { CITY_BOT_TUNING, TrackBot } from './trackBot';
 import { FixedStepLoop } from './loop';
 import { PerfProbe, heapMb } from './perf';
 
@@ -26,11 +26,14 @@ export interface GameHandle {
   version: string;
   /** The renderer, for headless probes (draw stats) and scene inspection from the console. */
   renderer: Renderer;
+  roadBot: TrackBot | null;
 }
 
 declare global {
   interface Window {
     __game?: GameHandle;
+    render_game_to_text?: () => string;
+    advanceTime?: (ms: number) => void;
   }
 }
 
@@ -56,16 +59,19 @@ export class App {
   private frameMsSmooth = 16.7;
   private stepMsLast = 0;
   private raf = 0;
+  private readonly manual: boolean;
 
   private constructor(platform: Platform, sim: SimWorld, canvas: HTMLCanvasElement, params: URLSearchParams) {
     this.platform = platform;
     this.sim = sim;
-    this.renderer = new Renderer(canvas, sim);
+    this.manual = params.get('manual') === '1';
+    const quality = params.get('quality');
+    this.renderer = new Renderer(canvas, sim, quality === 'low' || quality === 'high' ? quality : undefined);
     this.input = new InputManager();
     this.input.addDevice(new KeyboardDevice());
     this.audio = new EngineAudio();
     const uiRoot = document.getElementById('ui') ?? document.body;
-    this.hud = new Hud(uiRoot);
+    this.hud = new Hud(uiRoot, sim);
     this.hud.setHints({
       throttle: this.input.label('throttle'),
       brake: this.input.label('brake'),
@@ -124,7 +130,8 @@ export class App {
 
     const botParam = params.get('bot');
     const botOn = botParam === '1' || botParam === 'track';
-    this.bot = botParam === 'track' ? new TrackBot(this.sim.carId) : botOn ? new BotDriver(Number(params.get('seed') ?? '42')) : null;
+    this.bot = botOn && sim.city ? new TrackBot(sim.carId, CITY_BOT_TUNING)
+      : botParam === 'track' ? new TrackBot(this.sim.carId) : botOn ? new BotDriver(Number(params.get('seed') ?? '42')) : null;
     const duration = Number(params.get('duration') ?? '0');
     this.perf = botOn && duration > 0 ? new PerfProbe(duration) : null;
 
@@ -137,8 +144,25 @@ export class App {
       bot: botOn,
       version: __APP_VERSION__,
       renderer: this.renderer,
+      roadBot: sim.city && this.bot instanceof TrackBot ? this.bot : null,
     };
     window.__game = this.handle;
+    window.render_game_to_text = () => {
+      const p = sim.vehicle.body.translation();
+      return JSON.stringify({
+        axes: '+Y up, +Z north, +X west; metres', mode: this.paused ? 'paused' : 'driving',
+        map: sim.city ? 'city' : 'playground', seed: sim.city?.seed,
+        player: { x: p.x, y: p.y, z: p.z, speedKmh: sim.vehicle.telemetry.speedKmh, boost: sim.vehicle.boostMeter },
+        district: sim.city ? districtAt(p.x, p.z).name : null,
+        quality: this.renderer.quality, collisionChunks: sim.city?.active.size,
+        renderChunks: this.renderer.cityView?.meshes.size, lanesVisited: this.handle.roadBot?.visitedLanes.size,
+        tourComplete: this.handle.roadBot?.tourComplete, resets: this.bot?.resets ?? 0, tick: sim.tick,
+      });
+    };
+    if (this.manual) window.advanceTime = (ms) => {
+      const count = Math.max(0, Math.round(ms / (FIXED_DT * 1000)));
+      for (let i = 0; i < count; i++) this.frame(this.lastTime + FIXED_DT * 1000);
+    };
     window.addEventListener('error', (e) => this.handle.errors.push(String(e.message)));
     window.addEventListener('unhandledrejection', (e) => this.handle.errors.push(String((e).reason)));
 
@@ -174,7 +198,10 @@ export class App {
     const spawn = params.get('spawn') ?? undefined;
     const carParam = params.get('car');
     const car = (CAR_IDS as string[]).includes(carParam ?? '') ? (carParam as CarId) : undefined;
-    const sim = new SimWorld({ ...(spawn ? { spawn } : {}), ...(car ? { car } : {}) });
+    const citySpawns = ['city', 'crown', 'foundry', 'gardens', 'marina', 'highway'];
+    const map = params.get('map') === 'playground' || params.get('bot') === 'track' || (spawn && !citySpawns.includes(spawn)) ? 'playground' : 'city';
+    const seed = Number(params.get('seed') ?? '42');
+    const sim = new SimWorld({ map, seed: Number.isFinite(seed) ? seed : 42, ...(spawn ? { spawn } : {}), ...(car ? { car } : {}) });
     const app = new App(platform, sim, canvas, params);
     platform.loadingStop();
     app.start();
@@ -184,7 +211,8 @@ export class App {
   private start(): void {
     document.getElementById('loading')?.classList.add('is-hidden');
     this.lastTime = performance.now();
-    this.raf = requestAnimationFrame(this.frame);
+    if (this.manual) this.frame(this.lastTime + FIXED_DT * 1000);
+    else this.raf = requestAnimationFrame(this.frame);
   }
 
   private get paused(): boolean {
@@ -213,7 +241,7 @@ export class App {
   }
 
   private readonly frame = (now: number): void => {
-    this.raf = requestAnimationFrame(this.frame);
+    if (!this.manual) this.raf = requestAnimationFrame(this.frame);
     const rawDt = Math.max(0, (now - this.lastTime) / 1000);
     const frameDt = Math.min(MAX_FRAME_DT, rawDt);
     this.lastTime = now;

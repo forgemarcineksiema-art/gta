@@ -1,5 +1,5 @@
 /** Metre-based street architecture. Render descriptors only; solids stay simple in Rapier. */
-import { IDENTITY_QUAT, type StaticDesc, type BoxFace } from '../scene';
+import { IDENTITY_QUAT, quatFromYaw, type StaticDesc, type BoxFace } from '../scene';
 import { CITY_COLORS } from '../palette';
 export { CITY_COLORS } from '../palette';
 
@@ -27,6 +27,23 @@ export class Architecture {
       this.cylinder(x, 4.8, z, 2.7, 1.2, CITY_COLORS.hedge);
       this.cylinder(x + 0.5, 6.25, z, 2, 0.75, CITY_COLORS.leaves);
       this.cylinder(x - 1.8, 4.3, z + 0.5, 1.4, 0.8, CITY_COLORS.leaves);
+    }
+  }
+
+  /**
+   * A building whose street face (local -Z) looks along `yaw`: generated in its
+   * own frame, then every member is moved and given the same rotation, so the
+   * facade logic never knows the building is not axis aligned.
+   */
+  rotatedBuilding(x: number, z: number, yaw: number, hx: number, hz: number, district: string, floors: number, variant: number, accent: number): void {
+    const start = this.statics.length;
+    this.building(0, 0, hx, hz, district, 1, 1, floors, variant, accent, false, true);
+    const cos = Math.cos(yaw), sin = Math.sin(yaw), rot = quatFromYaw(yaw);
+    for (let i = start; i < this.statics.length; i++) {
+      const st = this.statics[i] as StaticDesc;
+      const lx = st.position.x, lz = st.position.z;
+      st.position = { x: x + cos * lx + sin * lz, y: st.position.y, z: z - sin * lx + cos * lz };
+      st.rotation = rot;
     }
   }
 

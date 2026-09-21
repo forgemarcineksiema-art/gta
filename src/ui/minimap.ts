@@ -25,7 +25,9 @@ export class Minimap {
       if (lane.from > lane.to) continue;
       const a = sim.city.graph.nodes[lane.from], b = sim.city.graph.nodes[lane.to];
       if (!a || !b) continue;
-      shape('line', { x1: String(-a.x), y1: String(-a.z), x2: String(-b.x), y2: String(-b.z), stroke: lane.highway ? '#f5cd75' : '#f7f3ea', 'stroke-width': lane.highway ? '22' : '13', opacity: '.8' });
+      // Junction to junction through the lane's own path, so authored curves read on the map.
+      const points = [a, ...lane.points, b].map((pt) => `${-pt.x},${-pt.z}`).join(' ');
+      shape('polyline', { points, fill: 'none', stroke: lane.highway ? '#f5cd75' : lane.special ? '#ffe9a8' : '#f7f3ea', 'stroke-width': lane.highway ? '22' : lane.special ? '16' : '13', 'stroke-linejoin': 'round', opacity: '.8' });
     }
     for (const { x, z } of LANDMARKS) shape('rect', { x: String(-x - 17), y: String(-z - 17), width: '34', height: '34', fill: '#2bd1ff' });
     this.arrow = shape('path', { d: 'M 0 -53 L 35 35 L 0 20 L -35 35 Z', fill: '#ffd23f', stroke: '#160e28', 'stroke-width': '14', 'stroke-linejoin': 'round' });

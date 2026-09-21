@@ -3,9 +3,9 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { GROUPS_SOLID, GROUPS_TERRAIN } from '../collision';
 import { PALETTE } from '../palette';
 import type { SpawnPoint } from '../playground';
-import type { StaticDesc } from '../scene';
+import { quatFromYaw, type StaticDesc } from '../scene';
 import { Architecture, CITY_COLORS } from './architecture';
-import { BLOCK, CITY_HALF, HIGHWAY_HALF, ROAD_HALF, buildCityRoute, buildRoadGraph } from './roads';
+import { BLOCK, CITY_HALF, HIGHWAY_HALF, ROAD_HALF, buildCityRoute, buildRoadGraph, distanceToPolyline, projectOnLane, type RoadPoint, type SpecialRoad } from './roads';
 
 export const DISTRICTS = [
   { id: 'crown', name: 'CROWN HEIGHTS', color: 0xb497d6, accent: 0xf5cd75, landmark: 'Crown Tower' },
@@ -58,6 +58,9 @@ export class City {
     for (const [name, x, z] of [['crown', -450, -450], ['foundry', 450, -450], ['gardens', -450, 450], ['marina', 450, 450], ['highway', -675, 0]] as const) {
       this.spawns.push({ name, position: { x: x - (name === 'highway' ? 6 : 4.5), y: 1, z: z + 40 }, yaw: 0 });
     }
+    // The authored loop starts on the first Crown diagonal, heading for the tower junction.
+    const first = this.graph.lanes.find((l) => l.special === 'Crown Diagonal West' && this.graph.nodes[l.from]?.x === -675);
+    if (first) this.spawns.push({ name: 'loop', position: { x: first.x0, y: 1, z: first.z0 }, yaw: first.yaw0 });
   }
 
   generate(cx: number, cz: number): CityChunk {
@@ -87,27 +90,70 @@ export class City {
       box(x, 0.022, z + d, 0.12, 0.006, 2.8, PALETTE.laneMark);
       box(x + d, 0.022, z, 2.8, 0.006, 0.12, PALETTE.laneMark);
     }
+    // Authored roads that come near this chunk. Their corridor (half width plus
+    // pavement) overrides the grid apron and lots, so nothing is built on them.
+    const corridors = this.graph.special.filter((road) => road.centre.some((pt) => Math.abs(pt.x - x) < BLOCK / 2 + road.halfWidth + 8 && Math.abs(pt.z - z) < BLOCK / 2 + road.halfWidth + 8));
+    const roadClearance = (px: number, pz: number): number => {
+      let best = Infinity;
+      for (const road of corridors) best = Math.min(best, distanceToPolyline(road.centre, px, pz) - road.halfWidth);
+      return best;
+    };
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
       const d = districtAt(x + sx * 55, z + sz * 55);
       const c = CITY_COLORS;
       const hx = (BLOCK / 2 - vx) / 2, hz = (BLOCK / 2 - vz) / 2;
-      // The collision apron stays continuous. Visually, pavement is only 4.5 m wide;
-      // the interior is gardens, courtyards or a paved industrial service yard.
-      box(x + sx * (vx + hx), 0.07, z + sz * (vz + hz), hx, 0.07, hz,
-        d.id === 'foundry' ? c.yard : c.soil, 'kerb');
-      box(x + sx * (vx + 2.25), 0.145, z + sz * (vz + hz), 2.25, 0.005, hz, PALETTE.kerb, 'decor', 'top');
-      box(x + sx * (vx + hx), 0.145, z + sz * (vz + 2.25), hx, 0.005, 2.25, PALETTE.kerb, 'decor', 'top');
-      // Continuous kerb edge and paving joints provide a metre-scale reference at speed.
-      box(x + sx * (vx + 0.12), 0.16, z + sz * (vz + hz), 0.12, 0.02, hz, c.trim);
-      box(x + sx * (vx + hx), 0.16, z + sz * (vz + 0.12), hx, 0.02, 0.12, c.trim);
-      for (let along = 26; along < 110; along += 6) {
-        box(x + sx * (vx + 2.3), 0.16, z + sz * along, 2.2, 0.002, 0.025, c.yard, 'decor', 'top');
-        box(x + sx * along, 0.16, z + sz * (vz + 2.3), 0.025, 0.002, 2.2, c.yard, 'decor', 'top');
+      const qx = x + sx * (vx + hx), qz = z + sz * (vz + hz);
+      const open = corridors.some((road) => road.centre.some((pt) => Math.abs(pt.x - qx) < hx + road.halfWidth + 6 && Math.abs(pt.z - qz) < hz + road.halfWidth + 6));
+      if (!open) {
+        // The collision apron stays continuous. Visually, pavement is only 4.5 m wide;
+        // the interior is gardens, courtyards or a paved industrial service yard.
+        box(qx, 0.07, qz, hx, 0.07, hz, d.id === 'foundry' ? c.yard : c.soil, 'kerb');
+        box(x + sx * (vx + 2.25), 0.145, z + sz * (vz + hz), 2.25, 0.005, hz, PALETTE.kerb, 'decor', 'top');
+        box(x + sx * (vx + hx), 0.145, z + sz * (vz + 2.25), hx, 0.005, 2.25, PALETTE.kerb, 'decor', 'top');
+        // Continuous kerb edge and paving joints provide a metre-scale reference at speed.
+        box(x + sx * (vx + 0.12), 0.16, z + sz * (vz + hz), 0.12, 0.02, hz, c.trim);
+        box(x + sx * (vx + hx), 0.16, z + sz * (vz + 0.12), hx, 0.02, 0.12, c.trim);
+        for (let along = 26; along < 110; along += 6) {
+          box(x + sx * (vx + 2.3), 0.16, z + sz * along, 2.2, 0.002, 0.025, c.yard, 'decor', 'top');
+          box(x + sx * along, 0.16, z + sz * (vz + 2.3), 0.025, 0.002, 2.2, c.yard, 'decor', 'top');
+        }
+      } else {
+        // Open quarter: the interior sits at road level and the grid pavements are
+        // only the 4.5 m strips, cut where the authored road passes through.
+        box(qx, 0.008, qz, hx, 0.001, hz, d.id === 'foundry' ? c.yard : d.id === 'gardens' ? PALETTE.grass : c.soil, 'decor', 'top');
+        for (const axis of ['x', 'z'] as const) {
+          const length = axis === 'x' ? hz * 2 : hx * 2;
+          const start = axis === 'x' ? vz : vx;
+          let runStart = -1;
+          for (let along = 0; along <= length + 1e-6; along += 1.5) {
+            const end = along >= length;
+            const px = axis === 'x' ? x + sx * (vx + 2.25) : x + sx * (start + along);
+            const pz = axis === 'x' ? z + sz * (start + along) : z + sz * (vz + 2.25);
+            const blocked = end || roadClearance(px, pz) < 5.5;
+            if (!blocked && runStart < 0) runStart = along;
+            if (blocked && runStart >= 0) {
+              const stop = Math.min(along, length), mid = start + (runStart + stop) / 2, half = (stop - runStart) / 2;
+              if (half > 1) {
+                if (axis === 'x') {
+                  box(x + sx * (vx + 2.25), 0.07, z + sz * mid, 2.25, 0.07, half, PALETTE.kerb, 'kerb');
+                  box(x + sx * (vx + 0.12), 0.16, z + sz * mid, 0.12, 0.02, half, c.trim);
+                } else {
+                  box(x + sx * mid, 0.07, z + sz * (vz + 2.25), half, 0.07, 2.25, PALETTE.kerb, 'kerb');
+                  box(x + sx * mid, 0.16, z + sz * (vz + 0.12), half, 0.02, 0.12, c.trim);
+                }
+              }
+              runStart = -1;
+            }
+          }
+        }
       }
       for (const ox of [40, 85]) for (const oz of [40, 85]) {
         // Reserve authored destinations before filling ordinary parcels.
         const landmarkOffset = d.id === 'crown' || d.id === 'foundry' ? 85 : 40;
         if (Math.abs(cx) === 2 && Math.abs(cz) === 2 && sx === 1 && sz === 1 && ox === landmarkOffset && oz === landmarkOffset) continue;
+        // Lots whose footprint could meet an authored road's frontage row are left
+        // to that road (its buildings, trees and pavements furnish the corridor).
+        if (open && [[0, 0], [-18, -18], [18, -18], [-18, 18], [18, 18]].some(([ex, ez]) => roadClearance(x + sx * ox + (ex as number), z + sz * oz + (ez as number)) < 40)) continue;
         const backlot = ox === 85 && oz === 85;
         const edge = Math.abs(x + sx * ox) > 702 || Math.abs(z + sz * oz) > 702;
         const park = edge || (backlot && d.id === 'gardens') || (backlot && rnd() < 0.35);
@@ -148,11 +194,12 @@ export class City {
         box(x + sx * along, 0.026, z + sz * (vz - 2), 0.065, 0.005, 1.65, PALETTE.laneMark, 'decor', 'top');
       }
       if (d.id !== 'foundry') for (const along of [57, 106]) {
-        architecture.tree(x + sx * (vx + 2.7), z + sz * along, d.id === 'marina');
-        architecture.tree(x + sx * along, z + sz * (vz + 2.7), d.id === 'marina');
+        if (roadClearance(x + sx * (vx + 2.7), z + sz * along) > 3) architecture.tree(x + sx * (vx + 2.7), z + sz * along, d.id === 'marina');
+        if (roadClearance(x + sx * along, z + sz * (vz + 2.7)) > 3) architecture.tree(x + sx * along, z + sz * (vz + 2.7), d.id === 'marina');
       }
       // Street lamps and planted verges are outside the driving corridor.
       for (const offset of [36, 80]) {
+        if (roadClearance(x + sx * (vx + 2), z + sz * offset) < 1.5) continue;
         box(x + sx * (vx + 2), 4, z + sz * offset, 0.18, 4, 0.18, 0x686678);
         box(x + sx * (vx + 1), 8, z + sz * offset, 1.4, 0.15, 0.45, PALETTE.laneMark);
       }
@@ -202,10 +249,116 @@ export class City {
         for (const side of [-1, 1]) architecture.tree(px + side * 21, pz - 19, true);
       }
     }
+    for (const road of corridors) this.specialRoad(road, cx, cz, architecture);
     // Visible seawalls match the persistent boundary colliders.
     if (Math.abs(cx) === 3) box(Math.sign(cx) * CITY_HALF, 2, z, 1, 2, BLOCK / 2, PALETTE.kerb, 'boundary');
     if (Math.abs(cz) === 3) box(x, 2, Math.sign(cz) * CITY_HALF, BLOCK / 2, 2, 1, PALETTE.kerb, 'boundary');
     return { key: `${cx},${cz}`, x: cx, z: cz, statics };
+  }
+
+  /**
+   * One authored road, drawn segment by segment; a segment belongs to the chunk
+   * that contains its midpoint, so neighbouring chunks never draw it twice. The
+   * surface is a raised top face over the grid cross, so junction overlaps do not
+   * z-fight; pavements are rotated kerb boxes that stop short of the junctions.
+   */
+  private specialRoad(road: SpecialRoad, cx: number, cz: number, architecture: Architecture): void {
+    const x = cx * BLOCK, z = cz * BLOCK, hw = road.halfWidth;
+    const box = architecture.box.bind(architecture);
+    const a0 = road.centre[0] as RoadPoint, a1 = road.centre[road.centre.length - 1] as RoadPoint;
+    const nearJunction = (px: number, pz: number, margin: number) =>
+      Math.max(Math.abs(px - a0.x), Math.abs(pz - a0.z)) < margin || Math.max(Math.abs(px - a1.x), Math.abs(pz - a1.z)) < margin;
+    const c = CITY_COLORS;
+    const paving = road.kind === 'service' ? c.yard : road.kind === 'parkway' ? PALETTE.grass : PALETTE.kerb;
+    // Frontage: buildings face the authored road, spaced along it, both sides.
+    const frontage = road.kind === 'avenue' ? { district: 'crown', hx: 10, hz: 10, gap: 3, setback: 1.3, floors: 4, accent: 0xf5cd75 }
+      : road.kind === 'quay' ? { district: 'marina', hx: 12, hz: 9, gap: 5, setback: 1.3, floors: 4, accent: 0x67c9ce }
+      : road.kind === 'parkway' ? { district: 'gardens', hx: 8, hz: 8, gap: 8, setback: 6, floors: 2, accent: 0x8bb583 } : null;
+    const vx = Math.abs(cx) === 3 ? HIGHWAY_HALF : ROAD_HALF, vz = Math.abs(cz) === 3 ? HIGHWAY_HALF : ROAD_HALF;
+    const footprintClear = (px: number, pz: number, yaw: number, hx: number, hz: number): boolean => {
+      const cos = Math.cos(yaw), sin = Math.sin(yaw);
+      for (const [lx, lz] of [[-hx, -hz], [hx, -hz], [-hx, hz], [hx, hz]] as const) {
+        const wx = px + cos * lx + sin * lz, wz = pz - sin * lx + cos * lz;
+        // Inside a block interior: clear of this and the neighbouring grid streets' pavements.
+        const dx = Math.abs(wx - x), dz = Math.abs(wz - z);
+        if (Math.min(dx, BLOCK - dx) < vx + 5 || Math.min(dz, BLOCK - dz) < vz + 5) return false;
+        if (Math.abs(wx) > CITY_HALF - 8 || Math.abs(wz) > CITY_HALF - 8) return false;
+      }
+      return true;
+    };
+    const pitch = frontage ? 2 * frontage.hx + frontage.gap : Infinity;
+    const fronts = [{ side: 1, next: 40 }, { side: -1, next: 40 + pitch / 2 }];
+    let along = 0, nextDash = 0, nextTree = 13, nextLamp = 30;
+    for (let i = 0; i + 1 < road.centre.length; i++) {
+      const a = road.centre[i] as RoadPoint, b = road.centre[i + 1] as RoadPoint;
+      const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz);
+      const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2, yaw = Math.atan2(dx, dz);
+      const rot = quatFromYaw(yaw);
+      // Right-hand normal when facing along the segment: (-dz, dx) / len.
+      const nx = -dz / len, nz = dx / len;
+      const startAlong = along;
+      along += len;
+      if (Math.abs(mx - x) >= BLOCK / 2 || Math.abs(mz - z) >= BLOCK / 2) continue;
+      const surface = box(mx, 0.019, mz, hw, 0.001, len / 2 + 0.25, PALETTE.asphalt, 'road', 'top');
+      surface.rotation = rot;
+      if (!nearJunction(mx, mz, 26)) {
+        while (nextDash < along) {
+          if (nextDash >= startAlong) {
+            const t = (nextDash - startAlong) / len;
+            const dash = box(a.x + dx * t, 0.028, a.z + dz * t, 0.12, 0.004, 1.4, PALETTE.laneMark);
+            dash.rotation = rot;
+          }
+          nextDash += 12;
+        }
+      }
+      if (!nearJunction(mx, mz, ROAD_HALF + 12)) {
+        for (const side of [-1, 1]) {
+          const kerb = box(mx + nx * side * (hw + 2.25), 0.07, mz + nz * side * (hw + 2.25), 2.25, 0.07, len / 2 + 0.3, paving === PALETTE.grass ? c.soil : paving, 'kerb');
+          kerb.rotation = rot;
+          const edge = box(mx + nx * side * (hw + 0.12), 0.16, mz + nz * side * (hw + 0.12), 0.12, 0.02, len / 2 + 0.3, c.trim);
+          edge.rotation = rot;
+          if (paving === PALETTE.grass) {
+            const lawn = box(mx + nx * side * (hw + 2.25), 0.145, mz + nz * side * (hw + 2.25), 2.25, 0.005, len / 2 + 0.3, PALETTE.grass, 'decor', 'top');
+            lawn.rotation = rot;
+          }
+        }
+        while (nextTree < along) {
+          if (nextTree >= startAlong && road.kind !== 'service') {
+            const t = (nextTree - startAlong) / len, side = Math.floor(nextTree / 27) % 2 ? 1 : -1;
+            architecture.tree(a.x + dx * t + nx * side * (hw + 2.7), a.z + dz * t + nz * side * (hw + 2.7), road.kind === 'quay');
+          }
+          nextTree += 27;
+        }
+        for (const front of fronts) while (frontage && front.next < along) {
+          if (front.next >= startAlong) {
+            const ts = (front.next - startAlong) / len, index = Math.round(front.next / pitch), side = front.side;
+            const ox = nx * side, oz = nz * side;
+            const yaw = Math.atan2(ox, oz), variant = (index * 7 + (side > 0 ? 0 : 1)) % 3;
+            const depth = frontage.hz + (variant === 1 ? 1 : 0), width = frontage.hx + (variant === 2 ? 1 : 0);
+            const centre = hw + 4.5 + frontage.setback + depth;
+            const px = a.x + dx * ts + ox * centre, pz = a.z + dz * ts + oz * centre;
+            if (!nearJunction(px, pz, ROAD_HALF + 30 + width) && footprintClear(px, pz, yaw, width + 1.5, depth + 1.5)) {
+              const floors = frontage.floors + (variant === 1 ? 1 : 0);
+              architecture.rotatedBuilding(px, pz, yaw, width, depth, frontage.district, floors, variant, frontage.accent);
+              // Entrance path from the door to the road's pavement.
+              const path = box(a.x + dx * ts + ox * (hw + 4.5 + frontage.setback / 2), 0.17, a.z + dz * ts + oz * (hw + 4.5 + frontage.setback / 2), 1.5, 0.01, frontage.setback / 2, PALETTE.kerb, 'decor', 'top');
+              path.rotation = quatFromYaw(yaw);
+            }
+          }
+          front.next += pitch;
+        }
+        while (nextLamp < along) {
+          if (nextLamp >= startAlong) {
+            const t = (nextLamp - startAlong) / len, side = Math.floor(nextLamp / 45) % 2 ? -1 : 1;
+            const px = a.x + dx * t + nx * side * (hw + 2), pz = a.z + dz * t + nz * side * (hw + 2);
+            box(px, 4, pz, 0.18, 4, 0.18, 0x686678);
+            const head = box(px - nx * side, 8, pz - nz * side, 0.45, 0.15, 1.4, PALETTE.laneMark);
+            head.rotation = rot;
+          }
+          nextLamp += 45;
+        }
+      }
+    }
   }
 
   sync(x: number, z: number): void {
@@ -223,7 +376,7 @@ export class City {
           if ((st.tag !== 'building' && st.tag !== 'kerb') || st.shape.kind !== 'box') continue;
           const p = st.position, s = st.shape;
           this.world.createCollider(RAPIER.ColliderDesc.cuboid(s.hx, s.hy, s.hz)
-            .setTranslation(p.x, p.y, p.z).setFriction(1).setRestitution(st.tag === 'building' ? 1 : 0)
+            .setTranslation(p.x, p.y, p.z).setRotation(st.rotation).setFriction(1).setRestitution(st.tag === 'building' ? 1 : 0)
             .setCollisionGroups(st.tag === 'building' ? GROUPS_SOLID : GROUPS_TERRAIN), body);
         }
         this.active.set(key, { body, chunk }); this.loaded++;
@@ -239,11 +392,10 @@ export class City {
   /** Project onto the closest driveable lane instead of resetting to a distant junction. */
   nearestRoad(x: number, z: number, out: SpawnPoint): SpawnPoint {
     let best = Infinity;
+    const hit = { x: 0, z: 0, yaw: 0 };
     for (const lane of this.graph.lanes) {
-      const dx = lane.x1 - lane.x0, dz = lane.z1 - lane.z0;
-      const t = Math.max(0, Math.min(1, ((x - lane.x0) * dx + (z - lane.z0) * dz) / (dx * dx + dz * dz)));
-      const px = lane.x0 + dx * t, pz = lane.z0 + dz * t, dist = (x - px) ** 2 + (z - pz) ** 2;
-      if (dist < best) { best = dist; out.position.x = px; out.position.z = pz; out.yaw = lane.yaw; }
+      const dist = projectOnLane(lane, x, z, hit);
+      if (dist < best) { best = dist; out.position.x = hit.x; out.position.z = hit.z; out.yaw = hit.yaw; }
     }
     return out;
   }

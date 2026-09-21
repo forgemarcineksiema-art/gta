@@ -58,7 +58,7 @@ for (const quality of ['low', 'high']) {
     console.log(`[city ${quality}] ${JSON.stringify(peak)}`);
     mkdirSync('perf', { recursive: true });
     writeFileSync(`perf/city-${quality}.json`, JSON.stringify(peak, null, 2));
-    expect(peak.lanes).toBe(168); expect(peak.resets).toBe(0);
+    expect(peak.lanes).toBe(178); expect(peak.resets).toBe(0);
     expect(peak.draws).toBeLessThanOrEqual(quality === 'low' ? 150 : 300);
     expect(peak.triangles).toBeLessThanOrEqual(quality === 'low' ? 250000 : 600000);
     expect(peak.heap).toBeLessThan(250);

@@ -33,10 +33,19 @@ const casts = (st: StaticDesc) => !st.face && !st.farFace && st.tag !== 'road' &
  * (ground, road cross) form a fifth base part.
  */
 export const PARTS = [{ ox: 0, oz: 0 }, { ox: -1, oz: -1 }, { ox: 1, oz: -1 }, { ox: -1, oz: 1 }, { ox: 1, oz: 1 }] as const;
+/** City statics rotate about +Y only; the quaternion is read back as a yaw. */
+export function staticYaw(st: StaticDesc): number {
+  const q = st.rotation;
+  return q.y === 0 && q.w === 1 ? 0 : 2 * Math.atan2(q.y, q.w);
+}
+
 export function partIndex(st: StaticDesc, cx: number, cz: number): number {
   const shape = st.shape;
-  const hx = shape.kind === 'cylinder' || shape.kind === 'wheel' ? shape.radius : shape.hx;
-  const hz = shape.kind === 'cylinder' || shape.kind === 'wheel' ? shape.radius : shape.hz;
+  const round = shape.kind === 'cylinder' || shape.kind === 'wheel';
+  // A rotated box straddles a centre line when its bounding circle does.
+  const rotated = !round && staticYaw(st) !== 0;
+  const hx = round ? shape.radius : rotated ? Math.hypot(shape.hx, shape.hz) : shape.hx;
+  const hz = round ? shape.radius : rotated ? Math.hypot(shape.hx, shape.hz) : shape.hz;
   const dx = st.position.x - cx, dz = st.position.z - cz;
   if (Math.abs(dx) <= hx || Math.abs(dz) <= hz) return 0;
   return 1 + (dx > 0 ? 1 : 0) + (dz > 0 ? 2 : 0);
@@ -66,20 +75,24 @@ export function cityGeometry(statics: StaticDesc[], detailed = true): THREE.Buff
     const sx = rectangular ? shape.hx : shape.radius;
     const sy = rectangular ? shape.hy : shape.halfHeight;
     const sz = rectangular ? shape.hz : shape.radius;
+    const yaw = staticYaw(st), cos = Math.cos(yaw), sin = Math.sin(yaw);
     color.setHex(st.color);
     for (const src of sources(st)) {
       const pos = src.getAttribute('position'), normal = src.getAttribute('normal');
       if (casts(st)) shadowVertices += pos.count;
       for (let i = 0; i < pos.count; i++, index += 3) {
-        positions[index] = st.position.x + pos.getX(i) * sx;
-        positions[index + 1] = st.position.y + pos.getY(i) * sy;
-        positions[index + 2] = st.position.z + pos.getZ(i) * sz;
-        normals[index] = normal.getX(i); normals[index + 1] = normal.getY(i); normals[index + 2] = normal.getZ(i);
+        const lx = pos.getX(i) * sx, lz = pos.getZ(i) * sz;
+        let nx = normal.getX(i), ny = normal.getY(i), nz = normal.getZ(i);
         if (shape.kind === 'gable') {
-          const nx = normal.getX(i) / sx, ny = normal.getY(i) / sy, nz = normal.getZ(i) / sz;
+          nx /= sx; ny /= sy; nz /= sz;
           const length = Math.hypot(nx, ny, nz);
-          normals[index] = nx / length; normals[index + 1] = ny / length; normals[index + 2] = nz / length;
+          nx /= length; ny /= length; nz /= length;
         }
+        // Rotation about +Y: local +Z maps to (sin yaw, cos yaw), matching quatFromYaw.
+        positions[index] = st.position.x + cos * lx + sin * lz;
+        positions[index + 1] = st.position.y + pos.getY(i) * sy;
+        positions[index + 2] = st.position.z - sin * lx + cos * lz;
+        normals[index] = cos * nx + sin * nz; normals[index + 1] = ny; normals[index + 2] = -sin * nx + cos * nz;
         colors[index] = color.r; colors[index + 1] = color.g; colors[index + 2] = color.b;
       }
     }

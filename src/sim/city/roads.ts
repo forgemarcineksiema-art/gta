@@ -1,16 +1,140 @@
-/** Directed right-hand lanes. Junction connections are curves, never teleports. */
+/**
+ * Directed right-hand lanes. Junction connections are curves, never teleports.
+ * The plan is a 7×7 grid (perimeter loop = highway) plus authored off-grid
+ * roads: every lane is a polyline, so diagonals and arcs use the same code as
+ * the grid streets, and the bot, reset projection, minimap and traffic (M3)
+ * never need to know which is which.
+ */
 import type { TrackDef, TrackSample } from '../track';
 
 export const BLOCK = 225;
 export const CITY_HALF = 787.5;
 export const ROAD_HALF = 12;
 export const HIGHWAY_HALF = 19;
+/** Lane endpoints stop this far from the junction centre; the connection curve fills the rest. */
+export const LANE_INSET = 23;
+
+export interface RoadPoint { x: number; z: number }
 export interface RoadNode { id: number; x: number; z: number; outgoing: number[] }
 export interface Lane {
   id: number; from: number; to: number; highway: boolean;
-  x0: number; z0: number; x1: number; z1: number; yaw: number; next: number[];
+  /** Authored off-grid road this lane belongs to, if any. */
+  special?: string;
+  /** Lane centre path from the start point to the end point, inset from both junctions. */
+  points: RoadPoint[];
+  x0: number; z0: number; x1: number; z1: number;
+  /** Heading at the start and at the end of the lane (equal on straight lanes). */
+  yaw0: number; yaw: number;
+  next: number[];
 }
-export interface RoadGraph { nodes: RoadNode[]; lanes: Lane[] }
+export interface RoadGraph { nodes: RoadNode[]; lanes: Lane[]; special: SpecialRoad[] }
+
+/** An authored road between two grid junctions: a sampled centreline and a half width. */
+export interface SpecialRoad {
+  name: string;
+  /** Grid indices (-3..3) of the two junctions. */
+  from: [number, number];
+  to: [number, number];
+  centre: RoadPoint[];
+  halfWidth: number;
+  /** Pavement colour family; the chunk generator picks the district colour. */
+  kind: 'avenue' | 'service' | 'parkway' | 'quay';
+}
+
+const node = (gx: number, gz: number): RoadPoint => ({ x: gx * BLOCK, z: gz * BLOCK });
+
+/** Resample a polyline at a uniform spacing (the last point is kept exactly). */
+export function resample(points: RoadPoint[], spacing: number): RoadPoint[] {
+  const out: RoadPoint[] = [];
+  let carried = 0;
+  for (let i = 0; i + 1 < points.length; i++) {
+    const a = points[i] as RoadPoint, b = points[i + 1] as RoadPoint;
+    const len = Math.hypot(b.x - a.x, b.z - a.z);
+    for (let d = carried; d < len; d += spacing) out.push({ x: a.x + (b.x - a.x) * d / len, z: a.z + (b.z - a.z) * d / len });
+    carried = ((carried - len) % spacing + spacing) % spacing;
+  }
+  out.push({ ...(points[points.length - 1] as RoadPoint) });
+  return out;
+}
+
+function straight(name: string, from: [number, number], to: [number, number], halfWidth: number, kind: SpecialRoad['kind']): SpecialRoad {
+  return { name, from, to, halfWidth, kind, centre: resample([node(...from), node(...to)], 9) };
+}
+
+/** Circular arc from one junction to another about `centre`, along the shorter sweep. */
+function arc(name: string, from: [number, number], to: [number, number], centre: RoadPoint, halfWidth: number, kind: SpecialRoad['kind']): SpecialRoad {
+  const a = node(...from), b = node(...to);
+  const radius = Math.hypot(a.x - centre.x, a.z - centre.z);
+  const t0 = Math.atan2(a.z - centre.z, a.x - centre.x);
+  let sweep = Math.atan2(b.z - centre.z, b.x - centre.x) - t0;
+  sweep = Math.atan2(Math.sin(sweep), Math.cos(sweep));
+  const steps = Math.ceil(Math.abs(sweep) * radius / 4.5);
+  const points: RoadPoint[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = t0 + sweep * i / steps;
+    points.push({ x: centre.x + Math.cos(t) * radius, z: centre.z + Math.sin(t) * radius });
+  }
+  points[0] = a; points[points.length - 1] = b;
+  return { name, from, to, halfWidth, kind, centre: points };
+}
+
+/** Catmull-Rom curve through control points; the first and last are the junctions. */
+function spline(name: string, from: [number, number], to: [number, number], control: RoadPoint[], halfWidth: number, kind: SpecialRoad['kind']): SpecialRoad {
+  const pts = [node(...from), ...control, node(...to)];
+  const raw: RoadPoint[] = [];
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const p0 = pts[Math.max(0, i - 1)] as RoadPoint, p1 = pts[i] as RoadPoint;
+    const p2 = pts[i + 1] as RoadPoint, p3 = pts[Math.min(pts.length - 1, i + 2)] as RoadPoint;
+    for (let k = 0; k < 16; k++) {
+      const t = k / 16, t2 = t * t, t3 = t2 * t;
+      raw.push({
+        x: 0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
+        z: 0.5 * (2 * p1.z + (-p0.z + p2.z) * t + (2 * p0.z - 5 * p1.z + 4 * p2.z - p3.z) * t2 + (-p0.z + 3 * p1.z - 3 * p2.z + p3.z) * t3),
+      });
+    }
+  }
+  raw.push(pts[pts.length - 1] as RoadPoint);
+  return { name, from, to, halfWidth, kind, centre: resample(raw, 4.5) };
+}
+
+/**
+ * The M2.2 loop: each district contributes one road that asks for different
+ * driving. Crown: two straight diagonals aimed at the tower. Sunset Works: a
+ * narrow service chicane through the yards. Palm Gardens: a 225 m radius
+ * parkway arc. Coral Quay: a 503 m radius sweep along the quay.
+ */
+export const SPECIAL_ROADS: SpecialRoad[] = [
+  straight('Crown Diagonal West', [-3, -1], [-2, -2], 12, 'avenue'),
+  straight('Crown Diagonal North', [-2, -2], [-1, -3], 12, 'avenue'),
+  spline('Works Chicane', [1, -2], [2, -1], [{ x: 300, z: -425 }, { x: 340, z: -370 }, { x: 340, z: -305 }, { x: 395, z: -250 }], 8, 'service'),
+  arc('Garden Parkway', [-1, 2], [-2, 1], { x: -225, z: 225 }, 10, 'parkway'),
+  arc('Quay Sweep', [2, 1], [1, 2], { x: 675, z: 675 }, 12, 'quay'),
+];
+
+/** Offset a polyline to its right (facing along it); +X is left when facing +Z. */
+function offsetRight(points: RoadPoint[], offset: number): RoadPoint[] {
+  return points.map((p, i) => {
+    const prev = points[Math.max(0, i - 1)] as RoadPoint, next = points[Math.min(points.length - 1, i + 1)] as RoadPoint;
+    const tx = next.x - prev.x, tz = next.z - prev.z, len = Math.hypot(tx, tz) || 1;
+    return { x: p.x - tz / len * offset, z: p.z + tx / len * offset };
+  });
+}
+
+/** Cut `inset` metres off both ends of a polyline, measured along it. */
+function trim(points: RoadPoint[], inset: number): RoadPoint[] {
+  const cut = (pts: RoadPoint[]): RoadPoint[] => {
+    let left = inset;
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const a = pts[i] as RoadPoint, b = pts[i + 1] as RoadPoint;
+      const len = Math.hypot(b.x - a.x, b.z - a.z);
+      if (len < left) { left -= len; continue; }
+      const t = left / len;
+      return [{ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t }, ...pts.slice(i + 1)];
+    }
+    return pts.slice(-1);
+  };
+  return cut(cut(points).reverse()).reverse();
+}
 
 export function buildRoadGraph(): RoadGraph {
   const nodes: RoadNode[] = [];
@@ -18,28 +142,35 @@ export function buildRoadGraph(): RoadGraph {
   for (let z = -3; z <= 3; z++) for (let x = -3; x <= 3; x++) {
     nodes.push({ id: nodes.length, x: x * BLOCK, z: z * BLOCK, outgoing: [] });
   }
-  const add = (a: RoadNode, b: RoadNode) => {
-    const dx = (b.x - a.x) / BLOCK, dz = (b.z - a.z) / BLOCK;
-    const highway = (a.x === b.x && Math.abs(a.x) === 675) || (a.z === b.z && Math.abs(a.z) === 675);
-    // +X points left when facing +Z; the right-hand lane is on -X.
-    const offset = highway ? 6 : 4.5;
-    const inset = 23;
+  const nodeAt = (gx: number, gz: number): RoadNode => nodes[(gz + 3) * 7 + (gx + 3)] as RoadNode;
+  const add = (a: RoadNode, b: RoadNode, centre: RoadPoint[], highway: boolean, special?: string, halfWidth = ROAD_HALF) => {
+    const offset = highway ? 6 : Math.min(4.5, halfWidth - 3.5);
+    const points = offsetRight(trim(centre, LANE_INSET), offset);
+    const first = points[0] as RoadPoint, second = points[1] as RoadPoint;
+    const last = points[points.length - 1] as RoadPoint, before = points[points.length - 2] as RoadPoint;
     const lane: Lane = {
-      id: lanes.length, from: a.id, to: b.id, highway,
-      x0: a.x + dx * inset - dz * offset, z0: a.z + dz * inset + dx * offset,
-      x1: b.x - dx * inset - dz * offset, z1: b.z - dz * inset + dx * offset,
-      yaw: Math.atan2(dx, dz), next: [],
+      id: lanes.length, from: a.id, to: b.id, highway, points,
+      x0: first.x, z0: first.z, x1: last.x, z1: last.z,
+      yaw0: Math.atan2(second.x - first.x, second.z - first.z), yaw: Math.atan2(last.x - before.x, last.z - before.z),
+      next: [], ...(special ? { special } : {}),
     };
     lanes.push(lane); a.outgoing.push(lane.id);
   };
   for (const a of nodes) for (const b of nodes) {
-    if (Math.abs(a.x - b.x) + Math.abs(a.z - b.z) === BLOCK) add(a, b);
+    if (Math.abs(a.x - b.x) + Math.abs(a.z - b.z) !== BLOCK) continue;
+    const highway = (a.x === b.x && Math.abs(a.x) === 675) || (a.z === b.z && Math.abs(a.z) === 675);
+    add(a, b, [{ x: a.x, z: a.z }, { x: b.x, z: b.z }], highway);
+  }
+  for (const road of SPECIAL_ROADS) {
+    const a = nodeAt(...road.from), b = nodeAt(...road.to);
+    add(a, b, road.centre, false, road.name, road.halfWidth);
+    add(b, a, [...road.centre].reverse(), false, road.name, road.halfWidth);
   }
   for (const lane of lanes) {
     // These broad arcade junctions permit U-turns; the connection curve handles them too.
     lane.next = [...(nodes[lane.to] as RoadNode).outgoing];
   }
-  return { nodes, lanes };
+  return { nodes, lanes, special: SPECIAL_ROADS };
 }
 
 /** A deterministic Euler tour visits every directed lane, including the perimeter. */
@@ -59,14 +190,17 @@ export function roadTour(graph: RoadGraph): number[] {
 /** Sample a lane and its connection at <= 3 m. Shared by bot and future traffic. */
 export function lanePath(lane: Lane, next: Lane): TrackSample[] {
   const out: TrackSample[] = [];
-  const length = Math.hypot(lane.x1 - lane.x0, lane.z1 - lane.z0);
-  const steps = Math.ceil(length / 3);
-  for (let i = 0; i < steps; i++) {
-    const t = i / steps;
-    out.push({ x: lane.x0 + (lane.x1 - lane.x0) * t, z: lane.z0 + (lane.z1 - lane.z0) * t, yaw: lane.yaw, curvature: 0, s: 0 });
+  for (let i = 0; i + 1 < lane.points.length; i++) {
+    const a = lane.points[i] as RoadPoint, b = lane.points[i + 1] as RoadPoint;
+    const length = Math.hypot(b.x - a.x, b.z - a.z), steps = Math.ceil(length / 3);
+    const yaw = Math.atan2(b.x - a.x, b.z - a.z);
+    for (let k = 0; k < steps; k++) {
+      const t = k / steps;
+      out.push({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, yaw, curvature: 0, s: 0 });
+    }
   }
   const cx0 = lane.x1 + Math.sin(lane.yaw) * 24, cz0 = lane.z1 + Math.cos(lane.yaw) * 24;
-  const cx1 = next.x0 - Math.sin(next.yaw) * 24, cz1 = next.z0 - Math.cos(next.yaw) * 24;
+  const cx1 = next.x0 - Math.sin(next.yaw0) * 24, cz1 = next.z0 - Math.cos(next.yaw0) * 24;
   for (let i = 0; i < 24; i++) {
     const t = i / 24, u = 1 - t;
     out.push({
@@ -76,6 +210,31 @@ export function lanePath(lane: Lane, next: Lane): TrackSample[] {
     });
   }
   return out;
+}
+
+/** Closest point on a lane's polyline; returns squared distance and writes the projection. */
+export function projectOnLane(lane: Lane, x: number, z: number, out: { x: number; z: number; yaw: number }): number {
+  let best = Infinity;
+  for (let i = 0; i + 1 < lane.points.length; i++) {
+    const a = lane.points[i] as RoadPoint, b = lane.points[i + 1] as RoadPoint;
+    const dx = b.x - a.x, dz = b.z - a.z;
+    const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / (dx * dx + dz * dz || 1)));
+    const px = a.x + dx * t, pz = a.z + dz * t, dist = (x - px) ** 2 + (z - pz) ** 2;
+    if (dist < best) { best = dist; out.x = px; out.z = pz; out.yaw = Math.atan2(dx, dz); }
+  }
+  return best;
+}
+
+/** Squared distance from a point to a sampled centreline. */
+export function distanceToPolyline(points: RoadPoint[], x: number, z: number): number {
+  let best = Infinity;
+  for (let i = 0; i + 1 < points.length; i++) {
+    const a = points[i] as RoadPoint, b = points[i + 1] as RoadPoint;
+    const dx = b.x - a.x, dz = b.z - a.z;
+    const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / (dx * dx + dz * dz || 1)));
+    best = Math.min(best, (x - a.x - dx * t) ** 2 + (z - a.z - dz * t) ** 2);
+  }
+  return Math.sqrt(best);
 }
 
 export interface CityRoute extends TrackDef { laneAtSample: number[] }

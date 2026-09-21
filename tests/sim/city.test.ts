@@ -9,7 +9,8 @@ describe('M2 city', () => {
   it('has connected directed lanes and a closed tour covering every lane', () => {
     const graph = buildRoadGraph(), tour = roadTour(graph);
     expect(graph.nodes).toHaveLength(49);
-    expect(graph.lanes).toHaveLength(168);
+    expect(graph.lanes).toHaveLength(168 + 2 * graph.special.length);
+    expect(graph.special).toHaveLength(5);
     expect(new Set(tour).size).toBe(graph.lanes.length);
     for (let i = 0; i < tour.length; i++) {
       const a = graph.lanes[tour[i] as number], b = graph.lanes[tour[(i + 1) % tour.length] as number];
@@ -79,7 +80,7 @@ describe('M2 city', () => {
           expect(sim.city?.active.size).toBeLessThanOrEqual(25);
         }
       }
-      console.log(`[city tour] lanes ${bot.visitedLanes.size}/168 time ${sim.time.toFixed(1)}s resets ${bot.resets} y ${minY.toFixed(3)}..${maxY.toFixed(3)} max impact ${maxImpact.toFixed(2)}`);
+      console.log(`[city tour] lanes ${bot.visitedLanes.size}/${sim.city?.graph.lanes.length} time ${sim.time.toFixed(1)}s resets ${bot.resets} y ${minY.toFixed(3)}..${maxY.toFixed(3)} max impact ${maxImpact.toFixed(2)}`);
       expect(bot.resets).toBe(0);
       expect(bot.tourComplete).toBe(true);
       expect(minY).toBeGreaterThan(0.2);

@@ -244,3 +244,64 @@ in most runs on this machine.
 - Silhouettes need an open sightline; street canyons hide them.
 - One 60–115 ms render spike per run remains unexplained; the tier switch is one
   known source.
+
+## M2.2 performance pass on the iGPU path (2026-09-21)
+
+Marcin asked for `npm run perf:headed`, A/B comparisons and a prepared test
+machine. The first headed run changed the picture: **headed Chromium on this
+laptop renders through the Intel UHD Graphics**, the brief's mid-range iGPU,
+while headless Playwright picks the NVIDIA MX330. Every number below is the
+headed Intel path unless stated; `npm run perf` (headless, MX330) stays as the
+fast regression check.
+
+Preparation for every measurement: no game tab in the desktop browser pane, no
+second preview server, `Get-Process` idle, and the reference build (`git archive`
+of the previous commit, junction to `node_modules`, `vite preview --port 4174`)
+alternated with the candidate three times (`screens/perf-ab-headed.mjs`).
+
+### What the profile said (CPU ×4, 20 s sample)
+
+Main thread saturated: render 35 % (Intel driver submission counted as
+`(program)`), simulation 20 %, DOM style/layout/paint for the HUD 19 %, the
+per-step reset lane projection 4 %, `performance.memory` reads 1.5 %. Streaming
+showed up as spikes rather than average cost: a chunk generation is 20–40 ms at
+×4 and one large part geometry about 9 ms unthrottled. The heap saw-toothed from
+45 to 113 MB and back (garbage, not a leak); one 75 ms frame with 14 ms of JS
+coincided with the drop.
+
+### Changes and their effect
+
+| Change | Evidence |
+|---|---|
+| Reset projection at 10 Hz (or when a reset can happen), lane-bounds early-out | `nearestRoad` off the profile |
+| HUD writes only on change, minimap arrow at 20 Hz, heap read every 30 frames | layout/paint share down; `get memory` gone |
+| Chunk descriptor cache (16), no build in a claim frame | reloads at the fog edge stop regenerating |
+| No per-frame allocations in `CityView.sync` (`Math.hypot` allocates) | garbage 66 → 53 MB per 20 s |
+| Effect shaders compiled in parallel at start | no mid-drive compile frame |
+| Resumable geometry builds, 1200 statics per frame, one slice a frame; claims and slices alternate during the start burst | no build frame above one slice; worst frames now only in the first second |
+
+Headed A/B at CPU ×4, low tier, 30 s, three alternating pairs, fps mean and
+frame p95 (the machine drifted warmer through the day; pairs stay comparable):
+
+| Stage | M2.1 build | Candidate |
+|---|---|---|
+| Before the pass | 47.2 / 47.6 / 46.9 fps | 46.7 / 46.3 / 38.8 fps |
+| After CPU cuts | 47.0 / 45.8 / 48.8 | 50.2 / 51.7 / 51.7 |
+| After allocation hygiene | 47.1 / 45.7 / 46.4 | 51.6 / 51.9 / 51.8 |
+| After resumable builds | 47.2 / 41.3 / 34.2 | 51.0 / 43.6 / 47.0 |
+
+`npm run perf:headed` (60 s, automatic quality) on the final code: 51.4 fps, frame
+p95 33.4 ms, p99 33.7 ms, max 83 ms, sim step p95 8.6 ms, heap peak 111 MB; the
+first headed run of the day was 47.4 fps, p99 50 ms, max 133 ms. Without CPU
+throttle the headed run holds 57–60 fps with p95 16.9 ms on both builds.
+
+### What remains
+
+- Frames of 55–95 ms in the first second after control (outer-ring chunk
+  generations while the simulation catches up). A chunk generation in a worker,
+  or generating the outer ring during boot, would remove them.
+- The p95 sits on the 33 ms vsync step at CPU ×4: the main thread needs about
+  10 ms of real CPU per frame and the throttle leaves 4. Stable 30+ holds; 60 does
+  not at ×4 on this CPU, and does without the throttle.
+- Garbage of about 2.5 MB/s remains (three.js uniform setters, vehicle update,
+  Rapier ray hits); GC pauses of 20–30 ms follow the saw-tooth peaks.

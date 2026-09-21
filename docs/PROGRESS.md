@@ -2,6 +2,48 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-21 — Session 11: performance on the iGPU path
+
+Marcin: he playtests every build himself and reports what feels wrong (noted;
+"feel unverified" is never an open problem). Then: performance and smoothness
+first with `perf:headed`, A/B comparisons and a prepared machine; city and looks
+after.
+
+### Done
+
+- Found that headed Chromium uses the Intel UHD (the brief's iGPU tier) while
+  headless uses the MX330. Headed A/B script, headed CPU/allocation/heap probes.
+- Main-thread cuts: reset projection at 10 Hz with lane bounds, HUD writes on
+  change, minimap at 20 Hz, heap read every 30 frames, chunk descriptor cache,
+  claim frames without builds, allocation-free `CityView.sync`, parallel shader
+  compile at start, resumable geometry builds (1200 statics per frame), claims
+  and slices alternating during the start burst.
+- Leak guard re-derived: fixed scene is about 50 geometries, not 40.
+- Report: `docs/M2_REPORT.md` § performance pass.
+
+### Evidence and boundaries
+
+- Headed A/B at CPU ×4 (three pairs each stage): M2.1 46–48 fps vs candidate
+  51–52 fps after the CPU cuts; p99 50 → 34 ms. `perf:headed` 51.4 fps on final
+  code (first run of the day 47.4, failing p95 by 0.0 ms). No throttle: 57–60 fps.
+- The machine ran warmer through the day: the M2.1 reference fell to 34–41 fps in
+  the last pairs while the candidate stayed 44–51; pairs, not absolute values,
+  carry the conclusion.
+- Remaining spikes are confined to the first second after control.
+
+### Decided and why
+
+- Keep `npm run perf` headless as the quick regression check and treat
+  `perf:headed` as the iGPU reference: they exercise different GPUs.
+- Resumable builds over a worker for now: no serialisation, same code path, and
+  the largest part now costs at most one slice per frame. A worker remains the
+  answer for the chunk generation spikes at start.
+
+### Next
+
+- City and looks (Marcin's second item): frontage rhythm, corner buildings,
+  chicane yards, then his playtest notes.
+
 ## 2026-09-21 — Session 10: M2.2 the loop, the skyline, streaming hygiene
 
 Marcin asked what M2.2 could hold and then to start it. Scope as recommended: a

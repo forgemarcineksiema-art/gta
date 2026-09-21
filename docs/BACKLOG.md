@@ -39,13 +39,15 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
   same build reached 4.6 s with every phase 1.5–2× longer (machine state, not
   code). Next levers if needed: the 9 physics chunk generations in the sim phase,
   shader warm-up before the first frame, chunk generation in a worker. (M2.2)
-- Remaining hitch sources at CPU ×4 from the frame probe (`screens/frame-probe.mjs`
-  pattern): the start burst (two geometry builds plus a chunk claim plus sim
-  catch-up in one frame, 80–120 ms), sim catch-up cascades after any long frame
-  (five substeps × 8–10 ms), single render spikes of 60–115 ms with no streaming
-  (one at the automatic tier switch, which reallocates the drawing buffer at DPR
-  1.5), and V8 scavenges after chunk generation. Chunk generation itself is
-  20–40 ms at ×4 and now happens only on new tiles. (M2.2)
+- Remaining hitch sources at CPU ×4 on the headed Intel path: outer-ring chunk
+  generations in the first second after control (55–95 ms frames while the
+  simulation catches up), GC pauses of 20–30 ms after heap peaks (about 2.5 MB/s
+  of garbage: three.js uniform setters, vehicle update, Rapier ray hits), the
+  automatic tier switch (drawing buffer reallocation at DPR 1.5). Generating
+  chunks in a worker, or the outer ring during boot, is the next lever. (M2.2)
+- The main thread needs about 10 ms of real CPU per frame; at CPU ×4 that is
+  the 33 ms vsync step for p95. Reaching 60 fps at ×4 would need the draw
+  submission (Intel driver) and the 60 Hz simulation both roughly halved. (M2.2)
 - Trees are 4 × 8-segment cylinders (128 triangles) and are a large share of the
   remaining shadow-pass cost; billboards or 6-segment crowns would halve it. (M2.1)
 

@@ -51,65 +51,140 @@ export function partIndex(st: StaticDesc, cx: number, cz: number): number {
   return 1 + (dx > 0 ? 1 : 0) + (dz > 0 ? 2 : 0);
 }
 
-export function cityGeometry(statics: StaticDesc[], detailed = true): THREE.BufferGeometry {
-  const visible = statics.filter((st) => !st.collisionOnly && st.shape.kind !== 'wheel' && (detailed || !st.detailOnly));
-  const sources = (st: StaticDesc): THREE.BufferGeometry[] => {
-    if (!detailed && st.farFace) return [faces[st.farFace]];
-    if (st.faces) return st.faces.map((f) => faces[f]);
-    return [st.face ? faces[st.face] : st.shape.kind === 'gable' ? gable : st.shape.kind === 'box' ? box : cylinder];
+/** Raw vertex arrays of the unit shapes: the builder copies floats, never calls accessors. */
+const RAW = (() => {
+  const raw = (g: THREE.BufferGeometry) => ({ p: g.getAttribute('position').array as Float32Array, n: g.getAttribute('normal').array as Float32Array });
+  return {
+    box: raw(box), cylinder: raw(cylinder), gable: raw(gable),
+    'x+': raw(faces['x+']), 'x-': raw(faces['x-']), 'z+': raw(faces['z+']), 'z-': raw(faces['z-']), top: raw(faces.top), bottom: raw(faces.bottom),
   };
-  // Keep actual shadow casters in a prefix of the same buffer. Window / paving
-  // panels receive shadows but don't need another draw in the depth pass.
-  // Building cores, roofs, slabs and parapets provide the shadow silhouette;
-  // repeated window reveals would mostly redraw depth already covered by the core.
-  const ordered = [...visible.filter(casts), ...visible.filter((st) => !casts(st))];
-  let count = 0;
-  for (const st of ordered) for (const source of sources(st)) count += source.getAttribute('position').count;
-  const positions = new Float32Array(count * 3), normals = new Float32Array(count * 3), colors = new Float32Array(count * 3);
-  let index = 0, shadowVertices = 0;
-  for (const st of ordered) {
-    const shape = st.shape;
-    if (shape.kind === 'wheel') continue;
+})();
+type Raw = { p: Float32Array; n: Float32Array };
+const sourceList: Raw[] = [];
 
-    const rectangular = shape.kind === 'box' || shape.kind === 'gable';
-    const sx = rectangular ? shape.hx : shape.radius;
-    const sy = rectangular ? shape.hy : shape.halfHeight;
-    const sz = rectangular ? shape.hz : shape.radius;
-    const yaw = staticYaw(st), cos = Math.cos(yaw), sin = Math.sin(yaw);
-    color.setHex(st.color);
-    for (const src of sources(st)) {
-      const pos = src.getAttribute('position'), normal = src.getAttribute('normal');
-      if (casts(st)) shadowVertices += pos.count;
-      for (let i = 0; i < pos.count; i++, index += 3) {
-        const lx = pos.getX(i) * sx, lz = pos.getZ(i) * sz;
-        let nx = normal.getX(i), ny = normal.getY(i), nz = normal.getZ(i);
-        if (shape.kind === 'gable') {
-          nx /= sx; ny /= sy; nz /= sz;
-          const length = Math.hypot(nx, ny, nz);
-          nx /= length; ny /= length; nz /= length;
-        }
-        // Rotation about +Y: local +Z maps to (sin yaw, cos yaw), matching quatFromYaw.
-        positions[index] = st.position.x + cos * lx + sin * lz;
-        positions[index + 1] = st.position.y + pos.getY(i) * sy;
-        positions[index + 2] = st.position.z - sin * lx + cos * lz;
-        normals[index] = cos * nx + sin * nz; normals[index + 1] = ny; normals[index + 2] = -sin * nx + cos * nz;
-        colors[index] = color.r; colors[index + 1] = color.g; colors[index + 2] = color.b;
+/** Fill `sourceList` with the unit geometries a static needs; returns the vertex count. */
+function sourcesOf(st: StaticDesc, detailed: boolean): number {
+  sourceList.length = 0;
+  if (!detailed && st.farFace) sourceList.push(RAW[st.farFace]);
+  else if (st.faces) for (const f of st.faces) sourceList.push(RAW[f]);
+  else sourceList.push(st.face ? RAW[st.face] : st.shape.kind === 'gable' ? RAW.gable : st.shape.kind === 'box' ? RAW.box : RAW.cylinder);
+  let count = 0;
+  for (const src of sourceList) count += src.p.length / 3;
+  return count;
+}
+
+/** sRGB → linear per palette entry, converted once instead of per static. */
+const colourCache = new Map<number, [number, number, number]>();
+function rgb(hex: number): [number, number, number] {
+  let c = colourCache.get(hex);
+  if (!c) { color.setHex(hex); c = [color.r, color.g, color.b]; colourCache.set(hex, c); }
+  return c;
+}
+
+/**
+ * An in-progress part geometry. Building a large part takes about 9 ms on the
+ * desktop and four times that on a throttled CPU, so the builder is resumable:
+ * `GeometryBuild.step` fills a bounded number of statics per call and the mesh
+ * only receives the geometry once it is complete.
+ */
+export class GeometryBuild {
+  private readonly order: StaticDesc[] = [];
+  private readonly positions: Float32Array;
+  private readonly normals: Float32Array;
+  private readonly colors: Float32Array;
+  private cursor = 0;
+  private index = 0;
+  private shadowVertices = 0;
+  private done = false;
+
+  constructor(statics: StaticDesc[], readonly detailed: boolean) {
+    // Shadow casters first, so they form a prefix of the buffer (onBeforeShadow draw range).
+    let count = 0;
+    for (let pass = 0; pass < 2; pass++) {
+      for (const st of statics) {
+        if (st.collisionOnly || st.shape.kind === 'wheel' || (!detailed && st.detailOnly)) continue;
+        if (casts(st) !== (pass === 0)) continue;
+        this.order.push(st);
+        const vertices = sourcesOf(st, detailed);
+        count += vertices;
+        if (pass === 0) this.shadowVertices += vertices;
       }
     }
+    this.positions = new Float32Array(count * 3); this.normals = new Float32Array(count * 3); this.colors = new Float32Array(count * 3);
   }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  g.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
-  g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  g.computeBoundingSphere();
-  g.userData['shadowVertices'] = shadowVertices;
-  return g;
+
+  /** Fill up to `budget` statics; returns true once every static is written. */
+  step(budget: number): boolean {
+    const positions = this.positions, normals = this.normals, colors = this.colors;
+    const stop = Math.min(this.order.length, this.cursor + budget);
+    let index = this.index;
+    for (; this.cursor < stop; this.cursor++) {
+      const st = this.order[this.cursor] as StaticDesc;
+      const shape = st.shape;
+      if (shape.kind === 'wheel') continue;
+      const rectangular = shape.kind === 'box' || shape.kind === 'gable';
+      const sx = rectangular ? shape.hx : shape.radius;
+      const sy = rectangular ? shape.hy : shape.halfHeight;
+      const sz = rectangular ? shape.hz : shape.radius;
+      const px = st.position.x, py = st.position.y, pz = st.position.z;
+      const yaw = staticYaw(st), rotated = yaw !== 0, cos = Math.cos(yaw), sin = Math.sin(yaw);
+      const gableShape = shape.kind === 'gable';
+      const [r, g, b] = rgb(st.color);
+      sourcesOf(st, this.detailed);
+      for (const src of sourceList) {
+        const sp = src.p, sn = src.n, n = sp.length;
+        for (let i = 0; i < n; i += 3, index += 3) {
+          let lx = (sp[i] as number) * sx, lz = (sp[i + 2] as number) * sz;
+          let nx = sn[i] as number, ny = sn[i + 1] as number, nz = sn[i + 2] as number;
+          if (gableShape) {
+            nx /= sx; ny /= sy; nz /= sz;
+            const length = Math.sqrt(nx * nx + ny * ny + nz * nz);
+            nx /= length; ny /= length; nz /= length;
+          }
+          if (rotated) {
+            // Rotation about +Y: local +Z maps to (sin yaw, cos yaw), matching quatFromYaw.
+            const rx = cos * lx + sin * lz, rz = -sin * lx + cos * lz;
+            lx = rx; lz = rz;
+            const rnx = cos * nx + sin * nz, rnz = -sin * nx + cos * nz;
+            nx = rnx; nz = rnz;
+          }
+          positions[index] = px + lx; positions[index + 1] = py + (sp[i + 1] as number) * sy; positions[index + 2] = pz + lz;
+          normals[index] = nx; normals[index + 1] = ny; normals[index + 2] = nz;
+          colors[index] = r; colors[index + 1] = g; colors[index + 2] = b;
+        }
+      }
+    }
+    this.index = index;
+    this.done = this.cursor >= this.order.length;
+    return this.done;
+  }
+
+  finish(): THREE.BufferGeometry {
+    if (!this.done) this.step(Infinity);
+    const out = new THREE.BufferGeometry();
+    out.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
+    out.setAttribute('normal', new THREE.BufferAttribute(this.normals, 3));
+    out.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
+    out.computeBoundingSphere();
+    out.userData['shadowVertices'] = this.shadowVertices;
+    return out;
+  }
 }
+
+export function cityGeometry(statics: StaticDesc[], detailed = true): THREE.BufferGeometry {
+  return new GeometryBuild(statics, detailed).finish();
+}
+
+/** Statics written per resumable build step: about 2.5 ms on the desktop, 10 ms at CPU ×4. */
+export const BUILD_SLICE = 1200;
+/** One shared placeholder for parts whose geometry is still queued (never disposed). */
+const EMPTY = new THREE.BufferGeometry();
+EMPTY.userData['shadowVertices'] = 0;
 
 /** Both detail levels are built once per part; the mesh swaps between them by distance. */
 interface Part { mesh: THREE.Mesh; index: number; x: number; z: number; detailed: boolean; near: THREE.BufferGeometry | null; far: THREE.BufferGeometry | null }
 /** `groups` holds the partitioned descriptors only while geometries are still being built. */
-interface Tile { key: string; x: number; z: number; parts: Part[] | null; groups: StaticDesc[][] | null; queue: Array<{ part: Part; detailed: boolean }> }
+interface Tile { key: string; x: number; z: number; parts: Part[] | null; groups: StaticDesc[][] | null; queue: Array<{ part: Part; detailed: boolean }>; build: GeometryBuild | null }
 
 export class CityView {
   /** Chunk key -> its five part meshes (base + four quadrants). */
@@ -122,7 +197,7 @@ export class CityView {
   private burst = 0;
   constructor(private readonly scene: THREE.Scene, private readonly city: City) {
     fadeShadowEdges(this.material);
-    for (let z = -3; z <= 3; z++) for (let x = -3; x <= 3; x++) this.tiles.push({ key: `${x},${z}`, x, z, parts: null, groups: null, queue: [] });
+    for (let z = -3; z <= 3; z++) for (let x = -3; x <= 3; x++) this.tiles.push({ key: `${x},${z}`, x, z, parts: null, groups: null, queue: [], build: null });
     const sea = new THREE.Mesh(new THREE.PlaneGeometry(5000, 5000), new THREE.MeshLambertMaterial({ color: 0x3fa7c9 }));
     sea.rotation.x = -Math.PI / 2; sea.position.y = -0.5; scene.add(sea);
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(CITY_HALF * 2, CITY_HALF * 2), new THREE.MeshLambertMaterial({ color: PALETTE.grass }));
@@ -140,16 +215,23 @@ export class CityView {
 
   private unload(tile: Tile): void {
     for (const part of tile.parts ?? []) { this.scene.remove(part.mesh); part.near?.dispose(); part.far?.dispose(); }
-    this.meshes.delete(tile.key); tile.parts = null; tile.groups = null; tile.queue = []; this.unloaded++;
+    this.meshes.delete(tile.key); tile.parts = null; tile.groups = null; tile.queue = []; tile.build = null; this.unloaded++;
   }
 
-  /** Build the next queued geometry of a tile; drops the descriptors once the queue is empty. */
+  /**
+   * One build step for a tile: start the queued geometry if none is in progress,
+   * write one slice, and hand the finished geometry to its part. Drops the
+   * descriptors once the queue is empty.
+   */
   private buildNext(tile: Tile): void {
-    const job = tile.queue.shift();
+    const job = tile.queue[0];
     if (!job || !tile.groups) return;
-    const geometry = cityGeometry(tile.groups[job.part.index] ?? [], job.detailed);
+    tile.build ??= new GeometryBuild(tile.groups[job.part.index] ?? [], job.detailed);
+    if (!tile.build.step(BUILD_SLICE)) return;
+    const geometry = tile.build.finish();
+    tile.build = null; tile.queue.shift();
     if (job.detailed) job.part.near = geometry; else job.part.far = geometry;
-    if (job.detailed === job.part.detailed || job.part.mesh.geometry.getAttribute('position') === undefined) {
+    if (job.detailed === job.part.detailed || job.part.mesh.geometry === EMPTY) {
       job.part.mesh.geometry = geometry; job.part.detailed = job.detailed;
     }
     if (tile.queue.length === 0) tile.groups = null;
@@ -189,7 +271,9 @@ export class CityView {
     // chunk spreads over five frames and never lands in one. A teleport/start
     // populates everything in front of the fog before it is shown; the fogged
     // outer ring follows at three parts a frame.
-    const claims = immediate ? 49 : 1;
+    // During the burst after a synchronous load, claims (a chunk generation each)
+    // and build slices alternate frames, so the first second never stacks both.
+    const claims = immediate ? 49 : this.burst > 0 && this.burst % 2 === 1 ? 0 : 1;
     let builds = immediate ? Infinity : this.burst > 0 ? 2 : 1;
     if (!immediate && this.burst > 0) this.burst--;
     if (immediate) this.burst = 60;
@@ -208,8 +292,7 @@ export class CityView {
       nearest.parts = PARTS.map((offset, index) => {
         const px = cx + offset.ox * BLOCK / 4, pz = cz + offset.oz * BLOCK / 4;
         const d = Math.sqrt((px - x) ** 2 + (pz - z) ** 2);
-        const empty = new THREE.BufferGeometry(); empty.userData['shadowVertices'] = 0;
-        const mesh = new THREE.Mesh(empty, this.material);
+        const mesh = new THREE.Mesh(EMPTY, this.material);
         // Vertices are already in world space: no per-frame matrix work for city parts.
         mesh.matrixAutoUpdate = false; mesh.matrixWorldAutoUpdate = false;
         mesh.receiveShadow = true;

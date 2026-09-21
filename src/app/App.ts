@@ -224,6 +224,14 @@ export class App {
     else this.raf = requestAnimationFrame(this.frame);
   }
 
+  private heapMbCached = 0;
+  private heapFrames = 0;
+  /** `performance.memory` is slow to read; once every 30 frames is plenty for a readout. */
+  private heapSample(): number {
+    if (this.heapFrames++ % 30 === 0) this.heapMbCached = heapMb();
+    return this.heapMbCached;
+  }
+
   private get paused(): boolean {
     return this.userPaused || this.focusPaused;
   }
@@ -312,7 +320,7 @@ export class App {
         stepMs: this.stepMsLast,
         drawCalls: stats.drawCalls,
         triangles: stats.triangles,
-        heapMb: heapMb(),
+        heapMb: this.heapSample(),
         dpr: stats.dpr,
         tick: this.sim.tick,
         steps: this.loop.lastSteps,

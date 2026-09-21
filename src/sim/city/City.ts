@@ -5,7 +5,7 @@ import { PALETTE } from '../palette';
 import type { SpawnPoint } from '../playground';
 import { IDENTITY_QUAT as IDENTITY_ROT, quatFromYaw, type StaticDesc } from '../scene';
 import { Architecture, CITY_COLORS } from './architecture';
-import { BLOCK, CITY_HALF, HIGHWAY_HALF, ROAD_HALF, buildCityRoute, buildRoadGraph, distanceToPolyline, projectOnLane, type RoadPoint, type SpecialRoad } from './roads';
+import { BLOCK, CITY_HALF, HIGHWAY_HALF, ROAD_HALF, buildCityRoute, buildRoadGraph, distanceToPolyline, projectOnLane, type Lane, type RoadPoint, type SpecialRoad } from './roads';
 
 export const DISTRICTS = [
   { id: 'crown', name: 'CROWN HEIGHTS', color: 0xb497d6, accent: 0xf5cd75, landmark: 'Crown Tower' },
@@ -37,6 +37,14 @@ function random(seed: number): () => number {
 export class City {
   readonly graph = buildRoadGraph();
   readonly route = buildCityRoute(this.graph);
+  /** Axis-aligned bounds per lane, so the reset projection skips distant lanes. */
+  private readonly laneBounds = this.graph.lanes.map((lane) => {
+    const b = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity };
+    for (const pt of lane.points) { b.minX = Math.min(b.minX, pt.x); b.maxX = Math.max(b.maxX, pt.x); b.minZ = Math.min(b.minZ, pt.z); b.maxZ = Math.max(b.maxZ, pt.z); }
+    return b;
+  });
+  /** Recently generated chunk descriptors: render tiles reload often at the fog edge. */
+  private readonly chunkCache = new Map<string, CityChunk>();
   readonly spawns: SpawnPoint[];
   readonly active = new Map<string, { body: RAPIER.RigidBody; chunk: CityChunk }>();
   loaded = 0;
@@ -463,7 +471,7 @@ export class City {
   }
 
   private load(ix: number, iz: number): void {
-    const chunk = this.generate(ix, iz);
+    const chunk = this.chunk(ix, iz);
     const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
     for (const st of chunk.statics) {
       if ((st.tag !== 'building' && st.tag !== 'kerb') || st.shape.kind !== 'box') continue;
@@ -479,10 +487,26 @@ export class City {
   nearestRoad(x: number, z: number, out: SpawnPoint): SpawnPoint {
     let best = Infinity;
     const hit = { x: 0, z: 0, yaw: 0 };
-    for (const lane of this.graph.lanes) {
-      const dist = projectOnLane(lane, x, z, hit);
+    for (let i = 0; i < this.graph.lanes.length; i++) {
+      const b = this.laneBounds[i] as { minX: number; maxX: number; minZ: number; maxZ: number };
+      const dx = Math.max(b.minX - x, 0, x - b.maxX), dz = Math.max(b.minZ - z, 0, z - b.maxZ);
+      if (dx * dx + dz * dz >= best) continue;
+      const dist = projectOnLane(this.graph.lanes[i] as Lane, x, z, hit);
       if (dist < best) { best = dist; out.position.x = hit.x; out.position.z = hit.z; out.yaw = hit.yaw; }
     }
     return out;
+  }
+
+  /** Cached generation: the last 16 chunks asked for, resident physics chunks first. */
+  chunk(cx: number, cz: number): CityChunk {
+    const key = `${cx},${cz}`;
+    const resident = this.active.get(key)?.chunk;
+    if (resident) return resident;
+    const cached = this.chunkCache.get(key);
+    if (cached) { this.chunkCache.delete(key); this.chunkCache.set(key, cached); return cached; }
+    const chunk = this.generate(cx, cz);
+    this.chunkCache.set(key, chunk);
+    if (this.chunkCache.size > 16) this.chunkCache.delete(this.chunkCache.keys().next().value as string);
+    return chunk;
   }
 }

@@ -156,6 +156,9 @@ export class Renderer {
     this.scene.add(this.sparks.heads);
 
     this.resize();
+    // Effects (speed lines, sparks, ghost) first appear mid-drive; compiling their
+    // programs lazily cost a 60 ms frame. Parallel compile off the critical path.
+    void this.renderer.compileAsync(this.scene, this.camera).catch(() => undefined);
   }
 
   private buildStatics(statics: StaticDesc[]): void {

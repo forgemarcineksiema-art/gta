@@ -132,7 +132,7 @@ export class CityView {
   /** One chunk generation per tile claim; the descriptors are dropped once both levels exist. */
   private partition(tile: Tile): StaticDesc[][] {
     const cx = tile.x * BLOCK, cz = tile.z * BLOCK;
-    const data = this.city.active.get(tile.key)?.chunk ?? this.city.generate(tile.x, tile.z);
+    const data = this.city.chunk(tile.x, tile.z);
     const groups = PARTS.map((): StaticDesc[] => []);
     for (const st of data.statics) groups[partIndex(st, cx, cz)]?.push(st);
     return groups;
@@ -171,14 +171,17 @@ export class CityView {
     // frustum tests, shadow candidates) to what fog and the shadow map can show.
     const partRadius = BLOCK * 0.25 * Math.SQRT2 + 12;
     const visibleRadius = far + partRadius, casterRadius = SHADOW_HALF + partRadius;
+    // Squared distances and no temporaries: this runs for every part every frame,
+    // and Math.hypot allocates its argument list.
+    const visible2 = visibleRadius * visibleRadius, caster2 = casterRadius * casterRadius, keep2 = keepRadius * keepRadius;
     for (const tile of this.tiles) {
       if (!tile.parts) continue;
-      const distance = Math.hypot(tile.x * BLOCK - x, tile.z * BLOCK - z);
-      if (distance > keepRadius) { this.unload(tile); continue; }
+      const tx = tile.x * BLOCK - x, tz = tile.z * BLOCK - z;
+      if (tx * tx + tz * tz > keep2) { this.unload(tile); continue; }
       for (const part of tile.parts) {
-        const d = Math.hypot(part.x - x, part.z - z);
-        part.mesh.visible = d <= visibleRadius;
-        part.mesh.castShadow = d <= casterRadius;
+        const dx = part.x - x, dz = part.z - z, d2 = dx * dx + dz * dz;
+        part.mesh.visible = d2 <= visible2;
+        part.mesh.castShadow = d2 <= caster2;
       }
     }
     // A tile is claimed with five empty part meshes (one chunk generation), then
@@ -187,7 +190,7 @@ export class CityView {
     // populates everything in front of the fog before it is shown; the fogged
     // outer ring follows at three parts a frame.
     const claims = immediate ? 49 : 1;
-    const builds = immediate ? Infinity : this.burst > 0 ? 2 : 1;
+    let builds = immediate ? Infinity : this.burst > 0 ? 2 : 1;
     if (!immediate && this.burst > 0) this.burst--;
     if (immediate) this.burst = 60;
     const syncRadius = QUALITY[tier].near + BLOCK * Math.SQRT1_2 + 40;
@@ -196,7 +199,7 @@ export class CityView {
       let nearest: Tile | undefined;
       for (const tile of this.tiles) {
         if (tile.parts) continue;
-        const d = Math.hypot(tile.x * BLOCK - x, tile.z * BLOCK - z);
+        const d = Math.sqrt((tile.x * BLOCK - x) ** 2 + (tile.z * BLOCK - z) ** 2);
         if (d < best) { best = d; nearest = tile; }
       }
       if (!nearest || (immediate && best > syncRadius)) break;
@@ -204,7 +207,7 @@ export class CityView {
       nearest.groups = this.partition(nearest);
       nearest.parts = PARTS.map((offset, index) => {
         const px = cx + offset.ox * BLOCK / 4, pz = cz + offset.oz * BLOCK / 4;
-        const d = Math.hypot(px - x, pz - z);
+        const d = Math.sqrt((px - x) ** 2 + (pz - z) ** 2);
         const empty = new THREE.BufferGeometry(); empty.userData['shadowVertices'] = 0;
         const mesh = new THREE.Mesh(empty, this.material);
         // Vertices are already in world space: no per-frame matrix work for city parts.
@@ -220,24 +223,34 @@ export class CityView {
       for (const part of nearest.parts) nearest.queue.push({ part, detailed: part.detailed });
       for (const part of nearest.parts) nearest.queue.push({ part, detailed: !part.detailed });
       this.meshes.set(nearest.key, nearest.parts.map((part) => part.mesh)); this.loaded++;
+      // A claim may have generated a chunk; a build on top of it would double this frame's cost.
+      if (!immediate) builds = 0;
     }
-    let uploads = 0;
-    const pending = this.tiles.filter((tile) => tile.groups)
-      .sort((a, b) => Math.hypot(a.x * BLOCK - x, a.z * BLOCK - z) - Math.hypot(b.x * BLOCK - x, b.z * BLOCK - z));
-    for (const tile of pending) {
-      // A synchronous load builds only the level each part needs now; the other
-      // level follows in the burst frames, so a teleport costs one level, not two.
-      const wanted = (tile: Tile) => !immediate || (tile.queue[0] ? tile.queue[0].detailed === tile.queue[0].part.detailed : false);
-      while (tile.groups && uploads < builds && wanted(tile)) { this.buildNext(tile); uploads++; }
-      if (uploads >= builds) break;
+    // Build from the nearest tile that still has queued geometries. A synchronous
+    // load builds only the level each part needs now; the other level follows in
+    // the burst frames, so a teleport costs one level, not two.
+    for (let uploads = 0; uploads < builds;) {
+      let best = Infinity;
+      let tile: Tile | undefined;
+      for (const t of this.tiles) {
+        if (!t.groups) continue;
+        const head = t.queue[0];
+        if (!head || (immediate && head.detailed !== head.part.detailed)) continue;
+        const d2 = (t.x * BLOCK - x) ** 2 + (t.z * BLOCK - z) ** 2;
+        if (d2 < best) { best = d2; tile = t; }
+      }
+      if (!tile) break;
+      this.buildNext(tile); uploads++;
     }
     // Detail is spatial, identical on both quality tiers: frames and sills are
     // sub-pixel past DETAIL_NEAR at DPR 1.5. Swapping is free once both levels
     // exist; hysteresis prevents toggling at a part boundary.
+    const near2 = DETAIL_NEAR * DETAIL_NEAR, far2 = DETAIL_FAR * DETAIL_FAR;
     for (const tile of this.tiles) {
-      for (const part of tile.parts ?? []) {
-        const distance = Math.hypot(part.x - x, part.z - z);
-        const detailed = immediate ? distance < DETAIL_NEAR : part.detailed ? distance < DETAIL_FAR : distance < DETAIL_NEAR;
+      if (!tile.parts) continue;
+      for (const part of tile.parts) {
+        const d2 = (part.x - x) ** 2 + (part.z - z) ** 2;
+        const detailed = immediate ? d2 < near2 : part.detailed ? d2 < far2 : d2 < near2;
         CityView.swap(part, detailed);
       }
     }

@@ -134,9 +134,13 @@ export class SimWorld {
   step(): void {
     if (this.city) {
       const pos = this.vehicle.body.translation(this.scratchPos);
-      const nearest = this.nearestSpawn(pos.x, pos.z);
-      this.vehicle.resetPose.position = nearest.position;
-      this.vehicle.resetPose.yaw = nearest.yaw;
+      // The reset pose only has to be fresh when a reset can happen this step;
+      // otherwise a 10 Hz refresh keeps the projection within a car length.
+      if (this.controls.reset || this.tick % 6 === 0 || this.vehicle.telemetry.groundedWheels === 0) {
+        const nearest = this.nearestSpawn(pos.x, pos.z);
+        this.vehicle.resetPose.position = nearest.position;
+        this.vehicle.resetPose.yaw = nearest.yaw;
+      }
       this.city.sync(pos.x, pos.z);
     }
     this.transforms.swap();

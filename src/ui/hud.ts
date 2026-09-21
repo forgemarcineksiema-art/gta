@@ -52,6 +52,9 @@ export class Hud {
   private toastTimer = 0;
   private lastDebugAt = 0;
   private lastSpeedText = '';
+  private lastBoostText = '';
+  private lastDriftText = '';
+  private frameIndex = 0;
   private lastGearText = '';
 
   constructor(parent: HTMLElement, sim: SimWorld) {
@@ -154,7 +157,9 @@ export class Hud {
   }
 
   update(sim: SimWorld, dt: number, info: HudDebugInfo | null, now: number): void {
-    this.minimap?.update(sim);
+    // Every DOM write here costs style, layout and paint on the main thread; the
+    // minimap arrow moves a fraction of a pixel per frame, so 20 Hz is enough.
+    if (this.frameIndex++ % 3 === 0) this.minimap?.update(sim);
     const tm = sim.vehicle.telemetry;
     const kmh = Math.round(Math.abs(tm.speedKmh));
     const speedText = String(kmh);
@@ -167,11 +172,15 @@ export class Hud {
       this.gear.textContent = gearText;
       this.lastGearText = gearText;
     }
-    this.boostFill.style.transform = `scaleX(${tm.boost.toFixed(3)})`;
+    const boostText = `scaleX(${tm.boost.toFixed(3)})`;
+    if (boostText !== this.lastBoostText) { this.boostFill.style.transform = boostText; this.lastBoostText = boostText; }
     this.boostWrap.classList.toggle('is-active', tm.boosting);
     this.boostWrap.classList.toggle('is-full', tm.boost >= 0.999);
     this.drift.classList.toggle('is-visible', tm.drifting);
-    if (tm.drifting) this.driftAngle.textContent = `${Math.abs(Math.round(tm.driftAngleDeg))}°  ${tm.driftTime.toFixed(1)}s  ${Math.round(tm.driftDistance)}m`;
+    if (tm.drifting) {
+      const driftText = `${Math.abs(Math.round(tm.driftAngleDeg))}°  ${tm.driftTime.toFixed(1)}s  ${Math.round(tm.driftDistance)}m`;
+      if (driftText !== this.lastDriftText) { this.driftAngle.textContent = driftText; this.lastDriftText = driftText; }
+    }
 
     if (this.toastTimer > 0) {
       this.toastTimer -= dt;
@@ -180,7 +189,7 @@ export class Hud {
 
     const lap = sim.lap;
     this.setLapVisible(lap.lapStartTick >= 0 || lap.best >= 0);
-    if (this.lapVisible) {
+    if (this.lapVisible && this.frameIndex % 2 === 0) {
       this.lapCurrent.textContent = lap.current >= 0 ? fmtLap(lap.current) : '--:--.--';
       this.lapLast.textContent = lap.last >= 0 ? fmtLap(lap.last) : '--';
       this.lapBest.textContent = lap.best >= 0 ? fmtLap(lap.best) : '--';

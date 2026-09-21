@@ -69,10 +69,12 @@ export class PerfProbe {
       this.warmup--;
       return;
     }
-    const heap = heapMb();
-    if (this.frameMs.length === 0) this.heapStart = heap;
-    this.heapMax = Math.max(this.heapMax, heap);
-    this.heapEnd = heap;
+    if (this.frameMs.length % 30 === 0) {
+      const heap = heapMb();
+      if (this.frameMs.length === 0) this.heapStart = heap;
+      this.heapMax = Math.max(this.heapMax, heap);
+      this.heapEnd = heap;
+    }
     this.frameMs.push(frameMs);
     this.stepMs.push(stepMs);
     this.draws.push(stats.drawCalls);

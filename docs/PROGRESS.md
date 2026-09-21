@@ -2,6 +2,58 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-21 — Vehicle model quality pass
+
+Marcin asked for properly finished, good-looking cars that fit the game.
+
+### Done
+
+- Rebuilt all three currently playable classes in the existing flat-shaded,
+  texture-free style. Muscle: fuller shoulders, four round headlights, stripes,
+  chrome bumper and segmented rear lamps. Compact: cyan paint, dark roof and
+  spoiler, four-spoke wheels. Heavy: orange cargo van, framed panels, door splits,
+  hinges, sliding rail, taller mirrors and protective mouldings.
+- Actual wheel-arch openings and bevelled returns replace black semicircle
+  decals. Open tyre profiles expose the recessed rims and spokes; the old rims
+  were hidden inside capped tyre cylinders. Wheel placement follows existing
+  tuning and retains the four independent steering/suspension/spin transforms.
+- Framed opaque glazing with broad reflections; all decals follow the actual
+  body triangles. Review caught and fixed glass clipping through nonplanar loft
+  faces and distorted side strips at arch cuts. Rear lamps, reversing lamps and
+  the compact's high brake lamp react to telemetry through colour buffer updates.
+- All rigid fittings merge into the body. Complete cars are five meshes each,
+  down from 14/11/11; muscle 6,118 triangles, compact 5,765, heavy 6,404 (previous
+  1,616/1,506/1,494). Additional geometry buys the openings and visible wheel
+  assemblies. No handling, camera, world, dependency or asset-texture changes.
+
+### Verification
+
+- Baseline `verify`: 92 tests, smoke 59.8 fps / frame p95 16.8 ms on headless
+  MX330. Final `verify`: 101 tests, all typecheck/lint/build/smoke/budget gates
+  pass; smoke 60.0 fps, p95 16.7 ms, 84 max draws, 162,964 max triangles,
+  startup 859 ms (unthrottled), 3.40 MB. These short runs are not an FPS A/B proof.
+- Nine render tests cover actual openings on both sides, exposed rim faces,
+  finite geometry, five-mesh/7k-triangle budgets and reversible brake/reverse
+  updates without replacing geometry or colour buffers.
+- `city`: 5/5; control in 1,942 ms at 20 Mbit / CPU x4. Whole 178-lane tours:
+  low 61 draws / 162,729 triangles; high 88 / 233,674; zero bot resets. Controls,
+  reset, pause and automatic quality tests pass. Existing limits unchanged.
+- `perf`: passes, 60 s headless MX330 / CPU x4: 59.4 fps, frame p95/p99 16.8 ms,
+  max 83.3 ms, sim-step p95 6.1 ms, 84 max draws, 176k max triangles, 45 MB
+  heap, zero bot resets. The script warns against the previous saved run about
+  step p95 (3.5 -> 6.1 ms) and heap (40.15 -> 45.20 MB); both remain within
+  limits. The sim code is unchanged, but no matched A/B establishes the cause
+  of the timing difference. This is not a sustained-performance claim for the
+  headed Intel/iGPU path or future multi-car traffic.
+- Twelve final in-game views (three classes, normal chase and front/rear/side)
+  reviewed against the baseline, zero browser errors. Skill-client acceleration,
+  steering/drift, braking and reverse captures also reviewed, on high for coupe
+  and compact and low for the van. Local evidence in
+  `output/design-review/cars-before/`, `cars-final/`, `cars-drive-v2/`,
+  `cars-compact-drive/`, `cars-heavy-drive/`; scratch script `screens/car-review.mjs`.
+- Visual review is from the real game lighting and camera, plus close views;
+  Marcin's subjective art-direction acceptance remains his playtest.
+
 ## 2026-09-21 — Session 12: heading-up radar minimap
 
 Marcin asked for a new minimap designed to best practice. The old one fitted the

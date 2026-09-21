@@ -19,7 +19,7 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 ## Geometry and materials
 
 - Low-poly, flat-shaded (`flatShading: true`), vertex colours or plain material colour from the palette. No textures per asset, ever. One merged mesh per chunk for statics.
-- Silhouettes do the work: cars are recognisable from their block-out (long bonnet + small cabin = muscle; tall box = van). Details are extra boxes, not detail geometry.
+- Silhouettes do the work: cars are recognisable from their block-out (long bonnet + small cabin = muscle; tall box = van). Car body sections, inset glazing and actual wheel openings establish the form; small fittings are merged into the body.
 - Palette (hex, sRGB):
 
 | Role | Colour | Role | Colour |
@@ -39,6 +39,30 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 
 - Blacks and greys for trim, rubber and metal, darkest to lightest: ink `#0c0c10`, rubber `#15151a`, charcoal `#25252c`, graphite `#35353e`, slate `#4a4a55`, steel `#6d6d78`, silver `#9d9da8`, light grey `#c4c4cd`, chrome `#e4e4ea`. A car uses at least three of them (pillars/seams in ink or charcoal, rims in graphite with light-grey spokes, badges and exhaust tips in chrome) so it does not read as one flat block of paint.
 - Districts (M2) each get one dominant building hue family from this palette plus one accent, so they read as different places from the minimap and from the road.
+
+## Vehicles
+
+- Three original, unbranded designs: red muscle coupe with raised shoulders,
+  twin dark stripes, four round headlights, segmented rear lights and a rear lip;
+  cyan hatchback with a charcoal roof, short overhangs and four-spoke wheels;
+  orange panel van with cargo-door panels, sliding rail, hinges and robust trim.
+- Body geometry follows the physical wheelbase, wheel radius and suspension rest
+  height. Twelve-segment arch openings cut through the side shell, with a flared
+  lip and an inward return. The narrow undertray does not seal these openings.
+- Tyres use an open revolved profile with bevelled shoulders; alloy faces sit
+  outside the tyre sidewall and have a rim lip, recessed centre and visible spokes.
+  The four wheels keep their independent simulation transforms.
+- Glazing is opaque dark blue with a broad muted reflection, black seals and
+  painted surrounding pillars. No texture, transparency or additional lights.
+  Decals are clipped to the actual body triangles so twisted loft panels cannot
+  cut through their windows or distort door seams and side mouldings.
+- Body and all fittings share one vertex-coloured Lambert mesh; four wheel meshes
+  share their geometry and the body material. Five draws before shadow passes;
+  under 7,000 triangles per complete car. Brake and reversing lamps update their
+  vertex colours only when the state changes, including the hatchback's high lamp.
+- Review both sides and front/rear three-quarter angles, then the normal driving
+  camera during acceleration, steering, braking and reversing. Build/test success
+  alone does not establish visual quality.
 
 ## Street architecture (M2.1)
 

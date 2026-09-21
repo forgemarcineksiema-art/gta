@@ -48,3 +48,22 @@ less reactive steering-camera motion. This is the current M2 playtest feedback.
   navigation start to first controllable frame (2.7 s typical at CPU ×4).
 - Gate: verify green (88 tests), city 5/5 (178 lanes; low 80 calls / 139k tris).
   Details in `docs/PROGRESS.md` session 10 and `docs/M2_REPORT.md` § M2.2.
+
+## Vehicle model quality — 2026-09-21
+
+User request: "Chciałbym, żebyś zrobił porządnie i fajnie modele samochodów.
+Tak, aby pasowały do gry. Naprawdę mają dobrze wyglądać."
+
+- Baseline verify green: 92 tests; MX330 smoke 59.8 fps, p95 16.8 ms.
+- Rebuilt the three existing vehicle classes around true wheel openings, framed
+  glazing, exposed alloy wheels, class-specific fittings and palette colours.
+  Fixed buried rims and triangle/decal intersections found in close-up review.
+- Complete cars: muscle 6,118 triangles, compact 5,765, heavy 6,404; five meshes
+  each (previously 14/11/11). Physics and controls remain the existing presets.
+- Baseline and final player-camera / detail views in
+  `output/design-review/cars-before/` and `cars-final/`; scratch reviewer is
+  `screens/car-review.mjs`. Nine geometry/light checks pass.
+- Skill client is the unchanged existing local copy in `screens/`, using this
+  project's Playwright. Driving images and state are in `cars-drive-v2/`,
+  `cars-compact-drive/`, `cars-heavy-drive/` under `output/design-review/`.
+- Final verification and runtime gates recorded in `docs/PROGRESS.md`.

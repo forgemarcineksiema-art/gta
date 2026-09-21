@@ -169,3 +169,78 @@ passes (p95 ≤ 33.4 ms, step p95 3–4 ms). The M2 frame-pacing caveat still ap
 - The base plane and island edge are untouched; the waterfront has no composition.
 - Trees are the largest remaining shadow-pass cost (see `docs/BACKLOG.md`).
 - Startup time margin shrank; see `docs/BACKLOG.md` for the deferral plan.
+
+## M2.2 — the loop, the skyline and streaming hygiene (2026-09-21)
+
+Goal: a route worth repeating and a city that places the player without the
+minimap, on the same road graph M3 traffic will use. Same physics and vehicle
+tuning as M2.
+
+### Built
+
+- **Authored loop** (`SPECIAL_ROADS`, `sim/city/roads.ts`), 4 km: Crown Diagonal
+  West and North (straight 24 m avenues meeting at the tower junction), the north
+  highway, the Works Chicane (16 m service road through the yards, R ≈ 55 m),
+  the Quay Sweep (R = 503 m along Coral Quay), the Garden Parkway (R = 225 m with
+  grass verges). Lanes are polylines; the graph has 178 directed lanes and the
+  bot's Euler tour covers all of them. `?spawn=loop` starts on the first diagonal.
+- **Open quarters and frontage**: quarters a road crosses drop the grid apron,
+  cut their pavements along the corridor and yield lots to a row of rotated
+  buildings facing the road (offices climbing toward the tower, loggia apartments
+  on the quay, houses with gardens on the parkway), with kerbs, trees and lamps.
+- **Skyline**: Crown Tower 30 floors with crown and spire, a 67 m works chimney,
+  a beacon mast by the Glasshouse, a 14-floor Coral Hotel with a roof sign, roof
+  variants on offices and quay blocks, and a silhouette layer that stays visible
+  through the haze from any open sightline. Coral Quay's sea edges have a pier
+  with pavilion and boats.
+- **Streaming hygiene**: physics loads one chunk per step; render parts are
+  claimed with one generation and built one geometry per frame with both detail
+  levels resident (no regeneration while driving); synchronous loads cover only
+  the ring in front of the fog. Boot phases are recorded and the startup gate
+  measures navigation start to the first controllable frame.
+
+### Validation (same machine: MX330 through ANGLE D3D11, headless Chromium)
+
+| Check | Result |
+|---|---|
+| `npm run verify` | green, 88 tests; build 3.37 MB / 5 files |
+| `npm run city` | 5/5; 178/178 lanes, 1,858 simulated seconds, zero resets, no console errors |
+| Accelerated tour, low | 80 calls / 139k triangles max (budget 150 / 250k), heap 40 MB |
+| Accelerated tour, high | 106 calls / 183k triangles max (budget 300 / 600k), heap 45 MB |
+| Physics residency | 18 chunks max (bound 25) |
+| Startup at 20 Mbit, 40 ms latency, CPU ×4 | 2.7 s to control in two of three runs (phases 0.9 / 0.2 / 0.4 / 0.65 / 0.6 s); one run 4.6 s with every phase slower; gate run 3.5 s |
+| Real-time A/B, 30 s at CPU ×4, low tier, before the streaming changes | M2.1 57.8 / 55.4 / 54.6 fps vs M2.2 52.7 / 55.9 / 54.6 fps |
+| `npm run perf`, 60 s, CPU ×4, automatic quality, final code | 54.4 fps; frame p95 33.3 ms, p99 50.0 ms, max 316.7 ms; sim step p95 4.5 ms; heap 36 MB; no bot resets |
+| `npm run screens` | 10/10 HUD and pause viewports |
+| Review images | each authored road at 8 / 50 / 92 % of its length, landmarks, skyline from the ring road, the tower silhouette isolated from Coral Quay |
+
+Two measurement lessons are recorded in `docs/PROGRESS.md`: a game tab left open
+in the desktop browser pane dropped every build to 13–34 fps until it was closed,
+and the wall-clock startup number contained one to three seconds of browser
+start-up outside the page, so the gate now reads the in-page phase clock.
+
+The hitch investigation (frame probe plus a Chrome trace) found no single cause:
+the start burst, sim catch-up cascades, isolated render spikes (one at the tier
+switch) and scavenges after chunk generation each contribute; chunk generation
+was moved off the driving path. Details and the remaining levers are in
+`docs/BACKLOG.md`. The M2 pacing caveat stands: p95 sits on the 33 ms vsync step
+in most runs on this machine.
+
+### Playtest additions
+
+1. `?spawn=loop`: drive the diagonals flat out, watch the tower grow on the right
+   at the junction, take the north highway east, turn south at the first junction
+   and into the chicane; then the long road south, the quay sweep, west across
+   the south of the map, the parkway arc and north back to the start. Time it.
+2. Without the minimap: from any junction, find the tower, the chimney, the mast
+   or the hotel sign before deciding where to turn.
+3. Corners: does the chicane ask for the handbrake, does the parkway hold a
+   drift, does the sweep reward not lifting? Report which of the three felt wrong.
+
+### Known issues
+
+- Frontage rhythm repeats along the avenue; junction corners on authored roads
+  have no corner buildings; the chicane's yards are bare.
+- Silhouettes need an open sightline; street canyons hide them.
+- One 60–115 ms render spike per run remains unexplained; the tier switch is one
+  known source.

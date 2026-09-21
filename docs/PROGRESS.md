@@ -2,6 +2,68 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-21 — Session 10: M2.2 the loop, the skyline, streaming hygiene
+
+Marcin asked what M2.2 could hold and then to start it. Scope as recommended: a
+memorable authored route, recognisability from afar, the car's relation to the
+new streets, and the perf hygiene items left by M2.1.
+
+### Done
+
+- **Roads as polylines** (`sim/city/roads.ts`): grid lanes unchanged in effect;
+  five authored roads (two diagonals, a chicane, two arcs) join the graph as lane
+  pairs. 178 lanes, Euler tour covers all, reset projects onto polylines, minimap
+  draws them. `?spawn=loop`.
+- **Rotated statics** in the renderer and colliders; `Architecture.rotatedBuilding`.
+- **Open quarters** with corridor-cut pavements, lot yielding, road surface, kerbs,
+  dashes, trees, lamps and frontage rows (avenue climbing toward the tower, quay
+  loggias, parkway houses).
+- **Skyline**: taller landmarks (tower, chimney, mast, hotel sign), roof variants,
+  a silhouette layer with long-range fog, quay piers with boats. Camera far 1700 m.
+- **Streaming hygiene**: one physics chunk per step; render tiles claimed with one
+  generation, geometries built one per frame from a queue, both detail levels
+  resident and swapped by distance; synchronous loads limited to the ring in front
+  of the fog; boot phase timings in `GameHandle.bootTimings`.
+- **Gate measurement**: the startup test reads navigation-relative time to the
+  first controllable frame and logs the wall clock alongside.
+- Docs: `docs/STYLE.md` § Street plan and skyline, `docs/ARCHITECTURE.md`
+  decisions 16–17, `docs/M2_REPORT.md` § M2.2, backlog items.
+
+### Evidence and boundaries
+
+- `verify` green, 88 tests. `city` 5/5 on both tiers (low 80 calls / 139k
+  triangles, high 106 / 183k; heap 40 / 45 MB; physics residency 18).
+- Startup at 20 Mbit + CPU ×4: 2.7 s to control typical, one 4.6 s run with every
+  phase 1.5–2× slower; gate run 3.5 s.
+- A/B against M2.1 (before the streaming changes), three alternating pairs at
+  CPU ×4 low tier: 57.8 / 55.4 / 54.6 vs 52.7 / 55.9 / 54.6 fps. Within noise.
+- Two false alarms caught: a hidden game tab in the desktop browser pane made every
+  build measure 13–34 fps (closed it, re-measured); the wall-clock startup number
+  included 1–3.5 s of browser start-up outside the page (one run 6.6 s wall for
+  3.1 s in-page). Neither was a code regression.
+- `git worktree remove` deleted through a `node_modules` junction and destroyed
+  `node_modules/.bin`; restored with `npm ci`. A/B builds now use `git archive`
+  exports and the junction is removed with `rmdir` before the folder.
+- Reviewed from the driving camera: every authored road at three points,
+  landmarks, ring-road skyline views, the isolated silhouette layer from the quay.
+
+### Decided and why
+
+- Polyline lanes in one graph rather than a second road type (decision 16).
+- Two resident detail levels rather than regenerating chunks at the detail
+  boundary (decision 17); heap stays far below budget.
+- The chicane has no frontage: yards read as yards, and the tight curve needs
+  sightlines.
+
+### Next
+
+- Marcin's loop playtest (`?spawn=loop`), then M3 traffic on this road graph.
+
+### Open problems
+
+- Frontage rhythm, bare chicane yards, corner buildings, silhouette sightlines,
+  the residual render spike: `docs/BACKLOG.md`.
+
 ## 2026-09-21 — Session 9: M2.1 street architecture, shadows, camera
 
 Marcin's playtest feedback on M2: buildings need considered scale and variety,

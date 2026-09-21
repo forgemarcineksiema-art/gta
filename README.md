@@ -18,6 +18,7 @@ Useful URLs:
 |---|---|
 | `/` | seeded 1.575 km square city; automatic rendering quality |
 | `/?spawn=crown` | city districts: `crown`, `foundry`, `gardens`, `marina`; perimeter road: `highway` |
+| `/?spawn=loop` | start of the authored loop: Crown diagonals, north highway, Works chicane, Quay sweep, Garden parkway |
 | `/?quality=low` | lock `low` or `high` for reproducible visual/performance comparisons |
 | `/?seed=123` | regenerate building lots from a seed (road topology stays fixed) |
 | `/?map=playground` | original M1 playground and handling instruments |

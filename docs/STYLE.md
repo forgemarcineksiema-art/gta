@@ -73,6 +73,32 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 - This is a street-quality pass over the regular M2 grid. Bespoke street plans,
   waterfront composition, traffic and populated shop interiors are later work.
 
+## Street plan and skyline (M2.2)
+
+- The grid stays; five authored roads join it as lane pairs between junctions
+  (`SPECIAL_ROADS` in `sim/city/roads.ts`): two straight Crown diagonals aimed at
+  the tower junction (24 m wide), the Works chicane (16 m, R ≈ 55 m, no frontage),
+  the Garden parkway (20 m, R = 225 m, grass verges, houses set back 6 m) and the
+  Quay sweep (24 m, R = 503 m, loggia apartments). Together with the north
+  highway they form a 4 km loop; `?spawn=loop` starts on it.
+- Quarters an authored road crosses are open: interior at road level in the
+  district's ground colour, grid pavements only as 4.5 m strips cut along the
+  corridor, and a frontage row of rotated buildings facing the road at 23–29 m
+  pitch, with entrance paths, kerbs, trees every 27 m and lamps every 45 m.
+  The Crown avenue climbs from 4 to 10 floors toward the tower junction.
+- Skyline: the Crown Tower is 30 floors plus crown and spire (~120 m), the Works
+  add a striped chimney (67 m), the Glasshouse a beacon mast (48 m), the Coral
+  Hotel is a 14-floor slab with a roof sign. Their silhouettes render in a
+  separate layer (`render/skyline.ts`) whose fog fades over three times the fog
+  distance and never past 82 %, so they place the player from any open sightline.
+- Roofs: offices and quay blocks alternate a plant box, a set-back penthouse with
+  a band, and a parapet ring with stair head and water tank; buildings of eight
+  floors or more get a second step. Houses and warehouses keep pitched or flat.
+- Coral Quay's sea edges have a pier with posts, a pavilion and moored boats
+  beyond the seawall (visual only; the boundary colliders are unchanged).
+- Rotated statics rotate about +Y only; a rotated building is generated in its
+  own frame and moved as a whole, so facade rules never see the rotation.
+
 ## UI
 
 - Plain DOM over the canvas. Typography: a heavy italic system sans for numbers and titles (`Segoe UI` 900 italic → falls back to Helvetica/Arial/system-ui), 600 weight for body text. No web fonts (bytes, offline, licensing).

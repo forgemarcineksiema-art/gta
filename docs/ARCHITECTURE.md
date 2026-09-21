@@ -79,6 +79,39 @@ actual motion only. Steering feed-forward, the 0.22 s heading lead and the large
 lateral look offset made quick corrections swing the road under the player;
 comfort tests in `tests/render/camera.test.ts` pin the new bounds.
 
+M2.2 (authored loop, skyline, streaming hygiene). Every lane is a polyline
+(`Lane.points`, `yaw0`/`yaw`); grid lanes are two-point polylines and the five
+authored roads (`SPECIAL_ROADS`: straight, arc and Catmull-Rom builders, sampled at
+4.5–9 m, trimmed by `LANE_INSET`, offset to the right) join as lane pairs between
+junctions, so the Euler tour, `lanePath`, `projectOnLane` (reset), the minimap and
+the M3 traffic foundation see one lane type. Statics may rotate about +Y: the
+renderer rotates positions and normals in `cityGeometry`, colliders take
+`setRotation`. A chunk generator queries the roads near it (`corridors`); quarters
+they touch become open quarters (road-level interior, grid pavements cut by
+sampling the strip at 1.5 m against the corridor, lots yielded when any footprint
+corner is within 40 m of the centreline) and `City.specialRoad` draws the surface
+as a raised top face, rotated kerbs, dashes, trees, lamps and a frontage row of
+`Architecture.rotatedBuilding`s whose footprints must clear the grid pavements.
+The skyline layer (`render/skyline.ts`) is one mesh from `City.landmarkSilhouettes`
+with a long-range fog. `City.sync` loads at most one physics chunk per step
+(nearest first, removal only once the neighbourhood is complete; spawns and
+teleports load all nine). `CityView` claims a tile with five empty part meshes and
+one chunk generation, then builds one geometry per frame from a per-tile queue:
+the level each part needs now, then the other level; both levels stay resident
+and the mesh swaps between them by distance, so driving never regenerates a
+chunk. Synchronous loads build only the needed level of the ring in front of the
+fog; the fogged ring and the second level follow at two builds a frame.
+`App.boot` records phase times in `GameHandle.bootTimings`; the startup gate
+measures navigation start to the first controllable frame.
+
+Decision 16 (M2.2): authored roads are polylines in the same graph, not a second
+road system. Alternatives were a separate spline road type with its own bot and
+reset code, or bending the grid itself; both would have doubled the traffic
+work in M3. Decision 17 (M2.2): two resident detail levels per part instead of
+regenerating a chunk at the detail boundary. The regeneration cost 20–40 ms per
+crossing at CPU ×4 and crossings happen about twice a second while driving; the
+second level costs roughly 40 % more geometry memory (heap 40–45 MB on the tour).
+
 ## Data flow per frame (detail)
 
 ```

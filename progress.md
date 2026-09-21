@@ -38,3 +38,13 @@ less reactive steering-camera motion. This is the current M2 playtest feedback.
   quartered chunk meshes with per-part culling, 180 m detail radius. Low tour
   77 calls / 109k triangles, high 105 / 149k; verify green, 88 tests; A/B perf vs
   M2 within run-to-run noise. Details in `docs/PROGRESS.md` and `docs/M2_REPORT.md`.
+
+## M2.2 — 2026-09-21
+
+- Authored 4 km loop (two diagonals, chicane, two arcs) as polyline lanes in the
+  same graph; open quarters with frontage rows; taller landmarks and a skyline
+  silhouette layer; quay piers. Streaming: one physics chunk per step, one
+  geometry build per frame, both detail levels resident. Startup gate measures
+  navigation start to first controllable frame (2.7 s typical at CPU ×4).
+- Gate: verify green (88 tests), city 5/5 (178 lanes; low 80 calls / 139k tris).
+  Details in `docs/PROGRESS.md` session 10 and `docs/M2_REPORT.md` § M2.2.

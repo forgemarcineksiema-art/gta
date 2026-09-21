@@ -21,7 +21,42 @@ tools/                verify.mjs, budget.mjs
 docs/                 BRIEF, PROGRESS, ARCHITECTURE, BACKLOG, CRAZYGAMES, STYLE, TITLES, ASSETS
 ```
 
-## Data flow per frame
+## City (M2)
+
+`sim/city/roads.ts` owns the fixed road plan, directed lane graph, cubic junction
+connections and uniform 3 m samples for the bot. `sim/city/City.ts` generates each
+225 m chunk from `(seed, chunkX, chunkZ)` independently. The route is an Euler tour
+of all 168 directed lanes; permissive arcade junctions include U-turn connections.
+
+The city sim loads a 3×3 neighbourhood of collision chunks and retains old chunks
+within a 5×5 neighbourhood. It loads before removing, and a reset projects onto a
+nearby lane before the physics step. Buildings use `GROUPS_SOLID` and restitution
+1; pavements use `GROUPS_TERRAIN`. All streets share one permanent ground collider.
+
+`render/CityView.ts` generates merged typed-array geometry directly (the city's
+descriptors are axis-aligned boxes and vertical cylinders). It shares one material,
+frustum-culls chunks, preloads outside fog and retains an extra chunk-width before
+disposing. One chunk is uploaded per normal frame; initial and teleported views
+populate synchronously. Physics and rendering residency are independent and
+observable in `window.__game` and `render_game_to_text()`.
+
+`Renderer` starts low and samples real frame intervals after warmup, then adapts
+fog/draw distance, shadow resolution and DPR with hysteresis. Locked quality URLs
+make benchmarks reproducible. Simulation, road topology and collisions are tier
+independent. The minimap is a static SVG built from the road graph, with just the
+player arrow and district label updated during play.
+
+`SimWorld()` still defaults to the playground for existing headless tests; `App`
+selects the city unless a playground/track URL was requested. City sessions do not
+record unbounded per-tick history. The M1 track bot reuses its pursuit/curvature
+controller with `CITY_BOT_TUNING` and a local route search for city coverage.
+
+Decision 12: keep a continuous ground collider instead of creating road colliders
+per chunk, so streaming and junctions cannot introduce suspension seams. Decision
+13: keep the road topology authored and deterministic; seed variation affects lots
+and massing, preserving route readability and a stable M3 traffic foundation.
+
+## Data flow per frame (detail)
 
 ```
 requestAnimationFrame

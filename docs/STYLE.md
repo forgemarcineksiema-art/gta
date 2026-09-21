@@ -40,6 +40,19 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 - Blacks and greys for trim, rubber and metal, darkest to lightest: ink `#0c0c10`, rubber `#15151a`, charcoal `#25252c`, graphite `#35353e`, slate `#4a4a55`, steel `#6d6d78`, silver `#9d9da8`, light grey `#c4c4cd`, chrome `#e4e4ea`. A car uses at least three of them (pillars/seams in ink or charcoal, rims in graphite with light-grey spokes, badges and exhaust tips in chrome) so it does not read as one flat block of paint.
 - Districts (M2) each get one dominant building hue family from this palette plus one accent, so they read as different places from the minimap and from the road.
 
+## City blockout (M2)
+
+| District | Massing | Building / accent | Landmark |
+|---|---|---|---|
+| Crown Heights | 18–58 m offices, inset roof stacks | lavender `#b497d6` / gold `#f5cd75` | Crown Tower |
+| Sunset Works | 9–14 m warehouses, roof vents and loading bays | terracotta `#d98768` / teal `#5daeb5` | Waterworks |
+| Palm Gardens | 5–11 m houses, frequent planted lots | sand `#e7bd87` / sage `#8bb583` | Glasshouse |
+| Coral Quay | 10–24 m apartments, horizontal window bands | pink `#eaa7ab` / aqua `#67c9ce` | Coral Hotel |
+
+District definitions and massing live in `src/sim/city/City.ts`. This is the first
+city blockout; a regular grid is deliberate for the M2 streaming and driving gate.
+Low fog is 100–340 m, high 180–580 m, both using the existing sunset palette.
+
 ## UI
 
 - Plain DOM over the canvas. Typography: a heavy italic system sans for numbers and titles (`Segoe UI` 900 italic → falls back to Helvetica/Arial/system-ui), 600 weight for body text. No web fonts (bytes, offline, licensing).

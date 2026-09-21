@@ -1,5 +1,8 @@
 # Status report — 2026-09-20
 
+Historical M1 snapshot. Current city gate: [M2_REPORT.md](M2_REPORT.md) and
+[PROGRESS.md](PROGRESS.md), updated 2026-09-21.
+
 Covers everything from the empty repository to the end of the M1 feel passes: 17 commits, 61 files, ~6,000 lines of TypeScript/CSS plus docs. M0 (foundations) and M1 (the car) are done; M1 has been through three playtest-driven feel passes and a car-model pass. M2 (the city) has not started.
 
 ## 1. Where the project stands

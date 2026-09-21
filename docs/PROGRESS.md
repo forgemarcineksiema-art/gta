@@ -2,6 +2,84 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-21 — Session 8: M2 city, ready for the playtest gate
+
+Marcin's instruction: begin M2. Baseline `verify` passed: 81 tests, 3.34 MB,
+869 ms unthrottled startup. Work is isolated on `codex/m2-city`.
+
+### Done
+
+- **City.** `sim/city/City.ts` generates 49 independent 225 m chunks, 1,575 m square,
+  from a seed. Four district massing/colour families, parks, pavements, lamps,
+  crossings, four landmarks and a visible island boundary. Original code geometry,
+  no new dependencies or third-party assets. This is a first blockout, not an
+  accepted final art pass.
+- **Roads.** `sim/city/roads.ts`: 49 connected junctions, 168 directed right-hand
+  lanes, wider perimeter loop, sampled cubic junction connections including U-turns.
+  An Euler route lets the existing pursuit controller visit every directed lane.
+- **Physics streaming.** One seamless permanent ground collider, 3×3 neighbourhood
+  loaded ahead, retention within 5×5, load before unload, existing building/wall
+  collision rules. Reset projects onto the closest lane and updates after teleports.
+- **Render streaming.** Direct typed-array mesh construction, one shared material,
+  one merged mesh per chunk, frustum culling, distance-limited shadow casting,
+  fog/load/eviction margins, geometry disposal. One new mesh per normal frame;
+  initial and teleported views are synchronous.
+- **Quality.** Low-first startup and actual frame-cost sampling, high/low fog and
+  shadows, DPR caps and dynamic resolution, cooldown/hysteresis. Locked query
+  overrides for repeatable checks. Simulation and collisions stay tier independent.
+- **UI / QA.** North-up minimap, car arrow, district/landmark labels; concise state
+  in `render_game_to_text()`, opt-in deterministic stepping via `?manual=1`.
+  The dev panel exposes only useful named district spawns, not all 168 lanes.
+- **M1 preserved.** Playground URLs and `?map=playground` keep the handling course,
+  recordings and lap ghost. No vehicle tuning was changed. City recording is off
+  by default so long sessions don't retain an unbounded pose/control history.
+
+### Evidence and boundaries
+
+- `verify`: 85 passing Vitest tests, both typechecks, lint, production build, smoke
+  and byte budgets on final code. Build 3.35 MB / 5 files; final smoke startup
+  740 ms. The camera-snap guard also passes the targeted browser controls test.
+- Full headless tour: **168/168 lanes**, **1,709.3 simulated seconds**, no bot resets,
+  no body impacts. Chassis Y after settling **0.415–0.433 m**. Streaming revisits
+  recreate identical geometry and remain under the collider residency bound.
+- `npm run city`: **5/5**. Startup **2,215 ms** at 20 Mbit / 40 ms latency / CPU ×4.
+  Accelerated whole-map render tours: low **49 calls / 49,473 tris / 25 meshes**;
+  high **54 / 64,437 / 45**, physics **16 chunks** max. Meshes unloaded **251/266**;
+  peak heap samples **19.6/26.3 MB**. Controls, pause/resume, reset after teleport,
+  and automatic high→low quality response are checked.
+- Initial real-time M2 perf, MX330 / ANGLE D3D11, 1280×720, CPU ×4, 60 s:
+  **59.8 fps**, frame p95/p99/max **16.7/16.8/50.1 ms**, sim substeps/frame p95
+  **3.2 ms**, heap **22 MB**, no bot resets. Extra triangles/heap compared with the
+  empty M1 lot trigger comparison warnings, not budget failures.
+- Final real-time repeat: **58.2 fps**, frame p95/p99/max **16.8/33.4/166.8 ms**,
+  sim p95/max **3.5/26.8 ms**, heap **21 MB**. The preceding run on the same code
+  had **56.7 fps**, frame max **766.6 ms** and sim max **257.6 ms**. The p95 budgets
+  pass, but these outliers prevent a hitch-free or sustained-60 claim.
+- Instrumented 60 s run: 55.0 fps, p95/p99/max 16.8/66.6/233.4 ms. Slowest render
+  call 58.5 ms with **no** chunk load/unload; render including an upload 28.9 ms;
+  physics step with three loads/removals 13.9 ms. The longer frame gaps remain
+  unexplained; streaming has a cost but is not established as their cause. Raw
+  scratch evidence: `perf/city-profile.json`. No extra profiling code ships.
+- `npm run screens`: **10/10** viewport cases, HUD + pause. Inspected player-camera
+  shots from the input-burst skill client and every named city spawn, plus the
+  smallest/largest HUD and the small pause view. No browser console errors in QA.
+- The **whole-map tour is accelerated** and checks coverage/streaming/scene budgets;
+  the **real-time perf run is 60 s**, not the entire 28-minute tour. Chromebook and
+  other hardware remain unmeasured. Human driving/art approval remains Marcin's.
+
+### Decisions and next
+
+- Fixed road plan plus seeded lots gives repeatable driving and an M3 traffic base.
+  The flat grid and at-grade perimeter intersections are deliberate first-pass scope.
+- Keep physics and visual streaming independent; never change gameplay by quality.
+- The renderer detects a large position jump itself, because a fixed step can clear
+  the sim's one-tick respawn flag before rendering. City teleport views and the chase
+  camera snap on their first frame; this has a browser regression assertion.
+- Gate report and five-minute playtest: `docs/M2_REPORT.md`. Start at `/`, or jump
+  with `?spawn=crown|foundry|gardens|marina|highway`; compare `?quality=low|high`.
+- Stop at the M2 playtest gate. M3 scope remains traffic LOD, dodging pedestrians,
+  damage, car-swap, takedowns, near misses, boost economy and collectibles.
+
 ## 2026-09-21 — Session 7: sparks, camera look-ahead
 
 Marcin's call: sparks while scraping, and a look-ahead camera.

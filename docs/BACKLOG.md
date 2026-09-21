@@ -4,6 +4,12 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 ## Performance / size
 
+- M2 frame pacing: p95 gates pass, but real-time runs on MX330 under CPU ×4 had
+  isolated 167–767 ms frame intervals. An instrumented run measured max render
+  58.5 ms (no stream event), max upload-containing render 28.9 ms, and streamed
+  physics step 13.9 ms. Investigate browser/GPU scheduling and system contention
+  with a trace; do not attribute the long gaps to streaming without evidence.
+
 - Rapier `-compat` inlines the WASM as base64 (~2.7 MB vs ~2.0 MB raw). If startup bytes ever approach the 8 MB target, switch to the bundler build with `vite-plugin-wasm` and keep `-compat` only for Vitest. (M0)
 - `RigidBody.translation()/rotation()` calls allocate per body per step in the JS bindings; fine for tens of bodies, revisit if traffic ever uses many rigid bodies (M3 plans kinematic traffic). (M0)
 - Headless Chromium (software GL) renders the playground at a few fps; the perf run is a CPU-side signal only, as the brief expects. Real GPU numbers need `npm run perf:headed` on Marcin's machines. (M0)

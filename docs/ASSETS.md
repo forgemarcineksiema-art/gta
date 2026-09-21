@@ -6,4 +6,4 @@ Every non-original asset in the build is listed here with its source URL and lic
 |---|---|---|---|---|
 | (none yet) | | | | |
 
-Everything in the current build is generated in code: the playground geometry, the first car (`src/render/carMesh.ts`), the sky, the engine/wind/skid audio (`src/audio/EngineAudio.ts`), and the UI (system fonts only).
+Everything in the current build is generated in code: the playground and seeded city (`src/sim/city/`), district landmarks and minimap, the cars (`src/render/carMesh.ts`), the sky, the engine/wind/skid audio (`src/audio/EngineAudio.ts`), and the UI (system fonts only). M2 adds no third-party art or runtime dependencies.

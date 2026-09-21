@@ -12,6 +12,7 @@ import { CAR_IDS, FIXED_DT, Recorder, SimWorld, districtAt, initPhysics, type Ca
 import { DebugPanel } from '../ui/debugPanel';
 import { Hud } from '../ui/hud';
 import { BotDriver } from './bot';
+import { AgentState } from '../sim/traffic/Traffic';
 import { CITY_BOT_TUNING, TrackBot } from './trackBot';
 import { FixedStepLoop } from './loop';
 import { PerfProbe, heapMb } from './perf';
@@ -174,7 +175,7 @@ export class App {
         map: sim.city ? 'city' : 'playground', seed: sim.city?.seed,
         carId: sim.carId,
         damage: null,
-        traffic: null,
+        traffic: sim.traffic ? sim.traffic.count(AgentState.Kinematic) : null,
         peds: null,
         billboards: null,
         events: recentEventKinds(sim.events),

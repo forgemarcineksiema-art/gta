@@ -7,17 +7,20 @@
  * every step (controls, pose, telemetry) and the ghost of the best lap.
  */
 import RAPIER from '@dimforge/rapier3d-compat';
+import { City } from './city/City';
 import { createControls, type VehicleControls } from './controls';
 import { EventLog } from './events';
 import { buildPlayground, type PlaygroundLayout, type SpawnPoint } from './playground';
 import { POSE_STRIDE, Recorder } from './recorder';
 import type { DynamicDesc, StaticDesc } from './scene';
 import { LapTimer, type LapState, type TrackDef } from './track';
+import { Traffic, type PlayerProbe } from './traffic/Traffic';
+import { TRAFFIC } from './traffic/tuning';
 import { TransformBuffer } from './transforms';
 import { CAR_PRESETS, type CarId } from './vehicle/presets';
 import { cloneTuning, type VehicleTuning } from './vehicle/tuning';
 import { Vehicle } from './vehicle/Vehicle';
-import { City } from './city/City';
+import * as M from './math';
 
 export const FIXED_DT = 1 / 60;
 export const FIXED_HZ = 60;
@@ -70,6 +73,8 @@ export class SimWorld {
   /** Density scales from `SimWorldOptions`. Read by the life systems when they exist. */
   readonly trafficDensity: number;
   readonly pedsDensity: number;
+  /** Null on the playground. Density 0 still constructs it so tests can `spawnAt`. */
+  readonly traffic: Traffic | null;
   readonly statics: StaticDesc[];
   readonly dynamics: DynamicDesc[] = [];
   readonly spawns: SpawnPoint[];
@@ -84,6 +89,7 @@ export class SimWorld {
   private readonly tracked: TrackedBody[] = [];
   private readonly scratchPos = { x: 0, y: 0, z: 0 };
   private readonly scratchRot = { x: 0, y: 0, z: 0, w: 1 };
+  private readonly probe: PlayerProbe = { x: 0, z: 0, yaw: 0, vx: 0, vz: 0, speed: 0, halfWidth: 0, halfLength: 0 };
   /** Pose stream of the best lap (x, y, z, qx, qy, qz, qw per tick), for the ghost. */
   bestLapPoses: Float32Array | null = null;
 
@@ -138,6 +144,7 @@ export class SimWorld {
     this.carId = opts.car ?? 'muscle';
     const tuning = opts.tuning ?? cloneTuning(CAR_PRESETS[this.carId]);
     this.vehicle = new Vehicle(this.world, this.transforms, tuning, spawn.position, spawn.yaw);
+    this.traffic = this.city ? new Traffic(this.world, this.transforms, this.city, opts.seed ?? 42, TRAFFIC, this.trafficDensity) : null;
     this.city?.sync(spawn.position.x, spawn.position.z, true);
   }
 
@@ -162,8 +169,25 @@ export class SimWorld {
     if (reset) this.respawned = true;
     this.controls.reset = false;
     this.controls.swap = false;
+    if (this.traffic) {
+      const pos = this.vehicle.body.translation(this.scratchPos);
+      const rot = this.vehicle.body.rotation(this.scratchRot);
+      const tm = this.vehicle.telemetry;
+      const he = this.vehicle.tuning.chassisHalfExtents;
+      const probe = this.probe;
+      probe.x = pos.x;
+      probe.z = pos.z;
+      probe.yaw = M.yawOf(rot);
+      probe.vx = tm.vx;
+      probe.vz = tm.vz;
+      probe.speed = Math.hypot(tm.vx, tm.vz);
+      probe.halfWidth = he.x;
+      probe.halfLength = he.z;
+      this.traffic.step(probe, FIXED_DT, this.events);
+    }
     this.world.step();
     this.vehicle.writeTransforms();
+    this.traffic?.writeTransforms();
     for (const t of this.tracked) {
       const p = t.body.translation(this.scratchPos);
       const r = t.body.rotation(this.scratchRot);

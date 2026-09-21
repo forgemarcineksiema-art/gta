@@ -67,7 +67,7 @@ describe('M2 city', () => {
   });
 
   it('drives the whole road graph without resets, seam jumps or escaped bodies', () => {
-    const sim = new SimWorld({ map: 'city', record: false });
+    const sim = new SimWorld({ map: 'city', record: false, traffic: 0, peds: 0 });
     const bot = new TrackBot('muscle', CITY_BOT_TUNING);
     let maxY = 0, minY = Infinity, maxImpact = 0;
     try {

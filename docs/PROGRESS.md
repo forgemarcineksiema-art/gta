@@ -2,6 +2,32 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-21 — M3 session 15: slice 1
+
+### Done
+
+- Kinematic traffic on the lane graph. `LaneTables` caches the 24-sample junction curve on first use. `Traffic` keeps 48 agents in typed arrays, spawns from `mulberry32(seed ^ 0x7a11)`, follows with `gapMin`, reserves turning and non-highway junctions, and writes y = 0.03. `TrafficView` packs live agents into three instanced meshes (`count` is the live number of that class) so zero-scale slots are not submitted. The city tour passes `traffic: 0, peds: 0`.
+
+### Verification
+
+- verify green, 119 tests. Smoke 55.8 fps / p95 16.8 ms / 80 draws / 145,929 tris, build 3.43 MB, gameplay-start 4683 ms. An earlier smoke on the same slice before instance packing was 60.0 fps / 90 draws / 235,024 tris; the 20 s bot does not always reach the draw peak.
+- Node: 60 s bot, min same-lane distance 4.53 m, min any 4.53 m, 48 alive, 41 agents entered after `junctionWait`. Mean step with 48 agents 0.559 ms (limit 3).
+- `npm run city` 5/5. Startup 2703 ms at 20 Mbit / CPU ×4. Tour low 62 draws / 162,135 tris / heap 40 MB / 0 resets; high 88 draws / 235,866 tris / heap 45 MB / 0 resets. Triangles match the M2 tour; low draws are 62 against the session-13 figure of 61.
+- Perf bases, traffic not in the build yet (`perf/m3-base-1.json`, `perf/m3-base-2.json`):
+  - base 1: fps 56.1, frame p95 16.80 / p99 50.00 / max 149.90, step p95 4.90 / max 82.70, draws 84, tris 162k, heap 48 MB, resets 0
+  - base 2: fps 58.5, frame p95 16.80 / p99 33.40 / max 100.00, step p95 3.30 / max 35.50, draws 83, tris 176k, heap 48 MB, resets 0
+- Perf with packed traffic: fps 54.4, frame p95 16.80 / p99 50.00 / max 916.70, step p95 6.20 / max 537.40, draws 90, tris 197k, heap 51 MB, resets 0, dropped 1.76 s. Draws +6 (three meshes and their shadow passes). Triangles +21k against base 2 and +35k against base 1. Step p95 is 1.3 ms above the higher base and 2.9 ms above the lower; frame p95 is unchanged. The 917 ms frame is one spike, not the p95.
+
+### Decided and why
+
+- Straight-through highway traffic does not reserve a node, as specified. A car also brakes for any agent 2–14 m ahead, and a post-step pass pushes a car back along its lane when another is inside 4.5 m. Without that, two cars merging onto one lane in the same step occupied the same point (measured 0.11 m) because the lane list is built before the move.
+- The view packs instances and sets `count` instead of leaving a zero-scale tail. Submitting three full pools counted about 73–87k triangles in `renderer.info` (197k after packing). Draw calls stay at three plus three shadow draws once every class has a car.
+- `Traffic` is constructed for every city world, including density 0, so `spawnAt` works in tests. `TrafficView` is created only when `trafficDensity > 0`, so the tour does not pay the six draws.
+
+### Next
+
+- Slice 2: lend dynamic bodies inside 40 m, classify hits, and teach the road bot to brake for traffic ahead.
+
 ## 2026-09-21 — M3 session 15: slice 0
 
 ### Done

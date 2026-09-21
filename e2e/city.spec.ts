@@ -31,7 +31,7 @@ for (const quality of ['low', 'high']) {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-    await page.goto(`/?manual=1&bot=1&quality=${quality}`);
+    await page.goto(`/?manual=1&bot=1&quality=${quality}&traffic=0&peds=0`);
     await page.waitForFunction(() => window.__game?.started);
     const peak = { draws: 0, triangles: 0, heap: 0, meshes: 0, geometry: 0, physics: 0, loaded: 0, unloaded: 0, lanes: 0, simSeconds: 0, resets: 0 };
     // Accelerated fixed-step tour; render every 15 ticks. This measures residency and

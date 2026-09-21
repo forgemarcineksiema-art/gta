@@ -38,6 +38,11 @@ export class Architecture {
   rotatedBuilding(x: number, z: number, yaw: number, hx: number, hz: number, district: string, floors: number, variant: number, accent: number): void {
     const start = this.statics.length;
     this.building(0, 0, hx, hz, district, 1, 1, floors, variant, accent, false, true);
+    this.rotateFrom(start, x, z, yaw);
+  }
+
+  /** Move every static generated since `start` (built about the origin) to (x, z) facing `yaw`. */
+  rotateFrom(start: number, x: number, z: number, yaw: number): void {
     const cos = Math.cos(yaw), sin = Math.sin(yaw), rot = quatFromYaw(yaw);
     for (let i = start; i < this.statics.length; i++) {
       const st = this.statics[i] as StaticDesc;
@@ -222,8 +227,23 @@ export class Architecture {
       // Stepped art-deco parapet distinguishes this type from the loggia blocks.
       this.box(x, height + 1, z, hx * 0.65, 0.55, hz * 0.65, body);
       this.box(x, height + 1.8, z, hx * 0.35, 0.25, hz * 0.45, c.trim);
+    } else if (variant === 1) {
+      // Set-back penthouse floor with its own band; reads as a second silhouette step.
+      this.box(x, height + 1.75, z, hx * 0.62, 1.55, hz * 0.62, body);
+      this.box(x, height + 3.4, z, hx * 0.66, 0.12, hz * 0.66, c.trim);
+      if (floors >= 8) this.box(x, height + 4.6, z, hx * 0.4, 1.1, hz * 0.4, c.stone);
+    } else if (variant === 2) {
+      // Parapet ring around the roof edge, stair head and a water tank on legs.
+      for (const side of [-1, 1]) {
+        this.box(x + side * (hx - 0.2), height + 0.95, z, 0.2, 0.5, hz, body);
+        this.box(x, height + 0.95, z + side * (hz - 0.2), hx - 0.4, 0.5, 0.2, body);
+      }
+      this.box(x - hx * 0.45, height + 1.6, z + hz * 0.35, 1.8, 1.1, 1.6, c.roof);
+      this.cylinder(x + hx * 0.45, height + 2.9, z - hz * 0.4, 1.3, 1.1, c.brick);
+      for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) this.box(x + hx * 0.45 + a * 0.9, height + 1.15, z - hz * 0.4 + b * 0.9, 0.08, 0.7, 0.08, c.roof);
     } else {
       this.box(x, height + 1, z, hx * 0.4, 0.45, hz * 0.4, c.roof);
+      if (floors >= 8) this.box(x, height + 2.2, z, hx * 0.62, 0.9, hz * 0.62, c.stone);
     }
   }
 }

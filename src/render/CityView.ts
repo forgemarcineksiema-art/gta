@@ -116,6 +116,8 @@ export class CityView {
   private readonly material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
   loaded = 0;
   unloaded = 0;
+  /** Frames left of the faster catch-up after a synchronous (near ring only) load. */
+  private burst = 0;
   constructor(private readonly scene: THREE.Scene, private readonly city: City) {
     fadeShadowEdges(this.material);
     for (let z = -3; z <= 3; z++) for (let x = -3; x <= 3; x++) this.tiles.push({ key: `${x},${z}`, x, z, parts: null });
@@ -165,8 +167,13 @@ export class CityView {
         part.mesh.castShadow = d <= casterRadius;
       }
     }
-    // One chunk upload per normal frame; a teleport/start populates the new view before it is shown.
-    const limit = immediate ? 49 : 1;
+    // One chunk upload per normal frame. A teleport/start populates everything in
+    // front of the fog before it is shown; the fogged outer ring follows at three
+    // chunks a frame, which keeps time-to-control short on a throttled CPU.
+    const limit = immediate ? 49 : this.burst > 0 ? 3 : 1;
+    if (!immediate && this.burst > 0) this.burst--;
+    if (immediate) this.burst = 20;
+    const syncRadius = QUALITY[tier].near + BLOCK * Math.SQRT1_2 + 40;
     let uploads = 0;
     for (let n = 0; n < limit; n++) {
       let best = loadRadius;
@@ -176,7 +183,7 @@ export class CityView {
         const d = Math.hypot(tile.x * BLOCK - x, tile.z * BLOCK - z);
         if (d < best) { best = d; nearest = tile; }
       }
-      if (!nearest) break;
+      if (!nearest || (immediate && best > syncRadius)) break;
       const cx = nearest.x * BLOCK, cz = nearest.z * BLOCK;
       const groups = this.partition(nearest);
       nearest.parts = PARTS.map((offset, index) => {

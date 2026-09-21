@@ -13,6 +13,7 @@ import { buildCarMesh, type CarMesh } from './carMesh';
 import { CityView, QUALITY, type QualityTier } from './CityView';
 import { SHADOW_HALF, SUN_OFFSET, stableShadowTarget } from './shadows';
 import { gableGeometry } from './geometry';
+import { buildSkyline } from './skyline';
 
 export interface RenderStats {
   drawCalls: number;
@@ -79,7 +80,8 @@ export class Renderer {
       this.stats.glRenderer = 'unknown';
     }
 
-    this.camera = new THREE.PerspectiveCamera(62, 1, 0.3, 900);
+    // Far enough for the skyline layer across the whole 1.6 km island.
+    this.camera = new THREE.PerspectiveCamera(62, 1, 0.3, 1700);
     this.chase = new ChaseCamera(this.camera);
 
     // sky, fog, lights (docs/STYLE.md: late golden hour)
@@ -107,6 +109,7 @@ export class Renderer {
     this.scene.add(this.sky);
 
     this.cityView = sim.city ? new CityView(this.scene, sim.city) : null;
+    if (sim.city) this.scene.add(buildSkyline(sim.city));
     if (sim.statics.length) this.buildStatics(sim.statics);
     this.setQuality(this.quality);
     if (this.cityView) {

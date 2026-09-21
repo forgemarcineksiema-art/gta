@@ -3,7 +3,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { GROUPS_SOLID, GROUPS_TERRAIN } from '../collision';
 import { PALETTE } from '../palette';
 import type { SpawnPoint } from '../playground';
-import { quatFromYaw, type StaticDesc } from '../scene';
+import { IDENTITY_QUAT as IDENTITY_ROT, quatFromYaw, type StaticDesc } from '../scene';
 import { Architecture, CITY_COLORS } from './architecture';
 import { BLOCK, CITY_HALF, HIGHWAY_HALF, ROAD_HALF, buildCityRoute, buildRoadGraph, distanceToPolyline, projectOnLane, type RoadPoint, type SpecialRoad } from './roads';
 
@@ -224,14 +224,19 @@ export class City {
         box(px, 0.165, z + 15, 2, 0.015, 3, PALETTE.kerb, 'decor', 'top');
       }
       if (d.id === 'crown') {
-        architecture.building(px, pz, 14, 14, 'crown', 1, 1, 20, 1, d.accent);
-        box(px, 66, pz, 10, 3, 10, CITY_COLORS.stone, 'building');
-        box(px, 72, pz, 6, 3, 6, d.accent);
-        box(px, 82, pz, 0.4, 7, 0.4, d.accent);
+        architecture.building(px, pz, 14, 14, 'crown', 1, 1, 30, 0, d.accent);
+        box(px, 97, pz, 10, 3, 10, CITY_COLORS.stone, 'building');
+        box(px, 103, pz, 6, 3, 6, d.accent);
+        box(px, 115, pz, 0.4, 9, 0.4, d.accent);
       } else if (d.id === 'foundry') {
         for (const a of [-8, 8]) for (const b of [-8, 8]) box(px + a, 15, pz + b, 1, 15, 1, d.accent, 'building');
         cylinder(px, 34, pz, 14, 6, d.color);
         box(px, 40.5, pz, 14, 0.5, 14, d.accent);
+        // The works chimney: the tallest thing in the north-east, striped at the top.
+        cylinder(px + 30, 33, pz - 30, 2.4, 33, CITY_COLORS.brick);
+        cylinder(px + 30, 62, pz - 30, 2.6, 1.5, d.accent);
+        cylinder(px + 30, 66, pz - 30, 2.6, 1.5, PALETTE.laneMark);
+        box(px + 30, 3, pz - 30, 4, 3, 4, CITY_COLORS.brick, 'building');
       } else if (d.id === 'gardens') {
         box(px, 5, pz, 18, 5, 18, d.accent, 'building');
         for (const side of [-1, 1]) for (const bay of [-12, -6, 0, 6, 12]) {
@@ -242,18 +247,77 @@ export class City {
         cylinder(px, 12, pz, 17, 2, PALETTE.glass);
         cylinder(px, 15, pz, 12, 1, PALETTE.glass);
         cylinder(px, 17, pz, 6, 1, d.accent);
+        // The gardens mast: a slim beacon so the low glasshouse still marks its district from afar.
+        cylinder(px + 26, 23, pz + 26, 0.7, 23, CITY_COLORS.trim);
+        box(px + 26, 47.5, pz + 26, 1.6, 1.6, 1.6, d.accent);
+        box(px + 26, 1, pz + 26, 2.5, 1, 2.5, CITY_COLORS.stone, 'building');
       } else {
-        architecture.building(px, pz, 16, 12, 'marina', 1, 1, 9, 0, d.accent);
-        box(px, 31, pz, 7, 2, 10, d.accent, 'building');
-        box(px, 34, pz, 9, 0.3, 11, PALETTE.laneMark);
+        architecture.building(px, pz, 16, 12, 'marina', 1, 1, 14, 0, d.accent);
+        box(px, 46.5, pz, 7, 2, 10, d.accent, 'building');
+        box(px, 50, pz, 11, 1.4, 0.4, PALETTE.laneMark);
+        box(px, 50, pz, 0.4, 1.4, 12, PALETTE.laneMark);
         for (const side of [-1, 1]) architecture.tree(px + side * 21, pz - 19, true);
       }
     }
     for (const road of corridors) this.specialRoad(road, cx, cz, architecture);
+    if ((cx === 3 && cz === 2) || (cx === 2 && cz === 3)) this.waterfront(cx, architecture);
     // Visible seawalls match the persistent boundary colliders.
     if (Math.abs(cx) === 3) box(Math.sign(cx) * CITY_HALF, 2, z, 1, 2, BLOCK / 2, PALETTE.kerb, 'boundary');
     if (Math.abs(cz) === 3) box(x, 2, Math.sign(cz) * CITY_HALF, BLOCK / 2, 2, 1, PALETTE.kerb, 'boundary');
     return { key: `${cx},${cz}`, x: cx, z: cz, statics };
+  }
+
+  /** Coral Quay's sea edge: a pier with a pavilion and moored boats beyond the seawall. */
+  private waterfront(cx: number, architecture: Architecture): void {
+    const box = architecture.box.bind(architecture), c = CITY_COLORS;
+    const start = architecture.statics.length;
+    // Built along +X from the seawall; rotated for the south edge.
+    box(31, 1.2, 0, 31, 0.22, 4.2, c.trim);
+    for (let d = 4; d < 62; d += 8) for (const side of [-1, 1]) architecture.cylinder(d, 0.1, side * 3.4, 0.3, 1.1, c.roof);
+    for (let d = 8; d < 60; d += 16) box(d, 2.0, -4.6, 0.12, 0.6, 0.12, c.roof);
+    box(57, 3.3, 0, 3.6, 1.9, 3.6, PALETTE.kerb);
+    architecture.statics.push({ shape: { kind: 'gable', hx: 4.2, hy: 1.4, hz: 4.2 }, position: { x: 57, y: 6.4, z: 0 }, rotation: IDENTITY_ROT, color: c.brick, tag: 'decor' });
+    box(24, 4.2, 4.8, 0.14, 3, 0.14, 0x686678);
+    box(24, 7.2, 4.8, 0.45, 0.14, 1.2, PALETTE.laneMark);
+    for (const [bx, bz, colour] of [[16, -13, PALETTE.carWhite], [30, 12, PALETTE.carBlue], [46, -12, PALETTE.carOrange], [70, 9, PALETTE.carWhite]] as const) {
+      box(bx, -0.1, bz, 3.2, 0.5, 1.2, colour);
+      box(bx + 0.4, 0.9, bz, 1.2, 0.55, 0.9, c.chalk);
+      box(bx - 0.6, 1.9, bz, 0.06, 1.4, 0.06, c.roof);
+    }
+    const yaw = cx === 3 ? Math.PI / 2 : 0;
+    architecture.rotateFrom(start, cx === 3 ? CITY_HALF : 400, cx === 3 ? 400 : CITY_HALF, yaw);
+  }
+
+  /** Simplified landmark shapes for the renderer's always-visible skyline layer. */
+  landmarkSilhouettes(): StaticDesc[] {
+    const statics: StaticDesc[] = [];
+    const a = new Architecture(statics), c = CITY_COLORS;
+    for (const site of LANDMARKS) {
+      const d = DISTRICTS.find((x) => x.id === site.district);
+      if (!d) continue;
+      const { x, z } = site;
+      if (site.district === 'crown') {
+        a.box(x, 46.9, z, 13.5, 46.9, 13.5, c.stone, 'skyline');
+        a.box(x, 97, z, 9.6, 2.9, 9.6, c.stone, 'skyline');
+        a.box(x, 103, z, 5.7, 2.9, 5.7, d.accent, 'skyline');
+        a.box(x, 115, z, 0.38, 8.8, 0.38, d.accent, 'skyline');
+      } else if (site.district === 'foundry') {
+        for (const p of [-8, 8]) for (const q of [-8, 8]) a.box(x + p, 15, z + q, 0.9, 14.9, 0.9, d.accent, 'skyline');
+        a.cylinder(x, 34, z, 13.6, 5.9, d.color);
+        a.cylinder(x + 30, 33, z - 30, 2.3, 32.9, c.brick);
+        a.cylinder(x + 30, 62, z - 30, 2.5, 1.4, d.accent);
+      } else if (site.district === 'gardens') {
+        a.cylinder(x, 12, z, 16.5, 1.9, PALETTE.glass);
+        a.cylinder(x + 26, 23, z + 26, 0.65, 22.9, c.trim);
+        a.box(x + 26, 47.5, z + 26, 1.5, 1.5, 1.5, d.accent, 'skyline');
+      } else {
+        a.box(x, 22.3, z, 15.5, 22.2, 11.5, c.peach, 'skyline');
+        a.box(x, 46.5, z, 6.8, 1.9, 9.8, d.accent, 'skyline');
+        a.box(x, 50, z, 10.8, 1.3, 0.38, PALETTE.laneMark, 'skyline');
+      }
+    }
+    for (const st of statics) st.tag = 'skyline';
+    return statics;
   }
 
   /**
@@ -338,7 +402,9 @@ export class City {
             const centre = hw + 4.5 + frontage.setback + depth;
             const px = a.x + dx * ts + ox * centre, pz = a.z + dz * ts + oz * centre;
             if (!nearJunction(px, pz, ROAD_HALF + 30 + width) && footprintClear(px, pz, yaw, width + 1.5, depth + 1.5)) {
-              const floors = frontage.floors + (variant === 1 ? 1 : 0);
+              // Crown's avenue climbs toward the tower junction; the quay alternates heights.
+              const floors = road.kind === 'avenue' ? 4 + Math.round(6 * Math.max(0, 1 - Math.hypot(px + 450, pz + 450) / 330))
+                : road.kind === 'quay' ? ([3, 4, 6, 4, 5][index % 5] as number) : frontage.floors + (variant === 1 ? 1 : 0);
               architecture.rotatedBuilding(px, pz, yaw, width, depth, frontage.district, floors, variant, frontage.accent);
               // Entrance path from the door to the road's pavement.
               const path = box(a.x + dx * ts + ox * (hw + 4.5 + frontage.setback / 2), 0.17, a.z + dz * ts + oz * (hw + 4.5 + frontage.setback / 2), 1.5, 0.01, frontage.setback / 2, PALETTE.kerb, 'decor', 'top');

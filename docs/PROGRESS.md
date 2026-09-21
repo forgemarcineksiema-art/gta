@@ -28,6 +28,23 @@ Claude reviews the branch after the gate and runs the fix-up pass.
   and the reviewer checklist.
 - `AGENTS.md` at the root so Cursor (which does not read `CLAUDE.md`) points
   the executor at the standing rules and the plan.
+- Review pass on the plan (Marcin's request), with measurements where the
+  plan had guessed: the damage rules are now calibrated against the M1 wall
+  harness (`telemetry.impact` per step: 100 km/h head-on 32.7 / 12.8 / 7.1,
+  60 km/h 19.1 / 3.6, 20° glance ≤ 4.5; threshold 8 and 0.04 per m/s give
+  glance 0, 60 km/h dented, 100 km/h wrecked; table in the plan under §3.4).
+  Billboard placement moved into `City.generate` with per-chunk quotas and a
+  local clearance check (the earlier rule put 16 of them in Palm Gardens
+  back-lots, which sit inside blocks and are invisible from any street, and
+  would have needed extra chunk generation at boot). Event log made
+  allocation-free (visitor instead of copies), bumper detachment by vertex
+  collapse instead of material groups (no extra draw calls), the pedestrian
+  corner rule stated honestly (always the right turn round the block; the
+  earlier text implied crossing side streets), the rear-end speed band
+  widened to 25–85 % from momentum, slow-motion test phrased in sim time,
+  the road bot's traffic awareness given a home in slice 2, draw-call deltas
+  restated to include the shadow pass, and API facts extended
+  (`world.getCollider`, collider `restitution()`, `EngineAudio.ready`).
 
 ### Decided and why
 

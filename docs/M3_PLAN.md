@@ -135,8 +135,11 @@ for. They cost nothing in Rapier.
 D8. **Billboards are pass-through triggers with a visible smash, not solids.**
 A solid billboard would be a wall at highway speed. A smashable one is a
 reward: the car passes through, loses 5 % speed for feedback, planks fly,
-the counter ticks. They are a separate instanced mesh, not part of the merged
-chunk geometry, so one can disappear without regenerating a chunk.
+the counter ticks. The chunk generator places them (a fixed quota per chunk,
+a local clearance check against the chunk's own statics, so the total is 50
+by construction and boot generates nothing extra), but they are drawn as a
+separate instanced mesh, not as part of the merged chunk geometry, so one can
+disappear without regenerating a chunk.
 
 D9. **Slow motion is a time scale on the fixed-step loop.** The takedown camera
 feeds `frameDt × timeScale` into `FixedStepLoop.advance`; the sim never knows.
@@ -172,7 +175,8 @@ src/sim/traffic/lanes.ts       per-lane length tables, connection cache, positio
 src/sim/traffic/Traffic.ts     agent pool, lane following, junctions, LOD, hits, wrecks, swap take-over
 src/sim/traffic/Pedestrians.ts pavement paths, walking, dodge, guarantee, poses
 src/sim/life/Life.ts           hit classification, damage, wrecked/respawn, swap, takedown, near miss, oncoming
-src/sim/city/collectibles.ts   billboard placement from the road graph + seed; smash state
+src/sim/city/collectibles.ts   smash state, ids, the footprint test; placement lives in City.generate
+src/sim/city/City.ts           + billboards placed at the end of generate (per-chunk quotas, clearance check), CityChunk.billboards
 src/sim/SimWorld.ts            owns traffic, peds, life, collectibles, events; carId mutable; step order
 src/sim/controls.ts            + swap: boolean (edge, consumed by SimWorld)
 src/sim/vehicle/Vehicle.ts     + engineCut, + hitHandle / hitImpulse in telemetry, + setVelocity for swap
@@ -235,14 +239,15 @@ export class EventLog {
   readonly capacity: number;            // 64, entries pre-allocated
   sequence: number;                     // next seq to assign
   push(kind: EventKind, value: number, x: number, y: number, z: number, target?: number): void;
-  /** Copies events with seq >= from into out (oldest first); returns the next seq to read from. */
-  readFrom(from: number, out: SimEvent[]): number;   // out is a caller-owned reusable array
+  /** Visits events with seq >= from, oldest first, without copying; returns the next seq to read from. */
+  readFrom(from: number, visit: (e: SimEvent) => void): number;   // visit is a bound method: no allocation
 }
 ```
 
 `value` is the boost granted (0..1) or the damage stage or the speed lost;
-`target` is a traffic agent index, a billboard index or -1. The renderer, HUD
-and audio each keep `private lastSeq = 0` and one reusable `SimEvent[]`.
+`target` is a traffic agent index, a billboard id or -1. The renderer, HUD
+and audio each keep `private lastSeq = 0` and a bound `onEvent` method they
+pass to `readFrom` once per frame.
 
 ```ts
 // src/sim/traffic/Traffic.ts
@@ -309,12 +314,14 @@ export class Life {
 
 ```ts
 // src/sim/city/collectibles.ts
-export interface BillboardDesc { x: number; z: number; yaw: number; width: number; height: number; paint: number; stripe: number }
+export interface BillboardDesc { id: number; x: number; z: number; yaw: number; width: number; height: number; paint: number; stripe: number }
+export const BILLBOARD_TOTAL = 50;          // the sum of the per-chunk quotas (slice 8)
 export class Collectibles {
-  readonly billboards: BillboardDesc[];     // exactly 50, deterministic from the graph and the seed
-  readonly smashed: Uint8Array;
+  /** Ids are stable: chunk index (0..48) × 4 + slot. Descriptors ride with the chunk (`CityChunk.billboards`). */
+  readonly smashed: Uint8Array;             // length 196, indexed by id
   smashedCount: number;
-  /** Returns the index smashed this step or -1. Overlap test: player footprint vs billboard OBB in XZ. */
+  readonly total: number;                   // BILLBOARD_TOTAL
+  /** Returns the id smashed this step or -1. Tests the player footprint (OBB in XZ) against the billboards of the generated chunks around the player (`city.active`). */
   step(player: PlayerProbe, minSpeed: number): number;
 }
 ```
@@ -373,8 +380,8 @@ export interface Economy {
   slowMoSeconds: 1.2; slowMoScale: 0.35;
 }
 export interface DamageRules {
-  threshold: 4;        // m/s of speed lost in one step below which a hit does no damage (props and taps)
-  perMetrePerSecond: 0.05;
+  threshold: 8;        // m/s of speed lost in one step below which a hit does no damage (glances, props, taps)
+  perMetrePerSecond: 0.04;
   stages: [0.3, 0.6, 0.85, 1.0];   // dented, smoking, burning, wrecked
   trafficFactor: 0.7;  // hits on traffic count 70 % (the other car moves)
   wreckRespawn: 3;     // seconds after a wreck before the automatic respawn (R respawns at once, E swaps at once)
@@ -387,6 +394,25 @@ export interface SwapRules { range: 6; lateral: 4; maxRelativeSpeed: 20; airborn
 The values above are the starting defaults (write them as real numbers in the
 code, the literal types here are documentation); they are playtest knobs, not
 pins. Tests pin behaviour bands wide enough to survive Marcin's retuning (§5).
+
+`DamageRules` was calibrated on 2026-09-21 against the M1 wall harness (the
+`launch` helper of `tests/sim/walls.test.ts`, muscle unless stated,
+`telemetry.impact` per step in m/s, damage = Σ max(0, impact − 8) × 0.04):
+
+| Case | Impact per step (steps above 0.5) | Σ max(0, impact − 8) | Damage |
+|---|---|---|---|
+| head-on 100 km/h | 32.7, 12.8, 7.1 | 29.5 | 1.18 → wrecked |
+| head-on 100 km/h, compact / heavy | 32.2, 19.2 / 32.7, 16.1, 6.6, … | 35.4 / 32.8 | wrecked / wrecked |
+| head-on 60 km/h (all three classes alike) | 19.1, 3.6 | 11.1 | 0.44 dented |
+| head-on 40 km/h | 12.6, 2.4 | 4.6 | 0.18 |
+| head-on 30 km/h | 9.4, 1.6 | 1.4 | 0.06 |
+| 45° at 100 km/h | 17.6, 0.5 | 9.6 | 0.38 dented |
+| 20° glance at 100 km/h | 4.5, 2.1, 0.6, 0.7 | 0 | 0 |
+| 60° at 150 km/h | 42.1, 28.5, 2.0 | 54.6 | wrecked |
+
+So a glance or a prop never costs anything, a 60 km/h head-on dents, two of
+them wreck, and a 100 km/h head-on wrecks outright. If the vehicle's wall
+numbers change, re-measure before touching the damage bands.
 
 ## 4. Slices
 
@@ -537,7 +563,11 @@ only), `Life.ts` (hit classification only), `tests/sim/traffic.test.ts`.
 - Body pool: at construction create `physicsBodies` dynamic bodies, each with
   one cuboid collider sized per kind at lend time (`applyTuning`-style rebuild:
   remove and create the collider with the kind's half extents; the body is
-  reused). Bodies start `setEnabled(false)` parked at y = −50. Collider:
+  reused; lends happen a few times a second, so this churn is acceptable, but
+  if it shows in the Node profile pre-create one collider per kind on each
+  body and toggle `Collider.setEnabled`, checking `body.mass()` afterwards
+  because a disabled collider may still contribute mass). Bodies start
+  `setEnabled(false)` parked at y = −50. Collider:
   friction 0.6 with the Max rule, restitution 0.3 with Multiply, groups
   `GROUPS_SOLID`, mass from `TRAFFIC.mass` via `setMassProperties` with a low
   centre of mass (y = 0.3), `setCcdEnabled(true)`, linear and angular damping
@@ -573,11 +603,18 @@ only), `Life.ts` (hit classification only), `tests/sim/traffic.test.ts`.
   (pool exhausted), the agent hops 3 m sideways and honks. Count these in
   `traffic.guardHops` for the soak test (must be 0 in normal driving).
 - `Life.postStep` hit classification: `telemetry.hitHandle` → `traffic` if
-  `traffic.agentForCollider(handle) >= 0`, else the collider's parent body:
-  fixed with restitution 1 → `wall` (buildings, boundary walls), fixed
-  otherwise → `terrain`, dynamic non-traffic → `prop`. Push `hit` with
+  `traffic.agentForCollider(handle) >= 0`, else by the collider's parent body
+  and the collider's own `restitution()`: fixed (or no parent) with
+  restitution 1 → `wall` (buildings, boundary walls), fixed otherwise →
+  `terrain` (ground, kerbs, junction prisms), dynamic non-traffic → `prop`.
+  Look the collider up with `world.getCollider(handle)`. Push `hit` with
   `value = telemetry.impact`, `target` = agent or -1. `Life` also stamps
   `traffic.lastPlayerContactTick[agent]`.
+- Road bot (`app/trackBot.ts`, app layer, reads `sim.traffic`): brake when an
+  agent is within 18 m ahead along its path and slower than it, so the perf
+  and smoke runs drive through traffic instead of ploughing it. The bot never
+  swaps. Its `resets` may rise when boxed in; the perf gate does not assert
+  them, the tour (traffic off) still does.
 
 Tests (append to `traffic.test.ts`):
 
@@ -587,8 +624,9 @@ Tests (append to `traffic.test.ts`):
 7. **Rear-end.** Player at 80 km/h into a kinematic agent doing 10 m/s
    20 m ahead on the same lane: within 2 s a `hit` event with target = that
    agent; the agent's state is `Disturbed` or `Physical` with speed > 12 m/s
-   at some step (it was pushed); the player keeps 30–75 % of its speed one
-   second after the hit; `hasNaN()` false.
+   at some step (it was pushed); the player keeps 25–85 % of its speed one
+   second after the hit (momentum alone predicts about 70 % against a
+   compact); `hasNaN()` false.
 8. **T-bone.** Player at 100 km/h into the side of a stopped physical agent:
    the agent moves ≥ 3 m laterally within 2 s; the player's chassis stays
    upright (`upness > 0.8`).
@@ -640,7 +678,9 @@ noise sweep 0.25 s; `honk` two-tone square with a 0.3 s envelope, pitch by
 agent kind; `nearMissPed` a comic pitch-bent sine yelp 0.2 s; later stings
 listed in slices 5–8. `EngineAudio` owns the master gain; `Sfx` takes the
 master node from it so the ad-mute hook still silences everything. Polls
-`sim.events` once per frame from `App`.
+`sim.events` once per frame from `App`. It is silent until `EngineAudio.ready`
+(the context exists only after the first user gesture) and must never throw
+before that; events that arrive earlier are simply consumed.
 
 Tests (`tests/sim/economy.test.ts`):
 
@@ -671,12 +711,16 @@ Files: `sim/traffic/Pedestrians.ts`, `tuning.ts`, `render/PedView.ts`,
   along its lane). `roadHalf` is 12 on streets, 19 on the highway, the
   special road's `halfWidth` on authored roads; `laneOffset` is 6 on the
   highway, `min(4.5, halfWidth − 3.5)` otherwise (mirror `buildRoadGraph`).
-  Highway pavements exist only on the inner side (the outer is parkland; skip
-  the outer pavement on `highway` lanes).
+  The highway has a strip on both sides, but pedestrians use only the inner
+  one (the outer verge is parkland and holds the highway billboards): skip
+  the outer pavement on `highway` lanes.
 - At the end of a pavement the ped picks the outgoing lane at the node whose
-  pavement start is nearest to its position (that is the corner continuing
-  around the block or straight on) and never crosses a carriageway. If none
-  is within 12 m, turn around (switch to the reverse lane's pavement).
+  pavement start is nearest to its position. That is always the right turn
+  round the block corner (about 32 m away across the corner pavement; going
+  straight on would mean crossing the side street, 46 m away), so pedestrians
+  walk round blocks and never cross a carriageway. If no start is within
+  40 m (highway corners), turn around onto the reverse lane's pavement.
+  Crossing at the zebra crossings is backlog.
 - Pool `count × density`; spawn between `spawnMin` and `spawnMax` behind the
   player's velocity or beyond 160 m; despawn beyond `despawn`. Walk speed per
   ped from the range. Tint from six palette colours. Deterministic RNG
@@ -731,7 +775,9 @@ Files: `economy.ts` (DAMAGE), `Life.ts`, `Vehicle.ts` (engineCut only),
 - Damage delta per step: `max(0, impact − threshold) × perMetrePerSecond`,
   times `trafficFactor` when the hit target is traffic, zero for `prop` and
   `terrain` targets. `impact` is `telemetry.impact` (m/s of speed change in a
-  step; the walls test shows 100 km/h head-on ≈ 27). Stages from `stages`:
+  step; see the calibration table under §3.4: a 100 km/h head-on arrives as
+  32.7, 12.8 and 7.1 over three steps, a 20° glance never exceeds 4.5).
+  Stages from `stages`:
   crossing a stage pushes `damage` with `value` = the new stage. Never
   regenerates in M3.
 - Stage 4 = wrecked: `vehicle.engineCut = true`, `wrecked` event, `state.
@@ -744,12 +790,13 @@ Files: `economy.ts` (DAMAGE), `Life.ts`, `Vehicle.ts` (engineCut only),
   event, `sim.respawned = true` so the camera snaps.
 - `carMesh.setDamage(stage)`: stage ≥ 1 darkens the paint decals toward
   `graphite` by 25 % per stage (write the colour buffer in place like the
-  brake lights do); stage 1 hides the front bumper, stage 2 the rear bumper
-  and the bonnet trim. Hiding: keep the bumpers as separate geometry groups in
-  the merged body with a second material index whose material has
-  `visible = false` when hidden (one extra draw call only while a bumper is
-  hidden is acceptable; document the count). Stage 4 also tints the glass
-  dark.
+  brake lights do); stage 1 detaches the front bumper, stage 2 the rear bumper
+  and the bonnet trim. Detaching: the builder records the vertex index range
+  of each detachable part inside the merged body; `setDamage` collapses that
+  range onto the part's centroid (position attribute rewritten in place,
+  `needsUpdate = true`) and `setDamage(0)` restores it from a kept copy. One
+  geometry, no material groups, no extra draw call. Stage 4 also tints the
+  glass dark.
 - `Debris`: pool of 32 boxes in one `InstancedMesh`; spawn on `damage` (the
   part that just fell: a bumper-sized box in the car's paint, thrown backwards
   at the car's velocity minus 4 m/s with spin), on `billboard` (slice 8), on
@@ -771,9 +818,10 @@ Files: `economy.ts` (DAMAGE), `Life.ts`, `Vehicle.ts` (engineCut only),
 Tests (`tests/sim/damage.test.ts`, playground `walls` lane like
 `walls.test.ts`):
 
-1. **Bands.** 100 km/h head-on → damage in [0.9, 1.0] and stage 4 (wrecked);
-   60 km/h head-on → [0.45, 0.8]; 20° glance at 100 km/h → < 0.15; a cone
-   (prop) at 60 km/h → 0.
+1. **Bands** (from the calibration table under §3.4). 100 km/h head-on →
+   damage 1.0 and stage 4 (wrecked); 60 km/h head-on → [0.3, 0.6]; 40 km/h
+   head-on → [0.1, 0.3]; 20° glance at 100 km/h → < 0.1; a cone (prop) at
+   60 km/h → 0.
 2. **Wrecked flow.** After a wreck, full throttle for 2 s moves the car
    < 1 m; `respawnIn` counts down and at 0 the car is at the reset pose with
    damage 0, boost unchanged, `engineCut` false, speed ≈ `respawnSpeed`;
@@ -783,9 +831,9 @@ Tests (`tests/sim/damage.test.ts`, playground `walls` lane like
 4. **Pins unchanged.** The existing `handling`, `cars`, `walls` tests pass
    untouched (damage never feeds back into forces).
 
-Acceptance: verify green; draw calls recorded (expect +2 for debris/smoke,
-+1 while a bumper is hidden); `npm run screens` `life` state shows the damage
-bar at 0.6 and reviewed.
+Acceptance: verify green; draw calls recorded (expect +2 for debris and smoke
+plus the debris shadow-pass draw); `npm run screens` `life` state shows the
+damage bar at 0.6 and reviewed.
 
 ### Slice 6 — car-swap (1.5 days)
 
@@ -876,8 +924,9 @@ Tests (`tests/sim/takedown.test.ts`, city map; a building face is found from
 1. **Into a wall.** Physical agent at 30 km/h 3 m from a wall face, player
    rams it at 90 km/h from behind at 20° toward the wall: within 2.5 s a
    `takedown` event with that target, the agent is `Wrecked`, boost rose by
-   `takedownBoost` (cap-aware), `slowMo` was set and then reached 0 after
-   `slowMoSeconds` of wall time.
+   `takedownBoost` (cap-aware), `slowMo` was set and reached 0 after
+   `slowMoSeconds × slowMoScale` seconds of sim time (25 steps), which is
+   `slowMoSeconds` of wall time once the loop runs at the scaled rate.
 2. **Not a takedown.** The rear-end from traffic test 7 (open road, no wall)
    produces no takedown.
 3. **One per agent.** Hitting the wrecked agent again produces nothing.
@@ -891,43 +940,78 @@ in `e2e/life.spec.ts`).
 Files: `sim/city/collectibles.ts`, `Life.ts`, `render/Billboards.ts`,
 `Debris.ts`, `hud.ts`, `Sfx.ts`, `tests/sim/collectibles.test.ts`.
 
-- Placement (deterministic from the graph and `seed`): 24 on the highway's
-  outer verge, one per perimeter segment at the quarter point nearer the
-  segment's start, 10 m outside the outer kerb line (x or z = ±(675 + 19 +
-  10)), facing the carriageway; 10 on the authored roads, two per road at 1/3
-  and 2/3 of its length on the outside of the curve (or alternating sides on
-  the straight diagonals), 8 m past `halfWidth`; 16 on Palm Gardens back-lot
-  parks (chunks with `cx ∈ {−3,−2,−1}`, `cz ∈ {1,2,3}`, the `ox = oz = 85`
-  lots, every other candidate by index) at the lot's street-facing edge,
-  8 m from the lot centre toward the nearest street, facing it. Panel 8 × 3 m
-  on two posts, bottom edge 2.5 m up, paint from a fixed five-colour list and
-  a contrasting stripe. Exactly 50.
-- Smash: `Collectibles.step` tests the player's footprint against each
-  billboard's OBB (only those within 20 m; keep a per-chunk index or a sorted
-  array by x for the broad phase) at speed ≥ `billboardMinSpeed`; on overlap:
+- Placement is the last step of `City.generate`, with a fixed quota per chunk
+  and a clearance check against the chunk's own statics, so the total is 50
+  by construction and boot generates nothing it does not generate today:
+  - **Perimeter chunks** (|cx| = 3 or |cz| = 3; 24 of them): quota 1, on the
+    outer verge of the perimeter segment that leaves the chunk's node in the
+    cyclic direction: +z on the cx = −3 edge, +x on the cz = 3 edge, −z on the
+    cx = 3 edge, −x on the cz = −3 edge; the corners follow the edge that
+    continues the cycle ((−3,−3) → +z, (−3,3) → +x, (3,3) → −z, (3,−3) → −x),
+    which makes the chunk→segment map a bijection over the 24 segments. The
+    slot is 62 m along that segment from the node, 10 m outside the outer
+    kerb line (|x| or |z| = 675 + 19 + 10 = 704, on the outer side), facing
+    the carriageway; 62 m lands in the 9 m gap between the two edge parks
+    (their lawns span 22–58 m and 67–103 m from the node), far from their
+    trees. Fallback slots in order: 66, 58, 108 m.
+  - **Interior chunks** (|cx| ≤ 2 and |cz| ≤ 2; 25 of them): quota 1, and 2
+    for the centre chunk (0,0), on the back edge of a pavement, posts 0.3 m
+    inside the pavement's outer edge (16.2 m from the street centreline),
+    the panel facing the street. First slot: the z-running street, +x side,
+    80 m from the chunk centre (the street trees stand at 57 and 106 m);
+    fallbacks 70, 90, 60, 100 m, then the −x side with the same list, then
+    the x-running street's +z side and −z side likewise. The centre chunk's
+    second billboard starts on the x-running street so both streets get one.
+  - **Clearance check** (in the generator, against every static already
+    emitted for the chunk, which is why placement runs last): a candidate is
+    rejected when any static whose top is above 1.0 m (box, cylinder, gable
+    or prism; use the AABB of rotated shapes) comes within 1 m of the panel's
+    ground footprint (8 × 0.3 m), when `roadClearance` at the posts is under
+    6.5 m (authored corridors and their frontage), or when the posts stand on
+    a cut pavement strip (open quarters). If every slot fails, the first slot
+    is used anyway and the unit test below turns red: that is the signal to
+    add a slot, not to lower the quota.
+  - Panel 8 × 3 m on two 0.15 m posts, bottom edge 2.5 m up, paint from a
+    fixed five-colour palette list with a contrasting stripe, chosen by
+    `(chunk index + slot) mod 5`. Ids are `chunk index × 4 + slot` with
+    chunk index `(cz + 3) × 7 + (cx + 3)`. `CityChunk` gains
+    `billboards: BillboardDesc[]`.
+- Smash: `Collectibles.step` tests the player's footprint against the
+  billboards of the generated chunks around the player (`city.active`, the
+  3×3 physics neighbourhood: at most 36 OBB tests) at speed ≥
+  `billboardMinSpeed`; on overlap:
   `smashed[i] = 1`, `smashedCount++`, `billboard` event (target = i, value =
   `billboardBoost`), boost added, player speed scaled by `1 −
   billboardSpeedLoss` via `setVelocity`; the camera reads `billboard` events
   and applies `impactShake × 4`.
-- `Billboards`: one `InstancedMesh` (panel + posts ≈ 40 triangles, vertex
-  colours: paint front face, stripe, `steel` posts, `charcoal` back), instances
-  scaled to zero when smashed (re-upload the matrix only then). `Debris`
-  throws 6 planks per smash in the panel's paint.
+- `Billboards`: one `InstancedMesh` of capacity 50 (panel + posts ≈ 40
+  triangles, vertex colours: paint front face, stripe, `steel` posts,
+  `charcoal` back). `CityView` hands it each claimed tile's
+  `chunk.billboards`; an id already present is skipped, instances are never
+  removed (50 resident instances cost nothing; fog hides the far ones), and a
+  smashed id gets a zero-scale matrix (matrix re-uploads only on add or
+  smash). `Debris` throws 6 planks per smash in the panel's paint.
 - HUD: `hud__collect` counter top-right "BILLBOARDS 12/50", shown for 3 s
   after a smash and always in the debug view; popup "BILLBOARD 12/50".
   Audio: a splintering noise burst plus a bright ding.
 
 Tests (`tests/sim/collectibles.test.ts`):
 
-1. **Fifty, placed sanely.** Exactly 50; every billboard's footprint (posts
-   and the panel projected to the ground) is at least 1 m from every `box`
-   static tagged `building`, `kerb` or `decor` with `hy > 0.2` in the chunk
-   that contains it (generate the chunk in the test); none inside a
-   carriageway (distance to every lane centreline ≥ roadHalf + 1).
-2. **Smash.** Teleport the player 15 m before billboard 0 heading at it at
-   60 km/h: within 2 s `smashed[0] === 1`, one `billboard` event, boost rose
-   by `billboardBoost`, speed dropped by 3–8 %. At 10 km/h: no smash.
-3. **Once.** Driving through it again does nothing.
+1. **Fifty, stable.** Generating all 49 chunks for seeds 42, 7 and 123 yields
+   exactly 50 billboards each time, with unique ids; generating a chunk twice
+   yields identical descriptors.
+2. **Clear and visible** (seed 42, every billboard): the panel's ground
+   footprint keeps ≥ 1 m from every static of its chunk whose top is above
+   1 m (the same rule as the generator, re-implemented in the test, not
+   imported), the posts are ≥ 6.5 m from every authored corridor and ≥ 0.5 m
+   outside every grid carriageway, and the centre is within 25 m of a lane
+   centreline (visible from a road).
+3. **Smash.** Take the first billboard of the spawn chunk, teleport the
+   player 15 m before it heading at it at 60 km/h: within 2 s `smashed[id]
+   === 1`, `smashedCount === 1`, one `billboard` event with that id, boost
+   rose by `billboardBoost`, speed on the smash step dropped by 3–8 %. At
+   10 km/h: no smash.
+4. **Once.** Driving through it again does nothing.
 
 Acceptance: verify green; draw calls +1; `npm run screens` `life` state
 shows the counter.
@@ -1032,9 +1116,10 @@ boundary at CPU ×4 sits at a p95 of 33.4 ms. Rules:
 - At the gate, run `npm run perf` twice on the final commit and compare with
   the two base runs. A regression claim needs both new runs worse than both
   base runs; otherwise report "within noise" with all four numbers.
-- Expected deltas (from the budgets in §4): draw calls +8 to +10 (three
-  traffic, one peds, one billboards, one debris, two smoke, one bumper while
-  hidden), triangles +25k to +40k, step mean +1 to +2 ms, heap +5 to +15 MB.
+- Expected deltas (from the budgets in §4): draw calls +12 to +16 (three
+  traffic, one peds, one billboards, one debris, two smoke, plus the
+  shadow-pass draws of the casters, which `renderer.info.render.calls`
+  counts), triangles +25k to +40k, step mean +1 to +2 ms, heap +5 to +15 MB.
   If any of these is exceeded twofold, stop and profile before the next slice.
 - `npm run perf:headed` on the laptop and the MX330 in a real window are
   Marcin's numbers; ask for them in the gate report, do not guess them.
@@ -1094,7 +1179,7 @@ All of these, or the report says which one is missing and why:
    inspected.
 4. Every budget in §5.6 holds; the perf comparison follows §5.5.
 5. No per-frame allocation in `Traffic.step`, `Pedestrians.step`,
-   `Life.postStep`, `TrafficView.update`, `PedView.update`, `Debris.update`,
+   `Life.postStep`, `Collectibles.step`, `TrafficView.update`, `PedView.update`, `Debris.update`,
    `Smoke.update`, `Hud.update` (reviewer greps for `new `, `[]`, `{}`,
    `.map(`, `.filter(`, spread and `Math.hypot` with more than two arguments
    inside these paths).
@@ -1154,6 +1239,15 @@ Verified against the installed packages on 2026-09-21:
 - `sim.respawned` is a one-tick flag the renderer may miss when several
   steps run in one frame; the renderer also snaps on an 80 m jump. A swap
   must not set `respawned` (the camera whips instead of cutting).
+
+- `renderer.info.render.calls` counts the shadow pass too: a caster costs two
+  draws. The current 84 already includes shadow draws.
+- `City.generate` is deterministic per `(seed, cx, cz)` and cached
+  (`city.chunk`); the 3×3 physics neighbourhood around the player is always
+  generated (`city.active`), so per-chunk data like billboards is available
+  there without extra work. Never generate chunks at boot beyond what M2 does.
+- `Vehicle.onPair` receives the other `Collider`; keep the handle of the
+  strongest pair in a number field, not the object, so nothing is retained.
 
 ## 9. Five-minute playtest script (for the gate report; adjust to what exists)
 

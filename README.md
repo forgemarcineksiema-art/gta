@@ -2,9 +2,10 @@
 
 Open-world arcade driving for the browser (CrazyGames). Steal any car, outrun the cops, wreck everything. Brief: `docs/BRIEF.md`. Standing rules: `CLAUDE.md`. Current state: `docs/PROGRESS.md`.
 
-M3 puts life in the city: traffic, pedestrians, damage and wrecks, car-swap,
-takedowns and fifty smashable billboards. Pursuits and activities are later
-milestones. Acceptance reports: `docs/M2_REPORT.md`, `docs/M3_REPORT.md`.
+M3 put life in the city: traffic, pedestrians, damage and wrecks, car-swap,
+takedowns and fifty smashable billboards. M4 (next) is the police and the run:
+`docs/M4_PLAN.md`, designed in `docs/DESIGN.md`. Acceptance reports:
+`docs/M2_REPORT.md`, `docs/M3_REPORT.md`; older ones in `docs/history/`.
 
 ## Run
 

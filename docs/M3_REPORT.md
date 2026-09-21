@@ -1,7 +1,7 @@
 # M3 — life gate
 
 Branch `grok/m3-life`. Slices 0–3 were built by Grok 4.7 XHigh and reviewed in
-`docs/M3_REVIEW_MID.md`; the four blocking findings, slices 4–8, the polish
+`docs/history/M3_REVIEW_MID.md`; the four blocking findings, slices 4–8, the polish
 pass and this gate were done by Claude Fable 5.1 after Marcin dropped Grok
 mid-milestone. Session log: `docs/PROGRESS.md` (sessions 14–16).
 
@@ -193,6 +193,9 @@ All of the first five are live in the dev panel (`?dev=1` or the backtick).
   fills the body pool with wrecks and traffic goes kinematic sooner.
 
 ## Proposed next scope (M4)
+
+Superseded on 2026-09-22 by `docs/DESIGN.md` §11 and `docs/M4_PLAN.md`
+(the run, cover and the hideout door added). Kept for the record.
 
 Police and pursuits on the same traffic machinery: a wanted level from the
 events already logged (hits, takedowns, billboards), police cars as agents

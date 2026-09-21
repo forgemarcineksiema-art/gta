@@ -395,6 +395,9 @@ onto the front page.
 
 ## 11. Milestones as they stand now
 
+The M4 contract with done criteria, pins and measurements per slice is
+`docs/M4_PLAN.md`; this section is the summary.
+
 - **M4 Heat**, slice order: 0 housekeeping (screens inspection, wreck
   tow-away, traffic step profile in the browser, the sports and police
   presets, real highway lanes); 1 heat and pursuit as two systems with

@@ -19,6 +19,12 @@ Free-form session log: done, decided and why, next, open problems. Newest sessio
   constraints, the M4 slice order, the playtest watch list.
 - `docs/BACKLOG.md`: three new sections (run structure and heat, activities
   and progression, city v2) with the ideas that are not in a slice.
+- `docs/M4_PLAN.md`: the M4 contract for the next agent: layout to add, ten
+  slices with done criteria, pins and the behaviour measurement each must
+  record, starting numbers, the per-slice playtest. `AGENTS.md`, `README.md`
+  and `CLAUDE.md` point at it. `docs/history/` takes the M1 report, the M3
+  mid-milestone status and review; the stale root `progress.md` (an M2 scratch
+  log) is removed. `docs/M3_REPORT.md` marks its M4 scope as superseded.
 - `docs/CRAZYGAMES.md`: A1 and A5 notes carry the planned ad points (the
   hideout door and busted; rewarded offers only in the garage and at the door
   with a cash alternative). `CLAUDE.md`: the DESIGN.md row and session-start
@@ -48,8 +54,10 @@ Free-form session log: done, decided and why, next, open problems. Newest sessio
 
 ### Next
 
-- M4 slice 0 (housekeeping), then slice 1: heat and pursuit as two systems
-  with level-1 patrols. Order in DESIGN.md §11.
+- A new agent in a new session starts M4 at slice 0 of `docs/M4_PLAN.md`, on
+  Marcin's signal. Nothing is in progress; this session changed docs only
+  and did not run `npm run verify` (two background runs were cut off by
+  session restarts); the next session runs it first, as always.
 - Marcin: the title (`docs/TITLES.md`, still "Untitled Driving Game") and
   `npm run perf:headed` on the laptop to close the M3 perf numbers.
 
@@ -60,9 +68,6 @@ Free-form session log: done, decided and why, next, open problems. Newest sessio
 - The MX330 frame-pacing hitches from M2 are still uninvestigated; the police
   add bodies and agents, so the traffic step profile in slice 0 doubles as the
   baseline for that.
-- `docs/` carries M3_PLAN.md, M3_STATUS.md and M3_REVIEW_MID.md from the Grok
-  period and REPORT.md from M1; all historical. Move to `docs/history/` in
-  slice 0 so the live documents are the ones listed in CLAUDE.md.
 
 ## 2026-09-22 — M3 session 16: gate
 

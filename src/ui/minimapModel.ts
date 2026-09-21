@@ -27,7 +27,7 @@ export const MINIMAP = {
   /** Dark outline on each side of a road, px. */
   casingPx: 2,
   /** Clamped markers sit this far inside the rim, px. */
-  rimInset: 11,
+  rimInset: 16,
   /** A position jump above this (m) snaps heading and zoom instead of easing (teleports, resets). */
   snapJumpM: 80,
   glyphPx: 8,

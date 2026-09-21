@@ -157,9 +157,10 @@ export class Hud {
   }
 
   update(sim: SimWorld, dt: number, info: HudDebugInfo | null, now: number): void {
-    // Every DOM write here costs style, layout and paint on the main thread; the
-    // minimap arrow moves a fraction of a pixel per frame, so 20 Hz is enough.
-    if (this.frameIndex++ % 3 === 0) this.minimap?.update(sim);
+    // Every DOM write here costs style, layout and paint on the main thread. The
+    // radar paints its own canvas at its own cadence, off the layout path.
+    this.frameIndex++;
+    this.minimap?.update(sim, dt, now);
     const tm = sim.vehicle.telemetry;
     const kmh = Math.round(Math.abs(tm.speedKmh));
     const speedText = String(kmh);

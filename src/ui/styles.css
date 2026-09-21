@@ -13,13 +13,46 @@
   --safe-right: env(safe-area-inset-right, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
+  --minimap-size: clamp(150px, 23vh, 240px);
 }
 
-.minimap { position: absolute; top: calc(16px + var(--safe-top)); right: calc(16px + var(--safe-right)); width: clamp(132px, 21vh, 184px); background: var(--ui-panel); border: 1px solid var(--ui-panel-line); border-radius: 8px; overflow: hidden; }
-.minimap svg { display: block; width: 100%; aspect-ratio: 1; }
-.minimap__north { position: absolute; top: 3px; left: calc(50% - 5px); font-size: 12px; font-weight: 800; text-shadow: 0 1px 3px black; }
-.minimap__district { padding: 4px 5px 0; text-align: center; font-size: 12px; font-weight: 800; letter-spacing: .03em; }
-.minimap__landmark { padding: 1px 4px 7px; text-align: center; font-size: 12px; color: var(--ui-ink-dim); }
+/* radar minimap, bottom left: a heading-up circle with the district above it */
+.minimap {
+  position: absolute;
+  left: calc(20px + var(--safe-left));
+  bottom: calc(20px + var(--safe-bottom));
+  width: var(--minimap-size);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.minimap__district {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 1.1;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+}
+.minimap__landmark {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+  line-height: 1.1;
+  color: var(--ui-ink-dim);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+  margin-bottom: 6px;
+}
+.minimap__canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45);
+}
 
 html,
 body {

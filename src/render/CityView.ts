@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { BLOCK, CITY_HALF, PALETTE, type City, type StaticDesc } from '../sim';
 import { SHADOW_HALF, fadeShadowEdges } from './shadows';
-import { gableGeometry } from './geometry';
+import { gableGeometry, prismGeometry } from './geometry';
 
 export type QualityTier = 'low' | 'high';
 export const QUALITY = {
@@ -29,7 +29,7 @@ const color = new THREE.Color();
  */
 export const DETAIL_NEAR = 120, DETAIL_FAR = 150;
 /** Order the shadow-caster prefix; trims and single-sided panels never enter the depth pass. */
-const casts = (st: StaticDesc) => !st.face && !st.farFace && st.tag !== 'road' && st.tag !== 'ground' && st.tag !== 'kerb' && st.tag !== 'trim';
+const casts = (st: StaticDesc) => !st.face && st.tag !== 'wall' && st.tag !== 'road' && st.tag !== 'ground' && st.tag !== 'kerb' && st.tag !== 'trim';
 
 /**
  * Quarter a chunk so frustum culling (camera and shadow passes) discards the
@@ -45,12 +45,22 @@ export function staticYaw(st: StaticDesc): number {
 
 export function partIndex(st: StaticDesc, cx: number, cz: number): number {
   const shape = st.shape;
-  const round = shape.kind === 'cylinder' || shape.kind === 'wheel';
-  // A rotated box straddles a centre line when its bounding circle does.
-  const rotated = !round && staticYaw(st) !== 0;
-  const hx = round ? shape.radius : rotated ? Math.hypot(shape.hx, shape.hz) : shape.hx;
-  const hz = round ? shape.radius : rotated ? Math.hypot(shape.hx, shape.hz) : shape.hz;
   const dx = st.position.x - cx, dz = st.position.z - cz;
+  // The junction square (crossings, bands) is one piece: both halves of a crossing
+  // must change detail level together, so they never belong to different quadrants.
+  if (Math.abs(dx) < 20 && Math.abs(dz) < 20) return 0;
+  let hx: number, hz: number;
+  if (shape.kind === 'prism') {
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (const pt of shape.points) { minX = Math.min(minX, pt.x); maxX = Math.max(maxX, pt.x); minZ = Math.min(minZ, pt.z); maxZ = Math.max(maxZ, pt.z); }
+    hx = (maxX - minX) / 2; hz = (maxZ - minZ) / 2;
+  } else {
+    const round = shape.kind === 'cylinder' || shape.kind === 'wheel';
+    // A rotated box straddles a centre line when its bounding circle does.
+    const rotated = !round && staticYaw(st) !== 0;
+    hx = round ? shape.radius : rotated ? Math.hypot(shape.hx, shape.hz) : shape.hx;
+    hz = round ? shape.radius : rotated ? Math.hypot(shape.hx, shape.hz) : shape.hz;
+  }
   if (Math.abs(dx) <= hx || Math.abs(dz) <= hz) return 0;
   return 1 + (dx > 0 ? 1 : 0) + (dz > 0 ? 2 : 0);
 }
@@ -65,12 +75,21 @@ const RAW = (() => {
 })();
 type Raw = { p: Float32Array; n: Float32Array };
 const sourceList: Raw[] = [];
+/** Prisms are already in world space; their vertex arrays are built once per descriptor. */
+const prismRaw = new WeakMap<StaticDesc, Raw>();
 
 /** Fill `sourceList` with the unit geometries a static needs; returns the vertex count. */
-function sourcesOf(st: StaticDesc, detailed: boolean): number {
+function sourcesOf(st: StaticDesc): number {
   sourceList.length = 0;
-  if (!detailed && st.farFace) sourceList.push(RAW[st.farFace]);
-  else if (st.faces) for (const f of st.faces) sourceList.push(RAW[f]);
+  if (st.shape.kind === 'prism') {
+    let raw = prismRaw.get(st);
+    if (!raw) {
+      const g = prismGeometry(st.shape.points, st.shape.y0, st.shape.y1);
+      raw = { p: g.getAttribute('position').array as Float32Array, n: g.getAttribute('normal').array as Float32Array };
+      prismRaw.set(st, raw);
+    }
+    sourceList.push(raw);
+  } else if (st.faces) for (const f of st.faces) sourceList.push(RAW[f]);
   else sourceList.push(st.face ? RAW[st.face] : st.shape.kind === 'gable' ? RAW.gable : st.shape.kind === 'box' ? RAW.box : RAW.cylinder);
   let count = 0;
   for (const src of sourceList) count += src.p.length / 3;
@@ -109,7 +128,7 @@ export class GeometryBuild {
         if (st.collisionOnly || st.shape.kind === 'wheel' || (!detailed && st.detailOnly) || (detailed && st.farOnly)) continue;
         if (casts(st) !== (pass === 0)) continue;
         this.order.push(st);
-        const vertices = sourcesOf(st, detailed);
+        const vertices = sourcesOf(st);
         count += vertices;
         if (pass === 0) this.shadowVertices += vertices;
       }
@@ -126,15 +145,16 @@ export class GeometryBuild {
       const st = this.order[this.cursor] as StaticDesc;
       const shape = st.shape;
       if (shape.kind === 'wheel') continue;
+      const absolute = shape.kind === 'prism';
       const rectangular = shape.kind === 'box' || shape.kind === 'gable';
-      const sx = rectangular ? shape.hx : shape.radius;
-      const sy = rectangular ? shape.hy : shape.halfHeight;
-      const sz = rectangular ? shape.hz : shape.radius;
-      const px = st.position.x, py = st.position.y, pz = st.position.z;
-      const yaw = staticYaw(st), rotated = yaw !== 0, cos = Math.cos(yaw), sin = Math.sin(yaw);
+      const sx = absolute ? 1 : rectangular ? shape.hx : shape.radius;
+      const sy = absolute ? 1 : rectangular ? shape.hy : shape.halfHeight;
+      const sz = absolute ? 1 : rectangular ? shape.hz : shape.radius;
+      const px = absolute ? 0 : st.position.x, py = absolute ? 0 : st.position.y, pz = absolute ? 0 : st.position.z;
+      const yaw = absolute ? 0 : staticYaw(st), rotated = yaw !== 0, cos = Math.cos(yaw), sin = Math.sin(yaw);
       const gableShape = shape.kind === 'gable';
       const [r, g, b] = rgb(st.color);
-      sourcesOf(st, this.detailed);
+      sourcesOf(st);
       for (const src of sourceList) {
         const sp = src.p, sn = src.n, n = sp.length;
         for (let i = 0; i < n; i += 3, index += 3) {

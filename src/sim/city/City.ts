@@ -24,6 +24,21 @@ export const LANDMARKS = DISTRICTS.map((d, i) => {
 export function chunkCoord(v: number): number { return Math.max(-3, Math.min(3, Math.floor((v + BLOCK / 2) / BLOCK))); }
 export interface CityChunk { key: string; x: number; z: number; statics: StaticDesc[] }
 
+type Pt = { x: number; z: number };
+/** Where a pavement band may begin or end along an authored road, with the edge to start on. */
+interface ClipEdge { t: number; dir: Pt | null }
+/** Pavement cut on a grid strip: the strip's fixed coordinate and the range to leave out. */
+interface StripCut { axis: 'x' | 'z'; line: number; from: number; to: number }
+interface RoadJoins {
+  /** Pavement quads at the junctions (wedges between the two carriageways, slivers past a crossing). */
+  prisms: Array<{ points: Pt[]; colour: number }>;
+  cuts: StripCut[];
+  /** Band clip per road side (index 0 = right-normal side -1, 1 = +1), in metres from a0. */
+  start: [ClipEdge | null, ClipEdge | null];
+  end: [ClipEdge | null, ClipEdge | null];
+}
+const PAVEMENT = 4.5;
+
 function random(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
@@ -45,6 +60,8 @@ export class City {
   });
   /** Recently generated chunk descriptors: render tiles reload often at the fog edge. */
   private readonly chunkCache = new Map<string, CityChunk>();
+  private readonly frames = new Map<string, { cum: number[]; nx: number[]; nz: number[]; total: number }>();
+  private readonly joins = new Map<string, RoadJoins>();
   readonly spawns: SpawnPoint[];
   readonly active = new Map<string, { body: RAPIER.RigidBody; chunk: CityChunk }>();
   loaded = 0;
@@ -111,6 +128,18 @@ export class City {
       for (const road of corridors) best = Math.min(best, distanceToPolyline(road.centre, px, pz) - road.halfWidth);
       return best;
     };
+    // Junction pavements of the authored roads: computed once per road, emitted by
+    // the chunk that holds each piece, and their strip cuts apply to any chunk.
+    const joinCuts: StripCut[] = [];
+    for (const road of corridors) {
+      const joins = this.joinsFor(road);
+      joinCuts.push(...joins.cuts);
+      for (const piece of joins.prisms) {
+        let mx = 0, mz = 0;
+        for (const pt of piece.points) { mx += pt.x / piece.points.length; mz += pt.z / piece.points.length; }
+        if (Math.abs(mx - x) < BLOCK / 2 && Math.abs(mz - z) < BLOCK / 2) architecture.prism(piece.points, 0, 0.14, piece.colour);
+      }
+    }
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
       const d = districtAt(x + sx * 55, z + sz * 55);
       const c = CITY_COLORS;
@@ -134,13 +163,22 @@ export class City {
         for (const axis of ['x', 'z'] as const) {
           const length = axis === 'x' ? hz * 2 : hx * 2;
           const start = axis === 'x' ? vz : vx;
+          const line = axis === 'x' ? x + sx * (vx + 2.25) : z + sz * (vz + 2.25);
+          const cuts = joinCuts.filter((cut) => cut.axis === axis && Math.abs(cut.line - line) < 0.1);
           let runStart = -1;
           for (let along = 0; along <= length + 1e-6; along += 1.5) {
             const end = along >= length;
             const px = axis === 'x' ? x + sx * (vx + 2.25) : x + sx * (start + along);
             const pz = axis === 'x' ? z + sz * (start + along) : z + sz * (vz + 2.25);
-            const blocked = end || roadClearance(px, pz) < 5.5;
-            if (!blocked && runStart < 0) runStart = along;
+            const free = axis === 'x' ? pz : px;
+            // Blocked where the authored carriageway would meet the strip box, and over
+            // the junction wedge that replaces the strip there (exact edge match).
+            const blocked = end || roadClearance(px, pz) < 2.5 || cuts.some((cut) => free >= cut.from && free <= cut.to);
+            if (!blocked && runStart < 0) {
+              // Start exactly on the wedge's end edge when a cut ended within the last sample.
+              const snap = cuts.find((cut) => free - (axis === 'x' ? sz : sx) * 1.5 <= cut.to && free > cut.to);
+              runStart = snap ? (axis === 'x' ? sz * (snap.to - z) : sx * (snap.to - x)) - start : along;
+            }
             if (blocked && runStart >= 0) {
               const stop = Math.min(along, length), mid = start + (runStart + stop) / 2, half = (stop - runStart) / 2;
               if (half > 1) {
@@ -196,9 +234,17 @@ export class City {
       // Parking bays explain the generous road width without altering the driving
       // envelope. They are 6 m patches of alternating tone, not painted lines: a
       // line across the road is sub-pixel tall from the driving camera past 25 m.
+      // A continuous bay edge line along the road (its width does not foreshorten)
+      // and alternating 6 m bay patches; nothing where an authored road merges in.
       for (const along of [32, 44, 56, 68, 80, 92]) {
-        box(x + sx * (vx - 2), 0.045, z + sz * (along + 3), 1.7, 0.001, 3, PALETTE.asphaltBay, 'decor', 'top');
-        box(x + sx * (along + 3), 0.045, z + sz * (vz - 2), 3, 0.001, 1.7, PALETTE.asphaltBay, 'decor', 'top');
+        if (roadClearance(x + sx * (vx - 2), z + sz * (along + 6)) > 3) {
+          box(x + sx * (vx - 2), 0.045, z + sz * (along + 3), 1.7, 0.001, 3, PALETTE.asphaltBay, 'decor', 'top');
+          box(x + sx * (vx - 3.86), 0.045, z + sz * (along + 6), 0.14, 0.001, 6, PALETTE.laneMark, 'decor', 'top');
+        }
+        if (roadClearance(x + sx * (along + 6), z + sz * (vz - 2)) > 3) {
+          box(x + sx * (along + 3), 0.045, z + sz * (vz - 2), 3, 0.001, 1.7, PALETTE.asphaltBay, 'decor', 'top');
+          box(x + sx * (along + 6), 0.045, z + sz * (vz - 3.86), 6, 0.001, 0.14, PALETTE.laneMark, 'decor', 'top');
+        }
       }
       if (d.id !== 'foundry') for (const along of [57, 106]) {
         if (roadClearance(x + sx * (vx + 2.7), z + sz * along) > 3) architecture.tree(x + sx * (vx + 2.7), z + sz * along, d.id === 'marina');
@@ -368,6 +414,7 @@ export class City {
   private specialRoad(road: SpecialRoad, cx: number, cz: number, architecture: Architecture): void {
     const x = cx * BLOCK, z = cz * BLOCK, hw = road.halfWidth;
     const box = architecture.box.bind(architecture);
+    const joins = this.joinsFor(road);
     const a0 = road.centre[0] as RoadPoint, a1 = road.centre[road.centre.length - 1] as RoadPoint;
     const nearJunction = (px: number, pz: number, margin: number) =>
       Math.max(Math.abs(px - a0.x), Math.abs(pz - a0.z)) < margin || Math.max(Math.abs(px - a1.x), Math.abs(pz - a1.z)) < margin;
@@ -422,16 +469,25 @@ export class City {
           nextDash += 12;
         }
       }
+      // Pavement bands follow the centreline exactly: one quad per segment between
+      // the carriageway edge and the edge 4.5 m out, using the shared point normals,
+      // so consecutive quads meet edge to edge on curves. At the junctions they
+      // start on the wedge's end edge (`dir`) so the three pieces tile exactly.
+      for (const side of [-1, 1] as const) {
+        const startClip = joins.start[side > 0 ? 1 : 0], endClip = joins.end[side > 0 ? 1 : 0];
+        let ta = startAlong, tb = along, dirA: Pt | null = null, dirB: Pt | null = null;
+        if (startClip && startClip.t > ta) { if (startClip.t >= tb) continue; ta = startClip.t; dirA = startClip.dir; }
+        if (endClip && endClip.t < tb) { if (endClip.t <= ta) continue; tb = endClip.t; dirB = endClip.dir; }
+        const pa = this.sampleRoad(road, ta), pb = this.sampleRoad(road, tb);
+        const ea = { x: pa.x + pa.nx * side * hw, z: pa.z + pa.nz * side * hw }, eb = { x: pb.x + pb.nx * side * hw, z: pb.z + pb.nz * side * hw };
+        const oa = dirA ?? { x: pa.nx * side, z: pa.nz * side }, ob = dirB ?? { x: pb.nx * side, z: pb.nz * side };
+        const quad = [ea, eb, { x: eb.x + ob.x * PAVEMENT, z: eb.z + ob.z * PAVEMENT }, { x: ea.x + oa.x * PAVEMENT, z: ea.z + oa.z * PAVEMENT }];
+        if (paving === PALETTE.grass) {
+          architecture.prism(quad, 0, 0.13, c.soil);
+          architecture.prism(quad, 0.13, 0.14, PALETTE.grass, 'decor');
+        } else architecture.prism(quad, 0, 0.14, paving);
+      }
       if (!nearJunction(mx, mz, ROAD_HALF + 12)) {
-        for (const side of [-1, 1]) {
-          if (onGridStreet(mx + nx * side * (hw + 2.25), mz + nz * side * (hw + 2.25))) continue;
-          const kerb = box(mx + nx * side * (hw + 2.25), 0.07, mz + nz * side * (hw + 2.25), 2.25, 0.07, len / 2 + 0.3, paving === PALETTE.grass ? c.soil : paving, 'kerb');
-          kerb.rotation = rot;
-          if (paving === PALETTE.grass) {
-            const lawn = box(mx + nx * side * (hw + 2.25), 0.145, mz + nz * side * (hw + 2.25), 2.25, 0.005, len / 2 + 0.3, PALETTE.grass, 'decor', 'top');
-            lawn.rotation = rot;
-          }
-        }
         while (nextTree < along) {
           if (nextTree >= startAlong && road.kind !== 'service') {
             const t = (nextTree - startAlong) / len, side = Math.floor(nextTree / 27) % 2 ? 1 : -1;
@@ -507,6 +563,123 @@ export class City {
     }
   }
 
+  /** Cumulative lengths and averaged right normals of an authored road's centreline. */
+  private frame(road: SpecialRoad): { cum: number[]; nx: number[]; nz: number[]; total: number } {
+    const cached = this.frames.get(road.name);
+    if (cached) return cached;
+    const pts = road.centre, n = pts.length, cum = [0], nx: number[] = [], nz: number[] = [];
+    for (let i = 0; i + 1 < n; i++) {
+      const a = pts[i] as RoadPoint, b = pts[i + 1] as RoadPoint;
+      cum.push((cum[i] as number) + Math.hypot(b.x - a.x, b.z - a.z));
+    }
+    for (let i = 0; i < n; i++) {
+      const a = pts[Math.max(0, i - 1)] as RoadPoint, b = pts[Math.min(n - 1, i + 1)] as RoadPoint;
+      const tx = b.x - a.x, tz = b.z - a.z, l = Math.hypot(tx, tz) || 1;
+      nx.push(-tz / l); nz.push(tx / l);
+    }
+    const frame = { cum, nx, nz, total: cum[n - 1] as number };
+    this.frames.set(road.name, frame);
+    return frame;
+  }
+
+  /** Centreline point and unit right normal at `t` metres from the road's first junction. */
+  private sampleRoad(road: SpecialRoad, t: number): { x: number; z: number; nx: number; nz: number } {
+    const f = this.frame(road), pts = road.centre;
+    const tt = Math.max(0, Math.min(f.total, t));
+    let i = 0;
+    while (i + 2 < pts.length && (f.cum[i + 1] as number) < tt) i++;
+    const seg = (f.cum[i + 1] as number) - (f.cum[i] as number) || 1, u = (tt - (f.cum[i] as number)) / seg;
+    const a = pts[i] as RoadPoint, b = pts[i + 1] as RoadPoint;
+    const nx = (f.nx[i] as number) + ((f.nx[i + 1] as number) - (f.nx[i] as number)) * u;
+    const nz = (f.nz[i] as number) + ((f.nz[i + 1] as number) - (f.nz[i] as number)) * u;
+    const l = Math.hypot(nx, nz) || 1;
+    return { x: a.x + (b.x - a.x) * u, z: a.z + (b.z - a.z) * u, nx: nx / l, nz: nz / l };
+  }
+
+  /**
+   * How an authored road's pavements meet the grid at both of its junctions.
+   * For each side of the road, its carriageway edge E(u) is followed out of the
+   * junction cross (u = metres from the node). The grid strip it leaves through is
+   * the one it joins. If the side faces that street, the pavement between the two
+   * carriageways is a wedge from the point where they separate until it is 9 m
+   * wide; there the road's own band and the grid strip take over, both starting on
+   * the wedge's end edge. If the side faces away, the road is crossing the strip
+   * and the uncovered remainder is a sliver. Nothing overlaps and nothing is missing.
+   */
+  private joinsFor(road: SpecialRoad): RoadJoins {
+    const cached = this.joins.get(road.name);
+    if (cached) return cached;
+    const f = this.frame(road), hw = road.halfWidth;
+    const joins: RoadJoins = { prisms: [], cuts: [], start: [null, null], end: [null, null] };
+    for (const end of ['a0', 'a1'] as const) {
+      const node = end === 'a0' ? (road.centre[0] as RoadPoint) : (road.centre[road.centre.length - 1] as RoadPoint);
+      const gx = Math.round(node.x / BLOCK), gz = Math.round(node.z / BLOCK);
+      const vx = Math.abs(gx) === 3 ? HIGHWAY_HALF : ROAD_HALF, vz = Math.abs(gz) === 3 ? HIGHWAY_HALF : ROAD_HALF;
+      const T = (u: number) => end === 'a0' ? u : f.total - u;
+      for (const side of [-1, 1] as const) {
+        const edge = (u: number): Pt & { nx: number; nz: number } => {
+          const s = this.sampleRoad(road, T(u));
+          // `side` is the road's own convention (its right normal along increasing t).
+          return { x: s.x + s.nx * side * hw, z: s.z + s.nz * side * hw, nx: s.nx * side, nz: s.nz * side };
+        };
+        // Leave the junction cross.
+        let uExit = -1;
+        for (let u = 0; u <= Math.min(140, f.total / 2); u += 0.5) {
+          const e = edge(u);
+          if (Math.abs(e.x - node.x) > vx && Math.abs(e.z - node.z) > vz) { uExit = u; break; }
+        }
+        if (uExit < 0) continue;
+        const ex = edge(uExit);
+        const sx = Math.sign(ex.x - node.x), sz = Math.sign(ex.z - node.z);
+        const excessX = Math.abs(ex.x - node.x) - vx, excessZ = Math.abs(ex.z - node.z) - vz;
+        // Crossed the x = node.x ± vx line last: joins the strip with a fixed x offset (loop axis 'x').
+        const axis: 'x' | 'z' = excessX <= excessZ ? 'x' : 'z';
+        const kerbLine = axis === 'x' ? node.x + sx * vx : node.z + sz * vz;
+        const outerLine = axis === 'x' ? node.x + sx * (vx + PAVEMENT) : node.z + sz * (vz + PAVEMENT);
+        const stripLine = axis === 'x' ? node.x + sx * (vx + PAVEMENT / 2) : node.z + sz * (vz + PAVEMENT / 2);
+        const off = (e: Pt) => axis === 'x' ? Math.abs(e.x - node.x) : Math.abs(e.z - node.z);
+        const free = (e: Pt) => axis === 'x' ? e.z : e.x;
+        const half = axis === 'x' ? vx : vz;
+        // Does this side face the street it joins?
+        const towardStreet = axis === 'x' ? -sx * ex.nx : -sz * ex.nz;
+        const faces = towardStreet > 0;
+        const target = faces ? half + 2 * PAVEMENT : half + PAVEMENT;
+        let uEnd = -1;
+        for (let u = uExit; u <= Math.min(160, f.total / 2); u += 0.5) if (off(edge(u)) >= target) { uEnd = u; break; }
+        if (uEnd < 0) continue;
+        // Sample the wedge at the road's own points so its edge matches the band.
+        const us: number[] = [uExit + (faces ? 2.5 : 0)];
+        for (const cum of f.cum) { const u = end === 'a0' ? cum : f.total - cum; if (u > (us[0] as number) + 0.5 && u < uEnd - 0.5) us.push(u); }
+        us.sort((a, b) => a - b); us.push(uEnd);
+        const foot = (e: Pt, line: number): Pt => axis === 'x' ? { x: line, z: e.z } : { x: e.x, z: line };
+        for (let i = 0; i + 1 < us.length; i++) {
+          const ea = edge(us[i] as number), eb = edge(us[i + 1] as number);
+          const line = faces ? kerbLine : outerLine;
+          const raw = [ea, eb, foot(eb, line), foot(ea, line)].map((pt) => ({ x: pt.x, z: pt.z }));
+          const points = raw.filter((pt, i) => { const prev = raw[(i + raw.length - 1) % raw.length] as Pt; return Math.hypot(pt.x - prev.x, pt.z - prev.z) > 0.05; });
+          if (points.length < 3) continue;
+          joins.prisms.push({ points, colour: PALETTE.kerb });
+        }
+        const eEnd = edge(uEnd), eStart = edge(uExit);
+        // The strip is absent from before the carriageways separate until the wedge ends.
+        const fromFree = free(eStart), toFree = free(eEnd);
+        joins.cuts.push({ axis, line: stripLine, from: Math.min(fromFree, toFree) - 3, to: Math.max(fromFree, toFree) });
+        // The band starts on the wedge's end edge: for a facing side that edge runs from E
+        // to the kerb line, perpendicular to the street; otherwise the band starts square.
+        let dir: Pt | null = null;
+        if (faces) {
+          const q = foot(eEnd, kerbLine), l = Math.hypot(q.x - eEnd.x, q.z - eEnd.z) || 1;
+          dir = { x: (q.x - eEnd.x) / l, z: (q.z - eEnd.z) / l };
+        }
+        const clip: ClipEdge = { t: T(uEnd), dir };
+        const index = side > 0 ? 1 : 0;
+        if (end === 'a0') joins.start[index] = clip; else joins.end[index] = clip;
+      }
+    }
+    this.joins.set(road.name, joins);
+    return joins;
+  }
+
   /**
    * Keep the 3×3 neighbourhood resident. A normal step loads at most one missing
    * chunk (nearest first), so crossing into a new row costs three steps instead of
@@ -545,7 +718,16 @@ export class City {
     const chunk = this.chunk(ix, iz);
     const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
     for (const st of chunk.statics) {
-      if ((st.tag !== 'building' && st.tag !== 'kerb') || st.shape.kind !== 'box') continue;
+      if (st.tag !== 'building' && st.tag !== 'kerb') continue;
+      if (st.shape.kind === 'prism') {
+        const pts = st.shape.points, y0 = st.shape.y0, y1 = st.shape.y1, hull = new Float32Array(pts.length * 6);
+        pts.forEach((pt, i) => { hull.set([pt.x, y0, pt.z], i * 3); hull.set([pt.x, y1, pt.z], (pts.length + i) * 3); });
+        const desc = RAPIER.ColliderDesc.convexHull(hull);
+        if (desc) this.world.createCollider(desc.setFriction(1).setRestitution(st.tag === 'building' ? 1 : 0)
+          .setCollisionGroups(st.tag === 'building' ? GROUPS_SOLID : GROUPS_TERRAIN), body);
+        continue;
+      }
+      if (st.shape.kind !== 'box') continue;
       const p = st.position, s = st.shape;
       this.world.createCollider(RAPIER.ColliderDesc.cuboid(s.hx, s.hy, s.hz)
         .setTranslation(p.x, p.y, p.z).setRotation(st.rotation).setFriction(1).setRestitution(st.tag === 'building' ? 1 : 0)

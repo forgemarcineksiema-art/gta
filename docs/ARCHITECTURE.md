@@ -104,6 +104,14 @@ fog; the fogged ring and the second level follow at two builds a frame.
 `App.boot` records phase times in `GameHandle.bootTimings`; the startup gate
 measures navigation start to the first controllable frame.
 
+`ShapeDesc` also has `prism`: a convex polygon in world XZ extruded between two
+heights, rendered as a top fan with outward sides (`render/geometry.ts`) and
+collided as a Rapier convex hull. `City.joinsFor` computes, once per authored
+road, the junction pavements at both ends (wedge and sliver prisms), the cuts
+they impose on grid strips (world-space, applied by whichever chunk owns the
+strip) and the clip edge where the road's own band may start; `specialRoad`
+builds bands as prism quads per centreline segment.
+
 Decision 16 (M2.2): authored roads are polylines in the same graph, not a second
 road system. Alternatives were a separate spline road type with its own bot and
 reset code, or bending the grid itself; both would have doubled the traffic

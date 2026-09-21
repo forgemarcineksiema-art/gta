@@ -69,6 +69,16 @@ after.
   crossings in worn tone near and a faint patch far, cornices 0.44 m, lamp
   heads 0.28 m, low-contrast frames, near level 120 / 150 m. Flicker pixels in
   the same drive 363 → 207, the rest at the fog horizon.
+- Fourth report (with screenshots): bays not readable, half a crossing appearing
+  late, facade pieces appearing late, unfinished junction corners. Causes and
+  fixes: (1) each crossing half sat in a different quadrant part with its own
+  detail switch; junction decals now go to the base part. (2) The far level drew
+  walls without reveals; both levels keep them (low tour 119k → 154k triangles).
+  (3) Corners were perpendicular cuts plus a band starting 24 m out; replaced by
+  constructed pavements: a `prism` shape (render fan, convex-hull collider),
+  wedge/sliver prisms from the real centreline, exact clip edges for bands and
+  strips, chamfered tips, bands as prism quads (no overlapping kerb boxes on
+  curves). (4) Bays get an edge line along the road and stronger patches.
 
 ### Next
 

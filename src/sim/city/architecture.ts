@@ -12,6 +12,15 @@ export class Architecture {
     return st;
   }
 
+  /** Convex polygon (world XZ) extruded from y0 to y1; solid when tagged 'kerb' or 'building'. */
+  prism(points: Array<{ x: number; z: number }>, y0: number, y1: number, color: number, tag = 'kerb'): StaticDesc {
+    let x = 0, z = 0;
+    for (const pt of points) { x += pt.x / points.length; z += pt.z / points.length; }
+    const st: StaticDesc = { shape: { kind: 'prism', points, y0, y1 }, position: { x, y: (y0 + y1) / 2, z }, rotation: IDENTITY_QUAT, color, tag };
+    this.statics.push(st);
+    return st;
+  }
+
   cylinder(x: number, y: number, z: number, radius: number, halfHeight: number, color: number): void {
     this.statics.push({ shape: { kind: 'cylinder', radius, halfHeight }, position: { x, y, z }, rotation: IDENTITY_QUAT, color, tag: 'decor' });
   }
@@ -154,7 +163,8 @@ export class Architecture {
         // and the underside of the neighbouring wall's band shows through.
         const capped = axis === 'x' && w >= span - 1e-6;
         st.faces = band ? [face, 'top', 'bottom', ...(capped ? ends : [])] : [face, ...ends];
-        st.farFace = face;
+        // Wall members stay out of the depth pass: the core casts the building's shadow.
+        st.tag = 'wall';
       };
       // Sills, mullions, shutters: only their visible sides, no shadow pass, and
       // omitted at distance where they are below one pixel.

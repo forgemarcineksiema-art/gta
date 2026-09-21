@@ -12,7 +12,7 @@ import { SpeedLines } from './SpeedLines';
 import { buildCarMesh, type CarMesh } from './carMesh';
 import { CityView, QUALITY, type QualityTier } from './CityView';
 import { SHADOW_HALF, SUN_OFFSET, stableShadowTarget } from './shadows';
-import { gableGeometry } from './geometry';
+import { gableGeometry, prismGeometry } from './geometry';
 import { buildSkyline } from './skyline';
 
 export interface RenderStats {
@@ -335,6 +335,8 @@ function geometryFor(shape: ShapeDesc): THREE.BufferGeometry {
       return new THREE.BoxGeometry(shape.hx * 2, shape.hy * 2, shape.hz * 2);
     case 'gable':
       return gableGeometry().scale(shape.hx, shape.hy, shape.hz);
+    case 'prism':
+      return prismGeometry(shape.points, shape.y0, shape.y1);
     case 'cylinder':
       return new THREE.CylinderGeometry(shape.radius, shape.radius, shape.halfHeight * 2, 10);
     case 'wheel': {

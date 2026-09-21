@@ -123,10 +123,21 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 - Measure, do not guess: `screens/flicker-capture2.mjs` records raw canvas
   frames while driving and the flicker map marks pixels that flip back and
   forth between consecutive frames.
-- Authored-road kerbs, trees and lamps are never laid inside a grid street's
-  corridor (`onGridStreet`): a road leaving a junction at a shallow angle runs
-  inside that corridor for tens of metres and its pavement would land on the
-  carriageway.
+- Where an authored road meets the grid, the pavements are constructed, not
+  cut: the road's carriageway edge is followed out of the junction; from the
+  point where the two carriageways separate, the pavement between them is a
+  wedge of prisms (convex polygons at kerb height) until it is 9 m wide, where
+  the road's own band and the grid strip take over, both starting on the
+  wedge's end edge. A side that crosses a grid strip leaves a sliver prism on
+  the far side. Wedge tips are chamfered 2.5 m. Bands along authored roads are
+  prism quads per centreline segment sharing point normals, so curves have no
+  overlapping kerb boxes. Trees and lamps still skip grid street corridors.
+- Parking bays: a continuous edge line along the road (its width does not
+  foreshorten) plus alternating 6 m bay patches; none where an authored road
+  merges in.
+- Junction decals (crossings, bands) live in a chunk's base render part so both
+  halves of a crossing change detail level together; the far level keeps the
+  facade reveals, so a building's only distance change is the sub-pixel trim.
 - Rotated statics rotate about +Y only; a rotated building is generated in its
   own frame and moved as a whole, so facade rules never see the rotation.
 

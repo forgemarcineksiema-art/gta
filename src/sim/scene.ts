@@ -6,7 +6,9 @@ export type ShapeDesc =
   | { kind: 'box'; hx: number; hy: number; hz: number }
   | { kind: 'gable'; hx: number; hy: number; hz: number }
   | { kind: 'cylinder'; radius: number; halfHeight: number }
-  | { kind: 'wheel'; radius: number; width: number };
+  | { kind: 'wheel'; radius: number; width: number }
+  /** Convex polygon in world XZ (any winding), extruded from y0 to y1; `position` is its centroid. */
+  | { kind: 'prism'; points: Array<{ x: number; z: number }>; y0: number; y1: number };
 
 export interface Quat {
   x: number;
@@ -36,8 +38,6 @@ export interface StaticDesc {
   face?: BoxFace;
   /** Exposed faces of a structural facade member; hidden internal faces are omitted. */
   faces?: BoxFace[];
-  /** At distance a wall member needs only its outer face, preserving opening layout. */
-  farFace?: BoxFace;
   /** Sub-pixel frames may be omitted from distant chunks. */
   detailOnly?: boolean;
   /** Distant stand-in (e.g. a crossing as one band) drawn only in the far level. */

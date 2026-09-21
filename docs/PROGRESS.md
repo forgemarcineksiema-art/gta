@@ -12,7 +12,7 @@ Free-form session log: done, decided and why, next, open problems. Newest sessio
 
 - verify green, 126 tests. Smoke 48.5 fps / p95 16.8 ms / 90 draws / 176,000 tris, build 3.44 MB, gameplay-start 1560 ms. The mean fps is one noisy run; p95 is still one frame.
 - Economy tests: one oncoming near miss grants 0.20, a 3 m footprint gap grants nothing, 3 s in the oncoming lane pays `3 × 0.10` within 15 %, the right direction pays nothing, a near miss from 0.95 lands on exactly 1.
-- `screens/life-1280x720.png` shows `ONCOMING!` above the speed and the `ONCOMING` label, clear of the radar and the speed digits. The capture still has the pause overlay up because the screenshot runs in the pause test; the popup is readable beside it. The ten-size `npm run screens` pass did not finish (the runner stalled). Re-run it before the gate review.
+- `npm run screens` 10/10. Life frames at 800×450, 821×462, 1280×720 and 1920×1080: `ONCOMING!` sits above the speedo, clear of the radar and the speed digits. Several of those frames were taken while the pause overlay was still up, because the life shot is chained after the pause shot; the popup stays readable beside it. The clean driving frame is `screens/life-821x462.png`.
 
 ### Decided and why
 

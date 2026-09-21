@@ -2,7 +2,7 @@
  * Visual profiles per vehicle class (see sim/vehicle/presets.ts for the matching
  * tuning). Heights above ground with the car at rest, +Z forward.
  */
-import type { CarId } from '../sim';
+import { PALETTE, type CarId } from '../sim';
 import { MUSCLE, type CarProfile } from './carMesh';
 
 /** Small hatchback: short bonnet, tall greenhouse, upright tail. */
@@ -31,7 +31,8 @@ export const COMPACT: CarProfile = {
   lipSpoiler: false,
   mirrors: true,
   exhausts: 1,
-  wheelInset: -0.05,
+  wheelInset: 0.005,
+  paint: PALETTE.carBlue,
 };
 
 /** Delivery van: flat nose, one long box, tall. */
@@ -49,7 +50,7 @@ export const HEAVY: CarProfile = {
   glassSides: [3, 4],
   glassTops: [2],
   aPillar: 2,
-  cPillar: 4,
+  cPillar: -1,
   pillars: [0.6],
   doorSeams: [1.05, 0.2],
   handleZ: 0.62,
@@ -60,7 +61,8 @@ export const HEAVY: CarProfile = {
   lipSpoiler: false,
   mirrors: true,
   exhausts: 1,
-  wheelInset: -0.04,
+  wheelInset: 0.025,
+  paint: PALETTE.carOrange,
 };
 
 export const CAR_PROFILES: Record<CarId, CarProfile> = { muscle: MUSCLE, compact: COMPACT, heavy: HEAVY };

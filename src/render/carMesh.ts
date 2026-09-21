@@ -3,13 +3,11 @@
  *
  * The body is a loft through cross-sections along the car's length: each section
  * has a floor, a belt line and a roof line with their own half widths. Every
- * face of the loft is a bilinear panel, and all the detail lives IN those panels
+ * face of the loft is a triangulated panel, and surface detail lives IN those panels
  * as flush decals (polygons drawn in the panel's own parameter space, offset a
- * few millimetres along its normal): pillars splitting the glass into windows,
- * the belt trim, door seams and handles, wheel-arch pockets, sills, bumper bands,
- * headlights, grille, tail lights, reverse lights, plate. Nothing is a box stuck
- * on a slanted surface. The only true 3D parts are the mirrors, the exhaust tips,
- * a lip spoiler and the wheels (tyre, sidewall, rim, spokes, cap).
+ * few millimetres along its normal). Wheel openings cut the shell; bevelled
+ * arch returns reveal the tyres and deep-dish wheels. Trim, mirrors, bumpers
+ * and exhausts are merged into the body: five draw calls per complete car.
  *
  * One geometry, vertex colours, flat shading, no textures. Brake and reverse
  * lights react to the sim by rewriting their decal colours in place.
@@ -64,21 +62,22 @@ export interface CarProfile {
   exhausts: number;
   /** Visual wheel offset along the axle: negative pushes the wheels outward past the sills. */
   wheelInset: number;
+  paint: number;
 }
 
 /** A long-bonnet coupe: the first car. Heights above ground, length 4.5 m, width ~1.9 m at the belt. */
 export const MUSCLE: CarProfile = {
   name: 'muscle',
   sections: [
-    { z: 2.25, floor: 0.4, belt: 0.62, roof: 0.66, hwFloor: 0.74, hwBelt: 0.84, hwRoof: 0.8 },
-    { z: 1.95, floor: 0.36, belt: 0.7, roof: 0.74, hwFloor: 0.8, hwBelt: 0.92, hwRoof: 0.88 },
-    { z: 1.3, floor: 0.36, belt: 0.76, roof: 0.79, hwFloor: 0.84, hwBelt: 0.94, hwRoof: 0.89 },
-    { z: 0.75, floor: 0.36, belt: 0.8, roof: 0.83, hwFloor: 0.84, hwBelt: 0.95, hwRoof: 0.89 },
-    { z: 0.05, floor: 0.36, belt: 0.82, roof: 1.32, hwFloor: 0.84, hwBelt: 0.95, hwRoof: 0.72 },
-    { z: -0.85, floor: 0.36, belt: 0.82, roof: 1.32, hwFloor: 0.84, hwBelt: 0.95, hwRoof: 0.72 },
-    { z: -1.5, floor: 0.37, belt: 0.84, roof: 0.92, hwFloor: 0.83, hwBelt: 0.93, hwRoof: 0.86 },
-    { z: -1.95, floor: 0.38, belt: 0.84, roof: 0.9, hwFloor: 0.8, hwBelt: 0.9, hwRoof: 0.84 },
-    { z: -2.25, floor: 0.42, belt: 0.8, roof: 0.86, hwFloor: 0.74, hwBelt: 0.84, hwRoof: 0.8 },
+    { z: 2.25, floor: 0.34, belt: 0.78, roof: 0.83, hwFloor: 0.8, hwBelt: 0.88, hwRoof: 0.8 },
+    { z: 1.95, floor: 0.32, belt: 0.88, roof: 0.94, hwFloor: 0.88, hwBelt: 0.98, hwRoof: 0.87 },
+    { z: 1.3, floor: 0.32, belt: 0.91, roof: 0.96, hwFloor: 0.88, hwBelt: 1.0, hwRoof: 0.88 },
+    { z: 0.65, floor: 0.32, belt: 0.89, roof: 0.94, hwFloor: 0.86, hwBelt: 0.97, hwRoof: 0.87 },
+    { z: -0.05, floor: 0.32, belt: 0.91, roof: 1.39, hwFloor: 0.85, hwBelt: 0.96, hwRoof: 0.73 },
+    { z: -0.86, floor: 0.32, belt: 0.93, roof: 1.37, hwFloor: 0.87, hwBelt: 0.99, hwRoof: 0.73 },
+    { z: -1.55, floor: 0.33, belt: 0.96, roof: 1.0, hwFloor: 0.89, hwBelt: 1.0, hwRoof: 0.87 },
+    { z: -1.95, floor: 0.34, belt: 0.9, roof: 0.95, hwFloor: 0.85, hwBelt: 0.95, hwRoof: 0.86 },
+    { z: -2.25, floor: 0.38, belt: 0.85, roof: 0.91, hwFloor: 0.8, hwBelt: 0.9, hwRoof: 0.81 },
   ],
   glassSides: [4, 5],
   glassTops: [3, 5],
@@ -87,20 +86,21 @@ export const MUSCLE: CarProfile = {
   pillars: [-0.42],
   doorSeams: [0.72, -0.52],
   handleZ: -0.25,
-  headlight: { width: 0.42, height: 0.12, y: 0.54, inset: 0.3 },
-  taillight: { width: 0.5, height: 0.13, y: 0.69, inset: 0.3 },
-  grille: { width: 0.6, height: 0.1, y: 0.54 },
+  headlight: { width: 0.42, height: 0.17, y: 0.665, inset: 0.27 },
+  taillight: { width: 0.57, height: 0.16, y: 0.71, inset: 0.32 },
+  grille: { width: 0.63, height: 0.18, y: 0.65 },
   bumperHeight: 0.1,
   lipSpoiler: true,
   mirrors: true,
   exhausts: 2,
-  wheelInset: -0.08,
+  wheelInset: 0.015,
+  paint: PALETTE.carRed,
 };
 
 type UV = [number, number];
 
 /**
- * A bilinear surface patch with an outward normal and a mapping from car
+ * A triangulated surface patch with an outward normal and a mapping from car
  * coordinates (a, b) to (u, v). `lo(u)`/`hi(u)` give the b-range at a given u,
  * `a0`/`a1` the a-range, so decals can be authored in metres.
  */
@@ -122,9 +122,6 @@ class BodyBuilder {
   readonly positions: number[] = [];
   readonly colors: number[] = [];
   private readonly c = new THREE.Color();
-  private readonly tmp = new THREE.Vector3();
-  private readonly tmp2 = new THREE.Vector3();
-  private readonly tmp3 = new THREE.Vector3();
 
   /** Base quad of a panel. */
   fill(p: Panel, color: number): void {
@@ -134,8 +131,35 @@ class BodyBuilder {
 
   /** Convex polygon in car coordinates on a panel, clipped to the panel, offset along its normal. Returns [start vertex, count]. */
   decal(p: Panel, poly: UV[], color: number, offset = 0.004): [number, number] {
-    let uv: UV[] = poly.map(([a, b]) => this.toUV(p, a, b));
-    uv = clipUnitSquare(uv);
+    const start = this.positions.length / 3;
+    const coords: UV[] = [[p.a0, p.lo0], [p.a1, p.lo1], [p.a1, p.hi1], [p.a0, p.hi0]];
+    const points = [p.c0, p.c1, p.c2, p.c3];
+    for (const indices of [[0, 1, 2], [0, 2, 3]]) {
+      const [ia, ib, ic] = indices as [number, number, number];
+      const a = coords[ia] as UV, b = coords[ib] as UV, c = coords[ic] as UV;
+      const dx = b[0] - a[0], dy = b[1] - a[1], ex = c[0] - a[0], ey = c[1] - a[1];
+      const det = dx * ey - dy * ex;
+      if (Math.abs(det) < 1e-10) continue;
+      // Clip in affine triangle coordinates. This keeps authored lines straight
+      // across a trapezoid even where its lower boundary follows a wheel arch.
+      let uv: UV[] = poly.map(([x, y]) => [((x - a[0]) * ey - (y - a[1]) * ex) / det, (dx * (y - a[1]) - dy * (x - a[0])) / det]);
+      for (const inside of [([u]: UV) => u, ([, v]: UV) => v, ([u, v]: UV) => 1 - u - v]) uv = clipHalfPlane(uv, inside);
+      let area = 0;
+      for (let i = 0; i < uv.length; i++) {
+        const cur = uv[i] as UV, next = uv[(i + 1) % uv.length] as UV;
+        area += cur[0] * next[1] - next[0] * cur[1];
+      }
+      if (area < 0) uv.reverse();
+      const pts = uv.map(([u, v]) => (points[ia] as THREE.Vector3).clone().multiplyScalar(1 - u - v)
+        .addScaledVector(points[ib] as THREE.Vector3, u).addScaledVector(points[ic] as THREE.Vector3, v).addScaledVector(p.normal, offset));
+      for (let i = 1; i < pts.length - 1; i++) this.tri(pts[0] as THREE.Vector3, pts[i] as THREE.Vector3, pts[i + 1] as THREE.Vector3, color);
+    }
+    return [start, this.positions.length / 3 - start];
+  }
+
+  /** Detail in normalized panel coordinates; useful for framed, raked windows. */
+  patch(p: Panel, poly: UV[], color: number, offset = 0.004): [number, number] {
+    const uv = clipUnitSquare(poly);
     const start = this.positions.length / 3;
     if (uv.length < 3) return [start, 0];
     // counter-clockwise in (u, v) means the triangles face along the panel's outward normal
@@ -146,22 +170,20 @@ class BodyBuilder {
       area += u0 * v1 - u1 * v0;
     }
     if (area < 0) uv.reverse();
-    const pts = uv.map(([u, v]) => this.at(p, u, v).addScaledVector(p.normal, offset));
-    for (let i = 1; i < pts.length - 1; i++) this.tri(pts[0] as THREE.Vector3, pts[i] as THREE.Vector3, pts[i + 1] as THREE.Vector3, color);
+    // The loft quad can be twisted. Split decals along its actual triangle seam
+    // so the glazing never cuts through the painted body on one side of the car.
+    for (const sign of [-1, 1]) {
+      const half = clipHalfPlane(uv, ([u, v]) => sign * (u - v));
+      const pts = half.map(([u, v]) => this.at(p, u, v).addScaledVector(p.normal, offset));
+      for (let i = 1; i < pts.length - 1; i++) this.tri(pts[0] as THREE.Vector3, pts[i] as THREE.Vector3, pts[i + 1] as THREE.Vector3, color);
+    }
     return [start, this.positions.length / 3 - start];
   }
 
-  private toUV(p: Panel, a: number, b: number): UV {
-    const u = (a - p.a0) / (p.a1 - p.a0);
-    const lo = p.lo0 + (p.lo1 - p.lo0) * u;
-    const hi = p.hi0 + (p.hi1 - p.hi0) * u;
-    return [u, (b - lo) / Math.max(1e-4, hi - lo)];
-  }
-
   private at(p: Panel, u: number, v: number): THREE.Vector3 {
-    this.tmp2.lerpVectors(p.c0, p.c1, u);
-    this.tmp3.lerpVectors(p.c3, p.c2, u);
-    return new THREE.Vector3().lerpVectors(this.tmp2, this.tmp3, v);
+    return u >= v
+      ? p.c0.clone().multiplyScalar(1 - u).addScaledVector(p.c1, u - v).addScaledVector(p.c2, v)
+      : p.c0.clone().multiplyScalar(1 - v).addScaledVector(p.c2, u).addScaledVector(p.c3, v - u);
   }
 
   private tri(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, color: number): void {
@@ -177,7 +199,6 @@ class BodyBuilder {
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.positions, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(this.colors, 3));
     g.computeVertexNormals();
-    void this.tmp;
     return g;
   }
 }
@@ -187,20 +208,7 @@ function clipUnitSquare(poly: UV[]): UV[] {
   let out = poly;
   const edges: Array<(p: UV) => number> = [([u]) => u, ([u]) => 1 - u, ([, v]) => v, ([, v]) => 1 - v];
   for (const inside of edges) {
-    const input = out;
-    out = [];
-    for (let i = 0; i < input.length; i++) {
-      const cur = input[i] as UV;
-      const prev = input[(i + input.length - 1) % input.length] as UV;
-      const dc = inside(cur);
-      const dp = inside(prev);
-      if (dc >= 0) {
-        if (dp < 0) out.push(lerpUV(prev, cur, dp / (dp - dc)));
-        out.push(cur);
-      } else if (dp >= 0) {
-        out.push(lerpUV(prev, cur, dp / (dp - dc)));
-      }
-    }
+    out = clipHalfPlane(out, inside);
     if (out.length === 0) return out;
   }
   return out;
@@ -241,196 +249,289 @@ function shade(hex: number, k: number): number {
   return new THREE.Color(hex).multiplyScalar(k).getHex();
 }
 
-export function buildCarMesh(t: VehicleTuning, profile: CarProfile = MUSCLE, color: number = PALETTE.carRed): CarMesh {
+/** Shared non-indexed vertex colour geometry; all rigid fittings share the body draw. */
+function coloured(g: THREE.BufferGeometry, hex: number): THREE.BufferGeometry {
+  const result = g.index ? g.toNonIndexed() : g;
+  if (result !== g) g.dispose();
+  const c = new THREE.Color(hex);
+  const colors = new Float32Array(result.getAttribute('position').count * 3);
+  for (let i = 0; i < colors.length; i += 3) colors.set([c.r, c.g, c.b], i);
+  result.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  result.deleteAttribute('uv');
+  return result;
+}
+
+function clipHalfPlane(input: UV[], inside: (p: UV) => number): UV[] {
+  const out: UV[] = [];
+  for (let i = 0; i < input.length; i++) {
+    const cur = input[i] as UV, prev = input[(i + input.length - 1) % input.length] as UV;
+    const dc = inside(cur), dp = inside(prev);
+    if ((dc >= 0) !== (dp >= 0)) out.push(lerpUV(prev, cur, dp / (dp - dc)));
+    if (dc >= 0) out.push(cur);
+  }
+  return out;
+}
+
+function wheelGeometry(t: VehicleTuning, style: string): THREE.BufferGeometry {
+  const r = t.wheelRadius, w = t.wheelWidth;
+  const parts: THREE.BufferGeometry[] = [];
+  // Revolved shoulder and sidewall with an open centre: the rim is not buried in a capped cylinder.
+  const profile = [[0.62, -0.5], [0.83, -0.5], [0.96, -0.37], [1, -0.24], [1, 0.24], [0.96, 0.37], [0.83, 0.5], [0.62, 0.5]];
+  parts.push(coloured(new THREE.LatheGeometry(profile.map(([radius, x]) => new THREE.Vector2((radius ?? 0) * r, (x ?? 0) * w)), 20).rotateZ(Math.PI / 2), PALETTE.tyre));
+  const cylinder = (radius: number, depth: number, x: number, color: number, segments = 20) => {
+    parts.push(coloured(new THREE.CylinderGeometry(radius, radius, depth, segments).rotateZ(Math.PI / 2).translate(x, 0, 0), color));
+  };
+  for (const side of [-1, 1]) {
+    const face = side * (w * 0.5 + 0.004);
+    cylinder(r * 0.65, 0.022, face - side * 0.025, PALETTE.steel);
+    cylinder(r * 0.56, 0.026, face - side * 0.01, PALETTE.ink);
+    parts.push(coloured(new THREE.TorusGeometry(r * 0.61, r * 0.045, 4, 20).rotateY(Math.PI / 2).translate(face, 0, 0), PALETTE.lightGrey));
+    const count = style === 'heavy' ? 6 : style === 'compact' ? 4 : 5;
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      parts.push(coloured(new THREE.BoxGeometry(0.035, r * 0.48, r * (style === 'compact' ? 0.23 : 0.14))
+        .translate(0, r * 0.32, 0).rotateX(angle).translate(face + side * 0.005, 0, 0), style === 'heavy' ? PALETTE.silver : PALETTE.lightGrey));
+    }
+    cylinder(r * (style === 'heavy' ? 0.28 : 0.2), 0.04, face + side * 0.015, PALETTE.graphite, 10);
+    cylinder(r * 0.10, 0.047, face + side * 0.023, PALETTE.chrome, 8);
+  }
+  const result = mergeGeometries(parts, false);
+  for (const p of parts) p.dispose();
+  return result;
+}
+
+export function buildCarMesh(t: VehicleTuning, profile: CarProfile = MUSCLE, color: number = profile.paint): CarMesh {
   const root = new THREE.Group();
-  const gEff = 9.81 + t.extraGravity;
-  const staticCompression = (t.mass * gEff) / 4 / t.suspensionStiffness;
+  root.name = `car-${profile.name}`;
+  const staticCompression = (t.mass * (9.81 + t.extraGravity)) / 4 / t.suspensionStiffness;
   const y0 = t.wheelRadius + t.suspensionRestLength - staticCompression - t.suspensionAttachY;
   const S = profile.sections;
-  const nose = S[0] as Section;
-  const tail = S[S.length - 1] as Section;
-  const paint = color;
-  const paintDark = shade(color, 0.72);
-  const glass = PALETTE.glass;
+  const nose = S[0] as Section, tail = S[S.length - 1] as Section;
+  const paint = color, paintDark = shade(color, 0.72), paintLight = shade(color, 1.13);
+  const muscle = profile.name === 'muscle', compact = profile.name === 'compact', van = profile.name === 'heavy';
+  const glass = 0x294653, glassLight = 0x6394a2;
   const bb = new BodyBuilder();
+  const tailLightRanges: Array<[number, number]> = [], reverseRanges: Array<[number, number]> = [];
   const P = (x: number, y: number, z: number) => new THREE.Vector3(x, y - y0, z);
+  const extras: THREE.BufferGeometry[] = [];
+  const part = (g: THREE.BufferGeometry, c: number, x: number, y: number, z: number) => extras.push(coloured(g.translate(x, y - y0, z), c));
+  const box = (w: number, h: number, d: number, c: number, x: number, y: number, z: number) => part(new THREE.BoxGeometry(w, h, d), c, x, y, z);
+  const panel = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: THREE.Vector3, ref: THREE.Vector3) => makePanel(a, b, c, d, ref, { a0: 0, a1: 1, lo0: 0, lo1: 0, hi0: 1, hi1: 1 });
+  const longitudinalPatch = (p: Panel, poly: UV[], c: number, offset = 0.004) =>
+    bb.patch(p, poly.map(([u, v]) => [p.a0 < p.a1 ? 1 - u : u, v]), c, offset);
+  const windowPanel = (p: Panel, margin = 0.07) => {
+    bb.fill(p, paint);
+    bb.patch(p, rect(margin * 0.6, 1 - margin * 0.6, 0.045, 0.955), PALETTE.charcoal, 0.004);
+    bb.patch(p, rect(margin, 1 - margin, 0.10, 0.90), glass, 0.006);
+    // Broad restrained reflection, framed by painted pillars; no transparent sorting or texture.
+    bb.patch(p, [[margin, 0.65], [1 - margin, 0.48], [1 - margin, 0.87], [margin, 0.87]], glassLight, 0.008);
+  };
+  const interpolate = (a: Section, b: Section, z: number): Section => {
+    const f = (z - a.z) / (b.z - a.z), s = { ...a, z };
+    for (const k of ['floor', 'belt', 'roof', 'hwFloor', 'hwBelt', 'hwRoof'] as const) s[k] = a[k] + (b[k] - a[k]) * f;
+    return s;
+  };
+  const sectionAt = (z: number) => {
+    for (let i = 0; i < S.length - 1; i++) {
+      const a = S[i] as Section, b = S[i + 1] as Section;
+      if (z <= a.z && z >= b.z) return interpolate(a, b, z);
+    }
+    return z > nose.z ? nose : tail;
+  };
+  const sideWidth = (s: Section, y: number) => s.hwFloor + (s.hwBelt - s.hwFloor) * Math.min(1, (y - s.floor) / (s.belt - s.floor));
+  const arcRadius = t.wheelRadius + (van ? 0.105 : 0.085);
+  // The same polygon drives both the cutout and the bevel, preventing cracks between them.
+  const arcs = [t.wheelBase / 2, -t.wheelBase / 2].map(z => Array.from({ length: 13 }, (_, i) => {
+    const angle = (i / 12) * Math.PI;
+    return { z: z + Math.cos(angle) * arcRadius, y: t.wheelRadius + Math.sin(angle) * arcRadius };
+  }));
+  const bottom = (s: Section) => {
+    let y = s.floor;
+    for (const arc of arcs) for (let i = 0; i < arc.length - 1; i++) {
+      const a = arc[i] as { z: number; y: number }, b = arc[i + 1] as { z: number; y: number };
+      if (s.z <= a.z + 1e-6 && s.z >= b.z - 1e-6) y = Math.max(y, a.y + (b.y - a.y) * (s.z - a.z) / (b.z - a.z));
+    }
+    return y;
+  };
 
-  // ---- the loft: per segment, six panels ------------------------------------------
   for (let i = 0; i < S.length - 1; i++) {
-    const a = S[i] as Section;
-    const b = S[i + 1] as Section;
+    const a = S[i] as Section, b = S[i + 1] as Section;
     const ref = P(0, (a.floor + a.roof + b.floor + b.roof) / 4, (a.z + b.z) / 2);
     const aMap = { a0: a.z, a1: b.z };
-    // floor
-    bb.fill(makePanel(P(a.hwFloor, a.floor, a.z), P(b.hwFloor, b.floor, b.z), P(-b.hwFloor, b.floor, b.z), P(-a.hwFloor, a.floor, a.z), ref, { ...aMap, lo0: a.hwFloor, lo1: b.hwFloor, hi0: -a.hwFloor, hi1: -b.hwFloor }), PALETTE.charcoal);
-    for (const side of [1, -1]) {
-      // lower side: floor -> belt (a = z, b = height)
-      const lower = makePanel(P(side * a.hwFloor, a.floor, a.z), P(side * b.hwFloor, b.floor, b.z), P(side * b.hwBelt, b.belt, b.z), P(side * a.hwBelt, a.belt, a.z), ref, { ...aMap, lo0: a.floor, lo1: b.floor, hi0: a.belt, hi1: b.belt });
-      bb.fill(lower, paint);
-      // sill along the bottom of the doors and fenders
-      bb.decal(lower, rect(a.z, b.z, Math.min(a.floor, b.floor), Math.max(a.floor, b.floor) + 0.05), PALETTE.charcoal);
-      // wheel-arch pockets
-      for (const wz of [t.wheelBase / 2, -t.wheelBase / 2]) {
-        if (wz + 0.5 < Math.min(a.z, b.z) || wz - 0.5 > Math.max(a.z, b.z)) continue;
-        const arc: UV[] = [];
-        const rr = t.wheelRadius + 0.07;
-        for (let k = 0; k <= 10; k++) {
-          const ang = (k / 10) * Math.PI;
-          arc.push([wz + Math.cos(ang) * rr, t.wheelRadius + Math.sin(ang) * rr]);
-        }
-        bb.decal(lower, arc, PALETTE.ink, 0.003);
+    // Narrow undertray leaves the wheel wells open from below as well as the sides.
+    bb.fill(panel(P(0.53, a.floor, a.z), P(0.53, b.floor, b.z), P(-0.53, b.floor, b.z), P(-0.53, a.floor, a.z), P(0, a.floor + 0.1, a.z)), PALETTE.charcoal);
+    for (const side of [-1, 1]) {
+      const cuts = [a.z, b.z, ...arcs.flat().map(p => p.z).filter(z => z < a.z - 1e-6 && z > b.z + 1e-6)].sort((x, y) => y - x);
+      for (let j = 0; j < cuts.length - 1; j++) {
+        const sa = interpolate(a, b, cuts[j] as number), sb = interpolate(a, b, cuts[j + 1] as number);
+        const ya = bottom(sa), yb = bottom(sb);
+        const lower = makePanel(P(side * sideWidth(sa, ya), ya, sa.z), P(side * sideWidth(sb, yb), yb, sb.z), P(side * sb.hwBelt, sb.belt, sb.z), P(side * sa.hwBelt, sa.belt, sa.z), ref,
+          { a0: sa.z, a1: sb.z, lo0: ya, lo1: yb, hi0: sa.belt, hi1: sb.belt });
+        bb.fill(lower, paint);
+        bb.decal(lower, rect(sa.z, sb.z, 0, Math.max(sa.floor, sb.floor) + (van ? 0.19 : 0.09)), van ? PALETTE.charcoal : paintDark);
+        bb.decal(lower, rect(sa.z, sb.z, a.belt - 0.10, a.belt - 0.075), paintLight);
+        for (const dz of profile.doorSeams) bb.decal(lower, rect(dz + 0.009, dz - 0.009, 0.43, 2), paintDark);
+        bb.decal(lower, rect(profile.handleZ + 0.10, profile.handleZ - 0.10, a.belt - 0.13, a.belt - 0.09), PALETTE.charcoal);
+        if (van) bb.decal(lower, rect(sa.z, sb.z, 0.85, 0.94), PALETTE.charcoal);
+        if (muscle && i < 3) bb.decal(lower, rect(0.88, 0.70, 0.7, 0.74), PALETTE.chrome);
       }
-      // door seams and handle
-      for (const dz of profile.doorSeams) bb.decal(lower, rect(dz + 0.012, dz - 0.012, Math.min(a.floor, b.floor) + 0.06, 2), PALETTE.ink);
-      bb.decal(lower, rect(profile.handleZ + 0.08, profile.handleZ - 0.08, a.belt - 0.16, a.belt - 0.12), PALETTE.graphite);
-
-      // upper side: belt -> roof
-      const upper = makePanel(P(side * a.hwBelt, a.belt, a.z), P(side * b.hwBelt, b.belt, b.z), P(side * b.hwRoof, b.roof, b.z), P(side * a.hwRoof, a.roof, a.z), ref, { ...aMap, lo0: a.belt, lo1: b.belt, hi0: a.roof, hi1: b.roof });
-      const isGlass = i >= profile.glassSides[0] && i < profile.glassSides[1];
-      if (i === profile.aPillar) {
-        // quarter light with the A pillar drawn along the windscreen slope
-        bb.fill(upper, glass);
-        const w = 0.16;
-        bb.decal(upper, [[a.z, a.belt], [a.z - w, a.belt], [b.z + w * 0.3, b.roof], [b.z, b.roof]].map(([z, y]) => [z, y] as UV), PALETTE.charcoal);
-        bb.decal(upper, [[a.z, a.belt], [b.z, b.belt], [b.z, b.belt + 0.06], [a.z, a.belt + 0.03]] as UV[], PALETTE.ink);
+      const upper = makePanel(P(side * a.hwBelt, a.belt, a.z), P(side * b.hwBelt, b.belt, b.z), P(side * b.hwRoof, b.roof, b.z), P(side * a.hwRoof, a.roof, a.z), ref,
+        { ...aMap, lo0: a.belt, lo1: b.belt, hi0: a.roof, hi1: b.roof });
+      if (i === profile.aPillar || (i >= profile.glassSides[0] && i < profile.glassSides[1])) {
+        windowPanel(upper, i === profile.aPillar ? 0.14 : 0.06);
+        for (const z of profile.pillars) bb.decal(upper, rect(z - 0.035, z + 0.035, 0, 3), PALETTE.charcoal, 0.012);
       } else if (i === profile.cPillar) {
-        // thick C pillar with a small quarter window in front of it
         bb.fill(upper, paint);
-        bb.decal(upper, [[a.z - 0.02, a.belt + 0.08], [a.z - 0.02, a.roof - 0.08], [a.z - 0.42, a.roof - 0.12], [a.z - 0.38, a.belt + 0.08]] as UV[], glass);
-        bb.decal(upper, rect(a.z, b.z, a.belt, a.belt + 0.05), PALETTE.ink);
-      } else if (isGlass) {
-        bb.fill(upper, glass);
-        for (const pz of profile.pillars) bb.decal(upper, rect(pz + 0.045, pz - 0.045, 0, 3), PALETTE.charcoal);
-        bb.decal(upper, rect(a.z, b.z, a.belt, a.belt + 0.05), PALETTE.ink); // belt trim
-        bb.decal(upper, rect(a.z, b.z, a.roof - 0.04, a.roof), PALETTE.charcoal); // drip rail
+        longitudinalPatch(upper, [[0.13, 0.16], [0.72, 0.16], [0.6, 0.72], [0.13, 0.84]], PALETTE.charcoal);
+        longitudinalPatch(upper, [[0.18, 0.24], [0.63, 0.24], [0.54, 0.65], [0.18, 0.73]], glassLight, 0.006);
       } else {
         bb.fill(upper, paint);
+        if (van && i === 4) {
+          // Cargo panel surround, sliding-door split and rail: no passenger quarter glass.
+          bb.patch(upper, rect(0.07, 0.94, 0.10, 0.88), paintDark);
+          bb.patch(upper, rect(0.085, 0.925, 0.12, 0.85), paintLight, 0.006);
+          bb.decal(upper, rect(-0.8, -0.816, 0.9, 2.2), paintDark, 0.009);
+          bb.decal(upper, rect(-0.15, -2.24, 1.19, 1.23), PALETTE.steel, 0.009);
+          bb.decal(upper, rect(-0.60, -0.75, 1.31, 1.37), PALETTE.charcoal, 0.01);
+        }
       }
     }
-    // top: roof line a -> b
-    const top = makePanel(P(a.hwRoof, a.roof, a.z), P(b.hwRoof, b.roof, b.z), P(-b.hwRoof, b.roof, b.z), P(-a.hwRoof, a.roof, a.z), ref, { ...aMap, lo0: a.hwRoof, lo1: b.hwRoof, hi0: -a.hwRoof, hi1: -b.hwRoof });
-    bb.fill(top, profile.glassTops.includes(i) ? glass : paint);
+    const top = makePanel(P(a.hwRoof, a.roof, a.z), P(b.hwRoof, b.roof, b.z), P(-b.hwRoof, b.roof, b.z), P(-a.hwRoof, a.roof, a.z), ref,
+      { ...aMap, lo0: a.hwRoof, lo1: b.hwRoof, hi0: -a.hwRoof, hi1: -b.hwRoof });
+    if (profile.glassTops.includes(i)) {
+      windowPanel(top, 0.08);
+      if (i === profile.aPillar) for (const side of [-1, 1]) bb.patch(top, rect(0.12, 0.135, side === 1 ? 0.16 : 0.57, side === 1 ? 0.43 : 0.84), PALETTE.charcoal, 0.014);
+    } else {
+      bb.fill(top, compact && i === 3 ? PALETTE.charcoal : paint);
+      if (muscle) for (const side of [-1, 1]) bb.decal(top, rect(a.z, b.z, side * 0.12, side * 0.30), PALETTE.charcoal);
+      if (van && i >= 3) for (const x of [-0.63, -0.31, 0.31, 0.63]) bb.decal(top, rect(a.z, b.z, x - 0.018, x + 0.018), paintLight);
+    }
+  }
+  // Flared arch lips and the dark inward return are real geometry, not painted circles.
+  for (const side of [-1, 1]) for (const arc of arcs) for (let k = 0; k < arc.length - 1; k++) {
+    const a = arc[k] as { z: number; y: number }, b = arc[k + 1] as { z: number; y: number }, sa = sectionAt(a.z), sb = sectionAt(b.z);
+    const ya = Math.max(sa.floor, a.y), yb = Math.max(sb.floor, b.y);
+    const wa = sideWidth(sa, ya), wb = sideWidth(sb, yb);
+    const ref = P(0, t.wheelRadius, (a.z + b.z) / 2);
+    bb.fill(panel(P(side * (wa + 0.025), ya, a.z), P(side * (wb + 0.025), yb, b.z), P(side * (wb + 0.012), yb + 0.045, b.z), P(side * (wa + 0.012), ya + 0.045, a.z), ref), compact || van ? PALETTE.charcoal : paintLight);
+    bb.fill(panel(P(side * (wa + 0.025), ya, a.z), P(side * (wb + 0.025), yb, b.z), P(side * (wb - 0.12), yb, b.z), P(side * (wa - 0.12), ya, a.z), P(0, ya + 0.2, (a.z + b.z) / 2)), PALETTE.charcoal);
   }
 
-  // ---- caps: nose and tail, with bumper bands, lights, grille, plate -----------------------
-  const cap = (s: Section, front: boolean) => {
+  const capPanels = (s: Section, front: boolean) => {
     const ref = P(0, (s.floor + s.roof) / 2, 0);
-    // parameter a runs up the cap (height), b across it (x), so the width follows the trapezoid exactly
-    const lower = makePanel(P(-s.hwFloor, s.floor, s.z), P(-s.hwBelt, s.belt, s.z), P(s.hwBelt, s.belt, s.z), P(s.hwFloor, s.floor, s.z), ref, { a0: s.floor, a1: s.belt, lo0: -s.hwFloor, lo1: -s.hwBelt, hi0: s.hwFloor, hi1: s.hwBelt });
-    const upper = makePanel(P(-s.hwBelt, s.belt, s.z), P(-s.hwRoof, s.roof, s.z), P(s.hwRoof, s.roof, s.z), P(s.hwBelt, s.belt, s.z), ref, { a0: s.belt, a1: s.roof, lo0: -s.hwBelt, lo1: -s.hwRoof, hi0: s.hwBelt, hi1: s.hwRoof });
-    bb.fill(lower, front ? paint : paintDark);
-    bb.fill(upper, paint);
-    // bumper band across the whole lower cap
-    bb.decal(lower, rectYX(s.floor, s.floor + profile.bumperHeight, -2, 2), PALETTE.charcoal);
-    bb.decal(lower, rectYX(s.floor, s.floor + 0.03, -2, 2), PALETTE.ink);
-    return lower;
+    const lo = makePanel(P(-s.hwFloor, s.floor, s.z), P(-s.hwBelt, s.belt, s.z), P(s.hwBelt, s.belt, s.z), P(s.hwFloor, s.floor, s.z), ref,
+      { a0: s.floor, a1: s.belt, lo0: -s.hwFloor, lo1: -s.hwBelt, hi0: s.hwFloor, hi1: s.hwBelt });
+    const hi = makePanel(P(-s.hwBelt, s.belt, s.z), P(-s.hwRoof, s.roof, s.z), P(s.hwRoof, s.roof, s.z), P(s.hwBelt, s.belt, s.z), ref,
+      { a0: s.belt, a1: s.roof, lo0: -s.hwBelt, lo1: -s.hwRoof, hi0: s.hwBelt, hi1: s.hwRoof });
+    bb.fill(lo, front ? paint : paintDark); bb.fill(hi, paint);
+    bb.decal(lo, rectYX(s.floor, s.floor + profile.bumperHeight, -2, 2), PALETTE.charcoal);
+    return [lo, hi] as const;
   };
-  const noseLower = cap(nose, true);
-  const tailLower = cap(tail, false);
+  const [noseLower] = capPanels(nose, true), tailPanels = capPanels(tail, false);
+  const [tailLower, tailUpper] = tailPanels;
   const h = profile.headlight;
-  for (const sx of [-1, 1]) {
-    const cx = sx * (nose.hwBelt - h.inset);
-    bb.decal(noseLower, rectYX(h.y - h.height / 2 - 0.02, h.y + h.height / 2 + 0.02, cx - h.width / 2 - 0.02, cx + h.width / 2 + 0.02), PALETTE.ink, 0.003);
-    bb.decal(noseLower, rectYX(h.y - h.height / 2, h.y + h.height / 2, cx - h.width / 2, cx + h.width / 2), 0xfff1c9, 0.005);
+  const circle = (y: number, x: number, radius: number): UV[] => Array.from({ length: 12 }, (_, k) => [y + Math.sin(k / 12 * Math.PI * 2) * radius, x + Math.cos(k / 12 * Math.PI * 2) * radius]);
+  for (const side of [-1, 1]) {
+    const cx = side * (nose.hwBelt - h.inset);
+    bb.decal(noseLower, rectYX(h.y - h.height / 2 - 0.035, h.y + h.height / 2 + 0.035, cx - h.width / 2 - 0.025, cx + h.width / 2 + 0.025), PALETTE.charcoal);
+    if (muscle) for (const dx of [-0.108, 0.108]) {
+      bb.decal(noseLower, circle(h.y, cx + dx, 0.083), PALETTE.chrome, 0.006);
+      bb.decal(noseLower, circle(h.y, cx + dx, 0.061), 0xffebbb, 0.009);
+    } else {
+      bb.decal(noseLower, rectYX(h.y - h.height / 2, h.y + h.height / 2, cx - h.width / 2, cx + h.width / 2), 0xffefca, 0.006);
+      bb.decal(noseLower, rectYX(h.y - 0.05, h.y + 0.05, cx + side * h.width * 0.2, cx + side * h.width * 0.45), PALETTE.carOrange, 0.008);
+    }
   }
   if (profile.grille) {
     const g = profile.grille;
-    bb.decal(noseLower, rectYX(g.y - g.height / 2, g.y + g.height / 2, -g.width / 2, g.width / 2), PALETTE.ink, 0.003);
-    for (let k = 0; k < 2; k++) {
-      const y = g.y - g.height / 2 + (g.height / 3) * (k + 1);
-      bb.decal(noseLower, rectYX(y - 0.006, y + 0.006, -g.width / 2 + 0.03, g.width / 2 - 0.03), PALETTE.steel, 0.005);
+    bb.decal(noseLower, rectYX(g.y - g.height / 2, g.y + g.height / 2, -g.width / 2, g.width / 2), PALETTE.ink);
+    for (let k = 1; k <= 3; k++) {
+      const y = g.y - g.height / 2 + g.height * k / 4;
+      bb.decal(noseLower, rectYX(y - 0.007, y + 0.007, -g.width / 2 + 0.025, g.width / 2 - 0.025), PALETTE.steel, 0.007);
     }
+    bb.decal(noseLower, [[g.y - 0.032, 0], [g.y, 0.045], [g.y + 0.032, 0], [g.y, -0.045]], PALETTE.chrome, 0.009);
   }
   const tl = profile.taillight;
-  const tailLightRanges: Array<[number, number]> = [];
-  const reverseRanges: Array<[number, number]> = [];
-  for (const sx of [-1, 1]) {
-    const cx = sx * (tail.hwBelt - tl.inset);
-    bb.decal(tailLower, rectYX(tl.y - tl.height / 2 - 0.02, tl.y + tl.height / 2 + 0.02, cx - tl.width / 2 - 0.02, cx + tl.width / 2 + 0.02), PALETTE.ink, 0.003);
-    const inner = cx - sx * tl.width * 0.2; // the reverse lamp sits on the inboard end
-    tailLightRanges.push(bb.decal(tailLower, rectYX(tl.y - tl.height / 2, tl.y + tl.height / 2, inner + sx * 0.03, cx + sx * (tl.width / 2)), 0xc2222f, 0.005));
-    reverseRanges.push(bb.decal(tailLower, rectYX(tl.y - tl.height / 2, tl.y + tl.height / 2, cx - sx * (tl.width / 2), inner - sx * 0.01), 0x8a8a8f, 0.005));
+  if (muscle) bb.decal(tailLower, rectYX(tl.y - 0.13, tl.y + 0.12, -0.82, 0.82), PALETTE.charcoal);
+  for (const p of tailPanels) for (const side of [-1, 1]) {
+    const cx = side * (tail.hwBelt - tl.inset), inner = cx - side * tl.width * 0.2;
+    bb.decal(p, rectYX(tl.y - tl.height / 2 - 0.025, tl.y + tl.height / 2 + 0.025, cx - tl.width / 2 - 0.02, cx + tl.width / 2 + 0.02), PALETTE.ink, 0.006);
+    tailLightRanges.push(bb.decal(p, rectYX(tl.y - tl.height / 2, tl.y + tl.height / 2, inner + side * 0.03, cx + side * tl.width / 2), 0xba2338, 0.009));
+    reverseRanges.push(bb.decal(p, rectYX(tl.y - tl.height / 2, tl.y + tl.height / 2, cx - side * tl.width / 2, inner - side * 0.01), 0x95a4a5, 0.009));
+    if (muscle) for (let k = 1; k <= 2; k++) {
+      const x = inner + side * 0.03 + side * k * 0.11;
+      bb.decal(p, rectYX(tl.y - tl.height / 2, tl.y + tl.height / 2, x, x + 0.015), PALETTE.charcoal, 0.012);
+    }
   }
-  bb.decal(tailLower, rectYX(tail.floor + profile.bumperHeight + 0.05, tail.floor + profile.bumperHeight + 0.16, -0.2, 0.2), PALETTE.lightGrey, 0.004); // plate
-
-  const geometry = bb.build();
-  const body = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
-  body.castShadow = true;
-  root.add(body);
-
-  // ---- true 3D parts: mirrors, exhausts, lip spoiler ------------------------------------
-  const flat = (hex: number) => new THREE.MeshLambertMaterial({ color: hex, flatShading: true });
-  const add = (geom: THREE.BufferGeometry, mat: THREE.Material, x: number, yGround: number, z: number): THREE.Mesh => {
-    const m = new THREE.Mesh(geom, mat);
-    m.position.set(x, yGround - y0, z);
-    m.castShadow = true;
-    root.add(m);
-    return m;
-  };
+  const plateY = tail.floor + profile.bumperHeight + 0.085;
+  bb.decal(tailLower, rectYX(plateY - 0.075, plateY + 0.075, -0.24, 0.24), PALETTE.charcoal, 0.005);
+  bb.decal(tailLower, rectYX(plateY - 0.056, plateY + 0.056, -0.215, 0.215), 0xeee2bd, 0.008);
+  for (let k = 0; k < 5; k++) bb.decal(tailLower, rectYX(plateY - 0.027, plateY + 0.027, -0.15 + k * 0.062, -0.12 + k * 0.062), PALETTE.charcoal, 0.01);
+  if (van) {
+    for (const side of [-1, 1]) {
+      bb.decal(tailUpper, rectYX(1.21, 1.98, side * 0.10, side * 0.77), paintDark);
+      bb.decal(tailUpper, rectYX(1.25, 1.94, side * 0.14, side * 0.73), paintLight, 0.007);
+      box(0.12, 0.055, 0.03, PALETTE.charcoal, side * 0.15, 1.37, tail.z - 0.016);
+      for (const y of [0.95, 1.77]) box(0.11, 0.05, 0.05, PALETTE.steel, side * 0.65, y, tail.z - 0.014);
+    }
+    for (const p of tailPanels) bb.decal(p, rectYX(0.69, 2.13, -0.012, 0.012), PALETTE.charcoal, 0.012);
+  }
+  // Fittings have real thickness, but are baked into the body vertex buffer.
+  for (const s of [nose, tail]) {
+    box(s.hwFloor * 1.98, van ? 0.14 : 0.075, 0.11, muscle ? PALETTE.silver : PALETTE.charcoal, 0, s.floor + 0.06, s.z);
+    if (muscle) box(s.hwFloor * 1.96, 0.045, 0.13, PALETTE.charcoal, 0, s.floor - 0.015, s.z);
+  }
   if (profile.mirrors) {
     const s = S[profile.aPillar] as Section;
-    for (const sx of [-1, 1]) {
-      add(new THREE.BoxGeometry(0.12, 0.025, 0.04), flat(PALETTE.charcoal), sx * (s.hwBelt + 0.05), s.belt + 0.05, s.z - 0.12);
-      add(new THREE.BoxGeometry(0.17, 0.08, 0.1), flat(paintDark), sx * (s.hwBelt + 0.13), s.belt + 0.09, s.z - 0.12);
+    for (const side of [-1, 1]) {
+      box(0.16, 0.035, 0.055, PALETTE.charcoal, side * (s.hwBelt + 0.035), s.belt + 0.085, s.z - 0.14);
+      box(van ? 0.17 : 0.18, van ? 0.21 : 0.10, 0.13, compact || van ? PALETTE.charcoal : paintDark, side * (s.hwBelt + 0.13), s.belt + 0.12, s.z - 0.14);
+      box(0.13, van ? 0.15 : 0.068, 0.007, glassLight, side * (s.hwBelt + 0.13), s.belt + 0.12, s.z - 0.208);
     }
   }
   for (let i = 0; i < profile.exhausts; i++) {
-    const sx = profile.exhausts === 1 ? 0.5 : i === 0 ? -0.42 : 0.42;
-    add(new THREE.CylinderGeometry(0.05, 0.05, 0.14, 10).rotateX(Math.PI / 2), flat(PALETTE.chrome), sx, tail.floor + 0.04, tail.z - 0.05);
-    add(new THREE.CylinderGeometry(0.032, 0.032, 0.15, 8).rotateX(Math.PI / 2), flat(PALETTE.ink), sx, tail.floor + 0.04, tail.z - 0.056);
+    const x = profile.exhausts === 1 ? 0.58 : i === 0 ? -0.62 : 0.62;
+    part(new THREE.CylinderGeometry(0.057, 0.057, 0.16, 10).rotateX(Math.PI / 2), PALETTE.chrome, x, tail.floor - 0.025, tail.z - 0.035);
+    part(new THREE.CircleGeometry(0.039, 10).rotateY(Math.PI), PALETTE.ink, x, tail.floor - 0.025, tail.z - 0.117);
   }
-  if (profile.lipSpoiler) add(new THREE.BoxGeometry(tail.hwRoof * 2 - 0.2, 0.035, 0.14), flat(paintDark), 0, tail.roof + 0.015, tail.z + 0.05);
-
-  // ---- wheels: tyre, sidewall, rim, spokes, cap merged into one vertex-coloured geometry per wheel ----
-  const wheels: THREE.Object3D[] = [];
-  const r = t.wheelRadius;
-  const w = t.wheelWidth;
-  const coloured = (g: THREE.BufferGeometry, hex: number): THREE.BufferGeometry => {
-    const c = new THREE.Color(hex);
-    const n = g.getAttribute('position').count;
-    const colors = new Float32Array(n * 3);
-    for (let i = 0; i < n; i++) colors.set([c.r, c.g, c.b], i * 3);
-    g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    return g.toNonIndexed();
-  };
-  const parts: THREE.BufferGeometry[] = [
-    coloured(new THREE.CylinderGeometry(r, r, w, 18).rotateZ(Math.PI / 2), PALETTE.tyre),
-    coloured(new THREE.CylinderGeometry(r * 0.8, r * 0.8, w + 0.012, 18).rotateZ(Math.PI / 2), PALETTE.rubber),
-    coloured(new THREE.CylinderGeometry(r * 0.64, r * 0.64, w * 0.55, 12).rotateZ(Math.PI / 2), PALETTE.graphite),
-    coloured(new THREE.CylinderGeometry(r * 0.15, r * 0.15, w * 0.72, 8).rotateZ(Math.PI / 2), PALETTE.chrome),
-  ];
-  for (let k = 0; k < 5; k++) parts.push(coloured(new THREE.BoxGeometry(w * 0.6, r * 1.16, r * 0.15).rotateX((k / 5) * Math.PI), PALETTE.lightGrey));
-  const wheelGeom = mergeGeometries(parts, false);
-  for (const g of parts) g.dispose();
-  const wheelMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  if (profile.lipSpoiler) {
+    for (const x of [-0.58, 0.58]) box(0.085, 0.07, 0.1, paintDark, x, tail.roof + 0.03, tail.z + 0.17);
+    box(tail.hwRoof * 2 + 0.04, 0.065, 0.22, paintDark, 0, tail.roof + 0.08, tail.z + 0.13);
+  }
+  if (compact) {
+    const s = S[4] as Section;
+    box(1.40, 0.065, 0.22, PALETTE.charcoal, 0, s.roof + 0.015, s.z - 0.06);
+    const lightStart = bb.positions.length / 3 + extras.reduce((n, g) => n + g.getAttribute('position').count, 0);
+    box(0.36, 0.035, 0.012, 0xba2338, 0, s.roof + 0.015, s.z - 0.175);
+    tailLightRanges.push([lightStart, 36]);
+  }
+  const bodyGeometry = bb.build();
+  const geometry = mergeGeometries([bodyGeometry, ...extras], false);
+  bodyGeometry.dispose(); for (const g of extras) g.dispose();
+  const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  const body = new THREE.Mesh(geometry, material); body.name = 'body-and-trim'; body.castShadow = true;
+  root.add(body);
+  const wheels: THREE.Object3D[] = [], wheelGeom = wheelGeometry(t, profile.name);
   for (let i = 0; i < 4; i++) {
-    // order matches the sim: FR, FL, RR, RL (left = odd, +x)
-    const g = new THREE.Group();
-    const mesh = new THREE.Mesh(wheelGeom, wheelMat);
-    mesh.castShadow = true;
+    const g = new THREE.Group(); g.name = `wheel-${i}`;
+    const mesh = new THREE.Mesh(wheelGeom, material); mesh.castShadow = true;
     mesh.position.x = (i % 2 === 1 ? -1 : 1) * profile.wheelInset;
-    g.add(mesh);
-    wheels.push(g);
+    g.add(mesh); wheels.push(g);
   }
-
-  // ---- reactive lights: rewrite decal colours in place -------------------------------------
   const colorAttr = geometry.getAttribute('color') as THREE.BufferAttribute;
+  const lightColor = new THREE.Color();
   const paintRange = (ranges: Array<[number, number]>, hex: number) => {
-    const c = new THREE.Color(hex);
-    for (const [start, count] of ranges) for (let k = start; k < start + count; k++) colorAttr.setXYZ(k, c.r, c.g, c.b);
+    lightColor.setHex(hex);
+    for (const [start, count] of ranges) for (let k = start; k < start + count; k++) colorAttr.setXYZ(k, lightColor.r, lightColor.g, lightColor.b);
     colorAttr.needsUpdate = true;
   };
   let lastState = -1;
-  return {
-    root,
-    wheels,
-    update(tm) {
-      const state = (tm.brake > 0.1 && tm.gear > 0 ? 1 : 0) | (tm.gear === -1 ? 2 : 0);
-      if (state !== lastState) {
-        paintRange(tailLightRanges, state & 1 ? 0xff5c6a : 0xc2222f);
-        paintRange(reverseRanges, state & 2 ? 0xfff6dc : 0x8a8a8f);
-        lastState = state;
-      }
-    },
-  };
+  return { root, wheels, update(tm) {
+    const state = (tm.brake > 0.1 && tm.gear > 0 ? 1 : 0) | (tm.gear === -1 ? 2 : 0);
+    if (state !== lastState) {
+      paintRange(tailLightRanges, state & 1 ? 0xff6972 : 0xba2338);
+      paintRange(reverseRanges, state & 2 ? 0xfff6dc : 0x95a4a5);
+      lastState = state;
+    }
+  } };
 }

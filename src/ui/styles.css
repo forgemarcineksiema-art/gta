@@ -201,6 +201,7 @@ body {
 }
 .hud__popup.is-on { opacity: 1; }
 .hud__popup.is-gain { color: var(--ui-accent); }
+.hud__popup.is-big { font-size: 24px; }
 
 /* damage bar under the boost bar: appears with the first dent, red from stage 3, pulsing when wrecked */
 .hud__damage {

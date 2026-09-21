@@ -2,6 +2,86 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-21 — M3 session 16: slice 7, takedowns
+
+### Done
+
+- `Life.takedowns`: a car the player touched inside `takedownWindow` (2.5 s)
+  that then takes a wall impulse of `takedownDeltaV` (7 m/s) or more, the
+  same from another car, flips, or took the player's own hit at a closing
+  speed of `takedownClosingSpeed` (14 m/s) with that Δv: it wrecks at once
+  (`Traffic.wreck`), pays `takedownBoost` 0.5 (`takedownTrafficBoost` 0.6
+  into traffic), pushes `takedown` / `takedownTraffic` and starts the slow
+  motion: `state.slowMo` 1.2 s, `slowMoTarget` the agent. One per agent.
+  `Traffic.senseImpact` now splits the impulse sums by source (`playerDv`,
+  `wallDv`, `trafficDv`) and keeps `prevSpeed`; the closing speed uses the
+  velocities before the step's physics (after the hit both cars already
+  share a velocity, and the check under-read by half).
+- `App`: `timeScale = slowMo > 0 ? slowMoScale : 1` on `loop.advance`;
+  `Life` counts `slowMo` down by `dt / slowMoScale` before the step's
+  takedowns, so 1.2 s of slow motion is 1.2 s of wall time and a fresh
+  takedown shows its full duration. Any pressed action skips it
+  (`skipSlowMo`), the bot never does.
+- Camera: `ChaseCamera.focus` on the takedown target while the slow motion
+  runs, `release` after; a debris burst and smoke on the wreck. HUD:
+  "TAKEDOWN!" (big, yellow) and the "INTO TRAFFIC!" second line; a big
+  crunch and a boom.
+- Two real bugs found while pinning it, both in traffic physics:
+  1. Every lent body weighed its class mass **plus** a compact: the body
+     desc carried `setAdditionalMass(mass.compact)` on top of the collider's
+     mass properties. A compact was 2100 kg, a heavy 3450 kg; `senseImpact`
+     divided by the tuned mass, so every Δv threshold read 1.4–2× too high,
+     and a shoved car barely moved. Removed. Bodies now weigh 1050 / 1300 /
+     2400 (checked with `body.mass()`).
+  2. Traffic colliders combined friction with `Max` against the ground's
+     1.0: a shoved car skidded at 1 g like a crate and stopped inside 2 m.
+     Now `Min` with `friction` 0.4 and `linearDamping` 0.3: a 7 m/s shove
+     slides about 6 m. Wrecks still stop.
+- Two latent traffic bugs the changed collision chain exposed:
+  3. Junction curves folded. The bezier handles were a fixed 24 m; on a
+     right-angle corner whose endpoints are 25 m apart the control polygon
+     crosses and the curve cusps (58° per sample at offset 0, a 151° loop
+     at offset 6). 875 of the 3420 (lane, next, offset) curves folded. The
+     handles now scale with the endpoint gap (`HANDLE_RATIO` 0.42, cap
+     24): zero folds, worst turn per sample 9°.
+  4. A body returned to kinematic inside a junction box snapped back to the
+     stop line 18 m behind it: a lent body braking for the line creeps a
+     little past it, `entering` went false, its `wait` never reset, and
+     `moveKinematic` treated the returned car as still holding. `entering`
+     now tolerates `STOP_TOLERANCE` 1.5 m past the line, `wait` resets past
+     it, and only a car still on the approach holds.
+
+### Verification
+
+- verify green, 145 tests. Smoke 60.0 fps / p95 16.7 ms / 95 draws /
+  193k tris, build 3.48 MB.
+- Pins (`tests/sim/takedown.test.ts`, the east boundary wall at x = 786.5):
+  a parked compact 1.6 m from the wall rammed at 47 km/h (under the
+  direct-hit closing speed) wrecks on the wall slam within 2.5 s, the
+  takedown step pays 0.5 boost, `slowMo` peaks at 1.2 and is 0 by the end,
+  one event. A compact parked 1.5 m behind a heavy, rammed at 47 km/h,
+  gives `takedownTraffic` and 0.6. A parked compact across the road hit at
+  100 km/h is a direct takedown. The open-road rear-end from the traffic
+  tests is no takedown; a wreck rammed at 90 km/h stays one takedown.
+- Traffic pins after the four fixes (same seed, same bot): min same-lane
+  gap 4.5+ m, lane changes > 0, max yaw rate < 2 rad/s, nose-to-carrot
+  under 60°, no unexplained stall over 3 s, flow ratio and stop share
+  inside their bands.
+
+### Decided
+
+- Junction curve handles are proportional (0.42 of the endpoint gap, capped
+  at 24 m). `roads.lanePath` (the bot's route, M2) still uses fixed 24 m
+  handles and folds on the same corners; the bot's lookahead smooths it, so
+  it is left for a re-pin of the bot laps (BACKLOG).
+- Traffic friction rule `Min` 0.4: the chassis now slides along a traffic
+  car at its own wall friction 0.15 rather than 0.6. Marcin judges the
+  side-swipe feel; the knob is `TRAFFIC.friction`.
+
+### Next
+
+- Slice 8: billboards.
+
 ## 2026-09-21 — M3 session 16: slice 6, car-swap
 
 ### Done

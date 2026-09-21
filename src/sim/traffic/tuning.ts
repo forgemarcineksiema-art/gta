@@ -98,9 +98,9 @@ export const TRAFFIC: TrafficTuning = {
   subLaneOffsets: { highway: [-2, 6], street: [0] },
   kindWeights: { compact: 0.5, muscle: 0.3, heavy: 0.2 },
   mass: { compact: 1050, muscle: 1300, heavy: 2400 },
-  friction: 0.6,
+  friction: 0.4,
   restitution: 0.3,
-  linearDamping: 0.6,
+  linearDamping: 0.3,
   angularDamping: 1.5,
 };
 

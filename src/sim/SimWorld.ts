@@ -193,6 +193,7 @@ export class SimWorld {
       probe.speed = Math.hypot(tm.vx, tm.vz);
       probe.halfWidth = he.x;
       probe.halfLength = he.z;
+      this.traffic.playerColliderHandle = this.vehicle.collider.handle;
       this.traffic.step(probe, FIXED_DT, this.events);
       this.peds?.step(probe, this.traffic, FIXED_DT, this.events);
     }

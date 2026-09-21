@@ -38,6 +38,11 @@ export class Life {
 
   private readonly wasAhead: Uint8Array;
   private readonly cool: Float32Array;
+  /** Agents already taken down (one takedown each); cleared when the agent is freed. */
+  private readonly takenDown: Uint8Array;
+  /** The player's velocity before this step's physics, for closing speeds. */
+  private prevVx = 0;
+  private prevVz = 0;
   private lastHit = -10;
   /** Collider handle of the previous step's contact, so a hit is reported once per contact, not per step. */
   private lastHitHandle = -1;
@@ -55,6 +60,7 @@ export class Life {
     const n = sim.traffic?.capacity ?? 1;
     this.wasAhead = new Uint8Array(n);
     this.cool = new Float32Array(n);
+    this.takenDown = new Uint8Array(n);
   }
 
   preStep(controls: VehicleControls, dt: number): void {
@@ -79,12 +85,57 @@ export class Life {
   }
 
   postStep(dt: number): void {
+    // slow motion runs on wall time: the loop scales its step by slowMoScale, so the timer counts dt / scale;
+    // it counts down before this step's takedowns so a fresh takedown shows its full duration
+    if (this.state.slowMo > 0) {
+      this.state.slowMo = Math.max(0, this.state.slowMo - dt / ECONOMY.slowMoScale);
+      if (this.state.slowMo === 0) this.state.slowMoTarget = -1;
+    }
     this.hits();
     this.damageStep();
+    this.takedowns();
     this.nearMisses(dt);
     this.oncomingLane(dt);
     const dodges = this.sim.peds?.dodgesThisStep ?? 0;
     if (dodges > 0) this.grant(ECONOMY.pedDodgeBoost * dodges);
+  }
+
+  /**
+   * A car the player touched inside `takedownWindow` that then slams a wall or
+   * another car hard, flips, or took the player's own hit at closing speed:
+   * it wrecks at once, pays boost and starts the takedown slow motion.
+   */
+  private takedowns(): void {
+    const traffic = this.sim.traffic;
+    if (!traffic) return;
+    const tm = this.sim.vehicle.telemetry;
+    const window = ECONOMY.takedownWindow * 60;
+    for (let i = 0; i < traffic.capacity; i++) {
+      const st = traffic.state[i];
+      if (st === AgentState.Free) { this.takenDown[i] = 0; continue; }
+      if (this.takenDown[i] || st === AgentState.Wrecked || !traffic.hasBody(i)) continue;
+      if (this.sim.tick - (traffic.lastPlayerContactTick[i] as number) > window) continue;
+      const wall = (traffic.wallDv[i] as number) >= ECONOMY.takedownDeltaV;
+      const other = (traffic.trafficDv[i] as number) >= ECONOMY.takedownDeltaV;
+      const flipped = traffic.upOf(i) < 0.3;
+      let direct = false;
+      if ((traffic.playerDv[i] as number) >= ECONOMY.takedownDeltaV) {
+        // closing speed before the impact, from the player's and the car's previous velocities
+        const ayaw = traffic.yaw[i] as number;
+        const speed = traffic.prevSpeed[i] as number;
+        direct = Math.hypot(this.prevVx - Math.sin(ayaw) * speed, this.prevVz - Math.cos(ayaw) * speed) >= ECONOMY.takedownClosingSpeed;
+      }
+      if (!wall && !other && !flipped && !direct) continue;
+      this.takenDown[i] = 1;
+      traffic.wreck(i);
+      const boost = other ? ECONOMY.takedownTrafficBoost : ECONOMY.takedownBoost;
+      this.grant(boost);
+      this.sim.events.push(other ? 'takedownTraffic' : 'takedown', boost, traffic.x[i] as number, 0.5, traffic.z[i] as number, i);
+      this.state.slowMo = ECONOMY.slowMoSeconds;
+      this.state.slowMoTarget = i;
+    }
+    this.prevVx = tm.vx;
+    this.prevVz = tm.vz;
   }
 
   /** Damage from this step's strongest contact: walls at full weight, traffic at `trafficFactor`, props and terrain never. */

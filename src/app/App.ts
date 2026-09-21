@@ -9,7 +9,8 @@ import { InputManager } from '../input/InputManager';
 import { KeyboardDevice } from '../input/KeyboardDevice';
 import { createPlatform, type Platform } from '../platform';
 import { Renderer } from '../render/Renderer';
-import { CAR_IDS, FIXED_DT, Recorder, SimWorld, districtAt, initPhysics, type CarId, type EventLog, type RecordingJSON } from '../sim';
+import { ACTIONS } from '../input/actions';
+import { CAR_IDS, ECONOMY, FIXED_DT, Recorder, SimWorld, districtAt, initPhysics, type CarId, type EventLog, type RecordingJSON } from '../sim';
 import { DebugPanel } from '../ui/debugPanel';
 import { Hud } from '../ui/hud';
 import { BotDriver } from './bot';
@@ -311,10 +312,15 @@ export class App {
     if (st.pressed.camera) this.renderer.chase.toggleMode();
     if (st.pressed.mute) this.hud.showToast(this.audio.toggleUserMute() ? 'MUTED' : 'SOUND ON', 1);
 
+    // takedown slow motion: the fixed-step loop gets scaled time (the sim never sees wall time); any key skips it
+    if (this.sim.life.state.slowMo > 0 && !this.bot) {
+      for (const action of ACTIONS) if (st.pressed[action]) { this.sim.life.skipSlowMo(); break; }
+    }
+    const timeScale = this.sim.life.state.slowMo > 0 ? ECONOMY.slowMoScale : 1;
     let alpha = 0;
     if (!this.paused) {
       const stepStart = performance.now();
-      alpha = this.loop.advance(frameDt, () => {
+      alpha = this.loop.advance(frameDt * timeScale, () => {
         const c = this.sim.controls;
         if (this.bot) {
           this.bot.drive(this.sim, c, FIXED_DT);

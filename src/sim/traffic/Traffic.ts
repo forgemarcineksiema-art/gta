@@ -63,6 +63,8 @@ const PAINTS = [
 ];
 /** Centre spacing subtracted when one agent follows another on a lane. */
 const CAR_GAP = 4.5;
+/** Metres past the stop line a car may creep and still count as waiting at it. */
+const STOP_TOLERANCE = 1.5;
 const MAX_ON_LANE = 48;
 /** Reservation slots per junction node. */
 const HOLDERS = 4;
@@ -98,6 +100,14 @@ export class Traffic {
   readonly contactDv: Float32Array;
   /** What bounded the agent's desired speed this step: 0 nothing, 1 leader, 2 player, 3 car ahead, 4 junction wait. */
   readonly blocker: Uint8Array;
+  /** Speed change (m/s) a lent body took this step from the player's chassis, from fixed solids (walls, buildings) and from other cars. */
+  readonly playerDv: Float32Array;
+  readonly wallDv: Float32Array;
+  readonly trafficDv: Float32Array;
+  /** A lent body's speed before this step's physics: closing speeds are measured before the impact. */
+  readonly prevSpeed: Float32Array;
+  /** Collider handle of the player's chassis, so contacts can be attributed. The world refreshes it every step. */
+  playerColliderHandle = -1;
   /** Bumps when paint or tint changes so the view reuploads instance colours. */
   paintSerial = 0;
   /** Agents that gave up waiting and entered a junction anyway. */
@@ -134,10 +144,14 @@ export class Traffic {
   private readonly pos = { x: 0, y: 0, z: 0 };
   private readonly rot = { x: 0, y: 0, z: 0, w: 1 };
   private contactSum = 0;
+  private pairSum = 0;
+  private playerSum = 0;
+  private wallSum = 0;
+  private trafficSum = 0;
   private currentCol: RAPIER.Collider | null = null;
   private readonly onTrafficManifold = (m: RAPIER.TempContactManifold, _flipped: boolean): void => {
     const n = m.numContacts();
-    for (let i = 0; i < n; i++) this.contactSum += m.contactImpulse(i);
+    for (let i = 0; i < n; i++) this.pairSum += m.contactImpulse(i);
   };
   private readonly onTrafficPair = (other: RAPIER.Collider): void => {
     const parent = other.parent();
@@ -145,7 +159,13 @@ export class Traffic {
     // The ground and kerbs support the car every step. Only a chassis, a wall or another car counts.
     if (fixed && other.restitution() < 0.99) return;
     const col = this.currentCol;
-    if (col) this.world.contactPair(col, other, this.onTrafficManifold);
+    if (!col) return;
+    this.pairSum = 0;
+    this.world.contactPair(col, other, this.onTrafficManifold);
+    this.contactSum += this.pairSum;
+    if (other.handle === this.playerColliderHandle) this.playerSum += this.pairSum;
+    else if (fixed) this.wallSum += this.pairSum;
+    else if (this.colliderAgent.has(other.handle)) this.trafficSum += this.pairSum;
   };
 
   constructor(world: RAPIER.World, transforms: TransformBuffer, city: City, seed: number, tuning: TrafficTuning = TRAFFIC, density = 1) {
@@ -178,6 +198,10 @@ export class Traffic {
     this.forced = new Uint8Array(n);
     this.contactDv = new Float32Array(n);
     this.blocker = new Uint8Array(n);
+    this.playerDv = new Float32Array(n);
+    this.wallDv = new Float32Array(n);
+    this.trafficDv = new Float32Array(n);
+    this.prevSpeed = new Float32Array(n);
     this.wobble = new Float32Array(n);
     this.turn = new Uint8Array(n);
     this.laneFill = new Uint8Array(this.lanes.laneCount);
@@ -209,8 +233,7 @@ export class Traffic {
         .setCanSleep(false)
         .setCcdEnabled(true)
         .setLinearDamping(tuning.linearDamping)
-        .setAngularDamping(tuning.angularDamping)
-        .setAdditionalMass(tuning.mass.compact));
+        .setAngularDamping(tuning.angularDamping));
       body.setEnabled(false);
       const col = world.createCollider(this.colliderDesc(0), body);
       this.bodies.push(body);
@@ -229,8 +252,9 @@ export class Traffic {
     const l = he.z * 2;
     return RAPIER.ColliderDesc.cuboid(he.x, hy, he.z)
       .setTranslation(0, hy, 0)
+      // Min wins over the ground's 1.0: a shoved car slides on its tyres, not like a crate
       .setFriction(this.tuning.friction)
-      .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Max)
+      .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min)
       .setRestitution(this.tuning.restitution)
       .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Multiply)
       .setCollisionGroups(GROUPS_TRAFFIC)
@@ -275,6 +299,14 @@ export class Traffic {
   /** Seconds the agent has been waiting at a junction, 0 when not waiting. */
   waiting(agent: number): number {
     return this.wait[agent] as number;
+  }
+
+  /** World-up component of the lent body's up axis (1 level, 0 on its side, -1 on its roof); 1 without a body. */
+  upOf(agent: number): number {
+    const slot = this.agentBody[agent] as number;
+    if (slot < 0) return 1;
+    const r = (this.bodies[slot] as RAPIER.RigidBody).rotation(this.rot);
+    return 1 - 2 * (r.x * r.x + r.z * r.z);
   }
 
   agentForCollider(handle: number): number {
@@ -464,7 +496,9 @@ export class Traffic {
     let desired = limit;
     if (gap < 1e8) desired = Math.min(limit, Math.sqrt(2 * t.brake * Math.max(0, gap - t.gapMin)));
     if (desired >= limit) blocker = 0;
-    const entering = nxt >= 0 && s <= len;
+    // A lent body braking for the line creeps a little past it; within the tolerance it is still at the line.
+    const entering = nxt >= 0 && s <= len + STOP_TOLERANCE;
+    if (!entering) this.wait[i] = 0;
     if (entering && !this.mayEnter(i, player)) {
       const w = this.wait[i] as number;
       if (w < t.junctionWait && w + dt >= t.junctionWait) {
@@ -493,7 +527,8 @@ export class Traffic {
     const len = this.lanes.length[lane] as number;
     const nxt = this.next[i] as number;
     let s = (this.s[i] as number) + (this.speed[i]) * dt;
-    const holding = nxt >= 0 && (this.wait[i] as number) > 0 && (this.wait[i] as number) < t.junctionWait && this.forced[i] === 0;
+    // Only a car still on the approach holds at the line; one already in the box (a returned body) drives on.
+    const holding = nxt >= 0 && (this.s[i] as number) <= len && (this.wait[i] as number) > 0 && (this.wait[i] as number) < t.junctionWait && this.forced[i] === 0;
     if (holding) {
       if (s > len - 0.2) {
         s = len - 0.2;
@@ -541,6 +576,7 @@ export class Traffic {
     this.z[i] = this.pos.z;
     this.yaw[i] = M.yawOf(this.rot);
     body.linvel(this.lin);
+    this.prevSpeed[i] = this.speed[i] as number;
     this.speed[i] = Math.hypot(this.lin.x, this.lin.z);
     const lane = this.lane[i] as number;
     if (lane < 0) return;
@@ -844,6 +880,9 @@ export class Traffic {
         this.senseImpact(i);
       } else if (st === AgentState.Wrecked) {
         this.wreckedFor[i] = (this.wreckedFor[i] as number) + dt;
+        this.senseImpact(i);
+      } else if (st === AgentState.Abandoned) {
+        this.senseImpact(i);
       }
     }
   }
@@ -977,18 +1016,27 @@ export class Traffic {
   private senseImpact(i: number): void {
     const col = this.bodyCollider[this.agentBody[i] as number] as RAPIER.Collider;
     this.contactSum = 0;
+    this.playerSum = 0;
+    this.wallSum = 0;
+    this.trafficSum = 0;
     this.currentCol = col;
     this.world.contactPairsWith(col, this.onTrafficPair);
     this.currentCol = null;
     const id = KINDS[this.kind[i] as number] as CarId;
-    const dv = this.contactSum / this.tuning.mass[id];
+    const mass = this.tuning.mass[id];
+    const dv = this.contactSum / mass;
     this.contactDv[i] = dv;
+    this.playerDv[i] = this.playerSum / mass;
+    this.wallDv[i] = this.wallSum / mass;
+    this.trafficDv[i] = this.trafficSum / mass;
+    const st = this.state[i];
+    if (st === AgentState.Wrecked || st === AgentState.Abandoned) return;
     if (dv >= this.tuning.wreckImpact) {
       this.wreck(i);
       return;
     }
     if (dv > this.tuning.disturbedImpact) {
-      if (this.state[i] !== AgentState.Disturbed) this.loosen(i);
+      if (st !== AgentState.Disturbed) this.loosen(i);
       this.state[i] = AgentState.Disturbed;
       this.disturbedFor[i] = this.tuning.disturbedTime;
     }

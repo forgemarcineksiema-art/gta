@@ -209,7 +209,9 @@ export class Hud {
       : kind === 'nearMissOncoming' ? 'ONCOMING!'
         : kind === 'nearMissPed' ? 'DODGED'
           : kind === 'swap' ? 'FRESH WHEELS'
-            : '';
+            : kind === 'takedown' ? 'TAKEDOWN!'
+              : kind === 'takedownTraffic' ? 'TAKEDOWN! INTO TRAFFIC!'
+                : '';
     if (!text) return;
     const i = this.popupCursor % this.popups.length;
     this.popupCursor++;
@@ -217,6 +219,7 @@ export class Hud {
     if (!popup) return;
     popup.textContent = text;
     popup.classList.toggle('is-gain', value > 0);
+    popup.classList.toggle('is-big', kind === 'takedown' || kind === 'takedownTraffic');
     popup.classList.add('is-on');
     this.popupLeft[i] = 1.2;
   }

@@ -6,6 +6,9 @@ import type { Lane, RoadGraph, RoadPoint } from '../city/roads';
 import type { TrafficTuning } from './tuning';
 
 const SAMPLES = 24;
+/** Bezier handle length as a fraction of the endpoint gap (0.55 of the radius approximates a circular arc), capped. */
+const HANDLE_RATIO = 0.42;
+const HANDLE_MAX = 24;
 const TURN_RAD = 15 * Math.PI / 180;
 
 export interface LanePose {
@@ -333,10 +336,13 @@ export class LaneTables {
     const az = a.z1 + Math.sin(a.yaw) * offset;
     const bx = b.x0 - Math.cos(b.yaw0) * offset;
     const bz = b.z0 + Math.sin(b.yaw0) * offset;
-    const cx0 = ax + Math.sin(a.yaw) * 24;
-    const cz0 = az + Math.cos(a.yaw) * 24;
-    const cx1 = bx - Math.sin(b.yaw0) * 24;
-    const cz1 = bz - Math.cos(b.yaw0) * 24;
+    // Handles scale with the gap between the endpoints: fixed 24 m handles fold into a cusp on a corner whose
+    // offset endpoints are 25 m apart (and loop outright on the inside of a tight turn).
+    const handle = Math.min(HANDLE_MAX, HANDLE_RATIO * Math.hypot(bx - ax, bz - az));
+    const cx0 = ax + Math.sin(a.yaw) * handle;
+    const cz0 = az + Math.cos(a.yaw) * handle;
+    const cx1 = bx - Math.sin(b.yaw0) * handle;
+    const cz1 = bz - Math.cos(b.yaw0) * handle;
     const pts = new Float32Array((SAMPLES + 1) * 2);
     const cum = new Float32Array(SAMPLES + 1);
     for (let i = 0; i <= SAMPLES; i++) {

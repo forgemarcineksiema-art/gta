@@ -16,6 +16,8 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 ## Vehicle / feel
 
+- `roads.lanePath` (the bot's city route) still builds junction curves with fixed 24 m bezier handles, which cusp on right-angle corners; the traffic curves switched to proportional handles (`lanes.ts` `HANDLE_RATIO`). The bot's lookahead smooths the cusp, so changing it means re-pinning the city bot laps. (M3)
+
 - Wheel visuals use body pose + spring compression; no camber/toe. (M1)
 - No clutch model (decided with Marcin: an automatic arcade car does not need one; launch revving, if ever wanted, is an audio effect). (M1)
 - The track bot plans each class with a hand-set lateral budget (`TRACK_BOT_BY_CAR`); deriving it from mu, mass and downforce would make new classes self-tuning. (M1)

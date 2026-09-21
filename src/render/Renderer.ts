@@ -328,6 +328,7 @@ export class Renderer {
     this.speedLines.update(tm, Math.hypot(this.carVel.x, this.carVel.z), this.camera.aspect, dt);
     this.sparks.update(tm, this.carVel, dt);
     this.eventSeq = this.sim.events.readFrom(this.eventSeq, this.onEvent);
+    this.syncFocus();
     this.car.setDamage(this.sim.life.state.stage);
     this.emitSmoke(dt);
     this.debris.update(dt);
@@ -355,6 +356,22 @@ export class Renderer {
     } else if (e.kind === 'wrecked') {
       this.debris.burst(e.x, e.y + 0.8, e.z, this.carVel.x * 0.5, 4, this.carVel.z * 0.5, 8, 0.45, paint, 4);
       for (let k = 0; k < 24; k++) this.smoke.emit(k % 3 ? 'fire' : 'dark', e.x, e.y + 0.9, e.z, this.carVel.x, this.carVel.z);
+    } else if (e.kind === 'takedown' || e.kind === 'takedownTraffic') {
+      const tint = e.target >= 0 && this.sim.traffic ? (this.sim.traffic.paint[e.target] as number) : PALETTE.charcoal;
+      this.debris.burst(e.x, e.y + 0.6, e.z, 0, 3, 0, e.kind === 'takedownTraffic' ? 10 : 6, 0.4, tint, 4);
+      for (let k = 0; k < 16; k++) this.smoke.emit(k % 2 ? 'fire' : 'dark', e.x, e.y + 0.8, e.z);
+    }
+  }
+
+  /** The takedown camera looks at the wreck while the slow motion runs; released as soon as it ends or is skipped. */
+  private syncFocus(): void {
+    const life = this.sim.life.state;
+    const traffic = this.sim.traffic;
+    if (life.slowMo > 0 && life.slowMoTarget >= 0 && traffic) {
+      const i = life.slowMoTarget;
+      this.chase.focus(traffic.x[i] as number, 0.8, traffic.z[i] as number, 0.2);
+    } else if (this.chase.focusing) {
+      this.chase.release();
     }
   }
 

@@ -22,6 +22,7 @@ export class Sfx {
     else if (e.kind === 'damage') this.crunch(ctx, master, e.value);
     else if (e.kind === 'wrecked') this.boom(ctx, master);
     else if (e.kind === 'respawn' || e.kind === 'swap') this.whoosh(ctx, master);
+    else if (e.kind === 'takedown' || e.kind === 'takedownTraffic') { this.crunch(ctx, master, 4); this.boom(ctx, master); }
   };
 
   constructor(private readonly engine: EngineAudio) {}

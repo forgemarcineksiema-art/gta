@@ -3,6 +3,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { GROUPS_SOLID, GROUPS_TERRAIN } from '../collision';
 import { PALETTE } from '../palette';
 import type { SpawnPoint } from '../playground';
+import { mulberry32 } from '../random';
 import { IDENTITY_QUAT as IDENTITY_ROT, quatFromYaw, type StaticDesc } from '../scene';
 import { Architecture, CITY_COLORS } from './architecture';
 import { buildRoadMarkings } from './markings';
@@ -39,16 +40,6 @@ interface RoadJoins {
   end: [ClipEdge | null, ClipEdge | null];
 }
 const PAVEMENT = 4.5;
-
-function random(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = Math.imul(a ^ (a >>> 15), a | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 export class City {
   readonly graph = buildRoadGraph();
@@ -93,7 +84,7 @@ export class City {
 
   generate(cx: number, cz: number): CityChunk {
     const x = cx * BLOCK, z = cz * BLOCK;
-    const rnd = random(this.seed ^ Math.imul(cx + 19, 73856093) ^ Math.imul(cz + 23, 19349663));
+    const rnd = mulberry32(this.seed ^ Math.imul(cx + 19, 73856093) ^ Math.imul(cz + 23, 19349663));
     const statics: StaticDesc[] = [];
     const architecture = new Architecture(statics);
     const box = architecture.box.bind(architecture);

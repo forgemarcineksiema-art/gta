@@ -88,6 +88,7 @@ export class Recorder {
     out.handbrake = this.controls[co + 3] as number;
     out.boost = this.controls[co + 4] as number;
     out.reset = (this.controls[co + 5] as number) > 0.5;
+    out.swap = false;
   }
 
   /** A copy of the pose stream between two ticks (for a ghost lap). */

@@ -3,21 +3,10 @@
  * Deterministic from the seed; cycles through driving patterns that exercise
  * the whole vehicle model and keeps itself inside the playground.
  */
-import type { SimWorld, VehicleControls } from '../sim';
+import { mulberry32, type SimWorld, type VehicleControls } from '../sim';
 
 type Phase = 'straight' | 'slalom' | 'drift' | 'boost' | 'brake';
 const PHASES: Phase[] = ['straight', 'slalom', 'boost', 'drift', 'straight', 'brake', 'slalom', 'drift'];
-
-export function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 export class BotDriver {
   private readonly rnd: () => number;

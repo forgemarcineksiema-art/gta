@@ -4,8 +4,7 @@
  */
 import { describe, expect, test } from 'vitest';
 import { FixedStepLoop } from '../../src/app/loop';
-import { FIXED_DT, SimWorld, type VehicleControls } from '../../src/sim';
-import { mulberry32 } from '../../src/app/bot';
+import { FIXED_DT, SimWorld, mulberry32, type VehicleControls } from '../../src/sim';
 import { createWorld, position } from './helpers';
 
 /** Deterministic scripted input as a function of the sim tick only. */

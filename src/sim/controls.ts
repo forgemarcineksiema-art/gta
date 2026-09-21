@@ -16,10 +16,12 @@ export interface VehicleControls {
   boost: number;
   /** Edge-triggered: consumed by the sim on the step it is seen. */
   reset: boolean;
+  /** Edge-triggered: take the car alongside. Consumed by the sim on the step it is seen. */
+  swap: boolean;
 }
 
 export function createControls(): VehicleControls {
-  return { throttle: 0, brake: 0, steer: 0, handbrake: 0, boost: 0, reset: false };
+  return { throttle: 0, brake: 0, steer: 0, handbrake: 0, boost: 0, reset: false, swap: false };
 }
 
 export function clearControls(c: VehicleControls): void {
@@ -29,4 +31,5 @@ export function clearControls(c: VehicleControls): void {
   c.handbrake = 0;
   c.boost = 0;
   c.reset = false;
+  c.swap = false;
 }

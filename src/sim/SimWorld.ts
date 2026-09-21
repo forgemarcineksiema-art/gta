@@ -8,6 +8,7 @@
  */
 import RAPIER from '@dimforge/rapier3d-compat';
 import { createControls, type VehicleControls } from './controls';
+import { EventLog } from './events';
 import { buildPlayground, type PlaygroundLayout, type SpawnPoint } from './playground';
 import { POSE_STRIDE, Recorder } from './recorder';
 import type { DynamicDesc, StaticDesc } from './scene';
@@ -39,6 +40,10 @@ export interface SimWorldOptions {
   car?: CarId;
   /** Record every step (default true on playground, false in the city). */
   record?: boolean;
+  /** Traffic density scale. 0 disables. Default 1. The pool arrives in a later slice. */
+  traffic?: number;
+  /** Pedestrian density scale. 0 disables. Default 1. */
+  peds?: number;
 }
 
 interface TrackedBody {
@@ -60,7 +65,11 @@ export class SimWorld {
   readonly city: City | null;
   private readonly roadReset: SpawnPoint = { name: 'nearest-road', position: { x: 0, y: 1, z: 0 }, yaw: 0 };
   readonly world: RAPIER.World;
-  readonly transforms = new TransformBuffer(512);
+  readonly transforms = new TransformBuffer(1024);
+  readonly events = new EventLog();
+  /** Density scales from `SimWorldOptions`. Read by the life systems when they exist. */
+  readonly trafficDensity: number;
+  readonly pedsDensity: number;
   readonly statics: StaticDesc[];
   readonly dynamics: DynamicDesc[] = [];
   readonly spawns: SpawnPoint[];
@@ -85,6 +94,8 @@ export class SimWorld {
 
   /** `initPhysics()` must have resolved before constructing. */
   constructor(opts: SimWorldOptions = {}) {
+    this.trafficDensity = opts.traffic ?? 1;
+    this.pedsDensity = opts.peds ?? 1;
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
     this.world.timestep = FIXED_DT;
     this.city = opts.map === 'city' ? new City(this.world, opts.seed) : null;
@@ -145,10 +156,12 @@ export class SimWorld {
     }
     this.transforms.swap();
     this.respawned = false;
+    this.events.tick = this.tick;
     const reset = this.controls.reset;
     this.vehicle.update(this.controls, FIXED_DT);
     if (reset) this.respawned = true;
     this.controls.reset = false;
+    this.controls.swap = false;
     this.world.step();
     this.vehicle.writeTransforms();
     for (const t of this.tracked) {

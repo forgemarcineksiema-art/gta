@@ -2,6 +2,27 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-21 — M3 session 15: slice 0
+
+### Done
+
+- Slice 0 scaffolding. `mulberry32` lives in `src/sim/random.ts`; `app/bot.ts` and `City.generate` both use it (the city seed pin still holds). `EventLog` is a 64-slot ring (`src/sim/events.ts`) with `tick` stamped from a field the world sets, because `push` has no tick argument. `VehicleControls.swap`, `Vehicle.engineCut`, `Vehicle.setVelocity`, telemetry `hitHandle` / `hitImpulse`. `TransformBuffer` capacity 1024. `SimWorldOptions.traffic` / `peds` stored as `trafficDensity` / `pedsDensity` (default 1). `?traffic=`, `?peds=` and `?life=0` parsed in `App.boot`. `render_game_to_text` reports `carId`, `damage` (null), `traffic` (null), `peds` (null), `billboards` (null) and the last five event kinds.
+
+### Verification
+
+- Before the edit: verify green, 109 tests, smoke 60.0 fps / p95 16.7 ms / 84 draws / 162,448 tris, build 3.40 MB, gameplay-start 1095 ms.
+- After slice 0: verify green, 111 tests (2 new event-log tests), smoke 59.2 fps / p95 16.8 ms / 84 draws / 166,994 tris, build 3.40 MB, gameplay-start 1667 ms. Draws unchanged. The triangle max and the startup time sit in the same band as earlier city runs (session 13 logged 162k tris and a 1.9–3.2 s control time); no system that draws or moves the car changed.
+
+### Decided and why
+
+- `EventLog.tick` is a public field the sim writes at the start of the step. The contract's `push` signature has no tick, and the event still has to carry one.
+- Density is stored now and the pools stay absent, so `?traffic=0` changes nothing visible until slice 1. `?life=0` forces both scales to 0 even if the other params are set.
+- `setVelocity` writes through the vehicle scratch vector. Swap will call it outside `update`.
+
+### Next
+
+- Slice 1: kinematic traffic on the lane graph and its instanced meshes. Before that, two `npm run perf` baselines on this commit (`perf/m3-base-1.json`, `perf/m3-base-2.json`).
+
 ## 2026-09-21 — Session 14: the M3 plan
 
 Marcin asked for a full, detailed M3 plan. The executor will be Grok 4.7 XHigh

@@ -1,6 +1,8 @@
 export { SimWorld, FIXED_DT, FIXED_HZ, initPhysics, type SimWorldOptions, type GhostPose } from './SimWorld';
 export { createControls, clearControls, type VehicleControls } from './controls';
 export { TransformBuffer } from './transforms';
+export { mulberry32 } from './random';
+export { EventLog, type EventKind, type SimEvent } from './events';
 export { PALETTE } from './palette';
 export { STRAIGHT, type SpawnPoint } from './playground';
 export type { StaticDesc, DynamicDesc, ShapeDesc, Vec3, Quat } from './scene';

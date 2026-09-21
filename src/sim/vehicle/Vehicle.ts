@@ -112,6 +112,10 @@ export interface VehicleTelemetry {
   gVert: number;
   /** Speed change from body contacts (walls, props) this step, m/s; 0 when free. */
   impact: number;
+  /** Collider handle of the strongest contact this step, or -1. */
+  hitHandle: number;
+  /** Summed normal impulse of that contact, N·s. */
+  hitImpulse: number;
   /** 0..1 how hard the body is scraping along a wall right now. */
   scrape: number;
   /** Side of the current wall contact: +1 left, -1 right, 0 none. */
@@ -184,6 +188,8 @@ export class Vehicle {
   /** Steering angle at the front axle (bicycle model), radians (+ = right). */
   steer = 0;
   drifting = false;
+  /** Throttle and boost are ignored while a wreck cuts the engine. Brakes and steering still work. */
+  engineCut = false;
   driftTime = 0;
   boostMeter: number;
   boosting = false;
@@ -208,6 +214,9 @@ export class Vehicle {
   private readonly prevVel = M.v3();
   // body contacts (walls, props), read back from Rapier's narrow phase each step
   private contactImpulse = 0;
+  private pairImpulse = 0;
+  private bestPairImpulse = 0;
+  private bestPairHandle = -1;
   private contactCount = 0;
   private wallTouch = false;
   private pairFixed = false;
@@ -221,6 +230,7 @@ export class Vehicle {
     const n = m.numContacts();
     for (let i = 0; i < n; i++) imp += m.contactImpulse(i);
     if (imp <= 0) return;
+    this.pairImpulse += imp;
     const nrm = scratch.n;
     m.normal(nrm);
     // the manifold normal points from the first collider to the second; make it point into the car
@@ -237,7 +247,12 @@ export class Vehicle {
   private readonly onPair = (other: RAPIER.Collider): void => {
     const parent = other.parent();
     this.pairFixed = parent === null || parent.isFixed();
+    this.pairImpulse = 0;
     this.world.contactPair(this.collider, other, this.onManifold);
+    if (this.pairImpulse > this.bestPairImpulse) {
+      this.bestPairImpulse = this.pairImpulse;
+      this.bestPairHandle = other.handle;
+    }
   };
   readonly telemetry: VehicleTelemetry;
   /** Where `reset` puts the car: updated by the world (nearest spawn point). */
@@ -337,6 +352,8 @@ export class Vehicle {
       contactNx: 0,
       contactNy: 0,
       contactNz: 0,
+      hitHandle: -1,
+      hitImpulse: 0,
     };
     this.writeTransforms(true);
   }
@@ -398,7 +415,7 @@ export class Vehicle {
     const forwardSpeed = M.dot(s.vel, s.fwd);
     const speed = M.length(s.vel);
     const absFwd = Math.abs(forwardSpeed);
-    const throttle = M.clamp01(controls.throttle);
+    const throttle = this.engineCut ? 0 : M.clamp01(controls.throttle);
     const brakeIn = M.clamp01(controls.brake);
     const handbrake = controls.handbrake > 0.5;
 
@@ -414,7 +431,7 @@ export class Vehicle {
     this.steer = Math.sign(this.steerRaw) * Math.pow(Math.abs(this.steerRaw), t.steerCurve) * maxSteer;
 
     // ---- boost --------------------------------------------------------------
-    this.boosting = controls.boost > 0.5 && this.boostMeter > 0;
+    this.boosting = !this.engineCut && controls.boost > 0.5 && this.boostMeter > 0;
     if (this.boosting) this.boostMeter = Math.max(0, this.boostMeter - t.boostDrain * dt);
 
     // ---- suspension raycasts --------------------------------------------------
@@ -487,6 +504,8 @@ export class Vehicle {
     // digs in, the car pivots into the wall and stops dead from 45 degrees up.
     this.contactImpulse = 0;
     this.contactCount = 0;
+    this.bestPairImpulse = 0;
+    this.bestPairHandle = -1;
     this.wallTouch = false;
     this.contactSide = 0;
     M.set(this.contactNormal, 0, 0, 0);
@@ -965,6 +984,8 @@ export class Vehicle {
     tm.brake = brakeIn;
     tm.driftDistance = this.driftDistance;
     tm.impact = impact;
+    tm.hitHandle = this.bestPairHandle;
+    tm.hitImpulse = this.bestPairImpulse;
     tm.scrape = scrape;
     tm.contactSide = this.wallTouch ? this.contactSide : 0;
     if (this.contactImpulse > 0) {
@@ -1050,6 +1071,15 @@ export class Vehicle {
       w.slipRatio = 0;
     }
     this.writeTransforms(true);
+  }
+
+  /** Replace linear velocity. Swap calls this after `teleport`, which zeroes it. */
+  setVelocity(vx: number, vy: number, vz: number): void {
+    const v = scratch.vel;
+    v.x = vx;
+    v.y = vy;
+    v.z = vz;
+    this.body.setLinvel(v, true);
   }
 
   /** Copy body + wheel poses into the transform buffer. Call after `world.step()`. */

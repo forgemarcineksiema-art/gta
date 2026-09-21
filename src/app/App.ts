@@ -8,7 +8,7 @@ import { InputManager } from '../input/InputManager';
 import { KeyboardDevice } from '../input/KeyboardDevice';
 import { createPlatform, type Platform } from '../platform';
 import { Renderer } from '../render/Renderer';
-import { CAR_IDS, FIXED_DT, Recorder, SimWorld, districtAt, initPhysics, type CarId, type RecordingJSON } from '../sim';
+import { CAR_IDS, FIXED_DT, Recorder, SimWorld, districtAt, initPhysics, type CarId, type EventLog, type RecordingJSON } from '../sim';
 import { DebugPanel } from '../ui/debugPanel';
 import { Hud } from '../ui/hud';
 import { BotDriver } from './bot';
@@ -18,6 +18,20 @@ import { PerfProbe, heapMb } from './perf';
 
 /** Filled during `App.boot`; copied into the handle for `?dev` and the startup gate. */
 const bootTimings: Record<string, number> = {};
+
+/** `?traffic=` / `?peds=` density scale. Missing or unreadable stays at 1. */
+function densityParam(raw: string | null): number {
+  if (raw === null) return 1;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : 1;
+}
+
+/** Last five event kinds, oldest first. Allocates; this hook is not a frame path. */
+function recentEventKinds(log: EventLog): string[] {
+  const kinds: string[] = [];
+  log.readFrom(Math.max(0, log.sequence - 5), (e) => kinds.push(e.kind));
+  return kinds;
+}
 
 export interface GameHandle {
   started: boolean;
@@ -158,6 +172,14 @@ export class App {
       return JSON.stringify({
         axes: '+Y up, +Z north, +X west; metres', mode: this.paused ? 'paused' : 'driving',
         map: sim.city ? 'city' : 'playground', seed: sim.city?.seed,
+        carId: sim.carId,
+        damage: null,
+        traffic: null,
+        peds: null,
+        billboards: null,
+        events: recentEventKinds(sim.events),
+        trafficDensity: sim.trafficDensity,
+        pedsDensity: sim.pedsDensity,
         player: { x: p.x, y: p.y, z: p.z, speedKmh: sim.vehicle.telemetry.speedKmh, boost: sim.vehicle.boostMeter },
         district: sim.city ? districtAt(p.x, p.z).name : null,
         quality: this.renderer.quality, collisionChunks: sim.city?.active.size,
@@ -209,7 +231,17 @@ export class App {
     const citySpawns = ['city', 'crown', 'foundry', 'gardens', 'marina', 'highway'];
     const map = params.get('map') === 'playground' || params.get('bot') === 'track' || (spawn && !citySpawns.includes(spawn)) ? 'playground' : 'city';
     const seed = Number(params.get('seed') ?? '42');
-    const sim = new SimWorld({ map, seed: Number.isFinite(seed) ? seed : 42, ...(spawn ? { spawn } : {}), ...(car ? { car } : {}) });
+    const lifeOff = params.get('life') === '0';
+    const traffic = lifeOff ? 0 : densityParam(params.get('traffic'));
+    const peds = lifeOff ? 0 : densityParam(params.get('peds'));
+    const sim = new SimWorld({
+      map,
+      seed: Number.isFinite(seed) ? seed : 42,
+      traffic,
+      peds,
+      ...(spawn ? { spawn } : {}),
+      ...(car ? { car } : {}),
+    });
     bootTimings['sim'] = performance.now();
     const app = new App(platform, sim, canvas, params);
     platform.loadingStop();
@@ -288,6 +320,7 @@ export class App {
           c.handbrake = st.value.handbrake;
           c.boost = st.value.boost;
           if (st.pressed.reset) c.reset = true;
+          if (st.pressed.swap) c.swap = true;
         }
         this.sim.step();
         this.panel?.graphPush(this.sim.vehicle.telemetry);

@@ -23,11 +23,9 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 ## City / world
 
-- Frontage rows use three variants per road kind; a long avenue still shows the
-  rhythm. Corner buildings at authored junctions and shops turning the corner
-  would break it. (M2.2)
-- The Works chicane has no frontage by design (yards); stacked containers, tanks
-  and a gantry would make it read as a working yard rather than empty paving. (M2.2)
+- Frontage rows now vary width and variant by index and fill the corners, but a
+  long avenue still reads as generated; shops turning the corner and one
+  authored "special" building per avenue would break the rhythm for good. (M2.2)
 - The landmark silhouettes are only visible along open sightlines (avenues aimed
   at them, the highway, open quarters); street canyons hide them. A subtle
   compass cue in the HUD or on the minimap edge would complete orientation. (M2.2)

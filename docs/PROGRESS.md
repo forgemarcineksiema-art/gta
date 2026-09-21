@@ -39,10 +39,19 @@ after.
   the largest part now costs at most one slice per frame. A worker remains the
   answer for the chunk generation spikes at start.
 
+### City and looks (same session, after the performance pass)
+
+- Yard props in `Architecture` (container, tank, gantry, fence, mast) placed
+  along the service road every 30 m, alternating sides, footprint-checked.
+- Frontage starts 8 m past the junction pavement (corner buildings); widths
+  vary by index.
+- Coral Quay edge: parapet with coping instead of the 4 m seawall, promenade,
+  palms, benches, masts. Boundary colliders unchanged.
+- Verify, city gate and unit tests green after the pass.
+
 ### Next
 
-- City and looks (Marcin's second item): frontage rhythm, corner buildings,
-  chicane yards, then his playtest notes.
+- Marcin's playtest notes on the loop and the yards; then M3 traffic.
 
 ## 2026-09-21 — Session 10: M2.2 the loop, the skyline, streaming hygiene
 

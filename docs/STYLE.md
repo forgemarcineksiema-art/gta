@@ -94,8 +94,17 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 - Roofs: offices and quay blocks alternate a plant box, a set-back penthouse with
   a band, and a parapet ring with stair head and water tank; buildings of eight
   floors or more get a second step. Houses and warehouses keep pitched or flat.
-- Coral Quay's sea edges have a pier with posts, a pavilion and moored boats
-  beyond the seawall (visual only; the boundary colliders are unchanged).
+- Coral Quay's sea edges are a 1.1 m parapet with a coping (the 4 m boundary
+  collider stays), a paved promenade with palms every 22 m, benches and floodlight
+  masts, and a pier with posts, a pavilion and moored boats beyond the wall.
+  Elsewhere the island edge keeps the 4 m seawall.
+- The Works chicane has yards instead of frontage: container rows (two colours,
+  one stacked tier), a storage tank with a teal band, a gantry crane, floodlight
+  masts and a chain-link fence between pavement and yard. Containers, tanks and
+  gantry legs are solid.
+- Frontage rows start 8 m past the junction pavement, so authored junctions have
+  corner buildings; widths cycle through three values per row on top of the
+  three facade variants.
 - Rotated statics rotate about +Y only; a rotated building is generated in its
   own frame and moved as a whole, so facade rules never see the rotation.
 

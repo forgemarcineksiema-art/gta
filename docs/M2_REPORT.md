@@ -237,10 +237,18 @@ in most runs on this machine.
 3. Corners: does the chicane ask for the handbrake, does the parkway hold a
    drift, does the sweep reward not lifting? Report which of the three felt wrong.
 
+### City and looks pass (same day)
+
+Worked off the known issues: chicane yards furnished (containers, tank, gantry,
+masts, fences, all solid where it matters), authored junctions get corner
+buildings (frontage starts 8 m past the pavement, footprint-checked), frontage
+widths vary by index, Coral Quay's edge is a low parapet with promenade, palms,
+benches and masts. Review images: `output/design-review/issues-after/`.
+
 ### Known issues
 
-- Frontage rhythm repeats along the avenue; junction corners on authored roads
-  have no corner buildings; the chicane's yards are bare.
+- Frontage rhythm still reads as generated over a whole avenue (three variants
+  times three widths).
 - Silhouettes need an open sightline; street canyons hide them.
 - One 60–115 ms render spike per run remains unexplained; the tier switch is one
   known source.

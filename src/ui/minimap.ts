@@ -54,15 +54,19 @@ export class Minimap {
   private readonly label: HTMLElement;
   private readonly landmark: HTMLElement;
   private readonly observer: ResizeObserver | null = null;
-  /** World-space paths built once; one transform per repaint draws them all. */
-  private readonly gridPath = new Path2D();
+  /**
+   * World-space paths built once; one transform per repaint draws the visible
+   * ones. Grid streets merge into whole lines across the island (10 subpaths
+   * instead of 60 segments), the perimeter highway is one closed rectangle.
+   */
+  private readonly gridLines: Array<{ path: Path2D; axis: 'x' | 'z'; at: number }> = [];
   private readonly highwayPath = new Path2D();
-  private readonly specialPaths: Array<{ path: Path2D; width: number }> = [];
+  private highwayRing = 0;
+  private readonly specialPaths: Array<{ path: Path2D; width: number; minX: number; maxX: number; minZ: number; maxZ: number }> = [];
   private readonly islandPath = new Path2D();
   private readonly districtFills: Array<{ path: Path2D; fill: string }> = [];
   private readonly gridWidth: number;
   private readonly highwayWidth: number;
-  private clipPath = new Path2D();
   private markers: readonly MinimapMarker[];
   private readonly state: MinimapState = { heading: 0, radiusM: MINIMAP.radiusMinM };
   private readonly tmp: Vec2 = { x: 0, y: 0 };
@@ -101,12 +105,33 @@ export class Minimap {
     this.gridWidth = layers?.gridWidth ?? 24;
     this.highwayWidth = layers?.highwayWidth ?? 38;
     if (layers) {
-      for (const s of layers.grid) { this.gridPath.moveTo(s.x0, s.z0); this.gridPath.lineTo(s.x1, s.z1); }
-      for (const s of layers.highway) { this.highwayPath.moveTo(s.x0, s.z0); this.highwayPath.lineTo(s.x1, s.z1); }
+      const lines = new Map<string, { axis: 'x' | 'z'; at: number; min: number; max: number }>();
+      for (const s of layers.grid) {
+        const axis = s.x0 === s.x1 ? 'x' : 'z';
+        const at = axis === 'x' ? s.x0 : s.z0;
+        const a = axis === 'x' ? s.z0 : s.x0, b = axis === 'x' ? s.z1 : s.x1;
+        const key = `${axis}${at}`;
+        const line = lines.get(key) ?? { axis, at, min: Infinity, max: -Infinity };
+        line.min = Math.min(line.min, a, b);
+        line.max = Math.max(line.max, a, b);
+        lines.set(key, line);
+      }
+      for (const line of lines.values()) {
+        const path = new Path2D();
+        if (line.axis === 'x') { path.moveTo(line.at, line.min); path.lineTo(line.at, line.max); }
+        else { path.moveTo(line.min, line.at); path.lineTo(line.max, line.at); }
+        this.gridLines.push({ path, axis: line.axis, at: line.at });
+      }
+      for (const s of layers.highway) this.highwayRing = Math.max(this.highwayRing, Math.abs(s.x0), Math.abs(s.x1), Math.abs(s.z0), Math.abs(s.z1));
+      if (this.highwayRing > 0) this.highwayPath.rect(-this.highwayRing, -this.highwayRing, this.highwayRing * 2, this.highwayRing * 2);
       for (const road of layers.special) {
         const path = new Path2D();
-        road.points.forEach((p, i) => (i === 0 ? path.moveTo(p.x, p.z) : path.lineTo(p.x, p.z)));
-        this.specialPaths.push({ path, width: road.width });
+        let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+        road.points.forEach((p, i) => {
+          if (i === 0) path.moveTo(p.x, p.z); else path.lineTo(p.x, p.z);
+          minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
+        });
+        this.specialPaths.push({ path, width: road.width, minX, maxX, minZ, maxZ });
       }
     }
     this.islandPath.rect(-CITY_HALF, -CITY_HALF, CITY_HALF * 2, CITY_HALF * 2);
@@ -190,8 +215,6 @@ export class Minimap {
     // Setting the size resets every canvas state; paint() sets all of it again.
     this.canvas.width = px;
     this.canvas.height = px;
-    this.clipPath = new Path2D();
-    this.clipPath.arc(cssPx / 2, cssPx / 2, cssPx / 2, 0, Math.PI * 2);
     this.dirty = true;
   }
 
@@ -202,10 +225,9 @@ export class Minimap {
     const px = ccx, py = ccy + R * MINIMAP.playerOffset;
     const h = this.state.heading;
     const s = R / this.state.radiusM;
+    // The square is painted whole; the CSS border-radius clips it to the circle on
+    // the compositor, which is far cheaper than an anti-aliased canvas clip.
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    c.clearRect(0, 0, size, size);
-    c.save();
-    c.clip(this.clipPath);
     c.fillStyle = WATER;
     c.fillRect(0, 0, size, size);
 
@@ -218,26 +240,28 @@ export class Minimap {
     c.fillStyle = ISLAND;
     c.fill(this.islandPath);
     for (const d of this.districtFills) { c.fillStyle = d.fill; c.fill(d.path); }
-    c.lineCap = 'round';
-    c.lineJoin = 'round';
     const minW = MINIMAP.minRoadPx / s;
     const casing = (MINIMAP.casingPx * 2) / s;
     const gridW = Math.max(this.gridWidth, minW);
     const highW = Math.max(this.highwayWidth, minW);
+    // Only paths within reach of the visible disc are stroked (casing pass, then fills).
+    const reach = this.state.radiusM + casing;
+    const highwayVisible = this.highwayRing > 0 && Math.max(Math.abs(x), Math.abs(z)) >= this.highwayRing - reach - highW / 2;
     c.strokeStyle = DARK;
-    c.lineWidth = gridW + casing;
-    c.stroke(this.gridPath);
-    for (const r of this.specialPaths) { c.lineWidth = Math.max(r.width, minW) + casing; c.stroke(r.path); }
-    c.lineWidth = highW + casing;
-    c.stroke(this.highwayPath);
+    this.strokeGrid(x, z, reach + gridW / 2, gridW + casing);
+    if (highwayVisible) { c.lineWidth = highW + casing; c.stroke(this.highwayPath); }
+    this.strokeSpecials(x, z, reach, casing, minW);
     c.strokeStyle = GRID;
-    c.lineWidth = gridW;
-    c.stroke(this.gridPath);
+    this.strokeGrid(x, z, reach + gridW / 2, gridW);
     c.strokeStyle = LOOP;
-    for (const r of this.specialPaths) { c.lineWidth = Math.max(r.width, minW); c.stroke(r.path); }
-    c.strokeStyle = ACCENT;
-    c.lineWidth = highW;
-    c.stroke(this.highwayPath);
+    this.strokeSpecials(x, z, reach, 0, minW);
+    if (highwayVisible) {
+      c.lineCap = 'butt';
+      c.lineJoin = 'miter';
+      c.strokeStyle = ACCENT;
+      c.lineWidth = highW;
+      c.stroke(this.highwayPath);
+    }
     c.restore();
 
     // Screen space from here: glyphs stay upright.
@@ -290,13 +314,37 @@ export class Minimap {
         c.stroke();
       }
     }
-    c.restore();
 
     c.beginPath();
     c.arc(ccx, ccy, R - 1, 0, Math.PI * 2);
     c.lineWidth = 2;
     c.strokeStyle = RIM;
     c.stroke();
+  }
+
+  /** Grid lines within `reach` of the car; butt caps, since every end sits under the highway ring. */
+  private strokeGrid(x: number, z: number, reach: number, width: number): void {
+    const c = this.ctx;
+    c.lineCap = 'butt';
+    c.lineJoin = 'miter';
+    c.lineWidth = width;
+    for (const line of this.gridLines) {
+      if (Math.abs((line.axis === 'x' ? x : z) - line.at) <= reach) c.stroke(line.path);
+    }
+  }
+
+  /** Authored polylines whose bounds touch the visible disc; round joins for the curves. */
+  private strokeSpecials(x: number, z: number, reach: number, extra: number, minW: number): void {
+    const c = this.ctx;
+    c.lineCap = 'round';
+    c.lineJoin = 'round';
+    for (const p of this.specialPaths) {
+      const w = Math.max(p.width, minW);
+      const margin = reach + w;
+      if (x + margin < p.minX || x - margin > p.maxX || z + margin < p.minZ || z - margin > p.maxZ) continue;
+      c.lineWidth = w + extra;
+      c.stroke(p.path);
+    }
   }
 
   /** Four distinct shapes so the landmarks read without colour: the tower, the water tank, the glasshouse, the hotel slab. */

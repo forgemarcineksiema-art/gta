@@ -130,18 +130,21 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   corner buildings; widths cycle through three values per row on top of the
   three facade variants.
 - Surface decals are top faces stacked at least 12 mm apart (road 0.010,
-  shoulders 0.022, lane marks 0.028, authored road 0.034, crosswalks and parking
-  marks 0.046, authored dashes 0.054); with the 0.6 m near plane the depth
-  buffer separates them out to the fog. Closer spacing z-fights while driving.
+  authored road 0.034, parking pads 0.040, all paint 0.063-0.064); with the
+  0.6 m near plane the depth buffer separates them out to the fog. Closer
+  spacing z-fights while driving. Paint never overlaps paint: bays replace edge
+  lines on kerbside roads, and lines stop 5 m short of stop lines and crossings.
 - Grazing-angle rule for anything flat on the ground: from the driving camera
   (about 4 m up) a mark of length L along the view direction at distance d is
   only L × 4 / d² radians tall, about 670 px per radian at 720p. A 0.28 m line
   across the road is 0.2 px at 60 m; a 4 cm kerb lip is 0.3 px at 40 m. Such
-  lines shimmer with 4× MSAA and no width fixes it, so they do not exist:
-  parking bays are 6 m patches of alternating tone, pavements have no lip and
-  no joints (their edge is the colour boundary plus the 14 cm kerb face),
-  zebra stripes are worn-paint tone and only in the near level (120 m), and
-  past that a crossing is a faint lighter patch. Vertical thin members shimmer
+  lines shimmer with 4× MSAA and no width fixes it, so they either run along
+  the road or fade: pavements have no lip and no joints (their edge is the
+  colour boundary plus the 14 cm kerb face), and every mark that lies across
+  the road (zebra stripes, stop lines, arrows, bay dividers, the P stencil)
+  carries a per-vertex `paint` underlay and fade distance, and the shared
+  material blends it into the surface colour underneath before its projected
+  thickness reaches a pixel (`render/roadPaint.ts`). Vertical thin members shimmer
   past 100 m below about 0.4 m: cornices are 0.44 m, lamp heads 0.28 m, and
   window frames keep low contrast against the glass.
 - Measure, do not guess: `screens/flicker-capture2.mjs` records raw canvas
@@ -156,9 +159,32 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   the far side. Wedge tips are chamfered 2.5 m. Bands along authored roads are
   prism quads per centreline segment sharing point normals, so curves have no
   overlapping kerb boxes. Trees and lamps still skip grid street corridors.
-- Parking bays: a continuous edge line along the road (its width does not
-  foreshorten) plus alternating 6 m bay patches; none where an authored road
-  merges in.
+- Road paint is one metre-based system for the whole city (`sim/city/markings.ts`),
+  measured along each road so dash phase never restarts at a chunk or polyline
+  segment, and each mark has one streaming owner. Centre lines are yellow: a
+  6 m dash for two-way streets, a double solid for the last 24 m before a
+  junction and the whole perimeter. White is everything else: edge lines on
+  the parkway, the service road and the highway; kerbside bays instead of edge
+  lines on streets, the Crown avenue and the quay. The perimeter is painted as
+  one closed loop with quarter-circle corners: double yellow and 4 m lane
+  dashes (two lanes each way, at 8 m) run on through every side-street mouth
+  because the highway has priority; only its inner edge line breaks at the
+  mouths and at the kerb corners.
+- Junctions: a crossing (1.6 × 3.5 m stripes at 3 m pitch, as many as the width
+  allows) is either whole or absent; it moves out past a diagonal merge and,
+  on an authored road, waits until both road edges are 6 m clear of the grid
+  kerb lines so it lands on the pavement wedge. A stop line spans the approach
+  lane 5 m past the crossing. Arrows describe the single broad lane, straight
+  through a crossroads and a left-right T at the perimeter, drawn whole or not
+  at all. No crossings on any approach to the perimeter or across the service
+  road; authored roads get no arrows, their options are the wedge's.
+- Parking is complete 3 × 7 m parallel spaces with a darker pad, two edge lines
+  along the road and fading dividers, in groups with a 7 m manoeuvring gap,
+  starting 14 m past the paint start and never where an authored road merges
+  in. Districts use the kerb differently (`PARKING_STYLE`): Crown and the quay
+  mark groups of five with a P stencil, the gardens groups of three with every
+  second group unmarked, Sunset Works groups of three in yellow with no P, the
+  loading bays of the yards.
 - Junction decals (crossings, bands) live in a chunk's base render part so both
   halves of a crossing change detail level together; the far level keeps the
   facade reveals, so a building's only distance change is the sub-pixel trim.

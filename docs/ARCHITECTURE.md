@@ -136,6 +136,23 @@ the bearing from the car, which is the compass cue the street canyons needed.
 Canvas 2D keeps the repaint off the DOM layout path that cost 19 % of the main
 thread in the M2.1 profile; the maths lives in a DOM-free module with Node pins.
 
+Decision 19 (M2.2): road paint is generated per road, not per chunk
+(`sim/city/markings.ts`). Chunk-local rules restarted dash phase at every tile
+edge, split crossings at diagonal merges into stray stripes and could only ever
+see one chunk of a curve. The generator walks each road's centreline in metres
+(grid streets, the five authored polylines, and the perimeter as one closed loop
+with quarter-circle corners), decides every crossing, stop line, arrow and bay
+against the whole graph, merges consecutive strokes of a line into boxes of at
+most 12 m, and hands each mark to the chunk that holds its centre; `City.generate`
+just appends its chunk's list. The perimeter has priority, so its centre and lane
+lines run through the side-street mouths and only its inner edge line breaks.
+Marks that lie across the road carry a per-vertex underlay colour and fade
+distance, and the shared material blends them into the surface colour before
+their projected thickness reaches a pixel (`render/roadPaint.ts`): the same
+merged, single-draw-call geometry, one extra vertex attribute, no second pass.
+The alternative, a decal texture per road, needs textures the style forbids and
+a second material.
+
 ## Data flow per frame (detail)
 
 ```

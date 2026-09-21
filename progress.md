@@ -67,3 +67,12 @@ Tak, aby pasowały do gry. Naprawdę mają dobrze wyglądać."
   project's Playwright. Driving images and state are in `cars-drive-v2/`,
   `cars-compact-drive/`, `cars-heavy-drive/` under `output/design-review/`.
 - Final verification and runtime gates recorded in `docs/PROGRESS.md`.
+
+## 2026-09-21 — Road markings and roadside parking
+
+- Request: improve horizontal road markings and properly finish roadside parking.
+- Baseline verify: 101 tests and all gates passed; captures in output/design-review/roads-before/.
+- Done (first pass): metre-based whole-road paint, complete parallel spaces, distance-filtered thin lines; Marcin accepted the look.
+- Done (second pass, whole city): the perimeter painted as one closed loop with lanes and unbroken priority lines; crossings and stop lines at every authored-road end; left-right arrows at the perimeter T-junctions; kerbside bays on the Crown avenue and the quay; district parking styles (loading bays in Sunset Works, sparse bays in the gardens); line strokes merged into 12 m boxes.
+- Session details and final validation are recorded in docs/PROGRESS.md.
+

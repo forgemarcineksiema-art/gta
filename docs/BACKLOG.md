@@ -26,6 +26,17 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 - Frontage rows now vary width and variant by index and fill the corners, but a
   long avenue still reads as generated; shops turning the corner and one
   authored "special" building per avenue would break the rhythm for good. (M2.2)
+- The highway is painted as two lanes each way (lane dashes at 8 m from the
+  centre); its lane graph still has one lane per direction at 6 m. When M3
+  traffic arrives, move the highway lanes to 4 and 12 m so cars sit in the
+  painted lanes and the bot no longer straddles the inner one. (M2.2)
+- The parkway joins its junctions tangentially, so its crossing and stop line
+  are 112 m from the node, where the road has finally separated from the
+  street; a give-way line at the actual merge would say more to the player.
+  The two streets it runs beside have no stop line at that end at all. (M2.2)
+- Paint is flat colour with one wear tone; no re-painted patches, no per-block
+  wear variation. Cheap to add as a second `paint` underlay once the flicker
+  capture shows it does not shimmer. (M2.2)
 - The minimap has no lot, park or water data to draw: `City.generate` emits
   render descriptors only. A small `cityFootprints()` export (park rects, block
   outlines, the promenade and piers) would let a full-screen map show blocks

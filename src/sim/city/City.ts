@@ -5,6 +5,7 @@ import { PALETTE } from '../palette';
 import type { SpawnPoint } from '../playground';
 import { IDENTITY_QUAT as IDENTITY_ROT, quatFromYaw, type StaticDesc } from '../scene';
 import { Architecture, CITY_COLORS } from './architecture';
+import { buildRoadMarkings } from './markings';
 import { BLOCK, CITY_HALF, HIGHWAY_HALF, ROAD_HALF, buildCityRoute, buildRoadGraph, distanceToPolyline, projectOnLane, type Lane, type RoadPoint, type SpecialRoad } from './roads';
 
 export const DISTRICTS = [
@@ -51,6 +52,7 @@ function random(seed: number): () => number {
 
 export class City {
   readonly graph = buildRoadGraph();
+  readonly roadMarkings = buildRoadMarkings(this.graph, districtAt);
   readonly route = buildCityRoute(this.graph);
   /** Axis-aligned bounds per lane, so the reset projection skips distant lanes. */
   private readonly laneBounds = this.graph.lanes.map((lane) => {
@@ -105,21 +107,9 @@ export class City {
       const half = (BLOCK / 2 - vx) / 2;
       box(x + side * (vx + half), 0, z, half, 0.01, vz, PALETTE.asphalt, 'road');
     }
-    // Surface layers, top faces from the ground up, at least 12 mm apart so the
-    // depth buffer separates them out to the fog (about 7 mm at 300 m with the
-    // 0.6 m near plane): road 0.010, shoulders 0.022, lane marks 0.028, authored
-    // road 0.034, crosswalks 0.046, parking marks 0.046, authored dashes 0.054.
-    // Paved parking / service shoulders visually separate the active carriageway.
-    // Keep the existing junction envelope for drift, U-turns and the lane graph.
-    for (const side of [-1, 1]) for (const along of [-1, 1]) {
-      box(x + side * (vx - 2), 0.021, z + along * 68.75, 2, 0.001, 43.75, PALETTE.asphaltLight, 'decor', 'top');
-      box(x + along * 68.75, 0.021, z + side * (vz - 2), 43.75, 0.001, 2, PALETTE.asphaltLight, 'decor', 'top');
-    }
-    for (let d = -100; d <= 100; d += 12) {
-      if (Math.abs(d) < 26) continue;
-      box(x, 0.022, z + d, 0.14, 0.006, 2.8, PALETTE.laneMark);
-      box(x + d, 0.022, z, 2.8, 0.006, 0.14, PALETTE.laneMark);
-    }
+    // One owner per whole-road marking, including marks across chunk boundaries.
+    // Non-colliding top faces: road .010/.034, parking pad .040, paint .064.
+    statics.push(...(this.roadMarkings.chunks.get(`${cx},${cz}`) ?? []));
     // Authored roads that come near this chunk. Their corridor (half width plus
     // pavement) overrides the grid apron and lots, so nothing is built on them.
     const corridors = this.graph.special.filter((road) => road.centre.some((pt) => Math.abs(pt.x - x) < BLOCK / 2 + road.halfWidth + 8 && Math.abs(pt.z - z) < BLOCK / 2 + road.halfWidth + 8));
@@ -231,21 +221,6 @@ export class City {
           }
         }
       }
-      // Parking bays explain the generous road width without altering the driving
-      // envelope. They are 6 m patches of alternating tone, not painted lines: a
-      // line across the road is sub-pixel tall from the driving camera past 25 m.
-      // A continuous bay edge line along the road (its width does not foreshorten)
-      // and alternating 6 m bay patches; nothing where an authored road merges in.
-      for (const along of [32, 44, 56, 68, 80, 92]) {
-        if (roadClearance(x + sx * (vx - 2), z + sz * (along + 6)) > 3) {
-          box(x + sx * (vx - 2), 0.045, z + sz * (along + 3), 1.7, 0.001, 3, PALETTE.asphaltBay, 'decor', 'top');
-          box(x + sx * (vx - 3.86), 0.045, z + sz * (along + 6), 0.14, 0.001, 6, PALETTE.laneMark, 'decor', 'top');
-        }
-        if (roadClearance(x + sx * (along + 6), z + sz * (vz - 2)) > 3) {
-          box(x + sx * (along + 3), 0.045, z + sz * (vz - 2), 3, 0.001, 1.7, PALETTE.asphaltBay, 'decor', 'top');
-          box(x + sx * (along + 6), 0.045, z + sz * (vz - 3.86), 6, 0.001, 0.14, PALETTE.laneMark, 'decor', 'top');
-        }
-      }
       if (d.id !== 'foundry') for (const along of [57, 106]) {
         if (roadClearance(x + sx * (vx + 2.7), z + sz * along) > 3) architecture.tree(x + sx * (vx + 2.7), z + sz * along, d.id === 'marina');
         if (roadClearance(x + sx * along, z + sz * (vz + 2.7)) > 3) architecture.tree(x + sx * along, z + sz * (vz + 2.7), d.id === 'marina');
@@ -255,19 +230,6 @@ export class City {
         if (roadClearance(x + sx * (vx + 2), z + sz * offset) < 1.5) continue;
         box(x + sx * (vx + 2), 4, z + sz * offset, 0.18, 4, 0.18, 0x686678);
         box(x + sx * (vx + 1), 8, z + sz * offset, 1.4, 0.28, 0.45, PALETTE.laneMark);
-      }
-      // Crosswalks, kept out of the highway.
-      if (vx === ROAD_HALF && vz === ROAD_HALF) {
-        // Stripes at 2.5 m pitch alias past ~150 m; the far level draws one band.
-        // Worn-paint tone: the zebra's 1.1 m gaps are under a pixel tall past 60 m,
-        // and lower contrast halves what aliasing is left before the far band.
-        for (let i = 0; i < 4; i++) {
-          box(x + sx * (2 + i * 2.5), 0.04, z + sz * 16, 0.7, 0.006, 2, PALETTE.kerb).detailOnly = true;
-          box(x + sx * 16, 0.04, z + sz * (2 + i * 2.5), 2, 0.006, 0.7, PALETTE.kerb).detailOnly = true;
-        }
-        // Past 150 m a crossing is a faint lighter patch: any contrast there aliases.
-        box(x + sx * 5.75, 0.04, z + sz * 16, 5.75, 0.006, 2, PALETTE.asphaltLight).farOnly = true;
-        box(x + sx * 16, 0.04, z + sz * 5.75, 2, 0.006, 5.75, PALETTE.asphaltLight).farOnly = true;
       }
     }
     // Each landmark owns a reserved plaza, with paths back to both bordering streets.
@@ -446,7 +408,7 @@ export class City {
     };
     const pitch = frontage ? 2 * frontage.hx + frontage.gap : Infinity;
     const fronts = [{ side: 1, next: 40 }, { side: -1, next: 40 + pitch / 2 }];
-    let along = 0, nextDash = 0, nextTree = 13, nextLamp = 30, nextYard = 45;
+    let along = 0, nextTree = 13, nextLamp = 30, nextYard = 45;
     for (let i = 0; i + 1 < road.centre.length; i++) {
       const a = road.centre[i] as RoadPoint, b = road.centre[i + 1] as RoadPoint;
       const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz);
@@ -459,16 +421,6 @@ export class City {
       if (Math.abs(mx - x) >= BLOCK / 2 || Math.abs(mz - z) >= BLOCK / 2) continue;
       const surface = box(mx, 0.033, mz, hw, 0.001, len / 2 + 0.25, PALETTE.asphalt, 'road', 'top');
       surface.rotation = rot;
-      if (!nearJunction(mx, mz, 26)) {
-        while (nextDash < along) {
-          if (nextDash >= startAlong) {
-            const t = (nextDash - startAlong) / len;
-            const dash = box(a.x + dx * t, 0.05, a.z + dz * t, 0.14, 0.004, 1.4, PALETTE.laneMark);
-            dash.rotation = rot;
-          }
-          nextDash += 12;
-        }
-      }
       // Pavement bands follow the centreline exactly: one quad per segment between
       // the carriageway edge and the edge 4.5 m out, using the shared point normals,
       // so consecutive quads meet edge to edge on curves. At the junctions they

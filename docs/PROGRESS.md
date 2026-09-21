@@ -2,6 +2,89 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-21 — Session 13: road paint for the whole city and proper kerbside parking
+
+Two passes. The first (started in a Codex session, accepted visually by Marcin)
+replaced the chunk-local decor rules with one metre-based generator
+(`sim/city/markings.ts`): yellow centre lines with a 6 m dash and double solid
+approaches, crossings whole or absent, stop lines and straight arrows on grid
+streets, complete 3 × 7 m parallel spaces with pads, edge lines, dividers and
+a P stencil, and a per-vertex `paint` underlay so marks that lie across the
+road fade into the surface before they alias (`render/roadPaint.ts`). The
+second pass, this session, extended it to every road and junction on the island.
+
+### Done
+
+- **Perimeter as one closed loop.** The highway is painted as a single
+  centreline with 19 m quarter circles about the inner kerb corners: double
+  yellow and 4 m lane dashes at ±8 m (two lanes each way) run on through all
+  20 side-street mouths because the highway has priority; the outer edge line
+  goes round the corners at 35 m radius, the inner one breaks at the mouths
+  (and at the two diagonal merges) and stops for the kerb corners. Before, each
+  of the 24 highway segments stopped 21–28 m short of every node and the
+  corners were empty squares.
+- **Authored road ends.** Every one of the ten approaches has a stop line;
+  the avenue ends at the tower, the parkway and the quay have crossings with as
+  many stripes as the width allows (8, 6, 8). The crossing waits until both
+  road edges are 6 m clear of the grid kerb lines, so it lands on the pavement
+  wedge; the parkway joins its junctions tangentially and its crossing is 112 m
+  out. No crossings at the perimeter or across the service road, no arrows on
+  authored roads.
+- **Perimeter T-junctions.** Streets ending at the highway get a left-right
+  arrow (six boxes) instead of nothing; an arrow is drawn whole or not at all.
+- **Kerbside on the avenue and the quay** (136 spaces) instead of edge lines;
+  the parkway and the service road keep edge lines.
+- **District parking** (`PARKING_STYLE`): Crown and the quay groups of five
+  with a P, the gardens groups of three with every second group unmarked,
+  Sunset Works groups of three in yellow with no P (loading bays).
+- **Strokes merge** into boxes of at most 12 m, never across a polyline bend:
+  4,540 line boxes for the whole island instead of about 12,000.
+- Docs: decision 19 in `ARCHITECTURE.md`, paint and parking rules in
+  `STYLE.md` (the 6 m patch rule is gone), three backlog lines.
+
+### Verification
+
+- `verify` green: 109 tests (7 marking pins: chassis fit, complete pads
+  without overlap or duplicate owners, district styles, whole crossings at
+  every join with the exact authored stripe counts, every street approach
+  furnished, the perimeter loop's continuity and mouth breaks, 12 m merge
+  cap and chunk ownership), build 3.40 MB, smoke 59.8 fps / p95 16.8 ms / 84
+  draws / 162k tris alone (41.7 fps in a run that overlapped a parallel lint,
+  not a code effect).
+- `city` 5/5: control in 3.2 s at 20 Mbit / CPU ×4 (a slow run; 1.9 s last
+  session); whole 178-lane tours low 61 draws / 162,135 triangles, high 88 /
+  235,866 (was 162,729 / 233,674), heap 48 MB, zero bot resets.
+- Overhead and driver-level captures at both tiers of the tower junction,
+  both diagonal ends, both ends of the parkway, quay and chicane, the
+  chicane middle, a highway corner, T-junction and straight, and a Coral Quay
+  crossroads: `output/design-review/whole-before/`, `whole-after/`,
+  `roads-whole/`; scratch scripts `screens/whole-city-review.mjs`,
+  `screens/road-review.mjs`. Zero browser errors.
+- Not measured: a matched perf A/B on the MX330 and the headed Intel path; the
+  triangle counts say the change is within noise, and Marcin's playtest is the
+  feel check.
+
+### Decided and why
+
+- Per road, not per chunk (decision 19): dash phase, crossings at merges and
+  curves all need the whole road; the chunk map is just the owner lookup.
+- The highway has priority, so its lines run through the mouths; the side
+  streets carry the stop line. Lane dashes at 8 m are honest about the 32 m
+  carriageway; the lane graph still runs one lane per direction at 6 m
+  (backlog: move to 4 and 12 m with M3 traffic).
+- Bays instead of edge lines wherever there is frontage: the avenue and the
+  quay read as city streets with parking, the parkway and the yards road as
+  through roads. An edge line and a bay edge would overlap at the same height.
+- No arrows on authored approaches: they merge at an angle into a wedge, and a
+  straight arrow would point at a pavement.
+
+### Next
+
+- Marcin's playtest of the whole loop; the tangential parkway ends are the
+  spot to judge (crossing and stop line 112 m from the node).
+- M3 traffic can take the lane dashes and the `approaches` list (stop line
+  positions per road end) as its stop points.
+
 ## 2026-09-21 — Vehicle model quality pass
 
 Marcin asked for properly finished, good-looking cars that fit the game.

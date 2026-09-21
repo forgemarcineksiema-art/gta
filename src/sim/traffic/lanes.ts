@@ -17,7 +17,17 @@ export interface LanePose {
 export interface LaneProjection extends LanePose {
   s: number;
   lateral: number;
+  /** Distance from the point to the polyline, m. */
+  dist: number;
 }
+
+/** Projection onto a lane and its chosen connection; `switched` means the point is already on `next`. */
+export interface PathProjection extends LaneProjection {
+  switched: boolean;
+}
+
+/** Two junction movements conflict when their curves come within this distance, m. */
+const CONFLICT_DISTANCE = 5;
 
 interface Connection {
   /** x, z pairs, SAMPLES + 1 points from the lane end to the next lane start. */
@@ -39,7 +49,9 @@ export class LaneTables {
   readonly midZ: Float32Array;
   private readonly uturnOf: Int16Array;
   private readonly connections = new Map<number, Connection>();
+  private readonly conflictCache = new Map<number, boolean>();
   private readonly scratch: LanePose = { x: 0, z: 0, yaw: 0 };
+  private readonly scratchProj: LaneProjection = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };
 
   constructor(graph: RoadGraph, tuning: TrafficTuning) {
     this.graph = graph;
@@ -98,8 +110,9 @@ export class LaneTables {
     return Math.abs(this.headingChange(lane, next)) < TURN_RAD;
   }
 
-  connectionLength(lane: number, next: number): number {
-    return this.connection(lane, next).length;
+  /** Length of the junction curve for an agent driving `offset` metres right of the lane (inside turns are shorter). */
+  connectionLength(lane: number, next: number, offset = 0): number {
+    return this.connection(lane, next, offset).length;
   }
 
   /**
@@ -113,7 +126,7 @@ export class LaneTables {
       this.sample(lane, Math.max(0, Math.min(s, len)), offset, out);
       return;
     }
-    const conn = this.connection(lane, next);
+    const conn = this.connection(lane, next, offset);
     const cs = s - len;
     if (cs >= conn.length) {
       const over = cs - conn.length;
@@ -121,11 +134,15 @@ export class LaneTables {
       this.sample(next, Math.max(0, Math.min(over, nlen)), offset, out);
       return;
     }
-    this.sampleConnection(conn, cs, offset, out);
+    this.sampleConnection(conn, cs, out);
   }
 
-  /** Closest point on the lane polyline. `lateral` is signed metres to the right of the polyline. */
-  project(lane: number, x: number, z: number, out: LaneProjection): void {
+  /**
+   * Closest point on the lane polyline shifted `offset` metres to its right (the
+   * path an agent with that lane offset actually drives). `lateral` is signed
+   * metres to the right of that shifted path.
+   */
+  project(lane: number, x: number, z: number, out: LaneProjection, offset = 0): void {
     const lanePts = (this.graph.lanes[lane] as Lane).points;
     const base = this.cumStart[lane] as number;
     let best = Infinity;
@@ -141,9 +158,15 @@ export class LaneTables {
       const dx = b.x - a.x;
       const dz = b.z - a.z;
       const len2 = dx * dx + dz * dz || 1;
-      const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / len2));
-      const px = a.x + dx * t;
-      const pz = a.z + dz * t;
+      const yaw = Math.atan2(dx, dz);
+      // right is (-cos yaw, sin yaw)
+      const ox = -Math.cos(yaw) * offset;
+      const oz = Math.sin(yaw) * offset;
+      const ax = a.x + ox;
+      const az = a.z + oz;
+      const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / len2));
+      const px = ax + dx * t;
+      const pz = az + dz * t;
       const ex = x - px;
       const ez = z - pz;
       const dist = ex * ex + ez * ez;
@@ -153,9 +176,8 @@ export class LaneTables {
         bestS = (this.cum[base + i] as number) + seg * t;
         bestX = px;
         bestZ = pz;
-        bestYaw = Math.atan2(dx, dz);
-        // right is (-cos yaw, sin yaw); lateral is the projection onto it
-        bestLat = ex * -Math.cos(bestYaw) + ez * Math.sin(bestYaw);
+        bestYaw = yaw;
+        bestLat = ex * -Math.cos(yaw) + ez * Math.sin(yaw);
       }
     }
     out.x = bestX;
@@ -163,6 +185,99 @@ export class LaneTables {
     out.yaw = bestYaw;
     out.s = bestS;
     out.lateral = bestLat;
+    out.dist = Math.sqrt(best);
+  }
+
+  /**
+   * Project onto the lane and, when `next` is chosen, onto the connection curve
+   * (then `s` runs past the lane length). Once the point has passed the end of
+   * the connection onto `next`, `switched` is set and `s` is along `next`.
+   */
+  projectPath(lane: number, next: number, x: number, z: number, out: PathProjection, offset = 0): void {
+    this.project(lane, x, z, out, offset);
+    out.switched = false;
+    if (next < 0) return;
+    const conn = this.connection(lane, next, offset);
+    let best = out.dist * out.dist;
+    let bestS = -1;
+    let bestX = 0;
+    let bestZ = 0;
+    let bestYaw = 0;
+    let bestLat = 0;
+    for (let i = 0; i < SAMPLES; i++) {
+      const ax = conn.pts[i * 2] as number;
+      const az = conn.pts[i * 2 + 1] as number;
+      const dx = (conn.pts[(i + 1) * 2] as number) - ax;
+      const dz = (conn.pts[(i + 1) * 2 + 1] as number) - az;
+      const len2 = dx * dx + dz * dz || 1;
+      const yaw = Math.atan2(dx, dz);
+      const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / len2));
+      const px = ax + dx * t;
+      const pz = az + dz * t;
+      const ex = x - px;
+      const ez = z - pz;
+      const d = ex * ex + ez * ez;
+      if (d < best) {
+        best = d;
+        bestS = (conn.cum[i] as number) + Math.sqrt(len2) * t;
+        bestX = px;
+        bestZ = pz;
+        bestYaw = yaw;
+        bestLat = ex * -Math.cos(yaw) + ez * Math.sin(yaw);
+      }
+    }
+    if (bestS < 0) return;
+    out.s = (this.length[lane] as number) + bestS;
+    out.x = bestX;
+    out.z = bestZ;
+    out.yaw = bestYaw;
+    out.lateral = bestLat;
+    out.dist = Math.sqrt(best);
+    if (bestS < conn.length - 0.5) return;
+    // At the end of the connection: the next lane starts here. Once the point
+    // has progressed onto it, report the switch.
+    const p = this.scratchProj;
+    this.project(next, x, z, p, offset);
+    if (p.s > 0.3 && p.dist <= out.dist + 0.1) {
+      out.switched = true;
+      out.s = p.s;
+      out.x = p.x;
+      out.z = p.z;
+      out.yaw = p.yaw;
+      out.lateral = p.lateral;
+      out.dist = p.dist;
+    }
+  }
+
+  /**
+   * True when two junction movements can collide: their connection curves come
+   * within CONFLICT_DISTANCE of each other. Movements from the same approach
+   * lane never conflict: the follower stays behind its leader through the box
+   * (the leader gap does that), so it need not wait for the box to clear.
+   * Cached per pair.
+   */
+  conflicts(laneA: number, nextA: number, laneB: number, nextB: number): boolean {
+    if (laneA === laneB) return false;
+    const ka = laneA * 1024 + nextA;
+    const kb = laneB * 1024 + nextB;
+    const key = ka < kb ? ka * 262144 + kb : kb * 262144 + ka;
+    const cached = this.conflictCache.get(key);
+    if (cached !== undefined) return cached;
+    const a = this.connection(laneA, nextA);
+    const b = this.connection(laneB, nextB);
+    const limit = CONFLICT_DISTANCE * CONFLICT_DISTANCE;
+    let hit = false;
+    for (let i = 0; i <= SAMPLES && !hit; i++) {
+      const ax = a.pts[i * 2] as number;
+      const az = a.pts[i * 2 + 1] as number;
+      for (let j = 0; j <= SAMPLES; j++) {
+        const dx = (b.pts[j * 2] as number) - ax;
+        const dz = (b.pts[j * 2 + 1] as number) - az;
+        if (dx * dx + dz * dz < limit) { hit = true; break; }
+      }
+    }
+    this.conflictCache.set(key, hit);
+    return hit;
   }
 
   private sample(lane: number, s: number, offset: number, out: LanePose): void {
@@ -185,7 +300,7 @@ export class LaneTables {
     applyOffset(x, z, yaw, offset, out);
   }
 
-  private sampleConnection(conn: Connection, s: number, offset: number, out: LanePose): void {
+  private sampleConnection(conn: Connection, s: number, out: LanePose): void {
     let seg = 0;
     for (let i = 0; i < SAMPLES; i++) {
       if ((conn.cum[i + 1] as number) >= s || i + 1 === SAMPLES) { seg = i; break; }
@@ -197,27 +312,38 @@ export class LaneTables {
     const z0 = conn.pts[seg * 2 + 1] as number;
     const x1 = conn.pts[(seg + 1) * 2] as number;
     const z1 = conn.pts[(seg + 1) * 2 + 1] as number;
-    const yaw = Math.atan2(x1 - x0, z1 - z0);
-    applyOffset(x0 + (x1 - x0) * t, z0 + (z1 - z0) * t, yaw, offset, out);
+    out.x = x0 + (x1 - x0) * t;
+    out.z = z0 + (z1 - z0) * t;
+    out.yaw = Math.atan2(x1 - x0, z1 - z0);
   }
 
-  private connection(lane: number, next: number): Connection {
-    const key = lane * 1024 + next;
+  /**
+   * The junction curve between the end of `lane` and the start of `next`, for a
+   * path `offset` metres to the right of both. It is a fresh Bezier between the
+   * offset endpoints (with the same tangents), never an offset of the centre
+   * curve, so an inside offset on a tight corner cannot fold back on itself.
+   */
+  private connection(lane: number, next: number, offset = 0): Connection {
+    const key = (lane * 1024 + next) * 1024 + 512 + Math.round(offset * 10);
     const cached = this.connections.get(key);
     if (cached) return cached;
     const a = this.graph.lanes[lane] as Lane;
     const b = this.graph.lanes[next] as Lane;
-    const cx0 = a.x1 + Math.sin(a.yaw) * 24;
-    const cz0 = a.z1 + Math.cos(a.yaw) * 24;
-    const cx1 = b.x0 - Math.sin(b.yaw0) * 24;
-    const cz1 = b.z0 - Math.cos(b.yaw0) * 24;
+    const ax = a.x1 - Math.cos(a.yaw) * offset;
+    const az = a.z1 + Math.sin(a.yaw) * offset;
+    const bx = b.x0 - Math.cos(b.yaw0) * offset;
+    const bz = b.z0 + Math.sin(b.yaw0) * offset;
+    const cx0 = ax + Math.sin(a.yaw) * 24;
+    const cz0 = az + Math.cos(a.yaw) * 24;
+    const cx1 = bx - Math.sin(b.yaw0) * 24;
+    const cz1 = bz - Math.cos(b.yaw0) * 24;
     const pts = new Float32Array((SAMPLES + 1) * 2);
     const cum = new Float32Array(SAMPLES + 1);
     for (let i = 0; i <= SAMPLES; i++) {
       const t = i / SAMPLES;
       const u = 1 - t;
-      pts[i * 2] = u * u * u * a.x1 + 3 * u * u * t * cx0 + 3 * u * t * t * cx1 + t * t * t * b.x0;
-      pts[i * 2 + 1] = u * u * u * a.z1 + 3 * u * u * t * cz0 + 3 * u * t * t * cz1 + t * t * t * b.z0;
+      pts[i * 2] = u * u * u * ax + 3 * u * u * t * cx0 + 3 * u * t * t * cx1 + t * t * t * bx;
+      pts[i * 2 + 1] = u * u * u * az + 3 * u * u * t * cz0 + 3 * u * t * t * cz1 + t * t * t * bz;
       if (i > 0) {
         const dx = (pts[i * 2] as number) - (pts[(i - 1) * 2] as number);
         const dz = (pts[i * 2 + 1] as number) - (pts[(i - 1) * 2 + 1] as number);

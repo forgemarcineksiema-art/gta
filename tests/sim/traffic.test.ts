@@ -97,7 +97,7 @@ describe('traffic', () => {
     try {
       run(sim, 8);
       const here = sim.vehicle.body.translation();
-      const proj: LaneProjection = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0 };
+      const proj: LaneProjection = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };
       lanes.project(lane, here.x, here.z, proj);
       const along = proj.s - (traffic.s[agent] as number);
       const hits: string[] = [];
@@ -132,11 +132,20 @@ describe('traffic', () => {
     } finally { sim.dispose(); }
   }, 60_000);
 
-  it('lends a body near the player and returns it far away', async () => {
+  it('lends a body near the player, steers it straight, moves it through junctions and returns it far away', async () => {
     const sim = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 0, record: false });
     const bot = new TrackBot('muscle', CITY_BOT_TUNING);
     const traffic = sim.traffic as Traffic;
     const bodies = traffic.tuning.physicsBodies;
+    const prevLane = new Int16Array(traffic.capacity).fill(-1);
+    const atEnd = new Float32Array(traffic.capacity);
+    const lastS = new Float32Array(traffic.capacity).fill(-1);
+    const physicalSince = new Int32Array(traffic.capacity);
+    const contactAt = new Int32Array(traffic.capacity).fill(-1000);
+    let laneChanges = 0;
+    let maxYawRate = 0;
+    let maxHeadingError = 0;
+    let maxAtEnd = 0;
     try {
       for (let step = 0; step < 60 * 60; step++) {
         bot.drive(sim, sim.controls, 1 / 60);
@@ -145,18 +154,87 @@ describe('traffic', () => {
         const pz = sim.vehicle.body.translation().z;
         let lent = 0;
         for (let i = 0; i < traffic.capacity; i++) {
-          if (traffic.state[i] === AgentState.Free) continue;
+          const st = traffic.state[i];
+          if (st === AgentState.Free) { prevLane[i] = -1; continue; }
           const dx = (traffic.x[i] as number) - px;
           const dz = (traffic.z[i] as number) - pz;
           const dist = Math.hypot(dx, dz);
-          const held = traffic.state[i] === AgentState.Physical || traffic.state[i] === AgentState.Disturbed || traffic.state[i] === AgentState.Wrecked;
+          const held = traffic.hasBody(i);
           if (held) lent++;
-          if (dist < 35) expect(traffic.state[i]).not.toBe(AgentState.Kinematic);
+          if (dist < 35) expect(st).not.toBe(AgentState.Kinematic);
           if (dist > 70) expect(held).toBe(false);
+          const lane = traffic.lane[i] as number;
+          if (st !== AgentState.Physical) physicalSince[i] = step;
+          if ((traffic.contactDv[i] as number) > 0) contactAt[i] = step;
+          if (st === AgentState.Physical && lane >= 0) {
+            // heading: a stable controller, no spinning, nose within 25 degrees of the path
+            // (a car the player is shoving from 8 m or less is physics, not the controller)
+            if (dist > 8) maxYawRate = Math.max(maxYawRate, Math.abs(traffic.bodyYawRate(i)));
+            // the nose points at the path 8 m ahead (the controller's carrot); on a tight corner the tangent at the
+            // car's own position can differ by 45 degrees, so the pin is against the carrot direction
+            traffic.lanes.positionAt(lane, (traffic.s[i] as number) + 8, traffic.laneOffset[i] as number, pose, traffic.next[i]);
+            let err = Math.atan2(pose.x - (traffic.x[i] as number), pose.z - (traffic.z[i] as number)) - (traffic.yaw[i] as number);
+            err = Math.abs(Math.atan2(Math.sin(err), Math.cos(err)));
+            // settled cars only: a car spun by a shove turns back on the spot, which is physics recovering, not steering
+            const settled = step - (physicalSince[i] as number) > 60 && step - (contactAt[i] as number) > 60;
+            if (dist > 8 && settled && (traffic.speed[i] as number) > 3) maxHeadingError = Math.max(maxHeadingError, err);
+            if ((prevLane[i] as number) >= 0 && prevLane[i] !== lane) laneChanges++;
+            // progress: a lent car with nothing in front of it and no reservation to wait for keeps moving along its path
+            const s = traffic.s[i] as number;
+            const stalled = Math.abs(s - (lastS[i] as number)) < 0.02 && traffic.waiting(i) === 0 && traffic.blocker[i] === 0;
+            if (stalled) {
+              atEnd[i] = (atEnd[i] as number) + 1 / 60;
+              maxAtEnd = Math.max(maxAtEnd, atEnd[i] as number);
+            } else atEnd[i] = 0;
+            lastS[i] = s;
+          } else { atEnd[i] = 0; lastS[i] = -1; }
+          prevLane[i] = st === AgentState.Physical ? lane : -1;
         }
         expect(lent).toBeLessThanOrEqual(bodies);
       }
+      console.log(`[traffic] lent bodies: lane changes ${laneChanges}, max yaw rate ${maxYawRate.toFixed(2)} rad/s, max nose-to-carrot error ${(maxHeadingError * 180 / Math.PI).toFixed(1)} deg, longest unexplained stall ${maxAtEnd.toFixed(2)} s`);
       expect(traffic.guardHops).toBe(0);
+      expect(laneChanges).toBeGreaterThan(0);
+      expect(maxYawRate).toBeLessThan(2);
+      expect(maxHeadingError).toBeLessThan(60 * Math.PI / 180);
+      expect(maxAtEnd).toBeLessThan(3);
+    } finally { sim.dispose(); }
+  }, 120_000);
+
+  it('flows: cars mostly drive, few stand still, few give up on a junction', async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 0, record: false });
+    const bot = new TrackBot('muscle', CITY_BOT_TUNING);
+    const traffic = sim.traffic as Traffic;
+    let agentSteps = 0;
+    let ratioSum = 0;
+    let stopped = 0;
+    let highwaySteps = 0;
+    let highwayRatio = 0;
+    try {
+      for (let step = 0; step < 60 * 60; step++) {
+        bot.drive(sim, sim.controls, 1 / 60);
+        sim.step();
+        if (step < 10 * 60) continue; // let the pool fill and settle
+        for (let i = 0; i < traffic.capacity; i++) {
+          const st = traffic.state[i];
+          if (st !== AgentState.Kinematic && st !== AgentState.Physical) continue;
+          const lane = traffic.lane[i] as number;
+          if (lane < 0) continue;
+          const limit = traffic.lanes.limit[lane] as number;
+          const ratio = (traffic.speed[i] as number) / limit;
+          agentSteps++;
+          ratioSum += ratio;
+          if ((traffic.speed[i] as number) < 0.5) stopped++;
+          if (limit === traffic.tuning.speedHighway) { highwaySteps++; highwayRatio += ratio; }
+        }
+      }
+      const mean = ratioSum / Math.max(1, agentSteps);
+      const stoppedShare = stopped / Math.max(1, agentSteps);
+      const highway = highwayRatio / Math.max(1, highwaySteps);
+      console.log(`[traffic] flow: mean speed/limit ${mean.toFixed(3)}, stopped share ${stoppedShare.toFixed(3)}, highway ${highway.toFixed(3)}, waited past ${traffic.waitedPast}, wrecked ${traffic.count(AgentState.Wrecked)}`);
+      expect(mean).toBeGreaterThan(0.6);
+      expect(stoppedShare).toBeLessThan(0.15);
+      expect(traffic.waitedPast).toBeLessThanOrEqual(5);
     } finally { sim.dispose(); }
   }, 120_000);
 
@@ -202,16 +280,17 @@ describe('traffic', () => {
     } finally { sim.dispose(); }
   }, 30_000);
 
-  it('knocks a stopped car sideways in a T-bone and stays upright', async () => {
+  it('knocks a stopped physical car sideways in a T-bone and stays upright', async () => {
     const sim = await createWorld({ map: 'city', seed: 5, traffic: 0, peds: 0, record: false });
     const traffic = sim.traffic as Traffic;
     const lane = longLane(traffic, 14, 120);
     const pose = { x: 0, z: 0, yaw: 0 };
     traffic.lanes.positionAt(lane, 40, 0, pose);
     sim.vehicle.teleport({ x: pose.x, y: 1, z: pose.z }, pose.yaw);
-    const agent = traffic.spawnAt(lane, 48, 'compact');
-    traffic.speed[agent] = 0;
+    // A stopped car across the lane: a wreck is a physical obstacle that never drives off.
+    const agent = traffic.spawnAt(lane, 48, 'compact', AgentState.Wrecked);
     sim.step();
+    expect(traffic.hasBody(agent)).toBe(true);
     traffic.setFacing(agent, pose.yaw + Math.PI / 2);
     const x0 = traffic.x[agent] as number;
     const z0 = traffic.z[agent] as number;
@@ -220,8 +299,6 @@ describe('traffic', () => {
     let moved = 0;
     try {
       for (let i = 0; i < 100; i++) {
-        traffic.state[agent] = AgentState.Disturbed;
-        traffic.disturbedFor[agent] = 4;
         if (i < 15) sim.vehicle.setVelocity(fx * (100 / 3.6), 0, fz * (100 / 3.6));
         sim.step();
         const dx = (traffic.x[agent] as number) - x0;
@@ -233,6 +310,41 @@ describe('traffic', () => {
       expect(sim.hasNaN()).toBe(false);
     } finally { sim.dispose(); }
   }, 30_000);
+
+  it('keeps a wreck as a stopped obstacle', async () => {
+    const sim = await createWorld({ map: 'city', seed: 11, traffic: 0, peds: 0, record: false });
+    const traffic = sim.traffic as Traffic;
+    const lane = longLane(traffic, 14, 140);
+    const pose = { x: 0, z: 0, yaw: 0 };
+    traffic.lanes.positionAt(lane, 30, 0, pose);
+    sim.vehicle.teleport({ x: pose.x, y: 1, z: pose.z }, pose.yaw);
+    const agent = traffic.spawnAt(lane, 44, 'compact');
+    try {
+      // ram it hard enough for wreckImpact
+      let wrecked = false;
+      for (let i = 0; i < 240 && !wrecked; i++) {
+        if (i < 20) sim.vehicle.setVelocity(Math.sin(pose.yaw) * 40, 0, Math.cos(pose.yaw) * 40);
+        sim.step();
+        wrecked = traffic.state[agent] === AgentState.Wrecked;
+      }
+      console.log(`[traffic] wreck by impact: ${wrecked}`);
+      if (!wrecked) traffic.wreck(agent);
+      // let the flung wreck slide to a stop, then park the player 15 m behind it so the pool keeps it, and watch 15 s
+      run(sim, 6); // no input: the brake from a standstill would engage reverse
+      const wx = traffic.x[agent] as number;
+      const wz = traffic.z[agent] as number;
+      sim.vehicle.teleport({ x: wx - Math.sin(pose.yaw) * 15, y: 1, z: wz - Math.cos(pose.yaw) * 15 }, pose.yaw);
+      run(sim, 1);
+      const x0 = traffic.x[agent] as number;
+      const z0 = traffic.z[agent] as number;
+      run(sim, 15);
+      expect(traffic.state[agent]).toBe(AgentState.Wrecked);
+      expect(traffic.speed[agent] as number).toBeLessThan(0.1);
+      expect(Math.hypot((traffic.x[agent] as number) - x0, (traffic.z[agent] as number) - z0)).toBeLessThan(0.5);
+      // still an obstacle: the body pool keeps it while the player is near
+      expect(traffic.hasBody(agent)).toBe(true);
+    } finally { sim.dispose(); }
+  }, 60_000);
 
   it('returns a body once the player drives away', async () => {
     const sim = await createWorld({ map: 'city', seed: 9, traffic: 0, peds: 0, record: false });

@@ -1,27 +1,38 @@
 /**
  * One-shot stings driven by the sim event log. Silent until the engine context
- * is running; events from before that are consumed and dropped.
+ * is running; events from before that are consumed and dropped. The callbacks
+ * are bound once because the ring is polled every frame.
  */
 import type { EngineAudio } from './EngineAudio';
-import type { SimWorld } from '../sim';
+import type { SimEvent, SimWorld } from '../sim';
 
 export class Sfx {
   private seq = 0;
+  private ctx: BaseAudioContext | null = null;
+  private master: AudioNode | null = null;
+  private traffic: SimWorld['traffic'] = null;
+  private readonly drop = (): void => undefined;
+  private readonly play = (e: SimEvent): void => {
+    const ctx = this.ctx;
+    const master = this.master;
+    if (!ctx || !master) return;
+    if (e.kind === 'nearMiss' || e.kind === 'nearMissOncoming') this.sweep(ctx, master);
+    else if (e.kind === 'honk') this.honk(ctx, master, e.target >= 0 ? (this.traffic?.kind[e.target] ?? 0) : 0);
+    else if (e.kind === 'nearMissPed') this.yelp(ctx, master);
+  };
 
   constructor(private readonly engine: EngineAudio) {}
 
   update(sim: SimWorld): void {
-    const ctx = this.engine.ready ? this.engine.output?.context ?? null : null;
-    const master = this.engine.output;
-    if (!ctx || !master) {
-      this.seq = sim.events.readFrom(this.seq, () => undefined);
+    const master = this.engine.ready ? this.engine.output : null;
+    if (!master) {
+      this.seq = sim.events.readFrom(this.seq, this.drop);
       return;
     }
-    this.seq = sim.events.readFrom(this.seq, (e) => {
-      if (e.kind === 'nearMiss' || e.kind === 'nearMissOncoming') this.sweep(ctx, master);
-      else if (e.kind === 'honk') this.honk(ctx, master, e.target >= 0 ? (sim.traffic?.kind[e.target] ?? 0) : 0);
-      else if (e.kind === 'nearMissPed') this.yelp(ctx, master);
-    });
+    this.ctx = master.context;
+    this.master = master;
+    this.traffic = sim.traffic;
+    this.seq = sim.events.readFrom(this.seq, this.play);
   }
 
   private sweep(ctx: BaseAudioContext, master: AudioNode): void {

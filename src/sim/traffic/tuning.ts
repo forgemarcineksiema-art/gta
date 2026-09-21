@@ -31,6 +31,9 @@ export interface TrafficTuning {
   wreckLinger: number;
   honkCooldown: number;
   wobbleTime: number;
+  /** Lent bodies: heading rate per radian of error (1/s) and its cap (rad/s). Stable while yawGain × dt < 1. */
+  yawGain: number;
+  yawRateMax: number;
   subLaneOffsets: { highway: readonly number[]; street: readonly number[] };
   kindWeights: { compact: number; muscle: number; heavy: number };
   mass: { compact: number; muscle: number; heavy: number };
@@ -70,15 +73,15 @@ export const TRAFFIC: TrafficTuning = {
   speedParkway: 16,
   speedQuay: 14,
   speedService: 11,
-  speedJunction: 8,
-  accel: 3,
+  speedJunction: 10,
+  accel: 4,
   brake: 6,
   gapMin: 6,
   gapTime: 1.2,
   playerGap: 25,
   playerLateral: 2.6,
-  junctionWait: 6,
-  junctionClear: 26,
+  junctionWait: 9,
+  junctionClear: 4,
   highwayGap: 25,
   disturbedImpact: 1.5,
   disturbedTime: 2.0,
@@ -88,6 +91,8 @@ export const TRAFFIC: TrafficTuning = {
   wreckLinger: 10,
   honkCooldown: 3,
   wobbleTime: 1,
+  yawGain: 3,
+  yawRateMax: 1.5,
   subLaneOffsets: { highway: [-2, 6], street: [0] },
   kindWeights: { compact: 0.5, muscle: 0.3, heavy: 0.2 },
   mass: { compact: 1050, muscle: 1300, heavy: 2400 },

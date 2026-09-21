@@ -2,7 +2,7 @@
  * In-game HUD: plain DOM over the canvas. Speedometer, boost bar, drift readout,
  * a debug block, a pause overlay and the keycap hint strip. Reads sim state only.
  */
-import type { SimWorld } from '../sim';
+import type { SimEvent, SimWorld } from '../sim';
 import { Minimap } from './minimap';
 
 export interface HudDebugInfo {
@@ -63,6 +63,8 @@ export class Hud {
   private eventSeq = 0;
   private boostFlash = 0;
   private lastMeter = 0;
+  /** Bound once: the event ring is polled every frame. */
+  private readonly onEvent = (e: SimEvent): void => this.showEvent(e.kind, e.value);
 
   constructor(parent: HTMLElement, sim: SimWorld) {
     this.root = el('div', 'hud');
@@ -214,7 +216,7 @@ export class Hud {
     if (this.boostFlash > 0) this.boostFlash -= dt;
     this.boostWrap.classList.toggle('is-gain', this.boostFlash > 0);
     this.oncoming.classList.toggle('is-on', sim.life.state.oncoming);
-    this.eventSeq = sim.events.readFrom(this.eventSeq, (e) => this.showEvent(e.kind, e.value));
+    this.eventSeq = sim.events.readFrom(this.eventSeq, this.onEvent);
     for (let i = 0; i < this.popups.length; i++) {
       const left = this.popupLeft[i] ?? 0;
       if (left <= 0) continue;

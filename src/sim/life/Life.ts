@@ -36,9 +36,11 @@ export class Life {
   private readonly wasAhead: Uint8Array;
   private readonly cool: Float32Array;
   private lastHit = -10;
+  /** Collider handle of the previous step's contact, so a hit is reported once per contact, not per step. */
+  private lastHitHandle = -1;
   private oncomingLeft = 0;
   private oncomingEvent = 0;
-  private readonly proj = { x: 0, y: 0, z: 0, yaw: 0, s: 0, lateral: 0 };
+  private readonly proj = { x: 0, y: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };
 
   constructor(private readonly sim: SimWorld) {
     const n = sim.traffic?.capacity ?? 1;
@@ -75,12 +77,19 @@ export class Life {
 
   private hits(): void {
     const tm = this.sim.vehicle.telemetry;
-    if (tm.hitHandle < 0 || tm.impact <= 0) return;
+    if (tm.hitHandle < 0 || tm.impact <= 0) {
+      this.lastHitHandle = -1;
+      return;
+    }
     const kind = this.classify(tm.hitHandle);
     if (kind === 'none') return;
     this.lastHit = this.sim.time;
     const agent = kind === 'traffic' ? (this.sim.traffic?.agentForCollider(tm.hitHandle) ?? -1) : -1;
     if (agent >= 0 && this.sim.traffic) this.sim.traffic.lastPlayerContactTick[agent] = this.sim.tick;
+    // One event per contact, plus one for every real hit inside a sustained contact (a scrape is not a stream of hits).
+    const fresh = tm.hitHandle !== this.lastHitHandle;
+    this.lastHitHandle = tm.hitHandle;
+    if (!fresh && tm.impact < this.sim.vehicle.tuning.wallHitSpeed) return;
     this.sim.events.push('hit', tm.impact, tm.contactX, tm.contactY, tm.contactZ, agent);
   }
 
@@ -103,6 +112,7 @@ export class Life {
       const dist = Math.hypot(ox, oz);
       const ahead = ox * tm.vx + oz * tm.vz > 0;
       if (ahead) this.wasAhead[i] = 1;
+      else if (dist > 12) this.wasAhead[i] = 0; // passed wide: nothing to score later from behind
       if (dist > 12 || recentHit || (this.cool[i] as number) > 0 || this.wasAhead[i] !== 1 || ahead) continue;
       const id = CAR_IDS[traffic.kind[i] as number];
       if (!id) continue;

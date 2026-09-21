@@ -33,6 +33,9 @@ for (const [w, h] of SIZES) {
     await page.keyboard.press('KeyP');
     await page.waitForFunction(() => window.__game?.paused === true);
     await page.screenshot({ path: `screens/pause-${w}x${h}.png` });
+    // the life frame is a driving frame: unpause first
+    await page.keyboard.press('KeyP');
+    await page.waitForFunction(() => window.__game?.paused === false);
     const lifeText = await page.evaluate(() => new Promise<string>((resolve) => {
       const sim = window.__game?.sim;
       if (!sim) { resolve('no sim'); return; }

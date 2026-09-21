@@ -2,6 +2,7 @@
  * In-game HUD: plain DOM over the canvas. Speedometer, boost bar, drift readout,
  * a debug block, a pause overlay and the keycap hint strip. Reads sim state only.
  */
+import { AgentState } from '../sim';
 import type { SimEvent, SimWorld } from '../sim';
 import { Minimap } from './minimap';
 
@@ -76,6 +77,8 @@ export class Hud {
   private readonly popupLeft = [0, 0, 0, 0];
   private popupCursor = 0;
   private eventSeq = 0;
+  private lastLifeAt = 0;
+  private lastLifeSeq = 0;
   private boostFlash = 0;
   private lastMeter = 0;
   /** Bound once: the event ring is polled every frame. */
@@ -211,6 +214,24 @@ export class Hud {
     this.toastTimer = seconds;
   }
 
+  /** Read-only life counters for the debug block: agents by state, lent bodies, pedestrians, guarantee hops, events per second. */
+  private lifeLine(sim: SimWorld, now: number): string {
+    const traffic = sim.traffic;
+    if (!traffic) return '';
+    let lent = 0;
+    for (let i = 0; i < traffic.capacity; i++) if (traffic.hasBody(i)) lent++;
+    const seq = sim.events.readFrom(this.eventSeq, this.onEvent);
+    this.eventSeq = seq;
+    const dt = this.lastLifeAt > 0 ? (now - this.lastLifeAt) / 1000 : 0;
+    const eps = dt > 0 ? (seq - this.lastLifeSeq) / dt : 0;
+    this.lastLifeAt = now;
+    this.lastLifeSeq = seq;
+    const peds = sim.peds;
+    const c = sim.collectibles;
+    return `\ntraffic K ${traffic.count(AgentState.Kinematic)} P ${traffic.count(AgentState.Physical)} D ${traffic.count(AgentState.Disturbed)} W ${traffic.count(AgentState.Wrecked)} A ${traffic.count(AgentState.Abandoned)}  lent ${lent}  hops ${traffic.guardHops}` +
+      `${peds ? `  peds ${peds.count()} hops ${peds.guaranteeHops}` : ''}  events ${eps.toFixed(1)}/s${c ? `  billboards ${c.smashedCount}/${c.total}` : ''}  slowmo ${sim.life.state.slowMo.toFixed(2)}`;
+  }
+
   private showEvent(kind: string, value: number): void {
     const text = kind === 'nearMiss' ? 'NEAR MISS'
       : kind === 'nearMissOncoming' ? 'ONCOMING!'
@@ -317,7 +338,8 @@ export class Hud {
         `tick ${info.tick}  t ${sim.time.toFixed(1)} s${sim.city ? `  chunks ${sim.city.active.size}  seed ${sim.city.seed}` : ''}\n` +
         `speed ${tm.speedKmh.toFixed(1)} km/h  gear ${tm.gear}${tm.shifting ? '*' : ''}  rpm ${tm.rpm.toFixed(0)}  load ${tm.load.toFixed(2)}  slip ratio ${tm.minSlipRatio.toFixed(2)}..${tm.maxSlipRatio.toFixed(2)}\n` +
         `steer ${tm.steerDeg.toFixed(1)}°  slip ${tm.maxSlipDeg.toFixed(1)}°  drift ${tm.drifting ? 'YES' : 'no'} ${tm.driftAngleDeg.toFixed(0)}°\n` +
-        `wheels ${tm.groundedWheels}/4  air ${tm.airTime.toFixed(2)} s  boost ${tm.boost.toFixed(2)}${tm.boosting ? ' ON' : ''}`;
+        `wheels ${tm.groundedWheels}/4  air ${tm.airTime.toFixed(2)} s  boost ${tm.boost.toFixed(2)}${tm.boosting ? ' ON' : ''}` +
+        this.lifeLine(sim, now);
     }
   }
 }

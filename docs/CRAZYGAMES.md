@@ -49,9 +49,9 @@ Launch model (requirements/intro): **Basic Launch** = live without SDK, no monet
 
 | # | Requirement | Source | Status | Notes |
 |---|---|---|---|---|
-| A1 | Never show a midgame ad while the player is actively playing; only at natural breaks (level transition, map change, after death, post-race summary). | requirements/ads | todo | |
+| A1 | Never show a midgame ad while the player is actively playing; only at natural breaks (level transition, map change, after death, post-race summary). | requirements/ads | todo | M3 adds the breaks: the wrecked overlay (3 s to respawn) and, in M4, the busted flow. Ad breaks attach there, never to a takedown's slow motion (control is never taken away) nor to the auto-pause on blur. |
 | A2 | Do not implement own cooldown timers: the SDK enforces max 1 midgame ad every 3 minutes and takes game start into account; early requests return `adCooldown`. | requirements/ads, resources/midgame-ads-pacing | info | Just request at every natural break. |
-| A3 | On `adStarted`: pause the game, mute audio, block all UI (disable buttons or show a blocking spinner) until `adFinished` or `adError`. Mute only when the ad actually starts, not on request. | requirements/ads, sdk/video-ads | todo | |
+| A3 | On `adStarted`: pause the game, mute audio, block all UI (disable buttons or show a blocking spinner) until `adFinished` or `adError`. Mute only when the ad actually starts, not on request. | requirements/ads, sdk/video-ads | todo | The M3 one-shots (`Sfx`) and the engine share one master gain, so the mute is one node. |
 | A4 | On `adError` (any code incl. `unfilled`, `adblock`, `adsDisabledBasicLaunch`, `adCooldown`, `other`) the game must continue normally. | requirements/ads, sdk/video-ads | todo | |
 | A5 | Rewarded ads are occasional optional bonuses, not a core loop; do not offer too often (show a timer or hide the button). | requirements/ads | todo | |
 | A6 | Rewarded ad button must not appear on an active gameplay screen and must not be misleading; show a video icon; skip/close must be equally prominent and never hidden or delayed. | requirements/ads | todo | |

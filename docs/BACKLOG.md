@@ -64,6 +64,21 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
   remaining shadow-pass cost; billboards or 6-segment crowns would halve it. (M2.1)
 
 
+## Life (M3)
+
+- Slice 9 stretch, not started: parked cars in the kerbside bays of the avenue and the quay as stopped agents (more swap candidates), stunt ramps on park lots, speed cameras on the highway with a FLASHED popup. (M3)
+- Traffic-only silhouettes (a van, a taxi, a bus): agents use the three player classes with paint for variety, so every swap yields a real car; new silhouettes need a preset each and a swap rule. (M3)
+- The highway's two lanes per direction are sub-lane offsets on one graph lane; real graph lanes would let the bot stop straddling the paint and traffic change lanes on the highway, at the cost of the Euler tour, the markings, the minimap and three pins. (M3)
+- Traffic density per quality tier for the mobile tier: the pool size is one tuning number (`TRAFFIC.agents`); M2's decision 13 keeps gameplay identical across tiers until M6 needs the lever. (M3)
+- Junction reservations are first come first served with a forced override after 9 s (about one a minute in a busy run); traffic lights or a round-robin would look more deliberate at the big crossings. (M3)
+- A driving traffic body has no terrain contact (kerbs and the pavement apron pass under it) and a disturbed car beyond 70 m snaps back onto its lane when its body is returned; nobody has seen either in play, but a slow blend back would be cleaner than a snap. (M3)
+- Wrecks never despawn while the player stays near them; a scrapyard run leaves a street of wrecks and the pool of 16 bodies can fill with them (traffic then goes kinematic sooner). A slow tow-away after a minute would free bodies. (M3)
+- The takedown camera only focuses; a short cut to a side view with the wreck in the foreground would sell it more. The whip on swap has no cut either, by design. (M3)
+- Pedestrian variety: one walker mesh in a handful of tints; a second silhouette and a walk-cycle pose would help once perf budgets are known on the low tier. (M3)
+- Billboard state is per session; the M5 save carries `Collectibles.smashed`. (M3)
+- The interior billboards are footway gates approached diagonally off the road; the frontage row leaves no run-out behind a roadside panel. Park lots and plazas could take roadside panels with a run-out once the lot generator exposes its open ground. (M3)
+- `Traffic.step` is about 0.3 ms in Node per step with 48 agents and 16 bodies; the browser step p95 under 4× throttle is multi-substep frames again, not the step. Profile before adding agents. (M3)
+
 ## UI
 
 - Keycap labels resolve through `navigator.keyboard.getLayoutMap()` only on Chromium; other browsers show `W/A/S/D` positions, which is what the brief asks for anyway. (M0)

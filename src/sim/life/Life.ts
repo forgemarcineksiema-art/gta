@@ -357,12 +357,14 @@ export class Life {
       const pos = this.sim.vehicle.body.translation(this.proj);
       const x = pos.x;
       const z = pos.z;
+      // the nearest lane through the city's lane bounds, then one projection for its heading
+      const lane = this.sim.city ? this.sim.city.nearestLane(x, z) : -1;
       let best = Infinity;
       let yaw = 0;
-      for (let lane = 0; lane < traffic.lanes.laneCount; lane++) {
+      if (lane >= 0) {
         traffic.lanes.project(lane, x, z, this.proj);
-        const lateral = Math.abs(this.proj.lateral);
-        if (lateral < best) { best = lateral; yaw = this.proj.yaw; }
+        best = Math.abs(this.proj.lateral);
+        yaw = this.proj.yaw;
       }
       if (best <= ECONOMY.oncomingLaneDistance) {
         const dot = Math.sin(yaw) * tm.vx + Math.cos(yaw) * tm.vz;

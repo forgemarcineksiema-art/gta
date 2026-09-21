@@ -696,6 +696,21 @@ export class City {
     return out;
   }
 
+  /** The lane whose polyline is closest to a point, through the lane bounds; -1 with no lanes. */
+  nearestLane(x: number, z: number): number {
+    let best = Infinity;
+    let found = -1;
+    const hit = { x: 0, z: 0, yaw: 0 };
+    for (let i = 0; i < this.graph.lanes.length; i++) {
+      const b = this.laneBounds[i] as { minX: number; maxX: number; minZ: number; maxZ: number };
+      const dx = Math.max(b.minX - x, 0, x - b.maxX), dz = Math.max(b.minZ - z, 0, z - b.maxZ);
+      if (dx * dx + dz * dz >= best) continue;
+      const dist = projectOnLane(this.graph.lanes[i] as Lane, x, z, hit);
+      if (dist < best) { best = dist; found = i; }
+    }
+    return found;
+  }
+
   /** Cached generation: the last 16 chunks asked for, resident physics chunks first. */
   chunk(cx: number, cz: number): CityChunk {
     const key = `${cx},${cz}`;

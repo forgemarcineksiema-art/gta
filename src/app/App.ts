@@ -10,7 +10,7 @@ import { KeyboardDevice } from '../input/KeyboardDevice';
 import { createPlatform, type Platform } from '../platform';
 import { Renderer } from '../render/Renderer';
 import { ACTIONS } from '../input/actions';
-import { CAR_IDS, ECONOMY, FIXED_DT, Recorder, SimWorld, districtAt, initPhysics, type CarId, type EventLog, type RecordingJSON } from '../sim';
+import { CAR_IDS, ECONOMY, FIXED_DT, Recorder, SimWorld, districtAt, initPhysics, type CarId, type EventLog, type RecordingJSON, TRAFFIC, PEDS, DAMAGE, SWAP } from '../sim';
 import { DebugPanel } from '../ui/debugPanel';
 import { Hud } from '../ui/hud';
 import { BotDriver } from './bot';
@@ -148,7 +148,15 @@ export class App {
         }
       },
       clearGhost: () => (sim.bestLapPoses = null),
-      extra: { camera: this.renderer.chase.tuning as unknown as Record<string, number> },
+      extra: {
+        camera: this.renderer.chase.tuning as unknown as Record<string, number>,
+        // the life numbers (docs/M3_PLAN.md §3.4): live-editable, same objects the sim reads
+        traffic: TRAFFIC as unknown as Record<string, number>,
+        peds: PEDS as unknown as Record<string, number>,
+        economy: ECONOMY as unknown as Record<string, number>,
+        damage: DAMAGE as unknown as Record<string, number>,
+        swap: SWAP as unknown as Record<string, number>,
+      },
     });
     this.hud.setDebugVisible(dev);
     if (dev) this.panel.setVisible(true);

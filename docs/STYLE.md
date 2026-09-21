@@ -199,6 +199,19 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 - Text shadow on everything over the 3D view for legibility on both peach sky and dark asphalt.
 - Minimum sizes at DPR 1: primary numbers ≥ 44 px, labels ≥ 12 px bold uppercase with tracking. Verify with `npm run screens`.
 - Keycaps: white rounded rectangles with dark text, always beside a one-word label.
+- Event popups (M3): a right-aligned stack above the speedo, 18 px heavy
+  italic uppercase with 0.08 em tracking, skewed −10°, ink with a flat black
+  shadow; gains in accent yellow. Each shows for 1.2 s; four slots recycle in
+  order so a burst never reflows. Texts: NEAR MISS, ONCOMING!, DODGED, FRESH
+  WHEELS, BILLBOARD!, and TAKEDOWN! / TAKEDOWN! INTO TRAFFIC! at 24 px.
+- Damage bar (M3): under the boost bar, only once damaged; a 120 × 8 px
+  skewed track filling in ink, danger red from stage 3, and the WRECKED
+  overlay (54 px title at 30 % height, a 16 px line with the countdown and the
+  reset key) at stage 4.
+- Swap prompt (M3): a keycap and SWAP in accent cyan at 18 px, centred above
+  the speedo, only while a car is within reach; never a button.
+- Billboard counter (M3): BILLBOARDS n/50 under the damage bar, 16 px heavy
+  italic, accent yellow when complete.
 - Minimap: a radar, not an atlas. A circle in the bottom-left corner
   (`--minimap-size`, 150–240 px) that turns with the direction of travel, the car
   22 % below the centre so more road shows ahead, zoom from a 210 m radius at rest
@@ -211,6 +224,54 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   places the street canyons hide. No text inside the circle but the rotating N;
   the district and landmark names sit above it at 12 px. Flat drop shadow, no
   glow. Numbers in `MINIMAP` (`src/ui/minimapModel.ts`).
+
+## Traffic and pedestrians (M3)
+
+- Traffic cars are the three player silhouettes (muscle, compact, heavy) in a
+  fixed set of paints (`PAINTS` in `src/sim/traffic/Traffic.ts`), never the
+  player's own paint for its class; an abandoned player car keeps the player
+  paint so it reads as "yours" from a distance. Same flat shading, same
+  vertex-colour meshes, drawn as instanced packs with shadows only on `high`.
+- Driving cars hold their lanes at real widths and stop at junction stop
+  lines; they never clip a kerb visually because a driving body has no terrain
+  contact. A disturbed car tumbles with full physics; a wreck sits where it
+  died, darkened, and smokes.
+- Pedestrians are one low-poly walker in a handful of tints, walking the
+  footways at 1.2–1.6 m/s, turning at block corners. They dodge sideways from
+  a car's corridor, dive when it is close, get up, and shake a fist when it
+  was very close; never limp, never bleed, never lie still for more than a
+  moment. The dive is the joke, not the danger.
+- Honks are short, per class (deeper for heavy), on a cooldown; the fist-shake
+  is silent.
+
+## Damage and debris (M3)
+
+- The player's car darkens toward graphite by a quarter per stage (four
+  stages at 30 / 60 / 85 / 100 % damage). The front bumper collapses onto its
+  centroid at stage 1, the rear at 2, mirrors and spoiler at 3, glass goes dark
+  at 4. One geometry, vertices moved in place; no dents, no textures, no
+  detached wheels.
+- Debris is up to 32 flat-shaded boxes with fake physics (gravity, one bounce,
+  spin, gone within a few seconds): bumper bits in silver or charcoal on a
+  damage stage, a burst in the car's paint on a wreck or a takedown, chalk or
+  paint planks plus a few steel bits on a billboard.
+- Smoke is 160 soft points: grey from a stage-2 car, dark from stage 3, with
+  orange "fire" points at stage 4 and on every wreck; drifts with the car's
+  velocity, dies within seconds. Never a full-screen effect.
+- Wrecked: the engine cuts, the overlay says WRECKED with a countdown, and the
+  respawn rolls the car out at 8 m/s on the nearest road. No fade to black, no
+  camera cut longer than the snap.
+
+## Billboards (M3)
+
+- Fifty per island. A panel on two steel posts, both faces in one of the car
+  paints or chalk, a dark stripe along the bottom edge; 8 × 2.5 m roadside
+  panels on the highway verges facing the road, 5 × 2.5 m gates across the
+  footways in the blocks, bottom edge 2.5 m up so every car passes under the
+  panel between the posts.
+- Smashing is a reward, not a crash: the panel vanishes, planks fly on with
+  the car, the camera takes a jolt, a splinter and a two-note chime play, and
+  the counter ticks. The car keeps 95 % of its speed.
 
 ## Camera and motion
 

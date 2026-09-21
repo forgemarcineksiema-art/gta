@@ -7,17 +7,20 @@ Short and current. Decision records at the bottom; add one when a decision would
 ```
 index.html            entry page: one canvas, one UI root, a loading overlay
 src/main.ts           boots App
-src/app/              App (glue), loop.ts (fixed-step accumulator), bot.ts (autopilot), perf.ts (probe)
-src/sim/              headless simulation: SimWorld, Vehicle, playground, transforms, palette, math
-src/render/           Three.js: Renderer, ChaseCamera (look-ahead, reverse orbit, shake), SpeedLines, Sparks, carMesh, carProfiles
-src/audio/            EngineAudio (WebAudio synthesis)
-src/ui/               Hud, Minimap (heading-up canvas radar) + minimapModel (pure maths), DebugPanel, styles.css
+src/app/              App (glue, slow-motion time scale), loop.ts (fixed-step accumulator), bot.ts / trackBot.ts (autopilots), perf.ts (probe)
+src/sim/              headless simulation: SimWorld, Vehicle, playground, transforms, palette, math, events (ring log), economy (ECONOMY / DAMAGE / SWAP)
+src/sim/traffic/      Traffic (pooled agents, lent bodies, junctions), Pedestrians (footway walkers), lanes (lane tables, junction curves), tuning
+src/sim/life/         Life: hits, damage, wrecked / respawn, car-swap, takedowns, near misses, oncoming, billboards
+src/sim/city/         City (chunks, statics, road graph), architecture, markings, roads, collectibles (billboard placement + smash trigger)
+src/render/           Three.js: Renderer, ChaseCamera (look-ahead, reverse orbit, shake, whip, focus), CityView, TrafficView, PedView, Billboards, Debris, Smoke, SpeedLines, Sparks, carMesh (damage stages), carProfiles
+src/audio/            EngineAudio (WebAudio synthesis), Sfx (event one-shots: sweep, honk, yelp, crunch, boom, whoosh, splinter, chime)
+src/ui/               Hud (popups, damage bar, wrecked overlay, swap prompt, billboard counter), Minimap (heading-up canvas radar) + minimapModel (pure maths), DebugPanel, styles.css
 src/input/            actions, InputManager, KeyboardDevice
 src/platform/         Platform interface, LocalPlatform, createPlatform()
-tests/sim/            Vitest headless sim tests (handling, cars, walls, instrumentation, loop)
+tests/sim/            Vitest headless sim tests (handling, cars, walls, instrumentation, loop, city, traffic, pedestrians, damage, swap, takedown, collectibles)
 tests/render/         Vitest camera pins (three.js math in Node, no WebGL)
 tests/ui/             Vitest minimap model pins (road layers, projection, easing, rim clamp)
-e2e/                  Playwright: smoke, perf, screens
+e2e/                  Playwright: smoke, perf, screens, city (M2 tour), life (M3 traffic run)
 tools/                verify.mjs, budget.mjs
 docs/                 BRIEF, PROGRESS, ARCHITECTURE, BACKLOG, CRAZYGAMES, STYLE, TITLES, ASSETS
 ```
@@ -153,17 +156,81 @@ merged, single-draw-call geometry, one extra vertex attribute, no second pass.
 The alternative, a decal texture per road, needs textures the style forbids and
 a second material.
 
+## Life (M3)
+
+The city's population is three systems that read one shared picture of the
+player (`SimWorld.probe`: position, heading, velocity, chassis half extents)
+and talk back through `sim.events`, a 64-entry ring log with a monotonic
+sequence that HUD, audio and renderer each poll from their own cursor.
+
+**Traffic** (`sim/traffic/Traffic.ts`) is a pool of 48 typed-array records
+(state, kind, lane, next lane, path distance `s`, sub-lane offset, speed,
+pose) and a pool of 16 Rapier dynamic bodies lent to the agents nearest the
+player. Every agent plans the same way (`plan`: lane speed limit, the gap to
+its leader, to the player and to whatever is ahead on its path, the junction
+reservation), then either moves along its polyline (`moveKinematic`) or has
+its body's linear and angular velocity blended toward that plan (`driveBody`:
+the heading controller `angvel.y = clamp(err × yawGain, ±yawRateMax)`, with a
+turn-back when the carrot is more than 60° off). Junction curves are cubic
+beziers between the offset endpoints of the two lanes with handles
+proportional to the endpoint gap; a node has four holder slots, curves
+within 5 m conflict, first come first served with a forced override after
+`junctionWait`. A body is lent within 35 m, returned beyond 70 m (or earlier
+when a nearer agent needs it), and the agent snaps back onto its path on
+return. Contact impulses are read per step and split by source
+(`playerDv`, `wallDv`, `trafficDv`); above `disturbedImpact` the agent goes
+`Disturbed` (full physics until it settles within `reattachDistance`), above
+`wreckImpact` it is `Wrecked` for good, a stopped obstacle until the player is
+far away. Deviation from the plan, recorded here: a driving body uses
+`GROUPS_TRAFFIC` (no terrain contact) with its vertical translation locked,
+and switches to `GROUPS_SOLID` with all axes free only when disturbed,
+wrecked or abandoned. Consequence: a driving traffic car passes over kerbs
+and the pavement apron, and a disturbed car further than 70 m snaps upright
+onto its lane when its body is returned.
+
+**Pedestrians** (`sim/traffic/Pedestrians.ts`) are colliderless points on
+footway paths (a lane polyline shifted onto the pavement) that walk, turn at
+block corners, dodge the player's corridor 0.7 s ahead, dive, get up and
+shake a fist; a last-resort hop off the chassis footprint makes "can never
+be hit" true by construction. Their pose is packed into the transform
+quaternion the instanced view reads.
+
+**Life** (`sim/life/Life.ts`) runs before the vehicle (`preStep`: swap on the
+`E` edge, the wrecked timer and respawn, heal on reset) and after the physics
+(`postStep`: slow-motion countdown, hit classification by collider, damage
+from the strongest contact, takedowns, billboards, near misses, the oncoming
+lane, pedestrian dodges). Damage is a rule set outside `Vehicle`; the vehicle
+only reports impacts and the contact handle, and gains one flag, `engineCut`.
+Car-swap retunes the player's `Vehicle` in place (tuning replaced, collider
+rebuilt, body teleported onto the target's pose with its velocity) while the
+target agent's record becomes the player's old car standing where the player
+was. Takedowns wreck a recently touched agent that slams a wall or another
+car, flips, or took a hard direct hit, and start `slowMo`; `App` feeds
+`frameDt × slowMoScale` into the loop while it runs, so the sim never knows.
+Billboards (`sim/city/collectibles.ts`) are placed as the last step of chunk
+generation and smashed by the chassis footprint at speed; no colliders.
+
+Rendering reads all of it: `TrafficView` and `PedView` are packed instanced
+meshes over the transform buffer, `Billboards` an instanced mesh fed from
+`CityView.onChunk`, `Debris` (32 boxes, fake physics) and `Smoke` (160
+points) are event-driven, `carMesh.setDamage` deforms the player's car per
+stage, `ChaseCamera` whips on a swap and focuses the takedown target.
+
 ## Data flow per frame (detail)
 
 ```
 requestAnimationFrame
   InputManager.update()              devices -> ActionState (values + edges)
-  FixedStepLoop.advance(dt)          0..5 fixed steps of 1/60 s
+  timeScale = slowMo ? 0.35 : 1      the takedown slow motion scales the frame's dt
+  FixedStepLoop.advance(dt × scale)  0..5 fixed steps of 1/60 s
     controls <- ActionState | Bot    app copies actions into sim.controls
-    SimWorld.step()                  transforms.swap(); vehicle.update(); rapier.step(); write transforms
-  Renderer.render(alpha)             interpolate prev/curr transforms, chase camera, draw
+    SimWorld.step()                  city.sync(); events.tick(); life.preStep(); vehicle.update();
+                                     probe <- vehicle; traffic.step(probe); peds.step(probe);
+                                     rapier.step(); write transforms; life.postStep()
+  Renderer.render(alpha)             interpolate prev/curr transforms, chase camera (whip / focus), views, debris, smoke, draw
   EngineAudio.update(telemetry)      RPM/load/speed/slip -> oscillators, filters, gains
-  Hud.update(sim, dt, info, now)     DOM text on change, throttled debug block, radar canvas at 30 Hz
+  Sfx (events)                       one-shots per sim event since the last cursor
+  Hud.update(sim, dt, info, now)     DOM text on change, popups per event, throttled debug block, radar canvas at 30 Hz
 ```
 
 The sim never sees wall time. `SimWorld.transforms` is a `TransformBuffer` (typed arrays, prev + curr) that the renderer reads directly; the sim publishes `StaticDesc[]` and `DynamicDesc[]` once so the renderer can build meshes without knowing physics.
@@ -243,3 +310,16 @@ Pinned by `tests/sim/handling.test.ts` (29 tests; `cars.test.ts` repeats the cla
 4. **Fixed 60 Hz step, max 5 substeps, drop the rest** (M0). Required by CrazyGames (same behaviour at 144/165 Hz) and by the tests; dropping time on a hitch is better than a spiral.
 5. **Vertex-colour merged statics** (M0). One draw call for the whole playground; the same approach scales to per-chunk meshes in M2.
 6. **No web fonts** (M0). System heavy italic is enough for the look, costs zero bytes, and avoids licence questions.
+12. **Traffic agents are pooled typed-array records; physics bodies are lent to the nearest** (M3). The brief asks for a simulation LOD and the M0 note says every Rapier binding call allocates. Forty-eight records cost a polyline lookup each; sixteen bodies cost physics and follow the player.
+13. **Near agents are dynamic bodies driven by velocity, not kinematic bodies** (M3). A kinematic body has infinite mass: hitting one is hitting a wall, and it cannot be shoved into a takedown. A dynamic body steered by velocity follows its lane like a kinematic one, yet a hit displaces it and the impulse reaches the player's chassis through the same manifold readback. Its friction combines with `Min` (0.4) against the ground's 1.0, so a shoved car slides on its tyres instead of stopping like a crate.
+14. **The highway's two lanes per direction are sub-lane offsets, not graph lanes** (M3). Offsets −2 and +6 m from the graph lane put cars in the painted lanes; changing `buildRoadGraph` would touch the Euler tour, the markings, the minimap and three pins for a cosmetic gain.
+15. **Junction curves are per-offset beziers with proportional handles** (M3). Curves built on the centre line and shifted by the offset folded on tight corners; curves built between the offset endpoints do not. Fixed 24 m handles cusped on right-angle corners whose endpoints are 25 m apart (875 of 3420 curves); handles of 0.42 × the endpoint gap, capped at 24, leave none.
+16. **Sim events are a ring buffer the other layers poll** (M3). No callbacks out of the sim, no allocation per event, headless-testable, and M5 can hang cash on the same log. Each consumer keeps its own cursor and a bound visitor.
+17. **Damage is a rule set outside `Vehicle`** (M3). The vehicle reports impacts and the strongest contact's collider; `Life` classifies and applies `DAMAGE`. The M1 handling pins do not move, and damage is off on the playground by default because those pins drive into walls at 150 km/h.
+18. **Car-swap retunes the player's `Vehicle` in place** (M3). One body, one transform slot, one camera target; the renderer keeps a mesh per class and toggles. The agent's record becomes the abandoned old car.
+19. **Pedestrians have no colliders** (M3). Points on footway paths with a dodge controller and a last-resort hop make "never hit" true by construction; PEGI 12 slapstick, zero Rapier cost.
+20. **Billboards are pass-through triggers with a visible smash** (M3). A solid panel is a wall at highway speed. Placed last in chunk generation with a fixed quota so the island has exactly fifty; drawn as their own instanced mesh so one can vanish without a chunk rebuild. Interior ones are gates across the footways, because the frontage row leaves no run-out behind a roadside panel; the highway verges get roadside panels.
+21. **Slow motion is a time scale on the fixed-step loop** (M3). Deterministic, no special stepping, input keeps flowing, any pressed action ends it.
+22. **Traffic density is the same on both quality tiers** (M3). Decision 13 of M2 (quality never changes gameplay) wins until M6 needs a mobile lever; the pool size is one tuning number.
+23. **Traffic classes are the player's classes** (M3). Real presets, real swaps; variety is paint. Traffic-only silhouettes are backlog.
+24. **Tests and tours run with traffic off unless they test traffic** (M3). The M2 tour pins zero resets and impact < 2; `?traffic=0&peds=0` and `SimWorldOptions` keep those pins honest, while the real-time perf run keeps traffic on because that is the cost being measured.

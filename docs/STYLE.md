@@ -105,6 +105,10 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 - Frontage rows start 8 m past the junction pavement, so authored junctions have
   corner buildings; widths cycle through three values per row on top of the
   three facade variants.
+- Surface decals are top faces stacked at least 12 mm apart (road 0.010,
+  shoulders 0.022, lane marks 0.028, authored road 0.034, crosswalks and parking
+  marks 0.046, authored dashes 0.054); with the 0.6 m near plane the depth
+  buffer separates them out to the fog. Closer spacing shimmers while driving.
 - Rotated statics rotate about +Y only; a rotated building is generated in its
   own frame and moved as a whole, so facade rules never see the rotation.
 

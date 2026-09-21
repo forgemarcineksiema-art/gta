@@ -81,7 +81,8 @@ export class Renderer {
     }
 
     // Far enough for the skyline layer across the whole 1.6 km island.
-    this.camera = new THREE.PerspectiveCamera(62, 1, 0.3, 1700);
+    // Near 0.6 m doubles depth precision over 0.3 m; the chase camera never comes closer than 3 m.
+    this.camera = new THREE.PerspectiveCamera(62, 1, 0.6, 1700);
     this.chase = new ChaseCamera(this.camera);
 
     // sky, fog, lights (docs/STYLE.md: late golden hour)

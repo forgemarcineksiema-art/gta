@@ -49,6 +49,10 @@ after.
   palms, benches, masts. Boundary colliders unchanged.
 - Verify, city gate and unit tests green after the pass.
 
+- Marcin's playtest: parking marks shimmered while driving. Cause: decals 1–13 mm
+  apart beyond the depth buffer's precision at 100–300 m (near 0.3, far 1700).
+  Fix: surface layers at least 12 mm apart, camera near 0.6 m.
+
 ### Next
 
 - Marcin's playtest notes on the loop and the yards; then M3 traffic.

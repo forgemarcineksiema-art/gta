@@ -88,11 +88,15 @@ export class City {
       const half = (BLOCK / 2 - vx) / 2;
       box(x + side * (vx + half), 0, z, half, 0.01, vz, PALETTE.asphalt, 'road');
     }
+    // Surface layers, top faces from the ground up, at least 12 mm apart so the
+    // depth buffer separates them out to the fog (about 7 mm at 300 m with the
+    // 0.6 m near plane): road 0.010, shoulders 0.022, lane marks 0.028, authored
+    // road 0.034, crosswalks 0.046, parking marks 0.046, authored dashes 0.054.
     // Paved parking / service shoulders visually separate the active carriageway.
     // Keep the existing junction envelope for drift, U-turns and the lane graph.
     for (const side of [-1, 1]) for (const along of [-1, 1]) {
-      box(x + side * (vx - 2), 0.017, z + along * 68.75, 2, 0.001, 43.75, PALETTE.asphaltLight, 'decor', 'top');
-      box(x + along * 68.75, 0.017, z + side * (vz - 2), 43.75, 0.001, 2, PALETTE.asphaltLight, 'decor', 'top');
+      box(x + side * (vx - 2), 0.021, z + along * 68.75, 2, 0.001, 43.75, PALETTE.asphaltLight, 'decor', 'top');
+      box(x + along * 68.75, 0.021, z + side * (vz - 2), 43.75, 0.001, 2, PALETTE.asphaltLight, 'decor', 'top');
     }
     for (let d = -100; d <= 100; d += 12) {
       if (Math.abs(d) < 26) continue;
@@ -199,8 +203,8 @@ export class City {
       }
       // Parking strips explain the generous road width without altering the driving envelope.
       for (const along of [38, 50, 62, 74, 86, 98]) {
-        box(x + sx * (vx - 2), 0.026, z + sz * along, 1.65, 0.005, 0.065, PALETTE.laneMark, 'decor', 'top');
-        box(x + sx * along, 0.026, z + sz * (vz - 2), 0.065, 0.005, 1.65, PALETTE.laneMark, 'decor', 'top');
+        box(x + sx * (vx - 2), 0.045, z + sz * along, 1.65, 0.001, 0.065, PALETTE.laneMark, 'decor', 'top');
+        box(x + sx * along, 0.045, z + sz * (vz - 2), 0.065, 0.001, 1.65, PALETTE.laneMark, 'decor', 'top');
       }
       if (d.id !== 'foundry') for (const along of [57, 106]) {
         if (roadClearance(x + sx * (vx + 2.7), z + sz * along) > 3) architecture.tree(x + sx * (vx + 2.7), z + sz * along, d.id === 'marina');
@@ -214,8 +218,8 @@ export class City {
       }
       // Crosswalks, kept out of the highway.
       if (vx === ROAD_HALF && vz === ROAD_HALF) for (let i = 0; i < 4; i++) {
-        box(x + sx * (2 + i * 2.5), 0.025, z + sz * 16, 0.7, 0.008, 2, PALETTE.laneMark);
-        box(x + sx * 16, 0.025, z + sz * (2 + i * 2.5), 2, 0.008, 0.7, PALETTE.laneMark);
+        box(x + sx * (2 + i * 2.5), 0.04, z + sz * 16, 0.7, 0.006, 2, PALETTE.laneMark);
+        box(x + sx * 16, 0.04, z + sz * (2 + i * 2.5), 2, 0.006, 0.7, PALETTE.laneMark);
       }
     }
     // Each landmark owns a reserved plaza, with paths back to both bordering streets.
@@ -397,13 +401,13 @@ export class City {
       const startAlong = along;
       along += len;
       if (Math.abs(mx - x) >= BLOCK / 2 || Math.abs(mz - z) >= BLOCK / 2) continue;
-      const surface = box(mx, 0.019, mz, hw, 0.001, len / 2 + 0.25, PALETTE.asphalt, 'road', 'top');
+      const surface = box(mx, 0.033, mz, hw, 0.001, len / 2 + 0.25, PALETTE.asphalt, 'road', 'top');
       surface.rotation = rot;
       if (!nearJunction(mx, mz, 26)) {
         while (nextDash < along) {
           if (nextDash >= startAlong) {
             const t = (nextDash - startAlong) / len;
-            const dash = box(a.x + dx * t, 0.028, a.z + dz * t, 0.12, 0.004, 1.4, PALETTE.laneMark);
+            const dash = box(a.x + dx * t, 0.05, a.z + dz * t, 0.12, 0.004, 1.4, PALETTE.laneMark);
             dash.rotation = rot;
           }
           nextDash += 12;

@@ -102,7 +102,7 @@ export class GeometryBuild {
     let count = 0;
     for (let pass = 0; pass < 2; pass++) {
       for (const st of statics) {
-        if (st.collisionOnly || st.shape.kind === 'wheel' || (!detailed && st.detailOnly)) continue;
+        if (st.collisionOnly || st.shape.kind === 'wheel' || (!detailed && st.detailOnly) || (detailed && st.farOnly)) continue;
         if (casts(st) !== (pass === 0)) continue;
         this.order.push(st);
         const vertices = sourcesOf(st, detailed);

@@ -100,8 +100,8 @@ export class City {
     }
     for (let d = -100; d <= 100; d += 12) {
       if (Math.abs(d) < 26) continue;
-      box(x, 0.022, z + d, 0.12, 0.006, 2.8, PALETTE.laneMark);
-      box(x + d, 0.022, z, 2.8, 0.006, 0.12, PALETTE.laneMark);
+      box(x, 0.022, z + d, 0.14, 0.006, 2.8, PALETTE.laneMark);
+      box(x + d, 0.022, z, 2.8, 0.006, 0.14, PALETTE.laneMark);
     }
     // Authored roads that come near this chunk. Their corridor (half width plus
     // pavement) overrides the grid apron and lots, so nothing is built on them.
@@ -126,9 +126,10 @@ export class City {
         // Continuous kerb edge and paving joints provide a metre-scale reference at speed.
         box(x + sx * (vx + 0.12), 0.16, z + sz * (vz + hz), 0.12, 0.02, hz, c.trim);
         box(x + sx * (vx + hx), 0.16, z + sz * (vz + 0.12), hx, 0.02, 0.12, c.trim);
+        // Thin lines alias into shimmer: joints are 12 cm wide and only in the near level.
         for (let along = 26; along < 110; along += 6) {
-          box(x + sx * (vx + 2.3), 0.16, z + sz * along, 2.2, 0.002, 0.025, c.yard, 'decor', 'top');
-          box(x + sx * along, 0.16, z + sz * (vz + 2.3), 0.025, 0.002, 2.2, c.yard, 'decor', 'top');
+          box(x + sx * (vx + 2.3), 0.16, z + sz * along, 2.2, 0.002, 0.06, c.yard, 'decor', 'top').detailOnly = true;
+          box(x + sx * along, 0.16, z + sz * (vz + 2.3), 0.06, 0.002, 2.2, c.yard, 'decor', 'top').detailOnly = true;
         }
       } else {
         // Open quarter: the interior sits at road level and the grid pavements are
@@ -203,8 +204,8 @@ export class City {
       }
       // Parking strips explain the generous road width without altering the driving envelope.
       for (const along of [38, 50, 62, 74, 86, 98]) {
-        box(x + sx * (vx - 2), 0.045, z + sz * along, 1.65, 0.001, 0.065, PALETTE.laneMark, 'decor', 'top');
-        box(x + sx * along, 0.045, z + sz * (vz - 2), 0.065, 0.001, 1.65, PALETTE.laneMark, 'decor', 'top');
+        box(x + sx * (vx - 2), 0.045, z + sz * along, 1.65, 0.001, 0.14, PALETTE.laneMark, 'decor', 'top').detailOnly = true;
+        box(x + sx * along, 0.045, z + sz * (vz - 2), 0.14, 0.001, 1.65, PALETTE.laneMark, 'decor', 'top').detailOnly = true;
       }
       if (d.id !== 'foundry') for (const along of [57, 106]) {
         if (roadClearance(x + sx * (vx + 2.7), z + sz * along) > 3) architecture.tree(x + sx * (vx + 2.7), z + sz * along, d.id === 'marina');
@@ -217,9 +218,14 @@ export class City {
         box(x + sx * (vx + 1), 8, z + sz * offset, 1.4, 0.15, 0.45, PALETTE.laneMark);
       }
       // Crosswalks, kept out of the highway.
-      if (vx === ROAD_HALF && vz === ROAD_HALF) for (let i = 0; i < 4; i++) {
-        box(x + sx * (2 + i * 2.5), 0.04, z + sz * 16, 0.7, 0.006, 2, PALETTE.laneMark);
-        box(x + sx * 16, 0.04, z + sz * (2 + i * 2.5), 2, 0.006, 0.7, PALETTE.laneMark);
+      if (vx === ROAD_HALF && vz === ROAD_HALF) {
+        // Stripes at 2.5 m pitch alias past ~150 m; the far level draws one band.
+        for (let i = 0; i < 4; i++) {
+          box(x + sx * (2 + i * 2.5), 0.04, z + sz * 16, 0.7, 0.006, 2, PALETTE.laneMark).detailOnly = true;
+          box(x + sx * 16, 0.04, z + sz * (2 + i * 2.5), 2, 0.006, 0.7, PALETTE.laneMark).detailOnly = true;
+        }
+        box(x + sx * 5.75, 0.04, z + sz * 16, 5.75, 0.006, 2, PALETTE.laneMark).farOnly = true;
+        box(x + sx * 16, 0.04, z + sz * 5.75, 2, 0.006, 5.75, PALETTE.laneMark).farOnly = true;
       }
     }
     // Each landmark owns a reserved plaza, with paths back to both bordering streets.
@@ -370,6 +376,14 @@ export class City {
     const a0 = road.centre[0] as RoadPoint, a1 = road.centre[road.centre.length - 1] as RoadPoint;
     const nearJunction = (px: number, pz: number, margin: number) =>
       Math.max(Math.abs(px - a0.x), Math.abs(pz - a0.z)) < margin || Math.max(Math.abs(px - a1.x), Math.abs(pz - a1.z)) < margin;
+    // An authored road leaving a junction at a shallow angle runs inside the grid
+    // street's corridor for tens of metres: its kerbs and furniture must not be
+    // laid on that carriageway or its pavement.
+    const onGridStreet = (px: number, pz: number): boolean => {
+      const gx = Math.round(px / BLOCK), gz = Math.round(pz / BLOCK);
+      const halfX = Math.abs(gx) === 3 ? HIGHWAY_HALF : ROAD_HALF, halfZ = Math.abs(gz) === 3 ? HIGHWAY_HALF : ROAD_HALF;
+      return Math.abs(px - gx * BLOCK) < halfX + 5 || Math.abs(pz - gz * BLOCK) < halfZ + 5;
+    };
     const c = CITY_COLORS;
     const paving = road.kind === 'service' ? c.yard : road.kind === 'parkway' ? PALETTE.grass : PALETTE.kerb;
     // Frontage: buildings face the authored road, spaced along it, both sides.
@@ -407,7 +421,7 @@ export class City {
         while (nextDash < along) {
           if (nextDash >= startAlong) {
             const t = (nextDash - startAlong) / len;
-            const dash = box(a.x + dx * t, 0.05, a.z + dz * t, 0.12, 0.004, 1.4, PALETTE.laneMark);
+            const dash = box(a.x + dx * t, 0.05, a.z + dz * t, 0.14, 0.004, 1.4, PALETTE.laneMark);
             dash.rotation = rot;
           }
           nextDash += 12;
@@ -415,6 +429,7 @@ export class City {
       }
       if (!nearJunction(mx, mz, ROAD_HALF + 12)) {
         for (const side of [-1, 1]) {
+          if (onGridStreet(mx + nx * side * (hw + 2.25), mz + nz * side * (hw + 2.25))) continue;
           const kerb = box(mx + nx * side * (hw + 2.25), 0.07, mz + nz * side * (hw + 2.25), 2.25, 0.07, len / 2 + 0.3, paving === PALETTE.grass ? c.soil : paving, 'kerb');
           kerb.rotation = rot;
           const edge = box(mx + nx * side * (hw + 0.12), 0.16, mz + nz * side * (hw + 0.12), 0.12, 0.02, len / 2 + 0.3, c.trim);
@@ -427,7 +442,8 @@ export class City {
         while (nextTree < along) {
           if (nextTree >= startAlong && road.kind !== 'service') {
             const t = (nextTree - startAlong) / len, side = Math.floor(nextTree / 27) % 2 ? 1 : -1;
-            architecture.tree(a.x + dx * t + nx * side * (hw + 2.7), a.z + dz * t + nz * side * (hw + 2.7), road.kind === 'quay');
+            const tx = a.x + dx * t + nx * side * (hw + 2.7), tz = a.z + dz * t + nz * side * (hw + 2.7);
+            if (!onGridStreet(tx, tz)) architecture.tree(tx, tz, road.kind === 'quay');
           }
           nextTree += 27;
         }
@@ -487,6 +503,7 @@ export class City {
           if (nextLamp >= startAlong) {
             const t = (nextLamp - startAlong) / len, side = Math.floor(nextLamp / 45) % 2 ? -1 : 1;
             const px = a.x + dx * t + nx * side * (hw + 2), pz = a.z + dz * t + nz * side * (hw + 2);
+            if (onGridStreet(px, pz)) { nextLamp += 45; continue; }
             box(px, 4, pz, 0.18, 4, 0.18, 0x686678);
             const head = box(px - nx * side, 8, pz - nz * side, 0.45, 0.15, 1.4, PALETTE.laneMark);
             head.rotation = rot;

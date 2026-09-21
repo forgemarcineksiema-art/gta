@@ -109,6 +109,15 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   shoulders 0.022, lane marks 0.028, authored road 0.034, crosswalks and parking
   marks 0.046, authored dashes 0.054); with the 0.6 m near plane the depth
   buffer separates them out to the fog. Closer spacing shimmers while driving.
+- Painted lines are never thinner than 0.28 m (parking marks) or 0.12 m (paving
+  joints), and both exist only in the near detail level; thinner lines fall
+  below one pixel past 60 m and alias into shimmer even with MSAA. Crossings are
+  stripes near and one band in the far level, because a 2.5 m stripe pitch
+  aliases past about 150 m.
+- Authored-road kerbs, trees and lamps are never laid inside a grid street's
+  corridor (`onGridStreet`): a road leaving a junction at a shallow angle runs
+  inside that corridor for tens of metres and its pavement would land on the
+  carriageway.
 - Rotated statics rotate about +Y only; a rotated building is generated in its
   own frame and moved as a whole, so facade rules never see the rotation.
 

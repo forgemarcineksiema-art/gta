@@ -40,6 +40,8 @@ export interface StaticDesc {
   farFace?: BoxFace;
   /** Sub-pixel frames may be omitted from distant chunks. */
   detailOnly?: boolean;
+  /** Distant stand-in (e.g. a crossing as one band) drawn only in the far level. */
+  farOnly?: boolean;
   /** Full collision envelope for a facade whose visible walls contain recesses. */
   collisionOnly?: boolean;
 }

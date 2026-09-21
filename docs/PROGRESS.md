@@ -52,6 +52,13 @@ after.
 - Marcin's playtest: parking marks shimmered while driving. Cause: decals 1–13 mm
   apart beyond the depth buffer's precision at 100–300 m (near 0.3, far 1700).
   Fix: surface layers at least 12 mm apart, camera near 0.6 m.
+- Second report: still shimmering (parking marks, crossings, paving joints), and
+  a broken-looking junction. Two real causes found from junction approach shots:
+  (1) thin decals aliasing (13 cm marks, 5 cm joints are sub-pixel past 60 m):
+  widened to 0.28 / 0.12 m and limited to the near level, crossings become one
+  band in the far level; (2) authored-road kerb slabs laid on the grid
+  carriageway where a road leaves a junction at a shallow angle, covering half a
+  crossing: authored furniture now skips grid street corridors.
 
 ### Next
 

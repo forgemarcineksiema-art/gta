@@ -182,7 +182,7 @@ export class App {
         damage: { value: sim.life.state.damage, stage: sim.life.state.stage, wrecked: sim.life.state.wrecked },
         traffic: sim.traffic ? { kinematic: sim.traffic.count(AgentState.Kinematic), physical: sim.traffic.count(AgentState.Physical), wrecked: sim.traffic.count(AgentState.Wrecked) } : null,
         peds: sim.peds ? { count: sim.peds.count(), hops: sim.peds.guaranteeHops } : null,
-        billboards: null,
+        billboards: sim.collectibles ? { smashed: sim.collectibles.smashedCount, total: sim.collectibles.total } : null,
         events: recentEventKinds(sim.events),
         trafficDensity: sim.trafficDensity,
         pedsDensity: sim.pedsDensity,

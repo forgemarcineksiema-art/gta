@@ -2,6 +2,73 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-22 — M3 session 16: slice 8, billboards
+
+### Done
+
+- `sim/city/collectibles.ts`: fifty smashable billboards placed as the last
+  step of `City.generate` (`CityChunk.billboards`), so the island always has
+  exactly fifty and boot generates nothing extra. Perimeter chunks put an
+  8 m roadside panel on the highway's outer verge facing the road; interior
+  chunks put a 5 m **gate** across a footway, 93 m from the junction, driven
+  through along the street; the centre chunk gets two. A slot is taken when
+  the panel's footprint (plus 1 m along its normal, 0.3 m past its ends) is
+  clear of statics up to the panel's top and ten metres of run-out either
+  side are clear up to car height; `placeBillboards` walks a short list of
+  candidates and the unit test names the chunk if none passes. Stable ids
+  (chunk index × 4 + slot), paint from the car palette plus chalk.
+- `Collectibles.step`: five points along the panel against the chassis
+  footprint (+0.3 m), only above `billboardMinSpeed` 5.5 m/s, over the
+  resident chunks; once per id. `Life.billboards`: boost 0.25, speed × 0.95
+  through `setVelocity`, one `billboard` event at panel height.
+- Render: `Billboards` instanced mesh (both panel faces in the instance
+  colour, the edges and posts fixed; width by instance scale), registered
+  from `CityView.onChunk` as tiles are claimed, smashed ids zero-scaled.
+  Planks in the panel's paint plus a few steel bits on the event, and a
+  camera `kick`. HUD "BILLBOARDS n/50" under the damage bar and a
+  "BILLBOARD!" popup; a splinter and a two-note chime;
+  `render_game_to_text.billboards`.
+- Two design turns during the slice, both checked in the browser:
+  1. The first placement (a roadside panel on the footway's back edge) put
+     every panel 3 m in front of a frontage: every smash ended in a wall hit
+     with damage. Hence the run-out rule and, since the frontage row leaves
+     no run-out behind a roadside panel, the footway gate for the interior.
+  2. A 6 m gate did not fit the 5.8 m between kerb and frontage in the
+     densest blocks; 5 m does, with posts 0.6 m off the kerb and on the
+     footway's back edge. Lamps at 36/80 m and trees at 57/106 m leave
+     81–105 m as the one stretch with a clear run-out.
+- Fixed while checking it: the panel geometry's faces wound clockwise, so
+  the painted face was culled and the panel showed its dark inside.
+
+### Verification
+
+- verify green, 148 tests. Smoke 60.0 fps / p95 16.7 ms / 97 draws /
+  197k tris (the billboard mesh and its shadow are the two new draws),
+  build 3.49 MB.
+- Pins (`tests/sim/collectibles.test.ts`): exactly fifty, unique and
+  identical on regeneration for seeds 42, 7 and 123; every panel clear of
+  statics per the rule above, 6.5 m off any authored road's edge, off the
+  grid carriageways, within 25 m of a lane. A pass at 60 km/h smashes the
+  first centre-chunk gate inside 2 s, pays 0.25 in that step, costs 3–8 %
+  of speed, pushes one event; a second pass smashes nothing; 10 km/h
+  smashes nothing.
+- Browser (manual-step mode on the preview build): the gate is visible
+  across the footway, the smash throws chalk planks, the popup and the
+  counter show 1/50, the car runs out along the footway with no damage.
+
+### Decided
+
+- Billboards are pass-through triggers, not colliders: the panel vanishes
+  and the car keeps 95 % of its speed. Posts are visual too.
+- Widths differ by kind (8 m roadside, 5 m gate) through `BillboardDesc.width`
+  and an instance scale, one geometry.
+
+### Next
+
+- Polish pass: ARCHITECTURE decisions, STYLE, README, BACKLOG, CRAZYGAMES
+  note, dev panel Life section, N4; then the gate (e2e `life`, screens,
+  perf A/B, `docs/M3_REPORT.md`).
+
 ## 2026-09-21 — M3 session 16: slice 7, takedowns
 
 ### Done

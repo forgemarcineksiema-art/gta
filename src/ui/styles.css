@@ -204,6 +204,28 @@ body {
 .hud__popup.is-big { font-size: 24px; }
 
 /* damage bar under the boost bar: appears with the first dent, red from stage 3, pulsing when wrecked */
+.hud__collect {
+  display: none;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 4px;
+}
+.hud__collect.is-visible { display: flex; }
+.hud__collect-label {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--ui-ink-dim);
+}
+.hud__collect-value {
+  font-size: 16px;
+  font-weight: 900;
+  font-style: italic;
+  color: var(--ui-ink);
+  text-shadow: 2px 2px 0 #000;
+}
+.hud__collect.is-done .hud__collect-value { color: var(--ui-accent); }
+
 .hud__damage {
   display: none;
   align-items: center;

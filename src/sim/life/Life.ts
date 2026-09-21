@@ -2,6 +2,7 @@
  * Risk economy and hit classification. Damage, swap and takedowns land in
  * later slices; this one pays boost for a near miss and for the oncoming lane.
  */
+import { BILLBOARD_BOTTOM, BILLBOARD_HEIGHT } from '../city/collectibles';
 import { CAR_IDS, CAR_PRESETS } from '../vehicle/presets';
 import { cloneTuning } from '../vehicle/tuning';
 import type { VehicleControls } from '../controls';
@@ -94,6 +95,7 @@ export class Life {
     this.hits();
     this.damageStep();
     this.takedowns();
+    this.billboards();
     this.nearMisses(dt);
     this.oncomingLane(dt);
     const dodges = this.sim.peds?.dodgesThisStep ?? 0;
@@ -136,6 +138,21 @@ export class Life {
     }
     this.prevVx = tm.vx;
     this.prevVz = tm.vz;
+  }
+
+  /** A billboard the footprint crosses at speed smashes: boost, a small speed loss, one `billboard` event, once per id. */
+  private billboards(): void {
+    const c = this.sim.collectibles;
+    if (!c) return;
+    const id = c.step(this.sim.probe, ECONOMY.billboardMinSpeed);
+    if (id < 0) return;
+    this.grant(ECONOMY.billboardBoost);
+    const v = this.sim.vehicle;
+    const tm = v.telemetry;
+    const keep = 1 - ECONOMY.billboardSpeedLoss;
+    v.setVelocity(tm.vx * keep, tm.vy, tm.vz * keep);
+    const board = c.descOf(id);
+    this.sim.events.push('billboard', ECONOMY.billboardBoost, board ? board.x : this.sim.probe.x, BILLBOARD_BOTTOM + BILLBOARD_HEIGHT / 2, board ? board.z : this.sim.probe.z, id);
   }
 
   /** Damage from this step's strongest contact: walls at full weight, traffic at `trafficFactor`, props and terrain never. */

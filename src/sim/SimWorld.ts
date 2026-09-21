@@ -10,6 +10,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { City } from './city/City';
 import { createControls, type VehicleControls } from './controls';
 import { EventLog } from './events';
+import { Collectibles } from './city/collectibles';
 import { Life } from './life/Life';
 import { buildPlayground, type PlaygroundLayout, type SpawnPoint } from './playground';
 import { POSE_STRIDE, Recorder } from './recorder';
@@ -81,6 +82,8 @@ export class SimWorld {
   readonly traffic: Traffic | null;
   readonly peds: Pedestrians | null;
   readonly life: Life;
+  /** The city's smashable billboards; null on the playground. */
+  readonly collectibles: Collectibles | null;
   readonly statics: StaticDesc[];
   readonly dynamics: DynamicDesc[] = [];
   readonly spawns: SpawnPoint[];
@@ -96,7 +99,8 @@ export class SimWorld {
   private readonly tracked: TrackedBody[] = [];
   private readonly scratchPos = { x: 0, y: 0, z: 0 };
   private readonly scratchRot = { x: 0, y: 0, z: 0, w: 1 };
-  private readonly probe: PlayerProbe = { x: 0, z: 0, yaw: 0, vx: 0, vz: 0, speed: 0, halfWidth: 0, halfLength: 0 };
+  /** The player's footprint and motion this step, filled before the life systems run. */
+  readonly probe: PlayerProbe = { x: 0, z: 0, yaw: 0, vx: 0, vz: 0, speed: 0, halfWidth: 0, halfLength: 0 };
   /** Pose stream of the best lap (x, y, z, qx, qy, qz, qw per tick), for the ghost. */
   bestLapPoses: Float32Array | null = null;
 
@@ -153,6 +157,7 @@ export class SimWorld {
     this.vehicle = new Vehicle(this.world, this.transforms, tuning, spawn.position, spawn.yaw);
     this.traffic = this.city ? new Traffic(this.world, this.transforms, this.city, opts.seed ?? 42, TRAFFIC, this.trafficDensity) : null;
     this.peds = this.city && this.traffic ? new Pedestrians(this.transforms, this.city, this.traffic.lanes, opts.seed ?? 42, PEDS, this.pedsDensity) : null;
+    this.collectibles = this.city ? new Collectibles(this.city) : null;
     this.life = new Life(this, opts.damage ?? this.city !== null);
     this.city?.sync(spawn.position.x, spawn.position.z, true);
   }

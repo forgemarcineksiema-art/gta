@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BLOCK, CITY_HALF, PALETTE, type City, type StaticDesc } from '../sim';
+import { BLOCK, CITY_HALF, PALETTE, type City, type CityChunk, type StaticDesc } from '../sim';
 import { SHADOW_HALF, fadeShadowEdges } from './shadows';
 import { fadeRoadPaint } from './roadPaint';
 import { gableGeometry, prismGeometry } from './geometry';
@@ -225,6 +225,8 @@ interface Tile { key: string; x: number; z: number; parts: Part[] | null; groups
 export class CityView {
   /** Chunk key -> its five part meshes (base + four quadrants). */
   readonly meshes = new Map<string, THREE.Mesh[]>();
+  /** Called once per tile claim with the chunk it generated (the billboards view registers its panels). */
+  onChunk: ((chunk: CityChunk) => void) | null = null;
   private readonly tiles: Tile[] = [];
   private readonly material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
   loaded = 0;
@@ -245,6 +247,7 @@ export class CityView {
   private partition(tile: Tile): StaticDesc[][] {
     const cx = tile.x * BLOCK, cz = tile.z * BLOCK;
     const data = this.city.chunk(tile.x, tile.z);
+    this.onChunk?.(data);
     const groups = PARTS.map((): StaticDesc[] => []);
     for (const st of data.statics) groups[partIndex(st, cx, cz)]?.push(st);
     return groups;

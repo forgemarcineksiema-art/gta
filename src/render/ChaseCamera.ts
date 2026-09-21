@@ -162,6 +162,11 @@ export class ChaseCamera {
   }
 
   /** Car-swap: for `seconds` the view swings to the new car at up to 720°/s and follows twice as fast, with a FOV punch. No cut. */
+  /** An external jolt (a billboard through the windscreen): adds bounded shake energy. */
+  kick(amount: number): void {
+    this.shakeEnergy = Math.min(0.7, this.shakeEnergy + amount);
+  }
+
   whip(seconds: number): void {
     this.whipLeft = seconds;
     this.fovPunch = 10;

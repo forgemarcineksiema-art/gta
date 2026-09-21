@@ -23,6 +23,7 @@ export class Sfx {
     else if (e.kind === 'wrecked') this.boom(ctx, master);
     else if (e.kind === 'respawn' || e.kind === 'swap') this.whoosh(ctx, master);
     else if (e.kind === 'takedown' || e.kind === 'takedownTraffic') { this.crunch(ctx, master, 4); this.boom(ctx, master); }
+    else if (e.kind === 'billboard') { this.splinter(ctx, master); this.ding(ctx, master); }
   };
 
   constructor(private readonly engine: EngineAudio) {}
@@ -146,6 +147,40 @@ export class Sfx {
     noise.connect(filter).connect(cg).connect(master);
     noise.start(t);
     noise.stop(t + 2.6);
+  }
+
+  /** Billboard: a short bright noise burst, the panel splintering. */
+  private splinter(ctx: BaseAudioContext, master: AudioNode): void {
+    const t = ctx.currentTime;
+    const noise = ctx.createBufferSource();
+    noise.buffer = noiseBuffer(ctx);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'highpass';
+    filter.frequency.setValueAtTime(1800, t);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.22, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+    noise.connect(filter).connect(gain).connect(master);
+    noise.start(t);
+    noise.stop(t + 0.3);
+  }
+
+  /** Billboard: the collect chime, two sines a fifth apart. */
+  private ding(ctx: BaseAudioContext, master: AudioNode): void {
+    const t = ctx.currentTime + 0.05;
+    for (const [freq, level] of [[1318.5, 0.12], [1975.5, 0.06]] as Array<[number, number]>) {
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(level, t + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+      osc.connect(gain).connect(master);
+      osc.start(t);
+      osc.stop(t + 0.52);
+    }
   }
 
   /** Respawn: an upward noise sweep. */

@@ -6,6 +6,7 @@ import type { SpawnPoint } from '../playground';
 import { mulberry32 } from '../random';
 import { IDENTITY_QUAT as IDENTITY_ROT, quatFromYaw, type StaticDesc } from '../scene';
 import { Architecture, CITY_COLORS } from './architecture';
+import { placeBillboards, type BillboardDesc } from './collectibles';
 import { buildRoadMarkings } from './markings';
 import { BLOCK, CITY_HALF, HIGHWAY_HALF, ROAD_HALF, buildCityRoute, buildRoadGraph, distanceToPolyline, projectOnLane, type Lane, type RoadPoint, type SpecialRoad } from './roads';
 
@@ -24,7 +25,7 @@ export const LANDMARKS = DISTRICTS.map((d, i) => {
   return { district: d.id, name: d.landmark, x: (i % 2 ? 450 : -450) + offset, z: (i < 2 ? -450 : 450) + offset, offset };
 });
 export function chunkCoord(v: number): number { return Math.max(-3, Math.min(3, Math.floor((v + BLOCK / 2) / BLOCK))); }
-export interface CityChunk { key: string; x: number; z: number; statics: StaticDesc[] }
+export interface CityChunk { key: string; x: number; z: number; statics: StaticDesc[]; billboards: BillboardDesc[] }
 
 type Pt = { x: number; z: number };
 /** Where a pavement band may begin or end along an authored road, with the edge to start on. */
@@ -288,7 +289,9 @@ export class City {
       box(x, quay ? 0.55 : 2, Math.sign(cz) * CITY_HALF, BLOCK / 2, quay ? 0.55 : 2, 1, PALETTE.kerb, 'boundary');
       if (quay) box(x, 1.16, Math.sign(cz) * CITY_HALF, BLOCK / 2, 0.07, 1.15, CITY_COLORS.trim, 'boundary');
     }
-    return { key: `${cx},${cz}`, x: cx, z: cz, statics };
+    // Last: the billboards need every static in place to find clear ground.
+    const billboards = placeBillboards(cx, cz, statics, roadClearance);
+    return { key: `${cx},${cz}`, x: cx, z: cz, statics, billboards };
   }
 
   /** Coral Quay's seawall edge: paved promenade, railing, palms, benches and masts. */

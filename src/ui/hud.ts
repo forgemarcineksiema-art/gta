@@ -59,6 +59,9 @@ export class Hud {
   private lastGearText = '';
   private readonly oncoming: HTMLElement;
   private readonly damageWrap: HTMLElement;
+  private readonly collect: HTMLElement;
+  private readonly collectValue: HTMLElement;
+  private lastCollectText = '';
   private readonly damageFill: HTMLElement;
   private readonly wrecked: HTMLElement;
   private readonly wreckedSub: HTMLElement;
@@ -102,6 +105,10 @@ export class Hud {
     damageTrack.appendChild(this.damageFill);
     this.damageWrap.append(el('div', 'hud__damage-label', 'DAMAGE'), damageTrack);
     speedo.append(this.damageWrap);
+    this.collect = el('div', 'hud__collect');
+    this.collectValue = el('span', 'hud__collect-value', '0/50');
+    this.collect.append(el('span', 'hud__collect-label', 'BILLBOARDS'), this.collectValue);
+    speedo.append(this.collect);
     this.oncoming = el('div', 'hud__oncoming', 'ONCOMING');
     speedo.prepend(this.oncoming);
     this.root.appendChild(speedo);
@@ -211,7 +218,8 @@ export class Hud {
           : kind === 'swap' ? 'FRESH WHEELS'
             : kind === 'takedown' ? 'TAKEDOWN!'
               : kind === 'takedownTraffic' ? 'TAKEDOWN! INTO TRAFFIC!'
-                : '';
+                : kind === 'billboard' ? 'BILLBOARD!'
+                  : '';
     if (!text) return;
     const i = this.popupCursor % this.popups.length;
     this.popupCursor++;
@@ -255,6 +263,14 @@ export class Hud {
     if (damageText !== this.lastDamageText) { this.damageFill.style.transform = damageText; this.lastDamageText = damageText; }
     if (life.stage !== this.lastStage) {
       this.lastStage = life.stage;
+      const c = sim.collectibles;
+      const collectText = c ? `${c.smashedCount}/${c.total}` : '';
+      if (collectText !== this.lastCollectText) {
+        this.collectValue.textContent = collectText;
+        this.collect.classList.toggle('is-visible', c !== null);
+        this.collect.classList.toggle('is-done', c !== null && c.smashedCount >= c.total);
+        this.lastCollectText = collectText;
+      }
       this.damageWrap.classList.toggle('is-visible', life.damage > 0);
       this.damageWrap.classList.toggle('is-danger', life.stage >= 3);
       this.damageWrap.classList.toggle('is-wrecked', life.stage >= 4);

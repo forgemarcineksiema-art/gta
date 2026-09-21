@@ -2,6 +2,47 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-21 — Session 14: the M3 plan
+
+Marcin asked for a full, detailed M3 plan. The executor will be Grok 4.7 XHigh
+in Cursor (a model released today, so this milestone is also its trial);
+Claude reviews the branch after the gate and runs the fix-up pass.
+
+### Done
+
+- `docs/M3_PLAN.md`: the milestone contract. Working rules for the executor,
+  scope (in, out, stretch), twelve fixed decisions with reasons (pooled
+  typed-array traffic with a lent body pool; velocity-driven dynamic bodies
+  near the player; highway sub-lane offsets instead of a graph change; a
+  polled event ring buffer; damage as rules outside `Vehicle`; car-swap by
+  retuning the player's `Vehicle` in place; colliderless pedestrians with a
+  dodge guarantee; pass-through billboards; slow motion as a loop time scale;
+  one traffic density on both tiers; traffic uses the player's classes;
+  tests and tours run with traffic off unless they test it), the module map,
+  the step order, TypeScript contracts for `EventLog`, `Traffic`,
+  `Pedestrians`, `Life`, `Collectibles`, the tuning objects with starting
+  values, nine slices with behaviour, numbers, tests and acceptance each, the
+  verification protocol (headless tests, `e2e/life.spec.ts`, screens, the
+  perf A/B rule), the gate criteria, the API facts checked against the
+  installed Rapier 0.20 and Three 0.186 types, a five-minute playtest script
+  and the reviewer checklist.
+- `AGENTS.md` at the root so Cursor (which does not read `CLAUDE.md`) points
+  the executor at the standing rules and the plan.
+
+### Decided and why
+
+- The plan fixes design decisions rather than leaving them to the executor:
+  an unfamiliar model is most likely to go wrong on architecture (bodies per
+  agent, callbacks from the sim, damage inside the vehicle model), and a
+  review against a written contract is cheaper than a rewrite.
+- Stretch content (parked cars, stunt ramps, speed cameras) is gated behind
+  the core gate criteria so the milestone stays a complete vertical slice.
+
+### Next
+
+- Grok works `grok/m3-life` through the slices; Claude reviews per §10 of the
+  plan; Marcin playtests at the gate; the M3.1 pass follows his notes.
+
 ## 2026-09-21 — Session 13: road paint for the whole city and proper kerbside parking
 
 Two passes. The first (started in a Codex session, accepted visually by Marcin)

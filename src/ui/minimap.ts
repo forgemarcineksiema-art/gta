@@ -1,4 +1,5 @@
 import { CITY_HALF, DISTRICTS, districtAt, type SimWorld } from '../sim';
+import { LANDMARKS } from '../sim/city/City';
 
 /** Static SVG map (built once), moving heading arrow and district label. North is +Z. */
 export class Minimap {
@@ -26,7 +27,7 @@ export class Minimap {
       if (!a || !b) continue;
       shape('line', { x1: String(-a.x), y1: String(-a.z), x2: String(-b.x), y2: String(-b.z), stroke: lane.highway ? '#f5cd75' : '#f7f3ea', 'stroke-width': lane.highway ? '22' : '13', opacity: '.8' });
     }
-    for (const x of [-365, 535]) for (const z of [-365, 535]) shape('rect', { x: String(-x - 17), y: String(-z - 17), width: '34', height: '34', fill: '#2bd1ff' });
+    for (const { x, z } of LANDMARKS) shape('rect', { x: String(-x - 17), y: String(-z - 17), width: '34', height: '34', fill: '#2bd1ff' });
     this.arrow = shape('path', { d: 'M 0 -53 L 35 35 L 0 20 L -35 35 Z', fill: '#ffd23f', stroke: '#160e28', 'stroke-width': '14', 'stroke-linejoin': 'round' });
     const north = document.createElement('span'); north.className = 'minimap__north'; north.textContent = 'N';
     this.label = document.createElement('div'); this.label.className = 'minimap__district';

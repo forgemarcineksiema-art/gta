@@ -3,7 +3,8 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { GROUPS_SOLID, GROUPS_TERRAIN } from '../collision';
 import { PALETTE } from '../palette';
 import type { SpawnPoint } from '../playground';
-import { IDENTITY_QUAT, type StaticDesc } from '../scene';
+import type { StaticDesc } from '../scene';
+import { Architecture, CITY_COLORS } from './architecture';
 import { BLOCK, CITY_HALF, HIGHWAY_HALF, ROAD_HALF, buildCityRoute, buildRoadGraph } from './roads';
 
 export const DISTRICTS = [
@@ -15,6 +16,11 @@ export const DISTRICTS = [
 export function districtAt(x: number, z: number): typeof DISTRICTS[number] {
   return DISTRICTS[(z >= 0 ? 2 : 0) + (x >= 0 ? 1 : 0)] as typeof DISTRICTS[number];
 }
+/** Low landmarks need an open corner; towers can rise behind the street frontage. */
+export const LANDMARKS = DISTRICTS.map((d, i) => {
+  const offset = i < 2 ? 85 : 40;
+  return { district: d.id, name: d.landmark, x: (i % 2 ? 450 : -450) + offset, z: (i < 2 ? -450 : 450) + offset, offset };
+});
 export function chunkCoord(v: number): number { return Math.max(-3, Math.min(3, Math.floor((v + BLOCK / 2) / BLOCK))); }
 export interface CityChunk { key: string; x: number; z: number; statics: StaticDesc[] }
 
@@ -58,12 +64,9 @@ export class City {
     const x = cx * BLOCK, z = cz * BLOCK;
     const rnd = random(this.seed ^ Math.imul(cx + 19, 73856093) ^ Math.imul(cz + 23, 19349663));
     const statics: StaticDesc[] = [];
-    const box = (px: number, py: number, pz: number, hx: number, hy: number, hz: number, color: number, tag = 'decor') => {
-      statics.push({ shape: { kind: 'box', hx, hy, hz }, position: { x: px, y: py, z: pz }, rotation: IDENTITY_QUAT, color, tag });
-    };
-    const cylinder = (px: number, py: number, pz: number, radius: number, halfHeight: number, color: number) => {
-      statics.push({ shape: { kind: 'cylinder', radius, halfHeight }, position: { x: px, y: py, z: pz }, rotation: IDENTITY_QUAT, color, tag: 'decor' });
-    };
+    const architecture = new Architecture(statics);
+    const box = architecture.box.bind(architecture);
+    const cylinder = architecture.cylinder.bind(architecture);
     const vx = Math.abs(cx) === 3 ? HIGHWAY_HALF : ROAD_HALF;
     const vz = Math.abs(cz) === 3 ? HIGHWAY_HALF : ROAD_HALF;
     box(x, -0.06, z, BLOCK / 2, 0.05, BLOCK / 2, PALETTE.grass, 'ground');
@@ -73,6 +76,12 @@ export class City {
       const half = (BLOCK / 2 - vx) / 2;
       box(x + side * (vx + half), 0, z, half, 0.01, vz, PALETTE.asphalt, 'road');
     }
+    // Paved parking / service shoulders visually separate the active carriageway.
+    // Keep the existing junction envelope for drift, U-turns and the lane graph.
+    for (const side of [-1, 1]) for (const along of [-1, 1]) {
+      box(x + side * (vx - 2), 0.017, z + along * 68.75, 2, 0.001, 43.75, PALETTE.asphaltLight, 'decor', 'top');
+      box(x + along * 68.75, 0.017, z + side * (vz - 2), 43.75, 0.001, 2, PALETTE.asphaltLight, 'decor', 'top');
+    }
     for (let d = -100; d <= 100; d += 12) {
       if (Math.abs(d) < 26) continue;
       box(x, 0.022, z + d, 0.12, 0.006, 2.8, PALETTE.laneMark);
@@ -80,46 +89,67 @@ export class City {
     }
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
       const d = districtAt(x + sx * 55, z + sz * 55);
-      // Raised pavements start outside the drivable 24/38 m cross.
+      const c = CITY_COLORS;
       const hx = (BLOCK / 2 - vx) / 2, hz = (BLOCK / 2 - vz) / 2;
-      box(x + sx * (vx + hx), 0.07, z + sz * (vz + hz), hx, 0.07, hz, PALETTE.kerb, 'kerb');
-      // Four lots in each quarter block. Each district has its own massing rules.
+      // The collision apron stays continuous. Visually, pavement is only 4.5 m wide;
+      // the interior is gardens, courtyards or a paved industrial service yard.
+      box(x + sx * (vx + hx), 0.07, z + sz * (vz + hz), hx, 0.07, hz,
+        d.id === 'foundry' ? c.yard : c.soil, 'kerb');
+      box(x + sx * (vx + 2.25), 0.145, z + sz * (vz + hz), 2.25, 0.005, hz, PALETTE.kerb, 'decor', 'top');
+      box(x + sx * (vx + hx), 0.145, z + sz * (vz + 2.25), hx, 0.005, 2.25, PALETTE.kerb, 'decor', 'top');
+      // Continuous kerb edge and paving joints provide a metre-scale reference at speed.
+      box(x + sx * (vx + 0.12), 0.16, z + sz * (vz + hz), 0.12, 0.02, hz, c.trim);
+      box(x + sx * (vx + hx), 0.16, z + sz * (vz + 0.12), hx, 0.02, 0.12, c.trim);
+      for (let along = 26; along < 110; along += 6) {
+        box(x + sx * (vx + 2.3), 0.16, z + sz * along, 2.2, 0.002, 0.025, c.yard, 'decor', 'top');
+        box(x + sx * along, 0.16, z + sz * (vz + 2.3), 0.025, 0.002, 2.2, c.yard, 'decor', 'top');
+      }
       for (const ox of [40, 85]) for (const oz of [40, 85]) {
-        const px = x + sx * ox, pz = z + sz * oz;
-        const edge = Math.abs(px) > 702 || Math.abs(pz) > 702;
-        const park = edge || (d.id === 'gardens' && rnd() < 0.4) || rnd() < 0.07;
+        // Reserve authored destinations before filling ordinary parcels.
+        const landmarkOffset = d.id === 'crown' || d.id === 'foundry' ? 85 : 40;
+        if (Math.abs(cx) === 2 && Math.abs(cz) === 2 && sx === 1 && sz === 1 && ox === landmarkOffset && oz === landmarkOffset) continue;
+        const backlot = ox === 85 && oz === 85;
+        const edge = Math.abs(x + sx * ox) > 702 || Math.abs(z + sz * oz) > 702;
+        const park = edge || (backlot && d.id === 'gardens') || (backlot && rnd() < 0.35);
         if (park) {
-          box(px, 0.15, pz, 16, 0.03, 16, PALETTE.grass);
-          cylinder(px - 6, 2.2, pz, 0.5, 2, 0x9d745b);
-          cylinder(px - 6, 5.8, pz, 4.8, 2, d.accent);
-          cylinder(px + 7, 2.2, pz + 5, 0.5, 2, 0x9d745b);
-          cylinder(px + 7, 5.8, pz + 5, 4.8, 2, 0x7fae5a);
-          box(px + 6, 0.7, pz - 7, 3, 0.5, 0.6, d.color);
+          const px = x + sx * ox, pz = z + sz * oz;
+          box(px, 0.16, pz, 18, 0.015, 18, PALETTE.grass, 'decor', 'top');
+          box(px, 0.18, pz, 1.6, 0.01, 18, PALETTE.kerb, 'decor', 'top');
+          architecture.tree(px - 7, pz, d.id === 'marina');
+          architecture.tree(px + 9, pz + 8, d.id === 'marina');
+          box(px + 4, 0.65, pz - 5, 1.4, 0.12, 0.4, c.brick);
+          box(px + 4, 0.9, pz - 5.35, 1.4, 0.35, 0.08, c.brick);
           continue;
         }
-        const w = 10 + rnd() * 5, depth = 11 + rnd() * 4;
-        const h = d.id === 'crown' ? 18 + rnd() * 40 : d.id === 'foundry' ? 9 + rnd() * 5 : d.id === 'gardens' ? 5 + rnd() * 6 : 10 + rnd() * 14;
-        const color = rnd() < 0.3 ? d.accent : d.color;
-        box(px, h / 2 + 0.14, pz, w, h / 2, depth, color, 'building');
-        box(px, 1.8, pz, w + 0.15, 1.5, depth + 0.15, d.accent);
-        box(px, h + 0.35, pz, w + 0.5, 0.35, depth + 0.5, PALETTE.kerb);
-        if (d.id === 'crown') {
-          box(px, h + 3, pz, w * 0.65, 3, depth * 0.65, color);
-          for (const face of [-1, 1]) {
-            box(px + face * (w + 0.02), h * 0.55, pz, 0.02, h * 0.32, depth * 0.58, 0x60758e);
-            box(px, h * 0.55, pz + face * (depth + 0.02), w * 0.58, h * 0.32, 0.02, 0x60758e);
+        const variant = Math.floor(rnd() * 3);
+        const w = d.id === 'gardens' ? 7 + variant : (ox === 85 ? 15 : 10) + variant;
+        const depth = d.id === 'gardens' ? 8 + variant : (oz === 85 ? 16 : 10) + variant;
+        const setback = d.id === 'gardens' ? 6 : d.id === 'foundry' ? 7 : 1.3;
+        const px = x + sx * (ox === 40 ? vx + 4.5 + setback + w : 82);
+        const pz = z + sz * (oz === 40 ? vz + 4.5 + setback + depth : 82);
+        // Higher offices cluster around Crown Tower; the street still has a human-scale podium.
+        const centreDistance = Math.hypot(px + 365, pz + 365);
+        const floors = d.id === 'crown' ? (backlot ? 7 + Math.max(0, 5 - Math.floor(centreDistance / 100)) : 3 + variant)
+          : d.id === 'foundry' ? 1 : d.id === 'gardens' ? 2 : 3 + variant;
+        architecture.building(px, pz, w, depth, d.id, sx, sz, floors, variant, d.accent, ox === 40 || backlot, oz === 40 || backlot);
+        // Paths join actual entrances to the public footway; yards are intentionally set back.
+        if (ox === 40) box(x + sx * (vx + 4.5 + setback / 2), 0.17, pz, setback / 2, 0.01, 1.5, PALETTE.kerb, 'decor', 'top');
+        if (oz === 40) box(px, 0.17, z + sz * (vz + 4.5 + setback / 2), 1.5, 0.01, setback / 2, PALETTE.kerb, 'decor', 'top');
+        if (d.id === 'gardens') {
+          if (ox === 40) {
+            architecture.tree(x + sx * (vx + 7), pz + sz * 5);
+            box(x + sx * (vx + 5.5), 0.65, pz - sz * 6, 0.7, 0.5, 4, c.hedge);
           }
-        } else if (d.id === 'foundry') {
-          box(px, h + 1, pz, w * 0.8, 1, depth * 0.8, 0x686678);
-          box(px - sx * (w + 0.03), 3, pz, 0.03, 2.5, 4, 0x686678);
-          cylinder(px + 5, h + 3, pz + 4, 1, 3, PALETTE.barrier);
-        } else {
-          for (const face of [-1, 1]) {
-            box(px + face * (w + 0.03), h * 0.6, pz, 0.03, 1.2, depth * 0.6, PALETTE.glass);
-            box(px, h * 0.6, pz + face * (depth + 0.03), w * 0.6, 1.2, 0.03, PALETTE.glass);
-          }
-          box(px, h + 1, pz, w * 0.75, 0.8, depth * 0.75, d.accent);
         }
+      }
+      // Parking strips explain the generous road width without altering the driving envelope.
+      for (const along of [38, 50, 62, 74, 86, 98]) {
+        box(x + sx * (vx - 2), 0.026, z + sz * along, 1.65, 0.005, 0.065, PALETTE.laneMark, 'decor', 'top');
+        box(x + sx * along, 0.026, z + sz * (vz - 2), 0.065, 0.005, 1.65, PALETTE.laneMark, 'decor', 'top');
+      }
+      if (d.id !== 'foundry') for (const along of [57, 106]) {
+        architecture.tree(x + sx * (vx + 2.7), z + sz * along, d.id === 'marina');
+        architecture.tree(x + sx * along, z + sz * (vz + 2.7), d.id === 'marina');
       }
       // Street lamps and planted verges are outside the driving corridor.
       for (const offset of [36, 80]) {
@@ -132,32 +162,44 @@ export class City {
         box(x + sx * 16, 0.025, z + sz * (2 + i * 2.5), 2, 0.008, 0.7, PALETTE.laneMark);
       }
     }
-    // Authored landmarks replace one lot, using its existing footprint.
+    // Each landmark owns a reserved plaza, with paths back to both bordering streets.
     if (Math.abs(cx) === 2 && Math.abs(cz) === 2) {
-      const px = x + 85, pz = z + 85, d = districtAt(x, z);
-      for (let i = statics.length - 1; i >= 0; i--) {
-        const p = (statics[i] as StaticDesc).position;
-        if (Math.abs(p.x - px) < 20 && Math.abs(p.z - pz) < 20 && p.y > 0.14) statics.splice(i, 1);
+      const d = districtAt(x, z);
+      const site = LANDMARKS.find((l) => l.district === d.id);
+      if (!site) throw new Error(`Missing landmark for ${d.id}`);
+      const px = site.x, pz = site.z;
+      box(px, 0.165, pz, 24, 0.015, 24, PALETTE.kerb, 'decor', 'top');
+      if (site.offset === 85) {
+        box(x + 49, 0.165, pz + 20, 36, 0.015, 2, PALETTE.kerb, 'decor', 'top');
+        box(px + 20, 0.165, z + 49, 2, 0.015, 36, PALETTE.kerb, 'decor', 'top');
+      } else {
+        box(x + 15, 0.165, pz, 3, 0.015, 2, PALETTE.kerb, 'decor', 'top');
+        box(px, 0.165, z + 15, 2, 0.015, 3, PALETTE.kerb, 'decor', 'top');
       }
       if (d.id === 'crown') {
-        box(px, 38, pz, 14, 38, 14, d.color, 'building');
-        box(px, 86, pz, 10, 10, 10, d.accent, 'building');
-        box(px, 107, pz, 0.6, 11, 0.6, d.accent);
-        for (const s of [-1, 1]) box(px + s * 14.1, 42, pz, 0.1, 32, 5, 0x60758e);
+        architecture.building(px, pz, 14, 14, 'crown', 1, 1, 20, 1, d.accent);
+        box(px, 66, pz, 10, 3, 10, CITY_COLORS.stone, 'building');
+        box(px, 72, pz, 6, 3, 6, d.accent);
+        box(px, 82, pz, 0.4, 7, 0.4, d.accent);
       } else if (d.id === 'foundry') {
         for (const a of [-8, 8]) for (const b of [-8, 8]) box(px + a, 15, pz + b, 1, 15, 1, d.accent, 'building');
         cylinder(px, 34, pz, 14, 6, d.color);
         box(px, 40.5, pz, 14, 0.5, 14, d.accent);
       } else if (d.id === 'gardens') {
         box(px, 5, pz, 18, 5, 18, d.accent, 'building');
+        for (const side of [-1, 1]) for (const bay of [-12, -6, 0, 6, 12]) {
+          box(px + side * 18.08, 5.3, pz + bay, 0.01, 3.8, 2.5, CITY_COLORS.windowLight, 'decor', side > 0 ? 'x+' : 'x-');
+          box(px + bay, 5.3, pz + side * 18.08, 2.5, 3.8, 0.01, CITY_COLORS.windowLight, 'decor', side > 0 ? 'z+' : 'z-');
+        }
+        box(px - 18.1, 1.4, pz, 0.01, 1.2, 1.2, CITY_COLORS.shop, 'decor', 'x-');
         cylinder(px, 12, pz, 17, 2, PALETTE.glass);
         cylinder(px, 15, pz, 12, 1, PALETTE.glass);
         cylinder(px, 17, pz, 6, 1, d.accent);
       } else {
-        box(px, 17, pz, 16, 17, 12, d.color, 'building');
-        for (let h = 8; h <= 32; h += 8) box(px, h, pz, 17, 0.5, 13, d.accent);
-        box(px, 41, pz, 7, 7, 10, d.accent, 'building');
-        box(px, 49, pz, 9, 1, 11, PALETTE.laneMark);
+        architecture.building(px, pz, 16, 12, 'marina', 1, 1, 9, 0, d.accent);
+        box(px, 31, pz, 7, 2, 10, d.accent, 'building');
+        box(px, 34, pz, 9, 0.3, 11, PALETTE.laneMark);
+        for (const side of [-1, 1]) architecture.tree(px + side * 21, pz - 19, true);
       }
     }
     // Visible seawalls match the persistent boundary colliders.

@@ -64,7 +64,9 @@ for (const quality of ['low', 'high']) {
     expect(peak.heap).toBeLessThan(250);
     expect(peak.physics).toBeLessThanOrEqual(25);
     expect(peak.unloaded).toBeGreaterThan(49);
-    expect(peak.geometry).toBeLessThan(80);
+    // Leak guard: five part geometries per resident chunk plus the fixed scene;
+    // a leak would scale with `loaded` (hundreds of chunk loads over the tour).
+    expect(peak.geometry).toBeLessThan(peak.meshes * 5 + 40);
     expect(errors).toEqual([]);
   });
 }

@@ -1,6 +1,6 @@
 /**
- * Chase camera look-ahead pins: in a steady turn the view leads the car and the
- * look point moves to the inside of the turn; straight ahead nothing shifts.
+ * Camera comfort contract: steering alone cannot swing the view; actual
+ * corners stay readable without excessive yaw lag. Supersedes the M1 lead pins.
  * Pure math in Node: a synthetic car object and telemetry, no WebGL.
  */
 import * as THREE from 'three';
@@ -19,14 +19,14 @@ function telemetry(over: Partial<VehicleTelemetry> = {}): VehicleTelemetry {
 }
 
 /** Runs the camera for `seconds` on a car moving at 20 m/s with the given yaw rate and steer. */
-function settle(yawRate: number, steer: number, seconds = 3): { yawOffsetDeg: number; sideOffset: number } {
+function settle(yawRate: number, steer: number, seconds = 3, hz = 60): { yawOffsetDeg: number; sideOffset: number } {
   const cam = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 1000);
   const chase = new ChaseCamera(cam);
   const car = new THREE.Object3D();
   const vel = new THREE.Vector3();
   let yaw = 0;
-  const dt = 1 / 60;
-  for (let i = 0; i < seconds * 60; i++) {
+  const dt = 1 / hz;
+  for (let i = 0; i < seconds * hz; i++) {
     yaw += yawRate * dt;
     car.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
     vel.set(Math.sin(yaw) * 20, 0, Math.cos(yaw) * 20);
@@ -46,18 +46,17 @@ function settle(yawRate: number, steer: number, seconds = 3): { yawOffsetDeg: nu
   return { yawOffsetDeg: (d * 180) / Math.PI, sideOffset: toPoint.dot(left) };
 }
 
-describe('chase camera look-ahead', () => {
+describe('chase camera comfort', () => {
   test('straight ahead the view is centred on the nose', () => {
     const r = settle(0, 0);
     expect(Math.abs(r.yawOffsetDeg)).toBeLessThan(0.5);
     expect(Math.abs(r.sideOffset)).toBeLessThan(0.05);
   });
 
-  test('a left turn leads the view left and slides the look point to the inside', () => {
+  test('a sustained corner stays within nine degrees of the road heading', () => {
     const r = settle(0.6, -0.4);
-    expect(r.yawOffsetDeg).toBeGreaterThan(1);
-    expect(r.yawOffsetDeg).toBeLessThan(25);
-    expect(r.sideOffset).toBeGreaterThan(1);
+    expect(Math.abs(r.yawOffsetDeg)).toBeLessThan(9);
+    expect(Math.abs(r.sideOffset)).toBeLessThan(1);
   });
 
   test('a right turn mirrors it', () => {
@@ -67,8 +66,39 @@ describe('chase camera look-ahead', () => {
     expect(r.sideOffset).toBeCloseTo(-l.sideOffset, 1);
   });
 
-  test('steering alone at speed already turns the view toward the corner', () => {
+  test('steering alone cannot rotate the view before the car actually turns', () => {
     const r = settle(0, -0.4);
-    expect(r.sideOffset).toBeGreaterThan(0.5);
+    expect(Math.abs(r.sideOffset)).toBeLessThan(0.05);
+    expect(Math.abs(r.yawOffsetDeg)).toBeLessThan(0.5);
+  });
+  test('sustained corner framing agrees at 30, 60 and 120 Hz', () => {
+    const reference = settle(0.6, -0.4, 4, 60);
+    for (const hz of [30, 120]) {
+      const actual = settle(0.6, -0.4, 4, hz);
+      expect(Math.abs(actual.yawOffsetDeg - reference.yawOffsetDeg)).toBeLessThan(0.6);
+      expect(Math.abs(actual.sideOffset - reference.sideOffset)).toBeLessThan(0.1);
+    }
+  });
+
+  test('a brief course correction stays smooth and recentres after release', () => {
+    const cam = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 1000);
+    const chase = new ChaseCamera(cam), car = new THREE.Object3D(), vel = new THREE.Vector3();
+    chase.tuning.shakeAmount = 0;
+    let yaw = 0, previous = 0, peakRate = 0;
+    const view = new THREE.Vector3();
+    for (let i = 0; i < 240; i++) {
+      const yawRate = i >= 60 && i < 72 ? 0.6 : i >= 72 && i < 84 ? -0.6 : 0;
+      yaw += yawRate / 60;
+      car.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+      vel.set(Math.sin(yaw) * 20, 0, Math.cos(yaw) * 20);
+      car.position.addScaledVector(vel, 1 / 60);
+      chase.update(car, vel, telemetry({ yawRate, steer: -Math.sign(yawRate) * 0.4 }), 1 / 60, i === 0);
+      cam.getWorldDirection(view);
+      const angle = Math.atan2(view.x, view.z);
+      if (i > 0) peakRate = Math.max(peakRate, Math.abs(angle - previous) * 60 * 180 / Math.PI);
+      previous = angle;
+    }
+    expect(peakRate).toBeLessThan(40);
+    expect(Math.abs(previous * 180 / Math.PI)).toBeLessThan(0.5);
   });
 });

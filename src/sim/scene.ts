@@ -4,6 +4,7 @@
  */
 export type ShapeDesc =
   | { kind: 'box'; hx: number; hy: number; hz: number }
+  | { kind: 'gable'; hx: number; hy: number; hz: number }
   | { kind: 'cylinder'; radius: number; halfHeight: number }
   | { kind: 'wheel'; radius: number; width: number };
 
@@ -20,6 +21,8 @@ export interface Vec3 {
   z: number;
 }
 
+export type BoxFace = 'x+' | 'x-' | 'z+' | 'z-' | 'top' | 'bottom';
+
 /** Static scenery: fixed transform, drawn as instanced / merged meshes by the renderer. */
 export interface StaticDesc {
   shape: ShapeDesc;
@@ -29,6 +32,16 @@ export interface StaticDesc {
   color: number;
   /** Optional grouping tag for the renderer (e.g. 'road', 'kerb', 'prop'). */
   tag?: string;
+  /** City-only surface panel: render one outward box face instead of a closed solid. */
+  face?: BoxFace;
+  /** Exposed faces of a structural facade member; hidden internal faces are omitted. */
+  faces?: BoxFace[];
+  /** At distance a wall member needs only its outer face, preserving opening layout. */
+  farFace?: BoxFace;
+  /** Sub-pixel frames may be omitted from distant chunks. */
+  detailOnly?: boolean;
+  /** Full collision envelope for a facade whose visible walls contain recesses. */
+  collisionOnly?: boolean;
 }
 
 /** Moving object: the renderer reads `slot` from the TransformBuffer every frame. */

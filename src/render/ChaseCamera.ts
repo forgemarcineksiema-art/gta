@@ -6,10 +6,9 @@
  * looks along it (so a drifting car stays centred while the view shows where it
  * is going). Reversing swings the camera around the car in a smooth orbit rather
  * than snapping. In flight the camera's height lags the car so the jump reads,
- * and a landing gives a short shake scaled by the impact. Look-ahead: the view
- * leads the car into a turn (the heading gains a share of the yaw rate) and the
- * look point slides toward the inside of the turn from the yaw rate and the
- * steering, so the corner exit is on screen before the car gets there.
+ * and a landing gives a short shake scaled by the impact. A small, bounded
+ * look-ahead follows actual angular motion. Steering input alone must never
+ * swivel the view: quick corrections should not move the road under the player.
  */
 import * as THREE from 'three';
 import type { VehicleTelemetry } from '../sim';
@@ -61,9 +60,8 @@ export interface CameraTuning {
   reverseHeight: number;
   /** Look-ahead: seconds of yaw rate added to the heading (not while drifting). */
   headingLead: number;
-  /** Look-ahead: lateral look offset per rad/s of yaw rate, and at full steering lock, m. */
+  /** Look-ahead: lateral look offset per rad/s of actual yaw rate, m. */
   lookSideYaw: number;
-  lookSideSteer: number;
   lookSideMax: number;
   /** Look-ahead smoothing (1/s) and the speed at which it is fully active (m/s). */
   lookSideRate: number;
@@ -79,20 +77,20 @@ export const DEFAULT_CAMERA: CameraTuning = {
   lookAheadPerSpeed: 0.1,
   lookHeight: 0.9,
   followRate: 8,
-  headingRate: 6,
-  headingRateDrift: 4.5,
-  maxYawRateDeg: 220,
+  headingRate: 5,
+  headingRateDrift: 3.8,
+  maxYawRateDeg: 110,
   velocityFollow: 0.6,
   driftVelocityFollow: 0.9,
   driftDistanceBonus: 0.8,
   driftHeightDrop: 0.3,
   fovBase: 60,
-  fovPerSpeed: 0.28,
-  fovBoost: 10,
-  fovDrift: 4,
-  fovMax: 92,
-  fovRate: 4,
-  shakeAmount: 0.05,
+  fovPerSpeed: 0.18,
+  fovBoost: 5,
+  fovDrift: 1.5,
+  fovMax: 80,
+  fovRate: 2.5,
+  shakeAmount: 0.02,
   shakeSpeedRef: 55,
   heightRateGround: 9,
   heightRateAir: 2.5,
@@ -104,11 +102,10 @@ export const DEFAULT_CAMERA: CameraTuning = {
   reverseStillDelay: 1.2,
   reverseOrbitOmega: 3.5,
   reverseHeight: 0.3,
-  headingLead: 0.22,
-  lookSideYaw: 1.8,
-  lookSideSteer: 2.2,
-  lookSideMax: 4.5,
-  lookSideRate: 6,
+  headingLead: 0.04,
+  lookSideYaw: 0.4,
+  lookSideMax: 0.65,
+  lookSideRate: 3,
   lookSideSpeedRef: 14,
 };
 
@@ -160,6 +157,7 @@ export class ChaseCamera {
   }
 
   update(car: THREE.Object3D, carVel: THREE.Vector3, tm: VehicleTelemetry, dt: number, snap: boolean): void {
+    snap ||= !this.initialised;
     const t = this.tuning;
     const speed = Math.hypot(carVel.x, carVel.z);
     const modeMul = this.mode === 'far' ? 1.6 : 1;
@@ -176,8 +174,7 @@ export class ChaseCamera {
     // look-ahead: lead the heading into the turn, and slide the look point to the inside
     const lookActive = Math.min(1, speed / t.lookSideSpeedRef) * (1 - this.reverseU);
     if (!tm.drifting) yawTarget += tm.yawRate * t.headingLead * lookActive;
-    const steerNorm = tm.steer / 0.6; // radians at the axle over the low-speed lock; + = right
-    const sideTarget = Math.max(-t.lookSideMax, Math.min(t.lookSideMax, (tm.yawRate * t.lookSideYaw - steerNorm * t.lookSideSteer) * lookActive));
+    const sideTarget = Math.max(-t.lookSideMax, Math.min(t.lookSideMax, tm.yawRate * t.lookSideYaw * lookActive));
     this.lookSide += (sideTarget - this.lookSide) * (snap ? 1 : 1 - Math.exp(-dt * t.lookSideRate));
 
     // reverse view: after a moment of backing up the camera orbits round to the front of the car,

@@ -9,7 +9,7 @@ export const PALETTE = {
   kerb: 0xc9c3b3,
   concrete: 0x9a938a,
   sand: 0xd9b57a,
-  grass: 0x7fae5a,
+  grass: 0x879b74,
   water: 0x3fa7c9,
   glass: 0x9fd8ff,
   ramp: 0xe5533d,
@@ -41,10 +41,17 @@ export const PALETTE = {
   policeWhite: 0xf7f3ea,
   policeBlue: 0x1d4ed8,
 
-  skyTop: 0x2b1b5a,
-  skyHorizon: 0xff8a5b,
-  sun: 0xffd27a,
-  fog: 0xe8a07a,
+  skyTop: 0x706c9b,
+  skyHorizon: 0xe5b6a5,
+  sun: 0xffe3ba,
+  fog: 0xd9b8ac,
 } as const;
 
 export type PaletteKey = keyof typeof PALETTE;
+
+export const CITY_COLORS = {
+  stone: 0xd4cbbd, chalk: 0xe3d8c4, lavender: 0xb1a8ba, brick: 0xad7864,
+  peach: 0xd7ae9c, mint: 0x91aca3, trim: 0xe2d9c9, roof: 0x62636c,
+  window: 0x526a76, windowLight: 0x82979c, shop: 0x415963,
+  soil: 0x8a9278, yard: 0x9a9991, hedge: 0x657f64, leaves: 0x849b70,
+} as const;

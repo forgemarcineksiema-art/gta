@@ -11,6 +11,8 @@ import { Sparks } from './Sparks';
 import { SpeedLines } from './SpeedLines';
 import { buildCarMesh, type CarMesh } from './carMesh';
 import { CityView, QUALITY, type QualityTier } from './CityView';
+import { SHADOW_HALF, SUN_OFFSET, stableShadowTarget } from './shadows';
+import { gableGeometry } from './geometry';
 
 export interface RenderStats {
   drawCalls: number;
@@ -83,21 +85,22 @@ export class Renderer {
     // sky, fog, lights (docs/STYLE.md: late golden hour)
     this.scene.background = new THREE.Color(PALETTE.skyHorizon);
     this.scene.fog = new THREE.Fog(PALETTE.fog, 120, 700);
-    const hemi = new THREE.HemisphereLight(0xffd9b8, 0x5a4a6e, 0.9);
+    const hemi = new THREE.HemisphereLight(0xe5e4f4, 0x777184, 1.35);
     this.scene.add(hemi);
-    this.sun = new THREE.DirectionalLight(PALETTE.sun, 2.2);
+    this.sun = new THREE.DirectionalLight(PALETTE.sun, 1.8);
     this.sun.position.set(-60, 70, -40);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
-    this.sun.shadow.camera.near = 10;
-    this.sun.shadow.camera.far = 260;
-    const s = 60;
+    this.sun.shadow.camera.near = 1;
+    this.sun.shadow.camera.far = 700;
+    const s = SHADOW_HALF;
     this.sun.shadow.camera.left = -s;
     this.sun.shadow.camera.right = s;
     this.sun.shadow.camera.top = s;
     this.sun.shadow.camera.bottom = -s;
-    this.sun.shadow.bias = -0.0005;
-    this.sun.shadow.normalBias = 0.05;
+    this.sun.shadow.bias = -0.00015;
+    this.sun.shadow.normalBias = 0.18;
+    this.sun.shadow.intensity = 0.72;
     this.sun.target = this.shadowTarget;
     this.scene.add(this.sun, this.shadowTarget);
     this.sky = buildSkyDome();
@@ -160,6 +163,7 @@ export class Renderer {
     const sc = new THREE.Vector3(1, 1, 1);
     const color = new THREE.Color();
     for (const st of statics) {
+      if (st.collisionOnly) continue;
       const g = geometryFor(st.shape);
       q.set(st.rotation.x, st.rotation.y, st.rotation.z, st.rotation.w);
       p.set(st.position.x, st.position.y, st.position.z);
@@ -255,20 +259,10 @@ export class Renderer {
     } else {
       this.ghost.root.visible = false;
     }
-    // shadow frustum follows the car and widens with speed so fast driving keeps shadowed ground ahead
-    const speed = Math.abs(tm.speed);
-    const half = 40 + Math.min(60, speed * 1.2);
-    const sc = this.sun.shadow.camera;
-    if (Math.abs(sc.right - half) > 2) {
-      sc.left = -half;
-      sc.right = half;
-      sc.top = half;
-      sc.bottom = -half;
-      sc.updateProjectionMatrix();
-    }
-    this.tmpPos.copy(carPos);
+    // Fixed coverage and a texel-aligned light basis avoid speed-dependent shadow jumps.
+    stableShadowTarget(carPos, this.sun.shadow.mapSize.x, this.tmpPos);
     this.shadowTarget.position.copy(this.tmpPos);
-    this.sun.position.set(this.tmpPos.x - 60, this.tmpPos.y + 90, this.tmpPos.z - 40);
+    this.sun.position.copy(this.tmpPos).add(SUN_OFFSET);
     // the sky dome rides with the camera so the horizon never comes closer
     this.sky.position.copy(this.camera.position);
     this.speedLines.update(tm, Math.hypot(this.carVel.x, this.carVel.z), this.camera.aspect, dt);
@@ -332,6 +326,8 @@ function geometryFor(shape: ShapeDesc): THREE.BufferGeometry {
   switch (shape.kind) {
     case 'box':
       return new THREE.BoxGeometry(shape.hx * 2, shape.hy * 2, shape.hz * 2);
+    case 'gable':
+      return gableGeometry().scale(shape.hx, shape.hy, shape.hz);
     case 'cylinder':
       return new THREE.CylinderGeometry(shape.radius, shape.radius, shape.halfHeight * 2, 10);
     case 'wheel': {

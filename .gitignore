@@ -3,6 +3,7 @@ dist/
 perf/*.json
 !perf/.gitkeep
 screens/
+output/design-review/
 test-results/
 playwright-report/
 .vite/

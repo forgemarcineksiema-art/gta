@@ -10,6 +10,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { City } from './city/City';
 import { createControls, type VehicleControls } from './controls';
 import { EventLog } from './events';
+import { Life } from './life/Life';
 import { buildPlayground, type PlaygroundLayout, type SpawnPoint } from './playground';
 import { POSE_STRIDE, Recorder } from './recorder';
 import type { DynamicDesc, StaticDesc } from './scene';
@@ -75,6 +76,7 @@ export class SimWorld {
   readonly pedsDensity: number;
   /** Null on the playground. Density 0 still constructs it so tests can `spawnAt`. */
   readonly traffic: Traffic | null;
+  readonly life: Life;
   readonly statics: StaticDesc[];
   readonly dynamics: DynamicDesc[] = [];
   readonly spawns: SpawnPoint[];
@@ -145,6 +147,7 @@ export class SimWorld {
     const tuning = opts.tuning ?? cloneTuning(CAR_PRESETS[this.carId]);
     this.vehicle = new Vehicle(this.world, this.transforms, tuning, spawn.position, spawn.yaw);
     this.traffic = this.city ? new Traffic(this.world, this.transforms, this.city, opts.seed ?? 42, TRAFFIC, this.trafficDensity) : null;
+    this.life = new Life(this);
     this.city?.sync(spawn.position.x, spawn.position.z, true);
   }
 
@@ -164,6 +167,7 @@ export class SimWorld {
     this.transforms.swap();
     this.respawned = false;
     this.events.tick = this.tick;
+    this.life.preStep(this.controls, FIXED_DT);
     const reset = this.controls.reset;
     this.vehicle.update(this.controls, FIXED_DT);
     if (reset) this.respawned = true;
@@ -188,6 +192,7 @@ export class SimWorld {
     this.world.step();
     this.vehicle.writeTransforms();
     this.traffic?.writeTransforms();
+    this.life.postStep(FIXED_DT);
     for (const t of this.tracked) {
       const p = t.body.translation(this.scratchPos);
       const r = t.body.rotation(this.scratchRot);

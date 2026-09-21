@@ -7,7 +7,8 @@
  * Every agent still brakes for a car sitting ahead of it inside 14 m, so a
  * pair the reservation does not cover cannot overlap.
  */
-import type RAPIER from '@dimforge/rapier3d-compat';
+import RAPIER from '@dimforge/rapier3d-compat';
+import { GROUP_DEFAULT, GROUP_TERRAIN, GROUPS_SOLID, interactionGroups } from '../collision';
 import type { City } from '../city/City';
 import type { RoadNode } from '../city/roads';
 import type { EventLog } from '../events';
@@ -43,6 +44,8 @@ const PAINTS = [
 const CAR_GAP = 4.5;
 const MAX_ON_LANE = 48;
 const WOBBLE_RAD = 5 * Math.PI / 180;
+/** Driving cars ignore the ground; a disturbed car is switched onto GROUPS_SOLID so it can tumble. */
+const GROUPS_TRAFFIC = interactionGroups(GROUP_DEFAULT, 0xffff & ~GROUP_TERRAIN);
 
 export class Traffic {
   readonly tuning: TrafficTuning;
@@ -87,10 +90,34 @@ export class Traffic {
   private readonly pose: LanePose = { x: 0, z: 0, yaw: 0 };
   private readonly proj: LaneProjection = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0 };
   private readonly scratchQ: Quat = { x: 0, y: 0, z: 0, w: 1 };
+  private readonly world: RAPIER.World;
+  private readonly bodies: RAPIER.RigidBody[] = [];
+  private readonly bodyCollider: RAPIER.Collider[] = [];
+  private readonly bodyAgent: Int16Array;
+  private readonly bodyKind: Int8Array;
+  private readonly agentBody: Int16Array;
+  private readonly reattachLeft: Float32Array;
+  private readonly lin = { x: 0, y: 0, z: 0 };
+  private readonly ang = { x: 0, y: 0, z: 0 };
+  private readonly pos = { x: 0, y: 0, z: 0 };
+  private readonly rot = { x: 0, y: 0, z: 0, w: 1 };
+  private contactSum = 0;
+  private currentCol: RAPIER.Collider | null = null;
+  private readonly onTrafficManifold = (m: RAPIER.TempContactManifold, _flipped: boolean): void => {
+    const n = m.numContacts();
+    for (let i = 0; i < n; i++) this.contactSum += m.contactImpulse(i);
+  };
+  private readonly onTrafficPair = (other: RAPIER.Collider): void => {
+    const parent = other.parent();
+    const fixed = parent === null || parent.isFixed();
+    // The ground and kerbs support the car every step. Only a chassis, a wall or another car counts.
+    if (fixed && other.restitution() < 0.99) return;
+    const col = this.currentCol;
+    if (col) this.world.contactPair(col, other, this.onTrafficManifold);
+  };
 
   constructor(world: RAPIER.World, transforms: TransformBuffer, city: City, seed: number, tuning: TrafficTuning = TRAFFIC, density = 1) {
-    // Retained for the body pool. The timestep read keeps the binding live until then.
-    void world.timestep;
+    this.world = world;
     this.transforms = transforms;
     this.tuning = tuning;
     this.capacity = tuning.agents;
@@ -133,6 +160,49 @@ export class Traffic {
       this.halfL[k] = CAR_PRESETS[id].chassisHalfExtents.z;
     }
     for (let i = 0; i < n; i++) this.slot[i] = transforms.allocate();
+    this.agentBody = new Int16Array(n);
+    this.reattachLeft = new Float32Array(n);
+    this.agentBody.fill(-1);
+    this.bodyAgent = new Int16Array(tuning.physicsBodies);
+    this.bodyAgent.fill(-1);
+    this.bodyKind = new Int8Array(tuning.physicsBodies);
+    this.bodyKind.fill(-1);
+    for (let b = 0; b < tuning.physicsBodies; b++) {
+      const body = world.createRigidBody(RAPIER.RigidBodyDesc.dynamic()
+        .setTranslation(0, -50, 0)
+        .setCanSleep(false)
+        .setCcdEnabled(true)
+        .setLinearDamping(tuning.linearDamping)
+        .setAngularDamping(tuning.angularDamping)
+        .setAdditionalMass(tuning.mass.compact));
+      body.setEnabled(false);
+      const col = world.createCollider(this.colliderDesc(0), body);
+      this.bodies.push(body);
+      this.bodyCollider.push(col);
+    }
+  }
+
+  private colliderDesc(kind: number): RAPIER.ColliderDesc {
+    const id = KINDS[kind] as CarId;
+    const he = CAR_PRESETS[id].chassisHalfExtents;
+    const mass = this.tuning.mass[id];
+    // Tall enough to meet the player's chassis. The body origin stays on the road for the mesh.
+    const hy = 0.7;
+    const w = he.x * 2;
+    const h = hy * 2;
+    const l = he.z * 2;
+    return RAPIER.ColliderDesc.cuboid(he.x, hy, he.z)
+      .setTranslation(0, hy, 0)
+      .setFriction(this.tuning.friction)
+      .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Max)
+      .setRestitution(this.tuning.restitution)
+      .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Multiply)
+      .setCollisionGroups(GROUPS_TRAFFIC)
+      .setMassProperties(mass, { x: 0, y: 0.35, z: 0 }, {
+        x: (mass / 12) * (h * h + l * l),
+        y: (mass / 12) * (w * w + l * l),
+        z: (mass / 12) * (w * w + h * h),
+      }, { x: 0, y: 0, z: 0, w: 1 });
   }
 
   count(state: AgentState): number {
@@ -158,7 +228,18 @@ export class Traffic {
     return best;
   }
 
-  /** Places a kinematic agent on the graph lane (offset 0) for tests. */
+  /** Test hook: yaw the lent body without moving it. */
+  setFacing(agent: number, yaw: number): void {
+    this.yaw[agent] = yaw;
+    const slot = this.agentBody[agent] as number;
+    if (slot < 0) return;
+    const body = this.bodies[slot] as RAPIER.RigidBody;
+    const q = M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, yaw);
+    body.setRotation(q, true);
+    body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+  }
+
   spawnAt(lane: number, s: number, kind: CarId, state: AgentState = AgentState.Kinematic): number {
     const i = this.findFree();
     if (i < 0) return -1;
@@ -182,11 +263,16 @@ export class Traffic {
     this.releaseNodes(dt);
     this.buildLaneLists();
     for (let i = 0; i < this.capacity; i++) {
-      if (this.state[i] !== AgentState.Kinematic) continue;
+      if (this.agentBody[i] !== undefined && (this.agentBody[i] as number) >= 0) this.pullPose(i);
+      if (this.state[i] === AgentState.Free) continue;
       this.chooseNext(i);
+      if (this.state[i] !== AgentState.Kinematic) continue;
       this.integrate(i, player, dt, events);
       this.honk(i, player, dt, events);
     }
+    this.unstick();
+    this.guard(player, events);
+    this.syncBodies(player, dt);
     this.unstick();
   }
 
@@ -198,10 +284,271 @@ export class Traffic {
         tb.writeBoth(slot, 0, -50, 0, 0, 0, 0, 1);
         continue;
       }
+      const bodyIndex = this.agentBody[i] as number;
+      if (bodyIndex >= 0) {
+        const body = this.bodies[bodyIndex] as RAPIER.RigidBody;
+        body.translation(this.pos);
+        body.rotation(this.rot);
+        this.x[i] = this.pos.x;
+        this.z[i] = this.pos.z;
+        this.yaw[i] = M.yawOf(this.rot);
+        tb.write(slot, this.pos.x, this.pos.y, this.pos.z, this.rot.x, this.rot.y, this.rot.z, this.rot.w);
+        continue;
+      }
       let yaw = this.yaw[i] as number;
       if ((this.wobble[i] as number) > 0) yaw += Math.sin((this.wobble[i] as number) * 18) * WOBBLE_RAD;
       const q = M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, yaw);
       tb.write(slot, this.x[i] as number, 0.03, this.z[i] as number, q.x, q.y, q.z, q.w);
+    }
+  }
+
+  private pullPose(i: number): void {
+    const body = this.bodies[this.agentBody[i] as number] as RAPIER.RigidBody;
+    body.translation(this.pos);
+    body.rotation(this.rot);
+    this.x[i] = this.pos.x;
+    this.z[i] = this.pos.z;
+    this.yaw[i] = M.yawOf(this.rot);
+    body.linvel(this.lin);
+    this.speed[i] = Math.hypot(this.lin.x, this.lin.z);
+    const lane = this.lane[i] as number;
+    if (lane < 0) return;
+    this.lanes.project(lane, this.pos.x, this.pos.z, this.proj);
+    this.s[i] = this.proj.s;
+  }
+
+  /** Last resort when the body pool is exhausted and a kinematic car overlaps the player. */
+  private guard(player: PlayerProbe, events: EventLog): void {
+    for (let i = 0; i < this.capacity; i++) {
+      if (this.state[i] !== AgentState.Kinematic) continue;
+      if (!this.overlapsPlayer(i, player)) continue;
+      const fx = Math.sin(player.yaw);
+      const fz = Math.cos(player.yaw);
+      const dx = (this.x[i] as number) - player.x;
+      const dz = (this.z[i] as number) - player.z;
+      const side = dx * -fz - dz * -fx;
+      this.laneOffset[i] = (this.laneOffset[i] as number) + (side >= 0 ? 3 : -3);
+      this.reposition(i);
+      this.guardHops++;
+      events.push('honk', 0, this.x[i] as number, 0.03, this.z[i] as number, i);
+    }
+  }
+
+  private overlapsPlayer(i: number, player: PlayerProbe): boolean {
+    const yaw = this.yaw[i] as number;
+    const dx = player.x - (this.x[i] as number);
+    const dz = player.z - (this.z[i] as number);
+    const along = dx * Math.sin(yaw) + dz * Math.cos(yaw);
+    const side = dx * -Math.cos(yaw) + dz * Math.sin(yaw);
+    const kind = this.kind[i] as number;
+    return Math.abs(side) <= (this.halfW[kind] as number) + player.halfWidth
+      && Math.abs(along) <= (this.halfL[kind] as number) + player.halfLength;
+  }
+
+  private syncBodies(player: PlayerProbe, dt: number): void {
+    const t = this.tuning;
+    for (let i = 0; i < this.capacity; i++) {
+      const b = this.agentBody[i] as number;
+      if (b < 0) continue;
+      const dx = (this.x[i] as number) - player.x;
+      const dz = (this.z[i] as number) - player.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist > t.physicsRelease) {
+        this.releaseBody(i, this.state[i] !== AgentState.Physical);
+        continue;
+      }
+      if (this.state[i] === AgentState.Wrecked) {
+        this.wreckedFor[i] = (this.wreckedFor[i] as number) + dt;
+        if ((this.wreckedFor[i] as number) > t.wreckLinger) this.releaseBody(i, true);
+        continue;
+      }
+    }
+    for (let n = 0; n < this.capacity; n++) {
+      const i = this.nearestKinematic(player);
+      if (i < 0) break;
+      let slot = this.freeBody();
+      if (slot < 0) {
+        const far = this.farthestUndisturbed(player, i);
+        if (far < 0) break;
+        this.releaseBody(far, false);
+        slot = this.freeBody();
+        if (slot < 0) break;
+      }
+      this.lend(i, slot);
+    }
+    for (let i = 0; i < this.capacity; i++) {
+      const b = this.agentBody[i] as number;
+      if (b < 0) continue;
+      if (this.state[i] === AgentState.Disturbed) this.settle(i, dt);
+      else if (this.state[i] === AgentState.Physical) this.driveBody(i, player, dt);
+      this.senseImpact(i);
+    }
+  }
+
+  private nearestKinematic(player: PlayerProbe): number {
+    const t = this.tuning;
+    const px = player.x + player.vx * 0.5;
+    const pz = player.z + player.vz * 0.5;
+    let best = -1;
+    let bestD = Infinity;
+    for (let i = 0; i < this.capacity; i++) {
+      if (this.state[i] !== AgentState.Kinematic || (this.agentBody[i] as number) >= 0) continue;
+      const dx = (this.x[i] as number) - player.x;
+      const dz = (this.z[i] as number) - player.z;
+      const dist = Math.hypot(dx, dz);
+      const ex = (this.x[i] as number) - px;
+      const ez = (this.z[i] as number) - pz;
+      const predicted = ex * ex + ez * ez < 64;
+      if (dist > t.physicsRadius && !predicted) continue;
+      if (dist < bestD) { bestD = dist; best = i; }
+    }
+    return best;
+  }
+
+  private freeBody(): number {
+    for (let b = 0; b < this.bodyAgent.length; b++) if ((this.bodyAgent[b] as number) < 0) return b;
+    return -1;
+  }
+
+  private farthestUndisturbed(player: PlayerProbe, than: number): number {
+    const thanD = Math.hypot((this.x[than] as number) - player.x, (this.z[than] as number) - player.z);
+    let far = -1;
+    let farD = thanD;
+    for (let i = 0; i < this.capacity; i++) {
+      if ((this.agentBody[i] as number) < 0 || this.state[i] !== AgentState.Physical) continue;
+      if ((this.reattachLeft[i] as number) > 0) continue;
+      const d = Math.hypot((this.x[i] as number) - player.x, (this.z[i] as number) - player.z);
+      if (d > farD) { farD = d; far = i; }
+    }
+    return far;
+  }
+
+  private lend(i: number, slot: number): void {
+    const body = this.bodies[slot] as RAPIER.RigidBody;
+    const kind = this.kind[i] as number;
+    let col = this.bodyCollider[slot] as RAPIER.Collider;
+    if ((this.bodyKind[slot] as number) !== kind) {
+      this.colliderAgent.delete(col.handle);
+      this.world.removeCollider(col, false);
+      col = this.world.createCollider(this.colliderDesc(kind), body);
+      this.bodyCollider[slot] = col;
+      this.bodyKind[slot] = kind;
+    }
+    col.setCollisionGroups(GROUPS_TRAFFIC);
+    this.colliderAgent.set(col.handle, i);
+    body.userData = i;
+    const yaw = this.yaw[i] as number;
+    const q = M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, yaw);
+    body.setEnabled(true);
+    body.setEnabledTranslations(true, false, true, true);
+    body.setTranslation({ x: this.x[i] as number, y: 0.03, z: this.z[i] as number }, true);
+    body.setRotation(q, true);
+    const speed = this.speed[i] as number;
+    body.setLinvel({ x: Math.sin(yaw) * speed, y: 0, z: Math.cos(yaw) * speed }, true);
+    body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    this.bodyAgent[slot] = i;
+    this.agentBody[i] = slot;
+    this.state[i] = AgentState.Physical;
+  }
+
+  private releaseBody(i: number, stop: boolean): void {
+    const slot = this.agentBody[i] as number;
+    if (slot < 0) return;
+    const body = this.bodies[slot] as RAPIER.RigidBody;
+    const col = this.bodyCollider[slot] as RAPIER.Collider;
+    this.colliderAgent.delete(col.handle);
+    body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    body.setTranslation({ x: 0, y: -50, z: 0 }, true);
+    body.setEnabled(false);
+    this.bodyAgent[slot] = -1;
+    this.agentBody[i] = -1;
+    this.reattachLeft[i] = 0;
+    this.state[i] = AgentState.Kinematic;
+    if (stop) this.speed[i] = 0;
+    const lane = this.lane[i] as number;
+    if (lane >= 0) {
+      this.lanes.project(lane, this.x[i] as number, this.z[i] as number, this.proj);
+      this.s[i] = this.proj.s;
+      this.laneOffset[i] = this.proj.lateral;
+      this.reposition(i);
+    }
+  }
+
+  private driveBody(i: number, player: PlayerProbe, dt: number): void {
+    const body = this.bodies[this.agentBody[i] as number] as RAPIER.RigidBody;
+    const lane = this.lane[i] as number;
+    if (lane < 0) return;
+    const nxt = this.next[i] as number;
+    this.lanes.positionAt(lane, (this.s[i] as number) + 8, this.laneOffset[i] as number, this.pose, nxt);
+    const dx = this.pose.x - (this.x[i] as number);
+    const dz = this.pose.z - (this.z[i] as number);
+    const len = Math.hypot(dx, dz) || 1;
+    let limit = this.lanes.limit[lane] as number;
+    if (nxt >= 0 && this.turn[i] === 1) limit = this.tuning.speedJunction;
+    let gap = this.leaderGap(i);
+    gap = Math.min(gap, this.playerGapOf(i, player));
+    gap = Math.min(gap, this.aheadGap(i));
+    let desired = limit;
+    if (gap < 1e8) desired = Math.min(limit, Math.sqrt(2 * this.tuning.brake * Math.max(0, gap - this.tuning.gapMin)));
+    body.linvel(this.lin);
+    const blend = (this.reattachLeft[i] as number) > 0 ? 1 - (this.reattachLeft[i] as number) / this.tuning.reattachBlend : 1;
+    if ((this.reattachLeft[i] as number) > 0) this.reattachLeft[i] = Math.max(0, (this.reattachLeft[i] as number) - dt);
+    const k = Math.min(1, 6 * dt) * Math.max(0, Math.min(1, blend));
+    this.lin.x += (dx / len * desired - this.lin.x) * k;
+    this.lin.z += (dz / len * desired - this.lin.z) * k;
+    body.setLinvel(this.lin, true);
+    body.angvel(this.ang);
+    let err = this.pose.yaw - (this.yaw[i] as number);
+    err = Math.atan2(Math.sin(err), Math.cos(err));
+    this.ang.y = 4 * err - 2 * this.ang.y;
+    body.setAngvel(this.ang, true);
+  }
+
+  private senseImpact(i: number): void {
+    const col = this.bodyCollider[this.agentBody[i] as number] as RAPIER.Collider;
+    this.contactSum = 0;
+    this.currentCol = col;
+    this.world.contactPairsWith(col, this.onTrafficPair);
+    this.currentCol = null;
+    const id = KINDS[this.kind[i] as number] as CarId;
+    const mass = this.tuning.mass[id];
+    if (this.contactSum / mass > this.tuning.disturbedImpact && this.state[i] !== AgentState.Wrecked) {
+      if (this.state[i] !== AgentState.Disturbed) {
+        const body = this.bodies[this.agentBody[i] as number] as RAPIER.RigidBody;
+        col.setCollisionGroups(GROUPS_SOLID);
+        body.setEnabledTranslations(true, true, true, true);
+      }
+      this.state[i] = AgentState.Disturbed;
+      this.disturbedFor[i] = this.tuning.disturbedTime;
+    }
+  }
+
+  private settle(i: number, dt: number): void {
+    this.disturbedFor[i] = (this.disturbedFor[i] as number) - dt;
+    if ((this.disturbedFor[i]) > 0) return;
+    const body = this.bodies[this.agentBody[i] as number] as RAPIER.RigidBody;
+    const r = body.rotation(this.rot);
+    const up = 1 - 2 * (r.x * r.x + r.z * r.z);
+    body.linvel(this.lin);
+    const speed = Math.hypot(this.lin.x, this.lin.z);
+    const lane = this.lane[i] as number;
+    let lateral = Infinity;
+    if (lane >= 0) {
+      this.lanes.project(lane, this.x[i] as number, this.z[i] as number, this.proj);
+      lateral = Math.abs(this.proj.lateral - (this.laneOffset[i] as number));
+    }
+    if (up > 0.7 && speed < 6 && lateral < this.tuning.reattachDistance) {
+      this.state[i] = AgentState.Physical;
+      this.reattachLeft[i] = this.tuning.reattachBlend;
+      this.s[i] = this.proj.s;
+      const col = this.bodyCollider[this.agentBody[i] as number] as RAPIER.Collider;
+      col.setCollisionGroups(GROUPS_TRAFFIC);
+      body.setEnabledTranslations(true, false, true, true);
+      body.setTranslation({ x: this.x[i] as number, y: 0.03, z: this.z[i] as number }, true);
+    } else {
+      this.state[i] = AgentState.Wrecked;
+      this.wreckedFor[i] = 0;
     }
   }
 
@@ -241,6 +588,7 @@ export class Traffic {
   }
 
   private free(i: number): void {
+    if ((this.agentBody[i] as number) >= 0) this.releaseBody(i, true);
     const lane = this.lane[i] as number;
     if (lane >= 0) {
       const node = this.lanes.toNode[lane] as number;

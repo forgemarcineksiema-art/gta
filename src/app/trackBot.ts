@@ -5,6 +5,7 @@
  * road bot in the city will reuse.
  */
 import type { CarId, SimWorld, TrackSample, VehicleControls } from '../sim';
+import { AgentState } from '../sim/traffic/Traffic';
 
 export interface TrackBotTuning {
   /** Lookahead distance = base + speed * perSpeed, clamped. */
@@ -140,6 +141,11 @@ export class TrackBot {
     controls.brake = speed > allowed + 1.5 ? 1 : 0;
     controls.handbrake = 0;
     controls.boost = t.boostAbove > 0 && speed > t.boostAbove && allowed >= t.vMax ? 1 : 0;
+    if (sim.traffic && this.trafficAhead(sim, px, pz, yaw, speed)) {
+      controls.throttle = 0;
+      controls.brake = 1;
+      controls.boost = 0;
+    }
 
     // stuck: no progress while trying to drive
     if (speed < 0.8 && controls.throttle > 0) {
@@ -153,5 +159,24 @@ export class TrackBot {
     } else {
       this.stuckTime = 0;
     }
+  }
+
+  /** Brake for a slower car within 18 m ahead on the bot's heading. Never swaps. */
+  private trafficAhead(sim: SimWorld, px: number, pz: number, yaw: number, speed: number): boolean {
+    const traffic = sim.traffic;
+    if (!traffic) return false;
+    const fx = Math.sin(yaw);
+    const fz = Math.cos(yaw);
+    for (let i = 0; i < traffic.capacity; i++) {
+      if (traffic.state[i] === AgentState.Free) continue;
+      const dx = (traffic.x[i] as number) - px;
+      const dz = (traffic.z[i] as number) - pz;
+      const along = dx * fx + dz * fz;
+      if (along < 1 || along > 18) continue;
+      const side = dx * -fz + dz * fx;
+      if (Math.abs(side) > 2.6) continue;
+      if ((traffic.speed[i] as number) < speed - 1) return true;
+    }
+    return false;
   }
 }

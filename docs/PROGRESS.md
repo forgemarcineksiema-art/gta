@@ -2,6 +2,31 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-21 — M3 session 15: slice 2
+
+### Done
+
+- Simulation LOD. A pool of 16 dynamic bodies is lent to the nearest kinematic agents inside 40 m (or on the 0.5 s velocity prediction). Velocity control follows the lane; a contact above `disturbedImpact` drops control for `disturbedTime`; a car that does not settle becomes wrecked and then a stopped kinematic obstacle. `Life.postStep` names the player's strongest contact and pushes `hit`. The road bot brakes for a slower car within 18 m.
+
+### Verification
+
+- verify green, 123 tests. Smoke 60.0 fps / p95 16.8 ms / 90 draws / 186,400 tris, build 3.43 MB, gameplay-start 1231 ms.
+- Node mean step with the pool live: 0.563 ms (slice 1 was 0.559 ms). The LOD drive kept `guardHops` at 0.
+- Perf twice, traffic on, after driving cars stopped colliding with the ground:
+  - run A: fps 54.8, frame p95 16.80 / p99 50.00 / max 1850, step p95 5.80 / max 59.50, draws 90, tris 202k, heap 51 MB, resets 1
+  - run B: fps 53.5, frame p95 33.30 / p99 50.00 / max 483, step p95 10.60 / max 147.70, draws 88, tris 181k, heap 51 MB, resets 1
+- Both step p95 values are under 12 ms. Run A is below slice 1's 6.20 ms. Run B is 4.4 ms above it and sits on the two-vsync frame boundary; the Node mean did not move, so that p95 is a throttled hitch, not a slower `Traffic.step`. An earlier run that left cars resting on the ground measured step p95 12.9 ms and was rejected.
+
+### Decided and why
+
+- A driving traffic collider uses `GROUPS_TRAFFIC` (everything except terrain) and locked vertical translation, with the box tall enough to meet the player's chassis. Resting on the ground collider made every step a contact and pushed the throttled step p95 over 12 ms. A disturbed car switches to `GROUPS_SOLID` and unlocks vertical motion so it can tumble. Ground contacts are ignored when scoring the disturbance impulse.
+- Colliders are rebuilt only when the lent body changes vehicle class.
+- `setFacing` is a test hook so a T-bone can yaw a lent body onto its side without a second road.
+
+### Next
+
+- Slice 3: near misses, the oncoming-lane bonus, HUD popups, and synthesised stings.
+
 ## 2026-09-21 — M3 session 15: slice 1
 
 ### Done

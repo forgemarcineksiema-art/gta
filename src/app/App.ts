@@ -4,6 +4,7 @@
  * that knows about all layers.
  */
 import { EngineAudio } from '../audio/EngineAudio';
+import { Sfx } from '../audio/Sfx';
 import { InputManager } from '../input/InputManager';
 import { KeyboardDevice } from '../input/KeyboardDevice';
 import { createPlatform, type Platform } from '../platform';
@@ -66,6 +67,7 @@ export class App {
   private readonly input: InputManager;
   private readonly hud: Hud;
   private readonly audio: EngineAudio;
+  private readonly sfx: Sfx;
   private readonly panel: DebugPanel | null;
   private readonly loop = new FixedStepLoop(FIXED_DT, 5);
   private readonly bot: BotDriver | TrackBot | null;
@@ -90,6 +92,7 @@ export class App {
     this.input = new InputManager();
     this.input.addDevice(new KeyboardDevice());
     this.audio = new EngineAudio();
+    this.sfx = new Sfx(this.audio);
     const uiRoot = document.getElementById('ui') ?? document.body;
     this.hud = new Hud(uiRoot, sim);
     this.hud.setHints({
@@ -331,6 +334,7 @@ export class App {
 
     this.renderer.render(alpha, this.paused ? 0 : frameDt);
     this.audio.update(this.sim.vehicle.telemetry, frameDt);
+    this.sfx.update(this.sim);
 
     if (!this.started) {
       // the player is in control from this frame on

@@ -1,9 +1,12 @@
 /**
- * Hit classification for the player's chassis. Damage, swap and takedowns
- * land in later slices; this one only names the contact and emits `hit`.
+ * Risk economy and hit classification. Damage, swap and takedowns land in
+ * later slices; this one pays boost for a near miss and for the oncoming lane.
  */
+import { CAR_IDS, CAR_PRESETS } from '../vehicle/presets';
 import type { VehicleControls } from '../controls';
+import { ECONOMY } from '../economy';
 import type { SimWorld } from '../SimWorld';
+import { AgentState } from '../traffic/Traffic';
 
 export interface LifeState {
   damage: number;
@@ -30,20 +33,27 @@ export class Life {
     respawnIn: -1,
   };
 
-  constructor(private readonly sim: SimWorld) {}
+  private readonly wasAhead: Uint8Array;
+  private readonly cool: Float32Array;
+  private lastHit = -10;
+  private oncomingLeft = 0;
+  private oncomingEvent = 0;
+  private readonly proj = { x: 0, y: 0, z: 0, yaw: 0, s: 0, lateral: 0 };
+
+  constructor(private readonly sim: SimWorld) {
+    const n = sim.traffic?.capacity ?? 1;
+    this.wasAhead = new Uint8Array(n);
+    this.cool = new Float32Array(n);
+  }
 
   preStep(_controls: VehicleControls, _dt: number): void {
     // Swap and the wreck timer arrive in later slices.
   }
 
-  postStep(_dt: number): void {
-    const tm = this.sim.vehicle.telemetry;
-    if (tm.hitHandle < 0 || tm.impact <= 0) return;
-    const kind = this.classify(tm.hitHandle);
-    if (kind === 'none') return;
-    const agent = kind === 'traffic' ? (this.sim.traffic?.agentForCollider(tm.hitHandle) ?? -1) : -1;
-    if (agent >= 0 && this.sim.traffic) this.sim.traffic.lastPlayerContactTick[agent] = this.sim.tick;
-    this.sim.events.push('hit', tm.impact, tm.contactX, tm.contactY, tm.contactZ, agent);
+  postStep(dt: number): void {
+    this.hits();
+    this.nearMisses(dt);
+    this.oncomingLane(dt);
   }
 
   skipSlowMo(): void {
@@ -61,5 +71,98 @@ export class Life {
     const fixed = parent === null || parent.isFixed();
     if (!fixed) return 'prop';
     return col.restitution() >= 0.99 ? 'wall' : 'terrain';
+  }
+
+  private hits(): void {
+    const tm = this.sim.vehicle.telemetry;
+    if (tm.hitHandle < 0 || tm.impact <= 0) return;
+    const kind = this.classify(tm.hitHandle);
+    if (kind === 'none') return;
+    this.lastHit = this.sim.time;
+    const agent = kind === 'traffic' ? (this.sim.traffic?.agentForCollider(tm.hitHandle) ?? -1) : -1;
+    if (agent >= 0 && this.sim.traffic) this.sim.traffic.lastPlayerContactTick[agent] = this.sim.tick;
+    this.sim.events.push('hit', tm.impact, tm.contactX, tm.contactY, tm.contactZ, agent);
+  }
+
+  private nearMisses(dt: number): void {
+    const traffic = this.sim.traffic;
+    if (!traffic) return;
+    const tm = this.sim.vehicle.telemetry;
+    const px = this.sim.vehicle.body.translation(this.proj);
+    const playerX = px.x;
+    const playerZ = px.z;
+    const speed = Math.hypot(tm.vx, tm.vz);
+    const recentHit = this.sim.time - this.lastHit < 0.5;
+    for (let i = 0; i < traffic.capacity; i++) {
+      if ((this.cool[i] as number) > 0) this.cool[i] = (this.cool[i] as number) - dt;
+      if (traffic.state[i] === AgentState.Free) continue;
+      const ax = traffic.x[i] as number;
+      const az = traffic.z[i] as number;
+      const ox = ax - playerX;
+      const oz = az - playerZ;
+      const dist = Math.hypot(ox, oz);
+      const ahead = ox * tm.vx + oz * tm.vz > 0;
+      if (ahead) this.wasAhead[i] = 1;
+      if (dist > 12 || recentHit || (this.cool[i] as number) > 0 || this.wasAhead[i] !== 1 || ahead) continue;
+      const id = CAR_IDS[traffic.kind[i] as number];
+      if (!id) continue;
+      const agentHw = CAR_PRESETS[id].chassisHalfExtents.x;
+      const clearance = dist - this.sim.vehicle.tuning.chassisHalfExtents.x - agentHw;
+      if (clearance > ECONOMY.nearMissGap) {
+        if (!ahead) this.wasAhead[i] = 0;
+        continue;
+      }
+      const avx = Math.sin(traffic.yaw[i] as number) * (traffic.speed[i] as number);
+      const avz = Math.cos(traffic.yaw[i] as number) * (traffic.speed[i] as number);
+      if (Math.hypot(tm.vx - avx, tm.vz - avz) < ECONOMY.nearMissSpeed) continue;
+      const heading = Math.sin(traffic.yaw[i] as number) * tm.vx + Math.cos(traffic.yaw[i] as number) * tm.vz;
+      const oncoming = speed > 1 && heading / speed < -0.5;
+      const boost = oncoming ? ECONOMY.nearMissOncomingBoost : ECONOMY.nearMissBoost;
+      this.grant(boost);
+      this.sim.events.push(oncoming ? 'nearMissOncoming' : 'nearMiss', boost, ax, 0.03, az, i);
+      this.cool[i] = ECONOMY.nearMissCooldown;
+      this.wasAhead[i] = 0;
+    }
+  }
+
+  private oncomingLane(dt: number): void {
+    const traffic = this.sim.traffic;
+    const tm = this.sim.vehicle.telemetry;
+    const speed = Math.hypot(tm.vx, tm.vz);
+    let opposed = false;
+    if (traffic && speed >= ECONOMY.oncomingSpeed) {
+      const pos = this.sim.vehicle.body.translation(this.proj);
+      const x = pos.x;
+      const z = pos.z;
+      let best = Infinity;
+      let yaw = 0;
+      for (let lane = 0; lane < traffic.lanes.laneCount; lane++) {
+        traffic.lanes.project(lane, x, z, this.proj);
+        const lateral = Math.abs(this.proj.lateral);
+        if (lateral < best) { best = lateral; yaw = this.proj.yaw; }
+      }
+      if (best <= ECONOMY.oncomingLaneDistance) {
+        const dot = Math.sin(yaw) * tm.vx + Math.cos(yaw) * tm.vz;
+        opposed = dot / speed < -0.7;
+      }
+    }
+    if (opposed) this.oncomingLeft = ECONOMY.oncomingHysteresis;
+    else this.oncomingLeft = Math.max(0, this.oncomingLeft - dt);
+    const active = this.oncomingLeft > 0 && speed >= ECONOMY.oncomingSpeed;
+    this.state.oncoming = active;
+    if (!active) { this.oncomingEvent = 0; return; }
+    const gained = ECONOMY.oncomingBoostPerSecond * dt;
+    this.grant(gained);
+    this.oncomingEvent += dt;
+    if (this.oncomingEvent >= 1) {
+      this.oncomingEvent -= 1;
+      const pos = this.sim.vehicle.body.translation(this.proj);
+      this.sim.events.push('oncoming', ECONOMY.oncomingBoostPerSecond, pos.x, pos.y, pos.z, -1);
+    }
+  }
+
+  private grant(amount: number): void {
+    const meter = this.sim.vehicle.boostMeter;
+    this.sim.vehicle.boostMeter = Math.min(1, meter + amount);
   }
 }

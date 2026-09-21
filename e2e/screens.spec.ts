@@ -33,5 +33,14 @@ for (const [w, h] of SIZES) {
     await page.keyboard.press('KeyP');
     await page.waitForFunction(() => window.__game?.paused === true);
     await page.screenshot({ path: `screens/pause-${w}x${h}.png` });
+    const lifeText = await page.evaluate(() => new Promise<string>((resolve) => {
+      const sim = window.__game?.sim;
+      if (!sim) { resolve('no sim'); return; }
+      sim.events.push('nearMissOncoming', 0.2, 0, 1, 0, -1);
+      sim.life.state.oncoming = true;
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve(document.querySelector('.hud')?.textContent ?? '')));
+    }));
+    if (!lifeText.includes('ONCOMING')) throw new Error(`life hud missing popup: ${lifeText.slice(0, 200)}`);
+    await page.screenshot({ path: `screens/life-${w}x${h}.png` });
   });
 }

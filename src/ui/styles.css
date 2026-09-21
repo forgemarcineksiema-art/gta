@@ -165,6 +165,42 @@ body {
 .hud__boost.is-active .hud__boost-label {
   color: #fff;
 }
+.hud__boost.is-gain .hud__boost-fill {
+  filter: brightness(1.6);
+}
+.hud__oncoming {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: var(--ui-accent);
+  opacity: 0;
+  transform: skewX(-10deg);
+  text-shadow: 2px 3px 0 #000;
+}
+.hud__oncoming.is-on { opacity: 1; }
+.hud__popups {
+  position: absolute;
+  right: calc(24px + var(--safe-right));
+  bottom: calc(168px + var(--safe-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  pointer-events: none;
+}
+.hud__popup {
+  font-size: 18px;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transform: skewX(-10deg);
+  opacity: 0;
+  color: var(--ui-ink);
+  text-shadow: 2px 3px 0 #000;
+}
+.hud__popup.is-on { opacity: 1; }
+.hud__popup.is-gain { color: var(--ui-accent); }
 
 /* drift readout, bottom centre */
 .hud__drift {

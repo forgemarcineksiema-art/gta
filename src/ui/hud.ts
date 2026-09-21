@@ -56,6 +56,13 @@ export class Hud {
   private lastDriftText = '';
   private frameIndex = 0;
   private lastGearText = '';
+  private readonly oncoming: HTMLElement;
+  private readonly popups: HTMLElement[];
+  private readonly popupLeft = [0, 0, 0, 0];
+  private popupCursor = 0;
+  private eventSeq = 0;
+  private boostFlash = 0;
+  private lastMeter = 0;
 
   constructor(parent: HTMLElement, sim: SimWorld) {
     this.root = el('div', 'hud');
@@ -75,7 +82,16 @@ export class Hud {
     boostTrack.appendChild(this.boostFill);
     this.boostWrap.append(boostLabel, boostTrack);
     speedo.append(speedRow, unit, this.boostWrap);
+    this.oncoming = el('div', 'hud__oncoming', 'ONCOMING');
+    speedo.prepend(this.oncoming);
     this.root.appendChild(speedo);
+    const stack = el('div', 'hud__popups');
+    this.popups = [0, 1, 2, 3].map(() => {
+      const popup = el('div', 'hud__popup');
+      stack.appendChild(popup);
+      return popup;
+    });
+    this.root.appendChild(stack);
 
     this.drift = el('div', 'hud__drift');
     this.driftAngle = el('div', 'hud__drift-angle', '');
@@ -156,6 +172,22 @@ export class Hud {
     this.toastTimer = seconds;
   }
 
+  private showEvent(kind: string, value: number): void {
+    const text = kind === 'nearMiss' ? 'NEAR MISS'
+      : kind === 'nearMissOncoming' ? 'ONCOMING!'
+        : kind === 'nearMissPed' ? 'DODGED'
+          : '';
+    if (!text) return;
+    const i = this.popupCursor % this.popups.length;
+    this.popupCursor++;
+    const popup = this.popups[i];
+    if (!popup) return;
+    popup.textContent = text;
+    popup.classList.toggle('is-gain', value > 0);
+    popup.classList.add('is-on');
+    this.popupLeft[i] = 1.2;
+  }
+
   update(sim: SimWorld, dt: number, info: HudDebugInfo | null, now: number): void {
     // Every DOM write here costs style, layout and paint on the main thread. The
     // radar paints its own canvas at its own cadence, off the layout path.
@@ -177,6 +209,19 @@ export class Hud {
     if (boostText !== this.lastBoostText) { this.boostFill.style.transform = boostText; this.lastBoostText = boostText; }
     this.boostWrap.classList.toggle('is-active', tm.boosting);
     this.boostWrap.classList.toggle('is-full', tm.boost >= 0.999);
+    if (tm.boost > this.lastMeter + 0.001) this.boostFlash = 0.3;
+    this.lastMeter = tm.boost;
+    if (this.boostFlash > 0) this.boostFlash -= dt;
+    this.boostWrap.classList.toggle('is-gain', this.boostFlash > 0);
+    this.oncoming.classList.toggle('is-on', sim.life.state.oncoming);
+    this.eventSeq = sim.events.readFrom(this.eventSeq, (e) => this.showEvent(e.kind, e.value));
+    for (let i = 0; i < this.popups.length; i++) {
+      const left = this.popupLeft[i] ?? 0;
+      if (left <= 0) continue;
+      const next = left - dt;
+      this.popupLeft[i] = next;
+      if (next <= 0) this.popups[i]?.classList.remove('is-on');
+    }
     this.drift.classList.toggle('is-visible', tm.drifting);
     if (tm.drifting) {
       const driftText = `${Math.abs(Math.round(tm.driftAngleDeg))}°  ${tm.driftTime.toFixed(1)}s  ${Math.round(tm.driftDistance)}m`;

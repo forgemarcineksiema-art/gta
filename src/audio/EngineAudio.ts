@@ -42,6 +42,11 @@ export class EngineAudio {
     return this.ctx !== null && this.ctx.state === 'running';
   }
 
+  /** Master gain. Effects connect here so the ad-mute hook silences them too. */
+  get output(): GainNode | null {
+    return this.master;
+  }
+
   /** Create or resume the context. Must run inside a user gesture the first time. */
   async unlock(): Promise<void> {
     try {

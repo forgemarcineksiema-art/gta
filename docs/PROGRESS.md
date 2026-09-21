@@ -2,6 +2,28 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-21 — M3 session 15: slice 3
+
+### Done
+
+- Near misses and the oncoming lane pay boost from `ECONOMY` and push events. The meter clamps at 1. HUD popups (`NEAR MISS`, `ONCOMING!`, `DODGED`) sit above the speedo, skewed, yellow when boost was granted, with a persistent `ONCOMING` label and a 0.3 s boost-bar flash. `Sfx` plays a noise sweep, a two-tone honk and a yelp on the engine master gain, and drops events until the audio context is running.
+
+### Verification
+
+- verify green, 126 tests. Smoke 48.5 fps / p95 16.8 ms / 90 draws / 176,000 tris, build 3.44 MB, gameplay-start 1560 ms. The mean fps is one noisy run; p95 is still one frame.
+- Economy tests: one oncoming near miss grants 0.20, a 3 m footprint gap grants nothing, 3 s in the oncoming lane pays `3 × 0.10` within 15 %, the right direction pays nothing, a near miss from 0.95 lands on exactly 1.
+- `screens/life-1280x720.png` shows `ONCOMING!` above the speed and the `ONCOMING` label, clear of the radar and the speed digits. The capture still has the pause overlay up because the screenshot runs in the pause test; the popup is readable beside it. The ten-size `npm run screens` pass did not finish (the runner stalled). Re-run it before the gate review.
+
+### Decided and why
+
+- A near miss uses the gap between the two chassis half-widths, not centre distance. A 1 m centre gap is already an overlap for these cars, so the test places the cars one metre and three metres of clearance apart.
+- The repeating `oncoming` event does not spawn a popup every second. The label is the persistent readout; `ONCOMING!` is the near-miss popup.
+- The lane search copies the player position out before projecting, because the projection writes into the same scratch object.
+
+### Next
+
+- Slice 4: pedestrians on the pavements, the dodge, and the guarantee hop.
+
 ## 2026-09-21 — M3 session 15: slice 2
 
 ### Done

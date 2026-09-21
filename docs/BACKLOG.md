@@ -89,3 +89,27 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
   that never turns. `advance()` with a fixed target heading is the whole change. (M5)
 - Touch layout (M6) moves the radar to the top-left, where GTA-style mobile HUDs
   keep it clear of the virtual stick and pedals: one CSS rule on `.minimap`. (M6)
+
+## Run structure and heat (M4 candidates beyond the slice plan; docs/DESIGN.md)
+
+- Pursuit breakers: smashable props that drop a static onto the road behind the player (scaffold, water tower, petrol canopy); police crash or reroute; doubles as cover. Billboard machinery plus a dropped static and a police reroute. (M4 stretch)
+- Multi-storey car park as a helicopter cover set piece: ramps, per-floor colliders, and a chase camera at 2.4 m plus look height inside 3 m ceilings; the camera alone is a week. (v1.1)
+- The comic arrest: the busted bar drawn as an officer walking up with a ticket book; one pedestrian pose. (M4 polish)
+- Heat-scaled sirens and a radio chatter layer under the engine, both synthesized; the helicopter's rotor as a low-pass on everything when it is overhead. (M4 audio)
+
+## Activities and progression (M5; docs/DESIGN.md §3–4, §7–8)
+
+- Order-free checkpoint races (Midnight Club) and road rules (a best time and best damage per street, Burnout Paradise): the same rival and recorder tech as the two race types that ship first. (M5 stretch)
+- Hidden cars: a stashed car somewhere in the city that a swap unlocks (the ice-cream truck). (M5)
+- A giant ball in a plaza, one dynamic sphere to push around; a free-roam toy that costs nothing. (M5)
+- Body crumple by vertex displacement on the low-poly car mesh, render only; thumbnail value. (M5 polish)
+- Derby in a park lot: eight cars from the body pool, last one rolling, takedowns for cash. (v1.1)
+- Crash mode: after a wreck, bounce it along the street with boost taps for cash; the player keeps control so the 2 s rule holds. (v1.1)
+- Cop mode: "the suspect is a red muscle car", catch and stop it; the descriptor and pursuit systems from the other side. The first post-launch update; the Interceptor unlock is its trailer. (post-launch)
+- Asynchronous rivals (a friend's ghost on a road) and cops-vs-robbers multiplayer: a backend and netcode; the fixed step is all that is designed for them now. (v2)
+
+## City v2 (after the M4 run loop works; docs/DESIGN.md §5–6)
+
+- Highway overpasses at the four avenue crossings: a third dimension in the road graph (lane height, kinematic traffic at height, the bot route, road meshes, markings, the minimap, the city pins). Scheduled as M4 slice 7, listed here until it starts. (M4)
+- Chokepoint and cover sites exported by the generator (the four on-ramps, the tower junction, one covered street per district) so roadblocks and the map read from data, not from hand-placed coordinates. (M4)
+- A lit hideout sign visible from the highway; drop-off approaches with a second, longer way in. (M4/M5)

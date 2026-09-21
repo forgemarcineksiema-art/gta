@@ -2,6 +2,68 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-22 — Design session before M4
+
+### Done
+
+- `docs/DESIGN.md`: the design decisions on top of the brief, written down so
+  they survive compaction: the run (heat as a ratchet, pursuit as a state,
+  bag/bank/reputation, busted, the identity rule on swap, the heat table and
+  multipliers, the EV argument), progression (earnings model, the eight-car
+  catalogue with reputation gates and target times, upgrades and looks,
+  district and job gates, dailies, prep items), the activities (point-to-point
+  free-routing races and the recorder ghost first), cover (covered streets and
+  overpasses), the city as a level (district roles, reward density, drop-offs,
+  chokepoints, the cold-open route), free-roam scoring, ideas from other games
+  placed by cost, the CrazyGames KPIs and what serves each, engineering
+  constraints, the M4 slice order, the playtest watch list.
+- `docs/BACKLOG.md`: three new sections (run structure and heat, activities
+  and progression, city v2) with the ideas that are not in a slice.
+- `docs/CRAZYGAMES.md`: A1 and A5 notes carry the planned ad points (the
+  hideout door and busted; rewarded offers only in the garage and at the door
+  with a cash alternative). `CLAUDE.md`: the DESIGN.md row and session-start
+  read.
+
+### Decided
+
+- Marcin (2026-09-22): runs with a ratchet heat and bag/bank, the hideout door
+  as the totals moment, covered streets and overpasses in M4. Everything else
+  in DESIGN.md is marked "set here": my call, his override.
+- M4 starts with a housekeeping slice (slice 0) before any police code: the
+  ten-size screens run inspected, the wreck tow-away (body pool), the traffic
+  step profiled in the browser, the sports and police presets, real highway
+  lanes. These were backlog items that the run design turns into
+  prerequisites.
+- Car swap and pursuit: the swap is a pure vehicle change today; the identity
+  rule is one condition in M4's detection model, not extra work.
+- Revised the same day after Marcin's challenge ("are these what players
+  want, for whom"): audience written down (§3.1), coins on the road as an
+  addition (his idea), reputation dropped (two currencies), busted pays a
+  fine of half the bag at ×1 instead of taking everything (a twelve-year-old
+  quits on a full loss; the multiplier is the bet), all six brief activity
+  types kept plus fares from Crazy Taxi with hot passengers, and more ideas
+  of mine in §8 (donut-shop withdrawal, news ticker, wanted poster, daily
+  seed). An earlier draft cut the activities to three; reverted, the cut was
+  mine and unasked.
+
+### Next
+
+- M4 slice 0 (housekeeping), then slice 1: heat and pursuit as two systems
+  with level-1 patrols. Order in DESIGN.md §11.
+- Marcin: the title (`docs/TITLES.md`, still "Untitled Driving Game") and
+  `npm run perf:headed` on the laptop to close the M3 perf numbers.
+
+### Open problems
+
+- `npm run screens` at all ten sizes has never completed and been inspected
+  (M3 report known issue); it is slice 0's first item.
+- The MX330 frame-pacing hitches from M2 are still uninvestigated; the police
+  add bodies and agents, so the traffic step profile in slice 0 doubles as the
+  baseline for that.
+- `docs/` carries M3_PLAN.md, M3_STATUS.md and M3_REVIEW_MID.md from the Grok
+  period and REPORT.md from M1; all historical. Move to `docs/history/` in
+  slice 0 so the live documents are the ones listed in CLAUDE.md.
+
 ## 2026-09-22 — M3 session 16: gate
 
 ### Done

@@ -9,7 +9,7 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 
 ## Session start
 
-1. Read this file and `docs/PROGRESS.md`; check `git log --oneline -15`.
+1. Read this file and `docs/PROGRESS.md` (and `docs/DESIGN.md` when planning a slice); check `git log --oneline -15`.
 2. Run `npm run verify` before touching anything. It must be green at every milestone gate.
 3. Work autonomously inside the milestone. Decide, act, note assumptions in `docs/PROGRESS.md`. Stop only at a gate, before destructive/irreversible operations, to change a fixed decision from the brief, or when blocked on something only Marcin can provide.
 4. Commit small and often; never leave significant work uncommitted. Commit messages end with `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
@@ -20,6 +20,7 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 |---|---|
 | `docs/BRIEF.md` | The project brief. Read-only. |
 | `docs/PROGRESS.md` | Session log: done, decided and why, next, open problems. |
+| `docs/DESIGN.md` | Design decisions on top of the brief: the run, progression, the city as a level, platform KPIs, the M4 slice order. Each section is marked decided (Marcin) or set here (mine). |
 | `docs/ARCHITECTURE.md` | Structure, dependency justifications, decision records. |
 | `docs/BACKLOG.md` | Out-of-milestone ideas and non-blocking bugs, one line of context each. |
 | `docs/CRAZYGAMES.md` | Platform compliance checklist with status column. Keep updated. |

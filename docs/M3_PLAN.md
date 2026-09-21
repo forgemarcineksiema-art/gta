@@ -25,7 +25,7 @@ your first edit (109 tests, build ~3.4 MB, smoke ~60 fps on the MX330).
   `docs/PROGRESS.md`, and it is committed. Commit small and often; never leave
   significant work uncommitted. Commit messages: `<area>: <what changed>`,
   body with the why and the numbers, trailer
-  `Co-Authored-By: Grok 4.7 <noreply@x.ai>`.
+  `Co-Authored-By: Grok 4.7` (no email).
 - **Autonomy.** Marcin is not watching. Decide, act, note the assumption in
   `docs/PROGRESS.md`. Stop only at the M3 gate (§7), before anything
   destructive, when you want to change a fixed decision from the brief or from

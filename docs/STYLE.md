@@ -149,6 +149,18 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 - Text shadow on everything over the 3D view for legibility on both peach sky and dark asphalt.
 - Minimum sizes at DPR 1: primary numbers ≥ 44 px, labels ≥ 12 px bold uppercase with tracking. Verify with `npm run screens`.
 - Keycaps: white rounded rectangles with dark text, always beside a one-word label.
+- Minimap: a radar, not an atlas. A circle in the bottom-left corner
+  (`--minimap-size`, 150–240 px) that turns with the direction of travel, the car
+  22 % below the centre so more road shows ahead, zoom from a 210 m radius at rest
+  to 420 m at 160 km/h. Roads at real width with a dark casing: grid streets in
+  ink, the perimeter highway in accent yellow, the authored loop in warm cream so
+  the 4 km loop reads as one ring; district tints are the district colours at low
+  alpha; water is a dark teal. Landmarks are four distinct glyphs in the district
+  accent (tower triangle, tank on a stem, glasshouse diamond, hotel slab) that
+  clamp to the rim with a chevron when out of range: this is the compass cue for
+  places the street canyons hide. No text inside the circle but the rotating N;
+  the district and landmark names sit above it at 12 px. Flat drop shadow, no
+  glow. Numbers in `MINIMAP` (`src/ui/minimapModel.ts`).
 
 ## Camera and motion
 

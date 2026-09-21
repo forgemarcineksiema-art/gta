@@ -2,6 +2,79 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-21 — Session 12: heading-up radar minimap
+
+Marcin asked for a new minimap designed to best practice. The old one fitted the
+whole island into 132–184 px (streets under 2 px) and drew the offset lane paths,
+so roads kinked at junctions; it never answered "which turn next".
+
+### Done
+
+- `src/ui/minimapModel.ts` (pure, Node-tested): road layers junction to junction
+  plus the five authored centrelines at real width, velocity-heading easing with
+  shortest-arc wrap and a 180°/s cap, speed zoom 210–420 m, world-to-screen
+  projection, rim clamp along the ray from the player. Four pins in
+  `tests/ui/minimap.test.ts` (92 tests total).
+- `src/ui/minimap.ts`: circular Canvas 2D radar, bottom-left, `--minimap-size`
+  150–240 px. Layers: water, island, district tints, road casing and fills (grid
+  ink, highway gold, loop cream), landmark glyphs (tower, tank, glasshouse,
+  hotel) that clamp to the rim with a chevron, car arrow rotated by yaw minus
+  heading (drifts show the car sideways), rotating N with E/S/W ticks. Cached
+  `Path2D` (grid streets merged into 10 whole lines, the highway one closed
+  rectangle, authored roads with bounds), only paths within reach stroked, one
+  transform per repaint, no per-update allocation, repaint at 30 Hz and only
+  while something moved; snaps on `respawned` or an 80 m jump. The circle is
+  the CSS `border-radius`, not a canvas `clip()`. `setMarkers()` for M3
+  police/traffic and M5 activities.
+- `Hud.update` passes `dt` and `now`; the old every-third-frame throttle is gone
+  (the canvas is off the DOM layout path).
+- Docs: decision 18 in `ARCHITECTURE.md`, minimap rules in `STYLE.md`, backlog
+  (compass cue done; full map, north-up option, touch layout, `cityFootprints()`).
+
+### Evidence and boundaries
+
+- `verify` green; `city` 5/5 (district label assertion and district shots);
+  `screens` 10/10 reviewed at DPR 1: labels 12 px, the circle clear of the drift
+  readout at 800×450.
+- Scripted review (manual stepping, DPR 2 crops): straight, turn, spin, reverse,
+  two teleports, highway at 131 km/h. Map turns with the velocity, arrow keeps
+  the nose, reverse follows the nose, teleports land aligned on the first frame,
+  clamped landmarks slide along the rim with the bearing. Canvas pixels sampled:
+  island band and blocks are the same fill (a tonal difference in the crop was
+  simultaneous contrast against the water and the gold highway).
+- Axis check: Coral Hotel (x 490) sits 44 m at +X of the marina spawn, which is
+  west, and draws on the left when heading north; matches `+X west` in `App`.
+- Cost, measured (headless MX330, CPU ×4, 20 s CPU profiles, old build served
+  from a `git archive` of 664e04c on port 4174): the first painter's `paint`
+  was 0.9 % of main-thread time (187–200 ms per 20.9 s); merging the grid into
+  lines and culling changed nothing measurable, dropping the anti-aliased
+  canvas `clip()` for the CSS radius took it to 0.6 % (131 ms), and the new
+  build's idle share then matched the old (44.6 % vs 43.9 %). The first
+  `npm run perf` on the new code failed the p95 gate by 0.0 ms (33.4000 vs
+  33.4, the two-vsync boundary at ×4, as in session 11's first run) at 48.4 fps;
+  the first three A/B pairs before the clip change read old 58.8 / 49.9 / 47.3
+  vs new 54.1 / 48.6 / 44.9 fps with the machine warming through the run.
+  After the clip change, three pairs: old 58.7 / 57.4 / 58.0 vs new
+  57.0 / 58.8 / 58.1 fps, p95 16.8 ms on every run; the same in the mean. The
+  gate run then passed: 59.0 fps, frame p95/p99/max 16.8/33.3/66.6 ms, step
+  p95 3.5 ms, heap 40 MB, 0 bot resets. Nothing here is the headed Intel path;
+  `perf:headed` on the laptop remains Marcin's number.
+
+### Decided and why
+
+- Radar over atlas, bottom-left, heading-up by velocity, zoom by speed: see
+  decision 18. Bottom-left keeps map, drift readout and speed along the bottom
+  edge where the eyes already are; one CSS rule moves it back.
+- Reversing follows the car's yaw, not the velocity, so backing up never flips
+  the map; a spin-out keeps the velocity heading until the car is truly backwards.
+- Time-gated repaint (33 ms) rather than every Nth frame, so a 30 fps machine
+  still gets 30 Hz on the map; the dirty check makes a parked car free.
+
+### Next
+
+- Marcin's playtest of the radar (rotation feel, zoom range, size); knobs in
+  `MINIMAP`. Then M3 traffic, whose cars go through `setMarkers()`.
+
 ## 2026-09-21 — Session 11: performance on the iGPU path
 
 Marcin: he playtests every build himself and reports what feels wrong (noted;

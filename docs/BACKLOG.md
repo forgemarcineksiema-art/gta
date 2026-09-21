@@ -26,9 +26,10 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 - Frontage rows now vary width and variant by index and fill the corners, but a
   long avenue still reads as generated; shops turning the corner and one
   authored "special" building per avenue would break the rhythm for good. (M2.2)
-- The landmark silhouettes are only visible along open sightlines (avenues aimed
-  at them, the highway, open quarters); street canyons hide them. A subtle
-  compass cue in the HUD or on the minimap edge would complete orientation. (M2.2)
+- The minimap has no lot, park or water data to draw: `City.generate` emits
+  render descriptors only. A small `cityFootprints()` export (park rects, block
+  outlines, the promenade and piers) would let a full-screen map show blocks
+  the way the radar shows roads. (M2)
 
 ## Rendering
 
@@ -53,3 +54,10 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 ## UI
 
 - Keycap labels resolve through `navigator.keyboard.getLayoutMap()` only on Chromium; other browsers show `W/A/S/D` positions, which is what the brief asks for anyway. (M0)
+- Full-screen city map for M5 activities: the radar painter already draws any
+  centre, scale and rotation, so a north-up whole-island view with activity
+  markers is a second instance behind a hold key, not a new renderer. (M2)
+- North-up option for the radar once settings exist; some players prefer a map
+  that never turns. `advance()` with a fixed target heading is the whole change. (M5)
+- Touch layout (M6) moves the radar to the top-left, where GTA-style mobile HUDs
+  keep it clear of the virtual stick and pedals: one CSS rule on `.minimap`. (M6)

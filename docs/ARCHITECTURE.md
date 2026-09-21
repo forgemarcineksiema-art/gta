@@ -11,11 +11,12 @@ src/app/              App (glue), loop.ts (fixed-step accumulator), bot.ts (auto
 src/sim/              headless simulation: SimWorld, Vehicle, playground, transforms, palette, math
 src/render/           Three.js: Renderer, ChaseCamera (look-ahead, reverse orbit, shake), SpeedLines, Sparks, carMesh, carProfiles
 src/audio/            EngineAudio (WebAudio synthesis)
-src/ui/               Hud, DebugPanel, styles.css
+src/ui/               Hud, Minimap (heading-up canvas radar) + minimapModel (pure maths), DebugPanel, styles.css
 src/input/            actions, InputManager, KeyboardDevice
 src/platform/         Platform interface, LocalPlatform, createPlatform()
 tests/sim/            Vitest headless sim tests (handling, cars, walls, instrumentation, loop)
 tests/render/         Vitest camera pins (three.js math in Node, no WebGL)
+tests/ui/             Vitest minimap model pins (road layers, projection, easing, rim clamp)
 e2e/                  Playwright: smoke, perf, screens
 tools/                verify.mjs, budget.mjs
 docs/                 BRIEF, PROGRESS, ARCHITECTURE, BACKLOG, CRAZYGAMES, STYLE, TITLES, ASSETS
@@ -58,8 +59,11 @@ texel grid (`render/shadows.ts`), and receivers fade the map edge.
 `Renderer` starts low and samples real frame intervals after warmup, then adapts
 fog/draw distance, shadow resolution and DPR with hysteresis. Locked quality URLs
 make benchmarks reproducible. Simulation, road topology and collisions are tier
-independent. The minimap is a static SVG built from the road graph, with just the
-player arrow and district label updated during play.
+independent. The minimap is a heading-up radar on its own 2D canvas
+(`ui/minimap.ts`, maths in `ui/minimapModel.ts`): roads from the graph cached as
+world-space paths, district tints, landmark glyphs that clamp to the rim along
+the bearing from the car, the car arrow and a rotating compass; it repaints at
+30 Hz and only while something moved (decision 18).
 
 `SimWorld()` still defaults to the playground for existing headless tests; `App`
 selects the city unless a playground/track URL was requested. City sessions do not
@@ -120,6 +124,18 @@ regenerating a chunk at the detail boundary. The regeneration cost 20–40 ms pe
 crossing at CPU ×4 and crossings happen about twice a second while driving; the
 second level costs roughly 40 % more geometry memory (heap 40–45 MB on the tour).
 
+Decision 18 (M2): the minimap is a heading-up radar on a canvas, not a
+whole-city SVG. The first minimap fitted the 1,575 m island into 132–184 px
+(8–12 m per pixel: streets under 2 px, the car a speck) and drew `lane.points`,
+which are offset carriageways inset from the junctions, so every road kinked;
+it answered "where on the island" but never "which turn next". The radar shows
+210–420 m around the car with the direction of travel up (what the chase camera
+follows, so a drift reads the same on both), the car below the centre, roads at
+real width from junction to junction, and landmarks that clamp to the rim along
+the bearing from the car, which is the compass cue the street canyons needed.
+Canvas 2D keeps the repaint off the DOM layout path that cost 19 % of the main
+thread in the M2.1 profile; the maths lives in a DOM-free module with Node pins.
+
 ## Data flow per frame (detail)
 
 ```
@@ -130,7 +146,7 @@ requestAnimationFrame
     SimWorld.step()                  transforms.swap(); vehicle.update(); rapier.step(); write transforms
   Renderer.render(alpha)             interpolate prev/curr transforms, chase camera, draw
   EngineAudio.update(telemetry)      RPM/load/speed/slip -> oscillators, filters, gains
-  Hud.update(sim)                    DOM text/transform updates, throttled debug block
+  Hud.update(sim, dt, info, now)     DOM text on change, throttled debug block, radar canvas at 30 Hz
 ```
 
 The sim never sees wall time. `SimWorld.transforms` is a `TransformBuffer` (typed arrays, prev + curr) that the renderer reads directly; the sim publishes `StaticDesc[]` and `DynamicDesc[]` once so the renderer can build meshes without knowing physics.

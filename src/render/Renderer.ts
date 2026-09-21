@@ -15,6 +15,7 @@ import { SHADOW_HALF, SUN_OFFSET, stableShadowTarget } from './shadows';
 import { gableGeometry, prismGeometry } from './geometry';
 import { buildSkyline } from './skyline';
 import { TrafficView } from './TrafficView';
+import { PedView } from './PedView';
 
 export interface RenderStats {
   drawCalls: number;
@@ -36,6 +37,7 @@ const MAX_DPR = 1.5;
 export class Renderer {
   readonly cityView: CityView | null;
   readonly trafficView: TrafficView | null;
+  readonly pedView: PedView | null;
   quality: QualityTier = 'low';
   private qualityElapsed = 0;
   private qualityFrames = 0;
@@ -113,6 +115,7 @@ export class Renderer {
 
     this.cityView = sim.city ? new CityView(this.scene, sim.city) : null;
     this.trafficView = sim.traffic && sim.trafficDensity > 0 ? new TrafficView(this.scene, sim.traffic) : null;
+    this.pedView = sim.peds && sim.pedsDensity > 0 ? new PedView(this.scene, sim.peds) : null;
     if (sim.city) this.scene.add(buildSkyline(sim.city));
     if (sim.statics.length) this.buildStatics(sim.statics);
     this.setQuality(this.quality);
@@ -249,6 +252,7 @@ export class Renderer {
   render(alpha: number, dt: number): void {
     this.applyTransforms(alpha);
     this.trafficView?.update(this.sim.transforms, alpha);
+    this.pedView?.update(this.sim.transforms, alpha);
     const tm = this.sim.vehicle.telemetry;
     const carPos = this.car.root.position;
     // A fixed step can clear the sim's respawn flag before the next render frame.
@@ -311,6 +315,7 @@ export class Renderer {
     this.scene.fog = new THREE.Fog(PALETTE.fog, q.near, q.far);
     this.sun.shadow.mapSize.set(q.shadow, q.shadow);
     this.sun.shadow.map?.dispose(); this.sun.shadow.map = null;
+    this.pedView?.setShadows(tier === 'high');
     this.resize();
   }
 

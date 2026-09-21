@@ -57,6 +57,8 @@ export interface PedTuning {
   fistTime: number;
   guaranteeDistance: number;
   hopDistance: number;
+  /** A diver the player passes inside this distance scores a near miss, m. */
+  scoreDistance: number;
 }
 
 export const TRAFFIC: TrafficTuning = {
@@ -116,4 +118,5 @@ export const PEDS: PedTuning = {
   fistTime: 4,
   guaranteeDistance: 1.3,
   hopDistance: 3,
+  scoreDistance: 3,
 };

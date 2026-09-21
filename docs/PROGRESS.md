@@ -2,6 +2,106 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-21 — M3 session 16: slice 4, pedestrians
+
+### Done
+
+- `sim/traffic/Pedestrians.ts`: 40 pooled pedestrians on the footways, as
+  points on a lane polyline shifted 9.75 m right on streets (15.25 m on the
+  highway's inner side, `halfWidth + 2.25 − laneOffset` on authored roads),
+  walking forward or back, turning right round the block corner (the nearest
+  footway on the same side, 12 m across the corner apron) or turning round,
+  never crossing a carriageway. A car whose predicted 0.7 s path sweeps
+  within 2.6 m makes them dive sideways at 6 m/s, get up and walk back onto
+  their line; if a car's footprint grown by 1.3 m still reaches one, it hops
+  clear of the flank (`guaranteeHops` counts it). A diver the player's car
+  passes within 3 m of its footprint scores `nearMissPed` once, and `Life`
+  pays `pedDodgeBoost`. Poses are written into the transform (walk bob, 70°
+  dive pitch, get-up, fist shake) so the view only interpolates.
+- `render/PedView.ts`: one instanced 72-triangle figure (torso, head, legs,
+  arms), shirt tinted per instance, shadows on the high tier only.
+- `render_game_to_text` reports traffic and pedestrian counts and hops.
+
+### Verification
+
+- verify green, 132 tests. Smoke 60.0 fps / p95 16.7 ms / 92 draws /
+  192k tris, build 3.44 MB.
+- Pins (`tests/sim/pedestrians.test.ts`): walkers on their line stay in
+  the footway band of their street; a pedestrian 40 m ahead of a car at
+  80 km/h dives before the car is within 8 m, is never inside the chassis
+  footprint, scores exactly one `nearMissPed`, walks again within 3 s of
+  the pass, no guarantee hops; with the dive switched off the guarantee
+  alone keeps it out of the footprint (≥ 1 hop); two seeded runs identical.
+- The full-pool cost test now fills with the road bot (a stationary player
+  at the island edge starved the spawn ring); mean step logged with cars
+  and pedestrians together.
+
+### Next
+
+- Slice 5: damage stages, wrecked, rolling respawn, debris and smoke.
+
+## 2026-09-21 — M3 session 16: review fixes B1–B4, hand-over to Claude
+
+Marcin dropped Grok 4.7 after `docs/M3_REVIEW_MID.md`; Claude executes the
+rest of M3 on the same branch. This session fixed the four blocking findings
+and the small ones, with behaviour pins.
+
+### Done
+
+- **Lent bodies** (`sim/traffic/Traffic.ts`, `lanes.ts`): one path-following
+  code for kinematic and lent agents (`plan` gives the desired speed, the
+  progress `s` of a lent body comes from `LaneTables.projectPath` onto its
+  offset path, lane switches happen for both). Heading is a first-order
+  controller with a rate cap (`yawGain` 3, `yawRateMax` 1.5 rad/s); the nose
+  follows the motion, and a car left facing away from its path turns back on
+  the spot. Junction curves are built per sub-lane offset from the offset
+  endpoints: offsetting the centre curve by 6 m folded on tight corners and
+  put the carrot behind the car.
+- **Junctions**: conflict-checked holders (curves within 5 m), same-lane
+  followers do not wait, release at 55 % of the curve, no re-claims from
+  inside the box, first come first served across arms, holders exempt from
+  fairness, the override after `junctionWait` (9 s, was 6) keeps the right
+  of way until the car leaves. `aheadGap` looks only in the agent's own
+  corridor. `accel` 4 (was 3), `speedJunction` 10 (was 8).
+- **Wrecks** stay wrecks: never re-lent as drivers, a lent wreck is a solid
+  obstacle, `wreckImpact` wrecks outright, the pool gives a lingering wreck's
+  body up only when a driving car needs it.
+- Small items from the review: `hit` once per contact, bound event callbacks
+  in HUD and Sfx, `subLaneOffsets` read from tuning, `unstick` once, wide
+  passes clear the near-miss flag, life screenshots unpaused, barrel exports.
+
+### Verification
+
+- verify green, 128 tests. Smoke 60.0 fps / p95 16.7 ms / 90 draws /
+  187k tris, build 3.44 MB.
+- New pins (`tests/sim/traffic.test.ts`): lent bodies change lanes (10 in
+  60 s), max |angvel.y| 1.46 rad/s away from the player, nose within 60° of
+  the carrot, longest unexplained stall 0.03 s; flow over 60 s: mean
+  speed/limit 0.69–0.72, stopped share 8 %, 1 junction override (bands
+  > 0.6, < 15 %, ≤ 5); a wreck stays put with its body for 15 s.
+- Measured on the way (scratch harness, not committed): before the fixes
+  the same drive had mean speed/limit 0.35, 58 % stopped, 102 overrides,
+  0 lane changes by lent bodies, 46 rad/s spins; the two remaining spin
+  events per minute are the player shoving a car from under 4 m.
+- Perf, two runs after the fixes (headless MX330, CPU ×4, 60 s): 57.2 /
+  55.1 fps, frame p95 16.8 / 33.3 ms, max 83 / 150 ms (the 667–1,850 ms
+  frames of the earlier builds are gone), step p95 8.1 / 10.5 ms, 90 / 69
+  draws, 184k / 160k tris, heap 51 MB, 0 bot resets (was 1). Node cost of
+  a full step with 46 cars and two lent bodies: 0.31–0.34 ms, of which
+  `Traffic.step` 0.16–0.21 ms; the browser step p95 is several substeps of
+  a throttled frame (0.35 ms × 4 × up to 5), so it tracks that cost, not a
+  hidden loop. Still under the 12 ms limit; a profile of `Traffic.step` is
+  on the list for the polish pass.
+
+### Decided and why
+
+- The plan's junction bands (`waitedPast` ≤ 5, stopped < 15 %) were kept,
+  and the mechanism changed until it met them: with a 6 s override and a
+  4.5 s crossing, overrides cascaded; fairness plus a longer override and a
+  faster launch brought them to one per minute.
+- Rapier collider handles are f64 bit patterns (denormals); they are used
+  only as Map keys and for equality, never for arithmetic.
+
 ## 2026-09-21 — M3 session 15: status report
 
 Marcin asked for the work-so-far report in a document. `docs/M3_STATUS.md` records slices 0–3. It is not the gate report; `docs/M3_REPORT.md` is still written at the gate.

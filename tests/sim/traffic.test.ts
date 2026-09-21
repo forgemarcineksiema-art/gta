@@ -109,28 +109,30 @@ describe('traffic', () => {
     } finally { sim.dispose(); }
   }, 30_000);
 
-  it('steps 48 agents in under 3 ms', async () => {
-    const sim = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 0, record: false });
+  it('steps a full pool in under 3 ms', async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 1, record: false });
+    const bot = new TrackBot('muscle', CITY_BOT_TUNING);
     const traffic = sim.traffic as Traffic;
     try {
-      let filled = false;
-      for (let i = 0; i < 30 * 60 && !filled; i++) {
-        sim.controls.throttle = 1;
+      // the road bot keeps moving, so the spawn ring stays inside the city and the pool fills
+      let alive = 0;
+      for (let i = 0; i < 40 * 60 && alive < 44; i++) {
+        bot.drive(sim, sim.controls, 1 / 60);
         sim.step();
-        filled = traffic.count(AgentState.Kinematic) >= 48;
+        alive = traffic.capacity - traffic.count(AgentState.Free);
       }
-      expect(filled).toBe(true);
+      expect(alive).toBeGreaterThanOrEqual(44);
       const steps = 3600;
       const t0 = performance.now();
       for (let i = 0; i < steps; i++) {
-        sim.controls.throttle = 1;
+        bot.drive(sim, sim.controls, 1 / 60);
         sim.step();
       }
       const mean = (performance.now() - t0) / steps;
-      console.log(`[traffic] mean step ${mean.toFixed(3)} ms with ${traffic.count(AgentState.Kinematic)} agents`);
+      console.log(`[traffic] mean step ${mean.toFixed(3)} ms with ${traffic.capacity - traffic.count(AgentState.Free)} cars and ${sim.peds?.count() ?? 0} pedestrians`);
       expect(mean).toBeLessThan(3);
     } finally { sim.dispose(); }
-  }, 60_000);
+  }, 120_000);
 
   it('lends a body near the player, steers it straight, moves it through junctions and returns it far away', async () => {
     const sim = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 0, record: false });

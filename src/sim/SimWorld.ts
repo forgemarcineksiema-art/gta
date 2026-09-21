@@ -15,8 +15,9 @@ import { buildPlayground, type PlaygroundLayout, type SpawnPoint } from './playg
 import { POSE_STRIDE, Recorder } from './recorder';
 import type { DynamicDesc, StaticDesc } from './scene';
 import { LapTimer, type LapState, type TrackDef } from './track';
+import { Pedestrians } from './traffic/Pedestrians';
 import { Traffic, type PlayerProbe } from './traffic/Traffic';
-import { TRAFFIC } from './traffic/tuning';
+import { PEDS, TRAFFIC } from './traffic/tuning';
 import { TransformBuffer } from './transforms';
 import { CAR_PRESETS, type CarId } from './vehicle/presets';
 import { cloneTuning, type VehicleTuning } from './vehicle/tuning';
@@ -74,8 +75,9 @@ export class SimWorld {
   /** Density scales from `SimWorldOptions`. Read by the life systems when they exist. */
   readonly trafficDensity: number;
   readonly pedsDensity: number;
-  /** Null on the playground. Density 0 still constructs it so tests can `spawnAt`. */
+  /** Null on the playground. Density 0 still constructs them so tests can `spawnAt`. */
   readonly traffic: Traffic | null;
+  readonly peds: Pedestrians | null;
   readonly life: Life;
   readonly statics: StaticDesc[];
   readonly dynamics: DynamicDesc[] = [];
@@ -147,6 +149,7 @@ export class SimWorld {
     const tuning = opts.tuning ?? cloneTuning(CAR_PRESETS[this.carId]);
     this.vehicle = new Vehicle(this.world, this.transforms, tuning, spawn.position, spawn.yaw);
     this.traffic = this.city ? new Traffic(this.world, this.transforms, this.city, opts.seed ?? 42, TRAFFIC, this.trafficDensity) : null;
+    this.peds = this.city && this.traffic ? new Pedestrians(this.transforms, this.city, this.traffic.lanes, opts.seed ?? 42, PEDS, this.pedsDensity) : null;
     this.life = new Life(this);
     this.city?.sync(spawn.position.x, spawn.position.z, true);
   }
@@ -188,10 +191,12 @@ export class SimWorld {
       probe.halfWidth = he.x;
       probe.halfLength = he.z;
       this.traffic.step(probe, FIXED_DT, this.events);
+      this.peds?.step(probe, this.traffic, FIXED_DT, this.events);
     }
     this.world.step();
     this.vehicle.writeTransforms();
     this.traffic?.writeTransforms();
+    this.peds?.writeTransforms();
     this.life.postStep(FIXED_DT);
     for (const t of this.tracked) {
       const p = t.body.translation(this.scratchPos);

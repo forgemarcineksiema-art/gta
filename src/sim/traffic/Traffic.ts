@@ -235,6 +235,14 @@ export class Traffic {
     return n;
   }
 
+  halfWidthOf(agent: number): number {
+    return this.halfW[this.kind[agent] as number] as number;
+  }
+
+  halfLengthOf(agent: number): number {
+    return this.halfL[this.kind[agent] as number] as number;
+  }
+
   /** True when the agent currently owns a Rapier body. */
   hasBody(agent: number): boolean {
     return (this.agentBody[agent] as number) >= 0;

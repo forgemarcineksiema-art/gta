@@ -56,6 +56,8 @@ export class Life {
     this.hits();
     this.nearMisses(dt);
     this.oncomingLane(dt);
+    const dodges = this.sim.peds?.dodgesThisStep ?? 0;
+    if (dodges > 0) this.grant(ECONOMY.pedDodgeBoost * dodges);
   }
 
   skipSlowMo(): void {

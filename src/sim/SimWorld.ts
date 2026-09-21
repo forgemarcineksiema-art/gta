@@ -49,6 +49,8 @@ export interface SimWorldOptions {
   traffic?: number;
   /** Pedestrian density scale. 0 disables. Default 1. */
   peds?: number;
+  /** Damage, wrecks and respawn. Default: on in the city, off on the playground (the handling lab keeps the M1 pins). */
+  damage?: boolean;
 }
 
 interface TrackedBody {
@@ -150,7 +152,7 @@ export class SimWorld {
     this.vehicle = new Vehicle(this.world, this.transforms, tuning, spawn.position, spawn.yaw);
     this.traffic = this.city ? new Traffic(this.world, this.transforms, this.city, opts.seed ?? 42, TRAFFIC, this.trafficDensity) : null;
     this.peds = this.city && this.traffic ? new Pedestrians(this.transforms, this.city, this.traffic.lanes, opts.seed ?? 42, PEDS, this.pedsDensity) : null;
-    this.life = new Life(this);
+    this.life = new Life(this, opts.damage ?? this.city !== null);
     this.city?.sync(spawn.position.x, spawn.position.z, true);
   }
 

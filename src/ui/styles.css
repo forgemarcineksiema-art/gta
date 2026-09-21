@@ -202,6 +202,65 @@ body {
 .hud__popup.is-on { opacity: 1; }
 .hud__popup.is-gain { color: var(--ui-accent); }
 
+/* damage bar under the boost bar: appears with the first dent, red from stage 3, pulsing when wrecked */
+.hud__damage {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.hud__damage.is-visible { display: flex; }
+.hud__damage-label {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--ui-ink-dim);
+}
+.hud__damage-track {
+  width: 120px;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(247, 243, 234, 0.35);
+  transform: skewX(-12deg);
+  overflow: hidden;
+}
+.hud__damage-fill {
+  height: 100%;
+  background: var(--ui-ink);
+  transform-origin: left;
+  transform: scaleX(0);
+}
+.hud__damage.is-danger .hud__damage-fill { background: var(--ui-danger); }
+.hud__damage.is-wrecked .hud__damage-fill { animation: hud-pulse 0.5s steps(2, end) infinite; }
+@keyframes hud-pulse { 50% { opacity: 0.35; } }
+
+/* wrecked: the car coasts, the player still steers; a swap or R gets a fresh car */
+.hud__wrecked {
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  transform: translate(-50%, -50%) skewX(-10deg);
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+}
+.hud__wrecked.is-visible { opacity: 1; }
+.hud__wrecked-title {
+  font-size: 54px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.06em;
+  color: var(--ui-danger);
+  text-shadow: 3px 4px 0 #000;
+}
+.hud__wrecked-sub {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--ui-ink);
+  text-shadow: 2px 3px 0 #000;
+}
+
 /* drift readout, bottom centre */
 .hud__drift {
   position: absolute;

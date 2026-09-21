@@ -16,6 +16,10 @@ import { gableGeometry, prismGeometry } from './geometry';
 import { buildSkyline } from './skyline';
 import { TrafficView } from './TrafficView';
 import { PedView } from './PedView';
+import { Debris } from './Debris';
+import { Smoke } from './Smoke';
+import { AgentState } from '../sim/traffic/Traffic';
+import type { SimEvent } from '../sim';
 
 export interface RenderStats {
   drawCalls: number;
@@ -58,6 +62,14 @@ export class Renderer {
   private readonly sun: THREE.DirectionalLight;
   private readonly speedLines: SpeedLines;
   private readonly sparks: Sparks;
+  private readonly debris: Debris;
+  private readonly smoke: Smoke;
+  private eventSeq = 0;
+  private smokeAcc = 0;
+  private fireAcc = 0;
+  private readonly wreckSmokeAcc: Float32Array;
+  private readonly tmpFwd = new THREE.Vector3();
+  private readonly onEvent = (e: SimEvent): void => this.handleEvent(e);
   private readonly tmpPos = new THREE.Vector3();
   private readonly lastCarPos = new THREE.Vector3(Infinity, Infinity, Infinity);
   private readonly carVel = new THREE.Vector3();
@@ -161,6 +173,10 @@ export class Renderer {
     this.sparks = new Sparks();
     this.scene.add(this.sparks.object);
     this.scene.add(this.sparks.heads);
+    this.debris = new Debris(this.scene);
+    this.smoke = new Smoke();
+    this.scene.add(this.smoke.object);
+    this.wreckSmokeAcc = new Float32Array(sim.traffic?.capacity ?? 1);
 
     this.resize();
     // Effects (speed lines, sparks, ghost) first appear mid-drive; compiling their
@@ -282,11 +298,65 @@ export class Renderer {
     this.sky.position.copy(this.camera.position);
     this.speedLines.update(tm, Math.hypot(this.carVel.x, this.carVel.z), this.camera.aspect, dt);
     this.sparks.update(tm, this.carVel, dt);
+    this.eventSeq = this.sim.events.readFrom(this.eventSeq, this.onEvent);
+    this.car.setDamage(this.sim.life.state.stage);
+    this.emitSmoke(dt);
+    this.debris.update(dt);
+    this.smoke.update(dt);
 
     this.renderer.info.reset();
     this.renderer.render(this.scene, this.camera);
     this.stats.drawCalls = this.renderer.info.render.calls;
     this.stats.triangles = this.renderer.info.render.triangles;
+  }
+
+  /** Sim events with a visible consequence: parts fly off, a wreck bursts. */
+  private handleEvent(e: SimEvent): void {
+    const car = this.car.root;
+    const paint = CAR_PROFILES[this.sim.carId].paint;
+    if (e.kind === 'damage') {
+      this.tmpFwd.set(0, 0, 1).applyQuaternion(car.quaternion);
+      const front = e.value === 1;
+      const along = front ? 2.2 : e.value === 2 ? -2.2 : 0;
+      this.tmpPos.copy(car.position).addScaledVector(this.tmpFwd, along);
+      // thrown back off the car: its own velocity less 4 m/s along the nose, a little up, with spin
+      const vx = this.carVel.x - this.tmpFwd.x * 4, vz = this.carVel.z - this.tmpFwd.z * 4;
+      if (e.value <= 2) this.debris.spawn(this.tmpPos.x, this.tmpPos.y + 0.3, this.tmpPos.z, vx, 2.5, vz, 1.7, 0.09, 0.14, front ? PALETTE.silver : PALETTE.charcoal);
+      else this.debris.burst(this.tmpPos.x, this.tmpPos.y + 0.9, this.tmpPos.z, vx, 1.5, vz, 3, 0.3, paint, 2.5);
+    } else if (e.kind === 'wrecked') {
+      this.debris.burst(e.x, e.y + 0.8, e.z, this.carVel.x * 0.5, 4, this.carVel.z * 0.5, 8, 0.45, paint, 4);
+      for (let k = 0; k < 24; k++) this.smoke.emit(k % 3 ? 'fire' : 'dark', e.x, e.y + 0.9, e.z, this.carVel.x, this.carVel.z);
+    }
+  }
+
+  /** Smoke and fire on the player's bonnet by damage stage, and dark smoke from wrecked traffic nearby. */
+  private emitSmoke(dt: number): void {
+    const stage = this.sim.life.state.stage;
+    if (stage >= 2) {
+      const car = this.car.root;
+      this.tmpFwd.set(0, 0, 1).applyQuaternion(car.quaternion);
+      this.tmpPos.copy(car.position).addScaledVector(this.tmpFwd, 1.5);
+      const y = this.tmpPos.y + 0.85;
+      this.smokeAcc += (stage === 2 ? 12 : 30) * dt;
+      while (this.smokeAcc >= 1) { this.smokeAcc -= 1; this.smoke.emit(stage === 2 ? 'smoke' : 'dark', this.tmpPos.x, y, this.tmpPos.z, this.carVel.x, this.carVel.z); }
+      if (stage >= 3) {
+        this.fireAcc += (stage === 3 ? 20 : 25) * dt;
+        while (this.fireAcc >= 1) { this.fireAcc -= 1; this.smoke.emit('fire', this.tmpPos.x, y, this.tmpPos.z, this.carVel.x, this.carVel.z); }
+      }
+    } else { this.smokeAcc = 0; this.fireAcc = 0; }
+    const traffic = this.sim.traffic;
+    if (!traffic) return;
+    const px = this.car.root.position.x, pz = this.car.root.position.z;
+    for (let i = 0; i < traffic.capacity; i++) {
+      if (traffic.state[i] !== AgentState.Wrecked) { this.wreckSmokeAcc[i] = 0; continue; }
+      const dx = (traffic.x[i] as number) - px, dz = (traffic.z[i] as number) - pz;
+      if (dx * dx + dz * dz > 120 * 120) continue;
+      this.wreckSmokeAcc[i] = (this.wreckSmokeAcc[i] as number) + 10 * dt;
+      while ((this.wreckSmokeAcc[i] as number) >= 1) {
+        this.wreckSmokeAcc[i] = (this.wreckSmokeAcc[i] as number) - 1;
+        this.smoke.emit('dark', traffic.x[i] as number, 1.1, traffic.z[i] as number);
+      }
+    }
   }
 
   /** Ghost wheels ride at their static positions relative to the ghost body. */

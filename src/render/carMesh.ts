@@ -23,6 +23,9 @@ export interface CarMesh {
   root: THREE.Group;
   wheels: THREE.Object3D[];
   update(tm: VehicleTelemetry): void;
+  /** Damage stage 0..4: paint darkens toward graphite, parts collapse (front bumper at 1, rear at 2, mirrors and spoiler at 3), glass darkens at 4. Stage 0 restores everything. */
+  setDamage(stage: number): void;
+  damageStage: number;
 }
 
 /** One cross-section of the body at longitudinal position z (metres, + = front). */
@@ -477,17 +480,24 @@ export function buildCarMesh(t: VehicleTuning, profile: CarProfile = MUSCLE, col
     for (const p of tailPanels) bb.decal(p, rectYX(0.69, 2.13, -0.012, 0.012), PALETTE.charcoal, 0.012);
   }
   // Fittings have real thickness, but are baked into the body vertex buffer.
+  // Detachable ones record their vertex range so damage can collapse them in place.
+  const detachable: Array<{ from: number; to: number; stage: number }> = [];
+  const vertexCursor = () => bb.positions.length / 3 + extras.reduce((n, g) => n + g.getAttribute('position').count, 0);
   for (const s of [nose, tail]) {
+    const from = vertexCursor();
     box(s.hwFloor * 1.98, van ? 0.14 : 0.075, 0.11, muscle ? PALETTE.silver : PALETTE.charcoal, 0, s.floor + 0.06, s.z);
     if (muscle) box(s.hwFloor * 1.96, 0.045, 0.13, PALETTE.charcoal, 0, s.floor - 0.015, s.z);
+    detachable.push({ from, to: vertexCursor(), stage: s === nose ? 1 : 2 });
   }
   if (profile.mirrors) {
     const s = S[profile.aPillar] as Section;
+    const from = vertexCursor();
     for (const side of [-1, 1]) {
       box(0.16, 0.035, 0.055, PALETTE.charcoal, side * (s.hwBelt + 0.035), s.belt + 0.085, s.z - 0.14);
       box(van ? 0.17 : 0.18, van ? 0.21 : 0.10, 0.13, compact || van ? PALETTE.charcoal : paintDark, side * (s.hwBelt + 0.13), s.belt + 0.12, s.z - 0.14);
       box(0.13, van ? 0.15 : 0.068, 0.007, glassLight, side * (s.hwBelt + 0.13), s.belt + 0.12, s.z - 0.208);
     }
+    detachable.push({ from, to: vertexCursor(), stage: 3 });
   }
   for (let i = 0; i < profile.exhausts; i++) {
     const x = profile.exhausts === 1 ? 0.58 : i === 0 ? -0.62 : 0.62;
@@ -495,8 +505,10 @@ export function buildCarMesh(t: VehicleTuning, profile: CarProfile = MUSCLE, col
     part(new THREE.CircleGeometry(0.039, 10).rotateY(Math.PI), PALETTE.ink, x, tail.floor - 0.025, tail.z - 0.117);
   }
   if (profile.lipSpoiler) {
+    const from = vertexCursor();
     for (const x of [-0.58, 0.58]) box(0.085, 0.07, 0.1, paintDark, x, tail.roof + 0.03, tail.z + 0.17);
     box(tail.hwRoof * 2 + 0.04, 0.065, 0.22, paintDark, 0, tail.roof + 0.08, tail.z + 0.13);
+    detachable.push({ from, to: vertexCursor(), stage: 3 });
   }
   if (compact) {
     const s = S[4] as Section;
@@ -526,12 +538,58 @@ export function buildCarMesh(t: VehicleTuning, profile: CarProfile = MUSCLE, col
     colorAttr.needsUpdate = true;
   };
   let lastState = -1;
-  return { root, wheels, update(tm) {
+  // Damage: paint vertices (the three paint tones) darken toward graphite, glass darkens at stage 4,
+  // detachable parts collapse onto their centroid. Originals are kept for the restore at stage 0.
+  const posAttr = geometry.getAttribute('position') as THREE.BufferAttribute;
+  const originalPos = new Float32Array(posAttr.array as Float32Array);
+  const originalCol = new Float32Array(colorAttr.array as Float32Array);
+  const isTone = (k: number, hex: number) => {
+    const c = lightColor.setHex(hex);
+    return Math.abs((originalCol[k * 3] as number) - c.r) < 0.004 && Math.abs((originalCol[k * 3 + 1] as number) - c.g) < 0.004 && Math.abs((originalCol[k * 3 + 2] as number) - c.b) < 0.004;
+  };
+  const paintIdx: number[] = [], glassIdx: number[] = [];
+  for (let k = 0; k < colorAttr.count; k++) {
+    if (isTone(k, paint) || isTone(k, paintDark) || isTone(k, paintLight)) paintIdx.push(k);
+    else if (isTone(k, glass) || isTone(k, glassLight)) glassIdx.push(k);
+  }
+  const graphite = new THREE.Color(PALETTE.graphite), soot = new THREE.Color(PALETTE.ink);
+  const tint = (idx: number[], toward: THREE.Color, amount: number) => {
+    for (const k of idx) {
+      colorAttr.setXYZ(k,
+        (originalCol[k * 3] as number) + (toward.r - (originalCol[k * 3] as number)) * amount,
+        (originalCol[k * 3 + 1] as number) + (toward.g - (originalCol[k * 3 + 1] as number)) * amount,
+        (originalCol[k * 3 + 2] as number) + (toward.b - (originalCol[k * 3 + 2] as number)) * amount);
+    }
+  };
+  const mesh: CarMesh = { root, wheels, damageStage: 0, update(tm) {
     const state = (tm.brake > 0.1 && tm.gear > 0 ? 1 : 0) | (tm.gear === -1 ? 2 : 0);
     if (state !== lastState) {
       paintRange(tailLightRanges, state & 1 ? 0xff6972 : 0xba2338);
       paintRange(reverseRanges, state & 2 ? 0xfff6dc : 0x95a4a5);
       lastState = state;
     }
+  }, setDamage(stage) {
+    stage = Math.max(0, Math.min(4, Math.round(stage)));
+    if (stage === mesh.damageStage) return;
+    mesh.damageStage = stage;
+    tint(paintIdx, graphite, Math.min(0.85, 0.25 * stage));
+    tint(glassIdx, soot, stage >= 4 ? 0.6 : 0);
+    for (const part of detachable) {
+      const detached = stage >= part.stage;
+      let cx = 0, cy = 0, cz = 0;
+      const n = part.to - part.from;
+      if (detached) {
+        for (let k = part.from; k < part.to; k++) { cx += originalPos[k * 3] as number; cy += originalPos[k * 3 + 1] as number; cz += originalPos[k * 3 + 2] as number; }
+        cx /= n; cy /= n; cz /= n;
+      }
+      for (let k = part.from; k < part.to; k++) {
+        if (detached) posAttr.setXYZ(k, cx, cy, cz);
+        else posAttr.setXYZ(k, originalPos[k * 3] as number, originalPos[k * 3 + 1] as number, originalPos[k * 3 + 2] as number);
+      }
+    }
+    posAttr.needsUpdate = true;
+    colorAttr.needsUpdate = true;
+    lastState = -1; // the lights repaint over the restored colours on the next update
   } };
+  return mesh;
 }

@@ -2,6 +2,56 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-21 — M3 session 16: slice 5, damage, wrecked, respawn
+
+### Done
+
+- `Life`: damage from the step's strongest contact, `max(0, impact − 8) ×
+  0.04`, walls at full weight, traffic at 0.7, props and terrain never
+  (`DAMAGE` in `sim/economy.ts`, calibrated in the plan's table). Stages
+  at 0.3 / 0.6 / 0.85 / 1.0 push a `damage` event; stage 4 wrecks: engine
+  cut, `wrecked` event, a 3 s timer; `R` or the timer respawns a clean car
+  of the same class rolling at 8 m/s on the nearest road with the boost
+  kept and traffic cleared within 15 m (`respawn` event, camera snap). Any
+  reset heals. Damage is on in the city and off on the playground unless
+  `SimWorldOptions.damage` says otherwise: the playground is the handling
+  lab and the M1 wall pins drive into walls at 150 km/h expecting to drive on.
+- `carMesh.setDamage(stage)`: paint tones darken toward graphite by 25 % a
+  stage, the front bumper collapses onto its centroid at 1, the rear at 2,
+  mirrors and spoiler at 3, glass darkens at 4; stage 0 restores from kept
+  copies. One geometry, no material groups, no extra draw call.
+- `render/Debris.ts` (32 boxes, one instanced mesh, fake physics with one
+  bounce) and `render/Smoke.ts` (160 points, distance-sized, grey smoke at
+  stage 2, dark smoke and fire from stage 3, a burst at the wreck, dark
+  smoke from wrecked traffic within 120 m). The renderer consumes the event
+  ring with a bound callback: a bumper flies off backwards on `damage`, a
+  burst on `wrecked`.
+- HUD: a DAMAGE bar under the boost bar (appears with the first dent, red
+  from stage 3, pulsing when wrecked) and a WRECKED overlay naming the swap
+  and reset keys. Sfx: crunch on `damage`, boom and two seconds of crackle
+  on `wrecked`, a whoosh on `respawn`.
+
+### Verification
+
+- verify green, 135 tests. Smoke 60.0 fps / p95 16.7 ms / 95 draws /
+  193k tris (debris and smoke add three draws), build 3.45 MB.
+- Pins (`tests/sim/damage.test.ts`, playground walls lane with damage on):
+  100 km/h head-on → damage 1, stage 4, wrecked; 60 km/h → 0.3–0.6 and
+  stage 1; 40 km/h → 0.1–0.3; a 20° glance at 100 km/h → under 0.1; the lot
+  boxes at 60 km/h → 0 with a real impact. A wreck under full throttle moves
+  under 2.5 m in 1.4 s (the bounce settling), respawns after the timer at
+  the reset pose with damage 0, engine on, boost kept and speed over 5 km/h,
+  and `R` respawns at once. A rear-end on traffic costs under 0.3. The M1
+  handling, cars and walls pins are unchanged and pass.
+- The first verify run failed nine wall pins because damage wrecked the
+  test car at 100–150 km/h; scoping damage to the city (the playground
+  default off) fixed it without touching a pin.
+
+### Next
+
+- Slice 6: car-swap on `E`, three resident car meshes, camera whip, the
+  fist-shaking driver.
+
 ## 2026-09-21 — M3 session 16: slice 4, pedestrians
 
 ### Done

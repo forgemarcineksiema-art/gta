@@ -28,6 +28,7 @@ export interface KeyHints {
   pause: string;
   camera: string;
   debug: string;
+  swap: string;
 }
 
 export class Hud {
@@ -57,6 +58,14 @@ export class Hud {
   private frameIndex = 0;
   private lastGearText = '';
   private readonly oncoming: HTMLElement;
+  private readonly damageWrap: HTMLElement;
+  private readonly damageFill: HTMLElement;
+  private readonly wrecked: HTMLElement;
+  private readonly wreckedSub: HTMLElement;
+  private lastDamageText = '';
+  private lastStage = -1;
+  private swapKey = 'E';
+  private resetKey = 'R';
   private readonly popups: HTMLElement[];
   private readonly popupLeft = [0, 0, 0, 0];
   private popupCursor = 0;
@@ -84,9 +93,19 @@ export class Hud {
     boostTrack.appendChild(this.boostFill);
     this.boostWrap.append(boostLabel, boostTrack);
     speedo.append(speedRow, unit, this.boostWrap);
+    this.damageWrap = el('div', 'hud__damage');
+    const damageTrack = el('div', 'hud__damage-track');
+    this.damageFill = el('div', 'hud__damage-fill');
+    damageTrack.appendChild(this.damageFill);
+    this.damageWrap.append(el('div', 'hud__damage-label', 'DAMAGE'), damageTrack);
+    speedo.append(this.damageWrap);
     this.oncoming = el('div', 'hud__oncoming', 'ONCOMING');
     speedo.prepend(this.oncoming);
     this.root.appendChild(speedo);
+    this.wrecked = el('div', 'hud__wrecked');
+    this.wreckedSub = el('div', 'hud__wrecked-sub', '');
+    this.wrecked.append(el('div', 'hud__wrecked-title', 'WRECKED'), this.wreckedSub);
+    this.root.appendChild(this.wrecked);
     const stack = el('div', 'hud__popups');
     this.popups = [0, 1, 2, 3].map(() => {
       const popup = el('div', 'hud__popup');
@@ -151,6 +170,9 @@ export class Hud {
     );
     const sub = this.pause.querySelector('.hud__pause-sub');
     if (sub) sub.textContent = `press ${k.pause} to continue`;
+    this.swapKey = k.swap;
+    this.resetKey = k.reset;
+    this.wreckedSub.textContent = `${this.swapKey} take a car  ·  ${this.resetKey} respawn`;
   }
 
   setHintsVisible(v: boolean): void {
@@ -216,6 +238,16 @@ export class Hud {
     if (this.boostFlash > 0) this.boostFlash -= dt;
     this.boostWrap.classList.toggle('is-gain', this.boostFlash > 0);
     this.oncoming.classList.toggle('is-on', sim.life.state.oncoming);
+    const life = sim.life.state;
+    const damageText = `scaleX(${life.damage.toFixed(3)})`;
+    if (damageText !== this.lastDamageText) { this.damageFill.style.transform = damageText; this.lastDamageText = damageText; }
+    if (life.stage !== this.lastStage) {
+      this.lastStage = life.stage;
+      this.damageWrap.classList.toggle('is-visible', life.damage > 0);
+      this.damageWrap.classList.toggle('is-danger', life.stage >= 3);
+      this.damageWrap.classList.toggle('is-wrecked', life.stage >= 4);
+      this.wrecked.classList.toggle('is-visible', life.wrecked);
+    }
     this.eventSeq = sim.events.readFrom(this.eventSeq, this.onEvent);
     for (let i = 0; i < this.popups.length; i++) {
       const left = this.popupLeft[i] ?? 0;

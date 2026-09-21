@@ -4,7 +4,7 @@
  */
 import { CAR_IDS, CAR_PRESETS } from '../vehicle/presets';
 import type { VehicleControls } from '../controls';
-import { ECONOMY } from '../economy';
+import { DAMAGE, ECONOMY } from '../economy';
 import type { SimWorld } from '../SimWorld';
 import { AgentState } from '../traffic/Traffic';
 
@@ -38,26 +38,92 @@ export class Life {
   private lastHit = -10;
   /** Collider handle of the previous step's contact, so a hit is reported once per contact, not per step. */
   private lastHitHandle = -1;
+  /** What the strongest contact of this step was, for the damage rules. */
+  private hitKind: 'traffic' | 'wall' | 'terrain' | 'prop' | 'none' = 'none';
   private oncomingLeft = 0;
   private oncomingEvent = 0;
   private readonly proj = { x: 0, y: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };
 
-  constructor(private readonly sim: SimWorld) {
+  /** `damageEnabled` false keeps the playground a handling lab: hits are classified and reported, nothing dents or wrecks. */
+  constructor(private readonly sim: SimWorld, private readonly damageEnabled = true) {
     const n = sim.traffic?.capacity ?? 1;
     this.wasAhead = new Uint8Array(n);
     this.cool = new Float32Array(n);
   }
 
-  preStep(_controls: VehicleControls, _dt: number): void {
-    // Swap and the wreck timer arrive in later slices.
+  preStep(controls: VehicleControls, dt: number): void {
+    const st = this.state;
+    if (st.wrecked) {
+      st.wreckedFor += dt;
+      st.respawnIn = Math.max(0, st.respawnIn - dt);
+      if (controls.reset || st.respawnIn <= 0) {
+        this.respawn();
+        controls.reset = false;
+      }
+    } else if (controls.reset) {
+      // any reset is a fresh car
+      this.heal();
+    }
   }
 
   postStep(dt: number): void {
     this.hits();
+    this.damageStep();
     this.nearMisses(dt);
     this.oncomingLane(dt);
     const dodges = this.sim.peds?.dodgesThisStep ?? 0;
     if (dodges > 0) this.grant(ECONOMY.pedDodgeBoost * dodges);
+  }
+
+  /** Damage from this step's strongest contact: walls at full weight, traffic at `trafficFactor`, props and terrain never. */
+  private damageStep(): void {
+    const st = this.state;
+    if (!this.damageEnabled || st.wrecked) return;
+    const kind = this.hitKind;
+    if (kind !== 'wall' && kind !== 'traffic') return;
+    const tm = this.sim.vehicle.telemetry;
+    const over = tm.impact - DAMAGE.threshold;
+    if (over <= 0) return;
+    const delta = over * DAMAGE.perMetrePerSecond * (kind === 'traffic' ? DAMAGE.trafficFactor : 1);
+    st.damage = Math.min(1, st.damage + delta);
+    let stage = 0;
+    for (let k = 0; k < DAMAGE.stages.length; k++) if (st.damage >= (DAMAGE.stages[k] as number)) stage = k + 1;
+    if (stage === st.stage) return;
+    st.stage = stage as LifeState['stage'];
+    this.sim.events.push('damage', stage, tm.contactX, tm.contactY, tm.contactZ, -1);
+    if (stage >= 4) this.wreck();
+  }
+
+  private wreck(): void {
+    const st = this.state;
+    st.wrecked = true;
+    st.wreckedFor = 0;
+    st.respawnIn = DAMAGE.wreckRespawn;
+    this.sim.vehicle.engineCut = true;
+    const p = this.sim.vehicle.body.translation(this.proj);
+    this.sim.events.push('wrecked', 1, p.x, p.y, p.z, -1);
+  }
+
+  private heal(): void {
+    const st = this.state;
+    st.damage = 0;
+    st.stage = 0;
+    st.wrecked = false;
+    st.wreckedFor = 0;
+    st.respawnIn = -1;
+    this.sim.vehicle.engineCut = false;
+  }
+
+  /** A fresh car of the same class, rolling on the nearest road, with the boost meter kept. */
+  private respawn(): void {
+    const v = this.sim.vehicle;
+    const pose = v.resetPose;
+    v.teleport(pose.position, pose.yaw);
+    v.setVelocity(Math.sin(pose.yaw) * DAMAGE.respawnSpeed, 0, Math.cos(pose.yaw) * DAMAGE.respawnSpeed);
+    this.sim.traffic?.clearAround(pose.position.x, pose.position.z, DAMAGE.respawnClear);
+    this.heal();
+    this.sim.respawned = true;
+    this.sim.events.push('respawn', 0, pose.position.x, pose.position.y, pose.position.z, -1);
   }
 
   skipSlowMo(): void {
@@ -79,12 +145,14 @@ export class Life {
 
   private hits(): void {
     const tm = this.sim.vehicle.telemetry;
+    this.hitKind = 'none';
     if (tm.hitHandle < 0 || tm.impact <= 0) {
       this.lastHitHandle = -1;
       return;
     }
     const kind = this.classify(tm.hitHandle);
     if (kind === 'none') return;
+    this.hitKind = kind;
     this.lastHit = this.sim.time;
     const agent = kind === 'traffic' ? (this.sim.traffic?.agentForCollider(tm.hitHandle) ?? -1) : -1;
     if (agent >= 0 && this.sim.traffic) this.sim.traffic.lastPlayerContactTick[agent] = this.sim.tick;

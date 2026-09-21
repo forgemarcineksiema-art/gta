@@ -106,6 +106,7 @@ export class App {
       pause: this.input.label('pause'),
       camera: this.input.label('camera'),
       debug: this.input.label('debug'),
+      swap: this.input.label('swap'),
     });
     this.hintsUntil = performance.now() + 12000;
 
@@ -177,7 +178,7 @@ export class App {
         axes: '+Y up, +Z north, +X west; metres', mode: this.paused ? 'paused' : 'driving',
         map: sim.city ? 'city' : 'playground', seed: sim.city?.seed,
         carId: sim.carId,
-        damage: null,
+        damage: { value: sim.life.state.damage, stage: sim.life.state.stage, wrecked: sim.life.state.wrecked },
         traffic: sim.traffic ? { kinematic: sim.traffic.count(AgentState.Kinematic), physical: sim.traffic.count(AgentState.Physical), wrecked: sim.traffic.count(AgentState.Wrecked) } : null,
         peds: sim.peds ? { count: sim.peds.count(), hops: sim.peds.guaranteeHops } : null,
         billboards: null,

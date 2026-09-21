@@ -127,7 +127,7 @@ export class SimWorld {
     this.carId = opts.car ?? 'muscle';
     const tuning = opts.tuning ?? cloneTuning(CAR_PRESETS[this.carId]);
     this.vehicle = new Vehicle(this.world, this.transforms, tuning, spawn.position, spawn.yaw);
-    this.city?.sync(spawn.position.x, spawn.position.z);
+    this.city?.sync(spawn.position.x, spawn.position.z, true);
   }
 
   /** Advance the simulation by exactly one fixed step using the current `controls`. */
@@ -222,7 +222,7 @@ export class SimWorld {
     const s = this.spawns.find((sp) => sp.name === name);
     if (!s) return;
     this.vehicle.teleport(s.position, s.yaw);
-    this.city?.sync(s.position.x, s.position.z);
+    this.city?.sync(s.position.x, s.position.z, true);
     this.lapTimer.reset();
     this.respawned = true;
   }

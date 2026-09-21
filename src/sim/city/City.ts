@@ -43,6 +43,7 @@ export class City {
   unloaded = 0;
   private cx = Infinity;
   private cz = Infinity;
+  private complete = false;
   constructor(readonly world: RAPIER.World, readonly seed = 42) {
     // The one unbroken collision plane eliminates suspension seams at roads and chunk borders.
     world.createCollider(RAPIER.ColliderDesc.cuboid(CITY_HALF, 0.5, CITY_HALF)
@@ -427,32 +428,51 @@ export class City {
     }
   }
 
-  sync(x: number, z: number): void {
+  /**
+   * Keep the 3×3 neighbourhood resident. A normal step loads at most one missing
+   * chunk (nearest first), so crossing into a new row costs three steps instead of
+   * one long one; a spawn or teleport loads all of them before the next step.
+   * Removal waits until the neighbourhood is complete: load before removal.
+   */
+  sync(x: number, z: number, immediate = false): void {
     const cx = chunkCoord(x), cz = chunkCoord(z);
-    if (cx === this.cx && cz === this.cz) return;
+    if (cx === this.cx && cz === this.cz && this.complete) return;
     this.cx = cx; this.cz = cz;
-    // Load before removal: even a reset across the map has ground + solids before physics.
-    for (let iz = Math.max(-3, cz - 1); iz <= Math.min(3, cz + 1); iz++) {
-      for (let ix = Math.max(-3, cx - 1); ix <= Math.min(3, cx + 1); ix++) {
-        const key = `${ix},${iz}`;
-        if (this.active.has(key)) continue;
-        const chunk = this.generate(ix, iz);
-        const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
-        for (const st of chunk.statics) {
-          if ((st.tag !== 'building' && st.tag !== 'kerb') || st.shape.kind !== 'box') continue;
-          const p = st.position, s = st.shape;
-          this.world.createCollider(RAPIER.ColliderDesc.cuboid(s.hx, s.hy, s.hz)
-            .setTranslation(p.x, p.y, p.z).setRotation(st.rotation).setFriction(1).setRestitution(st.tag === 'building' ? 1 : 0)
-            .setCollisionGroups(st.tag === 'building' ? GROUPS_SOLID : GROUPS_TERRAIN), body);
+    let missing = 0;
+    for (let pass = 0; pass < (immediate ? 9 : 1); pass++) {
+      let best = Infinity, bx = 0, bz = 0;
+      missing = 0;
+      for (let iz = Math.max(-3, cz - 1); iz <= Math.min(3, cz + 1); iz++) {
+        for (let ix = Math.max(-3, cx - 1); ix <= Math.min(3, cx + 1); ix++) {
+          if (this.active.has(`${ix},${iz}`)) continue;
+          missing++;
+          const d = (ix - cx) ** 2 + (iz - cz) ** 2;
+          if (d < best) { best = d; bx = ix; bz = iz; }
         }
-        this.active.set(key, { body, chunk }); this.loaded++;
       }
+      if (!missing) break;
+      this.load(bx, bz); missing--;
     }
+    this.complete = missing === 0;
+    if (!this.complete) return;
     for (const [key, entry] of this.active) {
       if (Math.abs(entry.chunk.x - cx) > 2 || Math.abs(entry.chunk.z - cz) > 2) {
         this.world.removeRigidBody(entry.body); this.active.delete(key); this.unloaded++;
       }
     }
+  }
+
+  private load(ix: number, iz: number): void {
+    const chunk = this.generate(ix, iz);
+    const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+    for (const st of chunk.statics) {
+      if ((st.tag !== 'building' && st.tag !== 'kerb') || st.shape.kind !== 'box') continue;
+      const p = st.position, s = st.shape;
+      this.world.createCollider(RAPIER.ColliderDesc.cuboid(s.hx, s.hy, s.hz)
+        .setTranslation(p.x, p.y, p.z).setRotation(st.rotation).setFriction(1).setRestitution(st.tag === 'building' ? 1 : 0)
+        .setCollisionGroups(st.tag === 'building' ? GROUPS_SOLID : GROUPS_TERRAIN), body);
+    }
+    this.active.set(`${ix},${iz}`, { body, chunk }); this.loaded++;
   }
 
   /** Project onto the closest driveable lane instead of resetting to a distant junction. */

@@ -16,8 +16,13 @@ import { CITY_BOT_TUNING, TrackBot } from './trackBot';
 import { FixedStepLoop } from './loop';
 import { PerfProbe, heapMb } from './perf';
 
+/** Filled during `App.boot`; copied into the handle for `?dev` and the startup gate. */
+const bootTimings: Record<string, number> = {};
+
 export interface GameHandle {
   started: boolean;
+  /** Milliseconds since navigation start at each boot phase (perf diagnostics). */
+  bootTimings: Record<string, number>;
   paused: boolean;
   sim: SimWorld;
   platformCalls: unknown;
@@ -137,6 +142,7 @@ export class App {
 
     this.handle = {
       started: false,
+      bootTimings: { ...bootTimings, renderer: performance.now() },
       paused: false,
       sim,
       platformCalls: (platform as unknown as { calls?: unknown }).calls,
@@ -194,7 +200,9 @@ export class App {
     const platform = createPlatform();
     await platform.init();
     platform.loadingStart();
+    bootTimings['platform'] = performance.now();
     await initPhysics();
+    bootTimings['physics'] = performance.now();
     const spawn = params.get('spawn') ?? undefined;
     const carParam = params.get('car');
     const car = (CAR_IDS as string[]).includes(carParam ?? '') ? (carParam as CarId) : undefined;
@@ -202,6 +210,7 @@ export class App {
     const map = params.get('map') === 'playground' || params.get('bot') === 'track' || (spawn && !citySpawns.includes(spawn)) ? 'playground' : 'city';
     const seed = Number(params.get('seed') ?? '42');
     const sim = new SimWorld({ map, seed: Number.isFinite(seed) ? seed : 42, ...(spawn ? { spawn } : {}), ...(car ? { car } : {}) });
+    bootTimings['sim'] = performance.now();
     const app = new App(platform, sim, canvas, params);
     platform.loadingStop();
     app.start();
@@ -284,6 +293,7 @@ export class App {
     if (!this.started) {
       // the player is in control from this frame on
       this.started = true;
+      this.handle.bootTimings['firstFrame'] = performance.now();
       this.handle.started = true;
       this.platform.gameplayStart();
     }

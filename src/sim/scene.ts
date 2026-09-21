@@ -42,6 +42,8 @@ export interface StaticDesc {
   detailOnly?: boolean;
   /** Distant stand-in (e.g. a crossing as one band) drawn only in the far level. */
   farOnly?: boolean;
+  /** Ground paint fades into its underlying surface before becoming sub-pixel. */
+  paint?: { underlay: number; fadeEnd: number };
   /** Full collision envelope for a facade whose visible walls contain recesses. */
   collisionOnly?: boolean;
 }

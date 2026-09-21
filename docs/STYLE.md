@@ -11,9 +11,9 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 ## Time of day and lighting
 
 - Fixed time of day: late golden hour. No day/night cycle in v1 (a cycle costs lighting variants and makes every screenshot inconsistent).
-- One directional sun (`PALETTE.sun`, intensity ~2.2) low in the sky, from the front-left of the default spawn so the car's near side is lit. A hemisphere light with a warm sky colour and a violet ground colour fills the shadows.
-- Shadows: one 2048 shadow map following the player, ~60 m half-extent. Nothing else casts dynamic shadows on the low tier.
-- Fog: linear, `PALETTE.fog` (peach-pink), starting ~120 m, opaque at ~700 m. Fog colour and sky horizon are close so the world dissolves into the sky.
+- One directional sun (`PALETTE.sun`, intensity 1.8) low in the sky, from the front-left of the default spawn so the car's near side is lit. A neutral-cool hemisphere light (intensity 1.35) and muted violet ground fill keep facade colours readable.
+- Shadows: one PCF map, 1024 low / 2048 high, fixed 140 m half-extent and 700 m depth. The target snaps to the light-space texel grid; city receivers fade the map edge over its outer band. Resident chunks cast into the light frustum; no hard 300 m caster cutoff or speed-dependent resizing. Shadow intensity is 0.72.
+- Fog: linear, `PALETTE.fog` (muted peach), 100–340 m low / 180–580 m high. Fog colour and sky horizon are close so the world dissolves into the sky.
 - Sky: an inverted vertex-coloured sphere, `skyHorizon` → `skyTop` with a power curve, no texture.
 
 ## Geometry and materials
@@ -30,28 +30,48 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 | kerb | `#c9c3b3` | car orange | `#ff9f1c` |
 | concrete | `#9a938a` | car magenta | `#f45bff` |
 | sand | `#d9b57a` | car white | `#f7f3ea` |
-| grass | `#7fae5a` | car black | `#1c1b22` |
+| grass | `#879b74` | car black | `#1c1b22` |
 | water | `#3fa7c9` | tyre / rim | `#15151a` / `#c4c4cd` |
 | glass | `#9fd8ff` | police | `#f7f3ea` + `#1d4ed8` |
-| ramp | `#e5533d` | sky top | `#2b1b5a` |
-| cone | `#ff8a2b` | sky horizon | `#ff8a5b` |
-| barrier | `#f7f3ea` | sun / fog | `#ffd27a` / `#e8a07a` |
+| ramp | `#e5533d` | sky top | `#706c9b` |
+| cone | `#ff8a2b` | sky horizon | `#e5b6a5` |
+| barrier | `#f7f3ea` | sun / fog | `#ffe3ba` / `#d9b8ac` |
 
 - Blacks and greys for trim, rubber and metal, darkest to lightest: ink `#0c0c10`, rubber `#15151a`, charcoal `#25252c`, graphite `#35353e`, slate `#4a4a55`, steel `#6d6d78`, silver `#9d9da8`, light grey `#c4c4cd`, chrome `#e4e4ea`. A car uses at least three of them (pillars/seams in ink or charcoal, rims in graphite with light-grey spokes, badges and exhaust tips in chrome) so it does not read as one flat block of paint.
 - Districts (M2) each get one dominant building hue family from this palette plus one accent, so they read as different places from the minimap and from the road.
 
-## City blockout (M2)
+## Street architecture (M2.1)
 
-| District | Massing | Building / accent | Landmark |
-|---|---|---|---|
-| Crown Heights | 18–58 m offices, inset roof stacks | lavender `#b497d6` / gold `#f5cd75` | Crown Tower |
-| Sunset Works | 9–14 m warehouses, roof vents and loading bays | terracotta `#d98768` / teal `#5daeb5` | Waterworks |
-| Palm Gardens | 5–11 m houses, frequent planted lots | sand `#e7bd87` / sage `#8bb583` | Glasshouse |
-| Coral Quay | 10–24 m apartments, horizontal window bands | pink `#eaa7ab` / aqua `#67c9ce` | Coral Hotel |
+| District | Street frontage and scale | Orientation cue |
+|---|---|---|
+| Crown Heights | 3–5 floors of shops/offices; taller rear offices concentrate around the tower | Lavender/stone, gold canopies, stepped Crown Tower |
+| Sunset Works | 5.4 m warehouse walls, loading bays, clerestories, service yards and pitched/flat roofs | Brick/grey, teal loading canopies, elevated Waterworks tank |
+| Palm Gardens | Two floors, 2.9 m ground floor, pitched or terrace roofs, 6 m front gardens | Chalk/sage/peach, hedges, Glasshouse plaza |
+| Coral Quay | 3–5 storey apartments with shopfronts and projecting balconies | Muted coral/mint, aqua balcony rails, palms and Coral Hotel |
 
-District definitions and massing live in `src/sim/city/City.ts`. This is the first
-city blockout; a regular grid is deliberate for the M2 streaming and driving gate.
-Low fog is 100–340 m, high 180–580 m, both using the existing sunset palette.
+- Upper floors are 3.1 m; public ground floors 3.8 m; doors 2.3 m high. Window
+  bays, entrance canopies and plinths establish scale from the driving camera.
+- Sidewalks are 4.5 m wide, with kerb edges, 6 m paving joints and connected entrance
+  paths. Block interiors read as gardens, courtyards or industrial yards. Parking
+  shoulders break up the wide arcade road surface; the M2 lane graph stays intact.
+- Reserve landmark parcels before filling lots. Paths connect their plazas to
+  public sidewalks. Normal roofs stay below the district's principal landmark.
+- Neutral facade bodies use `CITY_COLORS` in `src/sim/palette.ts`; district accents
+  belong on canopies, rails and trim. Avoid large yellow/purple colour slabs against
+  the sunset. Cars remain the most saturated moving objects.
+- `sim/city/architecture.ts` generates facades; `City.ts` chooses parcels and heights.
+  Surface panels use two triangles; roof prisms use eight. All remain in the same
+  merged chunk geometry and shared material, with no asset textures.
+- Openings are voids in the outer shell (piers, spandrels and bands), glazing sits
+  behind them, loggias have a slab, side returns and a parapet that starts on the
+  slab. Full-span bands on the corner-owning walls carry end caps so corners close.
+- Sills, mullions, shutters and balcony returns are `trim`: only their visible
+  faces, no shadow pass, and omitted beyond 180 m where they are sub-pixel.
+- Each chunk renders as five meshes (base plus four quadrants) so the camera and
+  shadow frusta cull streets behind the player; detail is spatial and tier
+  independent (`DETAIL_NEAR` / `DETAIL_FAR` in `render/CityView.ts`).
+- This is a street-quality pass over the regular M2 grid. Bespoke street plans,
+  waterfront composition, traffic and populated shop interiors are later work.
 
 ## UI
 
@@ -64,7 +84,7 @@ Low fog is 100–340 m, high 180–580 m, both using the existing sunset palette
 
 ## Camera and motion
 
-- Chase camera behind and above, FOV 60 → up to ~92 with speed and boost, pulls back and drops with speed, follows the velocity direction so drifts show the car sideways. Tiny shake at high speed. See `src/render/ChaseCamera.ts`.
+- Chase camera behind and above, FOV 60 → up to 80 with speed and boost, pulls back and drops with speed, follows the velocity direction so drifts show the car sideways. Very small shake at high speed. Steering input itself never swivels the view; actual yaw contributes only 0.04 s of heading lead and at most 0.65 m of lateral look offset. Heading follow is capped at 110°/s; speed/boost FOV changes ease at 2.5/s. See `src/render/ChaseCamera.ts`.
 - Sparks: only where the body scrapes a wall, at the contact point on the car's flank, thrown backwards along the wall. Chunky bright points with short tails, hot white-yellow to orange, additive, dead within half a second. Never in front of the car.
 - Speed lines: a screen-space pass of short streaks rushing outward from the frame's periphery above ~100 km/h and under boost (cyan lean). The centre of the frame, where the road is, is masked out; nothing is ever drawn in front of the car. This is how Burnout/NFS/Mario Kart do it: FOV, camera, peripheral blur or lines, sound; world particles only behind or beside the car.
 

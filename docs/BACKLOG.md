@@ -23,6 +23,13 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 ## Rendering
 
+- Startup under 20 Mbit + CPU ×4 rose from 2.2 s (M2 blockout) to 3.0–4.6 s with
+  the M2.1 facades: the initial synchronous load builds ~25 chunks × 5 parts. If
+  the 6 s gate ever gets tight, populate only the near ring synchronously and let
+  fogged tiles stream over the first frames, or generate parts in a worker. (M2.1)
+- Trees are 4 × 8-segment cylinders (128 triangles) and are a large share of the
+  remaining shadow-pass cost; billboards or 6-segment crowns would halve it. (M2.1)
+
 
 ## UI
 

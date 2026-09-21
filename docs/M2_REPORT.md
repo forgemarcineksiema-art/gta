@@ -97,3 +97,75 @@ flyovers, interiors or traffic. The perimeter loop has at-grade junctions. Loadi
 after a dev teleport is synchronous; normal driving preloads ahead. M3 adds traffic
 LOD, dodging pedestrians, damage, car-swap, takedowns, near misses and collectibles.
 Stop at this gate for Marcin's driving/readability review before M3.
+
+## M2.1 — street architecture, shadows and camera (2026-09-21)
+
+Playtest feedback on M2: building scale and variety, ground floors, sidewalks and
+recognisable places were not considered; some facades clashed with the sky; shadows
+popped on buildings; the camera reacted too strongly to steering. This pass keeps
+the M2 road graph, physics and vehicle tuning unchanged.
+
+### Built
+
+- `sim/city/architecture.ts`: metre-based facades per district. Openings are real
+  voids in the outer shell (piers, spandrels, bands) with glazing behind them,
+  reveals and sills; recessed loggias with slab, side returns and a parapet that
+  starts on the slab; shopfronts with a centred entrance and canopy; warehouse
+  loading bays with recessed shutters and clerestories; houses with shutters, front
+  gardens, hedges and pitched roofs; ribbon-window offices; stepped parapets.
+  Side and rear elevations are blank with a stairwell stack, not clones of the front.
+- Streets: 4.5 m sidewalks with kerb edge and paving joints, entrance paths, parking
+  shoulders, street trees and palms, block interiors as gardens, yards or courtyards,
+  reserved landmark plazas. Muted facade bodies (`CITY_COLORS`) and a cooler, lower
+  contrast sky/light so district accents sit on canopies, rails and trim.
+- Shadows: fixed 140 m half-extent map (1024 low / 2048 high), target snapped to the
+  light-space texel grid, edge fade in the receiver shader, all resident parts cast
+  inside the light frustum. No speed-dependent resizing and no hard caster cutoff.
+- Camera: no steering feed-forward; 0.04 s heading lead, 0.65 m maximum lateral
+  look, 110°/s heading rate cap, FOV 60–80 easing at 2.5/s, smaller shake. Four
+  comfort tests replace the M1 look-ahead pins.
+- Rendering: five meshes per chunk (base plus four quadrants) with per-part
+  distance culling and shadow-caster range, static matrices, a shadow-caster prefix
+  per buffer, `trim` members (sills, mullions, shutters, balcony returns) with only
+  their visible faces and no depth pass, and spatial facade detail (180 / 220 m).
+- Fixed on review: an open corner in every building (full-span bands on the
+  corner-owning walls had no end caps, so the underside of the neighbouring band
+  showed as a dark wedge); heap growth from render parts holding chunk descriptors.
+
+### Validation (same machine: MX330 through ANGLE D3D11, headless Chromium)
+
+| Check | Result |
+|---|---|
+| `npm run verify` | green, 88 tests; build 3.36 MB / 5 files; smoke startup 1.19 s |
+| `npm run city` | 5/5; 168/168 lanes, zero resets, no console errors on both tiers |
+| Accelerated tour, low | 77 calls / 109k triangles max (budget 150 / 250k) |
+| Accelerated tour, high | 105 calls / 149k triangles max (budget 300 / 600k) |
+| Heap during the tour | 54 MB low / 87 MB high (budget 250 MB) |
+| Startup at 20 Mbit, 40 ms latency, CPU ×4 | 3.0–4.6 s over six runs (target <6 s; M2 was 2.2 s) |
+| `npm run screens` | 10/10 HUD and pause viewports |
+| Close-up review | front, corner and side of one building per district, before/after |
+
+Real-time cost, 30 s bot runs at CPU ×4 on the locked low tier, alternating the
+M2 build and this build six times (fps mean and frame p95):
+
+| Pair | M2 build | M2.1 build |
+|---|---|---|
+| 1 | 51.9 fps / 33.4 ms | 56.4 fps / 33.3 ms |
+| 2 | 58.1 fps / 16.8 ms | 50.2 fps / 33.4 ms |
+| 3 | 55.4 fps / 33.3 ms | 53.7 fps / 33.3 ms |
+
+Mean 55.1 versus 53.4 fps; both builds spend most p95 values on the 33 ms vsync
+step, and the run-to-run spread (52–58 fps on identical code) is larger than the
+difference. A 20 s CPU profile at CPU ×4 before the per-part culling showed main
+thread idle falling from 21.6 % to 13.5 %, all of it in Three's per-object work
+(matrix update, frustum test, buffer binding), which the culling and static
+matrices then reduced (draw calls 102 → 77 on low). The 60 s `npm run perf` gate
+passes (p95 ≤ 33.4 ms, step p95 3–4 ms). The M2 frame-pacing caveat still applies.
+
+### Known issues
+
+- Facades repeat within a district by design (three variants per type); a visual
+  pass at speed still reads as generated, not authored. Roof silhouettes are simple.
+- The base plane and island edge are untouched; the waterfront has no composition.
+- Trees are the largest remaining shadow-pass cost (see `docs/BACKLOG.md`).
+- Startup time margin shrank; see `docs/BACKLOG.md` for the deferral plan.

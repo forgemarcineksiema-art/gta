@@ -34,11 +34,26 @@ nearby lane before the physics step. Buildings use `GROUPS_SOLID` and restitutio
 1; pavements use `GROUPS_TERRAIN`. All streets share one permanent ground collider.
 
 `render/CityView.ts` generates merged typed-array geometry directly (the city's
-descriptors are axis-aligned boxes and vertical cylinders). It shares one material,
-frustum-culls chunks, preloads outside fog and retains an extra chunk-width before
-disposing. One chunk is uploaded per normal frame; initial and teleported views
-populate synchronously. Physics and rendering residency are independent and
+descriptors are axis-aligned boxes, gable prisms, vertical cylinders and single box
+faces). It shares one material, preloads outside fog and retains an extra
+chunk-width before disposing. Each chunk becomes five meshes: statics that straddle
+a chunk centre line (ground, road cross) form a base part, everything else goes to
+its quadrant, so camera and shadow frustum culling discard the streets behind the
+player. Shadow casters sit in a prefix of each buffer (`onBeforeShadow` draw range);
+single faces, wall members and `trim` never enter the depth pass. Facade detail is
+spatial: parts inside `DETAIL_NEAR` (180 m) carry frames, sills and full wall
+members, parts beyond it draw only outer wall faces, with hysteresis to
+`DETAIL_FAR`. One chunk (or one part rebuild) is uploaded per normal frame; initial
+and teleported views populate synchronously. Parts hold no chunk descriptors; a
+rebuild regenerates the chunk. Physics and rendering residency are independent and
 observable in `window.__game` and `render_game_to_text()`.
+
+`sim/city/architecture.ts` builds facades as render descriptors only: one
+collision-only envelope per building, a core, and per wall a row of piers and bands
+around actual openings with glazing behind. Members declare their exposed faces
+(`faces`), their far-distance face (`farFace`) and whether they are `detailOnly`.
+Shadows use a fixed 140 m half-extent map whose target snaps to the light-space
+texel grid (`render/shadows.ts`), and receivers fade the map edge.
 
 `Renderer` starts low and samples real frame intervals after warmup, then adapts
 fog/draw distance, shadow resolution and DPR with hysteresis. Locked quality URLs
@@ -55,6 +70,14 @@ Decision 12: keep a continuous ground collider instead of creating road collider
 per chunk, so streaming and junctions cannot introduce suspension seams. Decision
 13: keep the road topology authored and deterministic; seed variation affects lots
 and massing, preserving route readability and a stable M3 traffic foundation.
+Decision 14 (M2.1): quarter chunk meshes and spatial facade detail instead of
+per-tier facade variants. The low tier tour peaked at 291k triangles with one mesh
+per chunk and full detail everywhere; quadrants plus the 180 m detail radius took
+it to 133k (high 175k) with no visible change from the driving camera, and both
+tiers keep identical geometry rules. Decision 15 (M2.1): the chase camera follows
+actual motion only. Steering feed-forward, the 0.22 s heading lead and the large
+lateral look offset made quick corrections swing the road under the player;
+comfort tests in `tests/render/camera.test.ts` pin the new bounds.
 
 ## Data flow per frame (detail)
 

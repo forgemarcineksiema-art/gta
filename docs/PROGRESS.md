@@ -2,6 +2,71 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-21 — Session 9: M2.1 street architecture, shadows, camera
+
+Marcin's playtest feedback on M2: buildings need considered scale and variety,
+ground floors, sidewalks and recognisable places; some facades clash with the sky;
+shadows appear oddly on buildings; the camera reacts too strongly to steering.
+A second round rejected the first facade pass (floating balcony rails, flat window
+rectangles pasted everywhere). The Codex session that started this work ran out of
+usage mid-way; this session verified its state and finished the pass.
+
+### Done
+
+- **Facades** (`sim/city/architecture.ts`): openings as voids in a shell of piers
+  and bands, glazing behind reveals, loggias with slab, returns and parapet on the
+  slab, shopfronts, loading bays, houses with shutters and gardens, ribbon offices,
+  distinct side/rear elevations. One collision-only envelope per building.
+- **Streets**: 4.5 m sidewalks, paving joints, entrance paths, parking shoulders,
+  trees, block interiors, reserved landmark plazas, muted facade bodies and sky.
+- **Shadows** (`render/shadows.ts`): fixed 140 m map, texel-snapped target, edge
+  fade, all resident casters. **Camera**: motion-only follow, bounded lead and
+  lateral look, 110°/s cap, FOV 60–80; four comfort tests replace M1 look-ahead pins.
+- **Budget recovery**: the facade pass had pushed the low tour to 291k triangles
+  (limit 250k). Quartered chunk meshes with per-part distance/shadow culling and
+  static matrices, spatial detail radius (180 / 220 m), `trim` members with only
+  visible faces and no depth pass, balcony members with exposed faces only. Low tour
+  now 77 calls / 109k triangles, high 105 / 149k.
+- **Fixes found on review**: open building corners (missing end caps on full-span
+  X bands showed the underside of the adjacent band as a dark wedge, located by a
+  pixel raycast against the merged buffer); render parts no longer retain chunk
+  descriptors; two docs written in cp1252 by the previous session restored to UTF-8.
+- Gate report extended: `docs/M2_REPORT.md` § M2.1.
+
+### Evidence and boundaries
+
+- `verify` green, 88 tests, 3.36 MB. `city` 5/5 on both tiers, `screens` 10/10,
+  `perf` passes its budgets.
+- Six alternating 30 s A/B runs against the M2 build at CPU ×4, low tier: 55.1 vs
+  53.4 fps mean; identical-code spread is 52–58 fps, so the difference is within
+  noise. A CPU profile attributed the extra main-thread time to Three per-object
+  overhead, which the per-part culling then reduced. Nothing here proves a sustained
+  60 fps on the low tier; the M2 pacing caveat stands.
+- Startup at 20 Mbit + CPU ×4: 3.0–4.6 s over six runs (M2: 2.2 s). Under the 6 s
+  gate; deferral plan in `docs/BACKLOG.md`.
+- Reviewed from the driving camera: six named views, a steering pulse, four
+  landmarks, and front/corner/side close-ups of one building per district.
+
+### Decided and why
+
+- Quadrant parts and a spatial detail radius rather than per-tier facade variants:
+  both tiers keep the same geometry rules and the low tier lost 55 % of its
+  triangles with no visible change (Decision 14 in `docs/ARCHITECTURE.md`).
+- The leak guard in `e2e/city.spec.ts` now scales with resident meshes (five
+  geometries per chunk) instead of the fixed 80; it still fails on any growth with
+  `loaded`.
+- Codex's root `progress.md` stays as a short mirror; this file remains the log.
+
+### Next
+
+- Marcin's playtest of M2.1 on the low-tier laptop (`npm run perf:headed` there
+  would give the first real low-tier numbers). Then M3 traffic on this foundation.
+
+### Open problems
+
+- Facade variety at speed, roof silhouettes, waterfront composition, trees' shadow
+  cost, startup margin: all listed in `docs/BACKLOG.md` or the report's known issues.
+
 ## 2026-09-21 — Session 8: M2 city, ready for the playtest gate
 
 Marcin's instruction: begin M2. Baseline `verify` passed: 81 tests, 3.34 MB,

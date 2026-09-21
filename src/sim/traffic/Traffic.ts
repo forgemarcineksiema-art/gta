@@ -45,6 +45,18 @@ export interface PlayerProbe {
 
 const KINDS: CarId[] = ['muscle', 'compact', 'heavy'];
 const KIND_INDEX: Record<CarId, number> = { muscle: 0, compact: 1, heavy: 2 };
+/** The player's paint per class (docs/STYLE.md): what an abandoned player car keeps. */
+export const PLAYER_PAINT: Record<CarId, number> = { muscle: PALETTE.carRed, compact: PALETTE.carBlue, heavy: PALETTE.carOrange };
+
+export interface SwapHandover {
+  x: number;
+  y: number;
+  z: number;
+  yaw: number;
+  vx: number;
+  vz: number;
+  kind: CarId;
+}
 const PAINTS = [
   PALETTE.carLime, PALETTE.carBlue, PALETTE.carOrange, PALETTE.carMagenta,
   PALETTE.carWhite, PALETTE.carBlack, CITY_COLORS.mint, CITY_COLORS.peach,
@@ -235,6 +247,10 @@ export class Traffic {
     return n;
   }
 
+  kindOf(agent: number): CarId {
+    return KINDS[this.kind[agent] as number] as CarId;
+  }
+
   halfWidthOf(agent: number): number {
     return this.halfW[this.kind[agent] as number] as number;
   }
@@ -296,6 +312,82 @@ export class Traffic {
     if (i < 0) return -1;
     this.place(i, lane, s, KIND_INDEX[kind], offset, state, PAINTS[0] as number);
     return i;
+  }
+
+  /** Test hook: a stopped car (wreck or abandoned) at a point, off the lane graph. */
+  spawnAtPoint(x: number, z: number, yaw: number, kind: CarId, state: AgentState.Wrecked | AgentState.Abandoned): number {
+    const i = this.findFree();
+    if (i < 0) return -1;
+    this.state[i] = state;
+    this.kind[i] = KIND_INDEX[kind];
+    this.paint[i] = PAINTS[0] as number;
+    this.lane[i] = -1;
+    this.next[i] = -1;
+    this.s[i] = 0;
+    this.laneOffset[i] = 0;
+    this.speed[i] = 0;
+    this.x[i] = x;
+    this.z[i] = z;
+    this.yaw[i] = yaw;
+    this.wait[i] = 0;
+    this.forced[i] = 0;
+    this.wobble[i] = 0;
+    this.turn[i] = 0;
+    this.honkCooldown[i] = 0;
+    this.disturbedFor[i] = 0;
+    this.wreckedFor[i] = 0;
+    this.lastPlayerContactTick[i] = -100000;
+    this.paintSerial++;
+    const q = M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, yaw);
+    this.transforms.writeBoth(this.slot[i] as number, x, 0.03, z, q.x, q.y, q.z, q.w);
+    return i;
+  }
+
+  /**
+   * Car-swap. The agent's car goes to the player (`out` receives its pose,
+   * velocity and class); the agent's record becomes the player's old car,
+   * standing where the player was: abandoned, or a wreck if the player's car
+   * was one. It keeps no lane and is lent a body next step like any obstacle.
+   */
+  takeOver(agent: number, oldKind: CarId, oldPaint: number, oldPose: { x: number; y: number; z: number; yaw: number }, oldWrecked: boolean, out: SwapHandover): void {
+    const yaw = this.yaw[agent] as number;
+    out.x = this.x[agent] as number;
+    out.z = this.z[agent] as number;
+    out.y = 0.03;
+    out.yaw = yaw;
+    out.kind = this.kindOf(agent);
+    const slot = this.agentBody[agent] as number;
+    if (slot >= 0) {
+      (this.bodies[slot] as RAPIER.RigidBody).linvel(this.lin);
+      out.vx = this.lin.x;
+      out.vz = this.lin.z;
+      this.releaseBody(agent);
+    } else {
+      const speed = this.speed[agent] as number;
+      out.vx = Math.sin(yaw) * speed;
+      out.vz = Math.cos(yaw) * speed;
+    }
+    this.releaseHolds(agent);
+    this.state[agent] = oldWrecked ? AgentState.Wrecked : AgentState.Abandoned;
+    this.kind[agent] = KIND_INDEX[oldKind];
+    this.paint[agent] = oldPaint;
+    this.lane[agent] = -1;
+    this.next[agent] = -1;
+    this.s[agent] = 0;
+    this.laneOffset[agent] = 0;
+    this.speed[agent] = 0;
+    this.x[agent] = oldPose.x;
+    this.z[agent] = oldPose.z;
+    this.yaw[agent] = oldPose.yaw;
+    this.wait[agent] = 0;
+    this.forced[agent] = 0;
+    this.wobble[agent] = 0;
+    this.turn[agent] = 0;
+    this.wreckedFor[agent] = 0;
+    this.lastPlayerContactTick[agent] = -100000;
+    this.paintSerial++;
+    const q = M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, oldPose.yaw);
+    this.transforms.writeBoth(this.slot[agent] as number, oldPose.x, 0.03, oldPose.z, q.x, q.y, q.z, q.w);
   }
 
   clearAround(x: number, z: number, radius: number): void {

@@ -103,3 +103,73 @@ describe('chase camera comfort', () => {
     expect(Math.abs(previous * 180 / Math.PI)).toBeLessThan(0.5);
   });
 });
+
+/** Car-swap whip and takedown focus: fast but never a cut, and always released. */
+describe('chase camera whip and focus', () => {
+  const HZ = 60;
+  const dt = 1 / HZ;
+  function rig() {
+    const cam = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 1000);
+    const chase = new ChaseCamera(cam);
+    const car = new THREE.Object3D();
+    const vel = new THREE.Vector3();
+    const drive = (yaw: number, seconds: number, first = false) => {
+      for (let i = 0; i < seconds * HZ; i++) {
+        car.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+        vel.set(Math.sin(yaw) * 20, 0, Math.cos(yaw) * 20);
+        car.position.addScaledVector(vel, dt);
+        chase.update(car, vel, telemetry({ vx: vel.x, vz: vel.z }), dt, first && i === 0);
+      }
+    };
+    const behind = (yaw: number): { along: number; side: number } => {
+      const fx = Math.sin(yaw), fz = Math.cos(yaw);
+      const dx = cam.position.x - car.position.x, dz = cam.position.z - car.position.z;
+      return { along: dx * fx + dz * fz, side: dx * -fz + dz * fx };
+    };
+    return { cam, chase, car, vel, drive, behind };
+  }
+
+  test('a swap whips the view behind a car heading 90 degrees away within half a second, without a cut', () => {
+    const r = rig();
+    r.drive(0, 2, true);
+    // the new car: 6 m to the side, heading +x
+    const yaw = Math.PI / 2;
+    r.car.position.x -= 6;
+    r.chase.whip(0.35);
+    let maxDist = 0;
+    for (let i = 0; i < 0.5 * HZ; i++) {
+      r.drive(yaw, dt);
+      maxDist = Math.max(maxDist, r.cam.position.distanceTo(r.car.position));
+    }
+    const b = r.behind(yaw);
+    expect(b.along).toBeLessThan(-3);                 // behind the car
+    expect(Math.abs(b.side)).toBeLessThan(2.5);        // and on its axis
+    expect(maxDist).toBeLessThan(25);                  // it swung round, it did not fly off
+    // the same turn without a whip is still far from behind after half a second (the whip is what did it)
+    const s = rig();
+    s.drive(0, 2, true);
+    s.car.position.x -= 6;
+    for (let i = 0; i < 0.5 * HZ; i++) s.drive(yaw, dt);
+    expect(Math.abs(s.behind(yaw).side)).toBeGreaterThan(2.5);
+  });
+
+  test('a focus looks at the target within 0.3 s and returns within 0.6 s of release', () => {
+    const r = rig();
+    r.drive(0, 2, true);
+    const target = new THREE.Vector3(r.car.position.x + 20, 0.8, r.car.position.z + 25);
+    const angleTo = (): number => {
+      const dir = new THREE.Vector3();
+      r.cam.getWorldDirection(dir);
+      const want = target.clone().sub(r.cam.position).normalize();
+      return Math.acos(Math.max(-1, Math.min(1, dir.dot(want)))) * 180 / Math.PI;
+    };
+    r.chase.focus(target.x, target.y, target.z, 2);
+    for (let i = 0; i < 0.3 * HZ; i++) { r.drive(0, dt); target.z += 20 * dt; target.x += 20 * dt; r.chase.focus(target.x, target.y, target.z, 2); }
+    expect(angleTo()).toBeLessThan(20);
+    r.chase.release();
+    for (let i = 0; i < 0.6 * HZ; i++) r.drive(0, dt);
+    const dir = new THREE.Vector3();
+    r.cam.getWorldDirection(dir);
+    expect(Math.abs(Math.atan2(dir.x, dir.z)) * 180 / Math.PI).toBeLessThan(5);
+  });
+});

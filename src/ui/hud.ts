@@ -62,6 +62,9 @@ export class Hud {
   private readonly damageFill: HTMLElement;
   private readonly wrecked: HTMLElement;
   private readonly wreckedSub: HTMLElement;
+  private readonly swap: HTMLElement;
+  private readonly swapKeycap: HTMLElement;
+  private swapVisible = false;
   private lastDamageText = '';
   private lastStage = -1;
   private swapKey = 'E';
@@ -106,6 +109,10 @@ export class Hud {
     this.wreckedSub = el('div', 'hud__wrecked-sub', '');
     this.wrecked.append(el('div', 'hud__wrecked-title', 'WRECKED'), this.wreckedSub);
     this.root.appendChild(this.wrecked);
+    this.swap = el('div', 'hud__swap');
+    this.swapKeycap = el('kbd', 'key', 'E');
+    this.swap.append(this.swapKeycap, el('span', 'hud__swap-label', 'SWAP'));
+    this.root.appendChild(this.swap);
     const stack = el('div', 'hud__popups');
     this.popups = [0, 1, 2, 3].map(() => {
       const popup = el('div', 'hud__popup');
@@ -172,6 +179,7 @@ export class Hud {
     if (sub) sub.textContent = `press ${k.pause} to continue`;
     this.swapKey = k.swap;
     this.resetKey = k.reset;
+    this.swapKeycap.textContent = this.swapKey;
     this.wreckedSub.textContent = `${this.swapKey} take a car  ·  ${this.resetKey} respawn`;
   }
 
@@ -200,7 +208,8 @@ export class Hud {
     const text = kind === 'nearMiss' ? 'NEAR MISS'
       : kind === 'nearMissOncoming' ? 'ONCOMING!'
         : kind === 'nearMissPed' ? 'DODGED'
-          : '';
+          : kind === 'swap' ? 'FRESH WHEELS'
+            : '';
     if (!text) return;
     const i = this.popupCursor % this.popups.length;
     this.popupCursor++;
@@ -247,6 +256,11 @@ export class Hud {
       this.damageWrap.classList.toggle('is-danger', life.stage >= 3);
       this.damageWrap.classList.toggle('is-wrecked', life.stage >= 4);
       this.wrecked.classList.toggle('is-visible', life.wrecked);
+    }
+    const swapVisible = life.swapCandidate >= 0;
+    if (swapVisible !== this.swapVisible) {
+      this.swapVisible = swapVisible;
+      this.swap.classList.toggle('is-visible', swapVisible);
     }
     this.eventSeq = sim.events.readFrom(this.eventSeq, this.onEvent);
     for (let i = 0; i < this.popups.length; i++) {

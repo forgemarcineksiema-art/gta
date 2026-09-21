@@ -4,7 +4,7 @@
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { PALETTE, type DynamicDesc, type GhostPose, type ShapeDesc, type SimWorld, type StaticDesc } from '../sim';
+import { CAR_IDS, CAR_PRESETS, PALETTE, SWAP, type CarId, type DynamicDesc, type GhostPose, type ShapeDesc, type SimWorld, type StaticDesc } from '../sim';
 import { ChaseCamera } from './ChaseCamera';
 import { CAR_PROFILES } from './carProfiles';
 import { Sparks } from './Sparks';
@@ -56,7 +56,10 @@ export class Renderer {
   readonly stats: RenderStats = { drawCalls: 0, triangles: 0, dpr: 1, width: 0, height: 0, glRenderer: '' };
   private readonly sim: SimWorld;
   private readonly dynamics: DynamicView[] = [];
-  private readonly car: CarMesh;
+  /** One mesh per class; `car` is the visible one and follows `sim.carId` (car-swap). */
+  private readonly cars: Record<CarId, CarMesh>;
+  private car: CarMesh;
+  private carId: CarId;
   private readonly ghost: CarMesh;
   private readonly ghostPose: GhostPose = { x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1 };
   private readonly sun: THREE.DirectionalLight;
@@ -137,9 +140,19 @@ export class Renderer {
     }
     for (const d of sim.dynamics) this.addDynamic(d);
     const profile = CAR_PROFILES[sim.carId];
-    this.car = buildCarMesh(sim.vehicle.tuning, profile);
-    this.scene.add(this.car.root);
-    for (const w of this.car.wheels) this.scene.add(w);
+    const cars: Partial<Record<CarId, CarMesh>> = {};
+    for (const id of CAR_IDS) {
+      const mesh = buildCarMesh(id === sim.carId ? sim.vehicle.tuning : CAR_PRESETS[id], CAR_PROFILES[id]);
+      this.scene.add(mesh.root);
+      for (const w of mesh.wheels) this.scene.add(w);
+      const visible = id === sim.carId;
+      mesh.root.visible = visible;
+      for (const w of mesh.wheels) w.visible = visible;
+      cars[id] = mesh;
+    }
+    this.cars = cars as Record<CarId, CarMesh>;
+    this.carId = sim.carId;
+    this.car = this.cars[sim.carId];
     // the best-lap ghost: the same car, translucent, no shadow, wheels carried by the body
     this.ghost = buildCarMesh(sim.vehicle.tuning, profile, PALETTE.carBlue);
     this.ghost.root.traverse((o) => {
@@ -265,7 +278,23 @@ export class Renderer {
     }
   }
 
+  /** Car-swap: show the new class's mesh where the old one was and whip the camera onto it. */
+  private syncCar(): void {
+    const id = this.sim.carId;
+    if (id === this.carId) return;
+    const old = this.car;
+    old.root.visible = false;
+    for (const w of old.wheels) w.visible = false;
+    this.car = this.cars[id];
+    this.car.root.visible = true;
+    for (const w of this.car.wheels) w.visible = true;
+    this.car.setDamage(0);
+    this.carId = id;
+    this.chase.whip(SWAP.whipSeconds);
+  }
+
   render(alpha: number, dt: number): void {
+    this.syncCar();
     this.applyTransforms(alpha);
     this.trafficView?.update(this.sim.transforms, alpha);
     this.pedView?.update(this.sim.transforms, alpha);

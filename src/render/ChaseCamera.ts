@@ -123,6 +123,11 @@ export class ChaseCamera {
   tuning: CameraTuning = { ...DEFAULT_CAMERA };
   mode: CameraMode = 'chase';
   private readonly camera: THREE.PerspectiveCamera;
+  private whipLeft = 0;
+  private fovPunch = 0;
+  private focusLeft = 0;
+  private focusAmount = 0;
+  private readonly focusPoint = new THREE.Vector3();
   private readonly pos = new THREE.Vector3();
   private readonly target = new THREE.Vector3();
   private readonly look = new THREE.Vector3();
@@ -154,6 +159,26 @@ export class ChaseCamera {
 
   toggleMode(): void {
     this.mode = this.mode === 'chase' ? 'far' : 'chase';
+  }
+
+  /** Car-swap: for `seconds` the view swings to the new car at up to 720°/s and follows twice as fast, with a FOV punch. No cut. */
+  whip(seconds: number): void {
+    this.whipLeft = seconds;
+    this.fovPunch = 10;
+  }
+
+  /** Takedown camera: keep following the player but look at a point for `seconds`. Any later `release()` ends it early. */
+  focus(x: number, y: number, z: number, seconds: number): void {
+    this.focusPoint.set(x, y, z);
+    this.focusLeft = seconds;
+  }
+
+  release(): void {
+    this.focusLeft = 0;
+  }
+
+  get focusing(): boolean {
+    return this.focusLeft > 0;
   }
 
   update(car: THREE.Object3D, carVel: THREE.Vector3, tm: VehicleTelemetry, dt: number, snap: boolean): void {
@@ -210,9 +235,11 @@ export class ChaseCamera {
       this.stillTime = 0;
       this.initialised = true;
     } else {
-      const rate = 1 - Math.exp(-dt * (tm.drifting ? t.headingRateDrift : t.headingRate));
+      const whipping = this.whipLeft > 0;
+      if (whipping) this.whipLeft = Math.max(0, this.whipLeft - dt);
+      const rate = 1 - Math.exp(-dt * (whipping ? 20 : tm.drifting ? t.headingRateDrift : t.headingRate));
       let delta = wrapAngle(yawTarget - this.heading) * rate;
-      const cap = t.maxYawRateDeg * DEG * dt;
+      const cap = (whipping ? 720 : t.maxYawRateDeg) * DEG * dt;
       delta = Math.max(-cap, Math.min(cap, delta));
       this.heading = wrapAngle(this.heading + delta);
     }
@@ -232,7 +259,7 @@ export class ChaseCamera {
     if (snap || !this.initialised) {
       this.pos.copy(this.target);
     } else {
-      const k = 1 - Math.exp(-dt * t.followRate);
+      const k = 1 - Math.exp(-dt * t.followRate * (this.whipLeft > 0 ? 2 : 1));
       this.pos.lerp(this.target, k);
       this.pos.y = Math.max(this.pos.y, car.position.y + 0.6);
     }
@@ -254,11 +281,17 @@ export class ChaseCamera {
       car.position.y + t.lookHeight,
       car.position.z + this.dir.z * ahead - this.dir.x * this.lookSide,
     );
+    // takedown focus: the look point blends toward the target and back (8/s), the view narrows a little
+    if (this.focusLeft > 0) this.focusLeft = Math.max(0, this.focusLeft - dt);
+    const focusTarget = this.focusLeft > 0 ? 1 : 0;
+    this.focusAmount += (focusTarget - this.focusAmount) * (snap ? 1 : 1 - Math.exp(-dt * 8));
+    if (this.focusAmount > 0.001) this.look.lerp(this.focusPoint, this.focusAmount);
     this.camera.up.copy(this.up);
     this.camera.lookAt(this.look);
 
-    const fovTarget = Math.min(t.fovMax, t.fovBase + speed * t.fovPerSpeed + (tm.boosting ? t.fovBoost : 0) + (tm.drifting ? t.fovDrift : 0));
-    this.fov += (fovTarget - this.fov) * (1 - Math.exp(-dt * t.fovRate));
+    this.fovPunch *= Math.exp(-dt * 6);
+    const fovTarget = Math.min(t.fovMax, t.fovBase + speed * t.fovPerSpeed + (tm.boosting ? t.fovBoost : 0) + (tm.drifting ? t.fovDrift : 0) + this.fovPunch - 6 * this.focusAmount);
+    this.fov += (fovTarget - this.fov) * (1 - Math.exp(-dt * (this.fovPunch > 0.5 ? 12 : t.fovRate)));
     if (Math.abs(this.camera.fov - this.fov) > 0.01) {
       this.camera.fov = this.fov;
       this.camera.updateProjectionMatrix();

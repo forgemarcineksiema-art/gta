@@ -3,10 +3,13 @@
  * later slices; this one pays boost for a near miss and for the oncoming lane.
  */
 import { CAR_IDS, CAR_PRESETS } from '../vehicle/presets';
+import { cloneTuning } from '../vehicle/tuning';
 import type { VehicleControls } from '../controls';
-import { DAMAGE, ECONOMY } from '../economy';
+import { DAMAGE, ECONOMY, SWAP } from '../economy';
+import * as M from '../math';
 import type { SimWorld } from '../SimWorld';
-import { AgentState } from '../traffic/Traffic';
+import { AgentState, PLAYER_PAINT, type SwapHandover } from '../traffic/Traffic';
+import { PedPose } from '../traffic/Pedestrians';
 
 export interface LifeState {
   damage: number;
@@ -43,6 +46,9 @@ export class Life {
   private oncomingLeft = 0;
   private oncomingEvent = 0;
   private readonly proj = { x: 0, y: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };
+  private readonly rot = { x: 0, y: 0, z: 0, w: 1 };
+  private readonly handover: SwapHandover = { x: 0, y: 0, z: 0, yaw: 0, vx: 0, vz: 0, kind: 'muscle' };
+  private readonly oldPose = { x: 0, y: 0, z: 0, yaw: 0 };
 
   /** `damageEnabled` false keeps the playground a handling lab: hits are classified and reported, nothing dents or wrecks. */
   constructor(private readonly sim: SimWorld, private readonly damageEnabled = true) {
@@ -53,6 +59,12 @@ export class Life {
 
   preStep(controls: VehicleControls, dt: number): void {
     const st = this.state;
+    st.swapCandidate = this.findSwapCandidate();
+    if (controls.swap && st.swapCandidate >= 0) {
+      this.swap(st.swapCandidate);
+      controls.swap = false;
+      return;
+    }
     if (st.wrecked) {
       st.wreckedFor += dt;
       st.respawnIn = Math.max(0, st.respawnIn - dt);
@@ -124,6 +136,69 @@ export class Life {
     this.heal();
     this.sim.respawned = true;
     this.sim.events.push('respawn', 0, pose.position.x, pose.position.y, pose.position.z, -1);
+  }
+
+  /** The nearest traffic car alongside, within `SWAP.range` along and `SWAP.lateral` across, not much faster or slower. */
+  private findSwapCandidate(): number {
+    const traffic = this.sim.traffic;
+    if (!traffic) return -1;
+    const tm = this.sim.vehicle.telemetry;
+    if (!SWAP.airborneAllowed && tm.groundedWheels < 2) return -1;
+    const p = this.sim.vehicle.body.translation(this.proj);
+    const yaw = M.yawOf(this.sim.vehicle.body.rotation(this.rot));
+    const fx = Math.sin(yaw);
+    const fz = Math.cos(yaw);
+    const rx = -fz;
+    const rz = fx;
+    let best = -1;
+    let bestD = Infinity;
+    for (let i = 0; i < traffic.capacity; i++) {
+      if (traffic.state[i] === AgentState.Free) continue;
+      const dx = (traffic.x[i] as number) - p.x;
+      const dz = (traffic.z[i] as number) - p.z;
+      const along = dx * fx + dz * fz;
+      const side = dx * rx + dz * rz;
+      if (Math.abs(along) > SWAP.range || Math.abs(side) > SWAP.lateral) continue;
+      const ayaw = traffic.yaw[i] as number;
+      const speed = traffic.speed[i] as number;
+      if (Math.hypot(tm.vx - Math.sin(ayaw) * speed, tm.vz - Math.cos(ayaw) * speed) > SWAP.maxRelativeSpeed) continue;
+      const d = along * along + side * side;
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    return best;
+  }
+
+  /** Take the candidate's car: retune the vehicle in place, carry the speed, leave the old car and its driver behind. */
+  private swap(agent: number): void {
+    const traffic = this.sim.traffic;
+    if (!traffic) return;
+    const v = this.sim.vehicle;
+    const p = v.body.translation(this.proj);
+    const oldYaw = M.yawOf(v.body.rotation(this.rot));
+    this.oldPose.x = p.x;
+    this.oldPose.y = p.y;
+    this.oldPose.z = p.z;
+    this.oldPose.yaw = oldYaw;
+    const oldKind = this.sim.carId;
+    traffic.takeOver(agent, oldKind, PLAYER_PAINT[oldKind], this.oldPose, this.state.wrecked, this.handover);
+    const h = this.handover;
+    this.sim.carId = h.kind;
+    v.tuning = cloneTuning(CAR_PRESETS[h.kind]);
+    v.applyTuning();
+    this.proj.x = h.x;
+    this.proj.y = p.y;
+    this.proj.z = h.z;
+    v.teleport(this.proj, h.yaw);
+    v.setVelocity(h.vx, 0, h.vz);
+    this.heal();
+    // the driver you left standing in the road, shaking a fist at you
+    const lx = Math.cos(oldYaw);
+    const lz = -Math.sin(oldYaw);
+    const px = this.oldPose.x + lx * 2.2;
+    const pz = this.oldPose.z + lz * 2.2;
+    this.sim.peds?.spawnAt(px, pz, Math.atan2(h.x - px, h.z - pz), PedPose.Fist);
+    this.sim.events.push('swap', 0, h.x, h.y, h.z, agent);
+    this.state.swapCandidate = -1;
   }
 
   skipSlowMo(): void {

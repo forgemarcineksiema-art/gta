@@ -261,6 +261,27 @@ body {
   text-shadow: 2px 3px 0 #000;
 }
 
+/* swap prompt: a keycap and one word, centre bottom, only while a car is alongside */
+.hud__swap {
+  position: absolute;
+  left: 50%;
+  bottom: calc(150px + var(--safe-bottom));
+  transform: translateX(-50%) skewX(-8deg);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  pointer-events: none;
+}
+.hud__swap.is-visible { opacity: 1; }
+.hud__swap-label {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--ui-accent-2);
+  text-shadow: 2px 3px 0 #000;
+}
+
 /* drift readout, bottom centre */
 .hud__drift {
   position: absolute;

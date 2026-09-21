@@ -2,6 +2,54 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-21 — M3 session 16: slice 6, car-swap
+
+### Done
+
+- `Life.findSwapCandidate`: the nearest traffic car within 6 m along and
+  4 m across in the player's frame, relative speed under 20 m/s, player on
+  at least two wheels (`SWAP` in `sim/economy.ts`); shown on the HUD as the
+  swap keycap. `Life.swap` on the `E` edge: `Traffic.takeOver` hands over
+  the car's pose, velocity and class and turns the agent's record into the
+  player's old car standing where the player was (abandoned, or a wreck if
+  the player's car was one), the player's `Vehicle` is retuned in place
+  (`tuning` replaced by the class preset, `applyTuning`), teleported onto
+  the car with its velocity, healed, boost kept; a pedestrian spawns 2.2 m
+  to the driver's side in the `Fist` pose facing the player; `swap` event.
+  `SimWorld.carId` is mutable now.
+- `Traffic.spawnAtPoint` (a stopped wreck or abandoned car off the graph, for
+  tests and swaps), `kindOf`, `PLAYER_PAINT` (the class colours from STYLE).
+- Renderer: three resident car meshes (one per class, built from the
+  presets), the visible one follows `sim.carId`; `ChaseCamera.whip` swings
+  the heading at up to 720°/s with a doubled follow rate and a 10° FOV punch
+  for 0.35 s, no cut; `focus`/`release` for the takedown camera (slice 7).
+  HUD swap prompt and the FRESH WHEELS popup; a whoosh.
+
+### Verification
+
+- verify green, 141 tests. Smoke 60.0 fps / p95 16.8 ms / 95 draws /
+  193k tris (the two hidden car meshes cost no draws), build 3.46 MB.
+- Pins (`tests/sim/swap.test.ts`): a compact alongside at 40 km/h: after
+  `E` the class is compact, the position within 1.5 m of the car's, speed
+  within 10 %, damage 0, mass 1050; the old pose holds an Abandoned muscle
+  within 1 m, a Fist pedestrian within 4 m, one `swap` event; two seconds
+  later it is still there. No candidate 12 m ahead and no swap in the air
+  (one step after a teleport so the telemetry sees the wheels up). Out of a
+  wreck at the boundary wall into a parked van: class heavy, engine on,
+  damage 0, the old car stays a wreck. After a swap into a parked compact
+  on the highway, 0–100 km/h lands in the compact band of `cars.test.ts`.
+- Camera pins (`tests/render/camera.test.ts`): a whip puts the view behind
+  a car heading 90° away within 0.5 s, never further than 25 m, and the
+  same turn without a whip does not; a focus looks within 20° of a moving
+  target in 0.3 s and is back within 5° of the nose 0.6 s after release.
+- Test setups now settle the car on its wheels before pushing it: forcing
+  the velocity with `vy = 0` right after a teleport to y = 1 held the car
+  in the air (no wheels down, no swap candidate).
+
+### Next
+
+- Slice 7: takedowns, slow motion on the loop, the focus camera.
+
 ## 2026-09-21 — M3 session 16: slice 5, damage, wrecked, respawn
 
 ### Done

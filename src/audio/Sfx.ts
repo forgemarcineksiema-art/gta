@@ -21,7 +21,7 @@ export class Sfx {
     else if (e.kind === 'nearMissPed') this.yelp(ctx, master);
     else if (e.kind === 'damage') this.crunch(ctx, master, e.value);
     else if (e.kind === 'wrecked') this.boom(ctx, master);
-    else if (e.kind === 'respawn') this.whoosh(ctx, master);
+    else if (e.kind === 'respawn' || e.kind === 'swap') this.whoosh(ctx, master);
   };
 
   constructor(private readonly engine: EngineAudio) {}

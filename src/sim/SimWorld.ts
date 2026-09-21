@@ -85,7 +85,8 @@ export class SimWorld {
   readonly dynamics: DynamicDesc[] = [];
   readonly spawns: SpawnPoint[];
   readonly vehicle: Vehicle;
-  readonly carId: CarId;
+  /** The player's class; car-swap changes it. */
+  carId: CarId;
   readonly controls: VehicleControls = createControls();
   readonly layout: PlaygroundLayout;
   readonly track: TrackDef;

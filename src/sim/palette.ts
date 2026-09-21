@@ -4,7 +4,7 @@
  */
 export const PALETTE = {
   asphalt: 0x3a3a46,
-  asphaltLight: 0x4a4a58,
+  asphaltLight: 0x4a4a58, asphaltBay: 0x3b3a41,
   laneMark: 0xf2e9d8,
   kerb: 0xc9c3b3,
   concrete: 0x9a938a,

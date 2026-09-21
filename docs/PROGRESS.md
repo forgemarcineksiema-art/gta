@@ -59,6 +59,16 @@ after.
   band in the far level; (2) authored-road kerb slabs laid on the grid
   carriageway where a road leaves a junction at a shallow angle, covering half a
   crossing: authored furniture now skips grid street corridors.
+- Third report: still shimmering, cornices too. Measured instead of guessed:
+  raw canvas frame sequences, static and at 64 km/h, and a flicker map of
+  pixels that flip between consecutive frames. Static: zero. Driving: kerb
+  lips, far marks, cornices, lamp heads; identical with shadows off and on the
+  high tier; MSAA 4× confirmed on the Intel path at 1906×935 with no
+  downscaling. Cause: grazing-angle geometry (a flat mark is L·h/d² tall on
+  screen). Redesign: parking bays as tone patches, no kerb lips or joints,
+  crossings in worn tone near and a faint patch far, cornices 0.44 m, lamp
+  heads 0.28 m, low-contrast frames, near level 120 / 150 m. Flicker pixels in
+  the same drive 363 → 207, the rest at the fog horizon.
 
 ### Next
 

@@ -108,12 +108,21 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 - Surface decals are top faces stacked at least 12 mm apart (road 0.010,
   shoulders 0.022, lane marks 0.028, authored road 0.034, crosswalks and parking
   marks 0.046, authored dashes 0.054); with the 0.6 m near plane the depth
-  buffer separates them out to the fog. Closer spacing shimmers while driving.
-- Painted lines are never thinner than 0.28 m (parking marks) or 0.12 m (paving
-  joints), and both exist only in the near detail level; thinner lines fall
-  below one pixel past 60 m and alias into shimmer even with MSAA. Crossings are
-  stripes near and one band in the far level, because a 2.5 m stripe pitch
-  aliases past about 150 m.
+  buffer separates them out to the fog. Closer spacing z-fights while driving.
+- Grazing-angle rule for anything flat on the ground: from the driving camera
+  (about 4 m up) a mark of length L along the view direction at distance d is
+  only L × 4 / d² radians tall, about 670 px per radian at 720p. A 0.28 m line
+  across the road is 0.2 px at 60 m; a 4 cm kerb lip is 0.3 px at 40 m. Such
+  lines shimmer with 4× MSAA and no width fixes it, so they do not exist:
+  parking bays are 6 m patches of alternating tone, pavements have no lip and
+  no joints (their edge is the colour boundary plus the 14 cm kerb face),
+  zebra stripes are worn-paint tone and only in the near level (120 m), and
+  past that a crossing is a faint lighter patch. Vertical thin members shimmer
+  past 100 m below about 0.4 m: cornices are 0.44 m, lamp heads 0.28 m, and
+  window frames keep low contrast against the glass.
+- Measure, do not guess: `screens/flicker-capture2.mjs` records raw canvas
+  frames while driving and the flicker map marks pixels that flip back and
+  forth between consecutive frames.
 - Authored-road kerbs, trees and lamps are never laid inside a grid street's
   corridor (`onGridStreet`): a road leaving a junction at a shallow angle runs
   inside that corridor for tens of metres and its pavement would land on the

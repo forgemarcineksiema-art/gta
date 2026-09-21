@@ -123,14 +123,10 @@ export class City {
         box(qx, 0.07, qz, hx, 0.07, hz, d.id === 'foundry' ? c.yard : c.soil, 'kerb');
         box(x + sx * (vx + 2.25), 0.145, z + sz * (vz + hz), 2.25, 0.005, hz, PALETTE.kerb, 'decor', 'top');
         box(x + sx * (vx + hx), 0.145, z + sz * (vz + 2.25), hx, 0.005, 2.25, PALETTE.kerb, 'decor', 'top');
-        // Continuous kerb edge and paving joints provide a metre-scale reference at speed.
-        box(x + sx * (vx + 0.12), 0.16, z + sz * (vz + hz), 0.12, 0.02, hz, c.trim);
-        box(x + sx * (vx + hx), 0.16, z + sz * (vz + 0.12), hx, 0.02, 0.12, c.trim);
-        // Thin lines alias into shimmer: joints are 12 cm wide and only in the near level.
-        for (let along = 26; along < 110; along += 6) {
-          box(x + sx * (vx + 2.3), 0.16, z + sz * along, 2.2, 0.002, 0.06, c.yard, 'decor', 'top').detailOnly = true;
-          box(x + sx * along, 0.16, z + sz * (vz + 2.3), 0.06, 0.002, 2.2, c.yard, 'decor', 'top').detailOnly = true;
-        }
+        // No kerb lip and no paving joints: a flat line seen from the driving camera
+        // is only (length along the view × camera height / distance²) tall on screen,
+        // so a 4 cm lip or a 12 cm joint is sub-pixel past 30 m and shimmers.
+        // The pavement edge is the colour boundary and the 14 cm kerb face.
       } else {
         // Open quarter: the interior sits at road level and the grid pavements are
         // only the 4.5 m strips, cut where the authored road passes through.
@@ -148,13 +144,8 @@ export class City {
             if (blocked && runStart >= 0) {
               const stop = Math.min(along, length), mid = start + (runStart + stop) / 2, half = (stop - runStart) / 2;
               if (half > 1) {
-                if (axis === 'x') {
-                  box(x + sx * (vx + 2.25), 0.07, z + sz * mid, 2.25, 0.07, half, PALETTE.kerb, 'kerb');
-                  box(x + sx * (vx + 0.12), 0.16, z + sz * mid, 0.12, 0.02, half, c.trim);
-                } else {
-                  box(x + sx * mid, 0.07, z + sz * (vz + 2.25), half, 0.07, 2.25, PALETTE.kerb, 'kerb');
-                  box(x + sx * mid, 0.16, z + sz * (vz + 0.12), half, 0.02, 0.12, c.trim);
-                }
+                if (axis === 'x') box(x + sx * (vx + 2.25), 0.07, z + sz * mid, 2.25, 0.07, half, PALETTE.kerb, 'kerb');
+                else box(x + sx * mid, 0.07, z + sz * (vz + 2.25), half, 0.07, 2.25, PALETTE.kerb, 'kerb');
               }
               runStart = -1;
             }
@@ -202,10 +193,12 @@ export class City {
           }
         }
       }
-      // Parking strips explain the generous road width without altering the driving envelope.
-      for (const along of [38, 50, 62, 74, 86, 98]) {
-        box(x + sx * (vx - 2), 0.045, z + sz * along, 1.65, 0.001, 0.14, PALETTE.laneMark, 'decor', 'top').detailOnly = true;
-        box(x + sx * along, 0.045, z + sz * (vz - 2), 0.14, 0.001, 1.65, PALETTE.laneMark, 'decor', 'top').detailOnly = true;
+      // Parking bays explain the generous road width without altering the driving
+      // envelope. They are 6 m patches of alternating tone, not painted lines: a
+      // line across the road is sub-pixel tall from the driving camera past 25 m.
+      for (const along of [32, 44, 56, 68, 80, 92]) {
+        box(x + sx * (vx - 2), 0.045, z + sz * (along + 3), 1.7, 0.001, 3, PALETTE.asphaltBay, 'decor', 'top');
+        box(x + sx * (along + 3), 0.045, z + sz * (vz - 2), 3, 0.001, 1.7, PALETTE.asphaltBay, 'decor', 'top');
       }
       if (d.id !== 'foundry') for (const along of [57, 106]) {
         if (roadClearance(x + sx * (vx + 2.7), z + sz * along) > 3) architecture.tree(x + sx * (vx + 2.7), z + sz * along, d.id === 'marina');
@@ -215,17 +208,20 @@ export class City {
       for (const offset of [36, 80]) {
         if (roadClearance(x + sx * (vx + 2), z + sz * offset) < 1.5) continue;
         box(x + sx * (vx + 2), 4, z + sz * offset, 0.18, 4, 0.18, 0x686678);
-        box(x + sx * (vx + 1), 8, z + sz * offset, 1.4, 0.15, 0.45, PALETTE.laneMark);
+        box(x + sx * (vx + 1), 8, z + sz * offset, 1.4, 0.28, 0.45, PALETTE.laneMark);
       }
       // Crosswalks, kept out of the highway.
       if (vx === ROAD_HALF && vz === ROAD_HALF) {
         // Stripes at 2.5 m pitch alias past ~150 m; the far level draws one band.
+        // Worn-paint tone: the zebra's 1.1 m gaps are under a pixel tall past 60 m,
+        // and lower contrast halves what aliasing is left before the far band.
         for (let i = 0; i < 4; i++) {
-          box(x + sx * (2 + i * 2.5), 0.04, z + sz * 16, 0.7, 0.006, 2, PALETTE.laneMark).detailOnly = true;
-          box(x + sx * 16, 0.04, z + sz * (2 + i * 2.5), 2, 0.006, 0.7, PALETTE.laneMark).detailOnly = true;
+          box(x + sx * (2 + i * 2.5), 0.04, z + sz * 16, 0.7, 0.006, 2, PALETTE.kerb).detailOnly = true;
+          box(x + sx * 16, 0.04, z + sz * (2 + i * 2.5), 2, 0.006, 0.7, PALETTE.kerb).detailOnly = true;
         }
-        box(x + sx * 5.75, 0.04, z + sz * 16, 5.75, 0.006, 2, PALETTE.laneMark).farOnly = true;
-        box(x + sx * 16, 0.04, z + sz * 5.75, 2, 0.006, 5.75, PALETTE.laneMark).farOnly = true;
+        // Past 150 m a crossing is a faint lighter patch: any contrast there aliases.
+        box(x + sx * 5.75, 0.04, z + sz * 16, 5.75, 0.006, 2, PALETTE.asphaltLight).farOnly = true;
+        box(x + sx * 16, 0.04, z + sz * 5.75, 2, 0.006, 5.75, PALETTE.asphaltLight).farOnly = true;
       }
     }
     // Each landmark owns a reserved plaza, with paths back to both bordering streets.
@@ -303,7 +299,6 @@ export class City {
     // Built along local X at the wall (local +Z is the sea); rotated for the east edge.
     const half = BLOCK / 2, wall = CITY_HALF;
     box(0, 0.16, -5, half, 0.02, 4, PALETTE.kerb, 'decor', 'top');
-    box(0, 0.19, -1.6, half, 0.005, 0.35, c.trim, 'decor', 'top');
     for (let u = -half + 11; u < half; u += 22) architecture.tree(u, -8.5, true);
     for (let u = -half + 22; u < half; u += 44) { box(u, 0.6, -3.2, 1.2, 0.08, 0.35, c.brick); box(u, 0.85, -3.5, 1.2, 0.3, 0.06, c.brick); }
     for (let u = -half + 30; u < half; u += 75) architecture.mast(u, -7.6);
@@ -432,8 +427,6 @@ export class City {
           if (onGridStreet(mx + nx * side * (hw + 2.25), mz + nz * side * (hw + 2.25))) continue;
           const kerb = box(mx + nx * side * (hw + 2.25), 0.07, mz + nz * side * (hw + 2.25), 2.25, 0.07, len / 2 + 0.3, paving === PALETTE.grass ? c.soil : paving, 'kerb');
           kerb.rotation = rot;
-          const edge = box(mx + nx * side * (hw + 0.12), 0.16, mz + nz * side * (hw + 0.12), 0.12, 0.02, len / 2 + 0.3, c.trim);
-          edge.rotation = rot;
           if (paving === PALETTE.grass) {
             const lawn = box(mx + nx * side * (hw + 2.25), 0.145, mz + nz * side * (hw + 2.25), 2.25, 0.005, len / 2 + 0.3, PALETTE.grass, 'decor', 'top');
             lawn.rotation = rot;
@@ -505,7 +498,7 @@ export class City {
             const px = a.x + dx * t + nx * side * (hw + 2), pz = a.z + dz * t + nz * side * (hw + 2);
             if (onGridStreet(px, pz)) { nextLamp += 45; continue; }
             box(px, 4, pz, 0.18, 4, 0.18, 0x686678);
-            const head = box(px - nx * side, 8, pz - nz * side, 0.45, 0.15, 1.4, PALETTE.laneMark);
+            const head = box(px - nx * side, 8, pz - nz * side, 0.45, 0.28, 1.4, PALETTE.laneMark);
             head.rotation = rot;
           }
           nextLamp += 45;

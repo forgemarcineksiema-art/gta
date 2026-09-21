@@ -122,8 +122,9 @@ export class Architecture {
       rotation: IDENTITY_QUAT, color: body, tag: 'building', collisionOnly: true });
     this.box(x, height / 2 + 0.14, z, hx - shellDepth, height / 2, hz - shellDepth, body);
     this.box(x, 0.3, z, hx + 0.04, 0.16, hz + 0.04, c.roof);
-    this.box(x, height + 0.27, z, hx + 0.24, 0.13, hz + 0.24, c.trim);
-    this.box(x, height + 0.44, z, hx - 0.32, 0.05, hz - 0.32, c.roof);
+    // A 44 cm cornice stays three pixels tall at 100 m; the earlier 26 cm one shimmered.
+    this.box(x, height + 0.36, z, hx + 0.3, 0.22, hz + 0.3, c.trim);
+    this.box(x, height + 0.62, z, hx - 0.32, 0.05, hz - 0.32, c.roof);
 
     for (const axis of ['x', 'z'] as const) for (const sign of [-1, 1]) {
       const street = axis === 'x' ? streetX && sign === -sx : streetZ && sign === -sz;
@@ -166,7 +167,8 @@ export class Architecture {
         const mid = (bottom + top) / 2, half = (top - bottom) / 2;
         surface(u, mid, width / 2, half, depth, c.window).tag = 'glazing';
         // Frames sit within the opening, not across the outer plaster face.
-        const trim = house ? c.trim : c.roof;
+        // Frames are 9 cm: keep their contrast low so what aliases is not visible.
+        const trim = house ? c.stone : c.roof;
         surface(u - width / 2 + 0.045, mid, 0.045, half, depth + 0.02, trim, true);
         surface(u + width / 2 - 0.045, mid, 0.045, half, depth + 0.02, trim, true);
         surface(u, bottom + 0.045, width / 2, 0.045, depth + 0.02, trim, true);

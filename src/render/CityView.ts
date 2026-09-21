@@ -22,8 +22,12 @@ const faces = {
   bottom: new THREE.PlaneGeometry(2, 2).rotateX(Math.PI / 2).translate(0, -1, 0).toNonIndexed(),
 };
 const color = new THREE.Color();
-/** Promote a chunk part to full detail inside this radius; demote beyond the hysteresis band. */
-export const DETAIL_NEAR = 180, DETAIL_FAR = 220;
+/**
+ * Promote a chunk part to full detail inside this radius; demote beyond the
+ * hysteresis band. Frames, sills and zebra stripes are under a pixel past
+ * about 120 m from the driving camera, so the near level ends there.
+ */
+export const DETAIL_NEAR = 120, DETAIL_FAR = 150;
 /** Order the shadow-caster prefix; trims and single-sided panels never enter the depth pass. */
 const casts = (st: StaticDesc) => !st.face && !st.farFace && st.tag !== 'road' && st.tag !== 'ground' && st.tag !== 'kerb' && st.tag !== 'trim';
 

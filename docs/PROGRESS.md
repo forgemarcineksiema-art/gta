@@ -2,6 +2,27 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-22 — M3 session 16: gate
+
+### Done
+
+- `e2e/life.spec.ts` (`npm run life`, 4/4): the bot 60 s with life on inside
+  the perf budgets and meeting traffic, the keyboard swap, the slow motion as
+  a time scale (21 ticks per wall second), wrecked to respawn. `npm run city`
+  5/5 with the new `E`-without-a-candidate check. Screens spec gains the life
+  state (popup, damage bar at stage 2, swap prompt, 12/50) and a wrecked
+  capture at 1280×720; the full ten-size run stalled in the background and was
+  not inspected, the 1280×720 case passes alone. `docs/M3_REPORT.md` with the
+  perf protocol (bases 56.1 / 58.5 fps, gate 57.4 / 52.5; step p50 up
+  1.4–2.1 ms, the rest within noise), the playtest script and the knobs.
+- Marcin closed the gate without the screens inspection; merged to `main`,
+  the branch deleted.
+
+### Next
+
+- M4 planning from `docs/BACKLOG.md` Life (M3) and Marcin's playtest notes;
+  `npm run screens` inspected before the next release.
+
 ## 2026-09-22 — M3 session 16: slice 8, billboards
 
 ### Done

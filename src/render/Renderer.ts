@@ -286,6 +286,11 @@ export class Renderer {
   }
 
   /** Car-swap: show the new class's mesh where the old one was and whip the camera onto it. */
+  /** The class whose mesh is shown (for the e2e swap check). */
+  get visibleCar(): CarId {
+    return this.carId;
+  }
+
   private syncCar(): void {
     const id = this.sim.carId;
     if (id === this.carId) return;

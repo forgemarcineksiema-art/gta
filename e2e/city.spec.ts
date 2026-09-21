@@ -94,6 +94,10 @@ test('player controls, reset, pause and district views', async ({ page }) => {
   expect(await page.evaluate(() => window.__game?.paused)).toBe(false);
   await page.keyboard.down('KeyR'); await step(17); await page.keyboard.up('KeyR'); await step(1000);
   expect(await page.evaluate(() => Math.abs(window.__game?.sim.vehicle.telemetry.speedKmh ?? 100))).toBeLessThan(1);
+  // E with no car alongside changes nothing (life is on in this test)
+  const carBefore = await page.evaluate(() => window.__game?.sim.carId);
+  await page.keyboard.down('KeyE'); await step(17); await page.keyboard.up('KeyE'); await step(200);
+  expect(await page.evaluate(() => window.__game?.sim.carId)).toBe(carBefore);
   mkdirSync('screens/m2', { recursive: true });
   for (const district of ['crown', 'foundry', 'gardens', 'marina', 'highway']) {
     await page.evaluate((name) => window.__game?.sim.spawnAt(name), district);

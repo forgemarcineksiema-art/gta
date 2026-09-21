@@ -1,7 +1,8 @@
 /**
- * Screenshot review: captures the HUD (and the pause screen) at every viewport
- * size CrazyGames requires legibility at (docs/CRAZYGAMES.md), at DPR 1.
- * Output: screens/<state>-<w>x<h>.png. Look at them.
+ * Screenshot review: captures the HUD, the pause screen and the life state
+ * (popup, damage bar, swap prompt, billboard counter) at every viewport size
+ * CrazyGames requires legibility at (docs/CRAZYGAMES.md), at DPR 1, plus the
+ * wrecked overlay at 1280x720. Output: screens/<state>-<w>x<h>.png. Look at them.
  */
 import { test } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
@@ -41,9 +42,30 @@ for (const [w, h] of SIZES) {
       if (!sim) { resolve('no sim'); return; }
       sim.events.push('nearMissOncoming', 0.2, 0, 1, 0, -1);
       sim.life.state.oncoming = true;
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve(document.querySelector('.hud')?.textContent ?? '')));
+      // the damage bar at stage 2, the billboard counter part-way, a car alongside for the swap prompt
+      sim.life.state.damage = 0.6;
+      sim.life.state.stage = 2;
+      if (sim.collectibles) sim.collectibles.smashedCount = 12;
+      if (sim.traffic) {
+        const p = sim.vehicle.body.translation();
+        const yaw = sim.probe.yaw;
+        sim.traffic.spawnAtPoint(p.x - Math.cos(yaw) * 3, p.z + Math.sin(yaw) * 3, yaw, 'compact', 5);
+      }
+      requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve(document.querySelector('.hud')?.textContent ?? ''))));
     }));
-    if (!lifeText.includes('ONCOMING')) throw new Error(`life hud missing popup: ${lifeText.slice(0, 200)}`);
+    for (const needle of ['ONCOMING', 'DAMAGE', '12/50', 'SWAP']) {
+      if (!lifeText.includes(needle)) throw new Error(`life hud missing ${needle}: ${lifeText.slice(0, 300)}`);
+    }
     await page.screenshot({ path: `screens/life-${w}x${h}.png` });
+    if (w === 1280 && h === 720) {
+      const wreckedText = await page.evaluate(() => new Promise<string>((resolve) => {
+        const sim = window.__game?.sim;
+        if (!sim) { resolve('no sim'); return; }
+        (sim.life as unknown as { wreck(): void }).wreck();
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve(document.querySelector('.hud')?.textContent ?? '')));
+      }));
+      if (!wreckedText.includes('WRECKED')) throw new Error(`wrecked overlay missing: ${wreckedText.slice(0, 300)}`);
+      await page.screenshot({ path: `screens/wrecked-${w}x${h}.png` });
+    }
   });
 }

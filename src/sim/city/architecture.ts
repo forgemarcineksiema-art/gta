@@ -1,6 +1,6 @@
 /** Metre-based street architecture. Render descriptors only; solids stay simple in Rapier. */
 import { IDENTITY_QUAT, quatFromYaw, type StaticDesc, type BoxFace } from '../scene';
-import { CITY_COLORS } from '../palette';
+import { CITY_COLORS, PALETTE } from '../palette';
 export { CITY_COLORS } from '../palette';
 
 export class Architecture {
@@ -28,6 +28,56 @@ export class Architecture {
       this.cylinder(x + 0.5, 6.25, z, 2, 0.75, CITY_COLORS.leaves);
       this.cylinder(x - 1.8, 4.3, z + 0.5, 1.4, 0.8, CITY_COLORS.leaves);
     }
+  }
+
+  /** Shipping container, 12 × 2.6 × 2.4 m, solid; `tier` stacks it. */
+  container(x: number, z: number, yaw: number, colour: number, tier = 0): void {
+    const start = this.statics.length;
+    const y = 0.14 + 1.3 + tier * 2.6;
+    this.box(0, y, 0, 6, 1.3, 1.2, colour, 'building');
+    // Corrugation reads as four dark ribs per side; doors at one end.
+    for (const side of [-1, 1]) for (const u of [-4.5, -1.5, 1.5, 4.5]) this.box(u, y, side * 1.21, 0.08, 1.2, 0.02, CITY_COLORS.roof, 'decor', side > 0 ? 'z+' : 'z-');
+    this.box(6.02, y, 0, 0.02, 1.15, 1.1, CITY_COLORS.roof, 'decor', 'x+');
+    this.rotateFrom(start, x, z, yaw);
+  }
+
+  /** Vertical storage tank on a plinth with a top band. */
+  tank(x: number, z: number, radius: number, height: number, colour: number, band: number): void {
+    this.box(x, 0.3, z, radius + 0.6, 0.16, radius + 0.6, CITY_COLORS.roof, 'building');
+    this.cylinder(x, 0.46 + height / 2, z, radius, height / 2, colour);
+    this.cylinder(x, 0.46 + height - 0.4, z, radius + 0.08, 0.35, band);
+    this.cylinder(x, 0.46 + height + 0.25, z, radius * 0.35, 0.3, CITY_COLORS.roof);
+    this.box(x + radius + 0.2, 0.46 + height / 2, z, 0.12, height / 2, 0.5, CITY_COLORS.roof);
+  }
+
+  /** Gantry crane: two A-legs and a beam spanning `span` across local X. */
+  gantry(x: number, z: number, yaw: number, span: number, colour: number): void {
+    const start = this.statics.length;
+    for (const side of [-1, 1]) {
+      this.box(side * span / 2, 5, 0, 0.35, 5, 0.35, colour, 'building');
+      this.box(side * span / 2, 0.6, 0, 1.4, 0.45, 1.4, CITY_COLORS.roof, 'building');
+    }
+    this.box(0, 10.4, 0, span / 2 + 0.8, 0.45, 0.6, colour);
+    this.box(span * 0.2, 9.4, 0, 1.2, 0.55, 0.9, CITY_COLORS.roof);
+    this.box(span * 0.2, 6.5, 0, 0.05, 2.4, 0.05, CITY_COLORS.roof);
+    this.box(span * 0.2, 3.8, 0, 0.6, 0.3, 0.6, CITY_COLORS.trim);
+    this.rotateFrom(start, x, z, yaw);
+  }
+
+  /** Chain-link fence run along local X: posts every 6 m and a top rail. */
+  fence(x: number, z: number, yaw: number, length: number): void {
+    const start = this.statics.length;
+    for (let u = -length / 2; u <= length / 2; u += 6) this.box(u, 1.1, 0, 0.06, 1.1, 0.06, CITY_COLORS.roof);
+    this.box(0, 2.15, 0, length / 2, 0.04, 0.04, CITY_COLORS.roof);
+    this.box(0, 1.1, 0, length / 2, 0.95, 0.001, 0x6f7078, 'decor', 'z+');
+    this.rotateFrom(start, x, z, yaw);
+  }
+
+  /** Floodlight mast for yards and quays. */
+  mast(x: number, z: number): void {
+    this.box(x, 7, z, 0.2, 7, 0.2, 0x686678);
+    this.box(x, 14.2, z, 1.1, 0.25, 0.5, CITY_COLORS.roof);
+    this.box(x, 14.55, z, 1.0, 0.1, 0.45, PALETTE.laneMark);
   }
 
   /**

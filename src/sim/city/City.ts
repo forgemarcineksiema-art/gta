@@ -270,10 +270,35 @@ export class City {
     }
     for (const road of corridors) this.specialRoad(road, cx, cz, architecture);
     if ((cx === 3 && cz === 2) || (cx === 2 && cz === 3)) this.waterfront(cx, architecture);
+    if ((cx === 3 && cz >= 1) || (cz === 3 && cx >= 1)) this.promenade(cx, cz, architecture);
     // Visible seawalls match the persistent boundary colliders.
-    if (Math.abs(cx) === 3) box(Math.sign(cx) * CITY_HALF, 2, z, 1, 2, BLOCK / 2, PALETTE.kerb, 'boundary');
-    if (Math.abs(cz) === 3) box(x, 2, Math.sign(cz) * CITY_HALF, BLOCK / 2, 2, 1, PALETTE.kerb, 'boundary');
+    // Coral Quay's edges are a low parapet with a coping so the promenade sees the
+    // water; the invisible 4 m boundary collider is unchanged. Elsewhere a seawall.
+    const quay = x > 0 && z > 0;
+    if (Math.abs(cx) === 3) {
+      box(Math.sign(cx) * CITY_HALF, quay ? 0.55 : 2, z, 1, quay ? 0.55 : 2, BLOCK / 2, PALETTE.kerb, 'boundary');
+      if (quay) box(Math.sign(cx) * CITY_HALF, 1.16, z, 1.15, 0.07, BLOCK / 2, CITY_COLORS.trim, 'boundary');
+    }
+    if (Math.abs(cz) === 3) {
+      box(x, quay ? 0.55 : 2, Math.sign(cz) * CITY_HALF, BLOCK / 2, quay ? 0.55 : 2, 1, PALETTE.kerb, 'boundary');
+      if (quay) box(x, 1.16, Math.sign(cz) * CITY_HALF, BLOCK / 2, 0.07, 1.15, CITY_COLORS.trim, 'boundary');
+    }
     return { key: `${cx},${cz}`, x: cx, z: cz, statics };
+  }
+
+  /** Coral Quay's seawall edge: paved promenade, railing, palms, benches and masts. */
+  private promenade(cx: number, cz: number, architecture: Architecture): void {
+    const box = architecture.box.bind(architecture), c = CITY_COLORS;
+    const start = architecture.statics.length;
+    // Built along local X at the wall (local +Z is the sea); rotated for the east edge.
+    const half = BLOCK / 2, wall = CITY_HALF;
+    box(0, 0.16, -5, half, 0.02, 4, PALETTE.kerb, 'decor', 'top');
+    box(0, 0.19, -1.6, half, 0.005, 0.35, c.trim, 'decor', 'top');
+    for (let u = -half + 11; u < half; u += 22) architecture.tree(u, -8.5, true);
+    for (let u = -half + 22; u < half; u += 44) { box(u, 0.6, -3.2, 1.2, 0.08, 0.35, c.brick); box(u, 0.85, -3.5, 1.2, 0.3, 0.06, c.brick); }
+    for (let u = -half + 30; u < half; u += 75) architecture.mast(u, -7.6);
+    const yaw = cx === 3 ? Math.PI / 2 : 0;
+    architecture.rotateFrom(start, cx === 3 ? wall : cx * BLOCK, cx === 3 ? cz * BLOCK : wall, yaw);
   }
 
   /** Coral Quay's sea edge: a pier with a pavilion and moored boats beyond the seawall. */
@@ -361,7 +386,7 @@ export class City {
     };
     const pitch = frontage ? 2 * frontage.hx + frontage.gap : Infinity;
     const fronts = [{ side: 1, next: 40 }, { side: -1, next: 40 + pitch / 2 }];
-    let along = 0, nextDash = 0, nextTree = 13, nextLamp = 30;
+    let along = 0, nextDash = 0, nextTree = 13, nextLamp = 30, nextYard = 45;
     for (let i = 0; i + 1 < road.centre.length; i++) {
       const a = road.centre[i] as RoadPoint, b = road.centre[i + 1] as RoadPoint;
       const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz);
@@ -407,10 +432,11 @@ export class City {
             const ts = (front.next - startAlong) / len, index = Math.round(front.next / pitch), side = front.side;
             const ox = nx * side, oz = nz * side;
             const yaw = Math.atan2(ox, oz), variant = (index * 7 + (side > 0 ? 0 : 1)) % 3;
-            const depth = frontage.hz + (variant === 1 ? 1 : 0), width = frontage.hx + (variant === 2 ? 1 : 0);
+            const depth = frontage.hz + (variant === 1 ? 1 : 0), width = frontage.hx + (variant === 2 ? 1 : 0) + ((index * 3 + (side > 0 ? 1 : 0)) % 3) - 1;
             const centre = hw + 4.5 + frontage.setback + depth;
             const px = a.x + dx * ts + ox * centre, pz = a.z + dz * ts + oz * centre;
-            if (!nearJunction(px, pz, ROAD_HALF + 30 + width) && footprintClear(px, pz, yaw, width + 1.5, depth + 1.5)) {
+            // Corners fill up to the grid pavement; the footprint check is the real limit.
+            if (!nearJunction(px, pz, ROAD_HALF + 8 + width) && footprintClear(px, pz, yaw, width + 1.5, depth + 1.5)) {
               // Crown's avenue climbs toward the tower junction; the quay alternates heights.
               const floors = road.kind === 'avenue' ? 4 + Math.round(6 * Math.max(0, 1 - Math.hypot(px + 450, pz + 450) / 330))
                 : road.kind === 'quay' ? ([3, 4, 6, 4, 5][index % 5] as number) : frontage.floors + (variant === 1 ? 1 : 0);
@@ -421,6 +447,37 @@ export class City {
             }
           }
           front.next += pitch;
+        }
+        while (road.kind === 'service' && nextYard < along) {
+          if (nextYard >= startAlong) {
+            const t = (nextYard - startAlong) / len, k = Math.round(nextYard / 30), side = k % 2 ? -1 : 1;
+            const ox = nx * side, oz = nz * side, ax = a.x + dx * t, az = a.z + dz * t;
+            const place = (offset: number) => ({ x: ax + ox * offset, z: az + oz * offset });
+            const clear = (pt: { x: number; z: number }, r: number) => footprintClear(pt.x, pt.z, yaw, r, r);
+            const kind = k % 5;
+            if (kind === 0 || kind === 3) {
+              // Container rows parallel to the road, two colours, a second tier on the inner one.
+              const row = place(hw + 13);
+              if (clear(row, 8)) {
+                architecture.container(row.x, row.z, yaw + Math.PI / 2, PALETTE.carOrange);
+                const back = place(hw + 16.2);
+                if (clear(back, 8)) { architecture.container(back.x, back.z, yaw + Math.PI / 2, PALETTE.carBlue); architecture.container(back.x, back.z, yaw + Math.PI / 2, CITY_COLORS.brick, 1); }
+              }
+            } else if (kind === 1) {
+              const pt = place(hw + 15);
+              if (clear(pt, 7)) { architecture.tank(pt.x, pt.z, 4.2, 7.5, CITY_COLORS.stone, road.kind === 'service' ? 0x5daeb5 : PALETTE.laneMark); }
+            } else if (kind === 2) {
+              const pt = place(hw + 20);
+              if (clear(pt, 13)) architecture.gantry(pt.x, pt.z, yaw + Math.PI / 2, 22, 0x5daeb5);
+            } else {
+              const pt = place(hw + 12);
+              if (clear(pt, 3)) architecture.mast(pt.x, pt.z);
+            }
+            // Fence between the pavement and the yard on this side.
+            const f = place(hw + 5.6);
+            if (footprintClear(f.x, f.z, yaw, 13, 0.5)) architecture.fence(f.x, f.z, yaw + Math.PI / 2, 26);
+          }
+          nextYard += 30;
         }
         while (nextLamp < along) {
           if (nextLamp >= startAlong) {

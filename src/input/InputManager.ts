@@ -19,7 +19,9 @@ export class InputManager {
   /** Call once per rendered frame before the sim steps. */
   update(): void {
     for (const a of ACTIONS) this.raw[a] = 0;
-    if (!this.blocked) for (const d of this.devices) d.read(this.raw);
+    // Read even while blocked so a tap latched during an ad is dropped, not replayed after it.
+    for (const d of this.devices) d.read(this.raw);
+    if (this.blocked) for (const a of ACTIONS) this.raw[a] = 0;
     for (const a of ACTIONS) {
       const v = this.raw[a];
       const was = this.prev[a] > 0.5;

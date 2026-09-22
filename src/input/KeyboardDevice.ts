@@ -65,6 +65,8 @@ interface KeyboardLayoutMapLike {
 
 export class KeyboardDevice implements InputDevice {
   private readonly down = new Set<string>();
+  /** Keys that went down since the last read, so a tap shorter than a frame is reported once instead of never. */
+  private readonly tapped = new Set<string>();
   private layout: KeyboardLayoutMapLike | null = null;
   private readonly target: Window;
   private readonly onDown: (e: KeyboardEvent) => void;
@@ -80,6 +82,7 @@ export class KeyboardDevice implements InputDevice {
       }
       if (e.code in BINDINGS) {
         this.down.add(e.code);
+        this.tapped.add(e.code);
         if (PREVENT_DEFAULT.has(e.code)) e.preventDefault();
       }
     };
@@ -87,7 +90,7 @@ export class KeyboardDevice implements InputDevice {
       this.down.delete(e.code);
       if (PREVENT_DEFAULT.has(e.code)) e.preventDefault();
     };
-    this.onBlur = () => this.down.clear();
+    this.onBlur = () => { this.down.clear(); this.tapped.clear(); };
     target.addEventListener('keydown', this.onDown);
     target.addEventListener('keyup', this.onUp);
     target.addEventListener('blur', this.onBlur);
@@ -108,6 +111,11 @@ export class KeyboardDevice implements InputDevice {
       const action = BINDINGS[code];
       if (action) raw[action] = 1;
     }
+    for (const code of this.tapped) {
+      const action = BINDINGS[code];
+      if (action) raw[action] = 1;
+    }
+    this.tapped.clear();
   }
 
   label(action: Action): string {

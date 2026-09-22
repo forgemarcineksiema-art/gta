@@ -11,14 +11,7 @@ export const BLOCK = 225;
 export const CITY_HALF = 787.5;
 export const ROAD_HALF = 12;
 export const HIGHWAY_HALF = 19;
-/**
- * The highway carries two real graph lanes per direction, at these distances
- * right of the centreline (decision 14, revisited in M4). They were sub-lane
- * offsets on one graph lane until roadblocks, interceptors and the parked
- * patrols needed a lane to be a thing the graph knows about: something a
- * roadblock can stand across, a unit can be told to take, and the placer can
- * test for a clear footprint.
- */
+/** Highway lane centres, metres right of the centreline: two real graph lanes per direction (decision 14, revisited in M4). */
 export const HIGHWAY_LANE_OFFSETS = [4, 12] as const;
 /** Lane endpoints stop this far from the junction centre; the connection curve fills the rest. */
 export const LANE_INSET = 23;

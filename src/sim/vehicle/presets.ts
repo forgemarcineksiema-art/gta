@@ -102,12 +102,7 @@ export const CAR_PRESETS: Record<CarId, VehicleTuning> = {
     boostThrust: 4000,
   }),
 
-  /**
-   * Low mid-engined coupe: the fastest thing on the road and the body the
-   * interceptor is built on. Short wheelbase, stiff springs, real downforce, a
-   * six-speed that keeps it on the cam; it rewards a clean line and punishes a
-   * lazy one, which is the point of putting it in the police's hands at heat 2.
-   */
+  /** Low coupe: the fastest body in the game and the interceptor's base. Stiff, real downforce, six speeds. */
   sports: preset({
     mass: 1180,
     chassisHalfExtents: { x: 0.92, y: 0.28, z: 2.1 },
@@ -145,14 +140,7 @@ export const CAR_PRESETS: Record<CarId, VehicleTuning> = {
     boostThrust: 3200,
   }),
 
-  /**
-   * Patrol interceptor: a muscle car with three hundred kilos of cage, radio and
-   * bull bar in it. Tuned to ram rather than to race: the extra mass and yaw
-   * inertia mean it arrives with momentum and is not spun by its own hit, the
-   * springs are stiff so the nose does not dive off the bumper, and the rear is
-   * deliberately planted (`powerOversteer` a third of the muscle's) so a unit
-   * that misses stays pointed at the player instead of sliding out of the chase.
-   */
+  /** Patrol saloon: a muscle car plus 300 kg, tuned to ram. Mass and yaw inertia carry the hit; a planted rear keeps a miss pointed at the player. */
   police: preset({
     mass: 1620,
     chassisHalfExtents: { x: 0.98, y: 0.34, z: 2.3 },

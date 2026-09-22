@@ -168,8 +168,7 @@ export class App {
     this.bot = botOn && sim.city ? new TrackBot(sim.carId, CITY_BOT_TUNING)
       : botParam === 'track' ? new TrackBot(this.sim.carId) : botOn ? new BotDriver(Number(params.get('seed') ?? '42')) : null;
     const duration = Number(params.get('duration') ?? '0');
-    // The phase profile costs five `performance.now()` calls per step, so it is
-    // only installed for a measured run, never for play.
+    // Five `performance.now()` calls per step: measured runs only.
     this.simProfile = (botOn && duration > 0) || params.get('profile') === '1' ? new SimProfile() : null;
     if (this.simProfile) sim.mark = this.simProfile.mark;
     this.perf = botOn && duration > 0 ? new PerfProbe(duration, this.simProfile) : null;

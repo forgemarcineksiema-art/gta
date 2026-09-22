@@ -832,10 +832,7 @@ export class Traffic {
     if ((this.s[i] as number) < len - 6) return;
     const outs = this.lanes.outs(lane);
     const uturn = this.lanes.uturn(lane);
-    // A highway car mostly keeps its lane. Choosing uniformly among the exits
-    // weaves it across the carriageway at every node (both lanes of a direction
-    // are now reachable from either) and drains the loop onto the side streets,
-    // which is the opposite of what the highway is for.
+    // Highway cars mostly keep their lane: a uniform pick weaves across the carriageway and drains the loop.
     if (this.isHighway(lane) && this.rng() < this.tuning.highwayKeepLane) {
       const off = this.lanes.offset[lane] as number;
       for (let k = 0; k < outs.length; k++) {
@@ -1161,12 +1158,9 @@ export class Traffic {
   }
 
   /**
-   * Tow-away. A wreck older than `wreckTow` is taken off the street the first
-   * moment the player is not looking at it, so a scrapyard run cannot leave the
-   * pool full of scenery (the backlog's Life case: nothing near the player ever
-   * despawns, and sixteen bodies end up parked in write-offs). The sight test is
-   * the instant one, never a clock of its own: the tow must not be watchable,
-   * and a player circling one junction would reset a hidden-for timer forever.
+   * Tow-away: a wreck older than `wreckTow` is freed the first step the player is
+   * not looking at it. The sight test is instantaneous on purpose: a hidden-for
+   * timer never fires for a player circling one junction.
    */
   private tow(player: PlayerProbe, dt: number): void {
     const t = this.tuning;

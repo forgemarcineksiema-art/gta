@@ -50,9 +50,7 @@ export const TRACK_BOT_BY_CAR: Record<CarId, Partial<TrackBotTuning>> = {
   muscle: {},
   compact: { latAccel: 13 },
   heavy: { latAccel: 11, brakeAccel: 8 },
-  // The sports car has the grip for more, but 19-23 m/s^2 make the bot
-  // inconsistent lap to lap on this track: it runs wide out of the hairpin and
-  // spends the gain recovering. The default budget is what holds.
+  // 19-23 m/s^2 make the sports car run wide out of the hairpin; the default holds.
   sports: {},
   police: { latAccel: 15 },
 };

@@ -22,6 +22,9 @@ interface LiveryStyle {
   mirror: Fitting;
   /** Housing is painted with the details, the two lenses are the flashing pair. */
   bar: { housing: Fitting; lens: Fitting };
+  /** The band's paint (policeBlue unless said); a single centred red lens instead of the pair. */
+  bandColor?: number;
+  singleLens?: boolean;
 }
 
 const POLICE_HALF_BASE = CAR_PRESETS.police.wheelBase * 0.5;
@@ -54,8 +57,25 @@ const SPORTS_LIVERY: LiveryStyle = {
   },
 };
 
-/** One kit per liveried class; anything else wearing `traffic.police` renders plain. */
-const LIVERIES: ReadonlyArray<readonly [CarId, LiveryStyle]> = [['police', POLICE_LIVERY], ['sports', SPORTS_LIVERY]];
+const HEAVY_HALF_BASE = CAR_PRESETS.heavy.wheelBase * 0.5;
+
+/** Police van (slice 7): the band along the box under the belt, broken at the door seams, a wide bar on the roof. */
+const HEAVY_LIVERY: LiveryStyle = {
+  band: { y0: 0.94, y1: 1.07, zones: [[-HEAVY_HALF_BASE - 0.9, 0.12], [0.28, 0.98], [1.12, HEAVY_HALF_BASE + 0.9]] },
+  frontBumper: { w: 1.9, h: 0.1, d: 0.14, x: 0, y: 0.5, z: 2.74 },
+  rearBumper: { w: 1.9, h: 0.1, d: 0.14, x: 0, y: 0.52, z: -2.74 },
+  mirror: { w: 0.2, h: 0.14, d: 0.14, x: 1.08, y: 1.25, z: 1.0 },
+  bar: {
+    housing: { w: 1.3, h: 0.04, d: 0.3, x: 0, y: 2.23, z: 0.5 },
+    lens: { w: 0.55, h: 0.1, d: 0.26, x: 0.33, y: 2.3, z: 0.5 },
+  },
+};
+
+/** The Chief (slice 7): the interceptor's body in ink with a carOrange band and one red lens. */
+const CHIEF_LIVERY: LiveryStyle = { ...SPORTS_LIVERY, bandColor: PALETTE.carOrange, singleLens: true };
+
+/** One kit per liveried class; anything else wearing `traffic.police` renders plain. The Chief has its own. */
+const LIVERIES: ReadonlyArray<readonly [CarId, LiveryStyle]> = [['police', POLICE_LIVERY], ['sports', SPORTS_LIVERY], ['heavy', HEAVY_LIVERY]];
 
 /** Instanced meshes plus the packed-instance bookkeeping for one liveried class. */
 interface LiveryKit {
@@ -75,6 +95,7 @@ export class PoliceView {
   private readonly lensMaterial = new THREE.MeshBasicMaterial({ vertexColors: true });
   private readonly kits: LiveryKit[] = [];
   private readonly kitOf: Partial<Record<CarId, LiveryKit>> = {};
+  private readonly chiefKit: LiveryKit;
   private readonly playerDetails: THREE.Mesh;
   private readonly playerLenses: THREE.Mesh;
   private readonly playerPositions: Float32Array;
@@ -92,20 +113,22 @@ export class PoliceView {
   constructor(scene: THREE.Scene, private readonly sim: SimWorld, player: CarMesh) {
     const capacity = sim.traffic?.capacity ?? 1;
     this.live = new Uint8Array(capacity);
-    for (const [id, style] of LIVERIES) {
+    const kitFor = (id: CarId, style: LiveryStyle, count: number): LiveryKit => {
       const source = buildTrafficGeometry(CAR_PROFILES[id], CAR_PRESETS[id]);
       const kit: LiveryKit = {
-        details: this.instances(scene, buildDetails(source, 0, style), this.material, capacity),
-        flashing: this.instances(scene, buildLenses(style.bar.lens), this.lensMaterial, capacity),
-        unlit: this.instances(scene, buildLenses(style.bar.lens), this.lensMaterial, capacity),
-        packed: new Int16Array(capacity).fill(-1),
-        wrecked: new Uint8Array(capacity),
+        details: this.instances(scene, buildDetails(source, 0, style), this.material, count),
+        flashing: this.instances(scene, buildLenses(style.bar.lens, style.singleLens), this.lensMaterial, count),
+        unlit: this.instances(scene, buildLenses(style.bar.lens, style.singleLens), this.lensMaterial, count),
+        packed: new Int16Array(count).fill(-1),
+        wrecked: new Uint8Array(count),
         n: 0, on: 0, off: 0, repaint: false,
       };
       source.dispose();
       this.kits.push(kit);
-      this.kitOf[id] = kit;
-    }
+      return kit;
+    };
+    for (const [id, style] of LIVERIES) this.kitOf[id] = kitFor(id, style, capacity);
+    this.chiefKit = kitFor('sports', CHIEF_LIVERY, 1);
 
     // Player bodies are authored relative to the sprung chassis, traffic to the ground.
     const t = sim.carId === 'police' ? sim.vehicle.tuning : CAR_PRESETS.police;
@@ -171,8 +194,8 @@ export class PoliceView {
     // Wrecks retain their livery even after leaving the active unit list.
     for (let i = 0; i < traffic.capacity; i++) {
       if (!traffic.police[i] || traffic.state[i] === AgentState.Free) continue;
-      const kit = this.kitOf[traffic.kindOf(i)];
-      if (!kit) continue;
+      const kit = i === sim.police?.chief ? this.chiefKit : this.kitOf[traffic.kindOf(i)];
+      if (!kit || kit.n >= kit.packed.length) continue;
       const slot = traffic.slot[i] as number, p = slot * 3, r = slot * 4;
       this.position.set(
         THREE.MathUtils.lerp(tb.prevPos[p] as number, tb.currPos[p] as number, alpha),
@@ -226,8 +249,16 @@ export class PoliceView {
   private relight(geometry: THREE.BufferGeometry, phase: number): void {
     const colors = geometry.getAttribute('color') as THREE.BufferAttribute;
     const positions = geometry.getAttribute('position');
+    // a single centred lens (the Chief's) is red on one phase and dark on the other
+    let single = true;
+    for (let i = 0; i < positions.count && single; i++) if (Math.abs(positions.getX(i)) > 0.3) single = false;
     for (let i = 0; i < colors.count; i++) {
       const left = positions.getX(i) < 0;
+      if (single) {
+        this.color.setHex(phase === 0 ? PALETTE.carRed : PALETTE.charcoal);
+        colors.setXYZ(i, this.color.r, this.color.g, this.color.b);
+        continue;
+      }
       this.color.setHex(left === (phase === 0) ? (left ? PALETTE.policeBlue : PALETTE.carRed) : PALETTE.charcoal);
       colors.setXYZ(i, this.color.r, this.color.g, this.color.b);
     }
@@ -269,7 +300,8 @@ function fitting(f: Fitting, side: number, y0: number, hex: number): THREE.Buffe
   return box(f.w, f.h, f.d, side * f.x, f.y - y0, f.z, hex);
 }
 
-function buildLenses(lens: Fitting): THREE.BufferGeometry {
+function buildLenses(lens: Fitting, single = false): THREE.BufferGeometry {
+  if (single) return merge([box(lens.w, lens.h, lens.d, 0, lens.y, lens.z, PALETTE.charcoal)]);
   return merge([fitting(lens, -1, 0, PALETTE.charcoal), fitting(lens, 1, 0, PALETTE.charcoal)]);
 }
 
@@ -279,7 +311,7 @@ type Vertex = [number, number, number];
 function buildDetails(source: THREE.BufferGeometry, y0: number, style: LiveryStyle): THREE.BufferGeometry {
   const positions = source.getAttribute('position'), normals = source.getAttribute('normal');
   const pos: number[] = [], col: number[] = [];
-  const blue = new THREE.Color(PALETTE.policeBlue);
+  const blue = new THREE.Color(style.bandColor ?? PALETTE.policeBlue);
   const { y0: low, y1: high, zones } = style.band;
   for (let i = 0; i < positions.count; i += 3) {
     const nx = normals.getX(i);

@@ -2,6 +2,60 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-22 — M4 slice 7: levels 4 and 5, heavies and the Chief
+
+### Done
+
+- `Police.wantedKind`: the roster fills the Chief first (level 5), then the
+  level's interceptors (the Chief is not one), then the heavies' share
+  (half the roster from level 4), then saloons. The Chief is the sports
+  body in ink at 45 m/s with a PIT from 14 m at 30 m/s² aimed where the
+  rear quarter will be once it arrives (the player's position and yaw rate
+  carried on); never recycled while the chase runs; after a wreck its place
+  is kept empty and another comes 16 s later.
+- Heavies (the van, 2,400 kg) shove at 20 m/s², aimed at the rear corner on
+  their own side 1.2 m off the centre line, so the car goes across the road
+  (a rear-centre shove moved it 0.2 m; 1.3 m spun it into a wall).
+- Views: the heavy livery (a band broken at the van's door seams, a wide
+  roof bar), the Chief's kit (ink body, carOrange band, one red lens).
+- `audio/Siren.ts`: the siren bed the plan assumed was not there; now a
+  wailing siren whose loudness follows the nearest unit while the police
+  are after the player, a lower voice while heavies are in the roster, and
+  the Chief's two-tone horn within 90 m every 2.6 s.
+- Tests: `heavy.test.ts` 7.1–7.4; 7.5 is `police.long.test.ts`'s level-5
+  pool pin, which now runs with four heavies and the Chief.
+
+### Measured
+
+- Rosters: level 4 = 2 interceptors, 3 heavies, 1 saloon; level 5 = the
+  Chief, 3 interceptors, 4 heavies (full within 0.02 s of sim time).
+- A heavy from 25 m behind at 70 km/h: 3.3 m across, 102 km/h a second
+  later, no damage. The Chief at 120 km/h on the north straight: its PITs
+  land (yaw rate to 0.84 rad/s) more than twice a minute.
+- Busted in five minutes, seeds 42 / 7 / 123: level 4 novice 2 / 7 / 6,
+  skilled 7 / 3 / 1; level 5 novice 10 / 3 / 3, skilled 3 / 1 / 0.
+- Browser, MX330, 4× CPU, auto quality, 60 s bot (same build, back to
+  back): heat 0 57.8 fps mean, frame p95 16.8 ms, step p95 6.4 ms, 98
+  draws, 229k tris; heat 5 57.1 fps, 16.8 ms, 6.8 ms, 110 draws, 194k tris,
+  heap 51 MB. Slice 0's baseline was 60.0 fps / p95 16.7 / 97 draws.
+
+### Decided (set here)
+
+- The Chief's replacement keeps its place: without that a saloon filled
+  the vacancy at once and no Chief ever came back.
+- The heavy's corner aim (`POLICE.heavy.aimSide`) is new; 7.2 asks for a
+  shove across the road and a centre ram does not give one.
+- 7.5: at level 5 the pursuit holds up to 14 of the 48 traffic records (8
+  units, 4 parked patrols, 2 roadblock cars) and at worst 30 civilians are
+  driving (level 2: 40), police bodies peak at 5 of 10. The plan's 36
+  civilians predates slice 6's parked patrols and roadblocks; the pool
+  stays at 48 (the traffic step's cost pin and the low tier), and the long
+  pin now holds a civilians-only floor of 28 at level 5 and 36 at level 2.
+
+### Next
+
+- Slice 8: ad points, polish, the gate.
+
 ## 2026-09-22 — M4 slice 6: level 3 (roadblocks, spikes, parked patrols, cameras, jumps)
 
 ### Done

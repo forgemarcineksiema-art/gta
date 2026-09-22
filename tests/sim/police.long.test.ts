@@ -63,22 +63,34 @@ describe('police patrols (long)', () => {
       const police = sim.police!;
       let maxPoliceBodies = 0;
       let minAlive = Infinity;
+      let minCivilians = Infinity;
       try {
         for (let tick = 0; tick < 45 * 60; tick++) {
           bot.drive(sim, sim.controls, 1 / 60);
           sim.step();
           maxPoliceBodies = Math.max(maxPoliceBodies, traffic.policeBodies());
-          if (sim.time > 5) minAlive = Math.min(minAlive, traffic.count(AgentState.Kinematic) + traffic.count(AgentState.Physical));
+          if (sim.time > 5) {
+            minAlive = Math.min(minAlive, traffic.count(AgentState.Kinematic) + traffic.count(AgentState.Physical));
+            let civilians = 0;
+            for (let i = 0; i < traffic.capacity; i++) {
+              const st = traffic.state[i];
+              if (traffic.police[i] === 0 && (st === AgentState.Kinematic || st === AgentState.Physical)) civilians++;
+            }
+            minCivilians = Math.min(minCivilians, civilians);
+          }
           expect(police.count).toBeLessThanOrEqual(POLICE.budget[level] as number);
         }
         let interceptors = 0;
-        for (const agent of police.units) if (agent >= 0 && traffic.kindOf(agent) === 'sports') interceptors++;
+        // the Chief (level 5, slice 7) drives the sports body but is not one of the level's interceptors
+        for (const agent of police.units) if (agent >= 0 && agent !== police.chief && traffic.kindOf(agent) === 'sports') interceptors++;
         console.log(`[police] level ${level}: ${police.count} units, ${interceptors} interceptors, ${maxPoliceBodies} police bodies, ${minAlive} cars alive at the worst moment`);
         expect(police.count).toBe(POLICE.budget[level] as number);
         expect(interceptors).toBe(POLICE.interceptors[level] as number);
         // The pursuit borrows from the traffic; it never owns the pool and never empties the street.
         expect(maxPoliceBodies).toBeLessThanOrEqual(TRAFFIC.policeBodies);
         expect(minAlive).toBeGreaterThan(20);
+        // at level 5 the pursuit holds up to 14 of the 48 records (8 units, 4 parked patrols, 2 roadblock cars)
+        expect(minCivilians).toBeGreaterThanOrEqual(level === 5 ? 28 : 36);
       } finally { sim.dispose(); }
     }
   }, 180_000);

@@ -13,6 +13,9 @@
  * - search: sight lost, units drive to where the player was last seen and fan
  *   out through the junctions there until the escape timer runs out;
  * - react: a unit the player hits notices at once, and it costs heat;
+ * - heavies and the Chief (slice 7): from level 4 half the roster is the heavy
+ *   van with a harder shove; at level 5 one unit is the Chief, an interceptor
+ *   whose PIT leads the player's turn;
  * - parked patrols (slice 6): from level 3 cars wait at the junctions near the
  *   player, lights on when close; one that sees the player pulls out and chases;
  * - identity (slice 5): a swap no unit saw ends the chase and the units box
@@ -24,6 +27,7 @@
  */
 import RAPIER from '@dimforge/rapier3d-compat';
 import { BALANCE } from '../balance';
+import { PALETTE } from '../palette';
 import type { SimEvent } from '../events';
 import type { ParkedJunction } from '../city/cover';
 import type { RoadGraph, Lane, RoadNode } from '../city/roads';
@@ -54,6 +58,9 @@ export class Police {
   arresting = false;
   /** Test hook: false keeps new units from coming on duty (deterministic busted and door setups). */
   dispatching = true;
+  /** The Chief's agent at level 5, -1 otherwise; after a wreck another comes `chiefWait` seconds later. */
+  chief = -1;
+  chiefWait = 0;
   /** Parked patrols: the agent at each place (-1 none) and its index into `parkedJunctions`. */
   readonly parked: Int16Array;
   readonly parkedAt: Int16Array;
@@ -94,6 +101,7 @@ export class Police {
   private readonly slotOpen = new Uint8Array(SLOTS);
   private readonly ray = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 });
   private readonly pos = { x: 0, y: 0, z: 0 };
+  private readonly spin = { x: 0, y: 0, z: 0 };
   private readonly pose: LanePose = { x: 0, z: 0, yaw: 0 };
   private readonly projection: LaneProjection = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };
   private readonly fields: [Float64Array, Float64Array];
@@ -172,6 +180,10 @@ export class Police {
       const state = traffic.state[agent];
       if (traffic.police[agent] !== 1 || state === AgentState.Free || state === AgentState.Wrecked || state === AgentState.Abandoned) {
         traffic.clearPolicePlan(agent);
+        if (agent === this.chief) {
+          this.chief = -1;
+          this.chiefWait = t.reinforceSeconds * t.chief.reinforceFactor;
+        }
         this.units[u] = -1;
         this.seen[u] = 0;
         this.los[u] = 0;
@@ -191,6 +203,7 @@ export class Police {
       this.rammed[u] = 0;
       traffic.clearPolicePlan(agent);
     }
+    this.chiefWait = Math.max(0, this.chiefWait - dt);
     const assaulted = this.assaults(dt);
     // last step's crimes, judged by who could see the car when they happened
     this.cursor = this.sim.events.readFrom(this.cursor, this.onCrime);
@@ -201,6 +214,7 @@ export class Police {
       this.spawnLeft = 0;
       this.arresting = false;
       this.boxing = false;
+      this.chiefWait = 0;
       this.leaving.fill(0);
       this.seen.fill(0);
       this.los.fill(0);
@@ -220,8 +234,11 @@ export class Police {
       this.spawnLeft = t.spawnRetrySeconds;
       for (let u = 0; u < this.units.length && this.count < this.budget; u++) {
         if ((this.units[u] as number) >= 0) continue;
-        const agent = this.spawn(player, cosHalf, this.interceptorsWanted(level));
+        const kind = this.wantedKind(level);
+        if (kind === null) break;
+        const agent = this.spawn(player, cosHalf, kind);
         if (agent < 0) break;
+        if (kind === 'chief') this.chief = agent;
         this.units[u] = agent;
         this.seen[u] = 0;
         this.withdrawing[u] = 0;
@@ -338,6 +355,7 @@ export class Police {
         if (Math.hypot(player.x - x, player.z - z) > t.patrolRecycle
           && traffic.outOfView(x, z, this.radius, player, t.viewNear, cosHalf)) {
           traffic.releasePolice(agent);
+          if (agent === this.chief) this.chief = -1;
           this.units[u] = -1;
           this.seen[u] = 0;
           this.count--;
@@ -362,10 +380,11 @@ export class Police {
         continue;
       }
       const pit = traffic.kindOf(agent) === 'sports';
+      const isChief = agent === this.chief;
       const next = this.isCutter(u, agent, level) && gap > t.cutoff.breakRange ? this.routeExit(agent, AHEAD) : this.routeExit(agent, CHASE);
       // Close in, a unit drives its class speed; a street back it runs flat out to arrive at all.
-      const speed = gap > t.catchUpRange ? t.catchUpSpeed : pit ? t.interceptorSpeed : t.chaseSpeed;
-      const range = pit ? t.pitRange : t.ramRange;
+      const speed = isChief ? t.chief.speed : gap > t.catchUpRange ? t.catchUpSpeed : pit ? t.interceptorSpeed : t.chaseSpeed;
+      const range = isChief ? t.chief.pitRange : pit ? t.pitRange : t.ramRange;
       const ram = this.seen[u] === 1 && traffic.state[agent] === AgentState.Physical && gap <= range;
       if (!ram) {
         traffic.setPolicePlan(agent, next, speed);
@@ -375,13 +394,27 @@ export class Police {
       let aimX = player.x + player.vx * t.ramLeadSeconds;
       let aimZ = player.z + player.vz * t.ramLeadSeconds;
       if (pit) {
+        // the Chief aims where the rear quarter will be once it arrives, the player's turn carried on
+        let yaw = player.yaw, px = player.x, pz = player.z;
+        if (isChief) {
+          const lead = Math.min(1, gap / Math.max(1, speed - player.speed + t.ramClosingSpeed));
+          yaw += this.sim.vehicle.body.angvel(this.spin).y * lead;
+          px += player.vx * lead;
+          pz += player.vz * lead;
+        }
+        const fx = Math.sin(yaw), fz = Math.cos(yaw);
+        const side = -dx * -fz - dz * fx >= 0 ? 1 : -1;
+        aimX = px - fx * player.halfLength * 0.9 + -fz * side * t.pitSideOffset;
+        aimZ = pz - fz * player.halfLength * 0.9 + fx * side * t.pitSideOffset;
+      } else if (traffic.kindOf(agent) === 'heavy') {
+        // a van shoves the rear corner on its own side: the car goes across the road, not just ahead
         const fx = Math.sin(player.yaw), fz = Math.cos(player.yaw);
         const side = -dx * -fz - dz * fx >= 0 ? 1 : -1;
-        aimX = player.x - fx * player.halfLength * 0.9 + -fz * side * t.pitSideOffset;
-        aimZ = player.z - fz * player.halfLength * 0.9 + fx * side * t.pitSideOffset;
+        aimX += -fx * player.halfLength * 0.6 + -fz * side * t.heavy.aimSide;
+        aimZ += -fz * player.halfLength * 0.6 + fx * side * t.heavy.aimSide;
       }
-      traffic.setPolicePlan(agent, next, speed, aimX, aimZ,
-        Math.min(speed, player.speed + t.ramClosingSpeed), pit ? t.pitAcceleration : t.ramAcceleration);
+      const shove = isChief ? t.chief.pitAcceleration : pit ? t.pitAcceleration : traffic.kindOf(agent) === 'heavy' ? t.heavy.ramAcceleration : t.ramAcceleration;
+      traffic.setPolicePlan(agent, next, speed, aimX, aimZ, Math.min(speed, player.speed + t.ramClosingSpeed), shove);
       this.rammed[u] = 1;
     }
   }
@@ -789,6 +822,7 @@ export class Police {
         && Math.hypot(player.x - x, player.z - z) >= t.withdrawRange
         && traffic.outOfView(x, z, this.radius, player, t.viewNear, cosHalf)) {
         traffic.releasePolice(agent);
+        if (agent === this.chief) this.chief = -1;
         this.units[u] = -1;
         this.count--;
         continue;
@@ -818,18 +852,38 @@ export class Police {
     return this.sim.world.castRay(this.ray, length, true, RAPIER.QueryFilterFlags.ONLY_FIXED | RAPIER.QueryFilterFlags.EXCLUDE_SENSORS) === null;
   }
 
-  /** True while the roster is short of the interceptors this level pays for. */
-  private interceptorsWanted(level: number): boolean {
-    const want = this.tuning.interceptors[level] ?? 0;
-    let live = 0;
+  /** Heavy vans in the roster now. */
+  get heavies(): number {
+    let n = 0;
     for (let u = 0; u < this.units.length; u++) {
       const agent = this.units[u] as number;
-      if (agent >= 0 && this.traffic.kindOf(agent) === 'sports') live++;
+      if (agent >= 0 && this.traffic.kindOf(agent) === 'heavy') n++;
     }
-    return live < want;
+    return n;
   }
 
-  private spawn(player: PlayerProbe, cosHalf: number, interceptor: boolean): number {
+  /**
+   * What the roster is short of, in order: the Chief at its level, the interceptors the level pays for
+   * (the Chief is not one of them), the heavies' share of the roster from their level, then saloons.
+   * Null while the Chief's place is kept for its replacement: nobody else fills it.
+   */
+  private wantedKind(level: number): 'chief' | 'sports' | 'heavy' | 'police' | null {
+    const t = this.tuning;
+    if (level >= t.chief.level && this.chief < 0) {
+      if (this.chiefWait <= 0) return 'chief';
+      if (this.count >= this.budget - 1) return null;
+    }
+    let interceptors = 0;
+    for (let u = 0; u < this.units.length; u++) {
+      const agent = this.units[u] as number;
+      if (agent >= 0 && agent !== this.chief && this.traffic.kindOf(agent) === 'sports') interceptors++;
+    }
+    if (interceptors < (t.interceptors[level] ?? 0)) return 'sports';
+    if (level >= t.heavy.fromLevel && this.heavies < Math.round(this.budget * t.heavy.share)) return 'heavy';
+    return 'police';
+  }
+
+  private spawn(player: PlayerProbe, cosHalf: number, kind: 'chief' | 'sports' | 'heavy' | 'police'): number {
     const t = this.tuning;
     const lanes = this.traffic.lanes;
     const fx = Math.sin(player.yaw), fz = Math.cos(player.yaw);
@@ -853,8 +907,10 @@ export class Police {
         bestS = s;
       }
     }
-    return bestLane < 0 ? -1
-      : this.traffic.spawnPoliceAt(bestLane, bestS, interceptor ? 'sports' : 'police', player, t.viewNear, cosHalf, t.spawnClearance);
+    if (bestLane < 0) return -1;
+    return kind === 'chief'
+      ? this.traffic.spawnPoliceAt(bestLane, bestS, 'sports', player, t.viewNear, cosHalf, t.spawnClearance, PALETTE.ink)
+      : this.traffic.spawnPoliceAt(bestLane, bestS, kind, player, t.viewNear, cosHalf, t.spawnClearance);
   }
 
   /** Reverse Dijkstra on the authored road graph toward the lane under a point, into one of the two fields. */

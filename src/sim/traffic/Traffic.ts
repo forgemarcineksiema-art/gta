@@ -401,14 +401,15 @@ export class Traffic {
   }
 
   /** Only an unseen, undisturbed civilian may give up a full agent slot. */
-  spawnPoliceAt(lane: number, s: number, kind: 'police' | 'sports', player: PlayerProbe, near: number, cosHalf: number, clearance: number): number {
+  spawnPoliceAt(lane: number, s: number, kind: 'police' | 'sports' | 'heavy', player: PlayerProbe, near: number, cosHalf: number, clearance: number, paint = -1): number {
     if (!this.canSpawnAt(lane, s, clearance)) return -1;
     const index = KIND_INDEX[kind];
     const radius = Math.hypot(this.halfW[index] as number, this.halfL[index] as number);
     if (!this.outOfView(this.pose.x, this.pose.z, radius, player, near, cosHalf)) return -1;
     const agent = this.claim(player, near, cosHalf);
     if (agent < 0) return -1;
-    this.place(agent, lane, s, index, 0, AgentState.Kinematic, PLAYER_PAINT[kind]);
+    // a heavy in the pursuit is a police van: white like the saloons, with the livery on top
+    this.place(agent, lane, s, index, 0, AgentState.Kinematic, paint >= 0 ? paint : kind === 'heavy' ? PLAYER_PAINT.police : PLAYER_PAINT[kind]);
     this.police[agent] = 1;
     return agent;
   }

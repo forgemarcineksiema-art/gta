@@ -357,7 +357,10 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   with `cone` orange stripes on `steel` trestles, between two cruisers
   standing along the lane with their bars flashing; the spike strip is a low
   `ink` bar with `steel` teeth across the open lane. Parked patrols flash
-  their bars within 200 m at heat 3+ and are dark otherwise.
+  their bars within 200 m at heat 3+ and are dark otherwise. The heavy unit
+  is the van in `policeWhite` with the band broken at its door seams and a
+  wide roof bar; the Chief is the interceptor's body in `ink` with a
+  `carOrange` band and a single red lens.
 
 ## Camera and motion
 

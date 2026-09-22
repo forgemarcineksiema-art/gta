@@ -1,6 +1,6 @@
 # M4 "Heat" — implementation plan
 
-Executor: the agent working M4 now (slices 0–6 are done; 7 is next).
+Executor: the agent working M4 now (slices 0–7 are done; 8 is next).
 Reviewer: Claude, at the gate. Director and playtester: Marcin. This
 document is the milestone contract: what to build, in which order, with
 which numbers, and what "done" means; each fixed decision carries its
@@ -62,6 +62,7 @@ update 1 (§5).
 | 4 the cold open | `Jobs` skeleton (one delivery kind); `ColdOpen`: the van at heat 1, the candidate held alongside, a 1.3 km route round the hideout's block through a billboard gate with its coin line and the marker at 600 m; verbs in any order, captions in order with cues and timeouts; skip on N; the session flag; `sim/city/route.ts` | scripted bot done in 89.1 s: swap 5.5 s, gate 22.0, marker 34.4, door 89.1; captions steer 0.0, swap 5.4, boost 5.5, smash 10.1, escape 42.0 (takedown never cued: the pair lost the bot at 5.4 s) |
 | 5 identity | the descriptor; a swap nobody saw loses the police and they box the car left behind, then pull out and withdraw; the disguise with BORROW, the lit bar, COVER BLOWN and the dispatcher's 30 s timer; `novice` and `skilled` bot policies; the road bot no longer resets out of an arrest | skilled at level 2, 120 s: 1 / 1 / 1 escapes by swap, 0 by cooldown, 0 disguises; novice busted 1 / 1 / 0; the in-sight cruiser exploit disguised 114 of 120 s → 30 s with the timer |
 | 6 level 3 | roadblocks at chokepoints ahead and out of view with the sawhorse, the braced car half and the heavy's breach; spike strips (grip, pull, mend); four parked patrols near the player; ten speed cameras with the flash; twenty stunt ramps on the park strip with the slow motion | busted per 5 min at L1 / L2 / L3: novice 0–5 / 2–6 / 1–16, skilled 0–2 / 1–2 / 0–2 (the rule does not fire); jumps 1.1–1.3 s; e2e heat 3: 84 draws, 147k tris |
+| 7 levels 4–5 | heavies (half the roster from level 4, a corner shove) and the Chief (level 5, a leading PIT, kept through the chase, replaced 16 s after a wreck); the heavy and Chief liveries; the siren bed | busted per 5 min at L4 / L5: novice 2–7 / 3–10, skilled 1–7 / 0–3; heat 5 in the browser 57.1 fps, step p95 6.8 ms, 110 draws |
 
 ### 1.2 In scope (gate-critical, §4 slices 3–8)
 
@@ -985,6 +986,11 @@ alive (the slice-2 pin re-run at level 5 with heavies).
 Acceptance: verify green; the browser step p95 and fps at level 5 on the
 low tier against the slice-0 baseline (`PERF_HEAT=5`), and the bot's
 busted rate at 4 and 5 (both policies), in PROGRESS.
+
+As built (2026-09-22, PROGRESS): the heavy shoves the rear corner on its
+side (`heavy.aimSide` 1.2 m) because a centre ram does not move the car
+across; the Chief's place in the roster stays empty until its replacement;
+the siren bed did not exist and was built here.
 
 ### Slice 8 — ad points, polish, the gate (2 days)
 

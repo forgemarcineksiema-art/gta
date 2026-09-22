@@ -76,6 +76,13 @@ export interface PoliceTuning {
   parked: { fromLevel: number; count: number; radius: number; lightsRange: number };
   /** Speed cameras: a flash when the car crosses the line more than `overKmh` over the road's limit; `cooldown` s per camera. */
   cameras: { count: number; overKmh: number; cooldown: number };
+  /** Heavy vans: from `fromLevel`, `share` of the roster, shoving the rear corner `aimSide` m off the centre line at `ramAcceleration` (m/s²). */
+  heavy: { fromLevel: number; share: number; ramAcceleration: number; aimSide: number };
+  /**
+   * The Chief (level `level`): an interceptor in ink at `speed` m/s whose PIT (from `pitRange` m, at
+   * `pitAcceleration`) leads the player's turn; replaced `reinforceFactor` × `reinforceSeconds` after a wreck.
+   */
+  chief: { level: number; speed: number; pitAcceleration: number; pitRange: number; reinforceFactor: number };
   /**
    * The arrest: under `playerSpeed` m/s (released above `releaseSpeed`) units within `range` m take the slots
    * `rear` / `front` m along and `side` m across the player, braking at `decel` to arrive within `arrive` m;
@@ -138,6 +145,8 @@ export const POLICE: PoliceTuning = {
   spike: { grip: 0.6, pull: 900 },
   parked: { fromLevel: 3, count: 4, radius: 450, lightsRange: 200 },
   cameras: { count: 10, overKmh: 20, cooldown: 30 },
+  heavy: { fromLevel: 4, share: 0.5, ramAcceleration: 20, aimSide: 1.3 },
+  chief: { level: 5, speed: 45, pitAcceleration: 30, pitRange: 14, reinforceFactor: 2 },
   // clear: a unit passes the player's car no closer than this (m), at detourSpeed (m/s)
   arrest: { playerSpeed: 6, releaseSpeed: 9, range: 60, rear: 5.6, front: 5.6, side: 3.2, standby: 12, decel: 6, arrive: 1.2, accel: 12, keep: 5, clear: 4, detourSpeed: 5 },
   search: { reach: 30 },

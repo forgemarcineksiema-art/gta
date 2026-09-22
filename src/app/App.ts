@@ -5,6 +5,7 @@
  */
 import { EngineAudio } from '../audio/EngineAudio';
 import { Sfx } from '../audio/Sfx';
+import { Siren } from '../audio/Siren';
 import { InputManager } from '../input/InputManager';
 import { KeyboardDevice } from '../input/KeyboardDevice';
 import { createPlatform, type Platform } from '../platform';
@@ -88,6 +89,7 @@ export class App {
   private readonly coldOpenHud: ColdOpenHud;
   private readonly audio: EngineAudio;
   private readonly sfx: Sfx;
+  private readonly siren: Siren;
   private readonly panel: DebugPanel | null;
   private readonly loop = new FixedStepLoop(FIXED_DT, 5);
   private readonly bot: BotDriver | TrackBot | BotPolicy | null;
@@ -118,6 +120,7 @@ export class App {
     this.input.addDevice(new KeyboardDevice());
     this.audio = new EngineAudio();
     this.sfx = new Sfx(this.audio);
+    this.siren = new Siren(this.audio);
     const uiRoot = document.getElementById('ui') ?? document.body;
     this.hud = new Hud(uiRoot, sim);
     this.runHud = new RunHud(uiRoot, sim);
@@ -443,6 +446,7 @@ export class App {
     this.renderer.render(alpha, this.paused ? 0 : frameDt);
     this.audio.update(this.sim.vehicle.telemetry, frameDt);
     this.sfx.update(this.sim);
+    this.siren.update(this.sim, this.paused ? 0 : frameDt);
 
     if (!this.started) {
       // the player is in control from this frame on

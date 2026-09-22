@@ -2,6 +2,47 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-22 — M4 slice 3b: coins and the spill
+
+Marcin: work autonomously to the end of M4. Slice 3b first.
+
+### Done
+
+- `sim/city/coins.ts`: every lane's coins from the seed (runs of 8–12 at
+  6 m, gaps 40–90 m, clear of the lane's first 10 m and last 30 m) and a
+  line of 8 through each billboard along its normal; each chunk takes the
+  coins inside it (`CityChunk.coins`), so a run crossing a chunk border is
+  one run. `Coins.step` picks under the chassis footprint (+0.4 m) over the
+  loaded chunks, one `coin` event each; `Run` adds road coins to
+  `run.coins` (never the bag) and counts them for the wall.
+- The spill: `Life.wreck` → `Run.spill` moves 30 % of the bag into a pool
+  of 12 coins laid from 10 m at 4 m pitch along the lane that runs the way
+  the wreck faced (on into the straight-through exit), 10 s to live; a
+  spilled coin (`coin` target −2) pays back into the bag.
+- `render/Coins.ts`: one instanced mesh of upright octagons (8 triangles,
+  carOrange), spinning in the vertex shader from one time uniform (no
+  matrix upload for the spin), packed and swap-removed on pickup; twelve
+  bigger carWhite ones for the spill. HUD: the coin counter under the bag
+  (white, an orange octagon glyph). Sfx: a blip that climbs a semitone per
+  coin in a run, a six-note cascade for the spill.
+- Tests: `coins.test.ts` 3.8–3.12. `brain.test.ts` 3c.2 now runs with the
+  player's damage off: its 110 km/h wall slam wrecked the player too and
+  the new spill took 30 % of the bag it measures.
+
+### Measured
+
+- Whole island: 2,999 / 3,004 / 3,026 coins for seeds 42 / 7 / 123 (about
+  2,600 on lanes, 400 through the billboards); inside the plan's
+  2,000–3,500.
+- The road bot, 300 s, traffic on: 54–56 coins a minute (DESIGN.md §3.3
+  assumed about 60), 2,710–2,820 in `run.coins`.
+- Smoke: 60.0 fps, p95 16.7 ms, 98 draws (+1, the coins; no shadow pass),
+  210k triangles (+17k: about 2,100 resident coins × 8). Startup 3.55 MB.
+
+### Next
+
+- Slice 4: the cold open prototype on the jobs skeleton.
+
 ## 2026-09-22 — M4 slice 3c: the police brain (Marcin's playtest of 3a)
 
 Marcin played 3a: being busted took long minutes right next to the police,

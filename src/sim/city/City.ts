@@ -8,6 +8,7 @@ import { IDENTITY_QUAT as IDENTITY_ROT, quatFromYaw, type StaticDesc } from '../
 import { Architecture, CITY_COLORS } from './architecture';
 import { placeBillboards, type BillboardDesc } from './collectibles';
 import { dropOffAt, hideoutStatics, nearDoor } from './cover';
+import { laneCoins, placeCoins, type CoinDesc } from './coins';
 import { buildRoadMarkings } from './markings';
 import { BLOCK, CITY_HALF, HIGHWAY_HALF, HIGHWAY_LANE_OFFSETS, ROAD_HALF, buildCityRoute, buildRoadGraph, distanceToPolyline, projectOnLane, type Lane, type RoadPoint, type SpecialRoad } from './roads';
 
@@ -26,7 +27,7 @@ export const LANDMARKS = DISTRICTS.map((d, i) => {
   return { district: d.id, name: d.landmark, x: (i % 2 ? 450 : -450) + offset, z: (i < 2 ? -450 : 450) + offset, offset };
 });
 export function chunkCoord(v: number): number { return Math.max(-3, Math.min(3, Math.floor((v + BLOCK / 2) / BLOCK))); }
-export interface CityChunk { key: string; x: number; z: number; statics: StaticDesc[]; billboards: BillboardDesc[] }
+export interface CityChunk { key: string; x: number; z: number; statics: StaticDesc[]; billboards: BillboardDesc[]; coins: CoinDesc[] }
 
 type Pt = { x: number; z: number };
 /** Where a pavement band may begin or end along an authored road, with the edge to start on. */
@@ -64,7 +65,10 @@ export class City {
   private cx = Infinity;
   private cz = Infinity;
   private complete = false;
+  /** Every lane's coins from the seed; each chunk takes the ones inside it. */
+  private readonly laneCoins: Array<{ x: number; z: number; lane: number }>;
   constructor(readonly world: RAPIER.World, readonly seed = 42) {
+    this.laneCoins = laneCoins(this.graph, seed);
     // The one unbroken collision plane eliminates suspension seams at roads and chunk borders.
     world.createCollider(RAPIER.ColliderDesc.cuboid(CITY_HALF, 0.5, CITY_HALF)
       .setTranslation(0, -0.5, 0).setFriction(1).setCollisionGroups(GROUPS_TERRAIN));
@@ -299,7 +303,8 @@ export class City {
     }
     // Last: the billboards need every static in place to find clear ground.
     const billboards = placeBillboards(cx, cz, statics, roadClearance);
-    return { key: `${cx},${cz}`, x: cx, z: cz, statics, billboards };
+    const coins = placeCoins(cx, cz, this.laneCoins, billboards);
+    return { key: `${cx},${cz}`, x: cx, z: cz, statics, billboards, coins };
   }
 
   /** Coral Quay's seawall edge: paved promenade, railing, palms, benches and masts. */

@@ -13,6 +13,9 @@ export class RunHud {
   private readonly bag: HTMLElement;
   private readonly bagValue: HTMLElement;
   private readonly mult: HTMLElement;
+  private readonly coinRow: HTMLElement;
+  private readonly coinValue: HTMLElement;
+  private lastCoins = -1;
   private readonly bar: HTMLElement;
   private readonly barFill: HTMLElement;
   private readonly card: HTMLElement;
@@ -39,6 +42,10 @@ export class RunHud {
     this.mult = el('span', 'run__mult', '×1');
     this.bag.append(this.bagValue, this.mult);
     this.bag.setAttribute('aria-label', 'Bag');
+    // coins under the bag, white: they are the player's the moment they are picked
+    this.coinRow = el('div', 'run__coins');
+    this.coinValue = el('span', 'run__coins-value', '0');
+    this.coinRow.append(el('span', 'run__coin-glyph'), this.coinValue);
     this.bar = el('div', 'run__busted');
     const track = el('div', 'run__busted-track');
     this.barFill = el('div', 'run__busted-fill');
@@ -51,9 +58,10 @@ export class RunHud {
     this.wallLines = el('div', 'run__lines');
     this.wallCounts = el('div', 'run__counts');
     this.wall.append(el('div', 'run__title', 'BANKED'), this.wallLines, this.wallCounts, this.prompt());
-    this.root.append(this.bag, this.bar, this.card, this.wall);
+    this.root.append(this.bag, this.coinRow, this.bar, this.card, this.wall);
     parent.appendChild(this.root);
     this.bag.classList.toggle('is-visible', sim.city !== null);
+    this.coinRow.classList.toggle('is-visible', sim.city !== null);
     this.update(sim, 0);
   }
 
@@ -79,6 +87,10 @@ export class RunHud {
     if (shown !== this.lastBagShown) {
       this.bagValue.textContent = money(shown);
       this.lastBagShown = shown;
+    }
+    if (run.coins !== this.lastCoins) {
+      this.coinValue.textContent = money(run.coins);
+      this.lastCoins = run.coins;
     }
     const m = run.multiplier;
     if (m !== this.lastMult) {
@@ -106,6 +118,7 @@ export class RunHud {
       this.card.classList.toggle('is-visible', run.state === 'busted');
       this.wall.classList.toggle('is-visible', run.state === 'door');
       this.bag.classList.toggle('is-hidden', run.state === 'busted' || run.state === 'door');
+      this.coinRow.classList.toggle('is-hidden', run.state === 'busted' || run.state === 'door');
     }
   }
 

@@ -135,6 +135,16 @@ export class Run {
     this.startRun();
   }
 
+  /** A wreck: `spill.share` of the bag leaves it as a pool of coins on the lane ahead (Life calls this). */
+  spill(x: number, z: number, yaw: number): void {
+    const coins = this.sim.coins;
+    if (!coins || this.state === 'door' || this.state === 'busted') return;
+    const amount = Math.round(this.bag * BALANCE.spill.share);
+    if (amount <= 0) return;
+    this.bag -= amount;
+    coins.spill(x, z, yaw, amount, this.sim.events);
+  }
+
   /** Any key at the busted card: drive on where you stand, heat 0. */
   closeCard(): void {
     if (this.state !== 'busted') return;
@@ -291,6 +301,14 @@ export class Run {
         // value: the heat level escaped from
         this.bag += bag.escapePerLevel * e.value;
         this.counts.escapes++;
+        break;
+      case 'coin':
+        // a spilled coin (target -2) was the bag's and goes back into it; a road coin is the player's for good
+        if (e.target === -2) this.bag += e.value;
+        else {
+          this.coins += e.value;
+          this.counts.coins++;
+        }
         break;
       default:
         break;

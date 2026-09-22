@@ -1,6 +1,6 @@
 # M4 "Heat" — implementation plan
 
-Executor: the agent working M4 now (slices 0–2, 3a and 3c are done; 3b is next).
+Executor: the agent working M4 now (slices 0–3 are done; 4 is next).
 Reviewer: Claude, at the gate. Director and playtester: Marcin. This
 document is the milestone contract: what to build, in which order, with
 which numbers, and what "done" means; each fixed decision carries its
@@ -57,6 +57,7 @@ update 1 (§5).
 | 1 heat and pursuit | `Heat` ratchet from the ring; `Pursuit` idle → detected → active → lost → idle; level-1 pair as traffic agents with a plan; sight rays; spawn out of view; stars; livery and light bar | bot at heat 1, 120 s: 23 % in pursuit, 2 escapes, 1 ram, first unit at 0.02 s, never in the view cone; Node step 0.62 ms |
 | 2 units per level | budgets 2/4/5/6/8, interceptors 0/1/2/2/3; the police-first lender with a hard share; rams and the PIT; catch-up speed; patrol recycling | level 2 → 4 units / 1 interceptor, level 5 → 8 / 3; peak police bodies 2 / 3 / 6 with 41–44 civilians alive; a shove costs no speed and 0.7 m, a PIT 5.8 m and 0.48 rad/s; Node step 0.64–0.91 ms at every level |
 | 3a the run | `Run`: bag, bank, `maxHeat`, the door race (control kept, bail-out, busted first), busted and the fine; three garages on generator lots; the roster stands down at heat 0; the wall, the card, the bag on the HUD; `?bot=door` | road bot from heat 0: bag 0, hideout in 99–130 s; from heat 2: 0 busted in 15 bot-minutes, 600–800 bag a minute, banked 5,000–6,250; smoke 60.0 fps / 97 draws unchanged |
+| 3b coins and the spill | `Coins`: runs along every lane and a line through each billboard from the seed, picked by the footprint into `run.coins`; the wreck's spill (30 % of the bag, 12 coins, 10 s) paying back into the bag; the shader-spun instanced view; the counter | island 2,999–3,026 coins; road bot 54–56 a minute; smoke 98 draws / 210k tris |
 | 3c the police brain | traffic damage and a settle that forgives a nudge; police armour; the arrest (slots round a slow player), the search at the last fix, the cut-off from heat 2, the assault heat (DESIGN.md §2.10) | police wrecks in 9 bot minutes 6 → 0; a player stopped at heat 2: never busted in 90 s → busted at 10.8–12.5 s, units arriving at ≤ 6.1 m/s; road bot at heat 2 busted 0 / 0 / 7 in 5 min by seed; a unit ahead and closing 9.2 → 11.8 % of chase time |
 
 ### 1.2 In scope (gate-critical, §4 slices 3–8)

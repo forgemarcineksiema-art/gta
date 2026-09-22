@@ -194,6 +194,8 @@ export class Life {
     this.sim.vehicle.engineCut = true;
     const p = this.sim.vehicle.body.translation(this.proj);
     this.sim.events.push('wrecked', 1, p.x, p.y, p.z, -1);
+    // the rings rule: part of the bag bursts out on the lane ahead, ten seconds to scramble it back
+    this.sim.run.spill(p.x, p.z, M.yawOf(this.sim.vehicle.body.rotation(this.rot)));
   }
 
   private heal(): void {

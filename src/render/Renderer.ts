@@ -21,6 +21,7 @@ import { Billboards } from './Billboards';
 import { Debris } from './Debris';
 import { Smoke } from './Smoke';
 import { HideoutView } from './HideoutView';
+import { Coins } from './Coins';
 import { AgentState } from '../sim/traffic/Traffic';
 import type { SimEvent } from '../sim';
 
@@ -48,6 +49,7 @@ export class Renderer {
   readonly pedView: PedView | null;
   readonly policeView: PoliceView;
   readonly hideoutView: HideoutView | null;
+  readonly coinsView: Coins | null;
   quality: QualityTier = 'low';
   private qualityElapsed = 0;
   private qualityFrames = 0;
@@ -136,9 +138,13 @@ export class Renderer {
 
     this.cityView = sim.city ? new CityView(this.scene, sim.city) : null;
     this.billboards = sim.collectibles ? new Billboards(this.scene) : null;
-    if (this.cityView && this.billboards) {
-      const view = this.billboards;
-      this.cityView.onChunk = (chunk) => view.add(chunk.billboards);
+    this.coinsView = sim.coins ? new Coins(this.scene) : null;
+    if (this.cityView) {
+      const boards = this.billboards, coins = this.coinsView;
+      this.cityView.onChunk = (chunk) => {
+        boards?.add(chunk.billboards);
+        coins?.add(chunk.coins, sim);
+      };
     }
     this.trafficView = sim.traffic && (sim.trafficDensity > 0 || sim.police) ? new TrafficView(this.scene, sim.traffic, sim.trafficDensity > 0) : null;
     this.pedView = sim.peds && sim.pedsDensity > 0 ? new PedView(this.scene, sim.peds) : null;
@@ -329,6 +335,7 @@ export class Renderer {
     this.syncDoorCamera();
     this.chase.update(this.car.root, this.carVel, tm, dt, snap);
     this.hideoutView?.update(this.sim);
+    this.coinsView?.update(this.sim, dt);
     this.car.update(tm);
     // ghost of the best lap
     if (this.sim.ghostPose(this.ghostPose)) {
@@ -474,6 +481,7 @@ export class Renderer {
     this.cityView?.dispose();
     this.policeView.dispose();
     this.hideoutView?.dispose();
+    this.coinsView?.dispose();
     this.renderer.dispose();
   }
 

@@ -8,7 +8,7 @@ export type EventKind =
   | 'hit' | 'damage' | 'wrecked' | 'respawn'
   | 'takedown' | 'takedownTraffic' | 'swap' | 'billboard' | 'honk' | 'escape'
   // the run (M4): money and its endings; camera, roadblock and jump are pushed from slice 6
-  | 'camera' | 'roadblock' | 'jump' | 'door' | 'banked' | 'busted';
+  | 'camera' | 'roadblock' | 'jump' | 'door' | 'banked' | 'busted' | 'coin' | 'spill';
 
 export interface SimEvent {
   kind: EventKind;

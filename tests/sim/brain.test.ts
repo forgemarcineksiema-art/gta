@@ -63,7 +63,8 @@ describe('the police brain', () => {
   }, 60_000);
 
   it('3c.2 a police car shoved into a wall at speed is still a takedown, worth police money', async () => {
-    const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
+    // the player's own damage off: a 110 km/h wall hit would wreck it too and spill part of the bag
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false, damage: false });
     const traffic = sim.traffic as Traffic;
     try {
       const yaw = Math.PI / 2, z = 100;

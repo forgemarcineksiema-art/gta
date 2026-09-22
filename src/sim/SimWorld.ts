@@ -11,6 +11,7 @@ import { City } from './city/City';
 import { createControls, type VehicleControls } from './controls';
 import { EventLog } from './events';
 import { Collectibles } from './city/collectibles';
+import { Coins } from './city/coins';
 import { Life } from './life/Life';
 import { Heat } from './heat/Heat';
 import { Police } from './police/Police';
@@ -96,6 +97,8 @@ export class SimWorld {
   readonly run: Run;
   /** The city's smashable billboards; null on the playground. */
   readonly collectibles: Collectibles | null;
+  /** Coins on the road and the spill pool; null on the playground. */
+  readonly coins: Coins | null;
   readonly statics: StaticDesc[];
   readonly dynamics: DynamicDesc[] = [];
   readonly spawns: SpawnPoint[];
@@ -172,6 +175,7 @@ export class SimWorld {
     this.traffic = this.city ? new Traffic(this.world, this.transforms, this.city, opts.seed ?? 42, TRAFFIC, this.trafficDensity) : null;
     this.peds = this.city && this.traffic ? new Pedestrians(this.transforms, this.city, this.traffic.lanes, opts.seed ?? 42, PEDS, this.pedsDensity) : null;
     this.collectibles = this.city ? new Collectibles(this.city) : null;
+    this.coins = this.city && this.traffic ? new Coins(this.city, this.traffic.lanes) : null;
     this.life = new Life(this, opts.damage ?? this.city !== null);
     this.heat = new Heat(this.events, this.traffic);
     this.heat.add(opts.heat ?? 0);
@@ -231,6 +235,7 @@ export class SimWorld {
     this.traffic?.writeTransforms();
     this.peds?.writeTransforms();
     this.life.postStep(FIXED_DT);
+    if (this.traffic) this.coins?.step(this.probe, FIXED_DT, this.events);
     this.heat.step();
     this.run.step(this.probe, FIXED_DT);
     for (const t of this.tracked) {

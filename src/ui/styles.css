@@ -660,6 +660,32 @@ kbd.key {
   transition: transform 0.15s;
 }
 .run__mult.is-pop { transform: scale(1.5); }
+.run__coins {
+  position: absolute;
+  top: calc(120px + var(--safe-top));
+  right: calc(24px + var(--safe-right));
+  display: none;
+  align-items: center;
+  gap: 6px;
+  transform: skewX(-10deg);
+  color: var(--ui-ink);
+  text-shadow: 2px 3px 0 #000;
+}
+.run__coins.is-visible { display: flex; }
+.run__coins.is-hidden { opacity: 0; }
+.run__coins-value {
+  font-size: 20px;
+  font-weight: 900;
+  font-style: italic;
+  font-variant-numeric: tabular-nums;
+}
+.run__coin-glyph {
+  width: 14px;
+  height: 14px;
+  background: #ff9f1c;
+  clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%);
+  box-shadow: 0 0 0 2px #000;
+}
 
 .run__busted {
   position: absolute;

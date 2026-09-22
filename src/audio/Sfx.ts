@@ -25,6 +25,8 @@ export class Sfx {
     else if (e.kind === 'takedown' || e.kind === 'takedownTraffic') { this.crunch(ctx, master, 4); this.boom(ctx, master); }
     else if (e.kind === 'billboard') { this.splinter(ctx, master); this.ding(ctx, master); }
     else if (e.kind === 'door') this.thud(ctx, master);
+    else if (e.kind === 'coin') this.coin(ctx, master);
+    else if (e.kind === 'spill') this.cascade(ctx, master);
     else if (e.kind === 'busted') this.fall(ctx, master);
   };
 
@@ -182,6 +184,48 @@ export class Sfx {
       osc.connect(gain).connect(master);
       osc.start(t);
       osc.stop(t + 0.52);
+    }
+  }
+
+  private coinStreak = 0;
+  private coinAt = -1;
+
+  /** A coin: a short bright blip that climbs a semitone per coin while they keep coming (a run plays a scale). */
+  private coin(ctx: BaseAudioContext, master: AudioNode): void {
+    const t = ctx.currentTime;
+    this.coinStreak = t - this.coinAt < 0.45 ? Math.min(this.coinStreak + 1, 12) : 0;
+    this.coinAt = t;
+    const freq = 1318.5 * Math.pow(2, this.coinStreak / 12);
+    const osc = ctx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(freq, t);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(3200, t);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.05, t + 0.005);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+    osc.connect(filter).connect(gain).connect(master);
+    osc.start(t);
+    osc.stop(t + 0.1);
+  }
+
+  /** The spill: six falling blips, the bag bursting. */
+  private cascade(ctx: BaseAudioContext, master: AudioNode): void {
+    const t0 = ctx.currentTime;
+    for (let k = 0; k < 6; k++) {
+      const t = t0 + k * 0.06;
+      const osc = ctx.createOscillator();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(1760 * Math.pow(2, -k * 2 / 12), t);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(0.05, t + 0.005);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
+      osc.connect(gain).connect(master);
+      osc.start(t);
+      osc.stop(t + 0.09);
     }
   }
 

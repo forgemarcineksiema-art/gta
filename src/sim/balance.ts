@@ -28,4 +28,8 @@ export const BALANCE = {
   fine: 0.5,
   /** Pulling into a drop-off under `enterSpeed` (m/s) starts the door; it takes `closeSeconds` to shut, busted live. */
   door: { closeSeconds: 3, enterSpeed: 8 },
+  /** Coins on the road: value, and the runs along the lanes (m); `billboardLine` coins through each billboard. */
+  coin: { value: 10, pitch: 6, runMin: 8, runMax: 12, gapMin: 40, gapMax: 90, billboardLine: 8 },
+  /** A wreck spills `share` of the bag as `coins` coins from `startAhead` m at `pitch` along the lane, for `seconds`. */
+  spill: { share: 0.3, coins: 12, seconds: 10, startAhead: 10, pitch: 4 },
 };

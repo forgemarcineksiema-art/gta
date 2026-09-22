@@ -9,6 +9,10 @@ export interface TrafficTuning {
   despawn: number;
   physicsRadius: number;
   physicsRelease: number;
+  /** A pursuit unit is lent a body this much further out than a civilian, m. */
+  policeBodyReach: number;
+  /** Bodies a pursuit may hold at once; the rest of the pool stays with the traffic around the player. */
+  policeBodies: number;
   speedStreet: number;
   speedHighway: number;
   speedAvenue: number;
@@ -80,6 +84,8 @@ export const TRAFFIC: TrafficTuning = {
   despawn: 320,
   physicsRadius: 40,
   physicsRelease: 60,
+  policeBodyReach: 25,
+  policeBodies: 10,
   speedStreet: 14,
   speedHighway: 22,
   speedAvenue: 16,

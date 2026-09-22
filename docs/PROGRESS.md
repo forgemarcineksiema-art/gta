@@ -2,6 +2,94 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-22 — M4 slice 2: units per level, interceptors, the body pool
+
+Verify green before and after (189 tests).
+
+### Done
+
+- **The roster is the heat level.** `POLICE.budget` 2/4/5/6/8 units by level and
+  `POLICE.interceptors` 0/1/2/2/3 of them as interceptors (the `sports` preset
+  in police livery, faster and with a PIT instead of a shove). `Police.budget`
+  is on the debug handle. Measured with the bot: level 1 → 2 units, level 2 → 4
+  with 1 interceptor, level 5 → 8 with 3, every level holding its roster.
+- **Police borrow the body pool, they never own it** (decision 28). A unit is
+  served first (`policeBodyReach` 25 m: it counts as 25 m nearer than it is, and
+  keeps its body 25 m further out), takes a body from the *traffic* when the pool
+  is full, never from another unit, and never past `policeBodies` (10 of 16).
+  A civilian never evicts a unit. Measured over 90 s: peak police bodies 2 at
+  level 1, 3 at level 2, 6 at level 5, with 41–44 cars still alive on the street.
+- **Ramming.** A saloon aims where the player will be in 0.15 s and accelerates
+  its own body at 14 m/s²; an interceptor aims at the rear quarter
+  (`pitSideOffset` 1.1 m inboard of the flank, 0.9 × half-length back) at
+  22 m/s². Rapier's contact does the rest. Measured, player at 70 km/h under
+  full throttle, unit closing from 25 m behind: the shove costs no speed at all
+  (the player is still accelerating through it) and pushes 0.7 m across the
+  lane; the PIT lands twice, pushes 5.8 m across and swings the car at
+  0.48 rad/s, and neither wrecks the player. That is the slice's rule: shoved,
+  never stopped.
+- **A patrol must be able to arrive.** Units run at `catchUpSpeed` 48 m/s while
+  more than 55 m back, then drop to their class speed (30 saloon, 38
+  interceptor); junction turns still take `speedJunction`. Without it the units
+  spawned behind a 170 km/h car and never saw it again.
+- **Presence instead of a conveyor belt.** While nobody is being chased, a unit
+  more than `patrolRecycle` (260 m) away and out of view goes off duty and the
+  next one comes on duty near the player, out of the view cone. Heat therefore
+  decides how much police the player *meets*, not only how many chase. With it,
+  the bot at 90 s: pursuit 45.8 s at level 1, 47.7 s at level 2 and 66.8 s at
+  level 5 (2 / 1 / 0 escapes, 1 / 1 / 3 rams). Without it the same runs sat at
+  13–16 s and never re-detected.
+
+### Measured
+
+- **Sim step, Node, 60 s of bot driving, two passes each**: heat 0 mean
+  1.53 / 0.91 ms, heat 2 (4 units) 0.83 / 0.78, heat 5 (8 units) 0.68 / 0.64.
+  The pursuit is inside the noise. It was not before: the first cut cost
+  +0.4–1.3 ms mean because the dispatch scanned all 226 lanes at 10 m samples
+  and the route projected the player onto all 226. Both are now bounded by the
+  lane midpoint (`spawnMax + length/2`, and 40 m for the route), which is the
+  open problem from slice 1 closed.
+- **Draw calls and triangles** at level 2 against heat 0, same route: 71 → 79
+  max draws (the two livery kits: details, flashing and unlit lenses per class)
+  and 135k → 138k triangles. Both far inside 150 / 250k on low.
+- **The throttled browser A/B is void this session.** Four alternating 60 s runs
+  read 7.2 / 6.6 / 5.6 / 8.0 fps — heat 0 as bad as heat 2, against 57–60 fps
+  from the same spec at the M3 gate. Another process on this machine was eating
+  the CPU (a browser at 234 s of CPU time that I did not start and must not
+  kill). The smoke inside `verify`, taken in a quiet window, was 57.6 fps /
+  p95 16.8 ms / 97 draws / 194k tris, matching the baseline. The level-2 step
+  p95 against the slice 0 baseline has to be re-taken on an idle machine; the
+  Node A/B above is the honest CPU-side answer for now.
+- Pins added to `tests/sim/police.test.ts`: the roster and the interceptor count
+  per level with the pool share held (levels 2 and 5, 45 s of driving each), and
+  the ram pin (contact, speed kept, no wreck).
+
+### Decided
+
+- `PERF_HEAT=<level>` on `npm run perf` drives the same route with a pursuit
+  running, so this comparison is repeatable rather than a one-off script.
+- The interceptor is the `sports` preset, not a new class: the brief's eight
+  vehicles already include it and the pursuit only needs the livery difference.
+- Slice 2's "traffic goes kinematic sooner" is implemented as a police-first
+  lender with a hard share, not as a lower traffic body count: the street the
+  player drives through must not thin out because a chase started.
+
+### Next
+
+- Slice 3: `Run`, the bag and the bank, busted with the bar, the hideout under
+  the Crown Tower block with the door, and the drop-offs.
+- Re-take the throttled perf A/B (heat 0 vs heat 2) on an idle machine, and
+  Marcin's `npm run perf:headed`.
+
+### Open problems
+
+- Units wreck themselves on a parked player fairly often (comic, but it feeds
+  the player heat and wrecks). Watch it at level 4–5 when the heavies land.
+- The interceptor's rear light bar was checked by geometry, not by eye: lenses
+  at y 0.91–0.96 and z −1.75…−1.55 (deck, behind the backlight) against the
+  saloon's y 1.52–1.61 at z −0.62…−0.38 (roof, B pillar). The saloon livery was
+  inspected in the running game; the interceptor never held still long enough.
+
 ## 2026-09-22 — M4 slice 1: heat and pursuit, level-1 patrols
 
 Verify green before the first edit and at the commit.

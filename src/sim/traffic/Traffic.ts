@@ -388,9 +388,10 @@ export class Traffic {
   }
 
   /** Only an unseen, undisturbed civilian may give up a full agent slot. */
-  spawnPoliceAt(lane: number, s: number, player: PlayerProbe, near: number, cosHalf: number, clearance: number): number {
+  spawnPoliceAt(lane: number, s: number, kind: 'police' | 'sports', player: PlayerProbe, near: number, cosHalf: number, clearance: number): number {
     if (!this.canSpawnAt(lane, s, clearance)) return -1;
-    const radius = Math.hypot(this.halfW[KIND_INDEX.police] as number, this.halfL[KIND_INDEX.police] as number);
+    const index = KIND_INDEX[kind];
+    const radius = Math.hypot(this.halfW[index] as number, this.halfL[index] as number);
     if (!this.outOfView(this.pose.x, this.pose.z, radius, player, near, cosHalf)) return -1;
     let agent = this.findFree();
     if (agent < 0) {
@@ -406,9 +407,17 @@ export class Traffic {
       if (agent < 0) return -1;
       this.free(agent);
     }
-    this.place(agent, lane, s, KIND_INDEX.police, 0, AgentState.Kinematic, PLAYER_PAINT.police);
+    this.place(agent, lane, s, index, 0, AgentState.Kinematic, PLAYER_PAINT[kind]);
     this.police[agent] = 1;
     return agent;
+  }
+
+  /** Off duty: the record goes back to the pool. The caller must have checked nobody is watching. */
+  releasePolice(agent: number): void {
+    if (this.police[agent] !== 1) return;
+    const state = this.state[agent];
+    if (state !== AgentState.Kinematic && state !== AgentState.Physical) return;
+    this.free(agent);
   }
 
   /** Bounded planner inputs: a connected exit, speed, and an optional physical ram target. */
@@ -975,7 +984,9 @@ export class Traffic {
       if ((this.agentBody[i] as number) < 0) continue;
       const dx = (this.x[i] as number) - player.x;
       const dz = (this.z[i] as number) - player.z;
-      if (dx * dx + dz * dz > t.physicsRelease * t.physicsRelease) this.releaseBody(i);
+      // A unit chasing from a street away keeps its body; a civilian that far back does not need one.
+      const release = t.physicsRelease + (this.police[i] === 1 ? t.policeBodyReach : 0);
+      if (dx * dx + dz * dz > release * release) this.releaseBody(i);
     }
     for (let n = 0; n < this.capacity; n++) {
       const i = this.nearestNeedingBody(player);
@@ -983,6 +994,8 @@ export class Traffic {
       let slot = this.freeBody();
       if (slot < 0) {
         let victim = this.lingeringWreck();
+        // Police take a body from the traffic, never from each other, and never past their share of the pool.
+        if (victim < 0 && this.police[i] === 1 && this.policeBodies() < t.policeBodies) victim = this.farthestCivilian(player);
         if (victim < 0) victim = this.farthestUndisturbed(player, i);
         if (victim < 0) break;
         this.releaseBody(victim);
@@ -1008,7 +1021,12 @@ export class Traffic {
     }
   }
 
-  /** Kinematic cars inside the radius (or about to be reached), and wrecks near the player without a body. */
+  /**
+   * Kinematic cars inside the radius (or about to be reached), and wrecks near
+   * the player without a body. A pursuit unit counts as `policeBodyReach` metres
+   * nearer than it is, so it is served first and from further out: a patrol two
+   * streets back still shoves when it arrives.
+   */
   private nearestNeedingBody(player: PlayerProbe): number {
     const t = this.tuning;
     const px = player.x + player.vx * 0.5;
@@ -1022,13 +1040,34 @@ export class Traffic {
       const dx = (this.x[i] as number) - player.x;
       const dz = (this.z[i] as number) - player.z;
       const dist = Math.hypot(dx, dz);
+      const reach = this.police[i] === 1 ? t.policeBodyReach : 0;
       const ex = (this.x[i] as number) - px;
       const ez = (this.z[i] as number) - pz;
       const predicted = ex * ex + ez * ez < 64;
-      if (dist > t.physicsRadius && !predicted) continue;
-      if (dist < bestD) { bestD = dist; best = i; }
+      if (dist > t.physicsRadius + reach && !predicted) continue;
+      if (dist - reach < bestD) { bestD = dist - reach; best = i; }
     }
     return best;
+  }
+
+  /** Bodies currently lent to the pursuit. */
+  policeBodies(): number {
+    let n = 0;
+    for (let i = 0; i < this.capacity; i++) if (this.police[i] === 1 && (this.agentBody[i] as number) >= 0) n++;
+    return n;
+  }
+
+  /** The civilian driving body furthest from the player: what a patrol takes when the pool is full. */
+  private farthestCivilian(player: PlayerProbe): number {
+    let far = -1;
+    let farD = 0;
+    for (let i = 0; i < this.capacity; i++) {
+      if ((this.agentBody[i] as number) < 0 || this.state[i] !== AgentState.Physical || this.police[i] === 1) continue;
+      if ((this.reattachLeft[i] as number) > 0) continue;
+      const d = Math.hypot((this.x[i] as number) - player.x, (this.z[i] as number) - player.z);
+      if (d > farD) { farD = d; far = i; }
+    }
+    return far;
   }
 
   private freeBody(): number {
@@ -1047,12 +1086,13 @@ export class Traffic {
     return oldest;
   }
 
+  /** Never a pursuit unit: the chase keeps its bodies until it is over. */
   private farthestUndisturbed(player: PlayerProbe, than: number): number {
     const thanD = Math.hypot((this.x[than] as number) - player.x, (this.z[than] as number) - player.z);
     let far = -1;
     let farD = thanD;
     for (let i = 0; i < this.capacity; i++) {
-      if ((this.agentBody[i] as number) < 0 || this.state[i] !== AgentState.Physical) continue;
+      if ((this.agentBody[i] as number) < 0 || this.state[i] !== AgentState.Physical || this.police[i] === 1) continue;
       if ((this.reattachLeft[i] as number) > 0) continue;
       const d = Math.hypot((this.x[i] as number) - player.x, (this.z[i] as number) - player.z);
       if (d > farD) { farD = d; far = i; }

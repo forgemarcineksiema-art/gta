@@ -3479,6 +3479,8 @@ const TRAFFIC = {
 	despawn: 320,
 	physicsRadius: 40,
 	physicsRelease: 60,
+	policeBodyReach: 25,
+	policeBodies: 10,
 	speedStreet: 14,
 	speedHighway: 22,
 	speedAvenue: 16,
@@ -3935,9 +3937,10 @@ var Traffic = class {
 		return dx * Math.sin(player.yaw) + dz * Math.cos(player.yaw) < cosHalf * Math.sqrt(distance * distance - radius * radius) - Math.sqrt(1 - cosHalf * cosHalf) * radius;
 	}
 	/** Only an unseen, undisturbed civilian may give up a full agent slot. */
-	spawnPoliceAt(lane, s, player, near, cosHalf, clearance) {
+	spawnPoliceAt(lane, s, kind, player, near, cosHalf, clearance) {
 		if (!this.canSpawnAt(lane, s, clearance)) return -1;
-		const radius = Math.hypot(this.halfW[KIND_INDEX.police], this.halfL[KIND_INDEX.police]);
+		const index = KIND_INDEX[kind];
+		const radius = Math.hypot(this.halfW[index], this.halfL[index]);
 		if (!this.outOfView(this.pose.x, this.pose.z, radius, player, near, cosHalf)) return -1;
 		let agent = this.findFree();
 		if (agent < 0) {
@@ -3956,9 +3959,16 @@ var Traffic = class {
 			if (agent < 0) return -1;
 			this.free(agent);
 		}
-		this.place(agent, lane, s, KIND_INDEX.police, 0, 1, PLAYER_PAINT.police);
+		this.place(agent, lane, s, index, 0, 1, PLAYER_PAINT[kind]);
 		this.police[agent] = 1;
 		return agent;
+	}
+	/** Off duty: the record goes back to the pool. The caller must have checked nobody is watching. */
+	releasePolice(agent) {
+		if (this.police[agent] !== 1) return;
+		const state = this.state[agent];
+		if (state !== 1 && state !== 2) return;
+		this.free(agent);
 	}
 	/** Bounded planner inputs: a connected exit, speed, and an optional physical ram target. */
 	setPolicePlan(agent, next, speed, ramX = 0, ramZ = 0, ramSpeed = 0, ramAccel = 0) {
@@ -4485,7 +4495,8 @@ var Traffic = class {
 			if (this.agentBody[i] < 0) continue;
 			const dx = this.x[i] - player.x;
 			const dz = this.z[i] - player.z;
-			if (dx * dx + dz * dz > t.physicsRelease * t.physicsRelease) this.releaseBody(i);
+			const release = t.physicsRelease + (this.police[i] === 1 ? t.policeBodyReach : 0);
+			if (dx * dx + dz * dz > release * release) this.releaseBody(i);
 		}
 		for (let n = 0; n < this.capacity; n++) {
 			const i = this.nearestNeedingBody(player);
@@ -4493,6 +4504,7 @@ var Traffic = class {
 			let slot = this.freeBody();
 			if (slot < 0) {
 				let victim = this.lingeringWreck();
+				if (victim < 0 && this.police[i] === 1 && this.policeBodies() < t.policeBodies) victim = this.farthestCivilian(player);
 				if (victim < 0) victim = this.farthestUndisturbed(player, i);
 				if (victim < 0) break;
 				this.releaseBody(victim);
@@ -4514,7 +4526,12 @@ var Traffic = class {
 			else if (st === 5) this.senseImpact(i);
 		}
 	}
-	/** Kinematic cars inside the radius (or about to be reached), and wrecks near the player without a body. */
+	/**
+	* Kinematic cars inside the radius (or about to be reached), and wrecks near
+	* the player without a body. A pursuit unit counts as `policeBodyReach` metres
+	* nearer than it is, so it is served first and from further out: a patrol two
+	* streets back still shoves when it arrives.
+	*/
 	nearestNeedingBody(player) {
 		const t = this.tuning;
 		const px = player.x + player.vx * .5;
@@ -4528,16 +4545,38 @@ var Traffic = class {
 			const dx = this.x[i] - player.x;
 			const dz = this.z[i] - player.z;
 			const dist = Math.hypot(dx, dz);
+			const reach = this.police[i] === 1 ? t.policeBodyReach : 0;
 			const ex = this.x[i] - px;
 			const ez = this.z[i] - pz;
 			const predicted = ex * ex + ez * ez < 64;
-			if (dist > t.physicsRadius && !predicted) continue;
-			if (dist < bestD) {
-				bestD = dist;
+			if (dist > t.physicsRadius + reach && !predicted) continue;
+			if (dist - reach < bestD) {
+				bestD = dist - reach;
 				best = i;
 			}
 		}
 		return best;
+	}
+	/** Bodies currently lent to the pursuit. */
+	policeBodies() {
+		let n = 0;
+		for (let i = 0; i < this.capacity; i++) if (this.police[i] === 1 && this.agentBody[i] >= 0) n++;
+		return n;
+	}
+	/** The civilian driving body furthest from the player: what a patrol takes when the pool is full. */
+	farthestCivilian(player) {
+		let far = -1;
+		let farD = 0;
+		for (let i = 0; i < this.capacity; i++) {
+			if (this.agentBody[i] < 0 || this.state[i] !== 2 || this.police[i] === 1) continue;
+			if (this.reattachLeft[i] > 0) continue;
+			const d = Math.hypot(this.x[i] - player.x, this.z[i] - player.z);
+			if (d > farD) {
+				farD = d;
+				far = i;
+			}
+		}
+		return far;
 	}
 	freeBody() {
 		for (let b = 0; b < this.bodyAgent.length; b++) if (this.bodyAgent[b] < 0) return b;
@@ -4556,12 +4595,13 @@ var Traffic = class {
 		}
 		return oldest;
 	}
+	/** Never a pursuit unit: the chase keeps its bodies until it is over. */
 	farthestUndisturbed(player, than) {
 		const thanD = Math.hypot(this.x[than] - player.x, this.z[than] - player.z);
 		let far = -1;
 		let farD = thanD;
 		for (let i = 0; i < this.capacity; i++) {
-			if (this.agentBody[i] < 0 || this.state[i] !== 2) continue;
+			if (this.agentBody[i] < 0 || this.state[i] !== 2 || this.police[i] === 1) continue;
 			if (this.reattachLeft[i] > 0) continue;
 			const d = Math.hypot(this.x[i] - player.x, this.z[i] - player.z);
 			if (d > farD) {
@@ -5916,7 +5956,22 @@ var Heat = class {
 //#endregion
 //#region src/sim/police/tuning.ts
 const POLICE = {
-	patrols: 2,
+	budget: [
+		0,
+		2,
+		4,
+		5,
+		6,
+		8
+	],
+	interceptors: [
+		0,
+		0,
+		1,
+		2,
+		2,
+		3
+	],
 	escapeSeconds: [
 		0,
 		6,
@@ -5949,7 +6004,14 @@ const POLICE = {
 	ramClosingSpeed: 6,
 	ramAcceleration: 14,
 	ramContactDv: .8,
-	ramCooldown: 1
+	ramCooldown: 1,
+	interceptorSpeed: 38,
+	pitRange: 11,
+	catchUpRange: 55,
+	catchUpSpeed: 48,
+	pitAcceleration: 22,
+	pitSideOffset: 1.1,
+	patrolRecycle: 260
 };
 //#endregion
 //#region src/sim/police/Police.ts
@@ -5957,7 +6019,9 @@ const POLICE = {
 var Police = class {
 	units;
 	tuning = POLICE;
+	/** Units alive now, and the roster the current heat level pays for. */
 	count = 0;
+	budget = 0;
 	ramsReceived = 0;
 	sim;
 	traffic;
@@ -6003,14 +6067,13 @@ var Police = class {
 	targetS = 0;
 	routeLeft = 0;
 	spawnLeft = 0;
-	dispatchLeft = 0;
 	hot = false;
 	constructor(sim) {
 		if (!sim.traffic || !sim.city) throw new Error("Police requires city traffic");
 		this.sim = sim;
 		this.traffic = sim.traffic;
 		this.graph = sim.city.graph;
-		this.units = new Int16Array(this.tuning.patrols);
+		this.units = new Int16Array(Math.max(...this.tuning.budget));
 		this.units.fill(-1);
 		this.seen = new Uint8Array(this.units.length);
 		this.withdrawing = new Uint8Array(this.units.length);
@@ -6074,12 +6137,13 @@ var Police = class {
 			this.hot = true;
 			this.spawnLeft = 0;
 		}
+		this.budget = Math.min(this.units.length, t.budget[level] ?? 0);
 		this.spawnLeft -= dt;
-		if (this.count < this.units.length && this.spawnLeft <= 0) {
+		if (this.count < this.budget && this.spawnLeft <= 0) {
 			this.spawnLeft = t.spawnRetrySeconds;
-			for (let u = 0; u < this.units.length; u++) {
+			for (let u = 0; u < this.units.length && this.count < this.budget; u++) {
 				if (this.units[u] >= 0) continue;
-				const agent = this.spawn(player, cosHalf);
+				const agent = this.spawn(player, cosHalf, this.interceptorsWanted(level));
 				if (agent < 0) break;
 				this.units[u] = agent;
 				this.seen[u] = 0;
@@ -6120,16 +6184,40 @@ var Police = class {
 			const agent = this.units[u];
 			if (agent < 0) continue;
 			if (!chasing) {
-				if (this.withdrawing[u] === 1) traffic.setPolicePlan(agent, this.awayExit(agent, player), 0);
+				if (this.withdrawing[u] === 1) {
+					traffic.setPolicePlan(agent, this.awayExit(agent, player), 0);
+					continue;
+				}
+				const x = traffic.x[agent], z = traffic.z[agent];
+				if (Math.hypot(player.x - x, player.z - z) > t.patrolRecycle && traffic.outOfView(x, z, this.radius, player, t.viewNear, cosHalf)) {
+					traffic.releasePolice(agent);
+					this.units[u] = -1;
+					this.seen[u] = 0;
+					this.count--;
+				}
 				continue;
 			}
 			const next = this.routeExit(agent);
+			const pit = traffic.kindOf(agent) === "sports";
 			const dx = player.x - traffic.x[agent];
 			const dz = player.z - traffic.z[agent];
-			if (this.seen[u] === 1 && traffic.state[agent] === 2 && dx * dx + dz * dz <= t.ramRange * t.ramRange) {
-				traffic.setPolicePlan(agent, next, t.chaseSpeed, player.x + player.vx * t.ramLeadSeconds, player.z + player.vz * t.ramLeadSeconds, Math.min(t.chaseSpeed, player.speed + t.ramClosingSpeed), t.ramAcceleration);
-				this.rammed[u] = 1;
-			} else traffic.setPolicePlan(agent, next, t.chaseSpeed);
+			const gap = Math.hypot(dx, dz);
+			const speed = gap > t.catchUpRange ? t.catchUpSpeed : pit ? t.interceptorSpeed : t.chaseSpeed;
+			const range = pit ? t.pitRange : t.ramRange;
+			if (!(this.seen[u] === 1 && traffic.state[agent] === 2 && gap <= range)) {
+				traffic.setPolicePlan(agent, next, speed);
+				continue;
+			}
+			let aimX = player.x + player.vx * t.ramLeadSeconds;
+			let aimZ = player.z + player.vz * t.ramLeadSeconds;
+			if (pit) {
+				const fx = Math.sin(player.yaw), fz = Math.cos(player.yaw);
+				const side = -dx * -fz - dz * fx >= 0 ? 1 : -1;
+				aimX = player.x - fx * player.halfLength * .9 + -fz * side * t.pitSideOffset;
+				aimZ = player.z - fz * player.halfLength * .9 + fx * side * t.pitSideOffset;
+			}
+			traffic.setPolicePlan(agent, next, speed, aimX, aimZ, Math.min(speed, player.speed + t.ramClosingSpeed), pit ? t.pitAcceleration : t.ramAcceleration);
+			this.rammed[u] = 1;
 		}
 	}
 	canSee(agent, player, distance) {
@@ -6147,7 +6235,17 @@ var Police = class {
 		this.ray.dir.z = dz / length;
 		return this.sim.world.castRay(this.ray, length, true, RAPIER.QueryFilterFlags.ONLY_FIXED | RAPIER.QueryFilterFlags.EXCLUDE_SENSORS) === null;
 	}
-	spawn(player, cosHalf) {
+	/** True while the roster is short of the interceptors this level pays for. */
+	interceptorsWanted(level) {
+		const want = this.tuning.interceptors[level] ?? 0;
+		let live = 0;
+		for (let u = 0; u < this.units.length; u++) {
+			const agent = this.units[u];
+			if (agent >= 0 && this.traffic.kindOf(agent) === "sports") live++;
+		}
+		return live < want;
+	}
+	spawn(player, cosHalf, interceptor) {
 		const t = this.tuning;
 		const lanes = this.traffic.lanes;
 		const fx = Math.sin(player.yaw), fz = Math.cos(player.yaw);
@@ -6155,6 +6253,7 @@ var Police = class {
 		let best = Infinity, bestLane = -1, bestS = 0;
 		for (let lane = 0; lane < lanes.laneCount; lane++) {
 			const len = lanes.length[lane];
+			if (Math.hypot(lanes.midX[lane] - player.x, lanes.midZ[lane] - player.z) > t.spawnMax + len / 2) continue;
 			for (let s = t.spawnEndInset; s <= len - t.spawnEndInset; s += t.spawnSample) {
 				lanes.positionAt(lane, s, 0, this.pose);
 				const dx = this.pose.x - player.x, dz = this.pose.z - player.z;
@@ -6169,7 +6268,7 @@ var Police = class {
 				bestS = s;
 			}
 		}
-		return bestLane < 0 ? -1 : this.traffic.spawnPoliceAt(bestLane, bestS, player, t.viewNear, cosHalf, t.spawnClearance);
+		return bestLane < 0 ? -1 : this.traffic.spawnPoliceAt(bestLane, bestS, interceptor ? "sports" : "police", player, t.viewNear, cosHalf, t.spawnClearance);
 	}
 	/** Reverse Dijkstra on the authored road graph, using constructor-owned arrays. */
 	route(player) {
@@ -6179,6 +6278,7 @@ var Police = class {
 		let best = Infinity;
 		this.targetLane = -1;
 		for (let i = 0; i < lanes.laneCount; i++) {
+			if (Math.hypot(lanes.midX[i] - x, lanes.midZ[i] - z) > lanes.length[i] / 2 + 40) continue;
 			lanes.project(i, x, z, this.projection);
 			const heading = Math.cos(this.projection.yaw - player.yaw);
 			const cost = this.projection.dist + (1 - heading) * this.tuning.targetHeadingWeight;
@@ -8599,46 +8699,44 @@ var TrackBot = class {
 	}
 };
 //#endregion
-//#region output/m4-patrol-probe.ts
+//#region output/m4-step-ab.ts
 await initPhysics();
-const sim = new SimWorld({
-	map: "city",
-	seed: 42,
-	heat: 20,
-	record: false
-});
-const bot = new TrackBot("muscle", CITY_BOT_TUNING);
-let activeSteps = 0;
-let lostSteps = 0;
-let firstPatrol = -1;
-let maxUnits = 0;
-const start = performance.now();
-try {
-	for (let tick = 0; tick < 7200; tick++) {
-		bot.drive(sim, sim.controls, 1 / 60);
-		sim.step();
-		if (sim.pursuit.state === "active" || sim.pursuit.state === "detected") activeSteps++;
-		if (sim.pursuit.state === "lost") lostSteps++;
-		const units = sim.police?.count ?? 0;
-		if (units > 0 && firstPatrol < 0) firstPatrol = sim.time;
-		maxUnits = Math.max(maxUnits, units);
+const rows = [];
+for (const heat of [
+	0,
+	40,
+	100
+]) for (const pass of [1, 2]) {
+	const sim = new SimWorld({
+		map: "city",
+		seed: 42,
+		heat,
+		record: false
+	});
+	const bot = new TrackBot("muscle", CITY_BOT_TUNING);
+	const samples = [];
+	try {
+		for (let tick = 0; tick < 3600; tick++) {
+			bot.drive(sim, sim.controls, 1 / 60);
+			const t0 = performance.now();
+			sim.step();
+			samples.push(performance.now() - t0);
+		}
+		samples.sort((a, b) => a - b);
+		const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
+		rows.push({
+			heat,
+			pass,
+			units: sim.police?.count,
+			meanMs: +mean.toFixed(3),
+			p50: +samples[Math.floor(samples.length * .5)].toFixed(3),
+			p95: +samples[Math.floor(samples.length * .95)].toFixed(3),
+			max: +samples[samples.length - 1].toFixed(3)
+		});
+	} finally {
+		sim.dispose();
 	}
-	console.log(JSON.stringify({
-		seconds: sim.time,
-		pursuitSeconds: activeSteps / 60,
-		cooldownSeconds: lostSteps / 60,
-		escapes: sim.pursuit.escapes,
-		escapesPerMinute: sim.pursuit.escapes / 2,
-		ramsReceived: sim.police?.ramsReceived,
-		firstPatrolSeconds: firstPatrol,
-		maxUnits,
-		heat: sim.heat.points,
-		resets: bot.resets,
-		nan: sim.hasNaN(),
-		nodeStepMeanMs: (performance.now() - start) / 7200
-	}, null, 2));
-} finally {
-	sim.dispose();
 }
+console.table(rows);
 //#endregion
 export {};

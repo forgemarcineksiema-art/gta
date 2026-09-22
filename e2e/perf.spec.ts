@@ -20,11 +20,13 @@ test('bot drives 60 s under 4x CPU throttle within budget', async ({ page, brows
   const seed = Number(process.env.PERF_SEED ?? '42');
   const duration = Number(process.env.PERF_DURATION ?? '60');
   const throttle = Number(process.env.PERF_THROTTLE ?? '4');
+  // PERF_HEAT=2 measures the same route with a pursuit running (M4 slice 2).
+  const heat = Number(process.env.PERF_HEAT ?? '0');
 
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: throttle });
 
-  await page.goto(`/?bot=1&seed=${seed}&duration=${duration}`);
+  await page.goto(`/?bot=1&seed=${seed}&duration=${duration}&heat=${heat}`);
   await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 60_000 });
   await page.waitForFunction(() => window.__perfDone === true, null, { timeout: (duration + 60) * 1000 });
   const perf = (await page.evaluate(() => window.__perf)) as PerfResult;
@@ -32,7 +34,7 @@ test('bot drives 60 s under 4x CPU throttle within budget', async ({ page, brows
 
   mkdirSync('perf', { recursive: true });
   if (existsSync('perf/latest.json')) renameSync('perf/latest.json', 'perf/previous.json');
-  writeFileSync('perf/latest.json', JSON.stringify({ ...perf, seed, throttle, measuredAt: new Date().toISOString() }, null, 2));
+  writeFileSync('perf/latest.json', JSON.stringify({ ...perf, seed, throttle, heat, measuredAt: new Date().toISOString() }, null, 2));
 
   const lines = [
     `gl ${perf.glRenderer}${perf.softwareGl ? '  (SOFTWARE GL: frame times are a CPU signal only)' : ''}`,

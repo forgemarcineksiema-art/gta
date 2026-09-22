@@ -32,6 +32,20 @@ after the first Basic Launch numbers (update 1 already has its contract in
   `docs/SUBMISSION.md` with the cover brief; the gate. Numbers, playtest.
 - Pointers: `CLAUDE.md` (session start, the table), `AGENTS.md`, README,
   DESIGN §11, ARCHITECTURE layout.
+- Rewritten the same day at `docs/M3_PLAN.md`'s level on Marcin's request
+  ("more detailed and more precise"): both plans now carry the working
+  rules, scope in / out / delivered-by-the-previous-milestone, numbered
+  decisions with reasons (M5: D1–D14, M6: D1–D11), the module map, the
+  step or boot order, TypeScript contracts for every new module (the save
+  format and store, jobs, the traffic guarantee, the garage, dailies, the
+  arrow and markers, the garage UI; the SDK typings, the adapter ladder,
+  the sitelock, the touch model and device, the layer and the overlay),
+  the balance and tuning objects with starting values, per-slice files /
+  behaviour / numbers / numbered tests / acceptance, the verification
+  protocol with expected perf deltas, a budgets table, gate criteria, the
+  API facts checked against the code at `ba9a12f` (M6's SDK facts from
+  the 2026-09-20 read, to be re-verified in its slice 0), the playtest
+  script and the reviewer checklist. 46 numbered tests in M5, 34 in M6.
 
 ### Set here (Marcin overrides)
 
@@ -46,6 +60,13 @@ after the first Basic Launch numbers (update 1 already has its contract in
   login by itself.
 - Time limits for jobs come from the lane-path time at the speed limits, not
   from a table, so a job stays fair wherever the generator puts it.
+- M6: the adapter ladder CrazyGames → Local → Disabled with a 3 s timeout;
+  a mock SDK injected by Playwright as the test double for every path; the
+  touch layer as an `InputDevice` over a pure model; the mobile tier as
+  rendering plus the one traffic lever; landscape only with a rotate
+  overlay; the sitelock obfuscated by hand; the mobile perf proxy at
+  800×450 under 6×; the package built by a script that can fail; English
+  only at launch with the locale logged.
 
 ### Next
 

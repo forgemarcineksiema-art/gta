@@ -305,6 +305,30 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   enough to read at 800x450. No props, no clutter, no second room; the camera
   cut does the work.
 
+## The run HUD, coins and ramps (M4)
+
+- The bag sits top right under the stars: the primary number (≥ 44 px, the
+  heavy italic, skewed, accent yellow, a flat black shadow) with the live
+  multiplier beside it at 18 px in the same accent (`×1`, `×1.25`, `×1.6`,
+  `×2.2`, `×3`), popping 0.3 s on a threshold. Yellow means "not yours yet".
+- The coin counter under it, smaller, in ink with the coin glyph: white
+  means safe. Placed coins are `carOrange` octagonal discs on the lane
+  centre, spinning slowly; spilled coins are `carWhite` and larger, so a
+  scramble reads from afar. Never a counter for the spill.
+- The busted bar: a red skewed track centre-bottom above the speedo, only
+  while it is filling; the busted card and the door screen use the popup
+  type at 54 px for the title and 18 px for the lines, panel background
+  from the UI palette, the totals right-aligned; one line of run counts
+  under the totals in 16 px.
+- The swap prompt reads SWAP for a civilian car and BORROW for a police
+  car, same keycap, same size, accent cyan.
+- Ramps are `ramp` red gables with a kerb-height lip, the run-out kept clear
+  by the placer; the "STUNT!" popup follows the TAKEDOWN! style at 24 px
+  with the airtime in seconds. Speed cameras are a `steel` pole with an
+  `ink` head; the flash is a 100 ms white overlay at 60 %, then FLASHED with
+  the speed in the popup stack. The roadblock's sawhorse is `barrier` white
+  with `cone` orange stripes, and its planks fly like a billboard's.
+
 ## Camera and motion
 
 - Chase camera behind and above, FOV 60 → up to 80 with speed and boost, pulls back and drops with speed, follows the velocity direction so drifts show the car sideways. Very small shake at high speed. Steering input itself never swivels the view; actual yaw contributes only 0.04 s of heading lead and at most 0.65 m of lateral look offset. Heading follow is capped at 110°/s; speed/boost FOV changes ease at 2.5/s. See `src/render/ChaseCamera.ts`.

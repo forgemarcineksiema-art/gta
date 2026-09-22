@@ -42,7 +42,9 @@ Controls: `W A S D` / arrows drive, `Space` handbrake (drift), `Shift` boost, `E
 ## Verify
 
 ```bash
-npm run verify       # typecheck, lint, sim tests, build, smoke, budget
+npm run verify       # typecheck, lint, the quick sim tests, build, smoke, budget
+npm run verify:gate  # the same with the long bot-driven pins (tests/**/*.long.test.ts): gates and slice commits
+npm run test:long    # only the tests stage, long pins included
 npm run perf         # bot 60 s under 4x CPU throttle -> perf/latest.json
 npm run perf:headed  # same, visible browser (real-device numbers)
 npm run screens      # HUD/pause screenshots at every required size -> screens/

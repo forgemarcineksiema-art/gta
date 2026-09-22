@@ -2,7 +2,9 @@
 /**
  * `npm run verify`: typecheck, lint, sim tests, build, budget, smoke.
  * Runs every stage, prints a summary, exits non-zero if any stage failed.
- * Must be green before every milestone gate and at the start of every session.
+ * Must be green at the start of every session. `--gate` (`npm run verify:gate`)
+ * also runs the long bot-driven pins (tests/**\/*.long.test.ts, LONG=1): the
+ * form for milestone gates and for the commit of a slice that added one.
  */
 import { spawnSync } from 'node:child_process';
 
@@ -16,7 +18,9 @@ const stages = [
   ['budget', 'node', ['tools/budget.mjs']],
 ];
 
-const only = process.argv.slice(2);
+const args = process.argv.slice(2);
+const gate = args.includes('--gate');
+const only = args.filter((a) => !a.startsWith('--'));
 const results = [];
 let failed = false;
 for (const [name, cmd, args] of stages) {
@@ -26,8 +30,9 @@ for (const [name, cmd, args] of stages) {
     continue;
   }
   const t0 = Date.now();
-  console.log(`\n=== ${name}: ${cmd} ${args.join(' ')}`);
-  const r = spawnSync(cmd, args, { stdio: 'inherit', shell: process.platform === 'win32' });
+  console.log(`\n=== ${name}: ${cmd} ${args.join(' ')}${gate && name === 'test' ? ' (LONG=1: long pins included)' : ''}`);
+  const env = gate && name === 'test' ? { ...process.env, LONG: '1' } : process.env;
+  const r = spawnSync(cmd, args, { stdio: 'inherit', shell: process.platform === 'win32', env });
   const ok = r.status === 0;
   results.push([name, ok ? `ok (${((Date.now() - t0) / 1000).toFixed(1)} s)` : `FAILED (exit ${r.status})`]);
   if (!ok) failed = true;

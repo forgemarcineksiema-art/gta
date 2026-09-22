@@ -661,7 +661,7 @@ cuts; a slower result is a bug.
 
 | Check | Limit | Where |
 |---|---|---|
-| `npm run verify` | green, lint 0 warnings | tools/verify.mjs |
+| `npm run verify:gate` | green, lint 0 warnings, the long pins included | tools/verify.mjs |
 | Startup bytes before gameplay-start | ≤ 8 MB target, 12 MB fail | tools/budget.mjs |
 | Mobile startup bytes | ≤ 20 MB (the SDK script counted) | tools/budget.mjs, new row |
 | Total build / files | ≤ 40 MB / 200 | tools/budget.mjs |
@@ -684,7 +684,7 @@ first update from the KPI reading order in `docs/DESIGN.md` §11.
 ## 7. Gate criteria (definition of done for M6)
 
 1. Slices 0–5 committed with their tests.
-2. `verify`, `platform`, `mobile`, `game`, `city`, `life`, `screens`,
+2. `verify:gate`, `platform`, `mobile`, `game`, `city`, `life`, `screens`,
    `perf`, `perf:mobile` green; the images inspected.
 3. Every budget in §5.5 holds; both perf comparisons per §5.4.
 4. The game reaches control on `?sdk=crazygames`, `?sdk=local`,

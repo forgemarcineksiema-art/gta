@@ -87,6 +87,9 @@ each and lists any gap in PROGRESS before starting:
 | `sim/city/coins.ts`, `render/Coins.ts`, the coin counter | 3 | the cold open route, the spill |
 | `render/HideoutView.ts`, `ui/run.ts`: the door, the wall totals, the cut camera, `gameplayStop/Start` around it | 3, 8 | the garage pages |
 | `sim/run/ColdOpen.ts`, `ui/coldOpen.ts`: the prototype with a session flag | 4 | slice 5 |
+| `sim/jobs/Jobs.ts` skeleton: one delivery kind, marker → target → bag, the timer, the cold open's def | 4 | slice 1 extends it, nothing renamed |
+| `app/botPolicy.ts`: the novice and skilled policies over the road bot | 5 | slice 7 |
+| twenty stunt jumps, `jump` events into the bag | 6 | dailies templates, the balance model's earnings |
 | `Pursuit` descriptor, the identity rule, the disguise, `blown` | 5 | steal-to-order, the respray |
 | `Platform.requestAd(kind)` used at the door and the busted card, mute on `adStarted`, input blocked | 8 | the offers |
 | events `coin`, `spill`, `banked`, `busted`, `camera`, `roadblock`, `escape` | 3–6 | dailies, jobs |
@@ -313,7 +316,7 @@ export function unpackDescriptor(d: number): { kind: CarId; paint: number };
 // src/sim/jobs/place.ts
 export function placeJobs(city: City, seed: number, lanes: LaneTables): JobDef[];   // deterministic; counts from BALANCE.jobs.counts
 
-// src/sim/jobs/Jobs.ts
+// src/sim/jobs/Jobs.ts (extends the M4 slice 4 skeleton: same class, same names, two kinds and the idle target added)
 export type JobState = 'idle' | 'hunting' | 'active' | 'done' | 'failed';
 export class Jobs {
   readonly defs: readonly JobDef[];
@@ -324,6 +327,7 @@ export class Jobs {
   constructor(sim: SimWorld, defs: JobDef[]);
   step(probe: PlayerProbe, dt: number): void;
   target(out: { x: number; z: number }): boolean;   // the arrow's target; false when idle
+  idleTarget(out: { x: number; z: number }): boolean;   // idle: the nearest marker, or the hideout once the bag is above BALANCE.offer.doorThreshold
   abandon(): void;                                   // the door and busted call it; no event
 }
 ```
@@ -509,9 +513,14 @@ Behaviour:
   the marker's nearest lane and the target's, times `limitFactor`, floored.
   The payout per km of that path, clamped.
 - The arrow: one flat chevron (12 triangles, `carOrange`) 2.5 m above the
-  car's roof, yawed to the bearing, fixed size, hidden when idle; the HUD
-  shows `DELIVERY 0:48 · 620 m` in the STYLE.md popup type, top centre
-  under the stars.
+  car's roof, yawed to the bearing, fixed size; the HUD shows `DELIVERY
+  0:48 · 620 m` in the STYLE.md popup type, top centre under the stars.
+  Between jobs it does not vanish (DESIGN.md §4, set 2026-09-22): at 40 %
+  opacity it points at `idleTarget`, the nearest marker by straight line,
+  or the hideout once the bag is above the door offer's threshold; so nobody
+  wanders, and the run's own exit is pointed at exactly when it is worth
+  taking. Hidden only inside the cold open (its captions lead) and at the
+  door.
 - Markers: one instanced mesh of rings (a flat torus, 24 segments) plus a
   beacon post per marker, colour by kind (delivery `carOrange`, order
   `carMagenta`, escape `policeBlue`), all 16 resident always (no chunk
@@ -540,6 +549,9 @@ Tests (`jobs.test.ts`, city world, seed 42, traffic off unless stated):
   idle with no event.
 - 1.7 the bot drives a delivery: from the marker to the target by
   `lanePath`, arrives inside the limit (this is also the measurement).
+- 1.8 idle: with no job the arrow's target is the nearest marker; with the
+  bag above `offer.doorThreshold` it is the hideout's door pose; during a
+  job it is the job's target.
 
 Acceptance: verify green; smoke draw calls +2 to +4 (arrow, markers, their
 shadow draws); the bot's delivery time against the limit and the payout in
@@ -727,6 +739,13 @@ Behaviour:
   deliver an order at stage 0, complete K deliveries, K police takedowns,
   pick up N coins, K near misses, bank K runs without a busted. Each
   carries `weight` 0/1/2 → `rewards[weight]`.
+- The daily police seed (DESIGN.md §8, low; set 2026-09-22): the same
+  `fnv1a(date)` seeds the choice of roadblock chokepoints, parked-patrol
+  junctions and camera sites in `cover.ts` (an `order` permutation over
+  the fixed site lists, nothing new placed), so today's police are today's
+  and the challenges sit on them; jobs, coins, ramps and the city stay
+  fixed so the map stays learnable. `?date=YYYY-MM-DD` overrides the local
+  date for tests and playtests.
 - `setDate(local)`: a different date draws three distinct templates from
   `mulberry32(fnv1a(date))`, resets progress, and updates the streak:
   `last` is yesterday → `count + 1`, today → no-op, else → 1; `topper` set
@@ -740,7 +759,9 @@ Behaviour:
   attached to whichever car the player drives, visible when
   `streak.topper`; survives a swap (it is the player's).
 
-Tests: 6.1 the same date twice gives the same ids; two dates differ in at
+Tests: 6.0 two dates give different chokepoint orders and the same date
+the same, and the job, coin and ramp placements are identical across dates;
+6.1 the same date twice gives the same ids; two dates differ in at
 least one id; the three are distinct; 6.2 a "K takedowns in a compact"
 template counts only takedowns while `carId === 'compact'`; 6.3 a "bank N"
 template completes on `onRunEnd(N, …, false)` and pays into the bank; 6.4
@@ -761,8 +782,8 @@ Behaviour: one vitest file, excluded from `verify` by a path filter in
 gate. It:
 
 1. Runs the road bot under the police headless for 180 s at each level 1–5
-   with the novice policy (M4 slice 6's: no swap, stays on the road) and the
-   skilled policy (swaps out of sight, uses the grid), seed 42, traffic on,
+   with the `novice` and `skilled` policies of `app/botPolicy.ts` (M4 slice
+   5), seed 42, traffic on,
    and records busted per minute per level. About 5 × 2 × 10,800 steps, a
    few minutes in Node.
 2. Builds the EV model of DESIGN.md §2.7 with those rates, the measured bag
@@ -827,8 +848,11 @@ Behaviour:
   arithmetic (prices, payouts, the fine), determinism and counting.
 - The existing pins do not change. `cars.test.ts` is re-run inside
   `garage.test.ts` 4.4 at tier 0, not edited.
-- New tests land around 50 on top of M4's count; `verify` stays under
-  three minutes on this machine (the balance script is outside it).
+- Long pins (bot or traffic-pool drives over about 10 s of wall time) go
+  into `tests/**/*.long.test.ts` and run in `npm run verify:gate`
+  (`CLAUDE.md`, working method); the quick `verify` stays under a minute
+  of tests. The balance script is outside both.
+- New tests land around 50 on top of M4's count.
 
 ### 5.2 `e2e/game.spec.ts` (Playwright, against the preview build)
 
@@ -860,7 +884,7 @@ to +5 (arrow, markers, the wanted ring and their shadow draws), triangles
 
 | Check | Limit | Where |
 |---|---|---|
-| `npm run verify` | green, lint 0 warnings | tools/verify.mjs |
+| `npm run verify:gate` | green, lint 0 warnings, the long pins included | tools/verify.mjs |
 | Startup bytes before gameplay-start | ≤ 8 MB target, 12 MB fail; the music bed loads after it | tools/budget.mjs |
 | Time to control, 20 Mbit + CPU ×4 | ≤ 6 s (the save load is one adapter call; it must not add a visible phase) | e2e/city.spec.ts |
 | Draw calls / triangles, low tier, tour | ≤ 150 / 250k | e2e/city.spec.ts |
@@ -883,7 +907,7 @@ knobs and where they live, known issues, the proposed M6 scope (which is
 
 1. Slices 0–5, 7 and 8 committed with their tests; slice 6 committed or
    moved to update 2 with one line in BACKLOG and the reason in PROGRESS.
-2. `npm run verify` green; `npm run balance` green with its table in
+2. `npm run verify:gate` green; `npm run balance` green with its table in
    PROGRESS; `npm run game` (the new e2e) 6/6; `npm run city` and `npm run
    life` still green; `npm run screens` seventy images captured and
    inspected.

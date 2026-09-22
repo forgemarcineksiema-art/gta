@@ -10,7 +10,7 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 ## Session start
 
 1. Read this file, `docs/PROGRESS.md` and the current milestone contract (M4: `docs/M4_PLAN.md`; then `docs/M5_PLAN.md`, `docs/M6_PLAN.md`; the design in `docs/DESIGN.md`); check `git log --oneline -15`.
-2. Run `npm run verify` before touching anything. It must be green at every milestone gate.
+2. Run `npm run verify` (the quick set) before touching anything. `npm run verify:gate` (the long bot-driven pins included) must be green at every milestone gate and at the commit of a slice that added a long pin.
 3. Work autonomously inside the milestone. Decide, act, note assumptions in `docs/PROGRESS.md`. Stop only at a gate, before destructive/irreversible operations, to change a fixed decision from the brief, or when blocked on something only Marcin can provide.
 4. Commit small and often; never leave significant work uncommitted. Commit messages end with `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
 
@@ -19,7 +19,8 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 | Path | What |
 |---|---|
 | `docs/BRIEF.md` | The project brief. Read-only. |
-| `docs/PROGRESS.md` | Session log: done, decided and why, next, open problems. |
+| `docs/PROGRESS.md` | Session log: done, decided and why, next, open problems. Holds the current milestone and the design talks; older entries are archived under `docs/history/` at each gate. |
+| `docs/history/` | Past gate reports, reviews and archived session logs (`PROGRESS_M0-M3.md`). |
 | `docs/DESIGN.md` | Design decisions on top of the brief: the run, progression, the city as a level, platform KPIs, the M4 slice order. Each section is marked decided (Marcin) or set here (mine). |
 | `docs/M4_PLAN.md` | The current milestone contract: slices in order, done criteria, pins, the measurement each slice must record, starting numbers. Its §5 holds the contract for post-launch update 1. |
 | `docs/M5_PLAN.md`, `docs/M6_PLAN.md` | The next two contracts, same shape: the launch minimum (jobs, garage, save, cold open, balance script) and the platform (SDK adapter, touch, mobile tier, submission). Placeholders marked "M4" are filled from PROGRESS before the milestone starts. |
@@ -35,7 +36,7 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 | `src/platform/` | `Platform` interface; `LocalPlatform` now, `CrazyGamesPlatform` in M6. Game code never touches `window.CrazyGames`. |
 | `src/app/` | Glue: fixed-step loop, bot, perf probe, `App`. |
 | `src/sim/vehicle/tuning.ts` | Every handling number (`VehicleTuning`). Live-editable via `?dev=1` / backtick key. |
-| `tests/sim/` | Vitest, Node, headless sim tests. The handling pins live here. |
+| `tests/sim/` | Vitest, Node, headless sim tests. The handling pins live here. `*.long.test.ts` are the long bot-driven pins, run with `LONG=1` (`npm run verify:gate`, `npm run test:long`). |
 | `e2e/` | Playwright: smoke, perf (bot under 4× CPU throttle), screenshots at required sizes. |
 | `tools/` | `verify.mjs`, `budget.mjs`. |
 | `perf/` | `latest.json` / `previous.json` / `startup.json` (git-ignored). |
@@ -65,5 +66,7 @@ Startup bytes before gameplay-start: target 8 MB, fail at 12 MB (uncompressed). 
 - Vertical slices; build what the milestone asks, completely. Ideas outside it go to `docs/BACKLOG.md`.
 - Never loosen a test or a budget to get green; say it is wrong instead.
 - Keep tests to the brief's list and to what a milestone calls for. Scratch scripts are not committed.
+- A bot-driven or traffic-pool test over about 10 s of wall time goes into `tests/**/*.long.test.ts`; the quick `verify` stays under a minute of tests, the gate runs everything.
+- At each milestone gate, move PROGRESS entries older than the milestone into `docs/history/PROGRESS_<range>.md` and leave a pointer at the bottom of PROGRESS.
 - Prefer targeted edits. Check current docs / installed types for Three.js, Rapier and the SDK instead of memory.
 - Gate report at each milestone: what was built, verify and perf numbers, how to run, a five-minute playtest script, tuning knobs and where they live, known issues, proposed next scope.

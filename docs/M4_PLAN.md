@@ -59,16 +59,20 @@ update 1 (§5).
 
 ### 1.2 In scope (gate-critical, §4 slices 3–8)
 
-3. The run: bag, bank, coins, the spill, `maxHeat`, the drop-offs and the
-   hideout door with the wall totals, busted with the bar and the fine.
-4. The cold open prototype: the first run scripted, the swap as the second
-   verb, captions, skippable, once per session.
+3. The run, in two commits: 3a bag, bank, `maxHeat`, the drop-offs and the
+   hideout door with the wall totals, the live multiplier on the HUD and the
+   run's summary line, busted with the bar and the fine; 3b coins and the
+   spill.
+4. The cold open prototype: the first run scripted on a minimal `Jobs`
+   (one delivery kind, which M5 extends), the swap as the second verb,
+   captions, skippable, once per session.
 5. Identity: the pursuit descriptor, a swap out of sight ends the chase and
-   the units box the old car, the disguise in a police car, the heavy as a
-   roadblock breacher (with slice 6).
+   the units box the old car, the disguise in a police car with the BORROW
+   prompt, the bot policies (novice, skilled) that three measurements use,
+   the heavy as a roadblock breacher (with slice 6).
 6. Level 3: roadblocks with a sawhorse weak point, spike strips, parked
-   patrols that join on detection, speed cameras; the busted-rate decision
-   rule.
+   patrols that join on detection, speed cameras, the twenty stunt jumps;
+   the busted-rate decision rule.
 7. Levels 4 and 5 on the ground: heavy units and the Chief.
 8. Ad points through the adapter at the door and the busted card, polish,
    the gate.
@@ -190,6 +194,9 @@ src/sim/police/Police.ts       + the boxing plan, the disguise in canSee, roadbl
 src/sim/police/tuning.ts       + busted, box, roadblock, spike, parked, cameras, heavy, chief (§3.4)
 src/sim/police/Roadblocks.ts   the placer and the sawhorse trigger; spike strips
 src/sim/city/cameras.ts        camera placement (10) and the flash trigger
+src/sim/city/jumps.ts          twenty ramps placed by the generator (park lots, pier ends); airtime → bag with the M3 slow motion
+src/sim/jobs/Jobs.ts           the skeleton: one delivery kind, marker → target → bag, the timer; M5 adds placement, kinds and the arrow
+src/app/botPolicy.ts           BotPolicy: novice (no swap, stays on the road) and skilled (swaps out of sight, turns to break sight)
 src/sim/life/Life.ts           + spike state (grip mul, pull), the breach damage rule, the spill on wrecked
 src/sim/vehicle/Vehicle.ts     + gripMul (default 1) multiplied into mu; + lateralPull N applied at the rear axle
 src/sim/traffic/Traffic.ts     + AgentState.Parked, park(agent, x, z, yaw), unpark(agent), lightsOn flag per agent
@@ -326,6 +333,32 @@ export class Roadblocks {
 export interface CameraDesc { id: number; x: number; z: number; yaw: number; limitMs: number }
 export function placeCameras(sites: Chokepoint[], count: number): CameraDesc[];
 export class Cameras { readonly descs: CameraDesc[]; step(probe: PlayerProbe, events: EventLog): void; lastFlashId: number }
+// src/sim/city/jumps.ts
+export interface JumpDesc { id: number; x: number; z: number; yaw: number; length: number; height: number }
+export function placeJumps(city: City, seed: number, count: number): JumpDesc[];   // ramps as 'gable' statics on park lots and pier ends, run-out clear
+export class Jumps { readonly descs: JumpDesc[]; step(probe: PlayerProbe, airborne: boolean, dt: number, events: EventLog): void }   // 'jump' with value = airtime when a launch from a ramp lands after minAirSeconds
+```
+
+```ts
+// src/sim/jobs/Jobs.ts (the M4 skeleton; M5 §3.3 is the full contract and extends this one without renaming)
+export type JobKind = 'delivery';
+export interface JobDef { id: number; kind: JobKind; x: number; z: number; yaw: number; targetX: number; targetZ: number; payout: number; limitSeconds: number; heat: number }
+export type JobState = 'idle' | 'active' | 'done' | 'failed';
+export class Jobs {
+  readonly defs: JobDef[]; state: JobState; active: number; remaining: number;
+  constructor(sim: SimWorld, defs: JobDef[]);
+  step(probe: PlayerProbe, dt: number): void;       // marker entry, the timer, arrival → bag, 'jobStart' | 'jobDone' | 'jobFailed'
+  target(out: { x: number; z: number }): boolean;
+  abandon(): void;
+}
+
+// src/app/botPolicy.ts
+export type PolicyName = 'novice' | 'skilled';
+export class BotPolicy {
+  constructor(name: PolicyName, bot: TrackBot);
+  drive(sim: SimWorld, controls: VehicleControls, dt: number): void;   // wraps the bot: skilled swaps when a candidate is alongside and no unit sees, prefers turns while 'lost'
+  readonly swaps: number; readonly escapesBySwap: number;
+}
 ```
 
 ```ts
@@ -353,11 +386,12 @@ cut(x: number, y: number, z: number, lookX: number, lookY: number, lookZ: number
 export const BALANCE = {
   heatThresholds: [20, 40, 60, 80, 100],
   heat: { trafficTakedown: 4, policeTakedown: 10, billboard: 2, camera: 5, roadblock: 6 },
-  bag: { billboard: 500, camera: 300, cameraPerKmh: 20, trafficTakedown: 800, policeTakedown: 1500, roadblock: 1000, escapePerLevel: 500 },
+  bag: { billboard: 500, camera: 300, cameraPerKmh: 20, trafficTakedown: 800, policeTakedown: 1500, roadblock: 1000, escapePerLevel: 500, jump: 400, jumpPerSecond: 200 },
   multiplier: [1, 1, 1.25, 1.6, 2.2, 3],     // index = maxHeat level (0 and 1 both ×1)
   fine: 0.5,
   spill: { share: 0.3, coins: 12, seconds: 10, startAhead: 10, pitch: 4 },
   coin: { value: 10, pitch: 6, runMin: 8, runMax: 12, gapMin: 40, gapMax: 90, ringAtBillboards: 8 },
+  jumps: { count: 20, minAirSeconds: 0.5, length: 9, height: 1.6, runOut: 25 },
 };
 ```
 
@@ -376,13 +410,12 @@ chief: { level: 5, speed: 45, pitAcceleration: 30, pitRange: 14, paint: 'ink' },
 
 ## 4. Slices
 
-### Slice 3 — the run: bag, bank, coins, the spill, busted, the door (3 days)
+### Slice 3a — the run: bag, bank, busted, the door (2 days)
 
-Files: `sim/balance.ts`, `sim/events.ts`, `sim/run/Run.ts`, `sim/city/coins.ts`,
-`sim/city/cover.ts`, `sim/city/City.ts`, `sim/life/Life.ts`, `SimWorld.ts`,
-`render/Coins.ts`, `render/HideoutView.ts`, `render/ChaseCamera.ts`,
-`ui/run.ts`, `ui/hud.ts`, `App.ts`, `audio/Sfx.ts`, `tests/sim/run.test.ts`,
-`tests/sim/coins.test.ts`, `tests/sim/police.test.ts` (busted).
+Files: `sim/balance.ts`, `sim/events.ts`, `sim/run/Run.ts`, `sim/city/cover.ts`,
+`sim/city/City.ts`, `SimWorld.ts`, `render/HideoutView.ts`,
+`render/ChaseCamera.ts`, `ui/run.ts`, `ui/hud.ts`, `App.ts`, `audio/Sfx.ts`,
+`tests/sim/run.test.ts`, `tests/sim/police.test.ts` (busted).
 
 Behaviour:
 
@@ -393,28 +426,6 @@ Behaviour:
   level). `maxHeat = max(maxHeat, heat.level)` every step. Coins go to
   `run.coins` from `coin` events and never to the bag; spilled coins carry
   a `spill` flag in the event's `target` (−2) and return to the bag.
-- **Coins.** `placeCoins` runs last in `City.generate` after the
-  billboards: along each lane in the chunk, runs of `runMin..runMax` coins
-  at `pitch`, gaps of `gapMin..gapMax`, on the lane's centre, skipping the
-  last 30 m before a junction; a ring of `ringAtBillboards` coins 6 m
-  around each billboard gate. Deterministic per (seed, chunk). `Coins.step`
-  tests the chassis footprint (`probe.halfWidth + 0.4`) against the
-  resident chunks' coins with a per-chunk coarse test first (chunk centre
-  within 250 m). A pickup: `picked` set, `pickedCount++`, `coin` event,
-  `run.coins += value`. The view is one instanced mesh (an octagonal disc,
-  8 triangles, `PALETTE.carOrange` for placed coins and `carWhite` for
-  spilled ones; the HUD's accent yellow is not a palette colour) over the
-  resident chunks, rebuilt on chunk claim like the billboards, picked ids
-  zero-scaled; the spill pool is 12 extra instances.
-  Spin by time in the shader-free way: rotate the instance matrix at
-  30 Hz for the nearest 64 only (a cheap loop, no allocation).
-- **The spill.** `Life` on the player's `wrecked`: `run.spill(x, z, yaw)`
-  moves `round(bag × share)` out of the bag and calls `coins.spill` with
-  the nearest lane and `s` (from `city.nearestLane` and
-  `lanes.projectPath`), which lays `spill.coins` coins from `startAhead`
-  at `pitch` along the lane in the wreck's direction, each worth the share
-  divided by the count, `ttl = seconds`. Picking one returns its value to
-  the bag; expired ones vanish. `spill` event with the value.
 - **cover.ts.** `coverSites`: the hideout under the Crown Tower block (the
   chunk that holds the tower: the box on the block's south-west lot,
   20 × 12 × 6 m, the door on the street face 6 m wide facing the street,
@@ -442,8 +453,13 @@ Behaviour:
   shows the totals (BAG, ×MULTIPLIER, BANKED, BEST RUN, BANK; the first-car
   line is M5's). Any action edge (except `pause`, `mute`, `debug`) →
   `run.openDoor()`: the collider disabled, the door slides open, the
-  camera released, `gameplayStart()`, `runs++`, state `running`. A
-  drop-off with an active pursuit refuses: the door stays shut, the car can
+  camera released, `gameplayStart()`, `runs++`, state `running`. The wall
+  also shows one line of the run's counts read from the ring since the last
+  door (takedowns, escapes, billboards, coins; jobs join in M5), and the
+  multiplier the run is currently earning is on the HUD the whole run,
+  `×1.6` beside the bag, changing on each heat threshold: the whole "one
+  more level" pull, no text (DESIGN.md §2.9). A drop-off with an active
+  pursuit refuses: the door stays shut, the car can
   only turn around (the entry box test fails; no message; the light bars
   behind are the message).
 - **Busted.** `Run.step`: `police.unitsWithin(range) ≥ busted.units` and
@@ -457,14 +473,13 @@ Behaviour:
   teleports to the nearest road as today (which is within sight by
   construction of `nearestRoad`); the pursuit does not care.
 - **HUD.** The bag (top right under the stars, ≥ 44 px, the STYLE.md skew,
-  accent yellow, counting up with a 0.3 s tween on change), the coins
-  (smaller, below, the coin glyph), the busted bar (a red skewed track
-  centre-bottom above the speedo, only while progress > 0), the spilled
-  coins have no counter. Sfx: a coin `ding` (the M3 chime reused at a
-  higher pitch), a spill cascade (six dings), the door thud, a busted
-  two-note fall.
+  accent yellow, counting up with a 0.3 s tween on change) with the live
+  multiplier beside it (`×1`, `×1.25`, … in 18 px, the same accent; a 0.3 s
+  scale pop on change), the busted bar (a red skewed track centre-bottom
+  above the speedo, only while progress > 0); the coin counter lands in 3b.
+  Sfx: the door thud, a busted two-note fall.
 
-Numbers: §3.4 `bag`, `multiplier`, `fine`, `spill`, `coin`; `busted`.
+Numbers: §3.4 `bag`, `multiplier`, `fine`; `busted`.
 
 Tests:
 
@@ -483,6 +498,58 @@ Tests:
   in the next second and the door collider is disabled (a ray from inside
   the box through the door hits nothing); while `door`, the collider is
   enabled (the ray hits).
+- `police.test.ts` (existing file) 3.13 `unitsWithin` counts only alive
+  units and never the parked civilian beside the player.
+- e2e (`heat.spec.ts`, first cases): 3.14 the bot from heat 0 drives to the
+  hideout (`?spawn=crown&bot=door`, a bot mode that routes to the hideout's
+  approach lane) and `run.state` becomes `door`, `platformCalls.gameplayStop`
+  increments, then `window.__game` sends `openDoor` and `gameplayStart`
+  increments; 3.15 screens: `door-1280x720.png` and `busted-1280x720.png`.
+
+Acceptance: verify green; the smoke's draw calls +1 (the door); the bot's
+run from heat 0 to the hideout measured: run length, bag, banked
+(`BALANCE.measured` in M5 reads these), in PROGRESS with the commit.
+
+### Slice 3b — coins and the spill (1 day)
+
+Files: `sim/city/coins.ts`, `sim/city/City.ts` (`CityChunk.coins`),
+`sim/run/Run.ts` (`coins`, `spill`), `sim/life/Life.ts` (the spill on
+wrecked), `render/Coins.ts`, `Renderer.ts`, `ui/run.ts` (the coin counter),
+`audio/Sfx.ts`, `tests/sim/coins.test.ts`.
+
+Behaviour:
+
+- **Coins.** `placeCoins` runs last in `City.generate` after the
+  billboards: along each lane in the chunk, runs of `runMin..runMax` coins
+  at `pitch`, gaps of `gapMin..gapMax`, on the lane's centre, skipping the
+  last 30 m before a junction; a ring of `ringAtBillboards` coins 6 m
+  around each billboard gate. Deterministic per (seed, chunk). `Coins.step`
+  tests the chassis footprint (`probe.halfWidth + 0.4`) against the
+  resident chunks' coins with a per-chunk coarse test first (chunk centre
+  within 250 m). A pickup: `picked` set, `pickedCount++`, `coin` event,
+  `run.coins += value`. The view is one instanced mesh (an octagonal disc,
+  8 triangles, `PALETTE.carOrange` for placed coins and `carWhite` for
+  spilled ones; the HUD's accent yellow is not a palette colour) over the
+  resident chunks, rebuilt on chunk claim like the billboards, picked ids
+  zero-scaled; the spill pool is 12 extra instances.
+  Spin by time in the shader-free way: rotate the instance matrix at
+  30 Hz for the nearest 64 only (a cheap loop, no allocation).
+- **The spill.** `Life` on the player's `wrecked`: `run.spill(x, z, yaw)`
+  moves `round(bag × share)` out of the bag and calls `coins.spill` with
+  the nearest lane and `s` (from `city.nearestLane` and
+  `lanes.projectPath`), which lays `spill.coins` coins from `startAhead`
+  at `pitch` along the lane in the wreck's direction, each worth the share
+  divided by the count, `ttl = seconds`. Picking one returns its value to
+  the bag; expired ones vanish. `spill` event with the value.
+- **HUD and audio.** The coin counter under the bag (smaller, the coin
+  glyph, white: coins are safe, the bag is yellow because it is not); the
+  spilled coins have no counter. Sfx: a coin `ding` (the M3 chime reused at
+  a higher pitch), a spill cascade (six dings).
+
+Numbers: §3.4 `spill`, `coin`.
+
+Tests:
+
 - `coins.test.ts`: 3.8 placement per chunk is deterministic for seeds 42, 7
   and 123, every coin within 1 m of a lane centre and ≥ 30 m from the
   lane's end, the whole-island count in a band (2,000–3,500) recorded in
@@ -493,25 +560,19 @@ Tests:
   straight recovers all 12 within the ttl and the bag is back to 10,000;
   3.11 after 10 s an untouched spill is gone and the bag stays at 7,000;
   3.12 coins survive busted (`run.coins` unchanged by the fine).
-- `police.test.ts` (existing file) 3.13 `unitsWithin` counts only alive
-  units and never the parked civilian beside the player.
-- e2e (`heat.spec.ts`, first cases): 3.14 the bot from heat 0 drives to the
-  hideout (`?spawn=crown&bot=door`, a bot mode that routes to the hideout's
-  approach lane) and `run.state` becomes `door`, `platformCalls.gameplayStop`
-  increments, then `window.__game` sends `openDoor` and `gameplayStart`
-  increments; 3.15 screens: `door-1280x720.png` and `busted-1280x720.png`.
 
-Acceptance: verify green; the smoke's draw calls +2 to +3 (coins and the
-door); the bot's run from heat 0 to the hideout measured: run length, bag,
-banked, coins picked per minute (`BALANCE.measured` in M5 reads these), in
-PROGRESS with the commit.
+Acceptance: verify green; the smoke's draw calls +1 to +2 (coins and their
+shadow draw); coins picked per minute by the bot in a 5-minute run
+(`BALANCE.measured.coinsPerMinute`), the whole-island coin count, in
+PROGRESS.
 
-### Slice 4 — the cold open prototype (1.5 days)
+### Slice 4 — the cold open prototype on the jobs skeleton (2 days)
 
-Files: `sim/run/ColdOpen.ts`, `sim/city/coins.ts` (the route line),
-`SimWorld.ts`, `App.ts` (`?coldopen=1` forces it; the session flag in
-`sessionStorage` is app glue), `ui/coldOpen.ts`, `ui/styles.css`,
-`tests/sim/coldOpen.test.ts`, `e2e/heat.spec.ts`.
+Files: `sim/jobs/Jobs.ts` (the skeleton of §3.3), `sim/run/ColdOpen.ts`,
+`sim/city/coins.ts` (the route line), `SimWorld.ts`, `App.ts` (`?coldopen=1`
+forces it; the session flag in `sessionStorage` is app glue),
+`ui/coldOpen.ts`, `ui/styles.css`, `tests/sim/jobs.test.ts` (the skeleton's
+own pins), `tests/sim/coldOpen.test.ts`, `e2e/heat.spec.ts`.
 
 Behaviour (DESIGN.md §6.6, revised): `start()` at boot when the session
 flag is clear: the car is a `heavy` at damage stage 2 on the `loop` spawn
@@ -523,8 +584,11 @@ speed = player's, no ram; rename to `setPlan` if that reads better) until
 taken or 15 s pass; a coin line laid on the diagonal's lane from the spawn
 to the tower junction and on through to the marker (the route's coins are
 added to the chunk's list at `start()`; they are extra ids after the
-placed ones); the delivery marker 600 m ahead past the junction (a ring, the
-M5 job machinery is not here: the script tests the chassis inside 4 m);
+placed ones); the delivery marker 600 m ahead past the junction as the first `JobDef`
+of the `Jobs` skeleton (one `delivery` kind: driving into the 4 m ring
+starts it, reaching the hideout's entry box pays the payout into the bag,
+the timer fails it; the same code M5 slice 1 extends with placement, the
+order and escape kinds and the arrow, so nothing here is thrown away);
 the hideout 300 m on. Verbs in order with the caption state: `steer`
 (cleared after 2 s of throttle), `swap` (the `E` keycap when
 `life.state.swapCandidate ≥ 0`; cleared by the `swap` event), `boost`
@@ -565,7 +629,12 @@ Tests (`coldOpen.test.ts`, city, seed 42, traffic on):
   verb order; `takedown` is optional for the bot and the caption times out.
 - 4.6 `skip()` ends the script, and a second `start()` in the same world
   does nothing (the flag).
-- e2e 4.7 `?coldopen=1`: the first caption is visible within 3 s of
+- `jobs.test.ts` (the skeleton): 4.7 driving into a delivery ring starts
+  the job, applies its heat once, and reaching the target pays `payout ×
+  (1 + 0.5 × remaining / limit)` into the bag with a `jobDone`; 4.8 the
+  timer fails it with no payout; a second ring while active does nothing;
+  `abandon()` goes idle silently.
+- e2e 4.9 `?coldopen=1`: the first caption is visible within 3 s of
   control and says the steer keycaps; after a reload without the parameter
   in the same context the caption never appears.
 
@@ -573,9 +642,9 @@ Acceptance: verify green; the bot's completion time and the time of each
 caption in PROGRESS; from this slice on, Marcin's first minute by hand is
 part of every slice's playtest.
 
-### Slice 5 — identity: the descriptor, the swap escape, the disguise (2 days)
+### Slice 5 — identity: the descriptor, the swap escape, the disguise, the bot policies (3 days)
 
-Files: `sim/police/Pursuit.ts`, `Police.ts`, `sim/life/Life.ts`,
+Files: `app/botPolicy.ts`, `sim/police/Pursuit.ts`, `Police.ts`, `sim/life/Life.ts`,
 `sim/traffic/Traffic.ts` (police cars as swap candidates already are; the
 descriptor's paint on the player's car is `PLAYER_PAINT` today and the
 respray is M5), `render/PoliceView.ts` (the player's car in police livery
@@ -608,7 +677,21 @@ Behaviour:
   descriptor. `blown` clears at the door and on a swap out of the police
   car. Heat counts every crime regardless. The player's car shows the
   police livery and a lit bar while disguised (the swap already switches
-  the class mesh; the bar is the police view's job).
+  the class mesh; the bar is the police view's job). The swap prompt says
+  BORROW instead of SWAP when the candidate is a police car (one string in
+  `ui/hud.ts` keyed on `Traffic.police[candidate]`): without it nobody
+  discovers the disguise.
+- **The bot policies** (`app/botPolicy.ts`, §3.3). Three measurements
+  (this slice's, slice 6's busted rates, M5's balance script) assume a
+  novice and a skilled bot, and neither exists: the road bot only follows
+  lanes. `novice` is the bot as it is. `skilled` wraps it: when a swap
+  candidate is alongside and no unit has sight (`Police.crimeSeen()`'s
+  sight flag), it presses `swap`; while the pursuit is `lost` it prefers
+  the exit that turns at the next junction over the straight one (a bias in
+  the lane choice, through the bot's existing route search), and it uses
+  boost on straights. About a day; sized here because nothing else in the
+  plans sizes it. `?bot=novice|skilled` runs either in the browser with
+  the perf probe.
 - **The heavy as a breacher** is slice 6's rule; listed here because it is
   the same "cars as tools" decision.
 
@@ -636,6 +719,11 @@ Tests (`identity.test.ts`, city, seed 42, traffic on, heat 20):
   points` +2) and the pursuit stays idle.
 - 5.7 (existing pin kept) a unit that lost the player re-detects only after
   120 m and out of view.
+- 5.8 the policies (`botPolicy.test.ts`, long): over 120 s at heat 40 with
+  traffic on, `skilled` swaps at least once and escapes at least once by
+  swap; `novice` never swaps; both keep `bot.resets` at 0.
+- 5.9 the prompt: with a police candidate alongside the HUD's swap label
+  reads BORROW (a DOM pin in the screens spec at 1280×720).
 
 Acceptance: verify green; the measurement: the bot with a swap policy
 (swap whenever a candidate is alongside and no unit sees, else drive the
@@ -643,9 +731,9 @@ grid) at level 2 for 120 s: escapes by swap versus by cooldown, and the
 share of escapes that were disguises, in PROGRESS (DESIGN.md §12 watch
 item; the fallback is a dispatcher timer if the share is above a half).
 
-### Slice 6 — level 3: roadblocks, spike strips, parked patrols, speed cameras (3 days)
+### Slice 6 — level 3: roadblocks, spike strips, parked patrols, speed cameras, stunt jumps (3.5 days)
 
-Files: `sim/police/Roadblocks.ts`, `sim/city/cameras.ts`, `sim/city/cover.ts`
+Files: `sim/police/Roadblocks.ts`, `sim/city/cameras.ts`, `sim/city/jumps.ts`, `sim/city/cover.ts`
 (sites, exist from slice 3), `Police.ts` (parked units), `Traffic.ts`
 (`Parked`, `park`, `unpark`, `lights`), `sim/life/Life.ts` (the breach
 rule, spike), `sim/vehicle/Vehicle.ts` (`gripMul`, `lateralPull`),
@@ -699,7 +787,7 @@ Behaviour:
   speed; heat +5, bag +300 + 20/km/h over (slice 3's rule). The lane's limit
   is `TRAFFIC.speedHighway` or `speedAvenue` in km/h.
 
-Numbers: §3.4 `roadblock`, `spike`, `parked`, `cameras`.
+Numbers: §3.4 `roadblock`, `spike`, `parked`, `cameras`, `jumps`, `bag.jump`.
 
 Tests:
 
@@ -726,6 +814,13 @@ Tests:
   straights and the avenue, none within 200 m of another; 6.11 crossing at
   the limit + 30 km/h flashes once (`camera` value 30 ± 1), at the limit +
   10 nothing; a second crossing inside the cooldown nothing.
+- `jumps.test.ts`: 6.13 exactly twenty ramps, deterministic for seeds 42, 7
+  and 123, each with a clear run-out and ≥ 120 m from any other, none on a
+  carriageway; 6.14 the bot launched at 90 km/h off the first ramp lands
+  inside the run-out with airtime ≥ 0.5 s, one `jump` event, the bag paid
+  by the formula, `slowMo` > 0 during the flight and 0 within 2 s of
+  landing, no wreck, `upness` ≥ 0.99 a second after touchdown; 6.15 a hop
+  off a kerb pays nothing.
 - e2e `heat.spec.ts` 6.12 `?heat=3&bot=1` for 120 s: at least one
   `roadblock` event or one `camera` event, no console errors, perf inside
   the budgets.
@@ -883,7 +978,15 @@ helicopter under cover first, then the cooldown".
   counting and determinism. The existing pins (M1–M3 and slices 0–2) do
   not change; if a slice-2 police pin must move (the roster at level 4
   with heavies), the reason is in the test and in PROGRESS.
-- About 55 new tests over slices 3–8 on top of 189.
+- Long pins go into `tests/**/*.long.test.ts` (2026-09-22): any case that
+  drives the bot or the traffic pool for more than about 10 s of wall time
+  on the MX330 laptop. The quick `npm run verify` excludes them so it stays
+  under a minute of tests; `npm run verify:gate` (LONG=1) runs everything and
+  is the command for the gate and for the commit of a slice that added a
+  long pin; `npm run test:long` runs only the tests stage that way. The
+  split moved the city tour, the two bot-driven police pins and the two
+  traffic drives (184 quick / 5 long at the split).
+- About 65 new tests over slices 3–8 on top of 189.
 
 ### 6.2 `e2e/heat.spec.ts`
 
@@ -932,9 +1035,9 @@ and is taken at the start of slice 3 on an idle machine. Marcin's
 ## 7. Gate criteria (definition of done for M4)
 
 1. Slices 3–8 committed with their tests; slices 0–2 as recorded.
-2. `npm run verify` green; `npm run heat` green; `npm run city` and `npm run
-   life` still green; `npm run screens` with the seven states at the ten
-   sizes captured and inspected.
+2. `npm run verify:gate` green (the long pins included); `npm run heat`
+   green; `npm run city` and `npm run life` still green; `npm run screens`
+   with the seven states at the ten sizes captured and inspected.
 3. Every budget in §6.5 holds; the perf comparison per §6.4 with all runs
    quoted, including `PERF_HEAT=5`.
 4. No per-step allocation in `Run.step`, `Coins.step`, `Roadblocks.step`,

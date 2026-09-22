@@ -112,7 +112,9 @@ camera, ram) with a unit in line of sight blows the disguise: the descriptor
 becomes "police saloon" or "interceptor" and the pursuit runs as usual. Heat
 still rises for every crime, seen or not. One more condition in detection,
 and the best joke in the game: escaping the police in their own car. Watch
-item in §12.
+item in §12. The swap prompt reads BORROW instead of SWAP when the candidate
+is a police car (set here, 2026-09-22): the disguise has to be discoverable
+without a tutorial line.
 
 ### 2.6 Heat levels, starting table
 
@@ -172,6 +174,11 @@ The hideout is a one-room drive-in garage. The door closes behind the car,
 the totals appear painted on the wall, the engine idles, any key opens the
 door and the player drives out. A cut camera as with the takedown focus. This
 is the only interior worth building: a straight box, no ramps. Ad points: §9.
+Two additions, set 2026-09-22: the multiplier the run is currently earning
+sits on the HUD beside the bag for the whole run (`×1.6`), which is the
+entire "one more level" pull without a word of text; and the wall shows one
+line of the run's counts under the totals (jobs, takedowns, escapes,
+billboards, coins), so a run reads as a story and not only as a sum.
 
 ## 3. Audience and progression — set here, revised 2026-09-22
 
@@ -283,10 +290,17 @@ cost, the cheap ones first so the city fills early.
    escape, so the heat system has a front door for players who want the chase
    without the build-up.
 7. **Stunt and collectible hunts**: jumps with the slow motion, billboards,
-   coins, hidden cars.
+   coins, hidden cars. The twenty stunt jumps themselves are v1 content
+   (brief §4) and ship in M4 slice 6 (decided 2026-09-22): ramps placed by
+   the generator on park lots and pier ends, airtime paid into the bag with
+   the M3 slow motion; they are the cheapest reward in free roam. The hunt
+   (a counter and a reward for all twenty) is update 2.
 
 Every job uses the Crazy Taxi arrow: one big destination arrow over the car,
-no map needed. Ghost time-attack against the recorder's pose stream,
+no map needed. Between jobs it does not vanish (set here, 2026-09-22): dimmed,
+it points at the nearest marker, and at the hideout once the bag is above the
+door offer's threshold, so nobody wanders and the run's exit is pointed at
+exactly when it is worth taking. Ghost time-attack against the recorder's pose stream,
 order-free checkpoints (Midnight Club) and road rules (Burnout) are the M5
 stretch.
 
@@ -408,7 +422,7 @@ hideout" 300 m on, with the patrols losing sight in the grid (escape). About
 | Police withdraw to the nearest donut shop when a pursuit ends; the shop is a marker building, the units path to it and park | mine | very low | M4 polish |
 | A news ticker at heat changes ("a red muscle car is terrorizing Crown Heights"), one line, no voice | mine | very low | M4 polish |
 | A wanted poster on the hideout wall showing the car the police are looking for; teaches the identity rule without text | mine | very low | M4 |
-| Daily seed: the police layout (roadblock sites, patrol routes, the Chief's car) from the date, with the daily challenges on it | mine | low | M5 |
+| Daily seed: the police layout (roadblock sites, parked-patrol junctions, camera sites) from the date, with the daily challenges on it; jobs, coins and the city fixed | mine | low | M5 slice 6, with the dailies |
 | A speed-camera flash shows the "photo" (a HUD card with the car's paint, the speed and the fine) | GTA, real life | low | M5 polish |
 | A giant ball in a plaza, one dynamic sphere | Rocket League | very low | M5 free-roam toy |
 | Body crumple by vertex displacement on the low-poly mesh | BeamNG, Wreckfest | low, render only | M5 polish, thumbnail value |
@@ -486,16 +500,19 @@ both.
 - **M4 Heat**, slice order: 0 housekeeping, 1 heat and pursuit as two
   systems with patrols at level 1, 2 police units per level with the pool
   budget and interceptors (all three done); 3 busted with the bar, the
-  hideout door, bag and bank with the multiplier, `balance.ts`, and the coins
-  (§3.2); 4 the cold open prototype (§2.8, §6.6); 5 the identity rule and the
-  police chasing the old car; 6 roadblocks, spike strips, parked patrols,
-  speed cameras, with the busted-rate decision rule (§12); 7 levels 4 and 5
-  on the ground, heavy SUVs and the Chief; 8 ad points through the adapter,
-  polish, the gate.
+  hideout door, bag and bank with the multiplier live on the HUD,
+  `balance.ts` (3a), and the coins with the spill (3b, §3.2); 4 the cold open
+  prototype on a minimal delivery job (§2.8, §6.6); 5 the identity rule, the
+  disguise with the BORROW prompt, the police chasing the old car, the bot
+  policies; 6 roadblocks, spike strips, parked patrols, speed cameras and the
+  twenty stunt jumps, with the busted-rate decision rule (§12); 7 levels 4
+  and 5 on the ground, heavy SUVs and the Chief; 8 ad points through the
+  adapter, polish, the gate.
 - **M5 The launch minimum**: the cold open finished on the save's seen flag,
   save through the platform, the garage with the catalogue and paint (§3.3),
   three jobs (getaway delivery, steal-to-order, pursuit escape), the Crazy
-  Taxi arrow, the balance script with the EV assertion
+  Taxi arrow with its idle target, the daily police seed with the dailies,
+  the balance script with the EV assertion
   and the bot as the capture probe, the UI and audio passes. Dailies and the
   streak ship with it if they fit after the three jobs: they are cheap once
   the save exists and they are the D1 lever; else they open update 2.

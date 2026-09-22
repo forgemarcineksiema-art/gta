@@ -42,6 +42,12 @@ test('bot drives 60 s under 4x CPU throttle within budget', async ({ page, brows
     `draw calls mean ${perf.drawCalls.mean.toFixed(0)} max ${perf.drawCalls.max}   tris mean ${(perf.triangles.mean / 1000).toFixed(0)}k max ${(perf.triangles.max / 1000).toFixed(0)}k`,
     `heap MB start ${perf.heapMb.start.toFixed(0)} end ${perf.heapMb.end.toFixed(0)} max ${perf.heapMb.max.toFixed(0)}   dropped ${perf.droppedTime.toFixed(2)} s  bot resets ${perf.botResets}`,
   ];
+  if (perf.simPhases) {
+    lines.push(`sim step by phase over ${perf.simPhases.steps} steps, ms:`);
+    for (const [name, p] of Object.entries(perf.simPhases.phases)) {
+      lines.push(`  ${name.padEnd(8)} mean ${p.mean.toFixed(3)}  p50 ${p.p50.toFixed(3)}  p95 ${p.p95.toFixed(3)}  p99 ${p.p99.toFixed(3)}  max ${p.max.toFixed(3)}`);
+    }
+  }
   console.log('[perf]\n' + lines.join('\n'));
 
   expect(perf.drawCalls.max, 'draw calls').toBeLessThanOrEqual(BUDGET.drawCallsMax);

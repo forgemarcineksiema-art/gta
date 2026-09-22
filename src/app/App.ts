@@ -18,6 +18,7 @@ import { AgentState } from '../sim/traffic/Traffic';
 import { CITY_BOT_TUNING, TrackBot } from './trackBot';
 import { FixedStepLoop } from './loop';
 import { PerfProbe, heapMb } from './perf';
+import { SimProfile } from './simProfile';
 
 /** Filled during `App.boot`; copied into the handle for `?dev` and the startup gate. */
 const bootTimings: Record<string, number> = {};
@@ -73,6 +74,7 @@ export class App {
   private readonly loop = new FixedStepLoop(FIXED_DT, 5);
   private readonly bot: BotDriver | TrackBot | null;
   private readonly perf: PerfProbe | null;
+  private readonly simProfile: SimProfile | null;
   private readonly handle: GameHandle;
   private readonly hintsUntil: number;
   private lastTime = 0;
@@ -166,7 +168,11 @@ export class App {
     this.bot = botOn && sim.city ? new TrackBot(sim.carId, CITY_BOT_TUNING)
       : botParam === 'track' ? new TrackBot(this.sim.carId) : botOn ? new BotDriver(Number(params.get('seed') ?? '42')) : null;
     const duration = Number(params.get('duration') ?? '0');
-    this.perf = botOn && duration > 0 ? new PerfProbe(duration) : null;
+    // The phase profile costs five `performance.now()` calls per step, so it is
+    // only installed for a measured run, never for play.
+    this.simProfile = (botOn && duration > 0) || params.get('profile') === '1' ? new SimProfile() : null;
+    if (this.simProfile) sim.mark = this.simProfile.mark;
+    this.perf = botOn && duration > 0 ? new PerfProbe(duration, this.simProfile) : null;
 
     this.handle = {
       started: false,
@@ -341,6 +347,7 @@ export class App {
           if (st.pressed.reset) c.reset = true;
           if (st.pressed.swap) c.swap = true;
         }
+        this.simProfile?.begin();
         this.sim.step();
         this.panel?.graphPush(this.sim.vehicle.telemetry);
       });

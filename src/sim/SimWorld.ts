@@ -19,6 +19,7 @@ import { LapTimer, type LapState, type TrackDef } from './track';
 import { Pedestrians } from './traffic/Pedestrians';
 import { Traffic, type PlayerProbe } from './traffic/Traffic';
 import { PEDS, TRAFFIC } from './traffic/tuning';
+import { SimPhase, type PhaseMark } from './profile';
 import { TransformBuffer } from './transforms';
 import { CAR_PRESETS, type CarId } from './vehicle/presets';
 import { cloneTuning, type VehicleTuning } from './vehicle/tuning';
@@ -108,6 +109,8 @@ export class SimWorld {
   time = 0;
   /** Set when the vehicle was respawned this step (for the renderer to snap the camera). */
   respawned = false;
+  /** Per-phase timing hook, installed from outside the sim (`src/app/simProfile.ts`). Null in tests and in play. */
+  mark: PhaseMark | null = null;
 
   /** `initPhysics()` must have resolved before constructing. */
   constructor(opts: SimWorldOptions = {}) {
@@ -184,6 +187,7 @@ export class SimWorld {
     if (reset) this.respawned = true;
     this.controls.reset = false;
     this.controls.swap = false;
+    this.mark?.(SimPhase.Vehicle);
     if (this.traffic) {
       const pos = this.vehicle.body.translation(this.scratchPos);
       const rot = this.vehicle.body.rotation(this.scratchRot);
@@ -200,9 +204,12 @@ export class SimWorld {
       probe.halfLength = he.z;
       this.traffic.playerColliderHandle = this.vehicle.collider.handle;
       this.traffic.step(probe, FIXED_DT, this.events);
-      this.peds?.step(probe, this.traffic, FIXED_DT, this.events);
     }
+    this.mark?.(SimPhase.Traffic);
+    if (this.traffic) this.peds?.step(this.probe, this.traffic, FIXED_DT, this.events);
+    this.mark?.(SimPhase.Peds);
     this.world.step();
+    this.mark?.(SimPhase.Physics);
     this.vehicle.writeTransforms();
     this.traffic?.writeTransforms();
     this.peds?.writeTransforms();
@@ -236,6 +243,7 @@ export class SimWorld {
         this.bestLapPoses = this.recorder.slicePoses(lap.completedLapStartTick, this.tick);
       }
     }
+    this.mark?.(SimPhase.Post);
   }
 
   get lap(): LapState {

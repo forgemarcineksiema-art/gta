@@ -3,6 +3,7 @@ export { createControls, clearControls, type VehicleControls } from './controls'
 export { TransformBuffer } from './transforms';
 export { mulberry32 } from './random';
 export { EventLog, type EventKind, type SimEvent } from './events';
+export { SimPhase, SIM_PHASES, type PhaseMark } from './profile';
 export { Traffic, AgentState, PLAYER_PAINT, type PlayerProbe, type SwapHandover } from './traffic/Traffic';
 export { Pedestrians, PedPose } from './traffic/Pedestrians';
 export { TRAFFIC, PEDS, type TrafficTuning, type PedTuning } from './traffic/tuning';

@@ -4,6 +4,7 @@
  * `window.__perf` (read by e2e/perf.spec.ts and the smoke test).
  */
 import type { RenderStats } from '../render/Renderer';
+import type { PhaseReport, SimProfile } from './simProfile';
 
 export interface Percentiles {
   mean: number;
@@ -31,6 +32,8 @@ export interface PerfResult {
   glRenderer: string;
   /** True when the GL renderer looks like a software rasterizer (SwiftShader, llvmpipe). */
   softwareGl: boolean;
+  /** Milliseconds per sim step by phase (`SimPhase`), when a profiler was installed. */
+  simPhases: PhaseReport | null;
 }
 
 declare global {
@@ -55,7 +58,7 @@ export class PerfProbe {
   done = false;
   result: PerfResult | null = null;
 
-  constructor(durationSec: number) {
+  constructor(durationSec: number, private readonly profile: SimProfile | null = null) {
     this.duration = durationSec;
     this.frameMs.length = 0;
   }
@@ -102,6 +105,7 @@ export class PerfProbe {
       userAgent: navigator.userAgent,
       glRenderer: stats.glRenderer,
       softwareGl: /swiftshader|llvmpipe|software|mesa offscreen/i.test(stats.glRenderer),
+      simPhases: this.profile?.report() ?? null,
     };
     window.__perf = this.result;
     window.__perfDone = true;

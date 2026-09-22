@@ -2,6 +2,107 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-22 — M4 slice 6: level 3 (roadblocks, spikes, parked patrols, cameras, jumps)
+
+### Done
+
+- `sim/police/Roadblocks.ts`: at level 3+ with the pursuit active, one
+  roadblock at a time at the first chokepoint 150–300 m ahead on the
+  player's road (the lane under the car, then straight on or the gentlest
+  turn), at least 100 m off, out of the view cone or behind a building from
+  the driver's eye; two lit cars along the lane 5 m apart, a sawhorse in the
+  gap, a spike strip 25 m before it across the open side. The sawhorse: −5 %
+  speed, `roadblock` (bag +1,000, heat +6), the cars pull out and join the
+  roster. Cleared 150 m past it, when the chase ends or the run ends;
+  `retryAfter` 20 s after a clear. `raise(site)` test hook.
+- The breach (`Life`): a roadblock car hit by the heavy at 80 km/h+ is
+  knocked loose (`Traffic.disturb`) and the heavy takes ×0.3 damage; any
+  other hit on a roadblock car is braced, ×3.5. The spike: `Life.puncture`
+  sets `Vehicle.gripMul` 0.6 and `lateralPull` 900 N at the rear axle
+  toward the block's side; `mend()` on a swap, a fresh car and the door.
+- Parked patrols (`Police`): from level 3, four cars at the parked
+  junctions nearest the player within 450 m, lit within 200 m, put there
+  out of view and beyond their own 90 m sight; one that sees the player
+  unparks onto its lane (`Traffic.unpark`, in place when it has a body) and
+  joins the roster; below level 3 they stay dark where they are until
+  nobody sees them go; they are swap candidates and count for busted.
+- `cover.ts`: chokepoints (every highway lane every 75 m, and the tower
+  junction's approaches, 60 m out), parked junctions (the interior grid
+  nodes 300 m or more from the hideout), camera sites (seven on the
+  highway's straights, three on the Crown avenue).
+- `sim/city/cameras.ts`: ten cameras, poles in the chunks; the line across
+  the road crossed more than 20 km/h over the limit flashes (`camera` with
+  the km/h over; heat +5, bag +300 + 20/km/h), 30 s rest per camera. HUD:
+  a 100 ms white flash at 60 % and FLASHED 132 KM/H; a shutter sound.
+- `sim/city/jumps.ts`: twenty ramps on the park strip outside the highway
+  (eight west, eight north, four east short of the quay promenade), 170 m
+  apart, seed-jittered; `rampProfile` eases in over three slabs; collision
+  slabs follow it and `render/RampView.ts` draws it (one mesh). `Jumps`:
+  a launch off a ramp flies with the slow motion through the flight; a
+  landing after 0.5 s pays `jump` (bag +400 + 200/s); STUNT! 1.1 S.
+- Views: parked and roadblock bars flash (`Traffic.lights`),
+  `render/RoadblockView.ts` (the striped sawhorse, the strip).
+- Tests: `roadblocks.test.ts` 6.3–6.6 and `roadblocks.long.test.ts`
+  6.1–6.2, `police.test.ts` 6.7–6.9, `cameras.test.ts` 6.10–6.11,
+  `jumps.test.ts` 6.13–6.15, e2e 6.12 in `heat.spec.ts`. The cold open's
+  bot pin (4.5) moved to `coldOpen.long.test.ts`: the quick tests had
+  reached 58 s.
+
+### Measured
+
+- Busted in five minutes (the harness re-arms the level 10 s after each
+  card), seeds 42 / 7 / 123:
+  - level 1: novice 0 / 0 / 5, skilled 0 / 1 / 2;
+  - level 2: novice 2 / 6 / 2, skilled 1 / 2 / 2;
+  - level 3: novice 1 / 5 / 16, skilled 1 / 2 / 0.
+  The 16 is the novice bot stopping in front of roadblock cars (9 blocks in
+  that run) and being boxed; a player drives through the sawhorse.
+- Jumps at 90 km/h: 1.1–1.3 s in the air, landing 27–31 m past the ridge,
+  apex 3.6–4.5 m, upright, no damage (the single steep slab had thrown the
+  muscle and the heavy to 8.6 m on their springs).
+- e2e 6.12 (`?heat=3&bot=1`, 120 s, low): 1 roadblock, 84 draws, 147k
+  triangles, 54 MB heap, step p95 1.0 ms.
+
+### Decided (set here)
+
+- The decision rule (DESIGN.md §12) does not fire: level 3's novice rate
+  (median 5 in five minutes) is far above one, and even levels 1 and 2
+  bust the novice (1.7 and 3.3 on average). The multipliers stay and
+  cameras and parked patrols stay at level 3. Nobody tuned `balance.ts`.
+- "Out of view" for a roadblock includes behind a building from the
+  driver's eye: on the highway's straights nothing is outside the cone
+  ahead, and a block round the corner building is not seen going up.
+- The roadblock cars stand along the lane: angled across it, the gap
+  between them was 0.6 m.
+- The braced car half (×3.5): the plan expected the M3 traffic factor to
+  wreck a car at 80 km/h; it gives 0.4 of a car's life, so a braced factor
+  makes the car half the wall the design means.
+- Parked junctions are all interior nodes 300 m from the hideout, not four
+  (test 6.7 wants four within 450 m of the player). Parked cars appear
+  beyond 90 m: one placed in view of the player pulled out at once and its
+  place filled again, a unit a second.
+- Cameras: 7 on the highway and 3 on the avenue; four on the avenue do not
+  fit 200 m apart clear of the tower junction.
+- Ramps on the park strip beyond the highway, not on park lots and pier
+  ends: a jump at 90 km/h needs 60 m of clear ground and the lots are 36 m
+  with trees; the strip has a clear lane the length of three sides. Drawn
+  by their own view from the collision profile, not as gable statics.
+
+### Next
+
+- Slice 7: heavies and the Chief.
+
+### Open problems
+
+- The novice bot stops in front of a roadblock and is busted; the
+  measurement counts it. A bot that picks the sawhorse is BACKLOG.
+- The skilled bot resets 1–3 times in five minutes at level 3 (stuck off
+  the road after swaps); the novice does not.
+- The city tour pin (`city.long.test.ts`) now keeps the heat at 0: at up to
+  115 km/h the tour crosses the new speed cameras, the heat reached level 1
+  and the patrols' rams broke its impact bound. It pins the road graph, not
+  a chase.
+
 ## 2026-09-22 — M4 slice 5: identity, the swap escape, the disguise, the bot policies
 
 ### Done

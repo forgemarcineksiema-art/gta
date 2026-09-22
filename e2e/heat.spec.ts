@@ -54,3 +54,25 @@ test('4.9 the cold open: the steer keycaps within 3 s of control, and never agai
   expect(await page.locator('.cold__caption.is-visible').count()).toBe(0);
   expect(errors).toEqual([]);
 });
+
+test('6.12 level 3 for 120 s with the road bot: a roadblock or a speed camera, no errors, the budgets hold', async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  await page.goto('/?heat=3&bot=1&duration=120&quality=low');
+  await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 60_000 });
+  await page.waitForFunction(() => window.__perfDone === true, null, { timeout: 200_000 });
+  const result = await page.evaluate(() => {
+    const sim = window.__game!.sim;
+    const perf = window.__perf as { drawCalls: { max: number }; triangles: { max: number }; heapMb: { max: number }; stepMs: { p95: number } };
+    return { roadblocks: sim.roadblocks?.placed ?? 0, flashes: sim.cameras?.flashes ?? 0, level: sim.heat.level, perf };
+  });
+  console.log(`[heat 3] ${result.roadblocks} roadblocks, ${result.flashes} camera flashes, level ${result.level}; draws ${result.perf.drawCalls.max}, tris ${(result.perf.triangles.max / 1000).toFixed(0)}k, heap ${result.perf.heapMb.max.toFixed(0)} MB, step p95 ${result.perf.stepMs.p95.toFixed(2)} ms`);
+  expect(result.roadblocks + result.flashes).toBeGreaterThanOrEqual(1);
+  expect(result.perf.drawCalls.max).toBeLessThanOrEqual(300);
+  expect(result.perf.triangles.max).toBeLessThanOrEqual(600_000);
+  if (result.perf.heapMb.max > 0) expect(result.perf.heapMb.max).toBeLessThanOrEqual(250);
+  expect(result.perf.stepMs.p95).toBeLessThan(12);
+  expect(errors).toEqual([]);
+});

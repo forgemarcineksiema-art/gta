@@ -624,7 +624,10 @@ both.
   `balance.ts`. Decision rule: if level 3 comes out below the §2.7 novice
   assumption (15 % a minute, about one busted in five minutes), the ratchet
   gets a cost that is not the police, speed cameras and parked patrols from
-  level 2 instead of 3, and the level 1–2 multipliers come down.
+  level 2 instead of 3, and the level 1–2 multipliers come down. Measured
+  in slice 6 (2026-09-22): busted in five minutes at levels 1 / 2 / 3, the
+  novice bot 0–5 / 2–6 / 1–16, the skilled one 0–2 / 1–2 / 0–2; the rule
+  does not fire and nothing changed.
 - The disguise (§2.5): does a police car make heat 1–2 trivial, since a
   chasing unit rams from alongside and is therefore always a swap candidate.
   If the bot's escape-by-disguise share is above half at level 2, the

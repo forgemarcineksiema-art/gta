@@ -82,6 +82,8 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 ## Run structure and heat (M4 candidates beyond the slice plan; docs/DESIGN.md)
 
+- The bot policies stop in front of a roadblock's cars and get boxed; a bot that aims for the sawhorse (or around) would make the level-3 busted rate a player's. (M4 slice 6)
+- Pier-end jumps (DESIGN.md §6.1 names them): the quay has no clear 60 m run-out off a pier; the twenty ramps are on the park strip. (M4 slice 6)
 - Update 1, "the air" (decided 2026-09-22, `docs/DESIGN.md` §5): covered streets with the camera occlusion rule, the highway overpasses, the helicopter with its spotlight. Left M4 so the game reaches Basic Launch with heat 4–5 on the ground; the contracts are §5 of `docs/M4_PLAN.md`. (update 1)
 - Pursuit breakers: smashable props that drop a static onto the road behind the player (scaffold, water tower, petrol canopy); police crash or reroute; doubles as cover. Billboard machinery plus a dropped static and a police reroute. (M4 stretch)
 - Multi-storey car park as a helicopter cover set piece: ramps, per-floor colliders, and a chase camera at 2.4 m plus look height inside 3 m ceilings; the camera alone is a week. (v1.1)

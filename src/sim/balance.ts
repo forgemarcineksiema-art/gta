@@ -33,6 +33,12 @@ export const BALANCE = {
   /** A wreck spills `share` of the bag as `coins` coins from `startAhead` m at `pitch` along the lane, for `seconds`. */
   spill: { share: 0.3, coins: 12, seconds: 10, startAhead: 10, pitch: 4 },
   /**
+   * Stunt jumps (slice 6): `count` ramps, each `length` m up to `height` m and as far down again; a launch
+   * off one that stays up `minAirSeconds` pays the bag (`bag.jump` + `bag.jumpPerSecond` × airtime); `runOut`
+   * m of clear ground beyond the landing at 90 km/h.
+   */
+  jumps: { count: 20, minAirSeconds: 0.5, length: 9, height: 1.6, runOut: 25 },
+  /**
    * Jobs (the slice-4 skeleton; M5 adds kinds and placement): a `markerRadius` m ring starts one, arriving
    * within the same radius of its target pays payout × (1 + timeBonus × remaining / limit); done and failed
    * show for `holdSeconds`.

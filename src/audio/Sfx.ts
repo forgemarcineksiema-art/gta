@@ -28,6 +28,9 @@ export class Sfx {
     else if (e.kind === 'coin') this.coin(ctx, master);
     else if (e.kind === 'spill') this.cascade(ctx, master);
     else if (e.kind === 'busted') this.fall(ctx, master);
+    else if (e.kind === 'camera') this.shutter(ctx, master);
+    else if (e.kind === 'jump') { this.crunch(ctx, master, 1); this.ding(ctx, master); }
+    else if (e.kind === 'roadblock') { this.splinter(ctx, master); this.crunch(ctx, master, 1); }
   };
 
   constructor(private readonly engine: EngineAudio) {}
@@ -168,6 +171,34 @@ export class Sfx {
     noise.connect(filter).connect(gain).connect(master);
     noise.start(t);
     noise.stop(t + 0.3);
+  }
+
+  /** A speed camera: a shutter click and the flash's rising whine. */
+  private shutter(ctx: BaseAudioContext, master: AudioNode): void {
+    const t = ctx.currentTime;
+    const noise = ctx.createBufferSource();
+    noise.buffer = noiseBuffer(ctx);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(3200, t);
+    const click = ctx.createGain();
+    click.gain.setValueAtTime(0.0001, t);
+    click.gain.exponentialRampToValueAtTime(0.3, t + 0.004);
+    click.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+    noise.connect(filter).connect(click).connect(master);
+    noise.start(t);
+    noise.stop(t + 0.06);
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(2400, t + 0.02);
+    osc.frequency.exponentialRampToValueAtTime(5200, t + 0.35);
+    const whine = ctx.createGain();
+    whine.gain.setValueAtTime(0.0001, t + 0.02);
+    whine.gain.exponentialRampToValueAtTime(0.05, t + 0.06);
+    whine.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+    osc.connect(whine).connect(master);
+    osc.start(t + 0.02);
+    osc.stop(t + 0.42);
   }
 
   /** Billboard: the collect chime, two sines a fifth apart. */

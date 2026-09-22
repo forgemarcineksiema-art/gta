@@ -54,6 +54,10 @@ export class Hud {
   private lapVisible = false;
   private debugVisible = false;
   private toastTimer = 0;
+  /** The speed camera's flash: a white overlay for `flashLeft` s. */
+  private readonly flash: HTMLElement;
+  private flashLeft = 0;
+  private readonly cameraLimits: number[];
   private lastDebugAt = 0;
   private lastSpeedText = '';
   private lastBoostText = '';
@@ -87,11 +91,14 @@ export class Hud {
   private boostFlash = 0;
   private lastMeter = 0;
   /** Bound once: the event ring is polled every frame. */
-  private readonly onEvent = (e: SimEvent): void => this.showEvent(e.kind, e.value);
+  private readonly onEvent = (e: SimEvent): void => this.showEvent(e.kind, e.value, e.target);
 
   constructor(parent: HTMLElement, sim: SimWorld) {
     this.root = el('div', 'hud');
     parent.appendChild(this.root);
+    this.flash = el('div', 'hud__flash');
+    this.root.appendChild(this.flash);
+    this.cameraLimits = sim.cameras ? sim.cameras.descs.map((c) => c.limitMs * 3.6) : [];
     this.minimap = sim.city ? new Minimap(this.root, sim) : null;
     this.heat = new HeatHud(this.root, sim);
 
@@ -239,8 +246,15 @@ export class Hud {
       `${peds ? `  peds ${peds.count()} hops ${peds.guaranteeHops}` : ''}  events ${eps.toFixed(1)}/s${c ? `  billboards ${c.smashedCount}/${c.total}` : ''}  slowmo ${sim.life.state.slowMo.toFixed(2)}`;
   }
 
-  private showEvent(kind: string, value: number): void {
-    const text = kind === 'nearMiss' ? 'NEAR MISS'
+  private showEvent(kind: string, value: number, target = -1): void {
+    if (kind === 'camera') {
+      // the flash, then the photo's caption: the speed it caught
+      this.flash.classList.add('is-on');
+      this.flashLeft = 0.1;
+    }
+    const text = kind === 'camera' ? `FLASHED ${Math.round((this.cameraLimits[target] ?? 0) + value)} KM/H`
+      : kind === 'jump' ? `STUNT! ${value.toFixed(1)} S`
+      : kind === 'nearMiss' ? 'NEAR MISS'
       : kind === 'nearMissOncoming' ? 'ONCOMING!'
         : kind === 'nearMissPed' ? 'DODGED'
           : kind === 'swap' ? 'FRESH WHEELS'
@@ -257,7 +271,7 @@ export class Hud {
     if (!popup) return;
     popup.textContent = text;
     popup.classList.toggle('is-gain', value > 0);
-    popup.classList.toggle('is-big', kind === 'takedown' || kind === 'takedownTraffic');
+    popup.classList.toggle('is-big', kind === 'takedown' || kind === 'takedownTraffic' || kind === 'jump');
     popup.classList.add('is-on');
     this.popupLeft[i] = 1.2;
   }
@@ -333,6 +347,10 @@ export class Hud {
       if (driftText !== this.lastDriftText) { this.driftAngle.textContent = driftText; this.lastDriftText = driftText; }
     }
 
+    if (this.flashLeft > 0) {
+      this.flashLeft -= dt;
+      if (this.flashLeft <= 0) this.flash.classList.remove('is-on');
+    }
     if (this.toastTimer > 0) {
       this.toastTimer -= dt;
       if (this.toastTimer <= 0) this.toast.classList.remove('is-visible');

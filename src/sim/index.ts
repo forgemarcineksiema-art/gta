@@ -14,6 +14,8 @@ export { Heat } from './heat/Heat';
 export { Police } from './police/Police';
 export { Pursuit, type PursuitState, type Descriptor } from './police/Pursuit';
 export { Roadblocks } from './police/Roadblocks';
+export { Cameras, placeCameras, type CameraDesc } from './city/cameras';
+export { Jumps, placeJumps, type JumpDesc } from './city/jumps';
 export { Run, type RunState, type RunCounts } from './run/Run';
 export { ColdOpen, COLD_OPEN_VERBS, coldOpenRoute, type ColdOpenVerb, type ColdOpenRoute } from './run/ColdOpen';
 export { Jobs, type JobDef, type JobKind, type JobState } from './jobs/Jobs';

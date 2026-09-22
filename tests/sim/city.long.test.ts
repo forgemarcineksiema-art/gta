@@ -17,6 +17,8 @@ describe('M2 city (long)', () => {
     try {
       for (let i = 0; i < 190_000 && !bot.tourComplete; i++) {
         bot.drive(sim, sim.controls, FIXED_DT); sim.step();
+        // this pins the road graph, not a chase: the speed cameras (M4 slice 6) on the tour would raise the heat
+        if (sim.heat.points > 0) sim.heat.reset();
         if (i > 120) { const y = sim.transforms.currPos[sim.vehicle.slot * 3 + 1] as number; maxY = Math.max(maxY, y); minY = Math.min(minY, y); }
         maxImpact = Math.max(maxImpact, sim.vehicle.telemetry.impact);
         if (i % 600 === 0) {

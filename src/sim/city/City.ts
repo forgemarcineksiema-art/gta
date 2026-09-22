@@ -2,12 +2,16 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import { GROUPS_SOLID, GROUPS_TERRAIN } from '../collision';
 import { PALETTE } from '../palette';
+import { POLICE } from '../police/tuning';
+import { BALANCE } from '../balance';
 import type { SpawnPoint } from '../playground';
 import { mulberry32 } from '../random';
 import { IDENTITY_QUAT as IDENTITY_ROT, quatFromYaw, type StaticDesc } from '../scene';
 import { Architecture, CITY_COLORS } from './architecture';
 import { placeBillboards, type BillboardDesc } from './collectibles';
-import { dropOffAt, hideoutStatics, nearDoor } from './cover';
+import { cameraSites, dropOffAt, hideoutStatics, nearDoor } from './cover';
+import { cameraStatics, placeCameras, type CameraDesc } from './cameras';
+import { jumpStatics, placeJumps, type JumpDesc } from './jumps';
 import { laneCoins, placeCoins, type CoinDesc } from './coins';
 import { buildRoadMarkings } from './markings';
 import { BLOCK, CITY_HALF, HIGHWAY_HALF, HIGHWAY_LANE_OFFSETS, ROAD_HALF, buildCityRoute, buildRoadGraph, distanceToPolyline, projectOnLane, type Lane, type RoadPoint, type SpecialRoad } from './roads';
@@ -65,10 +69,16 @@ export class City {
   private cx = Infinity;
   private cz = Infinity;
   private complete = false;
+  /** The ten speed cameras (slice 6): their poles go into the chunks that hold them. */
+  readonly cameras: readonly CameraDesc[];
+  /** The twenty stunt ramps (slice 6), likewise. */
+  readonly jumps: readonly JumpDesc[];
   /** Every lane's coins from the seed; each chunk takes the ones inside it. */
   readonly laneCoins: ReadonlyArray<{ x: number; z: number; lane: number }>;
   constructor(readonly world: RAPIER.World, readonly seed = 42) {
     this.laneCoins = laneCoins(this.graph, seed);
+    this.cameras = placeCameras(cameraSites(this.graph), POLICE.cameras.count);
+    this.jumps = placeJumps(seed, BALANCE.jumps.count);
     // The one unbroken collision plane eliminates suspension seams at roads and chunk borders.
     world.createCollider(RAPIER.ColliderDesc.cuboid(CITY_HALF, 0.5, CITY_HALF)
       .setTranslation(0, -0.5, 0).setFriction(1).setCollisionGroups(GROUPS_TERRAIN));
@@ -304,6 +314,9 @@ export class City {
     // Last: the billboards need every static in place to find clear ground.
     const billboards = placeBillboards(cx, cz, statics, roadClearance);
     const coins = placeCoins(cx, cz, this.laneCoins, billboards);
+    // speed cameras after the billboards, so the placer's clearance and the coin lines never change for them
+    for (const cam of this.cameras) if (chunkCoord(cam.poleX) === cx && chunkCoord(cam.poleZ) === cz) statics.push(...cameraStatics(cam));
+    for (const jd of this.jumps) if (chunkCoord(jd.x) === cx && chunkCoord(jd.z) === cz) statics.push(...jumpStatics(jd));
     return { key: `${cx},${cz}`, x: cx, z: cz, statics, billboards, coins };
   }
 

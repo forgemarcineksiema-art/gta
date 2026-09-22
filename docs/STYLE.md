@@ -347,12 +347,17 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   road with a 3 m beacon post, unlit so it reads in the towers' shade,
   pulsing ±8 % in scale; a ring glyph on the radar. Hidden while a job
   runs.
-- Ramps are `ramp` red gables with a kerb-height lip, the run-out kept clear
-  by the placer; the "STUNT!" popup follows the TAKEDOWN! style at 24 px
-  with the airtime in seconds. Speed cameras are a `steel` pole with an
+- Ramps are `ramp` red kickers drawn from their collision profile (an
+  eased-in slope up, one slab down), a `barrier` white lip at the ridge, on
+  the park strip outside the highway with the run-out kept clear; the
+  "STUNT!" popup follows the TAKEDOWN! style at 24 px with the airtime in
+  seconds. Speed cameras are a `steel` pole with an
   `ink` head; the flash is a 100 ms white overlay at 60 %, then FLASHED with
   the speed in the popup stack. The roadblock's sawhorse is `barrier` white
-  with `cone` orange stripes, and its planks fly like a billboard's.
+  with `cone` orange stripes on `steel` trestles, between two cruisers
+  standing along the lane with their bars flashing; the spike strip is a low
+  `ink` bar with `steel` teeth across the open lane. Parked patrols flash
+  their bars within 200 m at heat 3+ and are dark otherwise.
 
 ## Camera and motion
 

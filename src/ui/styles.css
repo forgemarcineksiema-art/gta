@@ -851,3 +851,13 @@ kbd.key {
   from { opacity: 0; transform: skewX(-10deg) translateY(-6px); }
   to { opacity: 1; transform: skewX(-10deg) translateY(0); }
 }
+
+/* the speed camera's flash: 100 ms of white at 60 % over everything but the panels */
+.hud__flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+}
+.hud__flash.is-on { opacity: 0.6; }

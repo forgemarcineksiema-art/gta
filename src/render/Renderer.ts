@@ -24,6 +24,7 @@ import { HideoutView } from './HideoutView';
 import { Coins } from './Coins';
 import { MarkerView } from './MarkerView';
 import { RoadblockView } from './RoadblockView';
+import { RampView } from './RampView';
 import { AgentState } from '../sim/traffic/Traffic';
 import type { SimEvent } from '../sim';
 
@@ -54,6 +55,7 @@ export class Renderer {
   readonly coinsView: Coins | null;
   readonly markerView: MarkerView;
   readonly roadblockView: RoadblockView | null;
+  readonly rampView: RampView | null;
   quality: QualityTier = 'low';
   private qualityElapsed = 0;
   private qualityFrames = 0;
@@ -155,6 +157,7 @@ export class Renderer {
     this.hideoutView = sim.run.dropOffs.length > 0 ? new HideoutView(this.scene, sim) : null;
     this.markerView = new MarkerView(this.scene);
     this.roadblockView = sim.roadblocks ? new RoadblockView(this.scene) : null;
+    this.rampView = sim.jumps ? new RampView(this.scene, sim) : null;
     if (sim.city) this.scene.add(buildSkyline(sim.city));
     if (sim.statics.length) this.buildStatics(sim.statics);
     this.setQuality(this.quality);
@@ -492,6 +495,7 @@ export class Renderer {
     this.coinsView?.dispose();
     this.markerView.dispose();
     this.roadblockView?.dispose();
+    this.rampView?.dispose();
     this.renderer.dispose();
   }
 

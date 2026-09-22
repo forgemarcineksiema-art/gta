@@ -215,13 +215,17 @@ function parkedJunctions(graph: RoadGraph, hideout: DropOff): ParkedJunction[] {
   return out;
 }
 
-/** Ten cameras: seven mid-segment on the highway's four sides, three along the Crown avenue's straight line. */
-function cameraSites(graph: RoadGraph): CameraSite[] {
+/**
+ * Ten cameras: seven mid-segment on the highway's four sides, three along the Crown avenue's straight line
+ * (the two diagonals, 636 m end to end, hold three 200 m apart clear of the tower junction; the plan's four
+ * does not fit).
+ */
+export function cameraSites(graph: RoadGraph): CameraSite[] {
   const out: CameraSite[] = [];
   const ring = 3 * BLOCK;
   // mid-segment points of the ring (a node every 225 m): x or z at ±112.5, ±337.5, ±562.5
   const highway: Array<readonly [number, number, number]> = [
-    [-ring, -337.5, 0], [-ring, 337.5, 0], [ring, -337.5, Math.PI], [ring, 337.5, Math.PI],
+    [-ring, -562.5, 0], [-ring, 337.5, 0], [ring, -337.5, Math.PI], [ring, 337.5, Math.PI],
     [-112.5, -ring, Math.PI / 2], [337.5, -ring, Math.PI / 2], [112.5, ring, -Math.PI / 2],
   ];
   for (const [x, z, yaw] of highway) {
@@ -238,7 +242,8 @@ function cameraSites(graph: RoadGraph): CameraSite[] {
     const len = Math.hypot(end.x - start.x, end.z - start.z);
     const dx = (end.x - start.x) / len, dz = (end.z - start.z) / len;
     const yaw = Math.atan2(dx, dz);
-    for (const d of [len * 0.18, len * 0.5, len * 0.82]) {
+    // clear of the tower junction halfway along, and 200 m apart
+    for (const d of [len * 0.12, len * 0.44, len * 0.76]) {
       const x = start.x + dx * d, z = start.z + dz * d;
       // the pole on the right-hand verge (right of the heading is (-dz, dx)), clear of the carriageway
       const side = a.halfWidth + 2;

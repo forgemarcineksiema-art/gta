@@ -10,6 +10,8 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { City } from './city/City';
 import { coverSites, type CoverSites } from './city/cover';
 import { Roadblocks } from './police/Roadblocks';
+import { Cameras } from './city/cameras';
+import { Jumps } from './city/jumps';
 import { createControls, type VehicleControls } from './controls';
 import { EventLog } from './events';
 import { Collectibles } from './city/collectibles';
@@ -101,6 +103,10 @@ export class SimWorld {
   readonly cover: CoverSites | null;
   /** Level 3's roadblocks and spike strips; null on the playground. */
   readonly roadblocks: Roadblocks | null;
+  /** The ten speed cameras; null on the playground. */
+  readonly cameras: Cameras | null;
+  /** The twenty stunt ramps' launches and landings; null on the playground. */
+  readonly jumps: Jumps | null;
   /** Bag, bank, the doors and busted: what ends a run (M4). Empty drop-offs on the playground. */
   readonly run: Run;
   /** Markers, the clock and the payout (the slice-4 skeleton; the cold open adds the first def). */
@@ -197,6 +203,8 @@ export class SimWorld {
     this.cover = this.city ? coverSites(this.city) : null;
     this.police = this.traffic ? new Police(this) : null;
     this.roadblocks = this.traffic && this.cover ? new Roadblocks(this, this.cover.chokepoints) : null;
+    this.cameras = this.cover ? new Cameras(this.cover.cameraSites) : null;
+    this.jumps = this.city ? new Jumps(this, this.city.jumps) : null;
     this.jobs = new Jobs(this, []);
     this.run = new Run(this);
     this.coldOpen = new ColdOpen(this);
@@ -255,7 +263,9 @@ export class SimWorld {
     this.peds?.writeTransforms();
     this.life.postStep(FIXED_DT);
     if (this.traffic) this.coins?.step(this.probe, FIXED_DT, this.events);
+    if (this.traffic) this.cameras?.step(this.probe, FIXED_DT, this.events);
     this.roadblocks?.step(this.probe, FIXED_DT, this.events);
+    this.jumps?.step(this.probe, this.vehicle.telemetry.groundedWheels === 0, FIXED_DT, this.events);
     this.heat.step();
     // before the run: a delivery into a garage pays the bag before the door can drop the job
     this.jobs.step(this.probe, FIXED_DT);

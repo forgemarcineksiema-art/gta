@@ -78,8 +78,9 @@ The mean fps and p95 sit inside the M3 bases' spread (the MX330 varies by
 
 ## How to run
 
-- `npm run dev`, then `http://localhost:5173/`. A plain `/` plays the cold
-  open once per tab.
+- `npm start`, then `http://localhost:4173/`: the production build. A plain
+  `/` plays the cold open once per tab. (`npm run dev` on 5173 is the source
+  with live reload; the parameters below work on both.)
 - URL parameters: `?coldopen=1` (force it), `?heat=1..5`, `?spawn=crown`
   (or `marina`, `highway`, …), `?bot=door` (the road bot parks in the
   hideout), `?bot=novice|skilled` (the policies), `?ad=off`,

@@ -156,7 +156,8 @@ export class Hud {
     this.root.appendChild(this.debug);
 
     this.pause = el('div', 'hud__pause');
-    this.pause.append(el('div', 'hud__pause-title', 'PAUSED'), el('div', 'hud__pause-sub', ''));
+    // the build stamp: which build is on screen (package version + commit, `-dirty` if uncommitted)
+    this.pause.append(el('div', 'hud__pause-title', 'PAUSED'), el('div', 'hud__pause-sub', ''), el('div', 'hud__pause-build', `build ${__APP_VERSION__}`));
     this.root.appendChild(this.pause);
 
     this.hints = el('div', 'hud__hints');

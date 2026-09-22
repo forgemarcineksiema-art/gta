@@ -25,6 +25,7 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 | `docs/M4_PLAN.md` | The current milestone contract: slices in order, done criteria, pins, the measurement each slice must record, starting numbers. Its §5 holds the contract for post-launch update 1. |
 | `docs/M5_PLAN.md`, `docs/M6_PLAN.md` | The next two contracts, same shape: the launch minimum (jobs, garage, save, cold open, balance script) and the platform (SDK adapter, touch, mobile tier, submission). Placeholders marked "M4" are filled from PROGRESS before the milestone starts. |
 | `docs/ARCHITECTURE.md` | Structure, dependency justifications, decision records. |
+| `docs/DEV.md` | Servers and ports, the build stamp, test URLs, QA hooks, the suites, scratch folders. `npm start` (4173) is the one way to play; `npm run dev` (5173) is for editing. |
 | `docs/BACKLOG.md` | Out-of-milestone ideas and non-blocking bugs, one line of context each. |
 | `docs/CRAZYGAMES.md` | Platform compliance checklist with status column. Keep updated. |
 | `docs/STYLE.md` | Art and UI style guide. |

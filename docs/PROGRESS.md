@@ -2,6 +2,37 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — One game, one build
+
+Marcin: too many links, builds and versions; sort it out and run the main
+build. Found: one repo, one branch, one worktree, clean; a dev server from
+2026-09-22 still on 5173 (started by an earlier session of mine); `main` 16
+commits ahead of `origin`; the six M4 probe scripts committed in `output/`;
+the README opening with 22 test URLs; and the first attempt at the game
+(Heat City, last commit 2026-09-19) in `C:\Games\Nowy folder (5)` beside
+this repo.
+
+### Done
+
+- `npm start` (build + preview on 4173) is the one way to play; the README
+  says so and leads with it. `npm run dev` is for editing. The test URLs,
+  the QA hooks, the suites and the scratch folders moved to `docs/DEV.md`;
+  CLAUDE.md, AGENTS.md and the M4 report point there.
+- The build stamp: `__APP_VERSION__` is `<version>+<short commit>`
+  (`-dirty` when uncommitted changes went in), shown bottom right on the
+  pause screen and in `window.__game.version`. Package version 0.4.0.
+- `output/` is git-ignored as a whole; the committed probes are removed.
+- `origin/main` brought up to date. The stale dev server on 5173 is still
+  up: the harness refused the kill, and it serves the same source anyway;
+  Marcin closes that terminal when he likes.
+
+### Decided (set here)
+
+- Version scheme `0.<milestone>.<patch>`: the minor moves at each gate, the
+  patch for a fix Marcin asks for after one (ARCHITECTURE record 40).
+- `Nowy folder (5)` (Heat City) is Marcin's to delete; nothing here refers
+  to it. The other siblings in `C:\Games` are unrelated projects.
+
 ## 2026-09-23 — Playtest after the gate: the bonnet smoke
 
 Marcin, first minute: "why does the car smoke like that? it ruins the whole

@@ -1,10 +1,11 @@
 {
   "name": "gta",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.4.0",
   "type": "module",
   "description": "Open-world arcade driving game for CrazyGames",
   "scripts": {
+    "start": "npm run build && npm run preview",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --port 4173 --strictPort",

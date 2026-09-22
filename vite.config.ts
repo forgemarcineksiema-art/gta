@@ -1,12 +1,28 @@
+import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { configDefaults, defineConfig } from 'vitest/config';
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8')) as { version: string };
 
+/**
+ * The build stamp shown on the pause screen and in `window.__game.version`:
+ * `<package version>+<short commit>`, `-dirty` when uncommitted changes went in.
+ * The version is the milestone (0.4.x = M4); the commit says which build this is.
+ */
+function buildStamp(): string {
+  try {
+    const git = (cmd: string) => execSync(cmd, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+    const dirty = git('git status --porcelain') !== '' ? '-dirty' : '';
+    return `${pkg.version}+${git('git rev-parse --short HEAD')}${dirty}`;
+  } catch {
+    return pkg.version;
+  }
+}
+
 export default defineConfig({
   // CrazyGames serves the build from an arbitrary path inside an iframe: relative URLs only.
   base: './',
-  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
+  define: { __APP_VERSION__: JSON.stringify(buildStamp()) },
   build: {
     target: 'es2022',
     sourcemap: false,

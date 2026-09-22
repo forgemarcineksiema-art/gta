@@ -87,7 +87,11 @@ export interface VehicleTuning {
   lsdPreload: number;
   /** How hard the diff resists a speed difference, N·m per rad/s. */
   lsdStiffness: number;
-  /** Upshift when rpm exceeds this fraction of the redline. */
+  /**
+   * Six speeds on every car. Gears 1-5 are spaced geometrically over the range
+   * the car can actually reach on its own, so the fifth is the top-speed gear;
+   * the sixth is an overdrive the car only pulls on boost or downhill.
+   */
   shiftUpAt: number;
   /** Downshift when rpm falls below this fraction of the redline. */
   shiftDownAt: number;
@@ -287,7 +291,7 @@ export const DEFAULT_TUNING: VehicleTuning = {
   engineBrakeTorque: 55,
   engineInertia: 0.25,
 
-  gearRatios: [3.6, 2.2, 1.55, 1.2, 0.95],
+  gearRatios: [4.33, 3.18, 2.33, 1.71, 1.25, 0.99],
   reverseRatio: 3.2,
   finalDrive: 4.1,
   drivetrainEfficiency: 0.9,

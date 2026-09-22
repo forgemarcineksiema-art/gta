@@ -2,6 +2,64 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-22 — Six speeds on every car (Marcin's request)
+
+Out of the M4 slice order: Marcin asked for five or six gears in every car.
+Verify green before and after.
+
+### Done
+
+- **Every class has six ratios, and uses them.** The old sets were nominally
+  five (six for sports), but no car ever reached its top gear on throttle
+  alone: the last ratio was so long that the upshift speed sat above what the
+  car could pull. Measured before, full throttle to plateau: muscle held 4th
+  at 170 km/h, compact 4th at 144, heavy 4th at 138, police 4th at 173,
+  sports 5th at 198. The top gear only appeared on boost.
+- **The new spacing**: first to fifth geometric over the range the class can
+  actually reach, so fifth is the top-speed gear, and sixth is an overdrive
+  that only pulls on boost. Fifth's limiter is set ~9% above the car's own top
+  speed, so the box does not drop into the overdrive at full speed and lose
+  ground (the first attempt did exactly that: muscle upshifted at 167 km/h and
+  sank to 160 over the next 40 s).
+- **Numbers, before → after** (headless, `spawn: 'straight'`):
+
+  | car | 0–100 | top speed (gear) | top on boost (gear) |
+  |---|---|---|---|
+  | muscle | 6.48 → 6.17 s | 170 (4th) → 172 (5th) | 234 → 233 (6th) |
+  | compact | 9.15 → 8.87 s | 144 (4th) → 144 (5th) | 195 → 202 (6th) |
+  | heavy | 10.70 → 10.15 s | 138 (4th) → 137 (5th) | 203 → 202 (6th) |
+  | sports | 4.62 → 4.30 s | 198 (5th) → 204 (5th) | 286 → 285 (6th) |
+  | police | 7.22 → 6.65 s | 173 (4th) → 176 (5th) | 241 → 240 (6th) |
+
+  In the running game (browser, muscle, full throttle at a held speed):
+  39 km/h 1st, 63 2nd, 92 3rd, 120 4th, 149 5th, 170 5th — 5100–6600 rpm
+  throughout, where the torque curve is.
+
+### Decided and why
+
+- **0–100 got 0.3–0.6 s quicker in every class** and that is the point of the
+  extra ratio, not a regression: the engine spends more of the run near peak
+  torque. Only the two pins this crossed were moved with it (`cars.test.ts`,
+  compact 9 → 8.5 s, heavy 10 → 9.6 s, with the reason in the file). Top
+  speeds, braking, drift and lap pins are untouched and still pass.
+- **Engine braking is stronger below ~60 km/h**, because first and second are
+  now shorter: coasting from 47 km/h for 3 s leaves 29.7 km/h instead of 33.2
+  (muscle). Above that nothing moves — from 90 km/h the car is simply a gear
+  higher and loses the same. `engineBrakeTorque` was left alone: scaling it
+  down would weaken the braking at speeds where the gearing did not change.
+- That coast is what broke `takedown.test.ts`'s "into traffic" case: the ram
+  arrived 1.2 km/h slower and no longer shoved the compact hard enough into
+  the heavy. The case wants a ~44 km/h contact after a 13 m coast, so the
+  launch speed went 47 → 49 km/h and the comment now says what the number is
+  for. The 14 m/s direct-hit threshold and every assertion stand.
+
+### Next
+
+- Back to `docs/M4_PLAN.md` slice 1 (heat and pursuit as two systems).
+- Marcin drives it: the things to feel are the 1–2 shift in town (muscle now
+  at ~53 km/h, was 63) and whether the overdrive appearing only on boost reads
+  as a top gear or as a missing gear.
+
 ## 2026-09-22 — M4 slice 0: housekeeping
 
 Session started on Opus 5, finished on Fable 5.1 (Opus overloaded). Verify was

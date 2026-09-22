@@ -1,6 +1,12 @@
 /**
  * Every vehicle class must pass the same handling pins, each with its own
  * numbers. Adding a car means adding a row here.
+ *
+ * The six-speed change (2026-09-22) moved 0-100 down by 0.3-0.6 s in every
+ * class: an extra ratio keeps the engine nearer peak torque, which is the
+ * point of the change, not a regression. Only the two lower bounds that this
+ * crossed were moved with it (compact 9 -> 8.5, heavy 10 -> 9.6); the top
+ * speeds and every other pin are untouched.
  */
 import { describe, expect, test } from 'vitest';
 import type { CarId } from '../../src/sim';
@@ -21,8 +27,8 @@ interface Expectations {
 
 const CARS: Record<CarId, Expectations> = {
   muscle: { to100: [5.8, 7.2], top: [160, 180], brake100: [22, 42], driftBand: [18, 42], driftMinSpeed: 50, pulse60: 20, botLap: [30, 40] },
-  compact: { to100: [9, 13], top: [130, 165], brake100: [22, 42], driftBand: [12, 40], driftMinSpeed: 40, pulse60: 20, botLap: [33, 43] },
-  heavy: { to100: [10, 16], top: [105, 140], brake100: [24, 48], driftBand: [10, 40], driftMinSpeed: 35, pulse60: 12, botLap: [35, 46] },
+  compact: { to100: [8.5, 13], top: [130, 165], brake100: [22, 42], driftBand: [12, 40], driftMinSpeed: 40, pulse60: 20, botLap: [33, 43] },
+  heavy: { to100: [9.6, 16], top: [105, 140], brake100: [24, 48], driftBand: [10, 40], driftMinSpeed: 35, pulse60: 12, botLap: [35, 46] },
   sports: { to100: [3.8, 5.6], top: [185, 212], brake100: [15, 30], driftBand: [22, 42], driftMinSpeed: 55, pulse60: 20, botLap: [30, 38] },
   police: { to100: [6.2, 8.6], top: [158, 185], brake100: [24, 44], driftBand: [18, 40], driftMinSpeed: 55, pulse60: 18, botLap: [32, 40] },
 };

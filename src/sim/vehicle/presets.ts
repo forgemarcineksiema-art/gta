@@ -1,5 +1,8 @@
 /**
- * The vehicle classes as tuning presets. Each is the default tuning with the
+ * The vehicle classes as tuning presets.
+ * Gearboxes: six speeds everywhere, spaced geometrically. First to fifth cover
+ * the range the class can reach on its own, so fifth is its top-speed gear;
+ * sixth is an overdrive that only pulls on boost. Each is the default tuning with the
  * numbers that make the class: mass, engine, drivetrain, geometry, suspension.
  * Visual profiles live in render/carProfiles.ts under the same ids.
  */
@@ -36,7 +39,7 @@ export const CAR_PRESETS: Record<CarId, VehicleTuning> = {
     steerSpeedRef: 30,
     torqueMax: 150,
     redlineRpm: 6600,
-    gearRatios: [3.8, 2.2, 1.5, 1.1, 0.9],
+    gearRatios: [3.95, 2.87, 2.08, 1.51, 1.1, 0.87],
     finalDrive: 4.2,
     driveFrontShare: 1,
     lsdLock: 0.2,
@@ -77,7 +80,7 @@ export const CAR_PRESETS: Record<CarId, VehicleTuning> = {
     steerRate: 4.5,
     torqueMax: 380,
     redlineRpm: 5200,
-    gearRatios: [4.2, 2.5, 1.6, 1.15, 0.85],
+    gearRatios: [4.67, 3.27, 2.3, 1.61, 1.13, 0.93],
     finalDrive: 4.0,
     brakeTorque: 9500,
     handbrakeTorque: 6000,
@@ -102,7 +105,7 @@ export const CAR_PRESETS: Record<CarId, VehicleTuning> = {
     boostThrust: 4000,
   }),
 
-  /** Low coupe: the fastest body in the game and the interceptor's base. Stiff, real downforce, six speeds. */
+  /** Low coupe: the fastest body in the game and the interceptor's base. Stiff, real downforce. */
   sports: preset({
     mass: 1180,
     chassisHalfExtents: { x: 0.92, y: 0.28, z: 2.1 },
@@ -124,7 +127,7 @@ export const CAR_PRESETS: Record<CarId, VehicleTuning> = {
     steerRate: 7,
     torqueMax: 300,
     redlineRpm: 8200,
-    gearRatios: [3.4, 2.15, 1.6, 1.28, 1.02, 0.86],
+    gearRatios: [3.85, 2.88, 2.15, 1.61, 1.2, 0.91],
     finalDrive: 3.9,
     brakeTorque: 7200,
     brakeFrontBias: 0.64,
@@ -161,7 +164,7 @@ export const CAR_PRESETS: Record<CarId, VehicleTuning> = {
     steerSpeedRef: 36,
     torqueMax: 290,
     redlineRpm: 7000,
-    gearRatios: [3.5, 2.15, 1.5, 1.16, 0.93],
+    gearRatios: [4.21, 3.11, 2.3, 1.7, 1.26, 0.98],
     finalDrive: 4.0,
     brakeTorque: 6800,
     brakeFrontBias: 0.63,

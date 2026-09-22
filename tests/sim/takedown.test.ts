@@ -36,7 +36,7 @@ describe('takedowns', () => {
       let slowMoSeen = 0;
       let paid = 0;
       for (let i = 0; i < 4 * 60; i++) {
-        if (i < 60) sim.vehicle.setVelocity(Math.sin(yaw) * (47 / 3.6), sim.vehicle.telemetry.vy, Math.cos(yaw) * (47 / 3.6));
+        if (i < 60) sim.vehicle.setVelocity(Math.sin(yaw) * (49 / 3.6), sim.vehicle.telemetry.vy, Math.cos(yaw) * (49 / 3.6));
         const boostBefore = sim.vehicle.boostMeter;
         sim.step();
         slowMoSeen = Math.max(slowMoSeen, sim.life.state.slowMo);
@@ -61,14 +61,17 @@ describe('takedowns', () => {
     const yaw = Math.PI / 2;
     const z = 100;
     sim.vehicle.teleport({ x: WALL_FACE - 80, y: 1, z }, yaw);
-    // a compact parked 1.5 m behind a heavy; the ram at 47 km/h is under the direct-hit closing speed
+    // A compact parked 1.5 m behind a heavy. The ram is held for a second and then coasts the last
+    // 13 m, so what lands on the compact is ~44 km/h: enough to shove it into the heavy, still under
+    // the 14 m/s direct-hit closing speed. The launch speed is what the coast (engine braking, and so
+    // the gearing) leaves at that distance, hence 49 rather than a round 47.
     const first = traffic.spawnAtPoint(WALL_FACE - 54, z, yaw, 'compact', AgentState.Abandoned);
     const second = traffic.spawnAtPoint(WALL_FACE - 48, z, yaw, 'heavy', AgentState.Abandoned);
     sim.vehicle.boostMeter = 0.1;
     try {
       run(sim, 0.5);
       for (let i = 0; i < 4 * 60; i++) {
-        if (i < 60) sim.vehicle.setVelocity(Math.sin(yaw) * (47 / 3.6), sim.vehicle.telemetry.vy, Math.cos(yaw) * (47 / 3.6));
+        if (i < 60) sim.vehicle.setVelocity(Math.sin(yaw) * (49 / 3.6), sim.vehicle.telemetry.vy, Math.cos(yaw) * (49 / 3.6));
         sim.step();
       }
       expect(count(sim, 'takedownTraffic')).toBeGreaterThanOrEqual(1);

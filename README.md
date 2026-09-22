@@ -1,6 +1,6 @@
 # Untitled Driving Game
 
-Open-world arcade driving for the browser (CrazyGames). Steal any car, outrun the cops, wreck everything. Brief: `docs/BRIEF.md`. Standing rules: `CLAUDE.md`. Current state: `docs/PROGRESS.md`.
+Open-world arcade driving for the browser (CrazyGames). You are the getaway driver who never keeps a car: steal, wreck, swap, escape, bank. Brief: `docs/BRIEF.md`. Standing rules: `CLAUDE.md`. Current state: `docs/PROGRESS.md`.
 
 M3 put life in the city: traffic, pedestrians, damage and wrecks, car-swap,
 takedowns and fifty smashable billboards. M4 (next) is the police and the run:

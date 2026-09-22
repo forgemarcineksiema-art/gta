@@ -15,6 +15,13 @@ taken away for more than 2 s, keyboard first. The player stays the getaway
 driver. What changes is the *shape of a session*: the brief's open world has
 no arc; runs give it one without a loading screen.
 
+**The pitch in one line — decided 2026-09-22.** You are the getaway driver
+who never keeps a car: steal, wreck, swap, escape, bank. The brief's four
+references describe the feel; this sentence is the identity, and it goes on
+the cover, at the top of the store description and into the first 20 seconds
+of play. The swap leads, because it is the one mechanic no other city driving
+game on the platform has.
+
 ## 2. The run — decided
 
 A session is a sequence of runs. A run starts at the hideout with heat 0 and
@@ -100,7 +107,9 @@ Bag multiplier by the highest heat reached: ×1 / ×1.25 / ×1.6 / ×2.2 / ×3.
 Roadblocks come from the billboard placer's clear-footprint query on the lanes
 ahead and always have a weak point (a sawhorse instead of a car): a skill
 check, not a wall. Spike strips are a tuning state (grip drop and a pull),
-healed by a swap. All numbers are placeholders for `balance.ts`.
+healed by a swap. All numbers are placeholders for `balance.ts`. At launch
+levels 4 and 5 have no helicopter (§5): heavy SUVs and the Chief on the
+ground, and breaking the pursuit is the cooldown alone, 12 and 15 s.
 
 ### 2.7 The shape of the decision
 
@@ -128,6 +137,13 @@ natural mobile session. The first run is the brief's cold open: 90 s, already
 in a pursuit at heat 1 with one delivery, the five verbs through keycaps, the
 last caption "get it to the hideout", and totals that show the first new car
 is one run away. Route in §6.6.
+
+Build order — decided 2026-09-22: the cold open is prototyped in M4 right
+after slice 3, not in M5. Conversion is decided in the first 20 seconds, and
+after slice 3 everything the first version needs exists: a patrol behind the
+player, the bag, the door. The prototype adds the delivery marker, the route
+and the keycap captions, and from then on it is played by hand every session,
+so that no later slice is tuned against a first minute that does not exist.
 
 ### 2.9 The hideout door as the results screen — decided
 
@@ -162,7 +178,10 @@ locked district. Revised around the audience.
   replacement for anything). Instanced, one draw call, placed in lines along
   the lanes, in arcs over jumps, in rings around billboards and job markers.
   They mark the suggested line of a time trial and the cold-open route, so
-  they are navigation as well as reward. Always kept, never at risk.
+  they are navigation as well as reward. Always kept, never at risk. Built
+  in M4 slice 3 with the bag, not in M5 (decided 2026-09-22): they are the
+  twelve-year-old's reward layer and the cheapest one. Boost is a means and
+  the bag is a number; without coins M4 has nothing visible every 20–30 s.
 - **The bag.** Job payouts, chaos bonuses (police takedowns, cameras,
   roadblocks) and the skill chain. At risk until banked, multiplied by the
   highest heat. The strategist's game sits on top of the kid's game.
@@ -204,8 +223,11 @@ under 1 MB, `Collectibles.smashed` included.
 
 ## 4. Activities — set here
 
-All six brief types ship in M5, plus fares. Ordered by build cost, the cheap
-ones first so the city fills early.
+Three ship at launch: getaway delivery, the time trial on a coin line and
+pursuit escape (§11, decided 2026-09-22). Street races with rivals, takedown
+rage, mayhem, the hunts and fares follow in the second post-launch update.
+The list is ordered by build cost, the cheap ones first so the city fills
+early.
 
 1. **Fares** (Crazy Taxi). A pedestrian hails from the kerb; stop alongside
    and they hop in (no on-foot: the ped mesh moves to the passenger seat). A
@@ -235,7 +257,17 @@ no map needed. Ghost time-attack against the recorder's pose stream,
 order-free checkpoints (Midnight Club) and road rules (Burnout) are the M5
 stretch.
 
-## 5. Cover — decided: covered streets in M4, overpasses in M4 after the loop works
+## 5. Cover — revised 2026-09-22: cover, overpasses and the helicopter are the first post-launch update
+
+Decided on 2026-09-22 (Marcin, on the launch-scope recommendation in §11):
+covered streets, the highway overpasses and the helicopter leave M4 and form
+the first update after Basic Launch. They are the three most expensive M4
+slices (the overpasses reopen M2, cover needs the camera occlusion rule, the
+helicopter needs both), they gate only heat 4–5, and the three KPIs are
+measured live from Basic Launch, where an update gets the game re-featured.
+Heat 4 and 5 ship on the ground: heavy SUVs and the Chief, the cooldown as the
+only escape. The contracts below and in `docs/M4_PLAN.md` (post-launch
+section) stand for that update.
 
 The city is flat: `RoadPoint` has x and z only, lanes carry no height, the
 chase camera has no occlusion handling, buildings are solid boxes.
@@ -398,20 +430,37 @@ onto the front page.
 The M4 contract with done criteria, pins and measurements per slice is
 `docs/M4_PLAN.md`; this section is the summary.
 
-- **M4 Heat**, slice order: 0 housekeeping (screens inspection, wreck
-  tow-away, traffic step profile in the browser, the sports and police
-  presets, real highway lanes); 1 heat and pursuit as two systems with
-  patrols at level 1; 2 police units per level with the pool budget,
-  interceptors, ramming; 3 busted with the bar, the hideout door, bag and
-  bank with the multiplier, `balance.ts`; 4 the identity rule and the police
-  chasing the old car; 5 roadblocks, spike strips, parked patrols, speed
-  cameras; 6 covered streets and the camera occlusion rule; 7 overpasses; 8
-  the helicopter and the Chief; 9 ad points through the adapter, the gate.
-  Free-roam chaos alone fills the bag in M4.
-- **M5 The game**: jobs (§4), the garage and progression (§3), save, dailies,
-  the cold open (§6.6), the skill chain, the full map, the balance script
-  with the EV assertion and the bot as the capture probe, UI and audio passes.
-- **M6 Platform** as in the brief.
+Revised 2026-09-22 (decided by Marcin): the game goes to Basic Launch after
+M4 and a minimum M5, and the rest ships as updates. The platform measures
+the three KPIs live from the first day and re-features updated games; no
+design table replaces that data, and the biggest milestone (M5) should not sit
+between the run loop and the first numbers. This deviates from the brief's v1
+list in two places, the helicopter and the activity count, and Marcin decided
+both.
+
+- **M4 Heat**, slice order: 0 housekeeping, 1 heat and pursuit as two
+  systems with patrols at level 1, 2 police units per level with the pool
+  budget and interceptors (all three done); 3 busted with the bar, the
+  hideout door, bag and bank with the multiplier, `balance.ts`, and the coins
+  (§3.2); 4 the cold open prototype (§2.8, §6.6); 5 the identity rule and the
+  police chasing the old car; 6 roadblocks, spike strips, parked patrols,
+  speed cameras, with the busted-rate decision rule (§12); 7 levels 4 and 5
+  on the ground, heavy SUVs and the Chief; 8 ad points through the adapter,
+  polish, the gate.
+- **M5 The launch minimum**: the cold open finished on the save's seen flag,
+  save through the platform, the garage with the catalogue and paint (§3.3),
+  three jobs (getaway delivery, the time trial on a coin line, pursuit
+  escape), the Crazy Taxi arrow, the balance script with the EV assertion
+  and the bot as the capture probe, the UI and audio passes. Dailies and the
+  streak ship with it if they fit after the three jobs: they are cheap once
+  the save exists and they are the D1 lever; else they open update 2.
+- **M6 Platform** as in the brief, then Basic Launch.
+- **Update 1, the air**: covered streets and the camera occlusion rule, the
+  overpasses, the helicopter with the spotlight (§5).
+- **Update 2, the jobs**: street races with rivals, takedown rage and mayhem,
+  fares with hot passengers, the stunt and collectible hunts, the skill chain,
+  the full map (§4, §7).
+- Later: cop mode, ghosts, the rest of §8, by the KPIs.
 
 ## 12. Playtest watch list
 
@@ -423,6 +472,15 @@ The M4 contract with done criteria, pins and measurements per slice is
 - The ratchet's risk: two accidental takedowns early put roadblocks on a race
   the player wanted to run calmly. Quiet heat until re-detection is the
   mitigation; watch whether it is enough.
+- The bag's risk at heat 1–3 is unproven (2026-09-22). Rams shove and never
+  stop, busted needs two units and 3 s under 5 km/h, and a swap out of sight
+  ends the pursuit at once: below the roadblocks a novice may be uncatchable,
+  which makes ×1.25 and ×1.6 free money and the §2.7 table fiction. M4 slice
+  6 measures the bot's busted rate per level before anyone tunes
+  `balance.ts`. Decision rule: if level 3 comes out below the §2.7 novice
+  assumption (15 % a minute, about one busted in five minutes), the ratchet
+  gets a cost that is not the police, speed cameras and parked patrols from
+  level 2 instead of 3, and the level 1–2 multipliers come down.
 
 ## References
 

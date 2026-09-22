@@ -10,6 +10,13 @@ ends in a commit with verify green, a pin or an e2e check, and one behaviour
 measurement written into `docs/PROGRESS.md`. Marcin plays every slice by
 hand; his feel notes outrank any number here.
 
+Revised 2026-09-22 after the design talk (decided by Marcin; reasons in
+`docs/DESIGN.md` §5 and §11): the coins join slice 3, the cold open prototype
+is slice 4, covered streets, overpasses and the helicopter leave the milestone
+for the first post-launch update (their contracts are kept in §5 of this
+file), levels 4 and 5 ship on the ground, and the slices after 3 are
+renumbered. Slices 0–2 were done before the revision and keep their numbers.
+
 ## 0. Ground rules that bite in this milestone
 
 - Sim stays headless: heat, pursuit, police steering, the run state machine
@@ -39,12 +46,16 @@ src/sim/police/Police.ts      units as traffic-class agents with a pursuit plann
 src/sim/police/Pursuit.ts     detection, descriptor, line of sight, state machine
 src/sim/heat/Heat.ts          the ratchet: points, thresholds, sources from events
 src/sim/run/Run.ts            run state machine: start → running → banked | busted → start
-src/sim/city/cover.ts         covered streets, chokepoints, drop-offs exported by the generator
-src/render/PoliceView.ts      unit meshes, light bars, the helicopter and spotlight
+src/sim/city/cover.ts         chokepoints and drop-offs exported by the generator (covered streets: update 1)
+src/sim/city/coins.ts         coin placement by the generator (lines along lanes, rings at markers), pickup by footprint
+src/sim/run/ColdOpen.ts       the first run's script: the five verbs in order, skippable, shown once
+src/render/PoliceView.ts      unit meshes, light bars (the helicopter and spotlight: update 1)
+src/render/Coins.ts           one instanced mesh over the placed coins, picked ids zero-scaled
 src/render/HideoutView.ts     the door, the wall totals camera cut
-src/ui/heat.ts                five stars, pursuit pulse; ui/run.ts the bag counter and the door screen
+src/ui/heat.ts                five stars, pursuit pulse; ui/run.ts the bag and coin counters and the door screen
+src/ui/coldOpen.ts            keycap captions for the cold open
 src/platform/Platform.ts      requestAd(kind, callbacks) added; LocalPlatform stubs it
-tests/sim/heat.test.ts, pursuit.test.ts, run.test.ts, police.test.ts
+tests/sim/heat.test.ts, pursuit.test.ts, run.test.ts, police.test.ts, coins.test.ts, coldOpen.test.ts
 e2e/heat.spec.ts              the bot under police: escape and busted rates, perf under 4×
 ```
 
@@ -106,7 +117,14 @@ e2e/heat.spec.ts              the bot under police: escape and busted rates, per
 - `Run`: starts at the hideout, `bag` accumulates from events through
   `balance.ts`, ends at a drop-off without an active pursuit (bank += bag ×
   multiplier[maxHeat]) or on busted (bank += bag × 0.5, no multiplier).
-  Coins are M5; the bag alone fills from chaos in M4.
+- Coins (DESIGN.md §3.2; moved here from M5 on 2026-09-22): placed by the
+  generator as the last step after the billboards, in lines along the lanes
+  (a coin every 6 m in runs of 8–12, gaps between runs), rings around the
+  billboard gates, the job markers later; 10 each; picked up by the chassis
+  footprint like a billboard, once per id, at any speed; instanced, one draw
+  call, picked ids zero-scaled; a chime and a counter on the HUD. Coins are
+  the player's the moment they are picked (`Run.coins`, never in the bag) and
+  survive busted. Session state now, the M5 save carries them.
 - Busted: boxed by ≥ 2 units within 6 m and speed < 5 km/h for 3 s; a bar
   fills; any movement above 5 km/h drains it. `R` under pursuit teleports
   within line of sight.
@@ -118,11 +136,39 @@ e2e/heat.spec.ts              the bot under police: escape and busted rates, per
   `gameplayStart()` when it opens; the same around the busted card.
 - Pins: bag arithmetic and the fine; the multiplier uses the highest heat
   reached, not the current; a drop-off refuses entry during `active`; busted
-  timing; reset keeps the pursuit.
-- Measurement: the bot from heat 0 to a drop-off: run length, bag, banked.
-  This is the first number the balance script (M5) will consume.
+  timing; reset keeps the pursuit; coin placement is deterministic per seed
+  and clear of statics; a coin is picked once and kept through busted.
+- Measurement: the bot from heat 0 to a drop-off: run length, bag, banked,
+  coins picked per minute (the §3.3 figure is 60). This is the first number
+  the balance script (M5) will consume.
 
-### Slice 4 — identity
+### Slice 4 — the cold open prototype
+
+- The first run, DESIGN.md §2.8 and §6.6, as a scripted state machine in
+  `sim/run/ColdOpen.ts`: spawn on the Crown diagonal (the `loop` spawn) at
+  heat 1 with two patrols behind and out of view; a delivery marker 600 m
+  ahead through the tower junction; a coin line marking the route; on the way
+  a billboard gate on the footway, a swap candidate alongside at the junction,
+  a patrol that lines up for a wall; the delivery; then "get it to the
+  hideout" 300 m on, the patrols losing sight in the grid; the door, the
+  totals showing the first car one run away.
+- Captions: keycap plus one word per verb (steer, boost, smash, swap,
+  takedown, escape) in `ui/coldOpen.ts`, each shown when its verb is possible
+  and cleared when performed; almost no text, never a modal. Any run key
+  skips it; a session flag keeps it from showing twice (the M5 save takes the
+  flag over). `gameplayStart()` fires at control, as today.
+- Prototype, not polish: the route and the captions have to exist and be
+  played by hand from now on, every session, before anything else in M4 is
+  tuned. What is missing (marker art, the arrow, the totals' wording) is
+  listed in PROGRESS, not built here.
+- Pins: the route's data exists on seed 42 (a marker reachable by lane path,
+  a billboard gate and a swap candidate on it, the hideout within 300 m of
+  the marker); the bot completes the script in under 120 s with the six
+  events in order; the script never shows twice in a session.
+- Measurement: the bot's completion time and the time of each caption; then
+  Marcin's first minute by hand with a stopwatch, written down.
+
+### Slice 5 — identity
 
 - `Pursuit` holds a descriptor (class + paint) and the last known position.
   A `swap` event with no unit in line of sight clears the descriptor: state
@@ -132,7 +178,7 @@ e2e/heat.spec.ts              the bot under police: escape and busted rates, per
 - Measurement: escapes by swap versus by cooldown in a bot run with a swap
   policy.
 
-### Slice 5 — level 3: roadblocks, spike strips, parked patrols, speed cameras
+### Slice 6 — level 3: roadblocks, spike strips, parked patrols, speed cameras
 
 - Roadblock placer: the billboard placer's clear-footprint query on the lanes
   150–300 m ahead of the player's heading at the chokepoints `cover.ts`
@@ -146,40 +192,28 @@ e2e/heat.spec.ts              the bot under police: escape and busted rates, per
   a flash, `camera` event, heat +5, bag bonus, a FLASHED popup.
 - Pins: a roadblock never spawns in view or within 100 m; the weak point is
   passable at 60 km/h without a wreck; spiked handling numbers.
-- Measurement: bot busted rate per level 1–3 over 5 minutes each.
+- Measurement: bot busted rate per level 1–3 over 5 minutes each, with a
+  novice policy (no swap, stays on the road) and a skilled one. Decision rule
+  (DESIGN.md §12): if level 3 comes out below the §2.7 novice assumption
+  (about one busted in five minutes), the ratchet gets a cost that is not the
+  police, cameras and parked patrols from level 2 instead of 3, and the level
+  1–2 multipliers come down. Nobody tunes `balance.ts` before this number
+  exists.
 
-### Slice 6 — covered streets and the camera occlusion rule
+### Slice 7 — levels 4 and 5 on the ground: heavy units and the Chief
 
-- One covered street per district from `cover.ts`: roof and side walls with
-  portal openings, static boxes, no road-graph change.
-- Line of sight against statics blocks inside cover (the pursuit's ray).
-- `ChaseCamera`: when a static lies between the camera and the car, the
-  distance shortens along the boom; recovers at `heightRateGround` pace.
-- Pins: LOS blocked inside cover; the camera check in e2e (no static between
-  camera and car for a drive through each cover).
-
-### Slice 7 — overpasses
-
-- Height in the road graph: `RoadPoint.y` optional, lanes carry height,
-  kinematic traffic at height, the bot route, road meshes, markings, the
-  minimap; the highway rises over the four avenue crossings with ramps
-  inside the vehicle's landing rules (decision 10).
-- Re-pin the city tour and bot laps with the reasons written. This slice
-  reopens M2 by design (DESIGN.md §5); Marcin decided it.
-- Measurement: smoke fps and draws before/after; the bot's whole-map tour.
-
-### Slice 8 — levels 4 and 5: heavy units, the helicopter, the Chief
-
-- Heavy SUVs (heavy preset, police livery), a ram that moves the player's
-  car in earnest. The helicopter: a kinematic unit above the road graph, a
-  spotlight cone as line of sight; cover breaks it; escape needs cover first,
-  then the cooldown. Level 5 adds the Chief: one boss car with the top speed
-  and a PIT that always lands.
-- Pins: the helicopter loses the player only under cover; unit budgets.
+- Heavy SUVs (heavy preset, police livery) from level 4, a ram that moves the
+  player's car in earnest. Level 5 adds the Chief: one boss car with the top
+  speed and a PIT that always lands. No helicopter at launch (DESIGN.md §5):
+  breaking the pursuit at 4 and 5 is the cooldown alone, 12 and 15 s, with
+  the roadblocks and parked patrols of slice 6 making line of sight harder
+  to lose.
+- Pins: unit budgets at 4 and 5; the Chief's PIT lands on a straight at
+  120 km/h; the heavy's ram moves the player at least 3 m across the lane.
 - Measurement: browser step p95 and fps at level 5 on the low tier against
   the baseline; the bot's busted rate at 4 and 5.
 
-### Slice 9 — ad points, polish, gate
+### Slice 8 — ad points, polish, gate
 
 - `Platform.requestAd('midgame' | 'rewarded', callbacks)`; `LocalPlatform`
   logs and calls `adFinished` after a delay (a `?ads=fail` query makes it
@@ -190,8 +224,9 @@ e2e/heat.spec.ts              the bot under police: escape and busted rates, per
 - Polish from DESIGN.md §8 if the budget allows: the officer's ticket book
   as the busted bar, the donut-shop withdrawal, the wanted poster.
 - Gate: `e2e/heat.spec.ts` (the bot at a set heat: escapes, busted, perf
-  under 4×), `npm run screens` with the heat HUD, the door and the busted
-  card at 1280×720 and the ten sizes, perf A/B against the M3 gate,
+  under 4×), `npm run screens` with the heat HUD, the coin counter, the cold
+  open's first caption, the door and the busted card at 1280×720 and the ten
+  sizes, perf A/B against the M3 gate,
   `docs/M4_REPORT.md` per `CLAUDE.md`, decision records in ARCHITECTURE,
   BACKLOG and CRAZYGAMES updated, PROGRESS entry.
 
@@ -204,6 +239,7 @@ All placeholders; DESIGN.md §2.6–2.7 explains the intended shape.
 | heat thresholds | 20 / 40 / 60 / 80 / 100 | balance.ts |
 | heat per event | traffic takedown 4, police takedown 10, billboard 2, camera 5, roadblock breach 6 | balance.ts |
 | bag per event | billboard 500, camera 300 + 20/km/h over, traffic takedown 800, police takedown 1500, roadblock 1000, escape 500 × level | balance.ts |
+| coin | 10; a coin every 6 m in runs of 8–12; about 60 a minute at normal driving | balance.ts |
 | multiplier by max heat | 1 / 1.25 / 1.6 / 2.2 / 3 | balance.ts |
 | fine | bag × 0.5, no multiplier | balance.ts |
 | escape cooldown | 6 / 8 / 10 / 12 / 15 s | police/tuning.ts |
@@ -219,5 +255,46 @@ and the patrols arrive from behind. Break line of sight in the grid and count
 the seconds. Swap out of view and watch the units go for the old car. Push to
 heat 3, meet a roadblock, take the sawhorse. Drive to the hideout with an
 active pursuit (refused), lose them, bank, read the wall. Get busted on
-purpose at heat 2 and watch the bar. Report what felt wrong before what
-worked.
+purpose at heat 2 and watch the bar. Follow a coin line and check it leads
+somewhere worth going. Clear the seen flag and play the first 90 seconds with
+a stopwatch: every caption must land on the verb it names. Report what felt
+wrong before what worked.
+
+## 5. Post-launch update 1 — the air (the contract for after Basic Launch)
+
+Moved out of M4 on 2026-09-22 (DESIGN.md §5). Three slices, in this order,
+worked the same way as the ones above once the first Basic Launch numbers
+are in. Heat 4–5 then gain the helicopter and the escape rule "lose the
+helicopter under cover first, then the cooldown".
+
+### Update slice A — covered streets and the camera occlusion rule
+
+- One covered street per district from `cover.ts`: roof and side walls with
+  portal openings, static boxes, no road-graph change.
+- Line of sight against statics blocks inside cover (the pursuit's ray).
+- `ChaseCamera`: when a static lies between the camera and the car, the
+  distance shortens along the boom; recovers at `heightRateGround` pace.
+- Pins: LOS blocked inside cover; the camera check in e2e (no static between
+  camera and car for a drive through each cover).
+
+### Update slice B — overpasses
+
+- Height in the road graph: `RoadPoint.y` optional, lanes carry height,
+  kinematic traffic at height, the bot route, road meshes, markings, the
+  minimap; the highway rises over the four avenue crossings with ramps
+  inside the vehicle's landing rules (decision 10).
+- Re-pin the city tour and bot laps with the reasons written. This slice
+  reopens M2 by design (DESIGN.md §5); Marcin decided it.
+- Measurement: smoke fps and draws before/after; the bot's whole-map tour.
+
+### Update slice C — the helicopter
+
+- A kinematic unit above the road graph from level 4, a spotlight cone as
+  line of sight; cover (slice A) and the overpasses (slice B) break it;
+  escape needs cover first, then the cooldown. `PoliceView` gets the body and
+  the spotlight; audio the rotor as a low-pass on everything when it is
+  overhead (BACKLOG).
+- Pins: the helicopter loses the player only under cover; unit budgets with
+  the helicopter counted.
+- Measurement: browser step p95 and fps at level 5 on the low tier against
+  the M4 gate; the bot's busted rate at 4 and 5 before and after.

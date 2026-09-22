@@ -91,6 +91,7 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 ## Run structure and heat (M4 candidates beyond the slice plan; docs/DESIGN.md)
 
+- Update 1, "the air" (decided 2026-09-22, `docs/DESIGN.md` §5): covered streets with the camera occlusion rule, the highway overpasses, the helicopter with its spotlight. Left M4 so the game reaches Basic Launch with heat 4–5 on the ground; the contracts are §5 of `docs/M4_PLAN.md`. (update 1)
 - Pursuit breakers: smashable props that drop a static onto the road behind the player (scaffold, water tower, petrol canopy); police crash or reroute; doubles as cover. Billboard machinery plus a dropped static and a police reroute. (M4 stretch)
 - Multi-storey car park as a helicopter cover set piece: ramps, per-floor colliders, and a chase camera at 2.4 m plus look height inside 3 m ceilings; the camera alone is a week. (v1.1)
 - The comic arrest: the busted bar drawn as an officer walking up with a ticket book; one pedestrian pose. (M4 polish)
@@ -98,6 +99,7 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 ## Activities and progression (M5; docs/DESIGN.md §3–4, §7–8)
 
+- Launch scope (decided 2026-09-22, `docs/DESIGN.md` §11): M5 ships the cold open, save, the garage and three jobs (getaway delivery, time trial on a coin line, pursuit escape), dailies and the streak if they fit. Update 2, "the jobs": street races with rivals, takedown rage and mayhem, fares with hot passengers, the stunt and collectible hunts, the skill chain, the full map. (update 2)
 - Order-free checkpoint races (Midnight Club) and road rules (a best time and best damage per street, Burnout Paradise): the same rival and recorder tech as the two race types that ship first. (M5 stretch)
 - Hidden cars: a stashed car somewhere in the city that a swap unlocks (the ice-cream truck). (M5)
 - A giant ball in a plaza, one dynamic sphere to push around; a free-roam toy that costs nothing. (M5)
@@ -109,6 +111,6 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 ## City v2 (after the M4 run loop works; docs/DESIGN.md §5–6)
 
-- Highway overpasses at the four avenue crossings: a third dimension in the road graph (lane height, kinematic traffic at height, the bot route, road meshes, markings, the minimap, the city pins). Scheduled as M4 slice 7, listed here until it starts. (M4)
+- Highway overpasses at the four avenue crossings: a third dimension in the road graph (lane height, kinematic traffic at height, the bot route, road meshes, markings, the minimap, the city pins). Moved from M4 to update 1 on 2026-09-22; the contract is §5 of `docs/M4_PLAN.md`. (update 1)
 - Chokepoint and cover sites exported by the generator (the four on-ramps, the tower junction, one covered street per district) so roadblocks and the map read from data, not from hand-placed coordinates. (M4)
 - A lit hideout sign visible from the highway; drop-off approaches with a second, longer way in. (M4/M5)

@@ -2,6 +2,70 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-22 — Design talk: the pitch, the launch scope, the cold open moved up
+
+Marcin asked for a read of the whole documentation and a talk about the idea
+itself, then said to write the conclusions in. Docs only, no code. Verify
+green at the start: 189 tests, smoke 60.0 fps / p95 16.7 ms / 97 draws /
+194k tris, gameplay-start 1.46 s, 3.51 MB.
+
+### Decided (Marcin, on my assessment)
+
+- **The pitch in one line**: you are the getaway driver who never keeps a
+  car. Steal, wreck, swap, escape, bank. The brief's four references describe
+  the feel; this is the identity for the cover, the description and the first
+  20 seconds. The swap leads, because no other city driving game on the
+  platform has it (`docs/DESIGN.md` §1, README).
+- **The cold open is prototyped in M4 right after slice 3**, not in M5.
+  Conversion is decided in the first 20 s; after slice 3 everything the first
+  version needs exists (a patrol behind, the bag, the door) and only the
+  delivery marker, the route and the captions are missing. M4 slice 4, played
+  by hand every session from then on.
+- **Coins move from M5 into M4 slice 3.** The twelve-year-old's reward layer
+  was thin: boost is a means, the bag is a number. Coins are cheap,
+  instanced, and they are what shows every 20–30 s.
+- **Launch scope.** Basic Launch after M4 plus a minimum M5: the cold open
+  finished, save, the garage with the catalogue, three jobs (getaway
+  delivery, time trial on a coin line, pursuit escape), dailies and the
+  streak if they fit. Covered streets, overpasses and the helicopter are
+  update 1 (heat 4–5 ship on the ground: heavies and the Chief); races with
+  rivals, fares, takedown rage, mayhem, the hunts, the skill chain and the
+  full map are update 2. The three KPIs are measured live from Basic Launch
+  and updates get re-featured; no design table replaces that. This deviates
+  from the brief's v1 list for the helicopter and the activity count; Marcin
+  decided it.
+- **The bag's risk at heat 1–3 is unproven and gets measured before
+  `balance.ts` is tuned.** Rams shove and never stop, busted needs two units
+  and 3 s under 5 km/h, a swap out of sight ends the pursuit at once: below
+  the roadblocks a novice may be uncatchable, which makes ×1.25 and ×1.6
+  free money and DESIGN §2.7 fiction. Decision rule in M4 slice 6: if the
+  bot's busted rate at level 3 is below the §2.7 novice assumption (about one
+  in five minutes), the ratchet gets a cost that is not the police (cameras
+  and parked patrols from level 2) and the level 1–2 multipliers come down.
+
+### Done
+
+- `docs/DESIGN.md`: §1 the pitch, §2.6 and §2.8 notes, §3.2 coins in M4,
+  §4 three jobs at launch, §5 rewritten, §11 rewritten with the launch scope
+  and the two updates, §12 the busted-rate watch item with its rule.
+- `docs/M4_PLAN.md`: coins in slice 3 (placement, pickup, pins, the
+  coins-per-minute measurement), the cold open prototype as slice 4 (script,
+  captions, pins, measurement), slices 5–8 renumbered, levels 4–5 on the
+  ground, the slice 6 decision rule, the coin row in the numbers table, the
+  playtest additions, §5 holding the cover, overpass and helicopter contracts
+  for update 1.
+- `docs/BACKLOG.md`: the update 1 and update 2 lines; the overpass entry
+  re-pointed. README tagline.
+
+### Next
+
+- Slice 3 of `docs/M4_PLAN.md`, now with the coins, then slice 4.
+
+### Open problems
+
+- The re-take of the throttled perf A/B (heat 0 vs 2) on an idle machine and
+  Marcin's `npm run perf:headed` are still owed from slice 2.
+
 ## 2026-09-22 — M4 slice 2: units per level, interceptors, the body pool
 
 Verify green before and after (189 tests).

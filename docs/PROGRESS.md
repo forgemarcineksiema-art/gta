@@ -2,6 +2,31 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — Playtest after the gate: the bonnet smoke
+
+Marcin, first minute: "why does the car smoke like that? it ruins the whole
+game". The cold open's van is stage 2 by design (DESIGN §6.6), and a stage-2
+car emitted 12 puffs a second. A puff hangs in the air behind a moving car
+and the chase camera, 6.4-8 m back and 2.4 m up, drove through every one:
+at 80 km/h a white wash lay over the van's rear doors. The point size was
+also a fixed pixel factor, so the puffs grew on smaller screens.
+
+### Done
+
+- `Smoke`: sizes are world metres projected with the camera's real scale
+  (`setViewport` from `Renderer.resize`); every puff fades out between 7 and
+  3.5 m from the camera and fades in over 0.12 s at the source; a `density`
+  argument thins a puff's peak alpha and shortens its life.
+- `Renderer.emitSmoke`: the player's smoke density is `1 / (1 + v / 10)`
+  (v in m/s), 10 puffs a second at stage 2 and 24 at stage 3. Before and
+  after screenshots at 1280×720 (78-80 km/h and stopped) were compared: the
+  rear doors are clear at speed, a thin column rises from the stopped van.
+
+### Decided (set here)
+
+- The van keeps stage 2 in the cold open: the damage bar and the dents say
+  "swap"; the smoke was the defect, not the stage.
+
 ## 2026-09-23 — M4 gate
 
 Marcin: work autonomously to the end of M4. Slices 3a–8 are done; the gate

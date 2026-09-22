@@ -257,7 +257,12 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   paint planks plus a few steel bits on a billboard.
 - Smoke is 160 soft points: grey from a stage-2 car, dark from stage 3, with
   orange "fire" points at stage 4 and on every wreck; drifts with the car's
-  velocity, dies within seconds. Never a full-screen effect.
+  velocity, dies within seconds. Never a full-screen effect: a puff is sized
+  in metres (0.3 m growing to about 1.2 m), the car's own smoke thins with
+  speed (half as dense at 36 km/h, a quarter at 108) and every puff fades
+  out between 7 and 3.5 m from the camera, so the trail a moving car leaves
+  never washes over it. A stopped stage-2 car shows a thin column off the
+  bonnet.
 - Wrecked: the engine cuts, the overlay says WRECKED with a countdown, and the
   respawn rolls the car out at 8 m/s on the nearest road. No fade to black, no
   camera cut longer than the snap.

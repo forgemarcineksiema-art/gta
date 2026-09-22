@@ -1,28 +1,36 @@
 /**
  * Smoke and fire as one pooled point cloud: grey smoke from a dented car,
  * dark smoke and short-lived fire points from a burning one, the same for
- * wrecked traffic nearby. Points are sized by distance in the vertex shader
- * and fade out through vertex alpha. Typed arrays updated in place; two
- * attributes uploaded per frame; one draw call. Nothing is drawn in front of
- * the camera: emitters sit on the cars.
+ * wrecked traffic nearby. A puff's size is a world diameter in metres (the
+ * vertex shader projects it with the camera's real scale, so it reads the
+ * same at every resolution); it fades in over its first moments and out over
+ * its life. Smoke left behind a moving car hangs in the air the chase camera
+ * drives through, so a puff fades out as it nears the camera instead of
+ * filling the screen. Typed arrays updated in place; one draw call.
  */
 import * as THREE from 'three';
 
 const POOL = 160;
 const HIDDEN_Y = -100;
+/** Seconds a puff takes to fade in at the source. */
+const FADE_IN = 0.12;
 
 export type Puff = 'smoke' | 'dark' | 'fire';
 
 const VERT = `
+uniform float uScale;
 attribute float aSize;
 attribute float aAlpha;
 varying vec3 vColor;
 varying float vAlpha;
 void main() {
   vColor = color;
-  vAlpha = aAlpha;
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
-  gl_PointSize = aSize * (300.0 / max(1.0, -mv.z));
+  float depth = max(0.5, -mv.z);
+  // The chase camera sits 6.4-8 m behind the car's centre: puffs behind the
+  // car's tail (under 4 m away) are gone, puffs over the bonnet are whole.
+  vAlpha = aAlpha * smoothstep(3.5, 7.0, depth);
+  gl_PointSize = aSize * uScale / depth;
   gl_Position = projectionMatrix * mv;
 }`;
 const FRAG = `
@@ -47,6 +55,7 @@ export class Smoke {
   private readonly life = new Float32Array(POOL);
   private readonly maxLife = new Float32Array(POOL);
   private readonly grow = new Float32Array(POOL);
+  private readonly peak = new Float32Array(POOL);
   private readonly kind = new Uint8Array(POOL);
   private next = 0;
   private seed = 7;
@@ -54,6 +63,7 @@ export class Smoke {
   private readonly colAttr: THREE.BufferAttribute;
   private readonly sizeAttr: THREE.BufferAttribute;
   private readonly alphaAttr: THREE.BufferAttribute;
+  private readonly material: THREE.ShaderMaterial;
 
   constructor() {
     const g = new THREE.BufferGeometry();
@@ -70,8 +80,11 @@ export class Smoke {
     g.setAttribute('color', this.colAttr);
     g.setAttribute('aSize', this.sizeAttr);
     g.setAttribute('aAlpha', this.alphaAttr);
-    const material = new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: FRAG, vertexColors: true, transparent: true, depthWrite: false });
-    this.object = new THREE.Points(g, material);
+    this.material = new THREE.ShaderMaterial({
+      vertexShader: VERT, fragmentShader: FRAG, vertexColors: true, transparent: true, depthWrite: false,
+      uniforms: { uScale: { value: 600 } },
+    });
+    this.object = new THREE.Points(g, this.material);
     this.object.frustumCulled = false;
     this.object.renderOrder = 5;
   }
@@ -81,8 +94,18 @@ export class Smoke {
     return this.seed / 4294967296;
   }
 
-  /** Emit one puff at a point. `vx, vz` is the source's velocity (the puff trails behind at a fraction of it). */
-  emit(kind: Puff, x: number, y: number, z: number, vx = 0, vz = 0): void {
+  /** Pixels per metre at 1 m from the camera: the drawing buffer's height over the frustum's height at 1 m. */
+  setViewport(bufferHeight: number, fovDegrees: number): void {
+    (this.material.uniforms.uScale as THREE.IUniform<number>).value = bufferHeight / (2 * Math.tan((fovDegrees * Math.PI) / 360));
+  }
+
+  /**
+   * Emit one puff at a point. `vx, vz` is the source's velocity (the puff
+   * trails behind at a fraction of it). `density` (0-1] thins a puff: smoke
+   * from a moving car is spread through more air per second, so it is fainter
+   * and mixes away sooner.
+   */
+  emit(kind: Puff, x: number, y: number, z: number, vx = 0, vz = 0, density = 1): void {
     const i = this.next;
     this.next = (this.next + 1) % POOL;
     const r = (): number => this.rnd();
@@ -91,25 +114,28 @@ export class Smoke {
     this.positions[i * 3 + 2] = z + (r() - 0.5) * 0.3;
     this.vx[i] = vx * 0.25 + (r() - 0.5) * 0.8;
     this.vz[i] = vz * 0.25 + (r() - 0.5) * 0.8;
+    const mix = 0.4 + 0.6 * density;
     if (kind === 'fire') {
       this.vy[i] = 1.5 + r() * 1.5;
-      this.life[i] = 0.3 + r() * 0.2;
-      this.sizes[i] = 0.35;
-      this.grow[i] = 0.2;
+      this.life[i] = (0.3 + r() * 0.2) * mix;
+      this.sizes[i] = 0.2;
+      this.grow[i] = 0.1;
+      this.peak[i] = 0.9 * density;
       this.colors[i * 3] = 1.0; this.colors[i * 3 + 1] = 0.55 + r() * 0.35; this.colors[i * 3 + 2] = 0.1;
       this.kind[i] = 2;
     } else {
       const dark = kind === 'dark';
-      this.vy[i] = 1.2 + r() * 0.8;
-      this.life[i] = 1.4 + r() * 0.8;
-      this.sizes[i] = 0.5;
-      this.grow[i] = dark ? 1.3 : 1.0;
+      this.vy[i] = 0.9 + r() * 0.6;
+      this.life[i] = (1.3 + r() * 0.7) * mix;
+      this.sizes[i] = dark ? 0.35 : 0.3;
+      this.grow[i] = dark ? 0.8 : 0.6;
+      this.peak[i] = (dark ? 0.7 : 0.45) * density;
       const tone = dark ? 0.16 + r() * 0.06 : 0.6 + r() * 0.15;
       this.colors[i * 3] = tone; this.colors[i * 3 + 1] = tone; this.colors[i * 3 + 2] = tone * 1.05;
       this.kind[i] = dark ? 1 : 0;
     }
     this.maxLife[i] = this.life[i];
-    this.alphas[i] = 0.8;
+    this.alphas[i] = 0;
   }
 
   update(dt: number): void {
@@ -125,8 +151,8 @@ export class Smoke {
       this.positions[i * 3 + 1] = (this.positions[i * 3 + 1] as number) + (this.vy[i] as number) * dt;
       this.positions[i * 3 + 2] = (this.positions[i * 3 + 2] as number) + (this.vz[i] as number) * dt;
       this.sizes[i] = (this.sizes[i] as number) + (this.grow[i] as number) * dt;
-      const t = (this.life[i] as number) / (this.maxLife[i] as number);
-      this.alphas[i] = this.kind[i] === 2 ? 0.9 * t : 0.7 * t;
+      const left = this.life[i] as number, max = this.maxLife[i] as number;
+      this.alphas[i] = (this.peak[i] as number) * Math.min(1, (max - left) / FADE_IN) * (left / max);
     }
     this.posAttr.needsUpdate = true;
     this.colAttr.needsUpdate = true;

@@ -80,7 +80,7 @@ export class Renderer {
   private readonly speedLines: SpeedLines;
   private readonly sparks: Sparks;
   private readonly debris: Debris;
-  private readonly smoke: Smoke;
+  private readonly smoke = new Smoke();
   private eventSeq = 0;
   private smokeAcc = 0;
   private fireAcc = 0;
@@ -215,7 +215,6 @@ export class Renderer {
     this.scene.add(this.sparks.object);
     this.scene.add(this.sparks.heads);
     this.debris = new Debris(this.scene);
-    this.smoke = new Smoke();
     this.scene.add(this.smoke.object);
     this.wreckSmokeAcc = new Float32Array(sim.traffic?.capacity ?? 1);
 
@@ -276,6 +275,7 @@ export class Renderer {
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    this.smoke.setViewport(h * dpr, this.camera.fov);
     this.stats.dpr = dpr;
     this.stats.width = w;
     this.stats.height = h;
@@ -452,11 +452,13 @@ export class Renderer {
       this.tmpFwd.set(0, 0, 1).applyQuaternion(car.quaternion);
       this.tmpPos.copy(car.position).addScaledVector(this.tmpFwd, 1.5);
       const y = this.tmpPos.y + 0.85;
-      this.smokeAcc += (stage === 2 ? 12 : 30) * dt;
-      while (this.smokeAcc >= 1) { this.smokeAcc -= 1; this.smoke.emit(stage === 2 ? 'smoke' : 'dark', this.tmpPos.x, y, this.tmpPos.z, this.carVel.x, this.carVel.z); }
+      // The same leak spread through more air at speed: half as dense at 36 km/h, a quarter at 108.
+      const density = 1 / (1 + Math.hypot(this.carVel.x, this.carVel.z) / 10);
+      this.smokeAcc += (stage === 2 ? 10 : 24) * dt;
+      while (this.smokeAcc >= 1) { this.smokeAcc -= 1; this.smoke.emit(stage === 2 ? 'smoke' : 'dark', this.tmpPos.x, y, this.tmpPos.z, this.carVel.x, this.carVel.z, density); }
       if (stage >= 3) {
         this.fireAcc += (stage === 3 ? 20 : 25) * dt;
-        while (this.fireAcc >= 1) { this.fireAcc -= 1; this.smoke.emit('fire', this.tmpPos.x, y, this.tmpPos.z, this.carVel.x, this.carVel.z); }
+        while (this.fireAcc >= 1) { this.fireAcc -= 1; this.smoke.emit('fire', this.tmpPos.x, y, this.tmpPos.z, this.carVel.x, this.carVel.z, Math.max(0.5, density)); }
       }
     } else { this.smokeAcc = 0; this.fireAcc = 0; }
     const traffic = this.sim.traffic;

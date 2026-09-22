@@ -470,8 +470,10 @@ onto the front page.
 
 ## 11. Milestones as they stand now
 
-The M4 contract with done criteria, pins and measurements per slice is
-`docs/M4_PLAN.md`; this section is the summary.
+The contracts with done criteria, pins and measurements per slice are
+`docs/M4_PLAN.md` (its §5 holds update 1), `docs/M5_PLAN.md` and
+`docs/M6_PLAN.md`; this section is the summary. Update 2 gets its contract
+after the first Basic Launch numbers.
 
 Revised 2026-09-22 (decided by Marcin): the game goes to Basic Launch after
 M4 and a minimum M5, and the rest ships as updates. The platform measures

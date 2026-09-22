@@ -3,8 +3,10 @@
 Open-world arcade driving for the browser (CrazyGames). You are the getaway driver who never keeps a car: steal, wreck, swap, escape, bank. Brief: `docs/BRIEF.md`. Standing rules: `CLAUDE.md`. Current state: `docs/PROGRESS.md`.
 
 M3 put life in the city: traffic, pedestrians, damage and wrecks, car-swap,
-takedowns and fifty smashable billboards. M4 (next) is the police and the run:
-`docs/M4_PLAN.md`, designed in `docs/DESIGN.md`. Acceptance reports:
+takedowns and fifty smashable billboards. M4 (in progress) is the police and
+the run: `docs/M4_PLAN.md`; M5 the launch minimum: `docs/M5_PLAN.md`; M6 the
+platform and the submission: `docs/M6_PLAN.md`; all designed in
+`docs/DESIGN.md`. Acceptance reports:
 `docs/M2_REPORT.md`, `docs/M3_REPORT.md`; older ones in `docs/history/`.
 
 ## Run

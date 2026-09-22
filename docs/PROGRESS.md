@@ -2,6 +2,55 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-22 — Contracts for M5 and M6
+
+Marcin asked whether every remaining milestone should have a plan at
+M4_PLAN's level. Recommended and done: M5 and M6 now, the update plans
+after the first Basic Launch numbers (update 1 already has its contract in
+`docs/M4_PLAN.md` §5). Docs only.
+
+### Done
+
+- `docs/M5_PLAN.md`: the launch minimum. Ground rules (headless save format
+  with app-side IO, one key, migrations, 32 kB guard; one ad per door; the
+  offers' rules), the inputs M4 still has to measure (bag and coins per
+  minute, busted rates per level, the cold open route), the layout, nine
+  slices: save and prices; jobs framework with the arrow and delivery;
+  steal-to-order with the traffic guarantee; pursuit escape; the garage
+  with the offers; the cold open finished on the save; dailies and the
+  streak (ships if it fits); the balance script as `npm run balance` with
+  the bot as the capture probe and three assertions; the UI and audio pass
+  and the gate. Numbers table, playtest.
+- `docs/M6_PLAN.md`: the platform. Ground rules (script-tag SDK, `init`
+  first, a 3 s timeout to a no-op adapter, the docs re-read before the
+  adapter), the layout, seven slices: the SDK re-read and
+  `CrazyGamesPlatform`; the compliance sweep and the hand-obfuscated
+  sitelock, account scenario 1; touch as an `InputDevice` over a pure,
+  Node-tested model; the mobile tier with the traffic lever, safe areas,
+  the rotate overlay, the 20 MB budget row and a mobile perf proxy; ads and
+  data end to end in the Preview tool; the submission package script and
+  `docs/SUBMISSION.md` with the cover brief; the gate. Numbers, playtest.
+- Pointers: `CLAUDE.md` (session start, the table), `AGENTS.md`, README,
+  DESIGN §11, ARCHITECTURE layout.
+
+### Set here (Marcin overrides)
+
+- The launch catalogue is the five bodies that exist (muscle starter,
+  compact, heavy, sports, police); Muscle Pro, GT and the ice-cream truck
+  need new profiles and are update 2. The brief's eight vehicles become five
+  at launch; it follows from the launch-scope decision.
+- The balance script is a vitest file run by `npm run balance`, outside
+  `verify`, and it steps the sim headlessly for its capture rates instead of
+  taking them from a table.
+- Account scenario 1 (no accounts) at launch; the SDK migrates guest data on
+  login by itself.
+- Time limits for jobs come from the lane-path time at the speed limits, not
+  from a table, so a job stays fair wherever the generator puts it.
+
+### Next
+
+- Unchanged: M4 slice 3 (`docs/M4_PLAN.md`).
+
 ## 2026-09-22 — Design talk, part 2: the swap as the job, the spill, the disguise
 
 Marcin: "the idea is good, could it be better?" Three additions and one

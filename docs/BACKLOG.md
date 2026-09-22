@@ -99,7 +99,7 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 ## Activities and progression (M5; docs/DESIGN.md §3–4, §7–8)
 
-- Launch scope (decided 2026-09-22, `docs/DESIGN.md` §11): M5 ships the cold open, save, the garage and three jobs (getaway delivery, time trial on a coin line, pursuit escape), dailies and the streak if they fit. Update 2, "the jobs": street races with rivals, takedown rage and mayhem, fares with hot passengers, the stunt and collectible hunts, the skill chain, the full map. (update 2)
+- Launch scope (decided 2026-09-22, `docs/DESIGN.md` §11): M5 ships the cold open, save, the garage and three jobs (getaway delivery, steal-to-order, pursuit escape), dailies and the streak if they fit. Update 2, "the jobs": the time trial with medals, street races with rivals, takedown rage and mayhem, fares with hot passengers, the stunt and collectible hunts, the skill chain, the full map. (update 2)
 - Order-free checkpoint races (Midnight Club) and road rules (a best time and best damage per street, Burnout Paradise): the same rival and recorder tech as the two race types that ship first. (M5 stretch)
 - Hidden cars: a stashed car somewhere in the city that a swap unlocks (the ice-cream truck). (M5)
 - A giant ball in a plaza, one dynamic sphere to push around; a free-roam toy that costs nothing. (M5)

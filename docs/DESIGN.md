@@ -59,6 +59,16 @@ is a roguelite rule for an older audience. Half at ×1 keeps the tension where
 the skilled player feels it and keeps the beginner's progress. The lawyer
 (§3.4) raises the fine's keep to three quarters.
 
+**The bag spills on a wreck — decided 2026-09-22.** The rings rule from
+Sonic: when the player's car is wrecked, a share of the bag (30 % to start)
+bursts out as coins laid along the lane ahead of the wreck, and they vanish
+after ten seconds. A swap or the rolling respawn drives straight through
+them; what is picked up goes back into the bag. This is the risk that does
+not depend on the police: a twelve-year-old reads it the first time, the
+strategist gets a reason to drive clean at heat 1–2, and the scene is
+slapstick. Busted still takes half; a wreck takes what you fail to scramble
+back. Numbers in `balance.ts`; built in M4 slice 3 with the coins.
+
 ### 2.3 The cycle
 
 1. Start at the hideout: heat 0, bag 0, in the garage car, drive out.
@@ -79,7 +89,7 @@ Boxed in by at least two units and under 5 km/h for 3 s, a visible bar
 filling so there is always a moment to break out; the bar is an officer
 walking up with a ticket book and flooring it mid-walk drains it. The fine
 (§2.2); coins and bank kept. A wrecked car never ends the run: swap or the M3 rolling
-respawn, as today. `R` under pursuit teleports within line of sight, so reset
+respawn, as today, minus the spill (§2.2). `R` under pursuit teleports within line of sight, so reset
 is not an escape.
 
 ### 2.5 Identity: car-swap ends a pursuit
@@ -92,6 +102,17 @@ ends at once; a swap in view does nothing. The units then drive to the
 descriptor's last known position, the abandoned car, and box it in while its
 ex-driver shakes a fist at them: the rule explains itself. Cost: one
 condition in M4's detection model.
+
+**The disguise — decided 2026-09-22.** A police car is a car, so `E` beside
+a unit takes it, and the unit's driver stands in the road shaking a fist.
+While the player drives a police-liveried car and no unit has seen a crime
+from it, patrols do not detect the player at all: they pass, parked patrols
+sit still, the stars stay quiet. The first crime event (takedown, billboard,
+camera, ram) with a unit in line of sight blows the disguise: the descriptor
+becomes "police saloon" or "interceptor" and the pursuit runs as usual. Heat
+still rises for every crime, seen or not. One more condition in detection,
+and the best joke in the game: escaping the police in their own car. Watch
+item in §12.
 
 ### 2.6 Heat levels, starting table
 
@@ -200,6 +221,8 @@ locked district. Revised around the audience.
 | skill chain | 50–300 per event, multiplier to ×5, banks on a clean end |
 | time trial | 3,000 / 5,000 / 8,000 by medal |
 | getaway delivery | 5,000–12,000 |
+| steal-to-order | 4,000–10,000, minus 10 % per damage stage on the delivered car |
+| wreck spill | 30 % of the bag as coins ahead of the wreck, 10 s to recover |
 | rampage zone | 6,000–15,000 |
 
 A five-minute novice run: about 3k in coins plus 8k in the bag at ×1.25 is
@@ -223,12 +246,22 @@ under 1 MB, `Collectibles.smashed` included.
 
 ## 4. Activities — set here
 
-Three ship at launch: getaway delivery, the time trial on a coin line and
-pursuit escape (§11, decided 2026-09-22). Street races with rivals, takedown
-rage, mayhem, the hunts and fares follow in the second post-launch update.
-The list is ordered by build cost, the cheap ones first so the city fills
-early.
+Three ship at launch: getaway delivery, steal-to-order and pursuit escape
+(§11, decided 2026-09-22; steal-to-order replaced the time trial the same
+day, because it is cheaper and it is the only job that sells the swap). The
+time trial, street races with rivals, takedown rage, mayhem, the hunts and
+fares follow in the second post-launch update. The list is ordered by build
+cost, the cheap ones first so the city fills early.
 
+0. **Steal-to-order** (Gone in 60 Seconds; decided 2026-09-22). The marker
+   is not a place but a car: "wanted: a cyan compact, no scratches, four
+   minutes". Traffic already spawns every class in a fixed set of paints, so
+   the player hunts the city for one, swaps into it, and brings it to the
+   drop-off; the payout falls by 10 % per damage stage on the delivered car
+   and the timer runs from the swap. It uses swap, damage, traffic paints,
+   heat and the hideout, all of which exist, and needs only a marker with a
+   descriptor and a delivery condition. The one job in which the swap is the
+   goal, not the tool: the identity of the game as a job.
 1. **Fares** (Crazy Taxi). A pedestrian hails from the kerb; stop alongside
    and they hop in (no on-foot: the ped mesh moves to the passenger seat). A
    big arrow to the destination, a timer, tips for near misses, jumps and
@@ -239,8 +272,8 @@ early.
 2. **Getaway delivery**: pick something up, get it to a drop-off under heat.
    The cold-open job.
 3. **Time trial on a coin line** with bronze, silver and gold medals (the
-   Moto X3M hook): the race type with no AI and the first to ship; the coins
-   mark the line, leaving it is allowed, the clock decides.
+   Moto X3M hook): the race type with no AI and the first race in update 2;
+   the coins mark the line, leaving it is allowed, the clock decides.
 4. **Street race, point-to-point, free routing** (Burnout Paradise): rivals on
    the bot's lane follower at race speed with a rubber band, the physics body
    near the player. The police join at heat 2 or more.
@@ -337,13 +370,19 @@ cover, cameras and the pursuit's units.
 
 ### 6.6 The cold-open route
 
+Revised 2026-09-22: the swap is the second verb, not the fourth. The game
+shows the one thing nobody else on the platform has inside ten seconds, and
+the thumbnail and the first frame say the same thing.
+
 Spawn on the Crown diagonal heading for the tower junction (the existing
-`loop` spawn), already at heat 1 with two patrols behind. A delivery marker
-600 m ahead through the junction. On the way: a billboard gate on the footway
-(smash), a swap candidate alongside at the junction (swap), a patrol that
-lines up for a wall (takedown), the delivery, then "get it to the hideout"
-300 m on, with the patrols losing sight in the grid (escape). About 1.5 km,
-90 s at 60 km/h, skippable, never shown twice.
+`loop` spawn) in a beat-up van, damage stage 2, already at heat 1 with two
+patrols behind. Within the first ten seconds a muscle car draws alongside:
+the keycap says `E`, the whip, FRESH WHEELS (swap). A delivery marker 600 m
+ahead through the junction; a coin line marks the route. On the way: boost
+on the straight (boost), a billboard gate on the footway (smash), a patrol
+that lines up for a wall (takedown), the delivery, then "get it to the
+hideout" 300 m on, with the patrols losing sight in the grid (escape). About
+1.5 km, 90 s at 60 km/h, skippable, never shown twice.
 
 ## 7. Free-roam scoring — set here
 
@@ -360,6 +399,10 @@ lines up for a wall (takedown), the delivery, then "get it to the hideout"
 |---|---|---|---|
 | Pursuit breakers: smashable props that drop a static onto the road behind the player (scaffold, water tower, petrol canopy); police crash or reroute, doubles as cover | NFS Most Wanted | medium | M4 stretch |
 | Hidden cars in the city: a swap into a stashed car unlocks it | Forza Horizon barn finds | low | M5 (the ice-cream truck) |
+| Steal-to-order: the job marker is a car descriptor, not a place; deliver it undamaged | Gone in 60 Seconds, GTA | very low | M5 launch (§4) |
+| The bag spills as coins on a wreck, ten seconds to scramble them back | Sonic's rings | low | M4 slice 3 (§2.2) |
+| The disguise: swap into a police car and the patrols pass you until they see you sin | Driver, GTA | very low | M4 slice 5 (§2.5) |
+| Cars as tools: the heavy breaches the car half of a roadblock, the sports car outruns interceptors, the police car is the disguise | Burnout, Driver | low | M4 slices 5–6 |
 | Fares with hot passengers and the chained timer | Crazy Taxi | low | M5 (§4) |
 | One big destination arrow over the car for every job | Crazy Taxi | very low | M5 |
 | Police withdraw to the nearest donut shop when a pursuit ends; the shop is a marker building, the units path to it and park | mine | very low | M4 polish |
@@ -449,17 +492,17 @@ both.
   polish, the gate.
 - **M5 The launch minimum**: the cold open finished on the save's seen flag,
   save through the platform, the garage with the catalogue and paint (§3.3),
-  three jobs (getaway delivery, the time trial on a coin line, pursuit
-  escape), the Crazy Taxi arrow, the balance script with the EV assertion
+  three jobs (getaway delivery, steal-to-order, pursuit escape), the Crazy
+  Taxi arrow, the balance script with the EV assertion
   and the bot as the capture probe, the UI and audio passes. Dailies and the
   streak ship with it if they fit after the three jobs: they are cheap once
   the save exists and they are the D1 lever; else they open update 2.
 - **M6 Platform** as in the brief, then Basic Launch.
 - **Update 1, the air**: covered streets and the camera occlusion rule, the
   overpasses, the helicopter with the spotlight (§5).
-- **Update 2, the jobs**: street races with rivals, takedown rage and mayhem,
-  fares with hot passengers, the stunt and collectible hunts, the skill chain,
-  the full map (§4, §7).
+- **Update 2, the jobs**: the time trial on a coin line, street races with
+  rivals, takedown rage and mayhem, fares with hot passengers, the stunt and
+  collectible hunts, the skill chain, the full map (§4, §7).
 - Later: cop mode, ghosts, the rest of §8, by the KPIs.
 
 ## 12. Playtest watch list
@@ -481,6 +524,14 @@ both.
   assumption (15 % a minute, about one busted in five minutes), the ratchet
   gets a cost that is not the police, speed cameras and parked patrols from
   level 2 instead of 3, and the level 1–2 multipliers come down.
+- The disguise (§2.5): does a police car make heat 1–2 trivial, since a
+  chasing unit rams from alongside and is therefore always a swap candidate.
+  If the bot's escape-by-disguise share is above half at level 2, the
+  disguise gets a timer (a dispatcher noticing the missing unit) before it
+  gets removed.
+- The spill (§2.2): does the scramble read as a chance or as a punishment,
+  and does a novice recover any of it. If the bot's recovery share is under a
+  third, the coins live longer or land closer to the respawn.
 
 ## References
 
@@ -489,4 +540,5 @@ Most Wanted 2005 (pursuit breakers, heat levels), Need for Speed Hot Pursuit
 2010 (police in races), Midnight Club (order-free checkpoints), Forza Horizon
 (skill chains, speed zones, barn finds), The Simpsons: Hit & Run (tone),
 Driver: San Francisco (the swap), Chase HQ (suspect pursuit), Wreckfest
-(derby), Trackmania (ghost time-attack).
+(derby), Trackmania (ghost time-attack), Gone in 60 Seconds (steal-to-order),
+Sonic (the rings rule for the spill).

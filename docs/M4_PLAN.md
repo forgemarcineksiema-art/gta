@@ -125,6 +125,13 @@ e2e/heat.spec.ts              the bot under police: escape and busted rates, per
   call, picked ids zero-scaled; a chime and a counter on the HUD. Coins are
   the player's the moment they are picked (`Run.coins`, never in the bag) and
   survive busted. Session state now, the M5 save carries them.
+- The spill (DESIGN.md §2.2; decided 2026-09-22): on the player's `wrecked`
+  event, `spillShare` (0.3) of the bag leaves the bag and is laid as
+  `spillCoins` (12) coins of equal value along the nearest lane ahead of the
+  wreck, starting 10 m on at 4 m pitch, so both a swap and the rolling
+  respawn (which rolls out on that lane) pass through them; they live
+  `spillSeconds` (10 s), then vanish. Picking one returns its value to the
+  bag, not to `Run.coins`. Distinct look: bigger, in the bag's yellow.
 - Busted: boxed by ≥ 2 units within 6 m and speed < 5 km/h for 3 s; a bar
   fills; any movement above 5 km/h drains it. `R` under pursuit teleports
   within line of sight.
@@ -137,7 +144,10 @@ e2e/heat.spec.ts              the bot under police: escape and busted rates, per
 - Pins: bag arithmetic and the fine; the multiplier uses the highest heat
   reached, not the current; a drop-off refuses entry during `active`; busted
   timing; reset keeps the pursuit; coin placement is deterministic per seed
-  and clear of statics; a coin is picked once and kept through busted.
+  and clear of statics; a coin is picked once and kept through busted; a
+  wreck at bag B moves round(B × 0.3) out of the bag into twelve coins ahead
+  of it, the rolling respawn recovers them all when it drives straight, and
+  after 10 s the rest are gone.
 - Measurement: the bot from heat 0 to a drop-off: run length, bag, banked,
   coins picked per minute (the §3.3 figure is 60). This is the first number
   the balance script (M5) will consume.
@@ -145,14 +155,16 @@ e2e/heat.spec.ts              the bot under police: escape and busted rates, per
 ### Slice 4 — the cold open prototype
 
 - The first run, DESIGN.md §2.8 and §6.6, as a scripted state machine in
-  `sim/run/ColdOpen.ts`: spawn on the Crown diagonal (the `loop` spawn) at
-  heat 1 with two patrols behind and out of view; a delivery marker 600 m
-  ahead through the tower junction; a coin line marking the route; on the way
-  a billboard gate on the footway, a swap candidate alongside at the junction,
-  a patrol that lines up for a wall; the delivery; then "get it to the
-  hideout" 300 m on, the patrols losing sight in the grid; the door, the
-  totals showing the first car one run away.
-- Captions: keycap plus one word per verb (steer, boost, smash, swap,
+  `sim/run/ColdOpen.ts`: spawn on the Crown diagonal (the `loop` spawn) in
+  a heavy at damage stage 2, at heat 1 with two patrols behind and out of
+  view; inside the first ten seconds a muscle car draws alongside at matching
+  speed and stays there until taken (the swap is the second verb, DESIGN.md
+  §6.6); a delivery marker 600 m ahead through the tower junction; a coin
+  line marking the route; on the way a straight for the boost, a billboard
+  gate on the footway, a patrol that lines up for a wall; the delivery; then
+  "get it to the hideout" 300 m on, the patrols losing sight in the grid; the
+  door, the totals showing the first car one run away.
+- Captions: keycap plus one word per verb (steer, swap, boost, smash,
   takedown, escape) in `ui/coldOpen.ts`, each shown when its verb is possible
   and cleared when performed; almost no text, never a modal. Any run key
   skips it; a session flag keeps it from showing twice (the M5 save takes the
@@ -162,9 +174,10 @@ e2e/heat.spec.ts              the bot under police: escape and busted rates, per
   tuned. What is missing (marker art, the arrow, the totals' wording) is
   listed in PROGRESS, not built here.
 - Pins: the route's data exists on seed 42 (a marker reachable by lane path,
-  a billboard gate and a swap candidate on it, the hideout within 300 m of
-  the marker); the bot completes the script in under 120 s with the six
-  events in order; the script never shows twice in a session.
+  a billboard gate on it, the hideout within 300 m of the marker); the swap
+  candidate is alongside within 10 s of control; the bot completes the
+  script in under 120 s with the six events in order, the swap first among
+  the five verbs; the script never shows twice in a session.
 - Measurement: the bot's completion time and the time of each caption; then
   Marcin's first minute by hand with a stopwatch, written down.
 
@@ -174,9 +187,26 @@ e2e/heat.spec.ts              the bot under police: escape and busted rates, per
   A `swap` event with no unit in line of sight clears the descriptor: state
   `lost` at once with cooldown 0; the units drive to the last known position
   (the abandoned car) and box it for 5 s. A swap in view does nothing.
-- Pins: both cases, and that units converge on the old car.
+- The disguise (DESIGN.md §2.5): a unit is a swap candidate like any car.
+  While the descriptor class is `police` and `Pursuit.blown` is false, no
+  unit detects the player; the first crime event (traffic or police takedown,
+  billboard, camera, a ram on a unit) with any unit in line of sight sets
+  `blown` and detection resumes with the police descriptor. `blown` clears at
+  the hideout door and on a swap out of the police car. Heat counts every
+  crime regardless. Parked patrols and passing units do nothing special yet;
+  the wave is polish.
+- The heavy as a tool (DESIGN.md §8): a heavy-class body at or above
+  `breachSpeed` (80 km/h) pushes the car half of a roadblock aside instead
+  of wrecking on it; everyone takes the sawhorse at 60. Landed in slice 6
+  with the roadblock placer; listed here because it is the same "cars as
+  tools" decision.
+- Pins: both identity cases, and that units converge on the old car; in a
+  police car with no crime seen, 60 s beside a patrol is never a detection;
+  a takedown in view of a unit blows it inside one step; a swap out of the
+  cruiser clears `blown`.
 - Measurement: escapes by swap versus by cooldown in a bot run with a swap
-  policy.
+  policy, and the share of escapes that are disguises at level 2 (DESIGN.md
+  §12 watch item).
 
 ### Slice 6 — level 3: roadblocks, spike strips, parked patrols, speed cameras
 
@@ -191,7 +221,9 @@ e2e/heat.spec.ts              the bot under police: escape and busted rates, per
 - Speed cameras on the highway straights and the avenue (backlog slice 9):
   a flash, `camera` event, heat +5, bag bonus, a FLASHED popup.
 - Pins: a roadblock never spawns in view or within 100 m; the weak point is
-  passable at 60 km/h without a wreck; spiked handling numbers.
+  passable at 60 km/h without a wreck; a heavy at 80 km/h passes the car
+  half with damage under stage 2, a compact at 80 wrecks on it; spiked
+  handling numbers.
 - Measurement: bot busted rate per level 1–3 over 5 minutes each, with a
   novice policy (no swap, stays on the road) and a skilled one. Decision rule
   (DESIGN.md §12): if level 3 comes out below the §2.7 novice assumption
@@ -240,6 +272,9 @@ All placeholders; DESIGN.md §2.6–2.7 explains the intended shape.
 | heat per event | traffic takedown 4, police takedown 10, billboard 2, camera 5, roadblock breach 6 | balance.ts |
 | bag per event | billboard 500, camera 300 + 20/km/h over, traffic takedown 800, police takedown 1500, roadblock 1000, escape 500 × level | balance.ts |
 | coin | 10; a coin every 6 m in runs of 8–12; about 60 a minute at normal driving | balance.ts |
+| spill | 30 % of the bag, 12 coins from 10 m ahead at 4 m pitch, 10 s | balance.ts |
+| disguise | no detection until a crime is seen; cleared at the door or on swap | police/tuning.ts |
+| roadblock breach | heavy class at 80 km/h through the car half; the sawhorse at 60 for all | police/tuning.ts |
 | multiplier by max heat | 1 / 1.25 / 1.6 / 2.2 / 3 | balance.ts |
 | fine | bag × 0.5, no multiplier | balance.ts |
 | escape cooldown | 6 / 8 / 10 / 12 / 15 s | police/tuning.ts |
@@ -256,9 +291,12 @@ the seconds. Swap out of view and watch the units go for the old car. Push to
 heat 3, meet a roadblock, take the sawhorse. Drive to the hideout with an
 active pursuit (refused), lose them, bank, read the wall. Get busted on
 purpose at heat 2 and watch the bar. Follow a coin line and check it leads
-somewhere worth going. Clear the seen flag and play the first 90 seconds with
-a stopwatch: every caption must land on the verb it names. Report what felt
-wrong before what worked.
+somewhere worth going. Wreck with a full bag and scramble for the spill; say
+whether ten seconds felt like a chance. Let a patrol pull alongside, take it
+with `E`, and drive past the next patrol: nothing should happen until you
+sin in front of it. Clear the seen flag and play the first 90 seconds with a
+stopwatch: the swap must be offered inside ten seconds and every caption
+must land on the verb it names. Report what felt wrong before what worked.
 
 ## 5. Post-launch update 1 — the air (the contract for after Basic Launch)
 

@@ -2,6 +2,51 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-22 — Design talk, part 2: the swap as the job, the spill, the disguise
+
+Marcin: "the idea is good, could it be better?" Three additions and one
+reorder, all on systems that exist; he said to write them in. Docs only.
+
+### Decided (Marcin, on my proposal)
+
+- **Steal-to-order** is a launch job and replaces the time trial in the M5
+  minimum: the marker is a car descriptor ("a cyan compact, no scratches,
+  four minutes"), the player hunts one in traffic, swaps, delivers; payout
+  minus 10 % per damage stage. Cheapest job of all and the only one in which
+  the swap is the goal. The time trial moves to update 2 with the races
+  (`docs/DESIGN.md` §4, §11).
+- **The bag spills on a wreck** (Sonic's rings): 30 % of the bag as twelve
+  coins along the lane ahead, ten seconds to scramble them back, what is
+  picked returns to the bag. The risk that does not depend on the police, so
+  heat 1–2 has a cost a novice reads. M4 slice 3 with the coins (§2.2).
+- **The disguise**: a police car is swappable like any car; in it the
+  patrols do not detect the player until a crime is seen from it, then the
+  descriptor is the police car and the pursuit runs. One condition in
+  detection. M4 slice 5 (§2.5), with a watch item and a fallback (a
+  dispatcher timer) if it makes level 2 trivial.
+- **Cars as tools**: the heavy breaches the car half of a roadblock at
+  80 km/h, everyone takes the sawhorse at 60; the sports car outruns; the
+  police car disguises. M4 slices 5–6 (§8).
+- **Swap is the second verb of the cold open**: start in a beat-up van, a
+  muscle car alongside inside ten seconds, `E`, the whip. The game shows the
+  one thing nobody else has before the first corner (§6.6, M4 slice 4).
+- Rejected on the way: heat per car (removes the run's escalation), a forced
+  pursuit on the last 500 m (reads as cheating), the contract wall at the
+  door (good, update 2).
+
+### Done
+
+- `docs/DESIGN.md`: §2.2 the spill, §2.4 note, §2.5 the disguise, §3.3 two
+  rows, §4 steal-to-order as item 0 and the launch line, §6.6 rewritten,
+  §8 five rows, §11 the job list, §12 two watch items, references.
+- `docs/M4_PLAN.md`: slice 3 spill rule and pins, slice 4 order and pins,
+  slice 5 disguise and breach with pins and measurement, slice 6 breach pin,
+  three number rows, playtest additions. `docs/BACKLOG.md` launch line.
+
+### Next
+
+- Unchanged: slice 3 of `docs/M4_PLAN.md`.
+
 ## 2026-09-22 — Design talk: the pitch, the launch scope, the cold open moved up
 
 Marcin asked for a read of the whole documentation and a talk about the idea

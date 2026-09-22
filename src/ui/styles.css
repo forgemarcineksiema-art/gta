@@ -624,3 +624,142 @@ kbd.key {
   opacity: 0;
   pointer-events: none;
 }
+
+/* the run (docs/STYLE.md, the run HUD): the bag under the stars, the busted bar, the card and the wall */
+.run {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  font-family: var(--font-display);
+}
+.run__bag {
+  position: absolute;
+  top: calc(70px + var(--safe-top));
+  right: calc(24px + var(--safe-right));
+  display: none;
+  align-items: baseline;
+  gap: 8px;
+  transform: skewX(-10deg);
+  text-shadow: 3px 4px 0 #000;
+  color: var(--ui-accent);
+}
+.run__bag.is-visible { display: flex; }
+.run__bag.is-hidden { opacity: 0; }
+.run__bag-value {
+  font-size: 44px;
+  font-weight: 900;
+  font-style: italic;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.run__mult {
+  font-size: 18px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.04em;
+  transition: transform 0.15s;
+}
+.run__mult.is-pop { transform: scale(1.5); }
+
+.run__busted {
+  position: absolute;
+  left: 50%;
+  /* under the swap prompt (150 px), over the drift readout (28 px) */
+  bottom: calc(66px + var(--safe-bottom));
+  transform: translateX(-50%) skewX(-12deg);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.run__busted.is-visible { display: flex; }
+.run__busted-label {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.25em;
+  color: var(--ui-danger);
+  text-shadow: 2px 2px 0 #000;
+}
+.run__busted-track {
+  width: clamp(200px, 30vw, 320px);
+  height: 14px;
+  border: 2px solid var(--ui-danger);
+  background: rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+.run__busted-fill {
+  height: 100%;
+  background: var(--ui-danger);
+  transform-origin: left;
+  transform: scaleX(0);
+}
+
+.run__card,
+.run__wall {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 300px;
+  padding: 14px 26px 16px;
+  background: var(--ui-panel);
+  border-radius: 6px;
+  box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.6);
+}
+.run__card.is-visible,
+.run__wall.is-visible { display: flex; }
+.run__title {
+  font-size: 54px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.06em;
+  line-height: 1.05;
+  color: var(--ui-accent);
+  transform: skewX(-10deg);
+  text-shadow: 3px 4px 0 #000;
+}
+.run__title--danger { color: var(--ui-danger); }
+.run__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+.run__line {
+  display: flex;
+  justify-content: space-between;
+  gap: 32px;
+  font-size: 18px;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: 0.08em;
+  text-shadow: 2px 3px 0 #000;
+}
+.run__line-label { color: var(--ui-ink-dim); }
+.run__line-value {
+  color: var(--ui-ink);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.run__line.is-strong .run__line-value { color: var(--ui-accent); }
+.run__counts {
+  margin-top: 6px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--ui-ink-dim);
+  text-shadow: 2px 2px 0 #000;
+}
+.run__prompt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--ui-ink);
+}

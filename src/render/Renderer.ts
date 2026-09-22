@@ -4,7 +4,7 @@
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { CAR_IDS, CAR_PRESETS, PALETTE, SWAP, type CarId, type DynamicDesc, type GhostPose, type ShapeDesc, type SimWorld, type StaticDesc } from '../sim';
+import { CAR_IDS, CAR_PRESETS, GARAGE, PALETTE, SWAP, type CarId, type DynamicDesc, type GhostPose, type ShapeDesc, type SimWorld, type StaticDesc } from '../sim';
 import { ChaseCamera } from './ChaseCamera';
 import { CAR_PROFILES } from './carProfiles';
 import { Sparks } from './Sparks';
@@ -20,6 +20,7 @@ import { PoliceView } from './PoliceView';
 import { Billboards } from './Billboards';
 import { Debris } from './Debris';
 import { Smoke } from './Smoke';
+import { HideoutView } from './HideoutView';
 import { AgentState } from '../sim/traffic/Traffic';
 import type { SimEvent } from '../sim';
 
@@ -46,6 +47,7 @@ export class Renderer {
   readonly trafficView: TrafficView | null;
   readonly pedView: PedView | null;
   readonly policeView: PoliceView;
+  readonly hideoutView: HideoutView | null;
   quality: QualityTier = 'low';
   private qualityElapsed = 0;
   private qualityFrames = 0;
@@ -140,6 +142,7 @@ export class Renderer {
     }
     this.trafficView = sim.traffic && (sim.trafficDensity > 0 || sim.police) ? new TrafficView(this.scene, sim.traffic, sim.trafficDensity > 0) : null;
     this.pedView = sim.peds && sim.pedsDensity > 0 ? new PedView(this.scene, sim.peds) : null;
+    this.hideoutView = sim.run.dropOffs.length > 0 ? new HideoutView(this.scene, sim) : null;
     if (sim.city) this.scene.add(buildSkyline(sim.city));
     if (sim.statics.length) this.buildStatics(sim.statics);
     this.setQuality(this.quality);
@@ -323,7 +326,9 @@ export class Renderer {
     if (this.cityView && dt > 0 && dt <= 0.25) this.adaptQuality(dt);
     this.carVel.set(tm.vx, tm.vy, tm.vz);
 
+    this.syncDoorCamera();
     this.chase.update(this.car.root, this.carVel, tm, dt, snap);
+    this.hideoutView?.update(this.sim);
     this.car.update(tm);
     // ghost of the best lap
     if (this.sim.ghostPose(this.ghostPose)) {
@@ -398,6 +403,29 @@ export class Renderer {
     }
   }
 
+  /**
+   * The door race and the shut door are seen from inside the garage: a held cut
+   * from the back corner, past the car and out through the opening, so the
+   * cruisers are heard arriving and the door is seen coming down. Released the
+   * moment the run is driving again (a bail-out, busted, the door opened).
+   */
+  private syncDoorCamera(): void {
+    const run = this.sim.run;
+    const site = run.dropOff >= 0 && (run.state === 'closing' || run.state === 'door') ? run.dropOffs[run.dropOff] : undefined;
+    if (!site) {
+      this.chase.releaseCut();
+      return;
+    }
+    if (this.chase.cutting) return;
+    const fx = Math.sin(site.yaw), fz = Math.cos(site.yaw);
+    // 1.2 m off the back wall, 4.5 m to the right, looking at the middle of the opening
+    const along = GARAGE.depth / 2 - 1.2, across = 4.5, doorAlong = -GARAGE.depth / 2;
+    this.chase.cut(
+      site.x + fx * along - fz * across, 3.2, site.z + fz * along + fx * across,
+      site.x + fx * doorAlong, 1.4, site.z + fz * doorAlong,
+    );
+  }
+
   /** Smoke and fire on the player's bonnet by damage stage, and dark smoke from wrecked traffic nearby. */
   private emitSmoke(dt: number): void {
     const stage = this.sim.life.state.stage;
@@ -445,6 +473,7 @@ export class Renderer {
   dispose(): void {
     this.cityView?.dispose();
     this.policeView.dispose();
+    this.hideoutView?.dispose();
     this.renderer.dispose();
   }
 

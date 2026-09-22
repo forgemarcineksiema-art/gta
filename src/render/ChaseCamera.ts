@@ -150,6 +150,11 @@ export class ChaseCamera {
   private shakeT = 0;
   private shakeEnergy = 0;
   private initialised = false;
+  /** A held hard cut (the garage interior at the door): position and look, until `releaseCut()`. */
+  private cutActive = false;
+  private snapNext = false;
+  private readonly cutPos = new THREE.Vector3();
+  private readonly cutLook = new THREE.Vector3();
 
   constructor(camera: THREE.PerspectiveCamera) {
     this.camera = camera;
@@ -186,8 +191,36 @@ export class ChaseCamera {
     return this.focusLeft > 0;
   }
 
+  /** Hard cut to a fixed camera, held until `releaseCut()`; the chase snaps back behind the car after it. */
+  cut(x: number, y: number, z: number, lookX: number, lookY: number, lookZ: number): void {
+    this.cutActive = true;
+    this.cutPos.set(x, y, z);
+    this.cutLook.set(lookX, lookY, lookZ);
+  }
+
+  releaseCut(): void {
+    if (!this.cutActive) return;
+    this.cutActive = false;
+    this.snapNext = true;
+  }
+
+  get cutting(): boolean {
+    return this.cutActive;
+  }
+
   update(car: THREE.Object3D, carVel: THREE.Vector3, tm: VehicleTelemetry, dt: number, snap: boolean): void {
-    snap ||= !this.initialised;
+    if (this.cutActive) {
+      this.camera.position.copy(this.cutPos);
+      this.camera.up.copy(this.up);
+      this.camera.lookAt(this.cutLook);
+      if (Math.abs(this.camera.fov - this.tuning.fovBase) > 0.01) {
+        this.camera.fov = this.tuning.fovBase;
+        this.camera.updateProjectionMatrix();
+      }
+      return;
+    }
+    snap ||= !this.initialised || this.snapNext;
+    this.snapNext = false;
     const t = this.tuning;
     const speed = Math.hypot(carVel.x, carVel.z);
     const modeMul = this.mode === 'far' ? 1.6 : 1;

@@ -63,6 +63,9 @@ export const CITY_BOT_TUNING: Partial<TrackBotTuning> = {
 export class TrackBot {
   tuning: TrackBotTuning;
   private idx = 0;
+  /** A path of its own (the drive to a drop-off) instead of the map's loop; open paths end in a stop. */
+  private path: TrackSample[] | null = null;
+  private loop = true;
   private stuckTime = 0;
   readonly visitedLanes = new Set<number>();
   tourComplete = false;
@@ -72,10 +75,21 @@ export class TrackBot {
     this.tuning = { ...DEFAULT_TRACK_BOT, ...TRACK_BOT_BY_CAR[car], ...overrides };
   }
 
+  /** Follow `samples` from now on; `loop` false treats the last sample as the end of the road. */
+  setPath(samples: TrackSample[], loop = false): void {
+    this.path = samples.length > 1 ? samples : null;
+    this.loop = loop || !this.path;
+    this.idx = 0;
+  }
+
+  private at(i: number, m: number): number {
+    return this.loop ? ((i % m) + m) % m : Math.max(0, Math.min(m - 1, i));
+  }
+
   /** Fill `controls` for one fixed step. */
   drive(sim: SimWorld, controls: VehicleControls, dt: number): void {
     const t = this.tuning;
-    const S = sim.track.samples;
+    const S = this.path ?? sim.track.samples;
     const m = S.length;
     const tp = sim.transforms.currPos;
     const px = tp[sim.vehicle.slot * 3] as number;
@@ -87,7 +101,7 @@ export class TrackBot {
     let best = this.idx;
     let bestD = Infinity;
     for (let k = sim.city ? -4 : -8; k <= (sim.city ? 16 : 24); k++) {
-      const i = (this.idx + k + m) % m;
+      const i = this.at(this.idx + k, m);
       const s = S[i] as TrackSample;
       const d = (s.x - px) ** 2 + (s.z - pz) ** 2;
       if (d < bestD) {
@@ -106,7 +120,7 @@ export class TrackBot {
       }
     }
     this.idx = best;
-    if (sim.city) {
+    if (sim.city && !this.path) {
       const lane = sim.city.route.laneAtSample[best];
       if (lane !== undefined) this.visitedLanes.add(lane);
       this.tourComplete = this.visitedLanes.size === sim.city.graph.lanes.length;
@@ -114,7 +128,7 @@ export class TrackBot {
 
     // pursuit target: the sample `look` metres ahead along the track
     const look = Math.max(t.lookMin, Math.min(t.lookMax, t.lookBase + speed * t.lookPerSpeed));
-    const target = S[(best + Math.round(look / 3)) % m] as TrackSample;
+    const target = S[this.at(best + Math.round(look / 3), m)] as TrackSample;
     const q = sim.transforms.currRot;
     const qi = sim.vehicle.slot * 4;
     const qx = q[qi] as number;
@@ -132,8 +146,8 @@ export class TrackBot {
     // speed plan: the slowest allowed speed reachable with the assumed braking, over the road ahead
     let allowed = t.vMax;
     let dist = 0;
-    for (let k = 0; dist < t.planAhead; k++) {
-      const s = S[(best + k) % m] as TrackSample;
+    for (let k = 0; dist < t.planAhead && (this.loop || best + k < m); k++) {
+      const s = S[this.at(best + k, m)] as TrackSample;
       const r = 1 / Math.max(1e-4, Math.abs(s.curvature));
       const vCorner = Math.min(t.vMax, Math.sqrt(t.latAccel * r));
       const vHere = Math.sqrt(vCorner * vCorner + 2 * t.brakeAccel * dist);

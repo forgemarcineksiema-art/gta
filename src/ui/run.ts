@@ -1,0 +1,161 @@
+/**
+ * The run on the HUD (docs/STYLE.md, the run HUD): the bag under the stars
+ * with the multiplier the run is earning, the busted bar while it fills, the
+ * busted card and the wall of totals behind a shut door. Yellow is money that
+ * is not yours yet. DOM writes only on change; reads sim state only.
+ */
+import type { RunState, SimWorld } from '../sim';
+
+const TWEEN_SECONDS = 0.3;
+
+export class RunHud {
+  readonly root: HTMLElement;
+  private readonly bag: HTMLElement;
+  private readonly bagValue: HTMLElement;
+  private readonly mult: HTMLElement;
+  private readonly bar: HTMLElement;
+  private readonly barFill: HTMLElement;
+  private readonly card: HTMLElement;
+  private readonly cardLines: HTMLElement;
+  private readonly wall: HTMLElement;
+  private readonly wallLines: HTMLElement;
+  private readonly wallCounts: HTMLElement;
+  private readonly prompts: HTMLElement[] = [];
+  private shownBag = 0;
+  private fromBag = 0;
+  private toBag = 0;
+  private tween = 1;
+  private lastBagShown = -1;
+  private lastMult = -1;
+  private popLeft = 0;
+  private lastBar = -1;
+  private barVisible = false;
+  private state: RunState = 'running';
+
+  constructor(parent: HTMLElement, sim: SimWorld) {
+    this.root = el('div', 'run');
+    this.bag = el('div', 'run__bag');
+    this.bagValue = el('span', 'run__bag-value', '0');
+    this.mult = el('span', 'run__mult', '×1');
+    this.bag.append(this.bagValue, this.mult);
+    this.bag.setAttribute('aria-label', 'Bag');
+    this.bar = el('div', 'run__busted');
+    const track = el('div', 'run__busted-track');
+    this.barFill = el('div', 'run__busted-fill');
+    track.appendChild(this.barFill);
+    this.bar.append(el('div', 'run__busted-label', 'BUSTED'), track);
+    this.card = el('div', 'run__card');
+    this.cardLines = el('div', 'run__lines');
+    this.card.append(el('div', 'run__title run__title--danger', 'BUSTED'), this.cardLines, this.prompt());
+    this.wall = el('div', 'run__wall');
+    this.wallLines = el('div', 'run__lines');
+    this.wallCounts = el('div', 'run__counts');
+    this.wall.append(el('div', 'run__title', 'BANKED'), this.wallLines, this.wallCounts, this.prompt());
+    this.root.append(this.bag, this.bar, this.card, this.wall);
+    parent.appendChild(this.root);
+    this.bag.classList.toggle('is-visible', sim.city !== null);
+    this.update(sim, 0);
+  }
+
+  /** The key that closes the card and opens the door: any; the label names one the player knows. */
+  setKeys(k: { any: string }): void {
+    for (const p of this.prompts) p.replaceChildren(el('kbd', 'key', k.any), el('span', 'run__prompt-label', 'ANY KEY'));
+  }
+
+  update(sim: SimWorld, dt: number): void {
+    const run = sim.run;
+    // the bag counts up over 0.3 s to its new value
+    if (run.bag !== this.toBag) {
+      this.fromBag = this.shownBag;
+      this.toBag = run.bag;
+      this.tween = 0;
+    }
+    if (this.tween < 1) {
+      this.tween = Math.min(1, this.tween + dt / TWEEN_SECONDS);
+      this.shownBag = this.fromBag + (this.toBag - this.fromBag) * this.tween;
+    }
+    // compare numbers first: a string per frame is garbage on the frame path
+    const shown = Math.round(this.shownBag);
+    if (shown !== this.lastBagShown) {
+      this.bagValue.textContent = money(shown);
+      this.lastBagShown = shown;
+    }
+    const m = run.multiplier;
+    if (m !== this.lastMult) {
+      this.mult.textContent = `×${m}`;
+      if (this.lastMult >= 0) this.popLeft = TWEEN_SECONDS;
+      this.lastMult = m;
+    }
+    if (this.popLeft > 0) {
+      this.popLeft -= dt;
+      this.mult.classList.toggle('is-pop', this.popLeft > 0);
+    }
+    const barVisible = run.bustedProgress > 0 && (run.state === 'running' || run.state === 'closing');
+    if (barVisible !== this.barVisible) {
+      this.barVisible = barVisible;
+      this.bar.classList.toggle('is-visible', barVisible);
+    }
+    if (barVisible) {
+      const bar = Math.round(run.bustedProgress * 200);
+      if (bar !== this.lastBar) { this.barFill.style.transform = `scaleX(${bar / 200})`; this.lastBar = bar; }
+    }
+    if (run.state !== this.state) {
+      this.state = run.state;
+      if (run.state === 'busted') this.fillCard(sim);
+      if (run.state === 'door') this.fillWall(sim);
+      this.card.classList.toggle('is-visible', run.state === 'busted');
+      this.wall.classList.toggle('is-visible', run.state === 'door');
+      this.bag.classList.toggle('is-hidden', run.state === 'busted' || run.state === 'door');
+    }
+  }
+
+  private fillCard(sim: SimWorld): void {
+    const run = sim.run;
+    this.cardLines.replaceChildren(
+      line('BAG', money(run.lastBag)),
+      line('YOU KEEP', money(run.lastFine), true),
+      line('BANK', money(run.bank)),
+    );
+  }
+
+  private fillWall(sim: SimWorld): void {
+    const run = sim.run;
+    this.wallLines.replaceChildren(
+      line('BAG', money(run.lastBag)),
+      line('MULTIPLIER', `×${run.lastMultiplier}`),
+      line('BANKED', money(run.lastBanked), true),
+      line('BEST RUN', money(run.bestRun)),
+      line('BANK', money(run.bank)),
+    );
+    const c = run.counts;
+    this.wallCounts.textContent = `${plural(c.takedowns, 'TAKEDOWN')} · ${plural(c.escapes, 'ESCAPE')} · ${plural(c.billboards, 'BILLBOARD')} · ${plural(c.coins, 'COIN')}`;
+  }
+
+  private prompt(): HTMLElement {
+    const p = el('div', 'run__prompt');
+    this.prompts.push(p);
+    return p;
+  }
+}
+
+function line(label: string, value: string, strong = false): HTMLElement {
+  const row = el('div', strong ? 'run__line is-strong' : 'run__line');
+  row.append(el('span', 'run__line-label', label), el('span', 'run__line-value', value));
+  return row;
+}
+
+/** A count and its word held together: the line may wrap only at the separators. */
+function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? '' : 'S'}`;
+}
+
+function money(v: number): string {
+  return Math.round(v).toLocaleString('en-US');
+}
+
+function el(tag: string, className: string, text?: string): HTMLElement {
+  const e = document.createElement(tag);
+  e.className = className;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}

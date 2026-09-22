@@ -9,10 +9,12 @@ import { InputManager } from '../input/InputManager';
 import { KeyboardDevice } from '../input/KeyboardDevice';
 import { createPlatform, type Platform } from '../platform';
 import { Renderer } from '../render/Renderer';
-import { ACTIONS } from '../input/actions';
-import { CAR_IDS, ECONOMY, FIXED_DT, Recorder, SimWorld, districtAt, initPhysics, type CarId, type EventLog, type RecordingJSON, TRAFFIC, PEDS, DAMAGE, SWAP } from '../sim';
+import { ACTIONS, type Action } from '../input/actions';
+import { CAR_IDS, ECONOMY, FIXED_DT, Recorder, SimWorld, clearControls, districtAt, initPhysics, type CarId, type EventLog, type RecordingJSON, TRAFFIC, PEDS, DAMAGE, SWAP } from '../sim';
 import { DebugPanel } from '../ui/debugPanel';
 import { Hud } from '../ui/hud';
+import { RunHud } from '../ui/run';
+import { routeToDropOff } from './doorRoute';
 import { BotDriver } from './bot';
 import { AgentState } from '../sim/traffic/Traffic';
 import { CITY_BOT_TUNING, TrackBot } from './trackBot';
@@ -62,6 +64,12 @@ declare global {
 }
 
 const MAX_FRAME_DT = 0.25;
+/** The wall and the busted card ignore keys this long, so a key mashed in the chase does not skip them. */
+const BREAK_MIN_MS = 600;
+/** Measured bot runs dismiss the wall and the card themselves after this long. */
+const BREAK_AUTO_MS = 1500;
+/** Every action ends a break except the ones that are not about driving on. */
+const DISMISS: readonly Action[] = ACTIONS.filter((a) => a !== 'pause' && a !== 'mute' && a !== 'debug' && a !== 'camera');
 
 export class App {
   private readonly platform: Platform;
@@ -69,6 +77,7 @@ export class App {
   private readonly renderer: Renderer;
   private readonly input: InputManager;
   private readonly hud: Hud;
+  private readonly runHud: RunHud;
   private readonly audio: EngineAudio;
   private readonly sfx: Sfx;
   private readonly panel: DebugPanel | null;
@@ -86,6 +95,10 @@ export class App {
   private stepMsLast = 0;
   private raf = 0;
   private readonly manual: boolean;
+  /** Last frame's run was being driven (running or closing): the brackets follow its edges. */
+  private wasPlaying = true;
+  private breakAt = 0;
+  private readonly autoDismiss: boolean;
 
   private constructor(platform: Platform, sim: SimWorld, canvas: HTMLCanvasElement, params: URLSearchParams) {
     this.platform = platform;
@@ -99,6 +112,8 @@ export class App {
     this.sfx = new Sfx(this.audio);
     const uiRoot = document.getElementById('ui') ?? document.body;
     this.hud = new Hud(uiRoot, sim);
+    this.runHud = new RunHud(uiRoot, sim);
+    this.runHud.setKeys({ any: this.input.label('throttle') });
     this.hud.setHints({
       throttle: this.input.label('throttle'),
       brake: this.input.label('brake'),
@@ -167,14 +182,19 @@ export class App {
     if (dev) this.panel.setVisible(true);
 
     const botParam = params.get('bot');
-    const botOn = botParam === '1' || botParam === 'track';
+    const doorBot = botParam === 'door' && sim.city !== null;
+    const botOn = botParam === '1' || botParam === 'track' || doorBot;
     this.bot = botOn && sim.city ? new TrackBot(sim.carId, CITY_BOT_TUNING)
       : botParam === 'track' ? new TrackBot(this.sim.carId) : botOn ? new BotDriver(Number(params.get('seed') ?? '42')) : null;
+    // the drive to the hideout: the road bot on a path of its own (slice 3a's e2e and measurement)
+    const hideout = sim.run.dropOffs[0];
+    if (doorBot && hideout && this.bot instanceof TrackBot) this.bot.setPath(routeToDropOff(sim, hideout));
     const duration = Number(params.get('duration') ?? '0');
     // Five `performance.now()` calls per step: measured runs only.
     this.simProfile = (botOn && duration > 0) || params.get('profile') === '1' ? new SimProfile() : null;
     if (this.simProfile) sim.mark = this.simProfile.mark;
     this.perf = botOn && duration > 0 ? new PerfProbe(duration, this.simProfile) : null;
+    this.autoDismiss = this.perf !== null;
 
     this.handle = {
       started: false,
@@ -198,6 +218,7 @@ export class App {
         damage: { value: sim.life.state.damage, stage: sim.life.state.stage, wrecked: sim.life.state.wrecked },
         heat: { points: sim.heat.points, level: sim.heat.level },
         pursuit: { state: sim.pursuit.state, cooldown: sim.pursuit.cooldown, units: sim.police?.count ?? 0, escapes: sim.pursuit.escapes },
+        run: { state: sim.run.state, bag: sim.run.bag, bank: sim.run.bank, multiplier: sim.run.multiplier, maxHeat: sim.run.maxHeat, door: sim.run.doorProgress, busted: sim.run.bustedProgress, dropOff: sim.run.dropOffs[sim.run.dropOff]?.name ?? null, runs: sim.run.runs },
         traffic: sim.traffic ? { kinematic: sim.traffic.count(AgentState.Kinematic), physical: sim.traffic.count(AgentState.Physical), wrecked: sim.traffic.count(AgentState.Wrecked) } : null,
         peds: sim.peds ? { count: sim.peds.count(), hops: sim.peds.guaranteeHops } : null,
         billboards: sim.collectibles ? { smashed: sim.collectibles.smashedCount, total: sim.collectibles.total } : null,
@@ -307,9 +328,12 @@ export class App {
     this.userPaused = !this.userPaused;
     this.hud.setPaused(this.paused, 'user');
     this.handle.paused = this.paused;
-    if (this.userPaused) this.platform.gameplayStop();
-    else {
-      this.platform.gameplayStart();
+    // behind a shut door or a busted card the game is already on a break: no second bracket
+    const driving = this.sim.run.state === 'running' || this.sim.run.state === 'closing';
+    if (this.userPaused) {
+      if (driving) this.platform.gameplayStop();
+    } else {
+      if (driving) this.platform.gameplayStart();
       this.lastTime = performance.now();
     }
   }
@@ -335,6 +359,17 @@ export class App {
     if (this.sim.life.state.slowMo > 0 && !this.bot) {
       for (const action of ACTIONS) if (st.pressed[action]) { this.sim.life.skipSlowMo(); break; }
     }
+    // behind the shut door and on the busted card, any driving key drives on
+    const run = this.sim.run;
+    if ((run.state === 'door' || run.state === 'busted') && !this.paused) {
+      const shown = now - this.breakAt;
+      let go = this.autoDismiss && shown > BREAK_AUTO_MS;
+      if (!this.bot && shown > BREAK_MIN_MS) for (const action of DISMISS) if (st.pressed[action]) { go = true; break; }
+      if (go) {
+        if (run.state === 'door') run.openDoor();
+        else run.closeCard();
+      }
+    }
     const timeScale = this.sim.life.state.slowMo > 0 ? ECONOMY.slowMoScale : 1;
     let alpha = 0;
     if (!this.paused) {
@@ -352,12 +387,24 @@ export class App {
           if (st.pressed.reset) c.reset = true;
           if (st.pressed.swap) c.swap = true;
         }
+        // the car idles behind a shut door and waits out the card
+        if (this.sim.run.state === 'door' || this.sim.run.state === 'busted') clearControls(c);
         this.simProfile?.begin();
         this.sim.step();
         this.panel?.graphPush(this.sim.vehicle.telemetry);
       });
       this.stepMsLast = performance.now() - stepStart;
     }
+
+    // the platform's brackets follow the run: a shut door and a busted card are game-made breaks
+    const playing = run.state === 'running' || run.state === 'closing';
+    if (this.started && this.wasPlaying && !playing) {
+      this.platform.gameplayStop();
+      this.breakAt = now;
+    } else if (this.started && !this.wasPlaying && playing) {
+      this.platform.gameplayStart();
+    }
+    this.wasPlaying = playing;
 
     this.renderer.render(alpha, this.paused ? 0 : frameDt);
     this.audio.update(this.sim.vehicle.telemetry, frameDt);
@@ -376,6 +423,7 @@ export class App {
     this.frameMsSmooth += (frameMs - this.frameMsSmooth) * 0.05;
     const stats = this.renderer.stats;
     this.hud.setHintsVisible(now < this.hintsUntil && !this.bot);
+    this.runHud.update(this.sim, frameDt);
     this.hud.update(
       this.sim,
       frameDt,

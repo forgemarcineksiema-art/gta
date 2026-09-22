@@ -19,6 +19,7 @@
     "screens": "playwright test e2e/screens.spec.ts",
     "city": "playwright test e2e/city.spec.ts",
     "life": "playwright test e2e/life.spec.ts",
+    "heat": "playwright test e2e/heat.spec.ts",
     "verify": "node tools/verify.mjs",
     "verify:gate": "node tools/verify.mjs --gate",
     "test:long": "node tools/verify.mjs test --gate"

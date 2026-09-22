@@ -24,6 +24,8 @@ export class Sfx {
     else if (e.kind === 'respawn' || e.kind === 'swap') this.whoosh(ctx, master);
     else if (e.kind === 'takedown' || e.kind === 'takedownTraffic') { this.crunch(ctx, master, 4); this.boom(ctx, master); }
     else if (e.kind === 'billboard') { this.splinter(ctx, master); this.ding(ctx, master); }
+    else if (e.kind === 'door') this.thud(ctx, master);
+    else if (e.kind === 'busted') this.fall(ctx, master);
   };
 
   constructor(private readonly engine: EngineAudio) {}
@@ -180,6 +182,57 @@ export class Sfx {
       osc.connect(gain).connect(master);
       osc.start(t);
       osc.stop(t + 0.52);
+    }
+  }
+
+  /** The roller door hitting the floor: a low knock and a short rattle. */
+  private thud(ctx: BaseAudioContext, master: AudioNode): void {
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(110, t);
+    osc.frequency.exponentialRampToValueAtTime(40, t + 0.25);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.45, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+    osc.connect(gain).connect(master);
+    osc.start(t);
+    osc.stop(t + 0.32);
+    const noise = ctx.createBufferSource();
+    noise.buffer = noiseBuffer(ctx);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(700, t);
+    filter.Q.setValueAtTime(1.2, t);
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.0001, t);
+    ng.gain.exponentialRampToValueAtTime(0.16, t + 0.01);
+    ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+    noise.connect(filter).connect(ng).connect(master);
+    noise.start(t);
+    noise.stop(t + 0.36);
+  }
+
+  /** Busted: two falling notes, the comic "wah-wah". */
+  private fall(ctx: BaseAudioContext, master: AudioNode): void {
+    const t0 = ctx.currentTime;
+    for (const [start, from, to] of [[0, 392, 370], [0.28, 311, 233]] as Array<[number, number, number]>) {
+      const t = t0 + start;
+      const osc = ctx.createOscillator();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(from, t);
+      osc.frequency.exponentialRampToValueAtTime(to, t + 0.26);
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(1600, t);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(0.1, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+      osc.connect(filter).connect(gain).connect(master);
+      osc.start(t);
+      osc.stop(t + 0.32);
     }
   }
 

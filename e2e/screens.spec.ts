@@ -2,7 +2,9 @@
  * Screenshot review: captures the HUD, the pause screen and the life state
  * (popup, damage bar, swap prompt, billboard counter) at every viewport size
  * CrazyGames requires legibility at (docs/CRAZYGAMES.md), at DPR 1, plus the
- * wrecked overlay at 1280x720. Output: screens/<state>-<w>x<h>.png. Look at them.
+ * wrecked overlay at 1280x720; and the run (M4): the bag and the busted bar
+ * filling, the busted card, and the wall behind the hideout's shut door.
+ * Output: screens/<state>-<w>x<h>.png. Look at them.
  */
 import { test } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
@@ -72,5 +74,49 @@ for (const [w, h] of SIZES) {
       await page.waitForTimeout(400); // the overlay fades in
       await page.screenshot({ path: `screens/wrecked-${w}x${h}.png` });
     }
+  });
+}
+
+/** A point in a drop-off's frame (along inward, across to the right); the page has no helpers at hand. */
+const RUN_STATES = `
+  const sim = window.__game.sim;
+  const site = sim.run.dropOffs[0];
+  const at = (along, across) => ({ x: site.x + Math.sin(site.yaw) * along - Math.cos(site.yaw) * across, z: site.z + Math.cos(site.yaw) * along + Math.sin(site.yaw) * across });
+  const place = (along) => { const p = at(along, 0); sim.city.sync(p.x, p.z, true); sim.vehicle.teleport({ x: p.x, y: 0.9, z: p.z }, site.yaw); };
+`;
+
+for (const [w, h] of SIZES) {
+  test(`run states at ${w}x${h}`, async ({ page }) => {
+    mkdirSync('screens', { recursive: true });
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto('/?manual=1&quality=low&spawn=crown');
+    await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 30_000 });
+    // boxed on the street outside the hideout at heat 3, the bag full: the busted bar half way
+    await page.evaluate(`${RUN_STATES}
+      sim.police.dispatching = false;
+      sim.heat.add(60);
+      sim.run.bag = 48750;
+      sim.run.maxHeat = 3;
+      place(-26);
+      for (const across of [3.6, -3.6]) { const p = at(-26, across); sim.traffic.spawnParkedPolice(p.x, p.z, site.yaw, 'police'); }
+      window.advanceTime(1500);
+    `);
+    await page.waitForSelector('.run__busted.is-visible', { timeout: 10_000 });
+    await page.screenshot({ path: `screens/bar-${w}x${h}.png` });
+    await page.evaluate(() => window.advanceTime?.(1800));
+    await page.waitForSelector('.run__card.is-visible', { timeout: 10_000 });
+    await page.screenshot({ path: `screens/busted-${w}x${h}.png` });
+    // the card goes, the hideout: the car stopped inside, three seconds, the wall
+    // after a card the entry boxes re-arm once the car is outside them: one step on the street first
+    await page.evaluate(() => { window.__game?.sim.run.closeCard(); window.advanceTime?.(50); });
+    await page.evaluate(`${RUN_STATES}
+      sim.run.bag = 32500;
+      sim.run.maxHeat = 4;
+      Object.assign(sim.run.counts, { takedowns: 3, escapes: 2, billboards: 5, coins: 84 });
+      place(-2);
+      window.advanceTime(3400);
+    `);
+    await page.waitForSelector('.run__wall.is-visible', { timeout: 10_000 });
+    await page.screenshot({ path: `screens/door-${w}x${h}.png` });
   });
 }

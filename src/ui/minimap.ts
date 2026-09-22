@@ -9,7 +9,7 @@ import { CITY_HALF, DISTRICTS, PALETTE, districtAt, type SimWorld } from '../sim
 import { LANDMARKS } from '../sim/city/City';
 import { MINIMAP, advance, buildRoadLayers, clampToRim, project, yawFromQuat, type MinimapState, type Vec2 } from './minimapModel';
 
-export type MarkerKind = 'tower' | 'tank' | 'glasshouse' | 'hotel';
+export type MarkerKind = 'tower' | 'tank' | 'glasshouse' | 'hotel' | 'garage';
 /** A point of interest on the map. M3 traffic and police, M5 activities add kinds. */
 export interface MinimapMarker { x: number; z: number; kind: MarkerKind; color: string; yaw?: number }
 
@@ -140,7 +140,11 @@ export class Minimap {
       path.rect(i % 2 ? 0 : -CITY_HALF, i >= 2 ? 0 : -CITY_HALF, CITY_HALF, CITY_HALF);
       this.districtFills.push({ path, fill: rgba(d.color, TINT_ALPHA) });
     }
-    this.markers = LANDMARKS.map((l, i) => ({ x: l.x, z: l.z, kind: GLYPH_KINDS[i] ?? 'tower', color: hex(DISTRICTS[i]?.accent ?? 0xffffff) }));
+    // the landmarks, then the three drop-offs: where a run can end is always on the rim
+    this.markers = [
+      ...LANDMARKS.map((l, i): MinimapMarker => ({ x: l.x, z: l.z, kind: GLYPH_KINDS[i] ?? 'tower', color: hex(DISTRICTS[i]?.accent ?? 0xffffff) })),
+      ...sim.run.dropOffs.map((d): MinimapMarker => ({ x: d.door.x, z: d.door.z, kind: 'garage', color: hex(PALETTE.carOrange) })),
+    ];
 
     if (typeof ResizeObserver !== 'undefined') {
       this.observer = new ResizeObserver(this.onResize);
@@ -373,6 +377,15 @@ export class Minimap {
       case 'hotel':
         c.rect(x - g * 0.9, y - g * 0.55, g * 1.8, g * 1.1);
         break;
+      case 'garage':
+        // a garage front: a pitched outline with the door as the dark band across its foot
+        c.moveTo(x - g * 0.9, y + g * 0.8);
+        c.lineTo(x - g * 0.9, y - g * 0.3);
+        c.lineTo(x, y - g);
+        c.lineTo(x + g * 0.9, y - g * 0.3);
+        c.lineTo(x + g * 0.9, y + g * 0.8);
+        c.closePath();
+        break;
     }
     c.lineJoin = 'round';
     c.lineWidth = 2;
@@ -380,6 +393,10 @@ export class Minimap {
     c.stroke();
     c.fillStyle = color;
     c.fill();
+    if (kind === 'garage') {
+      c.fillStyle = DARK;
+      c.fillRect(x - g * 0.55, y + g * 0.05, g * 1.1, g * 0.75);
+    }
   }
 
   /** A small chevron outside a clamped glyph, pointing along the bearing from the car. */

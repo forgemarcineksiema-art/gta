@@ -779,6 +779,37 @@ kbd.key {
   color: var(--ui-ink-dim);
   text-shadow: 2px 2px 0 #000;
 }
+.run__wanted {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 6px 10px;
+  align-self: flex-start;
+  background: rgba(247, 243, 234, 0.08);
+  border: 1px dashed var(--ui-panel-line);
+  border-radius: 3px;
+  transform: rotate(-2deg);
+}
+.run__wanted-title {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  color: var(--ui-danger);
+}
+.run__wanted-swatch {
+  width: 22px;
+  height: 12px;
+  border-radius: 2px;
+  box-shadow: 1px 1px 0 #000;
+}
+.run__wanted-car {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--ui-ink);
+  text-shadow: 1px 1px 0 #000;
+}
 .run__prompt {
   display: flex;
   align-items: center;

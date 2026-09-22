@@ -329,7 +329,10 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   (BUSTED in danger red, BANKED in accent yellow), 18 px lines with the
   values right-aligned and the one that counts in yellow, one line of run
   counts in 16 px that wraps only at its separators, and a keycap with ANY
-  KEY. The swap prompt hides while either is up.
+  KEY. The swap prompt hides while either is up. The wall carries a wanted
+  poster under the counts: a dashed card tilted −2°, WANTED in danger red at
+  12 px, a swatch of the car's paint and its class (MUSCLE CAR, VAN, …) at
+  14 px: the police remember the car, not the driver.
 - The swap prompt reads SWAP for a civilian car and BORROW for a police
   car, same keycap, same size, accent cyan. COPS LOST YOU (yellow, a gain)
   on every escape and COVER BLOWN (ink) join the popup stack. The player's

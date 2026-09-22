@@ -72,6 +72,8 @@ export class Hud {
   private readonly damageFill: HTMLElement;
   private readonly wrecked: HTMLElement;
   private readonly wreckedSub: HTMLElement;
+  /** The overlay follows the wreck itself, not only the damage stage (a wreck is not always a stage change). */
+  private lastWrecked = false;
   private readonly swap: HTMLElement;
   private readonly swapKeycap: HTMLElement;
   private readonly swapLabel: HTMLElement;
@@ -306,8 +308,9 @@ export class Hud {
     const life = sim.life.state;
     const damageText = `scaleX(${life.damage.toFixed(3)})`;
     if (damageText !== this.lastDamageText) { this.damageFill.style.transform = damageText; this.lastDamageText = damageText; }
-    if (life.stage !== this.lastStage) {
+    if (life.stage !== this.lastStage || life.wrecked !== this.lastWrecked) {
       this.lastStage = life.stage;
+      this.lastWrecked = life.wrecked;
       const c = sim.collectibles;
       const collectText = c ? `${c.smashedCount}/${c.total}` : '';
       if (collectText !== this.lastCollectText) {

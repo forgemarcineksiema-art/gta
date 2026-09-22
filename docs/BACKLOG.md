@@ -82,6 +82,8 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 ## Run structure and heat (M4 candidates beyond the slice plan; docs/DESIGN.md)
 
+- The officer's ticket book as the busted bar: a pedestrian walking up from the nearest unit while the bar fills (M4 slice 8 polish, skipped for the gate).
+- The donut-shop withdrawal: units path to a marker building and park when the pursuit ends (M4 slice 8 polish, skipped).
 - The bot policies stop in front of a roadblock's cars and get boxed; a bot that aims for the sawhorse (or around) would make the level-3 busted rate a player's. (M4 slice 6)
 - Pier-end jumps (DESIGN.md §6.1 names them): the quay has no clear 60 m run-out off a pier; the twenty ramps are on the park strip. (M4 slice 6)
 - Update 1, "the air" (decided 2026-09-22, `docs/DESIGN.md` §5): covered streets with the camera occlusion rule, the highway overpasses, the helicopter with its spotlight. Left M4 so the game reaches Basic Launch with heat 4–5 on the ground; the contracts are §5 of `docs/M4_PLAN.md`. (update 1)

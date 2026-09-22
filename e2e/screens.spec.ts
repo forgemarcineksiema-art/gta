@@ -47,6 +47,8 @@ for (const [w, h] of SIZES) {
       const sim = window.__game?.sim;
       const traffic = sim?.traffic;
       if (!sim || !traffic) return false;
+      // Life recomputes the flag every step, before the HUD reads it: hold it on for the frame
+      (sim.life as unknown as { oncomingLane(): void }).oncomingLane = () => { sim.life.state.oncoming = true; };
       sim.life.state.oncoming = true;
       sim.life.state.damage = 0.6;
       sim.life.state.stage = 2;
@@ -89,7 +91,8 @@ for (const [w, h] of SIZES) {
   test(`run states at ${w}x${h}`, async ({ page }) => {
     mkdirSync('screens', { recursive: true });
     await page.setViewportSize({ width: w, height: h });
-    await page.goto('/?manual=1&quality=low&spawn=crown');
+    // ads off: these frames are the card and the wall, not the ad that follows them
+    await page.goto('/?manual=1&quality=low&spawn=crown&ad=off');
     await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 30_000 });
     // boxed on the street outside the hideout at heat 3, the bag full: the busted bar half way
     await page.evaluate(`${RUN_STATES}

@@ -56,6 +56,10 @@ export interface GameHandle {
   /** The renderer, for headless probes (draw stats) and scene inspection from the console. */
   renderer: Renderer;
   roadBot: TrackBot | null;
+  /** The engine audio, for the ad pins (the master gain while an ad runs). */
+  audio: EngineAudio;
+  /** True from an ad request at a break until the ad finished or failed. */
+  adShowing: boolean;
 }
 
 declare global {
@@ -108,6 +112,8 @@ export class App {
   /** Last frame's run was being driven (running or closing): the brackets follow its edges. */
   private wasPlaying = true;
   private breakAt = 0;
+  /** An ad requested at this break is still running: the break cannot be dismissed. */
+  private adShowing = false;
   private readonly autoDismiss: boolean;
 
   private constructor(platform: Platform, sim: SimWorld, canvas: HTMLCanvasElement, params: URLSearchParams) {
@@ -231,6 +237,8 @@ export class App {
       version: __APP_VERSION__,
       renderer: this.renderer,
       roadBot: sim.city && this.bot instanceof TrackBot ? this.bot : this.bot instanceof BotPolicy ? this.bot.bot : null,
+      audio: this.audio,
+      adShowing: false,
     };
     window.__game = this.handle;
     window.render_game_to_text = () => {
@@ -273,6 +281,8 @@ export class App {
       } else {
         this.audio.setMuted(false);
         this.input.blocked = false;
+        this.adShowing = false;
+        this.handle.adShowing = false;
       }
     });
 
@@ -360,6 +370,26 @@ export class App {
     if (!v) this.lastTime = performance.now();
   }
 
+  /**
+   * The ad point of a break (docs/M4_PLAN.md slice 8, CRAZYGAMES.md A1/A3): at the door and at the busted
+   * card a midgame ad, input blocked from the request until it finishes or fails (the ad events unblock and
+   * unmute), the break held open meanwhile. Never at the first door of a session (it ends the cold open),
+   * never a request when the platform has no ad to give.
+   */
+  private adBreak(firstDoor: boolean): void {
+    if (firstDoor || !this.platform.adsAvailable('midgame')) return;
+    this.adShowing = true;
+    this.handle.adShowing = true;
+    this.input.blocked = true;
+    void this.platform.requestAd('midgame').then(() => {
+      // the events have already restored input and sound; a platform that emitted nothing still lets go here
+      this.adShowing = false;
+      this.handle.adShowing = false;
+      this.input.blocked = false;
+      this.breakAt = performance.now();
+    });
+  }
+
   private toggleUserPause(): void {
     this.userPaused = !this.userPaused;
     this.hud.setPaused(this.paused, 'user');
@@ -398,7 +428,7 @@ export class App {
     }
     // behind the shut door and on the busted card, any driving key drives on
     const run = this.sim.run;
-    if ((run.state === 'door' || run.state === 'busted') && !this.paused) {
+    if ((run.state === 'door' || run.state === 'busted') && !this.paused && !this.adShowing) {
       const shown = now - this.breakAt;
       let go = this.autoDismiss && shown > BREAK_AUTO_MS;
       if (!this.bot && shown > BREAK_MIN_MS) for (const action of DISMISS) if (st.pressed[action]) { go = true; break; }
@@ -438,6 +468,7 @@ export class App {
     if (this.started && this.wasPlaying && !playing) {
       this.platform.gameplayStop();
       this.breakAt = now;
+      this.adBreak(run.state === 'door' && run.firstDoor);
     } else if (this.started && !this.wasPlaying && playing) {
       this.platform.gameplayStart();
     }

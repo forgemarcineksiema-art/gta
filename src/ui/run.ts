@@ -4,7 +4,7 @@
  * busted card and the wall of totals behind a shut door. Yellow is money that
  * is not yours yet. DOM writes only on change; reads sim state only.
  */
-import type { RunState, SimWorld } from '../sim';
+import type { CarId, RunState, SimWorld } from '../sim';
 
 const TWEEN_SECONDS = 0.3;
 
@@ -23,6 +23,10 @@ export class RunHud {
   private readonly wall: HTMLElement;
   private readonly wallLines: HTMLElement;
   private readonly wallCounts: HTMLElement;
+  /** The wanted poster: the car the police will look for (the descriptor's class and paint). */
+  private readonly wanted: HTMLElement;
+  private readonly wantedSwatch: HTMLElement;
+  private readonly wantedCar: HTMLElement;
   private readonly prompts: HTMLElement[] = [];
   private shownBag = 0;
   private fromBag = 0;
@@ -57,7 +61,11 @@ export class RunHud {
     this.wall = el('div', 'run__wall');
     this.wallLines = el('div', 'run__lines');
     this.wallCounts = el('div', 'run__counts');
-    this.wall.append(el('div', 'run__title', 'BANKED'), this.wallLines, this.wallCounts, this.prompt());
+    this.wanted = el('div', 'run__wanted');
+    this.wantedSwatch = el('span', 'run__wanted-swatch');
+    this.wantedCar = el('span', 'run__wanted-car');
+    this.wanted.append(el('span', 'run__wanted-title', 'WANTED'), this.wantedSwatch, this.wantedCar);
+    this.wall.append(el('div', 'run__title', 'BANKED'), this.wallLines, this.wallCounts, this.wanted, this.prompt());
     this.root.append(this.bag, this.coinRow, this.bar, this.card, this.wall);
     parent.appendChild(this.root);
     this.bag.classList.toggle('is-visible', sim.city !== null);
@@ -142,6 +150,10 @@ export class RunHud {
     );
     const c = run.counts;
     this.wallCounts.textContent = `${plural(c.takedowns, 'TAKEDOWN')} · ${plural(c.escapes, 'ESCAPE')} · ${plural(c.billboards, 'BILLBOARD')} · ${plural(c.coins, 'COIN')}`;
+    // the poster: the police remember the car, not the driver (the identity rule, taught without a line of text)
+    const d = sim.pursuit.descriptor;
+    this.wantedSwatch.style.background = `#${d.paint.toString(16).padStart(6, '0')}`;
+    this.wantedCar.textContent = CAR_WORD[d.kind];
   }
 
   private prompt(): HTMLElement {
@@ -150,6 +162,8 @@ export class RunHud {
     return p;
   }
 }
+
+const CAR_WORD: Record<CarId, string> = { muscle: 'MUSCLE CAR', compact: 'COMPACT', heavy: 'VAN', sports: 'SPORTS CAR', police: 'POLICE CAR' };
 
 function line(label: string, value: string, strong = false): HTMLElement {
   const row = el('div', strong ? 'run__line is-strong' : 'run__line');

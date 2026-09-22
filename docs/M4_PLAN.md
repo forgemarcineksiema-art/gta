@@ -1,6 +1,6 @@
 # M4 "Heat" — implementation plan
 
-Executor: the agent working M4 now (slices 0–2 and 3a are done; 3b is next).
+Executor: the agent working M4 now (slices 0–2, 3a and 3c are done; 3b is next).
 Reviewer: Claude, at the gate. Director and playtester: Marcin. This
 document is the milestone contract: what to build, in which order, with
 which numbers, and what "done" means; each fixed decision carries its
@@ -57,6 +57,7 @@ update 1 (§5).
 | 1 heat and pursuit | `Heat` ratchet from the ring; `Pursuit` idle → detected → active → lost → idle; level-1 pair as traffic agents with a plan; sight rays; spawn out of view; stars; livery and light bar | bot at heat 1, 120 s: 23 % in pursuit, 2 escapes, 1 ram, first unit at 0.02 s, never in the view cone; Node step 0.62 ms |
 | 2 units per level | budgets 2/4/5/6/8, interceptors 0/1/2/2/3; the police-first lender with a hard share; rams and the PIT; catch-up speed; patrol recycling | level 2 → 4 units / 1 interceptor, level 5 → 8 / 3; peak police bodies 2 / 3 / 6 with 41–44 civilians alive; a shove costs no speed and 0.7 m, a PIT 5.8 m and 0.48 rad/s; Node step 0.64–0.91 ms at every level |
 | 3a the run | `Run`: bag, bank, `maxHeat`, the door race (control kept, bail-out, busted first), busted and the fine; three garages on generator lots; the roster stands down at heat 0; the wall, the card, the bag on the HUD; `?bot=door` | road bot from heat 0: bag 0, hideout in 99–130 s; from heat 2: 0 busted in 15 bot-minutes, 600–800 bag a minute, banked 5,000–6,250; smoke 60.0 fps / 97 draws unchanged |
+| 3c the police brain | traffic damage and a settle that forgives a nudge; police armour; the arrest (slots round a slow player), the search at the last fix, the cut-off from heat 2, the assault heat (DESIGN.md §2.10) | police wrecks in 9 bot minutes 6 → 0; a player stopped at heat 2: never busted in 90 s → busted at 10.8–12.5 s, units arriving at ≤ 6.1 m/s; road bot at heat 2 busted 0 / 0 / 7 in 5 min by seed; a unit ahead and closing 9.2 → 11.8 % of chase time |
 
 ### 1.2 In scope (gate-critical, §4 slices 3–8)
 
@@ -619,6 +620,26 @@ Acceptance: verify green; the smoke's draw calls +1 to +2 (coins and their
 shadow draw); coins picked per minute by the bot in a 5-minute run
 (`BALANCE.measured.coinsPerMinute`), the whole-island coin count, in
 PROGRESS.
+
+### Slice 3c — the police brain (done 2026-09-22, out of order on Marcin's playtest)
+
+Inserted after 3a when Marcin played it: busted was near impossible and a
+light touch wrote a police car off. DESIGN.md §2.10 is the design. Files:
+`sim/traffic/Traffic.ts` (`damage`, `justWrecked`, the settle rule, the
+free-steer plan), `sim/traffic/tuning.ts` (`damageThreshold` 3,
+`damagePerDv` 0.1, `policeArmour` 1.6, `settleSpin` 2, `disturbedMax` 8,
+`reattachDistance` 14), `sim/life/Life.ts` (takedown thresholds × armour,
+damage wrecks as takedowns), `sim/police/Police.ts` (arrest slots, search,
+cut-off, assault), `sim/police/tuning.ts` (`arrest`, `search`, `cutoff`,
+`assaultDv`, `assaultCooldown`; `busted.range` 7), `sim/balance.ts`
+(`heat.policeHit` 4). Tests: `brain.test.ts` 3c.1 a nudge leaves a police
+car and a civilian driving on (dented under 0.3); 3c.2 a 110 km/h wall slam
+is still a police takedown with police money; 3c.3 hitting an idle police
+car costs `policeHit` once; 3c.4 a lost pursuit comes within
+`search.reach` of the last fix; `brain.long.test.ts` 3c.5 a player stopped
+at heat 2 at four spawns is busted inside 20 s, units within 8 m never
+faster than 9 m/s, no police wreck. The slot names avoid slice 5's `box`
+(the units boxing an abandoned car): the arrest is `arrest`.
 
 ### Slice 4 — the cold open prototype on the jobs skeleton (2 days)
 

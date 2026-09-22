@@ -104,7 +104,9 @@ police comedy in one shot.
 
 Boxed in by at least two units and under 5 km/h for 3 s, a visible bar
 filling so there is always a moment to break out; the bar is an officer
-walking up with a ticket book and flooring it mid-walk drains it. The fine
+walking up with a ticket book and flooring it mid-walk drains it. The
+police make the box themselves: a player who slows under ~22 km/h is
+surrounded (§2.10), so stopping near them is the risk, not bad luck. The fine
 (§2.2); coins and bank kept. A wrecked car never ends the run: swap or the M3 rolling
 respawn, as today, minus the spill (§2.2). `R` under pursuit teleports within line of sight, so reset
 is not an escape.
@@ -205,6 +207,49 @@ counts under the totals (jobs, takedowns, escapes, billboards, coins), so a
 run reads as a story and not only as a sum. The door itself is the run's
 last beat (§2.3): 3 s to close, busted live until it shuts, the camera
 already cut to the interior so the sirens are heard and not seen.
+
+### 2.10 The police brain — set here, 2026-09-22 (Marcin's playtest)
+
+Marcin, after playing slice 3a: being busted took long minutes of sitting
+beside the police, the units took ages to work out what was happening, and
+a light touch wrote a police car off; go strongly into police intelligence,
+reactions and capabilities. Measured before any change: every police wreck
+in nine bot minutes was a nudge that failed the old settle test, and a
+player stopped at heat 2 was never busted in 90 s. What the police do now,
+in the order a chase meets it:
+
+- **Chase.** Route to where the player will be in 1.2 s; close in and shove
+  a fast player (the saloon's ram, the interceptor's PIT). Unchanged.
+- **Cut off.** From heat 2 every second saloon routes to where the player
+  will be in 4 s, so units come from ahead as well as from behind.
+- **Arrest.** A player under ~22 km/h is boxed: the units within 60 m take
+  the slots behind, ahead and beside the player (a slot behind a wall is
+  skipped), drive straight there braking to arrive at walking pace, round
+  the player's car rather than through it, and hold; the rest stand by
+  behind. Two in reach fill the busted bar. A player who floors it away
+  (over ~32 km/h) is chased again.
+- **Search.** Sight lost, the units drive to the last fix and fan out, a
+  different exit each at the junctions there, until the escape timer runs
+  out. Escaping is breaking sight and getting away from where you were
+  seen, not only breaking sight.
+- **React.** A police car the player hits while nobody is chasing notices
+  at once and it costs 4 heat: bumping a cop is a crime.
+- **Take a hit.** Every car keeps a damage value; a nudge dents, it does
+  not kill, and a shoved car drives back onto its road. Police cars carry
+  armour (1.6×: harder to shake, harder to write off, and the takedown
+  slam has to be harder by the same factor); a police car written off by
+  accumulated damage inside the takedown window is still the player's
+  takedown.
+
+What comes next is already in the plan and builds on this: roadblocks,
+spike strips and parked patrols at level 3 (M4 slice 6), heavies and the
+Chief at 4–5 (slice 7), the swap escape with the units boxing the
+abandoned car (slice 5). Mine, not yet placed, for when the KPIs ask for
+more police: civilians pulling over for a unit with its lights on (units
+arrive faster through traffic), radio chatter as a sound layer that names
+the car the police are looking for, and a unit that lost the player
+parking at the last fix with its lights on as a visible "they are looking
+here".
 
 ## 3. Audience and progression — set here, revised 2026-09-22
 
@@ -583,6 +628,10 @@ both.
   If the bot's escape-by-disguise share is above half at level 2, the
   disguise gets a timer (a dispatcher noticing the missing unit) before it
   gets removed.
+- The arrest (§2.10): does ~11 s from a stop to busted at heat 2 read as
+  fair; does the box read (units parking round the car) before the bar
+  does; is a slow junction turn at heat 1 a trap. The knobs are
+  `POLICE.arrest` and `POLICE.busted`.
 - The spill (§2.2): does the scramble read as a chance or as a punishment,
   and does a novice recover any of it. If the bot's recovery share is under a
   third, the coins live longer or land closer to the respawn.

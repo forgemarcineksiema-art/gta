@@ -2,6 +2,84 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-22 — M4 slice 3c: the police brain (Marcin's playtest of 3a)
+
+Marcin played 3a: being busted took long minutes right next to the police,
+the units took ages to work out what was going on, and a light touch wrote a
+police car off; "go strongly into police intelligence, reactions and
+capabilities". Done as slice 3c before 3b; code `98120f6`. Verify:gate green
+before the docs, 203 tests (quick 197, long 6).
+
+### Measured first (headless, heat 2, traffic and pedestrians on)
+
+- Police wrecks in 3 × 180 s of the road bot: 6, all "disturbed, then
+  failed to settle": a 2.4–5 m/s nudge took the unit out of lane control,
+  and two seconds later it was still over 6 m/s or more than 4 m off its
+  lane, which a chasing car always is.
+- A player stopped at heat 2 at four spawns: never busted in 90 s, never
+  more than one unit within 6 m. The units drove past on their lane,
+  circled the block, then queued behind each other 40 m back.
+
+### Done
+
+- **Damage and settle** (`Traffic`): contacts dent (`damage` += (Δv − 3) ×
+  0.1); one 7 m/s contact or full damage wrecks; an upright, non-spinning
+  disturbed car drives back onto its path at any speed within 14 m of it
+  (lean dropped); on its side, far off or tumbling past 8 s it is a wreck.
+  Police armour 1.6 on every threshold, the damage and the takedown rules;
+  a car wrecked by its own damage inside the takedown window is the
+  player's takedown.
+- **The brain** (`Police`): the arrest (slots behind, ahead and beside a
+  player under 6 m/s, ray-checked, reached by free steering with a v² = 2ad
+  arrival and a 5 m/s detour round the car, held; extra units stand by
+  behind; busted range 6 → 7 m), the search (to the last fix, then a
+  different exit per unit at the junctions there), the cut-off (from heat 2
+  every second saloon routes to the player's position 4 s ahead), the
+  assault (a police car hit while nobody chases: +4 heat and it sees the
+  player). DESIGN.md §2.10.
+- Tests: `brain.test.ts` 3c.1–3c.4, `brain.long.test.ts` 3c.5.
+
+### Measured after
+
+- Police wrecks in the same 9 bot minutes: 0.
+- A player stopped at heat 2 (units starting 47–67 m out): two units in
+  reach after 7.8–9.6 s, busted at 10.8–12.5 s, no unit faster than 6.1 m/s
+  within 8 m of the player.
+- The road bot at heat 2, 300 s per seed, heat back to 40 after each card:
+  busted 0 / 0 / 7, escapes 6 / 10 / 5, police wrecks 1 / 1 / 2 (its rams
+  now take real hits to kill a unit).
+- The cut-off, A/B over 3 × 180 s at heat 2: a unit ahead of the player
+  and driving at it in 11.8 % of active-chase time with it, 9.2 % without;
+  busted 7 against 4. Modest; kept.
+- Smoke 60.0 fps / p95 16.7 ms / 97 draws / 193k tris, unchanged.
+
+### Decided (set here)
+
+- The arrest slots are reached by free steering, not by the lane follower
+  (ARCHITECTURE decision 32): on the lane the units queued behind each
+  other and never reached a slot ahead or beside.
+- Busted's range 7 m: a unit parked on a slot stops up to `arrest.arrive`
+  (1.2 m) short of it, so the front and rear slots sit at 5.6–6.8 m.
+- `police.test.ts`'s detection pin with a stationary player on the highway
+  now ends in the arrest that player earns: it checks detection and the
+  closing distance at the moment the pursuit goes active, then requires the
+  busted card within 20 s. The heat-0 half is unchanged.
+- The slice-5 `box` name stays for the units boxing an abandoned car; the
+  arrest is `arrest`.
+
+### Next
+
+- Marcin plays it; then slice 3b (coins and the spill).
+
+### Open problems
+
+- 11–12 s from a stop to busted at heat 2 is my number; whether it reads as
+  fair or as a trap is Marcin's (`POLICE.arrest.playerSpeed`,
+  `POLICE.busted.seconds`).
+- A slow junction turn at heat 1–2 (under 22 km/h) starts the arrest; the
+  release at 32 km/h keeps it from flickering, but a player who crawls a
+  corner in a queue may be boxed. Watch item in DESIGN.md §12.
+
 ## 2026-09-22 — M4 slice 3a: the run, the door race, busted
 
 Verify green before the first edit (after the consistency pass) and at both

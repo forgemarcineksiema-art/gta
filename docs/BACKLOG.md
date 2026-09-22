@@ -62,6 +62,7 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 ## Life (M3)
 
+- Abandoned player cars (a swap leaves one) are never towed and traffic queues behind them for good; the wreck tow-away could take them too once out of view. Police units pull out past the one they boxed (slice 5). (M4)
 - Parked civilian cars in the kerbside bays of the avenue and the quay as stopped agents (more swap candidates); the rest of the M3 stretch (stunt ramps, speed cameras) is M4 slice 6. (M3)
 - Traffic-only silhouettes (a van, a taxi, a bus): agents use the three player classes with paint for variety, so every swap yields a real car; new silhouettes need a preset each and a swap rule. (M3)
 - Junction reservations are first come first served with a forced override after 9 s (about one a minute in a busy run); traffic lights or a round-robin would look more deliberate at the big crossings. (M3)

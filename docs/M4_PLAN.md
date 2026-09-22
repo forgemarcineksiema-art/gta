@@ -1,6 +1,6 @@
 # M4 "Heat" — implementation plan
 
-Executor: the agent working M4 now (slices 0–4 are done; 5 is next).
+Executor: the agent working M4 now (slices 0–5 are done; 6 is next).
 Reviewer: Claude, at the gate. Director and playtester: Marcin. This
 document is the milestone contract: what to build, in which order, with
 which numbers, and what "done" means; each fixed decision carries its
@@ -60,6 +60,7 @@ update 1 (§5).
 | 3b coins and the spill | `Coins`: runs along every lane and a line through each billboard from the seed, picked by the footprint into `run.coins`; the wreck's spill (30 % of the bag, 12 coins, 10 s) paying back into the bag; the shader-spun instanced view; the counter | island 2,999–3,026 coins; road bot 54–56 a minute; smoke 98 draws / 210k tris |
 | 3c the police brain | traffic damage and a settle that forgives a nudge; police armour; the arrest (slots round a slow player), the search at the last fix, the cut-off from heat 2, the assault heat (DESIGN.md §2.10) | police wrecks in 9 bot minutes 6 → 0; a player stopped at heat 2: never busted in 90 s → busted at 10.8–12.5 s, units arriving at ≤ 6.1 m/s; road bot at heat 2 busted 0 / 0 / 7 in 5 min by seed; a unit ahead and closing 9.2 → 11.8 % of chase time |
 | 4 the cold open | `Jobs` skeleton (one delivery kind); `ColdOpen`: the van at heat 1, the candidate held alongside, a 1.3 km route round the hideout's block through a billboard gate with its coin line and the marker at 600 m; verbs in any order, captions in order with cues and timeouts; skip on N; the session flag; `sim/city/route.ts` | scripted bot done in 89.1 s: swap 5.5 s, gate 22.0, marker 34.4, door 89.1; captions steer 0.0, swap 5.4, boost 5.5, smash 10.1, escape 42.0 (takedown never cued: the pair lost the bot at 5.4 s) |
+| 5 identity | the descriptor; a swap nobody saw loses the police and they box the car left behind, then pull out and withdraw; the disguise with BORROW, the lit bar, COVER BLOWN and the dispatcher's 30 s timer; `novice` and `skilled` bot policies; the road bot no longer resets out of an arrest | skilled at level 2, 120 s: 1 / 1 / 1 escapes by swap, 0 by cooldown, 0 disguises; novice busted 1 / 1 / 0; the in-sight cruiser exploit disguised 114 of 120 s → 30 s with the timer |
 
 ### 1.2 In scope (gate-critical, §4 slices 3–8)
 
@@ -818,6 +819,19 @@ Acceptance: verify green; the measurement: the bot with a swap policy
 grid) at level 2 for 120 s: escapes by swap versus by cooldown, and the
 share of escapes that were disguises, in PROGRESS (DESIGN.md §12 watch
 item; the fallback is a dispatcher timer if the share is above a half).
+
+As built (2026-09-22, PROGRESS): the box clock runs while two units are
+round the car (5 s), 15 s at most, since a junction on the way takes the
+units 5 s; they drive the lanes to it and go straight into a slot only
+inside 20 m (`box.approach`), rear and sides before the front, round the
+empty car at 10 m/s; afterwards each pulls out 14 m past it before the
+withdraw rule (traffic queues behind an abandoned car). The measurement
+tripped the fallback through the exploit the watch item names (the ramming
+unit's car taken in sight: 114 of 120 s disguised), so the cover blows 30 s
+after the theft (`POLICE.disguise`); 5.3 drives the cover's length and pins
+the blow-up. 5.7 is folded into 5.2. `Police.enlist` puts a police car into
+the roster. `TrackBot` treats a police car within 15 m of a stopped bot as
+an arrest, not a stuck car.
 
 ### Slice 6 — level 3: roadblocks, spike strips, parked patrols, speed cameras, stunt jumps (3.5 days)
 

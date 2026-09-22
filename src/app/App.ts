@@ -17,6 +17,7 @@ import { RunHud } from '../ui/run';
 import { ColdOpenHud } from '../ui/coldOpen';
 import { routeToDropOff } from './doorRoute';
 import { BotDriver } from './bot';
+import { BotPolicy } from './botPolicy';
 import { AgentState } from '../sim/traffic/Traffic';
 import { CITY_BOT_TUNING, TrackBot } from './trackBot';
 import { FixedStepLoop } from './loop';
@@ -89,7 +90,7 @@ export class App {
   private readonly sfx: Sfx;
   private readonly panel: DebugPanel | null;
   private readonly loop = new FixedStepLoop(FIXED_DT, 5);
-  private readonly bot: BotDriver | TrackBot | null;
+  private readonly bot: BotDriver | TrackBot | BotPolicy | null;
   private readonly perf: PerfProbe | null;
   private readonly simProfile: SimProfile | null;
   private readonly handle: GameHandle;
@@ -200,9 +201,12 @@ export class App {
 
     const botParam = params.get('bot');
     const doorBot = botParam === 'door' && sim.city !== null;
-    const botOn = botParam === '1' || botParam === 'track' || doorBot;
-    this.bot = botOn && sim.city ? new TrackBot(sim.carId, CITY_BOT_TUNING)
-      : botParam === 'track' ? new TrackBot(this.sim.carId) : botOn ? new BotDriver(Number(params.get('seed') ?? '42')) : null;
+    // the policies of slice 5: the road bot as a novice, or swapping and turning away as a skilled player
+    const policy = (botParam === 'novice' || botParam === 'skilled') && sim.city !== null ? botParam : null;
+    const botOn = botParam === '1' || botParam === 'track' || doorBot || policy !== null;
+    this.bot = policy ? new BotPolicy(policy, new TrackBot(sim.carId, CITY_BOT_TUNING))
+      : botOn && sim.city ? new TrackBot(sim.carId, CITY_BOT_TUNING)
+        : botParam === 'track' ? new TrackBot(this.sim.carId) : botOn ? new BotDriver(Number(params.get('seed') ?? '42')) : null;
     // the drive to the hideout: the road bot on a path of its own (slice 3a's e2e and measurement)
     const hideout = sim.run.dropOffs[0];
     if (doorBot && hideout && this.bot instanceof TrackBot) this.bot.setPath(routeToDropOff(sim, hideout));
@@ -223,7 +227,7 @@ export class App {
       bot: botOn,
       version: __APP_VERSION__,
       renderer: this.renderer,
-      roadBot: sim.city && this.bot instanceof TrackBot ? this.bot : null,
+      roadBot: sim.city && this.bot instanceof TrackBot ? this.bot : this.bot instanceof BotPolicy ? this.bot.bot : null,
     };
     window.__game = this.handle;
     window.render_game_to_text = () => {
@@ -234,7 +238,8 @@ export class App {
         carId: sim.carId,
         damage: { value: sim.life.state.damage, stage: sim.life.state.stage, wrecked: sim.life.state.wrecked },
         heat: { points: sim.heat.points, level: sim.heat.level },
-        pursuit: { state: sim.pursuit.state, cooldown: sim.pursuit.cooldown, units: sim.police?.count ?? 0, escapes: sim.pursuit.escapes },
+        pursuit: { state: sim.pursuit.state, cooldown: sim.pursuit.cooldown, units: sim.police?.count ?? 0, escapes: sim.pursuit.escapes, swapEscapes: sim.pursuit.swapEscapes, descriptor: sim.pursuit.descriptor.kind, disguised: sim.pursuit.disguised, boxing: sim.police?.boxing ?? false },
+        policy: this.bot instanceof BotPolicy ? { name: this.bot.name, swaps: this.bot.swaps, escapesBySwap: this.bot.escapesBySwap, escapesByCooldown: this.bot.escapesByCooldown, disguiseEscapes: this.bot.disguiseEscapes } : null,
         run: { state: sim.run.state, bag: sim.run.bag, bank: sim.run.bank, multiplier: sim.run.multiplier, maxHeat: sim.run.maxHeat, door: sim.run.doorProgress, busted: sim.run.bustedProgress, dropOff: sim.run.dropOffs[sim.run.dropOff]?.name ?? null, runs: sim.run.runs },
         coldOpen: { active: sim.coldOpen.active, verb: sim.coldOpen.verb, caption: sim.coldOpen.caption, done: sim.coldOpen.done },
         job: { state: sim.jobs.state, remaining: sim.jobs.remaining },

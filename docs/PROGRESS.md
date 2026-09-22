@@ -2,6 +2,77 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-22 — M4 slice 5: identity, the swap escape, the disguise, the bot policies
+
+### Done
+
+- `Pursuit`: the descriptor (class and paint) follows the player's car;
+  `onSwap(seenNow, kind, paint)` → `lose()` when a chase was on and no unit
+  saw it (idle at once, cooldown 0, an `escape` with target 1, counted in
+  `swapEscapes`); `force()`; `markBlown()` and the `blown` event; the
+  disguise (`descriptor.kind === 'police' && !blown`); the dispatcher's
+  timer (`coverLeft`).
+- `Police`: a raw line of sight per unit (`los`) beside the disguise-aware
+  `seen`; `crimeSeen()`; crimes from the ring (takedowns, billboards,
+  cameras) and a ram of an idle unit blow the cover when a unit sees; the
+  box: the units drive the lanes to the abandoned car and take the
+  arrest's slots round it (rear, sides, then front) within 20 m, the clock
+  (5 s) runs while two are there, 15 s at most; then each unit near it
+  pulls out 14 m past the car on its own lane before the withdraw rule;
+  `enlist(agent)` for tests and slice 6's parked patrols. `driveToSlot`
+  split into the slot choice and `driveTo` (the arrest's behaviour is
+  unchanged).
+- `Life.swap` calls `onSwap` with `crimeSeen()` and boxes the car left
+  behind; `Run.endRun` clears `blown`.
+- `app/botPolicy.ts`: `novice` (the road bot) and `skilled` (swaps when a
+  car is alongside and no unit sees, during a chase or into any police car;
+  a path that turns at every junction while the police search; boost on
+  straights); `?bot=novice|skilled`. `TrackBot` no longer counts being
+  boxed by police (a unit within 15 m) as stuck: its reset had teleported
+  it out of every arrest.
+- HUD: BORROW for a police candidate, COPS LOST YOU on every escape,
+  COVER BLOWN. The player's cruiser drives with its bar lit while the
+  disguise holds.
+- Tests: `identity.test.ts` 5.1–5.7 (5.7 folded into 5.2), 5.8 in
+  `botPolicy.long.test.ts`, 5.9 in `screens.spec.ts`.
+
+### Measured (heat 40, traffic on, 120 s, seeds 42 / 7 / 123)
+
+- Skilled (the plan's policy, swaps only unseen): escapes by swap 1 / 1 /
+  1, by cooldown 0 / 0 / 0, in a disguise 0 of 3; busted 0 / 0 / 1; 1–2
+  swaps; no resets.
+- Novice: never swaps; escapes by cooldown 1 / 2 / 2; busted 1 / 1 / 0; no
+  resets. The slice-3c figure (road bot at heat 2 busted 0 / 0 / 7 in five
+  minutes) was taken with the reset that teleported the bot out of the box;
+  slice 6's busted rates use the fixed bot.
+- The exploit the §12 watch item names: a bot that takes the ramming
+  unit's car in sight was disguised 114 of 120 s and chased 14 s, every
+  escape in the cruiser (share 1.0 > ½). With the 30 s timer: disguised
+  30 s, chased 73 / 89 / 50 s, 3 of 8 escapes in the cruiser.
+
+### Decided (set here)
+
+- The disguise timer is in, by the plan's own rule (DESIGN §12): 30 s from
+  the theft, then COVER BLOWN. Test 5.3 now drives the cover's length and
+  pins the blow-up instead of 60 s undetected.
+- The box clock runs while the box is made, not from the swap: with a
+  junction on the way the units need 5 s to arrive, and a box that ends as
+  they get there would never show the joke.
+- Units drive the lanes to the abandoned car and go straight only inside
+  20 m: straight at a slot round a corner they hit the corner building.
+- After a box a unit pulls out past the empty car: traffic queues behind
+  an abandoned car for good, and so would the unit.
+
+### Next
+
+- Slice 6: level 3.
+
+### Open problems
+
+- Abandoned cars are never towed and traffic queues behind them for good
+  (M3 behaviour). Far kinematic police stuck behind one are recycled by the
+  patrol rule; civilians stay. BACKLOG.
+
 ## 2026-09-22 — M4 slice 4: the cold open on the jobs skeleton
 
 ### Done

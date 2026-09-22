@@ -10,7 +10,9 @@ export type EventKind =
   // the run (M4): money and its endings; camera, roadblock and jump are pushed from slice 6
   | 'camera' | 'roadblock' | 'jump' | 'door' | 'banked' | 'busted' | 'coin' | 'spill'
   // jobs (M4 slice 4 skeleton): value = payout on start, paid on done; target = the def's id
-  | 'jobStart' | 'jobDone' | 'jobFailed';
+  | 'jobStart' | 'jobDone' | 'jobFailed'
+  // identity (slice 5): a crime seen from the police car the player drives
+  | 'blown';
 
 export interface SimEvent {
   kind: EventKind;

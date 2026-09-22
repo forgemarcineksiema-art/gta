@@ -133,7 +133,9 @@ still rises for every crime, seen or not. One more condition in detection,
 and the best joke in the game: escaping the police in their own car. Watch
 item in §12. The swap prompt reads BORROW instead of SWAP when the candidate
 is a police car (set here, 2026-09-22): the disguise has to be discoverable
-without a tutorial line.
+without a tutorial line. The dispatcher notices the missing unit 30 s after
+the theft and the cover is blown (set here 2026-09-22 on the slice-5
+measurement, §12).
 
 ### 2.6 Heat levels, starting table
 
@@ -627,7 +629,12 @@ both.
   chasing unit rams from alongside and is therefore always a swap candidate.
   If the bot's escape-by-disguise share is above half at level 2, the
   disguise gets a timer (a dispatcher noticing the missing unit) before it
-  gets removed.
+  gets removed. Measured in slice 5 (2026-09-22): a bot that takes the
+  ramming unit's car in sight was disguised for 114 of 120 s at level 2 and
+  every escape was in the cruiser, so the timer is in: the cover is blown
+  30 s after the theft (`POLICE.disguise.seconds`). With it the same bot is
+  disguised 30 s, chased 50–89 s of 120, and 3 of its 8 escapes were in the
+  cruiser. Watch whether 30 s still reads as the joke.
 - The arrest (§2.10): does ~11 s from a stop to busted at heat 2 read as
   fair; does the box read (units parking round the car) before the bar
   does; is a slow junction turn at heat 1 a trap. The knobs are

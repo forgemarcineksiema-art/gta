@@ -24,7 +24,7 @@ import { POSE_STRIDE, Recorder } from './recorder';
 import type { DynamicDesc, StaticDesc } from './scene';
 import { LapTimer, type LapState, type TrackDef } from './track';
 import { Pedestrians } from './traffic/Pedestrians';
-import { Traffic, type PlayerProbe } from './traffic/Traffic';
+import { PLAYER_PAINT, Traffic, type PlayerProbe } from './traffic/Traffic';
 import { PEDS, TRAFFIC } from './traffic/tuning';
 import { SimPhase, type PhaseMark } from './profile';
 import { TransformBuffer } from './transforms';
@@ -186,6 +186,8 @@ export class SimWorld {
     this.heat = new Heat(this.events, this.traffic);
     this.heat.add(opts.heat ?? 0);
     this.pursuit = new Pursuit(this.events);
+    this.pursuit.descriptor.kind = this.carId;
+    this.pursuit.descriptor.paint = PLAYER_PAINT[this.carId];
     this.police = this.traffic ? new Police(this) : null;
     this.jobs = new Jobs(this, []);
     this.run = new Run(this);
@@ -324,6 +326,8 @@ export class SimWorld {
   /** Change the player's class in place (the cold open's van; the swap does its own). */
   setCar(kind: CarId): void {
     this.carId = kind;
+    this.pursuit.descriptor.kind = kind;
+    this.pursuit.descriptor.paint = PLAYER_PAINT[kind];
     this.vehicle.tuning = cloneTuning(CAR_PRESETS[kind]);
     this.vehicle.applyTuning();
   }

@@ -6,7 +6,7 @@
  * filling, the busted card, and the wall behind the hideout's shut door.
  * Output: screens/<state>-<w>x<h>.png. Look at them.
  */
-import { test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 
 const SIZES: Array<[number, number]> = [
@@ -134,3 +134,21 @@ for (const [w, h] of SIZES) {
     await page.screenshot({ path: `screens/cold-${w}x${h}.png` });
   });
 }
+
+test('5.9 a police car alongside: the swap prompt says BORROW at 1280x720', async ({ page }) => {
+  mkdirSync('screens', { recursive: true });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('/?manual=1&quality=low&spawn=crown');
+  await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 30_000 });
+  await page.evaluate(() => {
+    window.advanceTime?.(600);
+    const sim = window.__game!.sim;
+    const p = sim.vehicle.body.translation();
+    const yaw = sim.probe.yaw;
+    sim.traffic!.spawnParkedPolice(p.x - Math.cos(yaw) * 3.4, p.z + Math.sin(yaw) * 3.4, yaw, 'police');
+    window.advanceTime?.(100);
+  });
+  await expect(page.locator('.hud__swap')).toHaveClass(/is-visible/, { timeout: 5_000 });
+  await expect(page.locator('.hud__swap-label')).toHaveText('BORROW');
+  await page.screenshot({ path: 'screens/borrow-1280x720.png' });
+});

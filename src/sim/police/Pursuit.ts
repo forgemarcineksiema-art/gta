@@ -1,20 +1,52 @@
 import type { EventLog } from '../events';
+import type { CarId } from '../vehicle/presets';
 import { POLICE, type PoliceTuning } from './tuning';
 
 export type PursuitState = 'idle' | 'detected' | 'active' | 'lost';
 
-/** Detection is separate from heat: escape clears the chase, never the stars. */
+/** What the police are looking for: the class and paint of the player's car (docs/DESIGN.md §2.5). */
+export interface Descriptor {
+  kind: CarId;
+  paint: number;
+}
+
+/**
+ * Detection is separate from heat: escape clears the chase, never the stars.
+ *
+ * Identity (slice 5): the descriptor follows the player's car through every
+ * swap. A swap no unit saw loses the police at once (`lose()`); one they saw
+ * only changes the descriptor. A police car is a disguise until a crime is
+ * committed in a unit's sight (`markBlown()`).
+ */
 export class Pursuit {
   state: PursuitState = 'idle';
   visible = false;
   cooldown = 0;
   escapes = 0;
+  /** Of those, the ones won by a swap nobody saw. */
+  swapEscapes = 0;
   lastX = 0;
   lastZ = 0;
+  readonly descriptor: Descriptor = { kind: 'muscle', paint: 0 };
+  /** A crime was seen from the police car the player drives: the disguise no longer holds. */
+  blown = false;
+  /** Seconds until the dispatcher notices the stolen police car (the slice-5 measurement's fallback, DESIGN.md §12). */
+  coverLeft = 0;
+  private level = 0;
 
   constructor(private readonly events: EventLog, private readonly tuning: PoliceTuning = POLICE) {}
 
+  /** In a police car nobody has seen misbehave: no unit detects the player. */
+  get disguised(): boolean {
+    return this.descriptor.kind === 'police' && !this.blown;
+  }
+
   step(dt: number, level: number, seen: boolean, x: number, z: number): void {
+    this.level = level;
+    if (this.disguised) {
+      this.coverLeft -= dt;
+      if (this.coverLeft <= 0) this.markBlown(x, z);
+    }
     this.visible = level > 0 && seen;
     if (level === 0) {
       this.reset();
@@ -40,6 +72,45 @@ export class Pursuit {
       this.escapes++;
       this.events.push('escape', level, x, 0, z);
     }
+  }
+
+  /**
+   * The player changed cars. The descriptor becomes the new car, which
+   * carries no blown cover. Returns true when the swap lost the police: a
+   * chase was on and no unit saw it happen.
+   */
+  onSwap(seenNow: boolean, kind: CarId, paint: number): boolean {
+    this.descriptor.kind = kind;
+    this.descriptor.paint = paint;
+    this.blown = false;
+    this.coverLeft = this.tuning.disguise.seconds;
+    if (seenNow || this.state === 'idle') return false;
+    this.lose();
+    return true;
+  }
+
+  /** The chase ends at once: idle, no cooldown, an escape at the current level (target 1: by a swap). */
+  lose(): void {
+    if (this.state === 'idle') return;
+    this.state = 'idle';
+    this.visible = false;
+    this.cooldown = 0;
+    this.escapes++;
+    this.swapEscapes++;
+    this.events.push('escape', this.level, this.lastX, 0, this.lastZ, 1);
+  }
+
+  /** Straight into a chase (M5's pursuit escape job, tests): active and seen this step. */
+  force(): void {
+    this.state = 'active';
+    this.visible = true;
+  }
+
+  /** A crime from the police car with a unit watching. */
+  markBlown(x: number, z: number): void {
+    if (this.blown || this.descriptor.kind !== 'police') return;
+    this.blown = true;
+    this.events.push('blown', 0, x, 0, z);
   }
 
   reset(): void {

@@ -281,6 +281,9 @@ export class Life {
     this.sim.peds?.spawnAt(px, pz, Math.atan2(h.x - px, h.z - pz), PedPose.Fist);
     this.sim.events.push('swap', 0, h.x, h.y, h.z, agent);
     this.state.swapCandidate = -1;
+    // identity (docs/DESIGN.md §2.5): a swap no unit saw loses them, and they box the car you left
+    const police = this.sim.police;
+    if (this.sim.pursuit.onSwap(police?.crimeSeen() ?? false, h.kind, PLAYER_PAINT[h.kind])) police?.box(this.oldPose.x, this.oldPose.z, oldYaw);
   }
 
   /** Set the damage directly (the cold open's beat-up van); the stage follows, silently, and a wreck is never set this way. */

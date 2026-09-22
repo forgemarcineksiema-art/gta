@@ -43,6 +43,16 @@ export interface PoliceTuning {
   /** Boxed in: `units` live police cars within `range` m while the player is under `speed` m/s fills the bar in `seconds`; moving drains it. */
   busted: { units: number; range: number; speed: number; seconds: number; drainPerSecond: number };
   /**
+   * A swap nobody saw: the units drive to the abandoned car and box it for `seconds` counted while two of
+   * them (or all there are) are within `range` m (the fifth and later hold `range` m back), `maxSeconds` at
+   * most in all; a unit
+   * drives the lanes until it is within `approach` m, then straight into its slot, round the empty car at
+   * `detourSpeed` m/s. The slots fill rear, the sides, then the front: nobody has to get past it.
+   */
+  box: { seconds: number; range: number; approach: number; maxSeconds: number; detourSpeed: number };
+  /** The disguise: the dispatcher notices the missing unit `seconds` after the player takes a police car, and the cover is blown. */
+  disguise: { seconds: number };
+  /**
    * The arrest: under `playerSpeed` m/s (released above `releaseSpeed`) units within `range` m take the slots
    * `rear` / `front` m along and `side` m across the player, braking at `decel` to arrive within `arrive` m;
    * the rest stand by `standby` m behind. `accel` caps the body's velocity change; `keep` m of hysteresis on a slot.
@@ -94,6 +104,8 @@ export const POLICE: PoliceTuning = {
   pitSideOffset: 1.1,
   patrolRecycle: 260,
   busted: { units: 2, range: 7, speed: 1.39, seconds: 3, drainPerSecond: 0.7 },
+  box: { seconds: 5, range: 8, approach: 20, maxSeconds: 15, detourSpeed: 10 },
+  disguise: { seconds: 30 },
   // clear: a unit passes the player's car no closer than this (m), at detourSpeed (m/s)
   arrest: { playerSpeed: 6, releaseSpeed: 9, range: 60, rear: 5.6, front: 5.6, side: 3.2, standby: 12, decel: 6, arrive: 1.2, accel: 12, keep: 5, clear: 4, detourSpeed: 5 },
   search: { reach: 30 },

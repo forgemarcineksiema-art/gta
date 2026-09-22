@@ -70,6 +70,9 @@ export class Hud {
   private readonly wreckedSub: HTMLElement;
   private readonly swap: HTMLElement;
   private readonly swapKeycap: HTMLElement;
+  private readonly swapLabel: HTMLElement;
+  /** The candidate is a police car: the prompt says BORROW (the disguise has to be discoverable). */
+  private swapBorrow = false;
   private swapVisible = false;
   private lastDamageText = '';
   private lastStage = -1;
@@ -124,7 +127,8 @@ export class Hud {
     this.root.appendChild(this.wrecked);
     this.swap = el('div', 'hud__swap');
     this.swapKeycap = el('kbd', 'key', 'E');
-    this.swap.append(this.swapKeycap, el('span', 'hud__swap-label', 'SWAP'));
+    this.swapLabel = el('span', 'hud__swap-label', 'SWAP');
+    this.swap.append(this.swapKeycap, this.swapLabel);
     this.root.appendChild(this.swap);
     const stack = el('div', 'hud__popups');
     this.popups = [0, 1, 2, 3].map(() => {
@@ -243,7 +247,9 @@ export class Hud {
             : kind === 'takedown' ? 'TAKEDOWN!'
               : kind === 'takedownTraffic' ? 'TAKEDOWN! INTO TRAFFIC!'
                 : kind === 'billboard' ? 'BILLBOARD!'
-                  : '';
+                  : kind === 'escape' ? 'COPS LOST YOU'
+                    : kind === 'blown' ? 'COVER BLOWN'
+                      : '';
     if (!text) return;
     const i = this.popupCursor % this.popups.length;
     this.popupCursor++;
@@ -307,6 +313,11 @@ export class Hud {
     if (swapVisible !== this.swapVisible) {
       this.swapVisible = swapVisible;
       this.swap.classList.toggle('is-visible', swapVisible);
+    }
+    const borrow = swapVisible && sim.traffic?.police[life.swapCandidate] === 1;
+    if (swapVisible && borrow !== this.swapBorrow) {
+      this.swapBorrow = borrow;
+      this.swapLabel.textContent = borrow ? 'BORROW' : 'SWAP';
     }
     this.eventSeq = sim.events.readFrom(this.eventSeq, this.onEvent);
     for (let i = 0; i < this.popups.length; i++) {

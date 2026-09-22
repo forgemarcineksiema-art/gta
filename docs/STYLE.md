@@ -331,7 +331,10 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   counts in 16 px that wraps only at its separators, and a keycap with ANY
   KEY. The swap prompt hides while either is up.
 - The swap prompt reads SWAP for a civilian car and BORROW for a police
-  car, same keycap, same size, accent cyan.
+  car, same keycap, same size, accent cyan. COPS LOST YOU (yellow, a gain)
+  on every escape and COVER BLOWN (ink) join the popup stack. The player's
+  own cruiser drives with its light bar flashing while the disguise holds
+  and dark once it is blown.
 - Cold open captions (M4 slice 4): top centre where the key hints sit
   (the hints hide meanwhile), skewed −10°, keycaps at 20 px beside one
   26 px heavy italic word (DRIVE, SWAP in cyan, BOOST); the three keyless

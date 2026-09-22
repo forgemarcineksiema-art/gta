@@ -37,6 +37,7 @@ Useful URLs:
 | `/?bot=1&seed=42&duration=60` | autopilot with the perf probe (`window.__perf`) |
 | `/?heat=3` | start the run at heat level 1-5 (the police answer at that level once they see you) |
 | `/?bot=door&spawn=crown` | the road bot drives to the hideout and parks; the door shuts behind it |
+| `/?bot=skilled&heat=2` | the road bot as a skilled player: swaps out of sight, turns away while searched, boosts (`bot=novice`: the plain road bot) |
 | `/?coldopen=1` | force the cold open (a plain `/` plays it once per browser tab); `?coldopen=0` skips it |
 | `/?ad=error&adError=adblock` | force an ad error code in `LocalPlatform` (`?ad=off`, `?adblock=1` also work) |
 

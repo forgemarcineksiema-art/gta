@@ -12,13 +12,17 @@
  *   there; two in reach fill the busted bar;
  * - search: sight lost, units drive to where the player was last seen and fan
  *   out through the junctions there until the escape timer runs out;
- * - react: a unit the player hits notices at once, and it costs heat.
+ * - react: a unit the player hits notices at once, and it costs heat;
+ * - identity (slice 5): a swap no unit saw ends the chase and the units box
+ *   the abandoned car for a few seconds before they withdraw; in a police car
+ *   the player is not detected until a unit sees a crime from it.
  *
  * Units share Traffic's records, lane follower and body pool; nothing here
  * steps physics. No allocation per step.
  */
 import RAPIER from '@dimforge/rapier3d-compat';
 import { BALANCE } from '../balance';
+import type { SimEvent } from '../events';
 import type { RoadGraph, Lane, RoadNode } from '../city/roads';
 import type { SimWorld } from '../SimWorld';
 import { AgentState, type PlayerProbe, type Traffic } from '../traffic/Traffic';
@@ -31,6 +35,10 @@ const CHASE = 0;
 const AHEAD = 1;
 /** Arrest slots: behind, ahead, left, right of the player; units beyond four stand by behind. */
 const SLOTS = 4;
+/** After a box: the leave point is this far past the empty car along the unit's lane (m), reached within this (m) or given up after this (s). */
+const LEAVE_PAST = 14;
+const LEAVE_REACHED = 4;
+const LEAVE_SECONDS = 4;
 
 export class Police {
   readonly units: Int16Array;
@@ -43,11 +51,27 @@ export class Police {
   arresting = false;
   /** Test hook: false keeps new units from coming on duty (deterministic busted and door setups). */
   dispatching = true;
+  /** A swap nobody saw: the units box the abandoned car at (boxX, boxZ); `boxLeft` runs while two are round it. */
+  boxing = false;
+  boxX = 0;
+  boxZ = 0;
+  boxLeft = 0;
+  /** Seconds since the box began (capped by `box.maxSeconds`). */
+  boxAge = 0;
 
   private readonly sim: SimWorld;
   private readonly traffic: Traffic;
   private readonly graph: RoadGraph;
   private readonly seen: Uint8Array;
+  /** Per unit: a clear line to the player at its last sight tick, disguise or not (what sees a crime). */
+  private readonly los: Uint8Array;
+  /** Per unit: pulling out past the boxed car to (leaveX, leaveZ) before it withdraws; seconds left. */
+  private readonly leaving: Float32Array;
+  private readonly leaveX: Float64Array;
+  private readonly leaveZ: Float64Array;
+  /** The abandoned car's pose, in the shape the slot planner takes. */
+  private readonly boxProbe: PlayerProbe = { x: 0, z: 0, yaw: 0, vx: 0, vz: 0, speed: 0, halfWidth: 1, halfLength: 2.3 };
+  private cursor: number;
   private readonly withdrawing: Uint8Array;
   private readonly rammed: Uint8Array;
   private readonly ramCooldown: Float32Array;
@@ -88,6 +112,11 @@ export class Police {
     this.units = new Int16Array(Math.max(...this.tuning.budget));
     this.units.fill(-1);
     this.seen = new Uint8Array(this.units.length);
+    this.los = new Uint8Array(this.units.length);
+    this.leaving = new Float32Array(this.units.length);
+    this.leaveX = new Float64Array(this.units.length);
+    this.leaveZ = new Float64Array(this.units.length);
+    this.cursor = sim.events.sequence;
     this.withdrawing = new Uint8Array(this.units.length);
     this.rammed = new Uint8Array(this.units.length);
     this.ramCooldown = new Float32Array(this.units.length);
@@ -130,6 +159,8 @@ export class Police {
         traffic.clearPolicePlan(agent);
         this.units[u] = -1;
         this.seen[u] = 0;
+        this.los[u] = 0;
+        this.leaving[u] = 0;
         this.rammed[u] = 0;
         this.slotOf[u] = -1;
         // A wrecked patrol is replaced, but the street gets a breather first.
@@ -146,12 +177,17 @@ export class Police {
       traffic.clearPolicePlan(agent);
     }
     const assaulted = this.assaults(dt);
+    // last step's crimes, judged by who could see the car when they happened
+    this.cursor = this.sim.events.readFrom(this.cursor, this.onCrime);
     const level = this.sim.heat.level;
     if (level === 0) {
       this.hot = false;
       this.spawnLeft = 0;
       this.arresting = false;
+      this.boxing = false;
+      this.leaving.fill(0);
       this.seen.fill(0);
+      this.los.fill(0);
       this.withdrawing.fill(0);
       this.slotOf.fill(-1);
       pursuit.step(dt, level, false, player.x, player.z);
@@ -189,13 +225,39 @@ export class Police {
       const distance = Math.hypot(player.x - x, player.z - z);
       if (this.withdrawing[u] === 1) {
         this.seen[u] = 0;
+        this.los[u] = 0;
         // Once it has really withdrawn, this same patrol may encounter the player again.
         if (distance >= t.withdrawRange && traffic.outOfView(x, z, this.radius, player, t.viewNear, cosHalf)) this.withdrawing[u] = 0;
         continue;
       }
-      if (distance > t.sightRange) this.seen[u] = 0;
-      else if (this.sim.tick % every === Math.floor(u * every / this.units.length)) this.seen[u] = this.canSee(agent, player, distance) ? 1 : 0;
+      if (distance > t.sightRange) {
+        this.seen[u] = 0;
+        this.los[u] = 0;
+      } else if (this.sim.tick % every === Math.floor(u * every / this.units.length)) {
+        this.los[u] = this.lineOfSight(agent, player, distance) ? 1 : 0;
+        this.seen[u] = this.los[u] === 1 && !pursuit.disguised ? 1 : 0;
+      }
       if (this.seen[u] === 1) visible = true;
+    }
+    // boxing the abandoned car: nobody is looking for the player until it is over
+    if (this.boxing) {
+      this.boxAge += dt;
+      // the clock runs while the box is made: two cars round it, or all there are
+      if (this.unitsWithin(this.boxX, this.boxZ, t.box.range) >= Math.min(t.busted.units, this.count)) this.boxLeft -= dt;
+      if (this.boxLeft > 0 && this.boxAge < t.box.maxSeconds) {
+        pursuit.step(dt, level, false, player.x, player.z);
+        this.stepBox(dt);
+        return;
+      }
+      // then the withdraw rule: away, and blind to the player until out of view and far; a unit
+      // boxed in behind the empty car first pulls out past it (traffic would queue behind it for good)
+      this.boxing = false;
+      this.withdrawing.fill(1);
+      this.seen.fill(0);
+      this.los.fill(0);
+      this.slotOf.fill(-1);
+      this.startLeaving();
+      visible = false;
     }
     if (visible) {
       this.lastVx = player.vx;
@@ -244,6 +306,10 @@ export class Police {
       const agent = this.units[u] as number;
       if (agent < 0) continue;
       if (!chasing && !searching) {
+        if ((this.leaving[u] as number) > 0) {
+          this.leave(u, agent, dt);
+          continue;
+        }
         // Idle means ordinary lane driving, not omniscient navigation to the player.
         if (this.withdrawing[u] === 1) {
           traffic.setPolicePlan(agent, this.awayExit(agent, player), 0);
@@ -274,7 +340,9 @@ export class Police {
       const gap = Math.hypot(dx, dz);
       const slot = this.slotOf[u] as number;
       if (arresting && slot >= 0 && traffic.hasBody(agent) && gap < a.range) {
-        this.driveToSlot(u, agent, slot, player);
+        this.driveToSlot(agent, slot, player, a.standby, a.detourSpeed);
+        // a unit at the player's elbow sees the player
+        this.seen[u] = 1;
         continue;
       }
       const pit = traffic.kindOf(agent) === 'sports';
@@ -301,6 +369,114 @@ export class Police {
       this.rammed[u] = 1;
     }
   }
+
+  /** True when any unit had a clear line to the player at its last sight tick, disguise or not: a crime now is seen. */
+  crimeSeen(): boolean {
+    for (let u = 0; u < this.units.length; u++) if ((this.units[u] as number) >= 0 && this.los[u] === 1) return true;
+    return false;
+  }
+
+  /** The swap nobody saw: box the abandoned car at this pose for `box.seconds`. */
+  box(x: number, z: number, yaw: number): void {
+    this.boxing = true;
+    this.boxX = x;
+    this.boxZ = z;
+    this.boxLeft = this.tuning.box.seconds;
+    this.boxAge = 0;
+    this.boxProbe.x = x;
+    this.boxProbe.z = z;
+    this.boxProbe.yaw = yaw;
+    this.routeLeft = 0;
+    this.slotLeft = 0;
+    this.slotOf.fill(-1);
+    this.arresting = false;
+  }
+
+  /** Put a police car already on the road into the roster (tests; slice 6's parked patrols joining in). Returns its unit or -1. */
+  enlist(agent: number): number {
+    if (this.traffic.police[agent] !== 1) return -1;
+    for (let u = 0; u < this.units.length; u++) if (this.units[u] === agent) return u;
+    for (let u = 0; u < this.units.length; u++) {
+      if ((this.units[u] as number) >= 0) continue;
+      this.units[u] = agent;
+      this.seen[u] = 0;
+      this.los[u] = 0;
+      this.withdrawing[u] = 0;
+      this.ramCooldown[u] = 0;
+      this.slotOf[u] = -1;
+      this.count++;
+      return u;
+    }
+    return -1;
+  }
+
+  /** The units round the abandoned car: the arrest's slots on its pose, the rest held `box.range` back; far units drive there. */
+  private stepBox(dt: number): void {
+    const traffic = this.traffic;
+    const t = this.tuning;
+    const b = this.boxProbe;
+    this.routeLeft -= dt;
+    if (this.routeLeft <= 0) {
+      this.route(CHASE, b.x, b.z, b.yaw);
+      this.routeLeft = t.routeSeconds;
+    }
+    this.placeSlots(b);
+    // an empty car cannot drive off: the front slot is dealt last, the second unit takes a side
+    const fx = this.slotX[1] as number, fz = this.slotZ[1] as number;
+    this.slotX[1] = this.slotX[3] as number; this.slotZ[1] = this.slotZ[3] as number;
+    this.slotX[3] = fx; this.slotZ[3] = fz;
+    this.slotLeft -= dt;
+    if (this.slotLeft <= 0) {
+      this.dealSlots(b);
+      this.slotLeft = t.routeSeconds;
+    }
+    for (let u = 0; u < this.units.length; u++) {
+      const agent = this.units[u] as number;
+      if (agent < 0) continue;
+      const slot = this.slotOf[u] as number;
+      const gap = Math.hypot(b.x - (traffic.x[agent] as number), b.z - (traffic.z[agent] as number));
+      // by the lanes until the car is in the same street, then straight into a slot round it
+      if (slot >= 0 && traffic.hasBody(agent) && gap < t.box.approach) this.driveToSlot(agent, slot, b, t.box.range, t.box.detourSpeed);
+      else traffic.setPolicePlan(agent, this.routeExit(agent, CHASE), t.chaseSpeed);
+    }
+  }
+
+  /** At the end of a box: each unit near the empty car gets a point 14 m past it along its own lane. */
+  private startLeaving(): void {
+    const traffic = this.traffic;
+    const b = this.boxProbe;
+    for (let u = 0; u < this.units.length; u++) {
+      const agent = this.units[u] as number;
+      const lane = agent >= 0 ? traffic.lane[agent] as number : -1;
+      if (lane < 0 || !traffic.hasBody(agent)) continue;
+      if (Math.hypot(b.x - (traffic.x[agent] as number), b.z - (traffic.z[agent] as number)) > this.tuning.box.approach) continue;
+      traffic.lanes.project(lane, b.x, b.z, this.projection);
+      traffic.lanes.positionAt(lane, Math.min(traffic.lanes.length[lane] as number, this.projection.s + LEAVE_PAST), 0, this.pose);
+      this.leaveX[u] = this.pose.x;
+      this.leaveZ[u] = this.pose.z;
+      this.leaving[u] = LEAVE_SECONDS;
+    }
+  }
+
+  /** Round the empty car to the leave point at the box's detour speed, then back to the lane and away. */
+  private leave(u: number, agent: number, dt: number): void {
+    const traffic = this.traffic;
+    const tx = this.leaveX[u] as number, tz = this.leaveZ[u] as number;
+    const left = (this.leaving[u] as number) - dt;
+    this.leaving[u] = left;
+    if (left <= 0 || !traffic.hasBody(agent) || Math.hypot(tx - (traffic.x[agent] as number), tz - (traffic.z[agent] as number)) < LEAVE_REACHED) {
+      this.leaving[u] = 0;
+      return;
+    }
+    this.driveTo(agent, tx, tz, this.boxProbe, this.tuning.box.detourSpeed);
+  }
+
+  /** A crime event from the ring: from a police car in a unit's sight it blows the disguise. */
+  private readonly onCrime = (e: SimEvent): void => {
+    const kind = e.kind;
+    if (kind !== 'takedown' && kind !== 'takedownTraffic' && kind !== 'billboard' && kind !== 'camera') return;
+    if (this.sim.pursuit.disguised && this.crimeSeen()) this.sim.pursuit.markBlown(this.sim.probe.x, this.sim.probe.z);
+  };
 
   /**
    * Live police cars (pursuit units, parked patrols, roadblock cars) within
@@ -341,6 +517,8 @@ export class Police {
       this.assaultCooldown[i] = t.assaultCooldown;
       this.sim.heat.add(BALANCE.heat.policeHit);
       assaulted = true;
+      // the car you rammed knows the police car that did it
+      this.sim.pursuit.markBlown(this.sim.probe.x, this.sim.probe.z);
     }
     return assaulted;
   }
@@ -404,20 +582,28 @@ export class Police {
     }
   }
 
-  /** Brake to arrive on the slot and hold there, lights on; the player's own push can still move the car. */
-  private driveToSlot(u: number, agent: number, slot: number, player: PlayerProbe): void {
-    const traffic = this.traffic;
-    const t = this.tuning;
-    const a = t.arrest;
+  /**
+   * Brake to arrive on the slot and hold there, lights on; the player's own push can still move the car.
+   * Units past the four stand by `standby` m behind; a slot beyond the car is reached round it at `detour` m/s.
+   */
+  private driveToSlot(agent: number, slot: number, player: PlayerProbe, standby: number, detour: number): void {
     let sx: number, sz: number;
     if (slot < SLOTS) {
       sx = this.slotX[slot] as number;
       sz = this.slotZ[slot] as number;
     } else {
-      const back = a.standby + (slot - SLOTS) * 6;
+      const back = standby + (slot - SLOTS) * 6;
       sx = player.x - Math.sin(player.yaw) * back;
       sz = player.z - Math.cos(player.yaw) * back;
     }
+    this.driveTo(agent, sx, sz, player, detour);
+  }
+
+  /** Straight at a point, braking to arrive; a point beyond `player` (the player's car, or the boxed one) is reached round it at `detour` m/s. */
+  private driveTo(agent: number, sx: number, sz: number, player: PlayerProbe, detour: number): void {
+    const traffic = this.traffic;
+    const t = this.tuning;
+    const a = t.arrest;
     const ux = traffic.x[agent] as number, uz = traffic.z[agent] as number;
     const d = Math.hypot(sx - ux, sz - uz);
     // v² = 2 a d: a stopped player is reached at walking pace, never at chase speed
@@ -435,8 +621,7 @@ export class Police {
       tz = player.z + nz * (a.clear + 1.5);
     }
     // round the player's car at a walking pace: it is a detour past a stopped car, not a pass
-    traffic.setPolicePlan(agent, this.routeExit(agent, CHASE), t.chaseSpeed, tx, tz, tx === sx ? arrive : Math.min(arrive, a.detourSpeed), a.accel, true);
-    this.seen[u] = 1;
+    traffic.setPolicePlan(agent, this.routeExit(agent, CHASE), t.chaseSpeed, tx, tz, tx === sx ? arrive : Math.min(arrive, detour), a.accel, true);
   }
 
   /** From heat 2 every second saloon heads for where the player is going instead of where the player is. */
@@ -490,7 +675,12 @@ export class Police {
     }
   }
 
-  private canSee(agent: number, player: PlayerProbe, distance: number): boolean {
+  /** A unit sees the player: a clear line and no disguise. */
+  canSee(agent: number, player: PlayerProbe, distance: number): boolean {
+    return !this.sim.pursuit.disguised && this.lineOfSight(agent, player, distance);
+  }
+
+  private lineOfSight(agent: number, player: PlayerProbe, distance: number): boolean {
     if (distance === 0) return true;
     this.sim.vehicle.body.translation(this.pos);
     this.ray.origin.x = this.traffic.x[agent] as number;

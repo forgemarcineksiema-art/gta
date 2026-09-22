@@ -55,6 +55,9 @@ export const TRACK_BOT_BY_CAR: Record<CarId, Partial<TrackBotTuning>> = {
   police: { latAccel: 15 },
 };
 
+/** A police car this close to a stopped bot is an arrest in progress: the bot waits it out instead of resetting (m). */
+const BOXED_RANGE = 15;
+
 /** Conservative junction speeds; this is a coverage driver, not a racing opponent. */
 export const CITY_BOT_TUNING: Partial<TrackBotTuning> = {
   latAccel: 7, brakeAccel: 7, vMax: 32, lookBase: 3, lookPerSpeed: 0.3, lookMin: 5, lookMax: 15,
@@ -80,6 +83,11 @@ export class TrackBot {
     this.path = samples.length > 1 ? samples : null;
     this.loop = loop || !this.path;
     this.idx = 0;
+  }
+
+  /** Metres left on an open path of its own; Infinity on the map's loop. */
+  get pathLeft(): number {
+    return this.path && !this.loop ? (this.path.length - 1 - this.idx) * 3 : Infinity;
   }
 
   private at(i: number, m: number): number {
@@ -164,8 +172,8 @@ export class TrackBot {
       controls.boost = 0;
     }
 
-    // stuck: no progress while trying to drive
-    if (speed < 0.8 && controls.throttle > 0) {
+    // stuck: no progress while trying to drive; boxed in by the police is an arrest, not a stuck car
+    if (speed < 0.8 && controls.throttle > 0 && (sim.police?.unitsWithin(px, pz, BOXED_RANGE) ?? 0) === 0) {
       this.stuckTime += dt;
       if (this.stuckTime > 2.5) {
         sim.spawnAt(sim.city ? 'city' : 'track');

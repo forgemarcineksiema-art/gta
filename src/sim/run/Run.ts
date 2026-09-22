@@ -262,6 +262,8 @@ export class Run {
     this.sim.heat.reset();
     this.sim.pursuit.reset();
     this.sim.jobs.abandon();
+    // a new run: the police car you still sit in is a clean disguise again
+    this.sim.pursuit.blown = false;
     this.bustedProgress = 0;
   }
 

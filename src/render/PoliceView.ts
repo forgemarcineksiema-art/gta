@@ -86,6 +86,8 @@ export class PoliceView {
   private readonly color = new THREE.Color();
   private phase = -1;
   private playerStage = -1;
+  /** The player's own bar: -1 dark, else the phase it was last lit at (lit while the disguise holds). */
+  private playerLit = -1;
 
   constructor(scene: THREE.Scene, private readonly sim: SimWorld, player: CarMesh) {
     const capacity = sim.traffic?.capacity ?? 1;
@@ -139,6 +141,13 @@ export class PoliceView {
       }
       positions.needsUpdate = true;
       this.playerStage = stage;
+    }
+    // in a police car nobody has seen misbehave, the player drives with the lights on: the disguise, visible
+    const lit = sim.carId === 'police' && sim.pursuit.disguised ? Math.floor(sim.time * 4) % 2 : -1;
+    if (lit !== this.playerLit) {
+      if (lit < 0) this.darken(this.playerLenses.geometry);
+      else this.relight(this.playerLenses.geometry, lit);
+      this.playerLit = lit;
     }
     if (!traffic) return;
     this.live.fill(0);
@@ -203,6 +212,13 @@ export class PoliceView {
       if (kit.off) kit.unlit.instanceMatrix.needsUpdate = true;
       if (kit.repaint && kit.details.instanceColor) kit.details.instanceColor.needsUpdate = true;
     }
+  }
+
+  private darken(geometry: THREE.BufferGeometry): void {
+    const colors = geometry.getAttribute('color') as THREE.BufferAttribute;
+    this.color.setHex(PALETTE.charcoal);
+    for (let i = 0; i < colors.count; i++) colors.setXYZ(i, this.color.r, this.color.g, this.color.b);
+    colors.needsUpdate = true;
   }
 
   /** Rewrite the lens colours in place, once per phase change; off is charcoal on both sides. */

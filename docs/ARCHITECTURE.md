@@ -8,21 +8,23 @@ Short and current. Decision records at the bottom; add one when a decision would
 index.html            entry page: one canvas, one UI root, a loading overlay
 src/main.ts           boots App
 src/app/              App (glue, slow-motion time scale), loop.ts (fixed-step accumulator), bot.ts / trackBot.ts (autopilots), perf.ts (probe)
-src/sim/              headless simulation: SimWorld, Vehicle, playground, transforms, palette, math, events (ring log), economy (ECONOMY / DAMAGE / SWAP)
+src/sim/              headless simulation: SimWorld, Vehicle, playground, transforms, palette, math, events (ring log), economy (ECONOMY / DAMAGE / SWAP), balance (heat and bag values)
 src/sim/traffic/      Traffic (pooled agents, lent bodies, junctions), Pedestrians (footway walkers), lanes (lane tables, junction curves), tuning
 src/sim/life/         Life: hits, damage, wrecked / respawn, car-swap, takedowns, near misses, oncoming, billboards
+src/sim/heat/         Heat: the run's ratchet, fed from the event ring
+src/sim/police/       Pursuit (detection state machine), Police (units as traffic agents with a plan), tuning
 src/sim/city/         City (chunks, statics, road graph), architecture, markings, roads, collectibles (billboard placement + smash trigger)
-src/render/           Three.js: Renderer, ChaseCamera (look-ahead, reverse orbit, shake, whip, focus), CityView, TrafficView, PedView, Billboards, Debris, Smoke, SpeedLines, Sparks, carMesh (damage stages), carProfiles
+src/render/           Three.js: Renderer, ChaseCamera (look-ahead, reverse orbit, shake, whip, focus), CityView, TrafficView, PoliceView (livery, light bars), PedView, Billboards, Debris, Smoke, SpeedLines, Sparks, carMesh (damage stages), carProfiles
 src/audio/            EngineAudio (WebAudio synthesis), Sfx (event one-shots: sweep, honk, yelp, crunch, boom, whoosh, splinter, chime)
-src/ui/               Hud (popups, damage bar, wrecked overlay, swap prompt, billboard counter), Minimap (heading-up canvas radar) + minimapModel (pure maths), DebugPanel, styles.css
+src/ui/               Hud (popups, damage bar, wrecked overlay, swap prompt, billboard counter), heat (five stars), Minimap (heading-up canvas radar) + minimapModel (pure maths), DebugPanel, styles.css
 src/input/            actions, InputManager, KeyboardDevice
 src/platform/         Platform interface, LocalPlatform, createPlatform()
-tests/sim/            Vitest headless sim tests (handling, cars, walls, instrumentation, loop, city, traffic, pedestrians, damage, swap, takedown, collectibles)
+tests/sim/            Vitest headless sim tests (handling, cars, walls, instrumentation, loop, city, traffic, pedestrians, damage, swap, takedown, collectibles, heat, pursuit, police)
 tests/render/         Vitest camera pins (three.js math in Node, no WebGL)
 tests/ui/             Vitest minimap model pins (road layers, projection, easing, rim clamp)
 e2e/                  Playwright: smoke, perf, screens, city (M2 tour), life (M3 traffic run)
 tools/                verify.mjs, budget.mjs
-docs/                 BRIEF, PROGRESS, ARCHITECTURE, BACKLOG, CRAZYGAMES, STYLE, TITLES, ASSETS
+docs/                 BRIEF, PROGRESS, DESIGN, M4_PLAN, ARCHITECTURE, BACKLOG, CRAZYGAMES, STYLE, TITLES, ASSETS
 ```
 
 ## City (M2)
@@ -327,3 +329,5 @@ Pinned by `tests/sim/handling.test.ts` (29 tests; `cars.test.ts` repeats the cla
 23. **Wrecks are towed by age plus an instantaneous sight test** (M4). A wreck older than `wreckTow` (60 s) is freed the first step it is outside a 55° half-cone on the player's heading and beyond 40 m. A hidden-for timer reads better but never fires for a player circling one junction, which is the scrapyard case the rule exists for.
 24. **The sim step is timed by phase through a hook, never by the sim** (M4). `SimWorld.mark` is called at the end of each `SimPhase`; `src/app/simProfile.ts` owns the clock, because `src/sim` has no lib.dom and no Node types. Installed for measured runs only.
 25. **Keyboard taps are latched until read** (M4). A key down and up between two frames was never seen; `KeyboardDevice.tapped` reports it once. Input read while blocked is dropped, not replayed after an ad.
+26. **Police are a planner over traffic agents, not a second traffic system** (M4). A unit is an ordinary pooled record with `Traffic.police[i]` set and a bounded plan (`setPolicePlan`: a connected exit, a speed, an optional ram point) written by `sim/police/Police.ts` before `Traffic.step`. It therefore shares the 16-body lender, the junction reservations, the gap rules and the lane follower; a pursuit adds no Rapier bodies. Only three planner rules change for a unit: the speed limit comes from the plan, a plan-chosen exit overrides the random turn, and a chasing unit with a body does not brake for the player. Police records are exempt from the despawn radius so a unit that lost the player does not evaporate.
+27. **Sight is a fixed-collider ray, sampled** (M4). One `castRay` per unit every six steps, staggered, `ONLY_FIXED` so traffic never hides the player and buildings do. The pursuit is what the sampled rays say; heat is a separate ratchet that only a banked or busted run clears, so an escape ends the chase and leaves the stars.

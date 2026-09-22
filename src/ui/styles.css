@@ -87,6 +87,41 @@ body {
   font-family: var(--font-display);
 }
 
+/* The wanted row owns the upper-right corner; hints leave this space clear. */
+.hud__heat {
+  position: absolute;
+  top: calc(14px + var(--safe-top));
+  right: calc(24px + var(--safe-right));
+  display: flex;
+  gap: 4px;
+  padding: 6px 8px;
+  background: var(--ui-panel);
+  border-radius: 4px;
+  transform: skewX(-8deg);
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.6);
+}
+.hud__heat-star {
+  width: clamp(24px, 3.5vh, 32px);
+  height: clamp(24px, 3.5vh, 32px);
+  fill: none;
+  stroke: var(--ui-ink);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+.hud__heat-star.is-filled {
+  fill: var(--ui-accent);
+  stroke: var(--ui-accent);
+}
+.hud__heat.is-active .hud__heat-star.is-filled {
+  fill: var(--ui-danger);
+  stroke: var(--ui-danger);
+  animation: heat-pulse 1s ease-in-out infinite;
+}
+@keyframes heat-pulse { 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) {
+  .hud__heat.is-active .hud__heat-star.is-filled { animation: none; }
+}
+
 /* speedometer, bottom right */
 .hud__speedo {
   position: absolute;
@@ -426,7 +461,7 @@ body {
   flex-wrap: wrap;
   justify-content: center;
   gap: 6px 16px;
-  max-width: 92vw;
+  max-width: calc(100vw - 400px - var(--safe-left) - var(--safe-right));
   transition: opacity 0.5s;
 }
 .hud__hints.is-hidden {

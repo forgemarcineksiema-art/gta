@@ -12,6 +12,9 @@ import { createControls, type VehicleControls } from './controls';
 import { EventLog } from './events';
 import { Collectibles } from './city/collectibles';
 import { Life } from './life/Life';
+import { Heat } from './heat/Heat';
+import { Police } from './police/Police';
+import { Pursuit } from './police/Pursuit';
 import { buildPlayground, type PlaygroundLayout, type SpawnPoint } from './playground';
 import { POSE_STRIDE, Recorder } from './recorder';
 import type { DynamicDesc, StaticDesc } from './scene';
@@ -53,6 +56,8 @@ export interface SimWorldOptions {
   peds?: number;
   /** Damage, wrecks and respawn. Default: on in the city, off on the playground (the handling lab keeps the M1 pins). */
   damage?: boolean;
+  /** Initial heat points for pursuit probes. Normal play starts quiet. */
+  heat?: number;
 }
 
 interface TrackedBody {
@@ -83,6 +88,9 @@ export class SimWorld {
   readonly traffic: Traffic | null;
   readonly peds: Pedestrians | null;
   readonly life: Life;
+  readonly heat: Heat;
+  readonly pursuit: Pursuit;
+  readonly police: Police | null;
   /** The city's smashable billboards; null on the playground. */
   readonly collectibles: Collectibles | null;
   readonly statics: StaticDesc[];
@@ -162,6 +170,10 @@ export class SimWorld {
     this.peds = this.city && this.traffic ? new Pedestrians(this.transforms, this.city, this.traffic.lanes, opts.seed ?? 42, PEDS, this.pedsDensity) : null;
     this.collectibles = this.city ? new Collectibles(this.city) : null;
     this.life = new Life(this, opts.damage ?? this.city !== null);
+    this.heat = new Heat(this.events, this.traffic);
+    this.heat.add(opts.heat ?? 0);
+    this.pursuit = new Pursuit(this.events);
+    this.police = this.traffic ? new Police(this) : null;
     this.city?.sync(spawn.position.x, spawn.position.z, true);
   }
 
@@ -203,6 +215,7 @@ export class SimWorld {
       probe.halfWidth = he.x;
       probe.halfLength = he.z;
       this.traffic.playerColliderHandle = this.vehicle.collider.handle;
+      this.police?.preStep(probe, FIXED_DT);
       this.traffic.step(probe, FIXED_DT, this.events);
     }
     this.mark?.(SimPhase.Traffic);
@@ -214,6 +227,7 @@ export class SimWorld {
     this.traffic?.writeTransforms();
     this.peds?.writeTransforms();
     this.life.postStep(FIXED_DT);
+    this.heat.step();
     for (const t of this.tracked) {
       const p = t.body.translation(this.scratchPos);
       const r = t.body.rotation(this.scratchRot);

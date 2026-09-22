@@ -20,7 +20,7 @@ export class TrafficView {
   private readonly color = new THREE.Color();
   private paintSerial = -1;
 
-  constructor(scene: THREE.Scene, private readonly traffic: Traffic) {
+  constructor(scene: THREE.Scene, private readonly traffic: Traffic, private readonly civilians = true) {
     const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
     this.packed = CAR_IDS.map(() => {
       const ids = new Int16Array(traffic.capacity);
@@ -47,7 +47,7 @@ export class TrafficView {
       let n = 0;
       let wroteColor = false;
       for (let i = 0; i < traffic.capacity; i++) {
-        if (traffic.state[i] === AgentState.Free || traffic.kind[i] !== kind) continue;
+        if (traffic.state[i] === AgentState.Free || traffic.kind[i] !== kind || (!this.civilians && !traffic.police[i])) continue;
         const slot = traffic.slot[i] as number;
         const p = slot * 3;
         const r = slot * 4;
@@ -66,7 +66,7 @@ export class TrafficView {
         mesh.setMatrixAt(n, this.scratchM.compose(this.scratchP, this.scratchQ, this.scratchS));
         if (repaint || pack[n] !== i) {
           const wrecked = traffic.state[i] === AgentState.Wrecked;
-          this.color.setHex(wrecked ? PALETTE.charcoal : (traffic.paint[i] as number));
+          this.color.setHex(wrecked ? PALETTE.charcoal : traffic.police[i] ? PALETTE.policeWhite : (traffic.paint[i] as number));
           mesh.setColorAt(n, this.color);
           pack[n] = i;
           wroteColor = true;

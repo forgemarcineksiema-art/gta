@@ -2,6 +2,110 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-22 — M4 slice 1: heat and pursuit, level-1 patrols
+
+Verify green before the first edit and at the commit.
+
+### Done
+
+- **Heat is a ratchet** (`src/sim/heat/Heat.ts`, numbers in `src/sim/balance.ts`).
+  It owns a cursor into the event ring and reads the same log everything else
+  polls: traffic takedown +4, police takedown +10, billboard +2, capped at 100,
+  thresholds 20/40/60/80/100. It never falls inside a run; only `reset()` (the
+  hideout door, slice 3) clears it. A police takedown is told from a civilian
+  one by `Traffic.police[agent]`, not by the car class, so a swapped-into patrol
+  car does not pay police money.
+- **Pursuit is a state** (`src/sim/police/Pursuit.ts`): `idle → detected →
+  active → lost → idle`. Line of sight restarts the whole escape window;
+  losing it counts the level's cooldown down (6/8/10/12/15 s) and the step it
+  reaches zero pushes an `escape` event and returns to `idle`. Heat survives it,
+  so the next patrol that sees the player answers at the same level.
+- **Patrols are traffic agents** (`src/sim/police/Police.ts`,
+  `src/sim/police/tuning.ts`). Level 1 keeps two units alive; they use the same
+  pooled records, the same body lender and the same path follower as civilian
+  traffic, so a pursuit costs no new Rapier bodies. `Police.preStep` runs before
+  `Traffic.step` and writes a bounded plan per unit (`setPolicePlan`: a
+  connected exit lane, a speed, optionally a ram point); everything else in the
+  planner is the M3 code. A unit with no plan drives its lane like any other car.
+- **Routing** is a reverse Dijkstra over the 49 nodes toward the lane the
+  player's projected position (1.2 s ahead) sits on, refreshed at 2 Hz; each
+  unit then picks the cheapest exit of its own lane. **Ramming** is a lent body
+  steered at the player's lead point with its own acceleration cap: Rapier's
+  contact does the shoving, nothing teleports or stops the player dead.
+- **Detection** is one `castRay` per unit every 6 steps, staggered, against
+  fixed colliders only (`ONLY_FIXED`), 90 m, from the unit's roof height to the
+  player's body. Traffic never blocks sight; buildings do, which is what slice 6
+  builds on.
+- **Spawning** never happens in front of the player: the whole car footprint
+  must clear a 55° half-cone and 40 m (`Traffic.outOfView`), 45–180 m away,
+  scored toward a point 65 m behind the player and against the lane's own
+  heading. When the agent pool is full, only an unseen, undisturbed civilian
+  gives up its slot. A wrecked patrol is replaced after `reinforceSeconds` (8 s),
+  so writing one off buys real time.
+- **HUD**: five stars upper right, filled by heat level, the filled ones pulsing
+  red only while the pursuit is `active` (`src/ui/heat.ts`). No text; the
+  aria-label carries the state. **Livery** (`src/render/PoliceView.ts`): the
+  instanced police body goes policeWhite with a policeBlue flank band, ink
+  fittings and a roof bar whose two lenses alternate blue/red at 2 Hz by
+  rewriting vertex colours. No lights, no textures, no extra shadow pass.
+- `?heat=1..5` starts a run at that level for playtesting; the debug line and
+  `render_game_to_text()` carry heat, pursuit state, cooldown and unit count.
+
+### Measured
+
+- **Bot at heat 1, 120 s headless** (city, seed 42, traffic on): 27.4 s in
+  pursuit (23 % of the run), 12.5 s of cooldown, **2 escapes (1.0/min)**, 1 ram
+  landed on the player, first patrol dispatched 0.02 s after the run started,
+  never more than 2 units, 0 bot resets, no NaN. Node step mean 0.62 ms with
+  police, traffic and peds all running.
+- Pins: `tests/sim/heat.test.ts` (each crime counted once, monotonic, capped,
+  police worth more), `tests/sim/pursuit.test.ts` (every level escapes on
+  exactly its cooldown step and only once; reacquisition restarts the window;
+  heat 0 never detects), `tests/sim/police.test.ts` (pair dispatched within 3 s,
+  no spawn inside the view cone over a 90 s drive, a wreck replaced after the
+  reinforcement delay, the civilian pool stays alive).
+- `npm run verify` green: 187 tests in 25 files (was 176/22), both typechecks,
+  lint, build, smoke, budget. Startup 3.51 MB (was 3.49; the police view, the
+  stars and the pursuit code are ~18 kB of the bundle).
+- Smoke, heat 0 so the police loop is idle: 57.6 fps, frame p95 16.8 ms, 97
+  draw calls, 194k tris, gameplay-start 2.66 s — the session's pre-slice
+  baseline was 56.7 / 16.8 / 97 / 196k / 3.08 s. A first smoke read 54.0 fps
+  and p95 33.3 ms with my inspection browser open on the same machine; the
+  re-run with it closed matched the baseline. The lesson from session 6 holds:
+  nothing else may be rendering during a measured run.
+
+### Decided
+
+- **Police are a planner on top of traffic, not a second traffic system**
+  (decision 26). The body pool, the junction reservations and the lane follower
+  are the expensive parts and they already exist; a unit is a civilian record
+  with a plan and a flag.
+- **The roster is maintained, not dispatched once.** An earlier draft sent the
+  pair at the first heat rise and never again, which made two takedowns the end
+  of the police for the rest of the run.
+- **A patrol that loses the player withdraws and then goes back to ordinary
+  lane driving.** It only re-detects after it is 120 m away and out of view, so
+  an escape is real, but the same car can find the player again later — that is
+  the design's "heat stays, the next detection answers at this level".
+- Police agents are exempt from the traffic despawn radius; otherwise a unit
+  that lost the player would evaporate mid-pursuit.
+
+### Next
+
+- Slice 2: per-level unit budgets, interceptors from level 2, pool priority for
+  police bodies with a floor for the player's nearby traffic, and the browser
+  step p95 A/B against the slice 0 baseline (traffic 1.55 ms mean / 3.0 p95).
+- Marcin: `?heat=1&spawn=crown`, earn a takedown or two, break line of sight in
+  the grid and count the seconds to the stars going quiet.
+
+### Open problems
+
+- A patrol that rams a parked player sometimes writes itself off on the
+  player's chassis; comic, but it pays the player heat. Watch it at level 2.
+- The spawn search scans every lane at 10 m samples on a dispatch tick
+  (~4,500 pose evaluations, 4 Hz at most while a unit is missing). Cheap today,
+  but it wants a lane index when level 5 dispatches eight units.
+
 ## 2026-09-22 — Six speeds on every car (Marcin's request)
 
 Out of the M4 slice order: Marcin asked for five or six gears in every car.

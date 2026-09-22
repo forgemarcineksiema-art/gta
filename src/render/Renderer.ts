@@ -16,6 +16,7 @@ import { gableGeometry, prismGeometry } from './geometry';
 import { buildSkyline } from './skyline';
 import { TrafficView } from './TrafficView';
 import { PedView } from './PedView';
+import { PoliceView } from './PoliceView';
 import { Billboards } from './Billboards';
 import { Debris } from './Debris';
 import { Smoke } from './Smoke';
@@ -44,6 +45,7 @@ export class Renderer {
   readonly billboards: Billboards | null;
   readonly trafficView: TrafficView | null;
   readonly pedView: PedView | null;
+  readonly policeView: PoliceView;
   quality: QualityTier = 'low';
   private qualityElapsed = 0;
   private qualityFrames = 0;
@@ -136,7 +138,7 @@ export class Renderer {
       const view = this.billboards;
       this.cityView.onChunk = (chunk) => view.add(chunk.billboards);
     }
-    this.trafficView = sim.traffic && sim.trafficDensity > 0 ? new TrafficView(this.scene, sim.traffic) : null;
+    this.trafficView = sim.traffic && (sim.trafficDensity > 0 || sim.police) ? new TrafficView(this.scene, sim.traffic, sim.trafficDensity > 0) : null;
     this.pedView = sim.peds && sim.pedsDensity > 0 ? new PedView(this.scene, sim.peds) : null;
     if (sim.city) this.scene.add(buildSkyline(sim.city));
     if (sim.statics.length) this.buildStatics(sim.statics);
@@ -160,6 +162,7 @@ export class Renderer {
     this.cars = cars as Record<CarId, CarMesh>;
     this.carId = sim.carId;
     this.car = this.cars[sim.carId];
+    this.policeView = new PoliceView(this.scene, sim, this.cars.police);
     // the best-lap ghost: the same car, translucent, no shadow, wheels carried by the body
     this.ghost = buildCarMesh(sim.vehicle.tuning, profile, PALETTE.carBlue);
     this.ghost.root.traverse((o) => {
@@ -310,6 +313,7 @@ export class Renderer {
     this.applyTransforms(alpha);
     this.trafficView?.update(this.sim.transforms, alpha);
     this.pedView?.update(this.sim.transforms, alpha);
+    this.policeView.update(alpha);
     const tm = this.sim.vehicle.telemetry;
     const carPos = this.car.root.position;
     // A fixed step can clear the sim's respawn flag before the next render frame.
@@ -440,6 +444,7 @@ export class Renderer {
 
   dispose(): void {
     this.cityView?.dispose();
+    this.policeView.dispose();
     this.renderer.dispose();
   }
 

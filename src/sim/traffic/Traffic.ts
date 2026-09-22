@@ -84,6 +84,8 @@ export class Traffic {
   readonly lanes: LaneTables;
   readonly state: Uint8Array;
   readonly kind: Uint8Array;
+  /** Pursuit membership, independent of car class; retained on a police wreck until free or swap. */
+  readonly police: Uint8Array;
   readonly paint: Uint32Array;
   readonly slot: Int16Array;
   readonly lane: Int16Array;
@@ -144,6 +146,13 @@ export class Traffic {
   private readonly bodyKind: Int8Array;
   private readonly agentBody: Int16Array;
   private readonly reattachLeft: Float32Array;
+  private readonly plannerLane: Int16Array;
+  private readonly plannerNext: Int16Array;
+  private readonly plannerSpeed: Float32Array;
+  private readonly ramX: Float32Array;
+  private readonly ramZ: Float32Array;
+  private readonly ramSpeed: Float32Array;
+  private readonly ramAccel: Float32Array;
   private readonly lin = { x: 0, y: 0, z: 0 };
   private readonly ang = { x: 0, y: 0, z: 0 };
   private readonly pos = { x: 0, y: 0, z: 0 };
@@ -185,6 +194,7 @@ export class Traffic {
     const n = this.capacity;
     this.state = new Uint8Array(n);
     this.kind = new Uint8Array(n);
+    this.police = new Uint8Array(n);
     this.paint = new Uint32Array(n);
     this.slot = new Int16Array(n);
     this.lane = new Int16Array(n);
@@ -228,6 +238,15 @@ export class Traffic {
     this.agentBody = new Int16Array(n);
     this.reattachLeft = new Float32Array(n);
     this.agentBody.fill(-1);
+    this.plannerLane = new Int16Array(n);
+    this.plannerNext = new Int16Array(n);
+    this.plannerSpeed = new Float32Array(n);
+    this.ramX = new Float32Array(n);
+    this.ramZ = new Float32Array(n);
+    this.ramSpeed = new Float32Array(n);
+    this.ramAccel = new Float32Array(n);
+    this.plannerLane.fill(-1);
+    this.plannerNext.fill(-1);
     this.bodyAgent = new Int16Array(tuning.physicsBodies);
     this.bodyAgent.fill(-1);
     this.bodyKind = new Int8Array(tuning.physicsBodies);
@@ -351,11 +370,75 @@ export class Traffic {
     return i;
   }
 
+  /** A clear graph pose; police use the same records and the same body lender as civilians. */
+  canSpawnAt(lane: number, s: number, clearance: number): boolean {
+    this.lanes.positionAt(lane, s, 0, this.pose);
+    return !this.nearWorld(this.pose.x, this.pose.z, clearance);
+  }
+
+  /** Includes the whole car footprint and the near exclusion, not just its centre. */
+  outOfView(x: number, z: number, radius: number, player: PlayerProbe, near: number, cosHalf: number): boolean {
+    const dx = x - player.x, dz = z - player.z;
+    const distance = Math.hypot(dx, dz);
+    if (distance <= near + radius) return false;
+    const along = dx * Math.sin(player.yaw) + dz * Math.cos(player.yaw);
+    const boundary = cosHalf * Math.sqrt(distance * distance - radius * radius)
+      - Math.sqrt(1 - cosHalf * cosHalf) * radius;
+    return along < boundary;
+  }
+
+  /** Only an unseen, undisturbed civilian may give up a full agent slot. */
+  spawnPoliceAt(lane: number, s: number, player: PlayerProbe, near: number, cosHalf: number, clearance: number): number {
+    if (!this.canSpawnAt(lane, s, clearance)) return -1;
+    const radius = Math.hypot(this.halfW[KIND_INDEX.police] as number, this.halfL[KIND_INDEX.police] as number);
+    if (!this.outOfView(this.pose.x, this.pose.z, radius, player, near, cosHalf)) return -1;
+    let agent = this.findFree();
+    if (agent < 0) {
+      let farthest = 0;
+      for (let i = 0; i < this.capacity; i++) {
+        if (this.police[i] !== 0 || (this.state[i] !== AgentState.Kinematic && this.state[i] !== AgentState.Physical)) continue;
+        const x = this.x[i] as number, z = this.z[i] as number;
+        const r = Math.hypot(this.halfWidthOf(i), this.halfLengthOf(i));
+        if (!this.outOfView(x, z, r, player, near, cosHalf)) continue;
+        const d = (x - player.x) ** 2 + (z - player.z) ** 2;
+        if (d > farthest) { farthest = d; agent = i; }
+      }
+      if (agent < 0) return -1;
+      this.free(agent);
+    }
+    this.place(agent, lane, s, KIND_INDEX.police, 0, AgentState.Kinematic, PLAYER_PAINT.police);
+    this.police[agent] = 1;
+    return agent;
+  }
+
+  /** Bounded planner inputs: a connected exit, speed, and an optional physical ram target. */
+  setPolicePlan(agent: number, next: number, speed: number, ramX = 0, ramZ = 0, ramSpeed = 0, ramAccel = 0): void {
+    if (this.police[agent] !== 1) return;
+    const lane = this.lane[agent] as number;
+    this.plannerLane[agent] = lane;
+    this.plannerNext[agent] = lane >= 0 && this.lanes.outs(lane).includes(next) ? next : -1;
+    this.plannerSpeed[agent] = Math.max(0, speed);
+    this.ramX[agent] = ramX;
+    this.ramZ[agent] = ramZ;
+    this.ramSpeed[agent] = Math.max(0, ramSpeed);
+    this.ramAccel[agent] = Math.max(0, ramAccel);
+  }
+
+  clearPolicePlan(agent: number): void {
+    this.plannerLane[agent] = -1;
+    this.plannerNext[agent] = -1;
+    this.plannerSpeed[agent] = 0;
+    this.ramSpeed[agent] = 0;
+    this.ramAccel[agent] = 0;
+  }
+
   /** Test hook: a stopped car (wreck or abandoned) at a point, off the lane graph. */
   spawnAtPoint(x: number, z: number, yaw: number, kind: CarId, state: AgentState.Wrecked | AgentState.Abandoned): number {
     const i = this.findFree();
     if (i < 0) return -1;
     this.state[i] = state;
+    this.police[i] = 0;
+    this.clearPolicePlan(i);
     this.kind[i] = KIND_INDEX[kind];
     this.paint[i] = PAINTS[0] as number;
     this.lane[i] = -1;
@@ -405,6 +488,8 @@ export class Traffic {
       out.vz = Math.cos(yaw) * speed;
     }
     this.releaseHolds(agent);
+    this.police[agent] = 0;
+    this.clearPolicePlan(agent);
     this.state[agent] = oldWrecked ? AgentState.Wrecked : AgentState.Abandoned;
     this.kind[agent] = KIND_INDEX[oldKind];
     this.paint[agent] = oldPaint;
@@ -492,10 +577,12 @@ export class Traffic {
     const nxt = this.next[i] as number;
     const s = this.s[i] as number;
     let limit = this.lanes.limit[lane] as number;
+    const chasing = (this.plannerSpeed[i] as number) > 0;
+    if (chasing) limit = this.plannerSpeed[i] as number;
     if (nxt >= 0 && s >= len - 6 && this.turn[i] === 1) limit = t.speedJunction;
     let gap = this.leaderGap(i);
     let blocker = gap < 1e8 ? 1 : 0;
-    const pGap = this.playerGapOf(i, player);
+    const pGap = chasing && this.hasBody(i) ? Infinity : this.playerGapOf(i, player);
     if (pGap < gap) { gap = pGap; blocker = 2; }
     const aGap = this.aheadGap(i);
     if (aGap < gap) { gap = aGap; blocker = 3; }
@@ -597,8 +684,15 @@ export class Traffic {
     const body = this.bodies[this.agentBody[i] as number] as RAPIER.RigidBody;
     const lane = this.lane[i] as number;
     if (lane < 0) return;
-    const desired = this.plan(i, player, dt, events);
-    this.lanes.positionAt(lane, (this.s[i] as number) + CARROT, this.laneOffset[i] as number, this.pose, this.next[i]);
+    let desired = this.plan(i, player, dt, events);
+    const ramming = (this.ramAccel[i] as number) > 0;
+    if (ramming) {
+      this.pose.x = this.ramX[i] as number;
+      this.pose.z = this.ramZ[i] as number;
+      desired = Math.min(desired, this.ramSpeed[i] as number);
+    } else {
+      this.lanes.positionAt(lane, (this.s[i] as number) + CARROT, this.laneOffset[i] as number, this.pose, this.next[i]);
+    }
     const dx = this.pose.x - (this.x[i] as number);
     const dz = this.pose.z - (this.z[i] as number);
     const len = Math.hypot(dx, dz) || 1;
@@ -606,15 +700,19 @@ export class Traffic {
     // A car spun round by a hit turns back on the spot before it drives on, so it never reverses along its path.
     let toCarrot = Math.atan2(dx, dz) - yaw;
     toCarrot = Math.atan2(Math.sin(toCarrot), Math.cos(toCarrot));
-    const turningBack = Math.abs(toCarrot) > Math.PI / 3;
+    const turningBack = !ramming && Math.abs(toCarrot) > Math.PI / 3;
     const speedTarget = turningBack ? 0 : desired;
     body.linvel(this.lin);
     const left = this.reattachLeft[i] as number;
     const blend = left > 0 ? 1 - left / t.reattachBlend : 1;
     if (left > 0) this.reattachLeft[i] = Math.max(0, left - dt);
     const k = Math.min(1, 6 * dt) * Math.max(0, Math.min(1, blend));
-    this.lin.x += (dx / len * speedTarget - this.lin.x) * k;
-    this.lin.z += (dz / len * speedTarget - this.lin.z) * k;
+    const dvx = dx / len * speedTarget - this.lin.x;
+    const dvz = dz / len * speedTarget - this.lin.z;
+    // A ram accelerates only the patrol's lent body. Rapier contacts deliver the shove.
+    const gain = ramming ? Math.min(k, (this.ramAccel[i] as number) * dt / (Math.hypot(dvx, dvz) || 1)) : k;
+    this.lin.x += dvx * gain;
+    this.lin.z += dvz * gain;
     body.setLinvel(this.lin, true);
     // Heading: a first-order controller with a rate cap (stable while yawGain × dt < 1).
     // Moving, the nose follows the motion so the car never crabs; stopped, it turns toward the path.
@@ -702,7 +800,7 @@ export class Traffic {
     const node = this.lanes.toNode[lane] as number;
     // A holder is already committed: it keeps going (gaps still stop it behind anyone in the box).
     if (this.isHolder(node, i)) return true;
-    if (this.playerNear(node, player)) return false;
+    if ((this.plannerSpeed[i] as number) <= 0 && this.playerNear(node, player)) return false;
     const fromHighway = (this.lanes.limit[lane] as number) === t.speedHighway;
     if (!fromHighway && this.highwayNode(node) && this.highwayApproaching(node)) return false;
     if (this.turn[i] === 0 && fromHighway) return true;
@@ -830,6 +928,12 @@ export class Traffic {
     if (lane < 0) return;
     const len = this.lanes.length[lane] as number;
     if ((this.s[i] as number) < len - 6) return;
+    const planned = this.plannerNext[i] as number;
+    if (this.plannerLane[i] === lane && planned >= 0) {
+      this.next[i] = planned;
+      this.turn[i] = this.lanes.straightThrough(lane, planned) ? 0 : 1;
+      return;
+    }
     const outs = this.lanes.outs(lane);
     const uturn = this.lanes.uturn(lane);
     // Highway cars mostly keep their lane: a uniform pick weaves across the carriageway and drains the loop.
@@ -1124,6 +1228,12 @@ export class Traffic {
 
   private place(i: number, lane: number, s: number, kind: number, offset: number, state: AgentState, paint: number): void {
     this.state[i] = state;
+    this.police[i] = 0;
+    this.clearPolicePlan(i);
+    this.contactDv[i] = 0;
+    this.playerDv[i] = 0;
+    this.wallDv[i] = 0;
+    this.trafficDv[i] = 0;
     this.kind[i] = kind;
     this.paint[i] = paint;
     this.lane[i] = lane;
@@ -1153,6 +1263,8 @@ export class Traffic {
     if ((this.agentBody[i] as number) >= 0) this.releaseBody(i);
     this.releaseHolds(i);
     this.state[i] = AgentState.Free;
+    this.police[i] = 0;
+    this.clearPolicePlan(i);
     this.next[i] = -1;
     this.lane[i] = -1;
   }
@@ -1185,7 +1297,7 @@ export class Traffic {
   private despawn(player: PlayerProbe): void {
     const r2 = this.tuning.despawn * this.tuning.despawn;
     for (let i = 0; i < this.capacity; i++) {
-      if (this.state[i] === AgentState.Free) continue;
+      if (this.state[i] === AgentState.Free || this.police[i] === 1) continue;
       const dx = (this.x[i] as number) - player.x;
       const dz = (this.z[i] as number) - player.z;
       if (dx * dx + dz * dz > r2) this.free(i);

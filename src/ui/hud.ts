@@ -5,6 +5,7 @@
 import { AgentState } from '../sim';
 import type { SimEvent, SimWorld } from '../sim';
 import { Minimap } from './minimap';
+import { HeatHud } from './heat';
 
 export interface HudDebugInfo {
   fps: number;
@@ -34,6 +35,7 @@ export interface KeyHints {
 
 export class Hud {
   private readonly minimap: Minimap | null;
+  private readonly heat: HeatHud;
   readonly root: HTMLElement;
   private readonly speed: HTMLElement;
   private readonly gear: HTMLElement;
@@ -88,6 +90,7 @@ export class Hud {
     this.root = el('div', 'hud');
     parent.appendChild(this.root);
     this.minimap = sim.city ? new Minimap(this.root, sim) : null;
+    this.heat = new HeatHud(this.root, sim);
 
     const speedo = el('div', 'hud__speedo');
     const speedRow = el('div', 'hud__speed-row');
@@ -258,6 +261,7 @@ export class Hud {
     // radar paints its own canvas at its own cadence, off the layout path.
     this.frameIndex++;
     this.minimap?.update(sim, dt, now);
+    this.heat.update(sim);
     const tm = sim.vehicle.telemetry;
     const kmh = Math.round(Math.abs(tm.speedKmh));
     const speedText = String(kmh);

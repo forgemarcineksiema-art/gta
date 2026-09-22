@@ -6,7 +6,7 @@
 export type EventKind =
   | 'nearMiss' | 'nearMissOncoming' | 'nearMissPed' | 'oncoming'
   | 'hit' | 'damage' | 'wrecked' | 'respawn'
-  | 'takedown' | 'takedownTraffic' | 'swap' | 'billboard' | 'honk';
+  | 'takedown' | 'takedownTraffic' | 'swap' | 'billboard' | 'honk' | 'escape';
 
 export interface SimEvent {
   kind: EventKind;

@@ -1,0 +1,10 @@
+import { rolldown } from 'rolldown';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+const entry = process.argv[2];
+if (!entry) throw new Error('Expected TypeScript probe path');
+const file = resolve('output/probe-bundle.mjs');
+const bundle = await rolldown({ input: resolve(entry), platform: 'node', external: ['@dimforge/rapier3d-compat'] });
+await bundle.write({ file, format: 'esm' });
+await bundle.close();
+await import(pathToFileURL(file).href);

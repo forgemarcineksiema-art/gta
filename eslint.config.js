@@ -29,7 +29,7 @@ const policies = Object.entries(LAYERS).map(([type, l]) => ({
 }));
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'node_modules/**', 'perf/**', 'screens/**', 'test-results/**', 'playwright-report/**'] },
+  { ignores: ['dist/**', 'node_modules/**', 'output/**', 'perf/**', 'screens/**', 'test-results/**', 'playwright-report/**'] },
   ...tseslint.configs.recommendedTypeChecked,
   {
     languageOptions: {

@@ -19,6 +19,7 @@ import { CITY_BOT_TUNING, TrackBot } from './trackBot';
 import { FixedStepLoop } from './loop';
 import { PerfProbe, heapMb } from './perf';
 import { SimProfile } from './simProfile';
+import { BALANCE, POLICE } from '../sim';
 
 /** Filled during `App.boot`; copied into the handle for `?dev` and the startup gate. */
 const bootTimings: Record<string, number> = {};
@@ -158,6 +159,8 @@ export class App {
         economy: ECONOMY as unknown as Record<string, number>,
         damage: DAMAGE as unknown as Record<string, number>,
         swap: SWAP as unknown as Record<string, number>,
+        balance: BALANCE as unknown as Record<string, number>,
+        police: POLICE as unknown as Record<string, number>,
       },
     });
     this.hud.setDebugVisible(dev);
@@ -193,6 +196,8 @@ export class App {
         map: sim.city ? 'city' : 'playground', seed: sim.city?.seed,
         carId: sim.carId,
         damage: { value: sim.life.state.damage, stage: sim.life.state.stage, wrecked: sim.life.state.wrecked },
+        heat: { points: sim.heat.points, level: sim.heat.level },
+        pursuit: { state: sim.pursuit.state, cooldown: sim.pursuit.cooldown, units: sim.police?.count ?? 0, escapes: sim.pursuit.escapes },
         traffic: sim.traffic ? { kinematic: sim.traffic.count(AgentState.Kinematic), physical: sim.traffic.count(AgentState.Physical), wrecked: sim.traffic.count(AgentState.Wrecked) } : null,
         peds: sim.peds ? { count: sim.peds.count(), hops: sim.peds.guaranteeHops } : null,
         billboards: sim.collectibles ? { smashed: sim.collectibles.smashedCount, total: sim.collectibles.total } : null,
@@ -258,6 +263,7 @@ export class App {
       seed: Number.isFinite(seed) ? seed : 42,
       traffic,
       peds,
+      heat: Math.max(0, Math.min(100, Number(params.get('heat') ?? 0) * 20)),
       ...(spawn ? { spawn } : {}),
       ...(car ? { car } : {}),
     });

@@ -44,6 +44,8 @@ for (const quality of ['low', 'high']) {
         let draws = 0, triangles = 0, meshes = 0, geometry = 0, physics = 0;
         for (let i = 0; i < 6000 && !roadBot.tourComplete; i++) {
           roadBot.drive(sim, sim.controls, 1 / 60); sim.step();
+          // this measures streaming, not a chase: the speed cameras on the tour would raise the heat
+          if (sim.heat.points > 0) sim.heat.reset();
           if (i % 15 === 0) {
             renderer.render(1, 0.25);
             draws = Math.max(draws, renderer.stats.drawCalls); triangles = Math.max(triangles, renderer.stats.triangles);

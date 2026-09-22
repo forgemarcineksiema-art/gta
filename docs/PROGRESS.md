@@ -2,6 +2,90 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-22 — M4 slice 4: the cold open on the jobs skeleton
+
+### Done
+
+- `sim/jobs/Jobs.ts`, the skeleton of M5 §3.3: one `delivery` kind; a 4 m
+  ring starts it (`jobStart`, its heat once, the clock), arriving within
+  4 m of the target pays `payout × (1 + 0.5 × remaining / limit)` through
+  `jobDone` (the bag takes it in `Run`), the clock fails it (`jobFailed`);
+  2 s done/failed hold; one job at a time; `Run.endRun` abandons it
+  silently. `add`/`remove` for run-time defs, a `serial` for the views.
+- `sim/run/ColdOpen.ts`: `start()` puts a stage-2 heavy on the `loop`
+  spawn rolling at 43 km/h, heat 20, a muscle car 40 m ahead 3.2 m to the
+  right held alongside by `Traffic.setGuidePlan` (the player's speed ± a
+  6 m/s nudge from the gap) for 15 s; the route; its coin line
+  (`Coins.addExtra`, ids after every chunk's, 116 coins); the delivery def.
+  Verbs are done in any order from the ring and the keys; the caption is
+  the first verb not done while its cue holds (swap: a car in reach; smash:
+  the gate within 150 m; takedown: a unit within 20 m; deliver: the marker
+  within 200 m). Swap gives up when the candidate goes, boost after 12 s,
+  smash once the car is 20 m past the gate, takedown after 20 s. The door
+  ends it; `skip()` ends it at once. No arrest and no busted while it runs.
+- `sim/city/route.ts`: the lane chain (Dijkstra), junction curves, a
+  smoothstep swerve through a gate, the turn into a garage, 3 m resampling
+  and the door crawl; `app/doorRoute.ts` now uses it.
+- UI: `ui/coldOpen.ts` captions top centre (keycaps and one word; the
+  three keyless verbs a short line), `N SKIP` underneath, the key hints
+  hidden meanwhile, the bottom swap prompt hidden while the caption says
+  it. `render/MarkerView.ts` (ring and beacon, carOrange, unlit, pulsing),
+  a ring glyph on the radar, the route's coins in the coin view.
+- App: the cold open runs on a load with no `bot`, `spawn`, `heat`, `car`,
+  `map` or `manual` parameter while `sessionStorage.coldOpenSeen` is clear;
+  `?coldopen=1` forces it, `?coldopen=0` stops it. `KeyN` joins `Enter` on
+  `skip`.
+- Tests: `jobs.test.ts` 4.7–4.8, `coldOpen.test.ts` 4.1–4.6, e2e 4.9 in
+  `heat.spec.ts`, and the first caption at the ten sizes in
+  `screens.spec.ts`.
+
+### Measured (seed 42, traffic on, the scripted bot of 4.5)
+
+- Done in 89.1 s (limit 120). Captions: steer 0.0 s, swap 5.4, boost 5.5,
+  smash 10.1 (the gate 150 m ahead), escape 42.0; takedown never cued (the
+  pair lost the bot at 5.4 s on the diagonal at 110 km/h and was never
+  within 20 m again), timed out at 42.0. Events: swap 5.5 s, billboard
+  22.0, jobStart 34.4, jobDone 84.2 (6,671 with the time bonus), door 89.1,
+  banked 8,671 at ×1.
+- Route 1,305 m: diagonal 318 m, the gate at 381 m, the marker at 600 m,
+  the door at 1,299 m.
+- City startup with the cold open (20 Mbit, 4× CPU): 3.35 s to control
+  (M3: 3.05 s). The world is built at the `loop` spawn when the cold open
+  runs, so `start()` costs 1–13 ms in Node instead of 35–147 ms (it had
+  loaded the chunks twice). Verify: 210 quick tests.
+
+### Decided (set here)
+
+- The route. The plan put the smash gate on the diagonal, but billboards
+  keep 6.5 m off the authored roads, so there is none; and the hideout
+  stands 150 m from the tower junction, so "the hideout 300 m past the
+  marker" cannot hold on any loop. The route turns sharp right at the
+  tower, swerves left across the carriageway through the footway gate by
+  the hideout's own door (board 32, the one gate within reach before the
+  marker), and goes anticlockwise round the hideout's block: the marker at
+  600 m as planned, the door 700 m after it. Trees and lamps are decor
+  without colliders, so the swerve only has to miss the garage wall
+  (3.3 m).
+- Verbs in any order, captions in order. A strict sequence would stall on
+  a player who smashed the gate before swapping; the first-not-done rule
+  keeps the captions in the plan's order and never asks for what is done.
+- The session flag is set when the cold open starts, not when it ends: the
+  DESIGN rule is "never shown twice" and 4.9 reloads mid-script.
+- `skip` on `KeyN` and `Enter`: the plan said skip had no key; `Enter` was
+  already bound. The caption shows N.
+- No busted and no boxing while it runs: the first minute teaches verbs,
+  and a novice who stops to read a caption must not meet the fine.
+
+### Next
+
+- Slice 5: identity.
+
+### Open problems
+
+- The pair rarely reaches a bot doing 110 km/h on the diagonal, so the
+  takedown beat is usually skipped by its timeout. Marcin's first minute
+  by hand decides whether the patrols need a head start in the cold open.
+
 ## 2026-09-22 — M4 slice 3b: coins and the spill
 
 Marcin: work autonomously to the end of M4. Slice 3b first.

@@ -789,3 +789,65 @@ kbd.key {
   letter-spacing: 0.1em;
   color: var(--ui-ink);
 }
+
+/* cold open captions: top centre where the key hints sit (hidden meanwhile); keycaps and one word */
+.cold {
+  position: absolute;
+  left: 50%;
+  top: calc(16px + var(--safe-top));
+  transform: translateX(-50%);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100vw - 380px - var(--safe-left) - var(--safe-right));
+  pointer-events: none;
+}
+.cold.is-active { display: flex; }
+.cold__line {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cold__caption {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  transform: skewX(-10deg);
+}
+.cold__caption.is-visible { display: flex; animation: cold-in 0.25s ease-out; }
+.cold__key {
+  font-size: 20px;
+  min-width: 22px;
+  padding: 3px 9px;
+}
+.cold__word {
+  margin-left: 6px;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.08em;
+  color: var(--ui-ink);
+  text-shadow: 2px 3px 0 #000;
+  white-space: nowrap;
+}
+.cold__caption--swap .cold__word { color: var(--ui-accent-2); }
+.cold__caption--takedown .cold__word, .cold__caption--escape .cold__word { color: var(--ui-accent); }
+.cold__skip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--ui-ink-dim);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+}
+@keyframes cold-in {
+  from { opacity: 0; transform: skewX(-10deg) translateY(-6px); }
+  to { opacity: 1; transform: skewX(-10deg) translateY(0); }
+}

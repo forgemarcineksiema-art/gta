@@ -25,6 +25,7 @@ const BINDINGS: Record<string, Action> = {
   KeyE: 'swap',
   KeyM: 'mute',
   Enter: 'skip',
+  KeyN: 'skip',
 };
 
 /** Primary key shown in overlays, per action. */
@@ -41,7 +42,7 @@ const PRIMARY: Partial<Record<Action, string>> = {
   debug: 'Backquote',
   swap: 'KeyE',
   mute: 'KeyM',
-  skip: 'Enter',
+  skip: 'KeyN',
 };
 
 const FALLBACK_LABEL: Record<string, string> = {

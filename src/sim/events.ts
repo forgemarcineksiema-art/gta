@@ -8,7 +8,9 @@ export type EventKind =
   | 'hit' | 'damage' | 'wrecked' | 'respawn'
   | 'takedown' | 'takedownTraffic' | 'swap' | 'billboard' | 'honk' | 'escape'
   // the run (M4): money and its endings; camera, roadblock and jump are pushed from slice 6
-  | 'camera' | 'roadblock' | 'jump' | 'door' | 'banked' | 'busted' | 'coin' | 'spill';
+  | 'camera' | 'roadblock' | 'jump' | 'door' | 'banked' | 'busted' | 'coin' | 'spill'
+  // jobs (M4 slice 4 skeleton): value = payout on start, paid on done; target = the def's id
+  | 'jobStart' | 'jobDone' | 'jobFailed';
 
 export interface SimEvent {
   kind: EventKind;

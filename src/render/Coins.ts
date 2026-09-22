@@ -9,7 +9,7 @@
  */
 import * as THREE from 'three';
 import { PALETTE, type SimWorld } from '../sim';
-import type { CoinDesc, Coins as SimCoins } from '../sim/city/coins';
+import { EXTRA_COIN_BASE, type CoinDesc, type Coins as SimCoins } from '../sim/city/coins';
 
 const CAPACITY = 4096;
 const SPIN = 3;
@@ -25,6 +25,7 @@ export class Coins {
   private count = 0;
   private pickedSeen = 0;
   private spillSerial = -1;
+  private extraSerial = 0;
   private readonly m = new THREE.Matrix4();
   private readonly p = new THREE.Vector3();
   private readonly q = new THREE.Quaternion();
@@ -70,6 +71,10 @@ export class Coins {
     this.time.value += dt;
     const coins = sim.coins;
     if (!coins) return;
+    if (coins.extraSerial !== this.extraSerial) {
+      this.extraSerial = coins.extraSerial;
+      this.replaceExtra(coins, sim);
+    }
     if (coins.pickedCount !== this.pickedSeen) {
       this.pickedSeen = coins.pickedCount;
       this.removePicked(coins);
@@ -87,12 +92,23 @@ export class Coins {
     }
   }
 
+  /** The run-time coins changed (laid or cleared): drop every extra slot and register the current ones. */
+  private replaceExtra(coins: SimCoins, sim: SimWorld): void {
+    this.removeWhere((c) => c.id >= EXTRA_COIN_BASE);
+    for (const id of this.known) if (id >= EXTRA_COIN_BASE) this.known.delete(id);
+    this.add(coins.extra, sim);
+  }
+
   /** Swap-remove every live slot whose coin was picked since the last look. */
   private removePicked(coins: SimCoins): void {
+    this.removeWhere((c) => coins.picked[c.id] === 1);
+  }
+
+  private removeWhere(gone: (c: CoinDesc) => boolean): void {
     let changed = false;
     for (let slot = 0; slot < this.count; slot++) {
       const c = this.slotCoin[slot] as CoinDesc;
-      if (coins.picked[c.id] !== 1) continue;
+      if (!gone(c)) continue;
       const last = this.count - 1;
       const moved = this.slotCoin[last] as CoinDesc;
       this.slotOf.delete(c.id);

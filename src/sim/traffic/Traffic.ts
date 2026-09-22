@@ -444,6 +444,21 @@ export class Traffic {
     this.ramAccel[agent] = Math.max(0, ramAccel);
   }
 
+  /**
+   * A civilian held to a speed (the cold open's candidate alongside the player): the lane limit is replaced
+   * by `speed` and the leader and junction rules still apply. `clearPolicePlan` ends it.
+   */
+  setGuidePlan(agent: number, speed: number): void {
+    if (this.police[agent] === 1 || this.state[agent] === AgentState.Free) return;
+    this.plannerLane[agent] = this.lane[agent] as number;
+    this.plannerNext[agent] = -1;
+    // 0 would read as no plan and send it off at the limit
+    this.plannerSpeed[agent] = Math.max(0.1, speed);
+    this.ramSpeed[agent] = 0;
+    this.ramAccel[agent] = 0;
+    this.freeSteer[agent] = 0;
+  }
+
   clearPolicePlan(agent: number): void {
     this.plannerLane[agent] = -1;
     this.plannerNext[agent] = -1;

@@ -1,6 +1,6 @@
 # M4 "Heat" — implementation plan
 
-Executor: the agent working M4 now (slices 0–3 are done; 4 is next).
+Executor: the agent working M4 now (slices 0–4 are done; 5 is next).
 Reviewer: Claude, at the gate. Director and playtester: Marcin. This
 document is the milestone contract: what to build, in which order, with
 which numbers, and what "done" means; each fixed decision carries its
@@ -59,6 +59,7 @@ update 1 (§5).
 | 3a the run | `Run`: bag, bank, `maxHeat`, the door race (control kept, bail-out, busted first), busted and the fine; three garages on generator lots; the roster stands down at heat 0; the wall, the card, the bag on the HUD; `?bot=door` | road bot from heat 0: bag 0, hideout in 99–130 s; from heat 2: 0 busted in 15 bot-minutes, 600–800 bag a minute, banked 5,000–6,250; smoke 60.0 fps / 97 draws unchanged |
 | 3b coins and the spill | `Coins`: runs along every lane and a line through each billboard from the seed, picked by the footprint into `run.coins`; the wreck's spill (30 % of the bag, 12 coins, 10 s) paying back into the bag; the shader-spun instanced view; the counter | island 2,999–3,026 coins; road bot 54–56 a minute; smoke 98 draws / 210k tris |
 | 3c the police brain | traffic damage and a settle that forgives a nudge; police armour; the arrest (slots round a slow player), the search at the last fix, the cut-off from heat 2, the assault heat (DESIGN.md §2.10) | police wrecks in 9 bot minutes 6 → 0; a player stopped at heat 2: never busted in 90 s → busted at 10.8–12.5 s, units arriving at ≤ 6.1 m/s; road bot at heat 2 busted 0 / 0 / 7 in 5 min by seed; a unit ahead and closing 9.2 → 11.8 % of chase time |
+| 4 the cold open | `Jobs` skeleton (one delivery kind); `ColdOpen`: the van at heat 1, the candidate held alongside, a 1.3 km route round the hideout's block through a billboard gate with its coin line and the marker at 600 m; verbs in any order, captions in order with cues and timeouts; skip on N; the session flag; `sim/city/route.ts` | scripted bot done in 89.1 s: swap 5.5 s, gate 22.0, marker 34.4, door 89.1; captions steer 0.0, swap 5.4, boost 5.5, smash 10.1, escape 42.0 (takedown never cued: the pair lost the bot at 5.4 s) |
 
 ### 1.2 In scope (gate-critical, §4 slices 3–8)
 
@@ -717,6 +718,17 @@ Tests (`coldOpen.test.ts`, city, seed 42, traffic on):
 Acceptance: verify green; the bot's completion time and the time of each
 caption in PROGRESS; from this slice on, Marcin's first minute by hand is
 part of every slice's playtest.
+
+As built (2026-09-22, PROGRESS): there is no billboard on the diagonal
+(billboards keep 6.5 m off the authored roads) and the hideout stands
+150 m from the tower junction, so the route turns right at the tower,
+swerves across the carriageway through the footway gate beside the
+hideout's door, and runs anticlockwise round the hideout's block: the
+marker at 600 m, the door 700 m after it, 1.3 km in all. Verbs are done in
+any order; the caption is the first verb not done while its cue holds.
+`skip` is on `KeyN` and `Enter`. The session flag is set when the script
+starts. The candidate's hold is `Traffic.setGuidePlan`. No busted and no
+boxing while the script runs.
 
 ### Slice 5 — identity: the descriptor, the swap escape, the disguise, the bot policies (3 days)
 

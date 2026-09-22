@@ -22,6 +22,7 @@ import { Debris } from './Debris';
 import { Smoke } from './Smoke';
 import { HideoutView } from './HideoutView';
 import { Coins } from './Coins';
+import { MarkerView } from './MarkerView';
 import { AgentState } from '../sim/traffic/Traffic';
 import type { SimEvent } from '../sim';
 
@@ -50,6 +51,7 @@ export class Renderer {
   readonly policeView: PoliceView;
   readonly hideoutView: HideoutView | null;
   readonly coinsView: Coins | null;
+  readonly markerView: MarkerView;
   quality: QualityTier = 'low';
   private qualityElapsed = 0;
   private qualityFrames = 0;
@@ -149,6 +151,7 @@ export class Renderer {
     this.trafficView = sim.traffic && (sim.trafficDensity > 0 || sim.police) ? new TrafficView(this.scene, sim.traffic, sim.trafficDensity > 0) : null;
     this.pedView = sim.peds && sim.pedsDensity > 0 ? new PedView(this.scene, sim.peds) : null;
     this.hideoutView = sim.run.dropOffs.length > 0 ? new HideoutView(this.scene, sim) : null;
+    this.markerView = new MarkerView(this.scene);
     if (sim.city) this.scene.add(buildSkyline(sim.city));
     if (sim.statics.length) this.buildStatics(sim.statics);
     this.setQuality(this.quality);
@@ -336,6 +339,7 @@ export class Renderer {
     this.chase.update(this.car.root, this.carVel, tm, dt, snap);
     this.hideoutView?.update(this.sim);
     this.coinsView?.update(this.sim, dt);
+    this.markerView.update(this.sim, dt);
     this.car.update(tm);
     // ghost of the best lap
     if (this.sim.ghostPose(this.ghostPose)) {
@@ -482,6 +486,7 @@ export class Renderer {
     this.policeView.dispose();
     this.hideoutView?.dispose();
     this.coinsView?.dispose();
+    this.markerView.dispose();
     this.renderer.dispose();
   }
 

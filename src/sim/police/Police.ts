@@ -224,7 +224,9 @@ export class Police {
 
     // arrest: a slow player is boxed; the slots are re-dealt twice a second
     const a = t.arrest;
-    const arresting = chasing && (player.speed < a.playerSpeed || (this.arresting && player.speed < a.releaseSpeed));
+    // the cold open has no busted, so nobody boxes: the units chase and ram
+    const arresting = chasing && !this.sim.coldOpen.active
+      && (player.speed < a.playerSpeed || (this.arresting && player.speed < a.releaseSpeed));
     if (arresting !== this.arresting) this.slotLeft = 0;
     this.arresting = arresting;
     if (arresting) {

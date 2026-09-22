@@ -160,7 +160,8 @@ export class Run {
     const police = this.sim.police;
     // Wanted, stopped and boxed. Two cruisers within six metres see the player by construction;
     // the pursuit's sampled sight would only add a lag.
-    const boxed = police !== null && this.sim.heat.level > 0 && probe.speed < b.speed
+    // never inside the cold open: the first minute teaches the verbs, not the fine
+    const boxed = police !== null && this.sim.heat.level > 0 && probe.speed < b.speed && !this.sim.coldOpen.active
       && police.unitsWithin(probe.x, probe.z, b.range) >= b.units;
     this.bustedProgress = boxed
       ? Math.min(1, this.bustedProgress + dt / b.seconds)
@@ -256,10 +257,11 @@ export class Run {
     this.sim.events.push('busted', this.lastFine, p.x, 0, p.z, -1);
   }
 
-  /** Heat 0 and the chase over; the police read level 0 on the next step and stand down. */
+  /** Heat 0, the chase over and any job dropped; the police read level 0 on the next step and stand down. */
   private endRun(): void {
     this.sim.heat.reset();
     this.sim.pursuit.reset();
+    this.sim.jobs.abandon();
     this.bustedProgress = 0;
   }
 
@@ -301,6 +303,10 @@ export class Run {
         // value: the heat level escaped from
         this.bag += bag.escapePerLevel * e.value;
         this.counts.escapes++;
+        break;
+      case 'jobDone':
+        // value: the payout with its time bonus, already rounded
+        this.bag += e.value;
         break;
       case 'coin':
         // a spilled coin (target -2) was the bag's and goes back into it; a road coin is the player's for good

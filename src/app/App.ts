@@ -14,6 +14,7 @@ import { CAR_IDS, ECONOMY, FIXED_DT, Recorder, SimWorld, clearControls, district
 import { DebugPanel } from '../ui/debugPanel';
 import { Hud } from '../ui/hud';
 import { RunHud } from '../ui/run';
+import { ColdOpenHud } from '../ui/coldOpen';
 import { routeToDropOff } from './doorRoute';
 import { BotDriver } from './bot';
 import { AgentState } from '../sim/traffic/Traffic';
@@ -68,6 +69,11 @@ const MAX_FRAME_DT = 0.25;
 const BREAK_MIN_MS = 600;
 /** Measured bot runs dismiss the wall and the card themselves after this long. */
 const BREAK_AUTO_MS = 1500;
+/** The session flag: the cold open has been shown in this tab (M5's save takes over). */
+const COLD_OPEN_KEY = 'coldOpenSeen';
+/** Any of these on the URL is a test or a dev session: no cold open unless `coldopen=1` forces it. */
+const COLD_OPEN_OFF_PARAMS = ['bot', 'spawn', 'heat', 'car', 'map', 'manual'];
+
 /** Every action ends a break except the ones that are not about driving on. */
 const DISMISS: readonly Action[] = ACTIONS.filter((a) => a !== 'pause' && a !== 'mute' && a !== 'debug' && a !== 'camera');
 
@@ -78,6 +84,7 @@ export class App {
   private readonly input: InputManager;
   private readonly hud: Hud;
   private readonly runHud: RunHud;
+  private readonly coldOpenHud: ColdOpenHud;
   private readonly audio: EngineAudio;
   private readonly sfx: Sfx;
   private readonly panel: DebugPanel | null;
@@ -114,6 +121,16 @@ export class App {
     this.hud = new Hud(uiRoot, sim);
     this.runHud = new RunHud(uiRoot, sim);
     this.runHud.setKeys({ any: this.input.label('throttle') });
+    this.coldOpenHud = new ColdOpenHud(uiRoot);
+    this.coldOpenHud.setKeys({
+      throttle: this.input.label('throttle'),
+      steerLeft: this.input.label('steerLeft'),
+      brake: this.input.label('brake'),
+      steerRight: this.input.label('steerRight'),
+      swap: this.input.label('swap'),
+      boost: this.input.label('boost'),
+      skip: this.input.label('skip'),
+    });
     this.hud.setHints({
       throttle: this.input.label('throttle'),
       brake: this.input.label('brake'),
@@ -219,6 +236,8 @@ export class App {
         heat: { points: sim.heat.points, level: sim.heat.level },
         pursuit: { state: sim.pursuit.state, cooldown: sim.pursuit.cooldown, units: sim.police?.count ?? 0, escapes: sim.pursuit.escapes },
         run: { state: sim.run.state, bag: sim.run.bag, bank: sim.run.bank, multiplier: sim.run.multiplier, maxHeat: sim.run.maxHeat, door: sim.run.doorProgress, busted: sim.run.bustedProgress, dropOff: sim.run.dropOffs[sim.run.dropOff]?.name ?? null, runs: sim.run.runs },
+        coldOpen: { active: sim.coldOpen.active, verb: sim.coldOpen.verb, caption: sim.coldOpen.caption, done: sim.coldOpen.done },
+        job: { state: sim.jobs.state, remaining: sim.jobs.remaining },
         traffic: sim.traffic ? { kinematic: sim.traffic.count(AgentState.Kinematic), physical: sim.traffic.count(AgentState.Physical), wrecked: sim.traffic.count(AgentState.Wrecked) } : null,
         peds: sim.peds ? { count: sim.peds.count(), hops: sim.peds.guaranteeHops } : null,
         billboards: sim.collectibles ? { smashed: sim.collectibles.smashedCount, total: sim.collectibles.total } : null,
@@ -279,15 +298,24 @@ export class App {
     const lifeOff = params.get('life') === '0';
     const traffic = lifeOff ? 0 : densityParam(params.get('traffic'));
     const peds = lifeOff ? 0 : densityParam(params.get('peds'));
+    // the first run of a session is the cold open; the world is built at its spawn so the chunks load once
+    const coldOpen = map === 'city' && coldOpenWanted(params);
     const sim = new SimWorld({
       map,
       seed: Number.isFinite(seed) ? seed : 42,
       traffic,
       peds,
       heat: Math.max(0, Math.min(100, Number(params.get('heat') ?? 0) * 20)),
-      ...(spawn ? { spawn } : {}),
+      ...(spawn ? { spawn } : coldOpen ? { spawn: 'loop' } : {}),
       ...(car ? { car } : {}),
     });
+    // the flag is set as it starts, so a reload never repeats it
+    if (coldOpen) {
+      sim.coldOpen.start();
+      if (sim.coldOpen.active) {
+        try { sessionStorage.setItem(COLD_OPEN_KEY, '1'); } catch { /* storage blocked: it shows again next load */ }
+      }
+    }
     bootTimings['sim'] = performance.now();
     const app = new App(platform, sim, canvas, params);
     platform.loadingStop();
@@ -354,6 +382,7 @@ export class App {
     }
     if (st.pressed.camera) this.renderer.chase.toggleMode();
     if (st.pressed.mute) this.hud.showToast(this.audio.toggleUserMute() ? 'MUTED' : 'SOUND ON', 1);
+    if (st.pressed.skip && this.sim.coldOpen.active) this.sim.coldOpen.skip();
 
     // takedown slow motion: the fixed-step loop gets scaled time (the sim never sees wall time); any key skips it
     if (this.sim.life.state.slowMo > 0 && !this.bot) {
@@ -422,8 +451,10 @@ export class App {
     const frameMs = performance.now() - frameStart;
     this.frameMsSmooth += (frameMs - this.frameMsSmooth) * 0.05;
     const stats = this.renderer.stats;
-    this.hud.setHintsVisible(now < this.hintsUntil && !this.bot);
+    // the cold open's captions sit where the hints do and teach the same keys
+    this.hud.setHintsVisible(now < this.hintsUntil && !this.bot && !this.sim.coldOpen.active);
     this.runHud.update(this.sim, frameDt);
+    this.coldOpenHud.update(this.sim);
     this.hud.update(
       this.sim,
       frameDt,
@@ -452,5 +483,18 @@ export class App {
     this.audio.dispose();
     this.renderer.dispose();
     this.sim.dispose();
+  }
+}
+
+/** The cold open runs on a plain load until the session has seen it; `coldopen=1` forces it, `coldopen=0` and test parameters turn it off. */
+function coldOpenWanted(params: URLSearchParams): boolean {
+  const forced = params.get('coldopen');
+  if (forced === '1') return true;
+  if (forced === '0') return false;
+  if (COLD_OPEN_OFF_PARAMS.some((k) => params.has(k))) return false;
+  try {
+    return sessionStorage.getItem(COLD_OPEN_KEY) !== '1';
+  } catch {
+    return true;
   }
 }

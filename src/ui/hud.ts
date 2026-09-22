@@ -302,7 +302,8 @@ export class Hud {
       this.wrecked.classList.toggle('is-visible', life.wrecked);
     }
     // no swap behind a shut door or on the busted card: the controls are the break's
-    const swapVisible = life.swapCandidate >= 0 && (sim.run.state === 'running' || sim.run.state === 'closing');
+    // the cold open's own caption teaches the swap at the top: one prompt at a time
+    const swapVisible = life.swapCandidate >= 0 && (sim.run.state === 'running' || sim.run.state === 'closing') && sim.coldOpen.caption !== 'swap';
     if (swapVisible !== this.swapVisible) {
       this.swapVisible = swapVisible;
       this.swap.classList.toggle('is-visible', swapVisible);

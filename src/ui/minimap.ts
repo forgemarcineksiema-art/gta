@@ -9,7 +9,7 @@ import { CITY_HALF, DISTRICTS, PALETTE, districtAt, type SimWorld } from '../sim
 import { LANDMARKS } from '../sim/city/City';
 import { MINIMAP, advance, buildRoadLayers, clampToRim, project, yawFromQuat, type MinimapState, type Vec2 } from './minimapModel';
 
-export type MarkerKind = 'tower' | 'tank' | 'glasshouse' | 'hotel' | 'garage';
+export type MarkerKind = 'tower' | 'tank' | 'glasshouse' | 'hotel' | 'garage' | 'job';
 /** A point of interest on the map. M3 traffic and police, M5 activities add kinds. */
 export interface MinimapMarker { x: number; z: number; kind: MarkerKind; color: string; yaw?: number }
 
@@ -68,6 +68,9 @@ export class Minimap {
   private readonly gridWidth: number;
   private readonly highwayWidth: number;
   private markers: readonly MinimapMarker[];
+  /** The landmarks and drop-offs; idle job markers are appended when the jobs change. */
+  private base: readonly MinimapMarker[];
+  private jobSerial = -1;
   private readonly state: MinimapState = { heading: 0, radiusM: MINIMAP.radiusMinM };
   private readonly tmp: Vec2 = { x: 0, y: 0 };
   /** CSS size of the (square) canvas and the backing-store ratio. */
@@ -141,10 +144,11 @@ export class Minimap {
       this.districtFills.push({ path, fill: rgba(d.color, TINT_ALPHA) });
     }
     // the landmarks, then the three drop-offs: where a run can end is always on the rim
-    this.markers = [
+    this.base = [
       ...LANDMARKS.map((l, i): MinimapMarker => ({ x: l.x, z: l.z, kind: GLYPH_KINDS[i] ?? 'tower', color: hex(DISTRICTS[i]?.accent ?? 0xffffff) })),
       ...sim.run.dropOffs.map((d): MinimapMarker => ({ x: d.door.x, z: d.door.z, kind: 'garage', color: hex(PALETTE.carOrange) })),
     ];
+    this.markers = this.base;
 
     if (typeof ResizeObserver !== 'undefined') {
       this.observer = new ResizeObserver(this.onResize);
@@ -155,7 +159,9 @@ export class Minimap {
 
   /** Replace the points of interest (landmarks by default). */
   setMarkers(markers: readonly MinimapMarker[]): void {
+    this.base = markers;
     this.markers = markers;
+    this.jobSerial = -1;
     this.dirty = true;
   }
 
@@ -182,6 +188,14 @@ export class Minimap {
     this.lastX = x;
     this.lastZ = z;
     advance(this.state, dt, yaw, tm.vx, tm.vz, tm.speed, snap);
+    if (sim.jobs.serial !== this.jobSerial) {
+      // job markers only while no job runs: a running job's target is a garage, already on the rim
+      this.jobSerial = sim.jobs.serial;
+      const jobs = sim.jobs.state === 'idle' ? sim.jobs.defs : [];
+      this.markers = jobs.length === 0 ? this.base
+        : [...this.base, ...jobs.map((d): MinimapMarker => ({ x: d.x, z: d.z, kind: 'job', color: hex(PALETTE.carOrange) }))];
+      this.dirty = true;
+    }
 
     const d = districtAt(x, z);
     if (d.id !== this.district) {
@@ -376,6 +390,12 @@ export class Minimap {
         break;
       case 'hotel':
         c.rect(x - g * 0.9, y - g * 0.55, g * 1.8, g * 1.1);
+        break;
+      case 'job':
+        // a ring, the marker's own shape on the road
+        c.arc(x, y, g * 0.85, 0, Math.PI * 2);
+        c.moveTo(x + g * 0.4, y);
+        c.arc(x, y, g * 0.4, 0, Math.PI * 2, true);
         break;
       case 'garage':
         // a garage front: a pitched outline with the door as the dark band across its foot

@@ -16,7 +16,9 @@ import { Life } from './life/Life';
 import { Heat } from './heat/Heat';
 import { Police } from './police/Police';
 import { Pursuit } from './police/Pursuit';
+import { ColdOpen } from './run/ColdOpen';
 import { Run } from './run/Run';
+import { Jobs } from './jobs/Jobs';
 import { buildPlayground, type PlaygroundLayout, type SpawnPoint } from './playground';
 import { POSE_STRIDE, Recorder } from './recorder';
 import type { DynamicDesc, StaticDesc } from './scene';
@@ -95,6 +97,10 @@ export class SimWorld {
   readonly police: Police | null;
   /** Bag, bank, the doors and busted: what ends a run (M4). Empty drop-offs on the playground. */
   readonly run: Run;
+  /** Markers, the clock and the payout (the slice-4 skeleton; the cold open adds the first def). */
+  readonly jobs: Jobs;
+  /** The first run's script; inactive until `start()`. */
+  readonly coldOpen: ColdOpen;
   /** The city's smashable billboards; null on the playground. */
   readonly collectibles: Collectibles | null;
   /** Coins on the road and the spill pool; null on the playground. */
@@ -181,7 +187,9 @@ export class SimWorld {
     this.heat.add(opts.heat ?? 0);
     this.pursuit = new Pursuit(this.events);
     this.police = this.traffic ? new Police(this) : null;
+    this.jobs = new Jobs(this, []);
     this.run = new Run(this);
+    this.coldOpen = new ColdOpen(this);
     this.city?.sync(spawn.position.x, spawn.position.z, true);
   }
 
@@ -201,6 +209,7 @@ export class SimWorld {
     this.transforms.swap();
     this.respawned = false;
     this.events.tick = this.tick;
+    this.coldOpen.preStep(this.controls, FIXED_DT);
     this.life.preStep(this.controls, FIXED_DT);
     const reset = this.controls.reset;
     this.vehicle.update(this.controls, FIXED_DT);
@@ -237,7 +246,10 @@ export class SimWorld {
     this.life.postStep(FIXED_DT);
     if (this.traffic) this.coins?.step(this.probe, FIXED_DT, this.events);
     this.heat.step();
+    // before the run: a delivery into a garage pays the bag before the door can drop the job
+    this.jobs.step(this.probe, FIXED_DT);
     this.run.step(this.probe, FIXED_DT);
+    this.coldOpen.postStep(FIXED_DT);
     for (const t of this.tracked) {
       const p = t.body.translation(this.scratchPos);
       const r = t.body.rotation(this.scratchRot);
@@ -307,6 +319,13 @@ export class SimWorld {
       }
     }
     return best;
+  }
+
+  /** Change the player's class in place (the cold open's van; the swap does its own). */
+  setCar(kind: CarId): void {
+    this.carId = kind;
+    this.vehicle.tuning = cloneTuning(CAR_PRESETS[kind]);
+    this.vehicle.applyTuning();
   }
 
   /** Teleport the player to a named spawn (dev panel / tests). */

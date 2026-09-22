@@ -120,3 +120,17 @@ for (const [w, h] of SIZES) {
     await page.screenshot({ path: `screens/door-${w}x${h}.png` });
   });
 }
+
+for (const [w, h] of SIZES) {
+  test(`cold open at ${w}x${h}`, async ({ page }) => {
+    mkdirSync('screens', { recursive: true });
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto('/?coldopen=1&manual=1&quality=low');
+    await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 30_000 });
+    await page.evaluate(() => window.advanceTime?.(800));
+    await page.waitForSelector('.cold__caption--steer.is-visible', { timeout: 10_000 });
+    // past the caption's 0.25 s entrance
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `screens/cold-${w}x${h}.png` });
+  });
+}

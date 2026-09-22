@@ -332,6 +332,18 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   KEY. The swap prompt hides while either is up.
 - The swap prompt reads SWAP for a civilian car and BORROW for a police
   car, same keycap, same size, accent cyan.
+- Cold open captions (M4 slice 4): top centre where the key hints sit
+  (the hints hide meanwhile), skewed −10°, keycaps at 20 px beside one
+  26 px heavy italic word (DRIVE, SWAP in cyan, BOOST); the three keyless
+  verbs get a short line instead (SMASH THE BILLBOARD, RAM THEM INTO A WALL
+  and GET IT TO THE HIDEOUT in accent yellow, PICK UP THE PACKAGE); a 12 px
+  `N SKIP` underneath. A caption slides in over 0.25 s and shows only while
+  its cue holds; the bottom swap prompt hides while the caption says SWAP.
+  Never a modal, never over the car.
+- Job markers: a flat `carOrange` ring (4 m radius, 24 segments) on the
+  road with a 3 m beacon post, unlit so it reads in the towers' shade,
+  pulsing ±8 % in scale; a ring glyph on the radar. Hidden while a job
+  runs.
 - Ramps are `ramp` red gables with a kerb-height lip, the run-out kept clear
   by the placer; the "STUNT!" popup follows the TAKEDOWN! style at 24 px
   with the airtime in seconds. Speed cameras are a `steel` pole with an

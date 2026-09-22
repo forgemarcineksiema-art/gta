@@ -283,6 +283,15 @@ export class Life {
     this.state.swapCandidate = -1;
   }
 
+  /** Set the damage directly (the cold open's beat-up van); the stage follows, silently, and a wreck is never set this way. */
+  setDamage(damage: number): void {
+    const st = this.state;
+    st.damage = Math.max(0, Math.min(DAMAGE.stages[3] - 0.01, damage));
+    let stage = 0;
+    for (let k = 0; k < DAMAGE.stages.length; k++) if (st.damage >= (DAMAGE.stages[k] as number)) stage = k + 1;
+    st.stage = stage as LifeState['stage'];
+  }
+
   skipSlowMo(): void {
     this.state.slowMo = 0;
     this.state.slowMoTarget = -1;

@@ -37,9 +37,12 @@ Useful URLs:
 | `/?bot=1&seed=42&duration=60` | autopilot with the perf probe (`window.__perf`) |
 | `/?heat=3` | start the run at heat level 1-5 (the police answer at that level once they see you) |
 | `/?bot=door&spawn=crown` | the road bot drives to the hideout and parks; the door shuts behind it |
+| `/?coldopen=1` | force the cold open (a plain `/` plays it once per browser tab); `?coldopen=0` skips it |
 | `/?ad=error&adError=adblock` | force an ad error code in `LocalPlatform` (`?ad=off`, `?adblock=1` also work) |
 
 Controls: `W A S D` / arrows drive, `Space` handbrake (drift), `Shift` boost, `E` swap into the car beside you, `R` reset (or respawn when wrecked), `C` camera, `P` pause, `M` mute, `` ` `` tuning panel. Any key skips the takedown slow motion, opens the garage door after the totals and closes the busted card.
+
+The first load of a tab is the cold open: a beat-up van at heat 1, a muscle car to swap into, a coin line round the hideout's block through a billboard, a delivery marker and the hideout door; captions teach each verb, `N` skips. Test parameters (`bot`, `spawn`, `heat`, `car`, `map`, `manual`) turn it off.
 
 The run: crimes fill the bag (yellow, top right, with the multiplier the police have seen you at). Pull into one of the three garages (orange on the radar) and stop: the door takes 3 s to shut and banks the bag times the multiplier; back out to cancel. Two police cars boxing you in while you are wanted fill the BUSTED bar: half the bag is kept, no multiplier.
 

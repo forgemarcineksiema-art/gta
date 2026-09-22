@@ -14,6 +14,8 @@ export { Heat } from './heat/Heat';
 export { Police } from './police/Police';
 export { Pursuit, type PursuitState } from './police/Pursuit';
 export { Run, type RunState, type RunCounts } from './run/Run';
+export { ColdOpen, COLD_OPEN_VERBS, coldOpenRoute, type ColdOpenVerb, type ColdOpenRoute } from './run/ColdOpen';
+export { Jobs, type JobDef, type JobKind, type JobState } from './jobs/Jobs';
 export { coverSites, dropOffFor, hideoutStatics, toDropOff, DROP_OFF_LOTS, GARAGE, type DropOff, type DropOffLot, type DoorPose, type CoverSites } from './city/cover';
 export { POLICE, type PoliceTuning } from './police/tuning';
 export { PALETTE } from './palette';

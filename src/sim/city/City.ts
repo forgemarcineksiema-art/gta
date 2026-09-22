@@ -66,7 +66,7 @@ export class City {
   private cz = Infinity;
   private complete = false;
   /** Every lane's coins from the seed; each chunk takes the ones inside it. */
-  private readonly laneCoins: Array<{ x: number; z: number; lane: number }>;
+  readonly laneCoins: ReadonlyArray<{ x: number; z: number; lane: number }>;
   constructor(readonly world: RAPIER.World, readonly seed = 42) {
     this.laneCoins = laneCoins(this.graph, seed);
     // The one unbroken collision plane eliminates suspension seams at roads and chunk borders.

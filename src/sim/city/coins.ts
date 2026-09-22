@@ -30,6 +30,9 @@ export interface CoinDesc {
 
 export const COINS_PER_CHUNK_MAX = 256;
 const CHUNKS = 49;
+/** Coins laid at run time (the cold open's route line) take ids after every chunk's. */
+export const EXTRA_COIN_BASE = CHUNKS * COINS_PER_CHUNK_MAX;
+export const EXTRA_COINS_MAX = 512;
 /** Metres left clear at a lane's start and before its end (the junction box and its approach). */
 const LANE_START = 10;
 const LANE_END = 30;
@@ -116,9 +119,13 @@ export function placeCoins(cx: number, cz: number, lanes: ReadonlyArray<{ x: num
 }
 
 export class Coins {
-  /** One byte per (chunk, slot). */
-  readonly picked = new Uint8Array(CHUNKS * COINS_PER_CHUNK_MAX);
+  /** One byte per (chunk, slot), then one per extra coin. */
+  readonly picked = new Uint8Array(EXTRA_COIN_BASE + EXTRA_COINS_MAX);
   pickedCount = 0;
+  /** Coins laid at run time, outside the chunks (lane -3); ids from EXTRA_COIN_BASE. */
+  readonly extra: CoinDesc[] = [];
+  /** Bumps when extra coins are laid or cleared, so the view registers them. */
+  extraSerial = 0;
   /** The spill pool: position, value, seconds left (0 = empty). */
   readonly spillX: Float32Array;
   readonly spillZ: Float32Array;
@@ -160,6 +167,18 @@ export class Coins {
         value += BALANCE.coin.value;
         events.push('coin', BALANCE.coin.value, coin.x, 0.8, coin.z, coin.id);
       }
+    }
+    const extra = this.extra;
+    for (let i = 0; i < extra.length; i++) {
+      const coin = extra[i] as CoinDesc;
+      if (this.picked[coin.id] === 1) continue;
+      const dx = coin.x - player.x, dz = coin.z - player.z;
+      if (Math.abs(dx) > 6 || Math.abs(dz) > 6) continue;
+      if (Math.abs(dx * fx + dz * fz) > hl || Math.abs(dx * rx + dz * rz) > hw) continue;
+      this.picked[coin.id] = 1;
+      this.pickedCount++;
+      value += BALANCE.coin.value;
+      events.push('coin', BALANCE.coin.value, coin.x, 0.8, coin.z, coin.id);
     }
     for (let k = 0; k < this.spillTtl.length; k++) {
       const ttl = this.spillTtl[k] as number;
@@ -220,6 +239,28 @@ export class Coins {
     }
     this.spillSerial++;
     events.push('spill', total, x, 0.5, z, -1);
+  }
+
+  /** Lays coins at these points (beyond the pool's room they are dropped); returns how many were laid. */
+  addExtra(points: ReadonlyArray<{ x: number; z: number }>): number {
+    let n = 0;
+    for (const p of points) {
+      if (this.extra.length >= EXTRA_COINS_MAX) break;
+      const id = EXTRA_COIN_BASE + this.extra.length;
+      this.picked[id] = 0;
+      this.extra.push({ id, x: p.x, z: p.z, lane: -3 });
+      n++;
+    }
+    if (n > 0) this.extraSerial++;
+    return n;
+  }
+
+  /** Takes every extra coin off the road (picked or not). */
+  clearExtra(): void {
+    if (this.extra.length === 0) return;
+    for (const c of this.extra) this.picked[c.id] = 1;
+    this.extra.length = 0;
+    this.extraSerial++;
   }
 
   /** Spilled coins still on the road. */

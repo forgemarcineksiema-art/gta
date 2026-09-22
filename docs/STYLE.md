@@ -42,7 +42,7 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 
 ## Vehicles
 
-- Three original, unbranded designs: red muscle coupe with raised shoulders,
+- Five original, unbranded designs; the first three (the sports car and the police saloon are under "Police, the interceptor and the hideout"): red muscle coupe with raised shoulders,
   twin dark stripes, four round headlights, segmented rear lights and a rear lip;
   cyan hatchback with a charcoal roof, short overhangs and four-spoke wheels;
   orange panel van with cargo-door panels, sliding rail, hinges and robust trim.
@@ -227,7 +227,7 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 
 ## Traffic and pedestrians (M3)
 
-- Traffic cars are the three player silhouettes (muscle, compact, heavy) in a
+- Civilian traffic uses three of the player silhouettes (muscle, compact, heavy; the sports and police bodies appear only as police units) in a
   fixed set of paints (`PAINTS` in `src/sim/traffic/Traffic.ts`), never the
   player's own paint for its class; an abandoned player car keeps the player
   paint so it reads as "yours" from a distance. Same flat shading, same

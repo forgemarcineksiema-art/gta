@@ -32,7 +32,7 @@ docs/                 BRIEF, PROGRESS, DESIGN, M4_PLAN / M5_PLAN / M6_PLAN, ARCH
 `sim/city/roads.ts` owns the fixed road plan, directed lane graph, cubic junction
 connections and uniform 3 m samples for the bot. `sim/city/City.ts` generates each
 225 m chunk from `(seed, chunkX, chunkZ)` independently. The route is an Euler tour
-of all 168 directed lanes; permissive arcade junctions include U-turn connections.
+of all directed lanes (168 at M2, 178 with the authored loop, 226 since the real highway lanes of M4 slice 0); permissive arcade junctions include U-turn connections.
 
 The city sim loads a 3×3 neighbourhood of collision chunks and retains old chunks
 within a 5×5 neighbourhood. It loads before removing, and a reset projects onto a
@@ -68,22 +68,22 @@ independent. The minimap is a heading-up radar on its own 2D canvas
 (`ui/minimap.ts`, maths in `ui/minimapModel.ts`): roads from the graph cached as
 world-space paths, district tints, landmark glyphs that clamp to the rim along
 the bearing from the car, the car arrow and a rotating compass; it repaints at
-30 Hz and only while something moved (decision 18).
+30 Hz and only while something moved (city decision C7).
 
 `SimWorld()` still defaults to the playground for existing headless tests; `App`
 selects the city unless a playground/track URL was requested. City sessions do not
 record unbounded per-tick history. The M1 track bot reuses its pursuit/curvature
 controller with `CITY_BOT_TUNING` and a local route search for city coverage.
 
-Decision 12: keep a continuous ground collider instead of creating road colliders
-per chunk, so streaming and junctions cannot introduce suspension seams. Decision
-13: keep the road topology authored and deterministic; seed variation affects lots
+City decision C1 (M2): keep a continuous ground collider instead of creating road colliders
+per chunk, so streaming and junctions cannot introduce suspension seams. City decision
+C2 (M2): keep the road topology authored and deterministic; seed variation affects lots
 and massing, preserving route readability and a stable M3 traffic foundation.
-Decision 14 (M2.1): quarter chunk meshes and spatial facade detail instead of
+City decision C3 (M2.1): quarter chunk meshes and spatial facade detail instead of
 per-tier facade variants. The low tier tour peaked at 291k triangles with one mesh
 per chunk and full detail everywhere; quadrants plus the 180 m detail radius took
 it to 133k (high 175k) with no visible change from the driving camera, and both
-tiers keep identical geometry rules. Decision 15 (M2.1): the chase camera follows
+tiers keep identical geometry rules. City decision C4 (M2.1): the chase camera follows
 actual motion only. Steering feed-forward, the 0.22 s heading lead and the large
 lateral look offset made quick corrections swing the road under the player;
 comfort tests in `tests/render/camera.test.ts` pin the new bounds.
@@ -121,15 +121,15 @@ they impose on grid strips (world-space, applied by whichever chunk owns the
 strip) and the clip edge where the road's own band may start; `specialRoad`
 builds bands as prism quads per centreline segment.
 
-Decision 16 (M2.2): authored roads are polylines in the same graph, not a second
+City decision C5 (M2.2): authored roads are polylines in the same graph, not a second
 road system. Alternatives were a separate spline road type with its own bot and
 reset code, or bending the grid itself; both would have doubled the traffic
-work in M3. Decision 17 (M2.2): two resident detail levels per part instead of
+work in M3. City decision C6 (M2.2): two resident detail levels per part instead of
 regenerating a chunk at the detail boundary. The regeneration cost 20–40 ms per
 crossing at CPU ×4 and crossings happen about twice a second while driving; the
 second level costs roughly 40 % more geometry memory (heap 40–45 MB on the tour).
 
-Decision 18 (M2): the minimap is a heading-up radar on a canvas, not a
+City decision C7 (M2): the minimap is a heading-up radar on a canvas, not a
 whole-city SVG. The first minimap fitted the 1,575 m island into 132–184 px
 (8–12 m per pixel: streets under 2 px, the car a speck) and drew `lane.points`,
 which are offset carriageways inset from the junctions, so every road kinked;
@@ -141,7 +141,7 @@ the bearing from the car, which is the compass cue the street canyons needed.
 Canvas 2D keeps the repaint off the DOM layout path that cost 19 % of the main
 thread in the M2.1 profile; the maths lives in a DOM-free module with Node pins.
 
-Decision 19 (M2.2): road paint is generated per road, not per chunk
+City decision C8 (M2.2): road paint is generated per road, not per chunk
 (`sim/city/markings.ts`). Chunk-local rules restarted dash phase at every tile
 edge, split crossings at diagonal merges into stray stripes and could only ever
 see one chunk of a curve. The generator walks each road's centreline in metres
@@ -227,8 +227,8 @@ requestAnimationFrame
   FixedStepLoop.advance(dt × scale)  0..5 fixed steps of 1/60 s
     controls <- ActionState | Bot    app copies actions into sim.controls
     SimWorld.step()                  city.sync(); events.tick(); life.preStep(); vehicle.update();
-                                     probe <- vehicle; traffic.step(probe); peds.step(probe);
-                                     rapier.step(); write transforms; life.postStep()
+                                     probe <- vehicle; police.preStep(probe); traffic.step(probe); peds.step(probe);
+                                     rapier.step(); write transforms; life.postStep(); heat.step()
   Renderer.render(alpha)             interpolate prev/curr transforms, chase camera (whip / focus), views, debris, smoke, draw
   EngineAudio.update(telemetry)      RPM/load/speed/slip -> oscillators, filters, gains
   Sfx (events)                       one-shots per sim event since the last cursor
@@ -269,7 +269,7 @@ TypeScript 5.9 (strict + `noUncheckedIndexedAccess` + `exactOptionalPropertyType
 
 - **Chassis.** One dynamic Rapier body (cuboid collider, explicit mass properties with a low centre of mass, CCD on, never sleeps). `applyTuning()` rebuilds the collider and wheel positions live from the dev panel.
 - **Suspension.** Four raycasts (`castRayAndGetNormal`, own body excluded): spring + separate compression/rebound damping + bump stop + anti-roll coupling per axle. Force at the attach point along body-up.
-- **Engine and drivetrain.** Torque curve over rpm (five points), five automatic gears plus reverse (engaged with the brake from a standstill), final drive, efficiency, rev limiter, engine braking, torque cut during shifts. Engine rpm follows the driven wheels' angular velocity (idle as the floor), so the audio note and the acceleration character come from the same numbers.
+- **Engine and drivetrain.** Torque curve over rpm (five points), six automatic gears plus reverse (first to fifth geometric over the reachable range, fifth the top-speed gear, sixth an overdrive that pulls on boost) (engaged with the brake from a standstill), final drive, efficiency, rev limiter, engine braking, torque cut during shifts. Engine rpm follows the driven wheels' angular velocity (idle as the floor), so the audio note and the acceleration character come from the same numbers.
 - **Wheels.** Each wheel carries its own angular velocity. Per substep (2 per fixed step) the rotation is solved in closed form against the slip-ratio tyre force: `I (ω − ω₀)/h = T − r·F(κ(ω))`. In the linear region of F the solution is exact and unconditionally stable; past the peak the plateau solution is used; if the two disagree the answer sits on the boundary. Burnouts, wheelspin at launch and brake lock-ups emerge without a stiff ODE blowing up at 60 Hz.
 - **Tyres.** Lateral force from the slip angle: linear to `slipAngPeakDeg`, decaying to `slipAngTail`; longitudinal from the slip ratio with the same shape (`slipRatioPeak`, `slipRatioTail`); a friction circle caps the combination at `mu · load`; an impulse clamp (`m/4 · 0.6 · |vLat| / dt`) stops slow manoeuvres from chattering; rolling resistance per N of load. Forces applied above the contact patch (`tireForceHeight`) to keep body roll arcade-flat.
 - **Steering.** Speed-sensitive lock (`maxSteerDegLow` → `High` by `steerSpeedRef`), rate-limited with a faster return, Ackermann inner/outer angles.
@@ -304,14 +304,14 @@ Pinned by `tests/sim/handling.test.ts` (29 tests; `cars.test.ts` repeats the cla
 1. **Rapier `-compat` over the bundler build** (M0). Headless Node tests and zero build plugins outweigh ~0.7 MB of base64. Revisit only if the startup budget bites.
 2. **Custom raycast car over Rapier's built-in vehicle controller** (M1). The built-in controller gives no drift state, no slip curve, no arcade assists; the feel targets in the brief need all three. Writing it also keeps every number in one `VehicleTuning`.
 3. **Drift as a controlled state on top of physical tyres** (M1). Emergent handbrake slides either spun out or scrubbed all speed. The stick commands the drift angle and the fronts counter-steer automatically; the physical tyre model stays underneath and every assist is a number that can be set to 0.
-7. **Wheel rotation solved, not integrated** (M1 physics pass). A wheel's inertia is tiny next to the tyre's stiffness, so explicit or semi-implicit integration at 60 Hz oscillated between lock and spin. Solving the per-substep equilibrium in closed form (linear region exact, plateau otherwise) is stable at any speed including standstill, which is what makes wheelspin and lock-ups usable rather than chaotic.
-9. **The chassis does not collide with terrain while upright** (M1 feel pass 3, `src/sim/collision.ts`). The suspension rays carry the car over kerbs and ramp kinks; a body scraping a 26° lip stole 14 km/h in one step and read as a wall. The terrain group is switched on only when the car is on its side or roof so it can rest there until it rights itself.
-11. **Wall hits are shaped, not simulated** (M1, session 6). Realistic corner friction turns a 45° wall hit into a pivot that leaves the car nose-in and stopped, and a 60° hit into a spin that ends facing backwards; both read as the wall "grabbing" the car. The contacts stay physical (Rapier resolves penetration and the impulse), but the chassis is slippery, most of the spin from the hit is dropped, and a yaw controller turns the nose along the direction of travel while the car slides, so every hit under 80° comes out pointing where it is going with speed in proportion to the angle. The player always keeps a way out: a stopped car peels off with throttle and steer.
-10. **Landings keep momentum** (M1 feel pass 3). Vertical speed is mostly absorbed at touchdown and 92% of the total speed is redirected along the ground; a kink in the road redirects with no loss. Physical landings cost too much speed for an arcade loop where jumps are rewards.
-8. **Speed streaks are world-anchored motes** (M1 polish). Screen-space lines around the camera looked generic; motes that sit in the world and smear along the car's velocity parallax correctly, streak sideways in a drift and leave the centre of the screen clear.
 4. **Fixed 60 Hz step, max 5 substeps, drop the rest** (M0). Required by CrazyGames (same behaviour at 144/165 Hz) and by the tests; dropping time on a hitch is better than a spiral.
 5. **Vertex-colour merged statics** (M0). One draw call for the whole playground; the same approach scales to per-chunk meshes in M2.
 6. **No web fonts** (M0). System heavy italic is enough for the look, costs zero bytes, and avoids licence questions.
+7. **Wheel rotation solved, not integrated** (M1 physics pass). A wheel's inertia is tiny next to the tyre's stiffness, so explicit or semi-implicit integration at 60 Hz oscillated between lock and spin. Solving the per-substep equilibrium in closed form (linear region exact, plateau otherwise) is stable at any speed including standstill, which is what makes wheelspin and lock-ups usable rather than chaotic.
+8. **Speed streaks are world-anchored motes** (M1 polish). Screen-space lines around the camera looked generic; motes that sit in the world and smear along the car's velocity parallax correctly, streak sideways in a drift and leave the centre of the screen clear.
+9. **The chassis does not collide with terrain while upright** (M1 feel pass 3, `src/sim/collision.ts`). The suspension rays carry the car over kerbs and ramp kinks; a body scraping a 26° lip stole 14 km/h in one step and read as a wall. The terrain group is switched on only when the car is on its side or roof so it can rest there until it rights itself.
+10. **Landings keep momentum** (M1 feel pass 3). Vertical speed is mostly absorbed at touchdown and 92% of the total speed is redirected along the ground; a kink in the road redirects with no loss. Physical landings cost too much speed for an arcade loop where jumps are rewards.
+11. **Wall hits are shaped, not simulated** (M1, session 6). Realistic corner friction turns a 45° wall hit into a pivot that leaves the car nose-in and stopped, and a 60° hit into a spin that ends facing backwards; both read as the wall "grabbing" the car. The contacts stay physical (Rapier resolves penetration and the impulse), but the chassis is slippery, most of the spin from the hit is dropped, and a yaw controller turns the nose along the direction of travel while the car slides, so every hit under 80° comes out pointing where it is going with speed in proportion to the angle. The player always keeps a way out: a stopped car peels off with throttle and steer.
 12. **Traffic agents are pooled typed-array records; physics bodies are lent to the nearest** (M3). The brief asks for a simulation LOD and the M0 note says every Rapier binding call allocates. Forty-eight records cost a polyline lookup each; sixteen bodies cost physics and follow the player.
 13. **Near agents are dynamic bodies driven by velocity, not kinematic bodies** (M3). A kinematic body has infinite mass: hitting one is hitting a wall, and it cannot be shoved into a takedown. A dynamic body steered by velocity follows its lane like a kinematic one, yet a hit displaces it and the impulse reaches the player's chassis through the same manifold readback. Its friction combines with `Min` (0.4) against the ground's 1.0, so a shoved car slides on its tyres instead of stopping like a crate.
 14. **The highway's two lanes per direction are sub-lane offsets, not graph lanes** (M3). Offsets −2 and +6 m from the graph lane put cars in the painted lanes; changing `buildRoadGraph` would touch the Euler tour, the markings, the minimap and three pins for a cosmetic gain.
@@ -323,12 +323,12 @@ Pinned by `tests/sim/handling.test.ts` (29 tests; `cars.test.ts` repeats the cla
 19. **Pedestrians have no colliders** (M3). Points on footway paths with a dodge controller and a last-resort hop make "never hit" true by construction; PEGI 12 slapstick, zero Rapier cost.
 20. **Billboards are pass-through triggers with a visible smash** (M3). A solid panel is a wall at highway speed. Placed last in chunk generation with a fixed quota so the island has exactly fifty; drawn as their own instanced mesh so one can vanish without a chunk rebuild. Interior ones are gates across the footways, because the frontage row leaves no run-out behind a roadside panel; the highway verges get roadside panels.
 21. **Slow motion is a time scale on the fixed-step loop** (M3). Deterministic, no special stepping, input keeps flowing, any pressed action ends it.
-22. **Traffic density is the same on both quality tiers** (M3). Decision 13 of M2 (quality never changes gameplay) wins until M6 needs a mobile lever; the pool size is one tuning number.
-23. **Traffic classes are the player's classes** (M3). Real presets, real swaps; variety is paint. Traffic-only silhouettes are backlog.
-24. **Tests and tours run with traffic off unless they test traffic** (M3). The M2 tour pins zero resets and impact < 2; `?traffic=0&peds=0` and `SimWorldOptions` keep those pins honest, while the real-time perf run keeps traffic on because that is the cost being measured.
+22. **Traffic density is the same on both quality tiers** (M3). The M2 rule that quality never changes gameplay (City section: simulation, road topology and collisions are tier independent) wins until M6 needs a mobile lever; the pool size is one tuning number.
 23. **Wrecks are towed by age plus an instantaneous sight test** (M4). A wreck older than `wreckTow` (60 s) is freed the first step it is outside a 55° half-cone on the player's heading and beyond 40 m. A hidden-for timer reads better but never fires for a player circling one junction, which is the scrapyard case the rule exists for.
 24. **The sim step is timed by phase through a hook, never by the sim** (M4). `SimWorld.mark` is called at the end of each `SimPhase`; `src/app/simProfile.ts` owns the clock, because `src/sim` has no lib.dom and no Node types. Installed for measured runs only.
 25. **Keyboard taps are latched until read** (M4). A key down and up between two frames was never seen; `KeyboardDevice.tapped` reports it once. Input read while blocked is dropped, not replayed after an ad.
 26. **Police are a planner over traffic agents, not a second traffic system** (M4). A unit is an ordinary pooled record with `Traffic.police[i]` set and a bounded plan (`setPolicePlan`: a connected exit, a speed, an optional ram point) written by `sim/police/Police.ts` before `Traffic.step`. It therefore shares the 16-body lender, the junction reservations, the gap rules and the lane follower; a pursuit adds no Rapier bodies. Only three planner rules change for a unit: the speed limit comes from the plan, a plan-chosen exit overrides the random turn, and a chasing unit with a body does not brake for the player. Police records are exempt from the despawn radius so a unit that lost the player does not evaporate.
 27. **Sight is a fixed-collider ray, sampled** (M4). One `castRay` per unit every six steps, staggered, `ONLY_FIXED` so traffic never hides the player and buildings do. The pursuit is what the sampled rays say; heat is a separate ratchet that only a banked or busted run clears, so an escape ends the chase and leaves the stars.
 28. **The pursuit borrows the body pool with a hard share** (M4). A unit is lent one of the 16 traffic bodies before a civilian (it counts as `policeBodyReach` nearer, and keeps it that much further out), evicts only civilians and only while police hold fewer than `policeBodies` (10), and is never evicted by one. The alternative, thinning the traffic while a chase runs, empties exactly the street the player is driving through; this way the chase is physical and the city stays alive.
+29. **Traffic classes are the player's classes** (M3). Real presets, real swaps; variety is paint. Traffic-only silhouettes are backlog.
+30. **Tests and tours run with traffic off unless they test traffic** (M3). The M2 tour pins zero resets and impact < 2; `?traffic=0&peds=0` and `SimWorldOptions` keep those pins honest, while the real-time perf run keeps traffic on because that is the cost being measured.

@@ -260,7 +260,7 @@ export class CrazyGamesPlatform implements Platform {
 }
 
 // src/platform/DisabledPlatform.ts
-export class DisabledPlatform implements Platform { /* name 'local'? no: name 'crazygames', environment 'disabled' */ }
+export class DisabledPlatform implements Platform { /* info(): name 'crazygames', environment 'disabled': the build is the portal build running off the portal; `PlatformName` needs no new member */ }
 
 // src/platform/index.ts
 export function createPlatform(opts?: { timeoutMs?: number; now?: () => number }): Platform;   // sync return of a lazy adapter whose init() performs the wait
@@ -404,9 +404,9 @@ Behaviour:
 - Every row of the checklist visited and set: T5 (external files: none),
   T7 (Safari: Marcin's run, `blocked` until then), T8 (the 4× proxy and the
   laptop), T9, T10 (slice 3), T15 (Basic Launch with SDK: `gameplayStart`
-  yes, ads never requested while `environment` is not `crazygames`? no:
-  requested and answered `adsDisabledBasicLaunch`, which A13 says is the
-  normal path), T16 (sitelock), G3 (English; locale logged), G5, G6, G9,
+  at control; ads are still requested at every door and busted card and
+  answered `adsDisabledBasicLaunch`, which A13 names as the normal path, so
+  nothing in the game branches on the launch phase), T16 (sitelock), G3 (English; locale logged), G5, G6, G9,
   G10, D1–D6, L3–L5, X1–X4 (slice 3), S1–S4, U1–U8 (scenario 1, `n/a` with
   the reason), M1–M4, P1–P3, Q1–Q5. Each `done` names the file or the test.
 - The sitelock per D8: `allowed(hostname)` true for `localhost`,

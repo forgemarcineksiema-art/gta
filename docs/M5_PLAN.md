@@ -237,23 +237,27 @@ e2e/screens.spec.ts            + job card, door with totals, garage, busted at t
 
 ### 3.2 Step order in `SimWorld.step()`
 
-M4's order with M5's two lines added (marked +):
+`docs/M4_PLAN.md` §3.2's order, which already holds `jobs.step` (the M4
+skeleton, before `run.step`), with M5's one line added (marked +) and the
+jobs line extended:
 
 ```
 city.sync(player)
-transforms.swap()
-events.tick = tick
-life.preStep(controls, dt)             swap, respawn timers
+transforms.swap(); events.tick = tick
+coldOpen.preStep(controls)
+life.preStep(controls, dt)             swap (→ pursuit.onSwap, → jobs: the wanted agent taken), respawn timers
 vehicle.update(controls, dt)
-police.preStep(probe, dt); traffic.step(probe, dt, events)
-peds.step(probe, traffic, dt, events)
+police.preStep(probe, dt)              sight → pursuit.step inside
+traffic.step(probe, dt, events); peds.step(…)
 world.step()
-vehicle.writeTransforms(); traffic.writeTransforms(); peds.writeTransforms()
+vehicle / traffic / peds .writeTransforms()
 life.postStep(dt)                      hits, damage, wrecked, takedowns, near misses, billboards
+coins.step; cameras.step; roadblocks.step; jumps.step
 heat.step()                            the ratchet reads the ring
-pursuit / run.step(dt)                 (M4) detection, the door, bag, spill, coins
-jobs.step(probe, dt)                 + marker entry, hunting, timer, arrival → events
+jobs.step(probe, dt)                   (M4, extended) marker entry, hunting, timer, arrival → bag and events
+run.step(probe, dt)                    (M4) bag, maxHeat, busted, the door
 dailies.step()                       + progress from the ring
+coldOpen.postStep()
 tick++, time += dt
 ```
 
@@ -569,9 +573,10 @@ Files: `sim/traffic/Traffic.ts` (`ensure`, `paintOf`), `sim/jobs/Jobs.ts`,
 
 Behaviour:
 
-- The six fences: the two drop-offs and the third site (`cover.ts` exports
-  a `fence` in Palm Gardens; if M4 did not, add it in `cover.ts` beside the
-  drop-offs: a lot corner on the parkway). Each order's descriptor is drawn
+- The six orders deliver to three fences: the two drop-offs other than
+  the hideout (the scrapyard, the hotel garage) and a third site
+  (`cover.ts` exports a `fence` in Palm Gardens; if M4 did not, add it in
+  `cover.ts` beside the drop-offs: a lot corner on the parkway). Each order's descriptor is drawn
   from the four non-police classes and `PAINTS` at generation, so the card
   can say "CYAN COMPACT" from data.
 - Entry: state `hunting`, `jobStart`, the card says the descriptor, the

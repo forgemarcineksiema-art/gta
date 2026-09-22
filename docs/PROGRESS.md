@@ -2,6 +2,52 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-22 — Docs consistency pass before slice 3a
+
+Marcin asked for a full read of the documentation, then what to do about the
+inconsistencies it turned up. Fixed in one commit before slice 3a.
+
+### Decided (set here)
+
+- **The door race keeps control.** M4 D6 zeroed the controls for the 3 s of
+  `closing` while the busted bar kept filling: 3 s without control breaks
+  brief §3 and removes the break-out moment D4 promises. Now the player
+  keeps the wheel, reversing back over the door line cancels the closing,
+  busted is evaluated before the door on every step (a tie goes to the
+  police), and the door shuts only with the whole chassis behind the line.
+  `BALANCE.door.stopSpeed` 2.2 (the slice text said 8 m/s) becomes
+  `enterSpeed` 8. M4 D6, §3.3, §3.4, slice 3a, tests 3.3 and 3.4 (with a
+  bail-out case), the §8 trap, playtest step 5; DESIGN §2.3.
+- M4 §3.2 gains `jumps.step` (slice 6) and `jobs.step` (slice 4), the latter
+  before `run.step` so a delivery to a drop-off pays before the door can
+  abandon the job; M5 §3.2 now copies M4's order instead of an older one.
+- The traffic cost pin measures the best of three 1,200-step windows, the
+  remedy the previous entry named. Second flake at session start: 3.75 ms
+  inside the full parallel suite, passing alone.
+
+### Done
+
+- DESIGN: §2 intro and §2.2 match the revised §2.3 and §2.6 (any door,
+  pursuit or not; the multiplier by the heat at which the police had you);
+  §3.2 heat 4 shows the heavies, the helicopter is update 1; §6.1 without
+  reputation gates, the highway as two lanes each way; cover and the
+  full-screen map tagged update 1 and 2.
+- ARCHITECTURE: decision records unique and in order (M3's duplicate 23 and
+  24 are now 29 and 30), the inline M2 city decisions renamed C1–C8 so
+  "decision 14" means one thing; six gears, 226 lanes, police and heat in
+  the step line.
+- BACKLOG: lines already done or now scheduled removed (the highway lanes
+  twice, the chokepoint sites, the per-tier traffic lever, the radar on
+  touch, the billboard save, the traffic profile), stale tags corrected.
+- STYLE: five designs; civilian traffic stays three silhouettes (sports and
+  police only as units). CRAZYGAMES: A5 points at DESIGN §3.4, sizes 3.51 MB.
+  M6_PLAN: two drafting fragments rewritten (DisabledPlatform's name, T15).
+  M5_PLAN: the three fences for the six orders.
+
+### Next
+
+- M4 slice 3a, on Marcin's signal.
+
 ## 2026-09-22 — Design talk, part 4: the brief's and DESIGN's decisions
 
 Marcin: "and what about the brief's and design's decisions?" A pass over

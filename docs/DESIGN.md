@@ -26,9 +26,10 @@ game on the platform has.
 
 A session is a sequence of runs. A run starts at the hideout with heat 0 and
 an empty bag, escalates through jobs and free-roam chaos, and ends one of two
-ways: the player reaches a drop-off without an active pursuit and banks the
-bag with a multiplier, or the police box the player in and the bag is lost.
-Totals, then the next run from the same spot in the same city.
+ways: the player gets through a drop-off's door, pursuit or not, and banks
+the bag with a multiplier (§2.3), or the police box the player in and the
+bag lands at half with no multiplier (§2.2, §2.4). Totals, then the next run
+from the same spot in the same city.
 
 ### 2.1 Heat and pursuit are two things
 
@@ -47,7 +48,8 @@ active pursuit. No text.
 
 Coins picked up on the road are the player's at once, always (§3.2).
 Everything else earned in a run goes into the **bag**. At a drop-off the bag
-lands in the **bank** multiplied by the highest heat reached. Busted pays a
+lands in the **bank** multiplied by the highest heat at which the police had
+the player (§2.6). Busted pays a
 **fine**: the bag lands at half, with no multiplier. The bet is the
 multiplier, not the bag: at heat 4 the door pays ×2.2 and busted pays ×0.5,
 a four-and-a-half-fold swing, and nobody leaves with nothing.
@@ -79,9 +81,13 @@ back. Numbers in `balance.ts`; built in M4 slice 3 with the coins.
 3. Drive to the hideout or a drop-off (§6.3). Entry is always allowed
    (revised 2026-09-22, decided: back to the brief, where reaching the
    respray shop is itself an escape). The door takes 3 s to close behind a
-   stopped car, and busted still counts inside it: two units at the door
-   before it shuts, and the run ends on the threshold. The bag lands in the
-   bank multiplied by the highest heat at which the police had you (§2.6).
+   car that pulls in, and busted still counts inside it: two units at the
+   door before it shuts, and the run ends on the threshold. The player keeps
+   the wheel the whole time (brief §3, never more than 2 s without
+   control): reversing back out over the door line cancels the closing, so
+   the last-second bail-out is always there (set here, 2026-09-22). The bag
+   lands in the bank multiplied by the highest heat at which the police had
+   you (§2.6).
 4. The door closes, the totals, the door opens, heat 0. Same city, no load.
 
 The brief's respray shop and the hideout are one place with one verb: bank
@@ -235,8 +241,10 @@ locked district. Revised around the audience.
   highest heat. The strategist's game sits on top of the kid's game.
 - **No reputation.** Unlocks are cash only; every job and every district is
   open from the first run. Discovery is the progression: heat 3 shows
-  roadblocks for the first time, heat 4 the helicopter, a first escape from
-  heat 5 unlocks the Interceptor.
+  roadblocks for the first time, heat 4 the heavy units (the helicopter
+  joins in update 1, §5), a first escape from heat 5 unlocks the police car
+  (the Interceptor of §3.3; at launch the police saloon, `docs/M5_PLAN.md`
+  D13).
 
 ### 3.3 Earnings (placeholders for `balance.ts`)
 
@@ -366,14 +374,15 @@ and quay as authored roads, the Crown Tower junction at the centre.
 | District | Character | Role in the loop |
 |---|---|---|
 | Crown Heights (NW) | towers, dense grid | home: the hideout under the Crown Tower block; a grid full of escape turns; low-heat jobs (races, deliveries) |
-| Sunset Works (NE) | one-floor industry, yards, the Waterworks | mayhem and takedown rage in the yards; gantry cover; a scrapyard drop-off |
+| Sunset Works (NE) | one-floor industry, yards, the Waterworks | mayhem and takedown rage in the yards; gantry cover (update 1); a scrapyard drop-off |
 | Palm Gardens (SW) | low houses, parks, the parkway, the Glasshouse | races on the parkway curves, stunt jumps on park lots, ghost roads |
 | Coral Quay (SE) | the Coral Hotel, promenade, piers | getaway deliveries, the biggest jumps (piers), water as risk; the hotel garage drop-off |
-| Highway loop | four lanes each way in paint | the pursuit racetrack: interceptors, roadblocks, spike strips, speed cameras, overpass cover at the avenue crossings |
+| Highway loop | two lanes each way, real graph lanes since M4 slice 0 | the pursuit racetrack: interceptors, roadblocks, spike strips, speed cameras, overpass cover at the avenue crossings (update 1) |
 
-Difficulty follows the reputation gates: the districts open in the order of
-their police response geography, Crown Heights with the most turns and the
-weakest patrols, the highway and the Quay with the fastest units.
+Every district is open from the first run (§3.2); difficulty follows the
+police response geography: Crown Heights with the most turns to break sight
+in, the highway and the Quay with the long straights where interceptors and
+roadblocks bite.
 
 ### 6.2 Reward density
 
@@ -396,13 +405,13 @@ banking at home. The wall is DOM, so the three doors cost one screen.
 ### 6.4 Chokepoints and cover
 
 Roadblock sites: the four highway on-ramps and the Crown Tower junction, all
-visible from 150 m. Cover sites: one covered street per district on the way
+visible from 150 m. Cover sites (update 1): one covered street per district on the way
 from that district's jobs to its drop-off, and the four overpasses.
 
 ### 6.5 Navigation
 
 The four landmarks already read from anywhere; the hideout gets a lit sign
-visible from the highway. The full-screen map (M5) shows jobs, drop-offs,
+visible from the highway. The full-screen map (update 2) shows jobs, drop-offs,
 cover, cameras and the pursuit's units.
 
 ### 6.6 The cold-open route

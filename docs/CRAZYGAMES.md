@@ -12,9 +12,9 @@ Launch model (requirements/intro): **Basic Launch** = live without SDK, no monet
 
 | # | Requirement | Source | Status | Notes |
 |---|---|---|---|---|
-| T1 | Total bundle size <= 250 MB. | requirements/technical | done | 3.3 MB total after M1; `npm run budget` enforces 40 MB (our target) < 250 MB. |
-| T2 | File count <= 1500 files. | requirements/technical | done | 5 files after M1; budget enforces 200. |
-| T3 | Initial download size <= 50 MB, measured "between the start of loading and the occurence of the first `Gameplay start` event" (`gameplayStart()`); <= 20 MB to be eligible for the mobile homepage. | requirements/technical | done | Measured by the smoke test into perf/startup.json: 3.29 MB before the first gameplayStart() (target 8 MB, CI fails at 12 MB). |
+| T1 | Total bundle size <= 250 MB. | requirements/technical | done | 3.51 MB total (M4 slice 2); `npm run budget` enforces 40 MB (our target) < 250 MB. |
+| T2 | File count <= 1500 files. | requirements/technical | done | 5 files (M4 slice 2); budget enforces 200. |
+| T3 | Initial download size <= 50 MB, measured "between the start of loading and the occurence of the first `Gameplay start` event" (`gameplayStart()`); <= 20 MB to be eligible for the mobile homepage. | requirements/technical | done | Measured by the smoke test into perf/startup.json: 3.51 MB before the first gameplayStart() (M4 slice 2) (target 8 MB, CI fails at 12 MB). |
 | T4 | If the SDK is NOT integrated, the total file size is used instead and must be <= 50 MB (20 MB for mobile homepage). | requirements/technical | info | Applies to Basic Launch without SDK only. |
 | T5 | Externally hosted/loaded files: QA measures time to reach gameplay, must be <= 20 seconds. | requirements/technical | todo | |
 | T6 | Use only relative paths inside the bundle; never absolute paths. | requirements/technical | done | `base: './'` in vite.config.ts; `npm run budget` scans the build for absolute paths. |
@@ -53,7 +53,7 @@ Launch model (requirements/intro): **Basic Launch** = live without SDK, no monet
 | A2 | Do not implement own cooldown timers: the SDK enforces max 1 midgame ad every 3 minutes and takes game start into account; early requests return `adCooldown`. | requirements/ads, resources/midgame-ads-pacing | info | Just request at every natural break. |
 | A3 | On `adStarted`: pause the game, mute audio, block all UI (disable buttons or show a blocking spinner) until `adFinished` or `adError`. Mute only when the ad actually starts, not on request. | requirements/ads, sdk/video-ads | todo | The M3 one-shots (`Sfx`) and the engine share one master gain, so the mute is one node. |
 | A4 | On `adError` (any code incl. `unfilled`, `adblock`, `adsDisabledBasicLaunch`, `adCooldown`, `other`) the game must continue normally. | requirements/ads, sdk/video-ads | todo | |
-| A5 | Rewarded ads are occasional optional bonuses, not a core loop; do not offer too often (show a timer or hide the button). | requirements/ads | todo | Planned (docs/DESIGN.md §3.5, §9): rewarded offers only in the garage (lawyer, fence) and at the hideout door (double the bag), each with a cash price as the equal alternative; hidden when ads are unavailable. |
+| A5 | Rewarded ads are occasional optional bonuses, not a core loop; do not offer too often (show a timer or hide the button). | requirements/ads | todo | Planned (docs/DESIGN.md §3.4, §9): rewarded offers only in the garage (lawyer, fence) and at the hideout door (double the bag), each with a cash price as the equal alternative; hidden when ads are unavailable. |
 | A6 | Rewarded ad button must not appear on an active gameplay screen and must not be misleading; show a video icon; skip/close must be equally prominent and never hidden or delayed. | requirements/ads | todo | |
 | A7 | Reward only on `adFinished`; never reward on `adError`. | requirements/ads | todo | |
 | A8 | Do not chain ads (more than one rewarded ad for a single reward). | requirements/ads | todo | |

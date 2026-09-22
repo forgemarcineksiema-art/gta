@@ -273,6 +273,38 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   the car, the camera takes a jolt, a splinter and a two-note chime play, and
   the counter ticks. The car keeps 95 % of its speed.
 
+## Police, the interceptor and the hideout (M4)
+
+- Two more silhouettes, built the same way as the three playable classes
+  (`src/render/carProfiles.ts`, `src/sim/vehicle/presets.ts`): the **sports**
+  car, a low wedge coupe with a 1.2 m roof, a fastback tail and a lip spoiler,
+  the fastest body in the game and the one the interceptor is built on; the
+  **police** saloon, four doors, square shoulders, a deep front bumper and a
+  1.5 m roof, three hundred kilos heavier than the muscle car so it arrives
+  with momentum.
+- Police livery, palette colours only: `policeWhite` body, a `policeBlue`
+  band along the flanks from the front arch to the rear arch at belt height,
+  `policeWhite` doors over it so the car reads white-blue-white from the side,
+  `ink` bumpers and mirror caps. No text, no badge, no decal sheet: the shape,
+  the two colours and the light bar carry it. An unliveried police body in
+  another paint is a civilian saloon, which is what a parked one at a junction
+  should look like until its lights come on.
+- Light bar: one flat box across the roof at the B pillar, 0.9 m wide,
+  0.12 m tall, `ink` housing with two lenses, left `policeBlue`, right
+  `carRed`. They alternate at 2 Hz, emissive by vertex colour only (no
+  lights): the lens colours are rewritten in place like the brake lamps. Off
+  means the two lenses are `charcoal`. A pursuit reads at 150 m from the bar
+  alone, which is what the roadblock rule needs.
+- Interceptor livery is the same two colours on the sports body with the band
+  running higher and no roof bar: a low-profile bar behind the rear window, so
+  the two unit types are told apart at a glance from behind.
+- The hideout is a one-room drive-in box: `concrete` walls and floor, a
+  `graphite` roof, one `charcoal` roller door on the street face with a
+  `carOrange` warning stripe along its bottom edge, and a single warm interior
+  light. The totals are painted on the back wall in the HUD's own type, big
+  enough to read at 800x450. No props, no clutter, no second room; the camera
+  cut does the work.
+
 ## Camera and motion
 
 - Chase camera behind and above, FOV 60 → up to 80 with speed and boost, pulls back and drops with speed, follows the velocity direction so drifts show the car sideways. Very small shake at high speed. Steering input itself never swivels the view; actual yaw contributes only 0.04 s of heading lead and at most 0.65 m of lateral look offset. Heading follow is capped at 110°/s; speed/boost FOV changes ease at 2.5/s. See `src/render/ChaseCamera.ts`.

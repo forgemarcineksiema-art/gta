@@ -23,6 +23,8 @@ const CARS: Record<CarId, Expectations> = {
   muscle: { to100: [5.8, 7.2], top: [160, 180], brake100: [22, 42], driftBand: [18, 42], driftMinSpeed: 50, pulse60: 20, botLap: [30, 40] },
   compact: { to100: [9, 13], top: [130, 165], brake100: [22, 42], driftBand: [12, 40], driftMinSpeed: 40, pulse60: 20, botLap: [33, 43] },
   heavy: { to100: [10, 16], top: [105, 140], brake100: [24, 48], driftBand: [10, 40], driftMinSpeed: 35, pulse60: 12, botLap: [35, 46] },
+  sports: { to100: [3.8, 5.6], top: [185, 212], brake100: [15, 30], driftBand: [22, 42], driftMinSpeed: 55, pulse60: 20, botLap: [30, 38] },
+  police: { to100: [6.2, 8.6], top: [158, 185], brake100: [24, 44], driftBand: [18, 40], driftMinSpeed: 55, pulse60: 18, botLap: [32, 40] },
 };
 
 for (const [id, e] of Object.entries(CARS) as Array<[CarId, Expectations]>) {

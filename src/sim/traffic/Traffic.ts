@@ -43,10 +43,13 @@ export interface PlayerProbe {
   halfLength: number;
 }
 
-const KINDS: CarId[] = ['muscle', 'compact', 'heavy'];
-const KIND_INDEX: Record<CarId, number> = { muscle: 0, compact: 1, heavy: 2 };
+const KINDS: CarId[] = ['muscle', 'compact', 'heavy', 'sports', 'police'];
+const KIND_INDEX: Record<CarId, number> = { muscle: 0, compact: 1, heavy: 2, sports: 3, police: 4 };
 /** The player's paint per class (docs/STYLE.md): what an abandoned player car keeps. */
-export const PLAYER_PAINT: Record<CarId, number> = { muscle: PALETTE.carRed, compact: PALETTE.carBlue, heavy: PALETTE.carOrange };
+export const PLAYER_PAINT: Record<CarId, number> = {
+  muscle: PALETTE.carRed, compact: PALETTE.carBlue, heavy: PALETTE.carOrange,
+  sports: PALETTE.carLime, police: PALETTE.policeWhite,
+};
 
 export interface SwapHandover {
   x: number;

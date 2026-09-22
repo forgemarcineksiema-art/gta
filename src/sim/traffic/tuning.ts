@@ -1,4 +1,6 @@
 /** Every traffic and pedestrian number. Live-editable from the dev panel. */
+import type { CarId } from '../vehicle/presets';
+
 export interface TrafficTuning {
   agents: number;
   physicsBodies: number;
@@ -41,8 +43,9 @@ export interface TrafficTuning {
   yawGain: number;
   yawRateMax: number;
   subLaneOffsets: { highway: readonly number[]; street: readonly number[] };
+  /** Spawn shares of the ambient classes; they must sum to 1. `sports` and `police` are never ambient traffic. */
   kindWeights: { compact: number; muscle: number; heavy: number };
-  mass: { compact: number; muscle: number; heavy: number };
+  mass: Record<CarId, number>;
   friction: number;
   restitution: number;
   linearDamping: number;
@@ -106,7 +109,7 @@ export const TRAFFIC: TrafficTuning = {
   yawRateMax: 1.5,
   subLaneOffsets: { highway: [-2, 6], street: [0] },
   kindWeights: { compact: 0.5, muscle: 0.3, heavy: 0.2 },
-  mass: { compact: 1050, muscle: 1300, heavy: 2400 },
+  mass: { compact: 1050, muscle: 1300, heavy: 2400, sports: 1180, police: 1620 },
   friction: 0.4,
   restitution: 0.3,
   linearDamping: 0.3,

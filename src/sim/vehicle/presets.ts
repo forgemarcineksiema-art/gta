@@ -5,8 +5,8 @@
  */
 import { DEFAULT_TUNING, cloneTuning, type VehicleTuning } from './tuning';
 
-export type CarId = 'muscle' | 'compact' | 'heavy';
-export const CAR_IDS: CarId[] = ['muscle', 'compact', 'heavy'];
+export type CarId = 'muscle' | 'compact' | 'heavy' | 'sports' | 'police';
+export const CAR_IDS: CarId[] = ['muscle', 'compact', 'heavy', 'sports', 'police'];
 
 function preset(overrides: Partial<VehicleTuning>): VehicleTuning {
   return { ...cloneTuning(DEFAULT_TUNING), ...overrides };
@@ -100,5 +100,93 @@ export const CAR_PRESETS: Record<CarId, VehicleTuning> = {
     airAngularDamping: 12000,
     boostTorqueMul: 1.3,
     boostThrust: 4000,
+  }),
+
+  /**
+   * Low mid-engined coupe: the fastest thing on the road and the body the
+   * interceptor is built on. Short wheelbase, stiff springs, real downforce, a
+   * six-speed that keeps it on the cam; it rewards a clean line and punishes a
+   * lazy one, which is the point of putting it in the police's hands at heat 2.
+   */
+  sports: preset({
+    mass: 1180,
+    chassisHalfExtents: { x: 0.92, y: 0.28, z: 2.1 },
+    chassisOffsetY: 0.38,
+    centerOfMassY: -0.12,
+    inertiaScale: { x: 0.95, y: 0.9, z: 0.95 },
+    wheelBase: 2.7,
+    trackWidth: 1.76,
+    wheelRadius: 0.34,
+    wheelWidth: 0.3,
+    suspensionRestLength: 0.26,
+    suspensionStiffness: 78000,
+    suspensionDampingCompression: 6400,
+    suspensionDampingRebound: 8200,
+    antiRollStiffness: 38000,
+    maxSteerDegLow: 33,
+    maxSteerDegHigh: 4.2,
+    steerSpeedRef: 36,
+    steerRate: 7,
+    torqueMax: 300,
+    redlineRpm: 8200,
+    gearRatios: [3.4, 2.15, 1.6, 1.28, 1.02, 0.86],
+    finalDrive: 3.9,
+    brakeTorque: 7200,
+    brakeFrontBias: 0.64,
+    wheelInertia: 1.0,
+    muFront: 2.45,
+    muRear: 2.5,
+    slipAngPeakDeg: 7.5,
+    powerOversteer: 0.18,
+    driftMaxAngleDeg: 32,
+    drag: 0.95,
+    downforce: 3.0,
+    boostTorqueMul: 1.3,
+    boostThrust: 3200,
+  }),
+
+  /**
+   * Patrol interceptor: a muscle car with three hundred kilos of cage, radio and
+   * bull bar in it. Tuned to ram rather than to race: the extra mass and yaw
+   * inertia mean it arrives with momentum and is not spun by its own hit, the
+   * springs are stiff so the nose does not dive off the bumper, and the rear is
+   * deliberately planted (`powerOversteer` a third of the muscle's) so a unit
+   * that misses stays pointed at the player instead of sliding out of the chase.
+   */
+  police: preset({
+    mass: 1620,
+    chassisHalfExtents: { x: 0.98, y: 0.34, z: 2.3 },
+    chassisOffsetY: 0.44,
+    centerOfMassY: -0.02,
+    inertiaScale: { x: 1.05, y: 1.15, z: 1.05 },
+    wheelBase: 3.0,
+    trackWidth: 1.78,
+    wheelRadius: 0.37,
+    wheelWidth: 0.29,
+    suspensionRestLength: 0.3,
+    suspensionStiffness: 84000,
+    suspensionDampingCompression: 6800,
+    suspensionDampingRebound: 8600,
+    antiRollStiffness: 40000,
+    maxSteerDegLow: 33,
+    maxSteerDegHigh: 5,
+    steerSpeedRef: 36,
+    torqueMax: 290,
+    redlineRpm: 7000,
+    gearRatios: [3.5, 2.15, 1.5, 1.16, 0.93],
+    finalDrive: 4.0,
+    brakeTorque: 6800,
+    brakeFrontBias: 0.63,
+    wheelInertia: 1.3,
+    muFront: 2.25,
+    muRear: 2.3,
+    powerOversteer: 0.05,
+    driftMaxAngleDeg: 26,
+    driftThrottlePush: 5600,
+    drag: 1.18,
+    downforce: 2.2,
+    wallHitRetainSpin: 0.08,
+    boostTorqueMul: 1.25,
+    boostThrust: 2800,
   }),
 };

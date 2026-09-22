@@ -46,6 +46,19 @@ after the first Basic Launch numbers (update 1 already has its contract in
   API facts checked against the code at `ba9a12f` (M6's SDK facts from
   the 2026-09-20 read, to be re-verified in its slice 0), the playtest
   script and the reviewer checklist. 46 numbered tests in M5, 34 in M6.
+- `docs/M4_PLAN.md` rewritten the same way on Marcin's "and M4?": slices
+  0–2 kept as the record with their measurements, decisions D1–D17 with
+  reasons, the module map, the step order, contracts for `Run`, `Coins`,
+  `cover.ts`, `ColdOpen`, the `Pursuit` and `Police` additions,
+  `Roadblocks`, `Cameras`, the `Traffic` `Parked` state, `ui/run.ts` and
+  the camera cut; the balance and police tuning additions with values;
+  slices 3–8 with files, behaviour, numbers, 60 numbered tests and
+  acceptance; the verification protocol with the bases and expected
+  deltas; budgets; gate criteria; API facts checked against `6b52d03`;
+  playtest; reviewer checklist. §5 (update 1) unchanged. Two things set
+  there: after busted the run restarts in place (no teleport), and the
+  sawhorse is a pass-through trigger like a billboard while the roadblock's
+  cars are parked units with bodies.
 
 ### Set here (Marcin overrides)
 

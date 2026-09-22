@@ -195,7 +195,7 @@ src/sim/vehicle/Vehicle.ts     + gripMul (default 1) multiplied into mu; + later
 src/sim/traffic/Traffic.ts     + AgentState.Parked, park(agent, x, z, yaw), unpark(agent), lightsOn flag per agent
 src/sim/SimWorld.ts            owns run, coins, roadblocks, cameras, coldOpen; step order §3.2; SimWorldOptions.coldOpen
 src/render/Coins.ts            one instanced mesh over the resident chunks' coins plus the spill pool
-src/render/HideoutView.ts      the door mesh (slides), the interior light, the wall totals as a texture-free text mesh? no: the totals are DOM (ui/run.ts); the view is the door and the cut camera target
+src/render/HideoutView.ts      the door mesh (slides), the interior light, the cut camera target; the totals themselves are DOM (ui/run.ts)
 src/render/PoliceView.ts       + parked lights, the heavy and Chief liveries, the roadblock sawhorse and spike strip meshes, camera poles
 src/render/ChaseCamera.ts      + cut(x, y, z, lookX, lookY, lookZ) for the door, released on drive-out
 src/ui/run.ts                  the bag and coin counters, the busted bar and card, the door screen (totals), the FLASHED popup
@@ -340,7 +340,7 @@ spawnParkedPolice(x: number, z: number, yaw: number, kind: 'police' | 'heavy'): 
 ```ts
 // src/ui/run.ts
 export class RunHud { constructor(parent: HTMLElement, sim: SimWorld); update(sim: SimWorld, dt: number): void; setKeys(k: { any: string }): void }
-// the bag counter (top right under the stars, ≥ 44 px), the coin counter, the busted bar, the busted card, the door screen with the totals, FLASHED, ROADBLOCK AHEAD? no text for that: the light bars are the warning
+// the bag counter (top right under the stars, ≥ 44 px), the coin counter, the busted bar, the busted card, the door screen with the totals, FLASHED; no roadblock text: the light bars are the warning
 // src/render/ChaseCamera.ts (addition)
 cut(x: number, y: number, z: number, lookX: number, lookY: number, lookZ: number): void;   // hard cut, held until release()
 ```
@@ -402,10 +402,10 @@ Behaviour:
   resident chunks' coins with a per-chunk coarse test first (chunk centre
   within 250 m). A pickup: `picked` set, `pickedCount++`, `coin` event,
   `run.coins += value`. The view is one instanced mesh (an octagonal disc,
-  8 triangles, `carLime`? no: the HUD accent yellow `#ffd23f` is not a
-  palette colour; use `PALETTE.carOrange` for coins and `carWhite` for
-  spilled ones) over the resident chunks, rebuilt on chunk claim like the
-  billboards, picked ids zero-scaled; the spill pool is 12 extra instances.
+  8 triangles, `PALETTE.carOrange` for placed coins and `carWhite` for
+  spilled ones; the HUD's accent yellow is not a palette colour) over the
+  resident chunks, rebuilt on chunk claim like the billboards, picked ids
+  zero-scaled; the spill pool is 12 extra instances.
   Spin by time in the shader-free way: rotate the instance matrix at
   30 Hz for the nearest 64 only (a cheap loop, no allocation).
 - **The spill.** `Life` on the player's `wrecked`: `run.spill(x, z, yaw)`
@@ -534,10 +534,10 @@ diagonal is on the route by construction; cleared by `billboard`),
 the caption says "RAM THEM INTO A WALL" only while a unit is within 20 m;
 cleared by `takedown` on a police agent or after 20 s), `deliver` (the
 marker; cleared when inside), `escape` ("GET IT TO THE HIDEOUT" with the
-arrow-less coin line; cleared by `door`). `skip` (the `skip` action: the
-keyboard binds it to `KeyX`? no: any run key is taken by the sim as
-gameplay; add `Escape`? never. Bind `skip` to `KeyN` and show "N: SKIP"
-under the caption) ends the script; completion or skip sets the session
+arrow-less coin line; cleared by `door`). The `skip` action ends the
+script: it has no key today, so the keyboard binds it to `KeyN` (never
+Escape, and every run key is gameplay) and the caption shows "N: SKIP"
+underneath; completion or skip sets the session
 flag (`sessionStorage`, app) so a reload in the same tab does not repeat it
 until M5's save takes over. Captions are DOM: a keycap plus one word, top
 centre, STYLE.md sizes; never a modal; input never blocked.

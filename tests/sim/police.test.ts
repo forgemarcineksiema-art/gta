@@ -19,23 +19,26 @@ describe('police patrols', () => {
         sim.spawnAt('highway');
         run(sim, 4);
         expect(sim.heat.level).toBe(heat === 0 ? 0 : 1);
-        run(sim, 12);
         const police = sim.police!;
         if (heat === 0) {
+          run(sim, 12);
           expect(police.count).toBe(0);
           expect(sim.pursuit.state).toBe('idle');
           continue;
         }
-        expect(police.count).toBe(POLICE.budget[1] as number);
-        expect(sim.pursuit.state).toBe('active');
+        // the pair is on duty and sees the player within the window...
+        const found = runUntil(sim, 12, (s) => s.pursuit.state === 'active' && s.police!.count === (POLICE.budget[1] as number));
+        expect(found).toBeGreaterThan(0);
         expect(sim.pursuit.visible).toBe(true);
-        // A patrol closes on the player rather than idling at its spawn.
+        // ...closing on the player rather than idling at its spawn,
         const live = Array.from(police.units).filter((agent) => agent >= 0);
         const nearest = Math.min(...live.map((agent) =>
           Math.hypot((traffic.x[agent] as number) - sim.probe.x, (traffic.z[agent] as number) - sim.probe.z)));
-        console.log(`[police] nearest unit ${nearest.toFixed(0)} m after 12 s of a stationary target`);
+        console.log(`[police] nearest unit ${nearest.toFixed(0)} m when the pursuit went active on a stationary target`);
         expect(nearest).toBeLessThan(POLICE.sightRange);
         for (const agent of live) expect(traffic.state[agent]).not.toBe(AgentState.Free);
+        // ...and a player who just sits there is boxed and busted (the arrest, slice 3c)
+        expect(runUntil(sim, 20, (s) => s.run.state === 'busted')).toBeGreaterThan(0);
       } finally { sim.dispose(); }
     }
   }, 120_000);

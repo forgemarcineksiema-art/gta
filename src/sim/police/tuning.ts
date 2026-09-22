@@ -42,6 +42,19 @@ export interface PoliceTuning {
   pitSideOffset: number;
   /** Boxed in: `units` live police cars within `range` m while the player is under `speed` m/s fills the bar in `seconds`; moving drains it. */
   busted: { units: number; range: number; speed: number; seconds: number; drainPerSecond: number };
+  /**
+   * The arrest: under `playerSpeed` m/s (released above `releaseSpeed`) units within `range` m take the slots
+   * `rear` / `front` m along and `side` m across the player, braking at `decel` to arrive within `arrive` m;
+   * the rest stand by `standby` m behind. `accel` caps the body's velocity change; `keep` m of hysteresis on a slot.
+   */
+  arrest: { playerSpeed: number; releaseSpeed: number; range: number; rear: number; front: number; side: number; standby: number; decel: number; arrive: number; accel: number; keep: number; clear: number; detourSpeed: number };
+  /** Sight lost: units drive to the last fix and fan out once within `reach` m of it. */
+  search: { reach: number };
+  /** From `fromLevel` every second saloon routes to the player's position `seconds` ahead, until within `breakRange` m. */
+  cutoff: { fromLevel: number; seconds: number; breakRange: number };
+  /** A police car the player hits at this dv while nobody chases notices (and heat rises); once per `assaultCooldown` s per car. */
+  assaultDv: number;
+  assaultCooldown: number;
 }
 
 export const POLICE: PoliceTuning = {
@@ -80,5 +93,11 @@ export const POLICE: PoliceTuning = {
   pitAcceleration: 22,
   pitSideOffset: 1.1,
   patrolRecycle: 260,
-  busted: { units: 2, range: 6, speed: 1.39, seconds: 3, drainPerSecond: 0.7 },
+  busted: { units: 2, range: 7, speed: 1.39, seconds: 3, drainPerSecond: 0.7 },
+  // clear: a unit passes the player's car no closer than this (m), at detourSpeed (m/s)
+  arrest: { playerSpeed: 6, releaseSpeed: 9, range: 60, rear: 5.6, front: 5.6, side: 3.2, standby: 12, decel: 6, arrive: 1.2, accel: 12, keep: 5, clear: 4, detourSpeed: 5 },
+  search: { reach: 30 },
+  cutoff: { fromLevel: 2, seconds: 4, breakRange: 40 },
+  assaultDv: 1.5,
+  assaultCooldown: 3,
 };

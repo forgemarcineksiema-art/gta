@@ -1,11 +1,36 @@
-/** Two graph patrols, sharing Traffic's agent records, steering and physical body pool. */
+/**
+ * The police brain: units are traffic agents with a plan (decision 26), and
+ * this planner writes those plans before `Traffic.step`. What a unit does
+ * follows from the pursuit and the player (docs/DESIGN.md §2.10):
+ *
+ * - chase: route to where the player will be in 1.2 s; close in and shove a
+ *   fast player (a saloon's ram, an interceptor's PIT);
+ * - cut off: from heat 2 every second saloon routes to where the player will
+ *   be in 4 s, so units arrive from ahead as well as from behind;
+ * - arrest: a player under ~22 km/h is boxed. Units within 60 m take the
+ *   slots behind, ahead and beside the player, braking to arrive, and hold
+ *   there; two in reach fill the busted bar;
+ * - search: sight lost, units drive to where the player was last seen and fan
+ *   out through the junctions there until the escape timer runs out;
+ * - react: a unit the player hits notices at once, and it costs heat.
+ *
+ * Units share Traffic's records, lane follower and body pool; nothing here
+ * steps physics. No allocation per step.
+ */
 import RAPIER from '@dimforge/rapier3d-compat';
+import { BALANCE } from '../balance';
 import type { RoadGraph, Lane, RoadNode } from '../city/roads';
 import type { SimWorld } from '../SimWorld';
 import { AgentState, type PlayerProbe, type Traffic } from '../traffic/Traffic';
 import type { LanePose, LaneProjection } from '../traffic/lanes';
 import { CAR_PRESETS } from '../vehicle/presets';
 import { POLICE, type PoliceTuning } from './tuning';
+
+/** Distance fields over the road graph: toward the player's near future, and toward where the player is heading. */
+const CHASE = 0;
+const AHEAD = 1;
+/** Arrest slots: behind, ahead, left, right of the player; units beyond four stand by behind. */
+const SLOTS = 4;
 
 export class Police {
   readonly units: Int16Array;
@@ -14,6 +39,8 @@ export class Police {
   count = 0;
   budget = 0;
   ramsReceived = 0;
+  /** True while the player is slow enough to be boxed and the units are taking their slots. */
+  arresting = false;
   /** Test hook: false keeps new units from coming on duty (deterministic busted and door setups). */
   dispatching = true;
 
@@ -24,21 +51,34 @@ export class Police {
   private readonly withdrawing: Uint8Array;
   private readonly rammed: Uint8Array;
   private readonly ramCooldown: Float32Array;
+  /** Per traffic record: a hit from the player that already cost heat. */
+  private readonly assaultCooldown: Float32Array;
+  /** Per unit: its arrest slot (0..3), a standby place (4 + n), or -1. */
+  readonly slotOf: Int8Array;
+  private readonly slotX = new Float64Array(SLOTS);
+  private readonly slotZ = new Float64Array(SLOTS);
+  private readonly slotOpen = new Uint8Array(SLOTS);
   private readonly ray = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 });
   private readonly pos = { x: 0, y: 0, z: 0 };
   private readonly pose: LanePose = { x: 0, z: 0, yaw: 0 };
   private readonly projection: LaneProjection = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };
-  private readonly distance: Float64Array;
+  private readonly fields: [Float64Array, Float64Array];
+  private readonly targetLane = new Int16Array(2);
+  private readonly targetS = new Float64Array(2);
   private readonly visited: Uint8Array;
   private readonly incoming: Int16Array;
   private readonly previousIncoming: Int16Array;
   private readonly laneCost: Float32Array;
   private readonly radius: number;
-  private targetLane = -1;
-  private targetS = 0;
   private routeLeft = 0;
+  private slotLeft = 0;
   private spawnLeft = 0;
   private hot = false;
+  /** The player's velocity when last seen: where a search starts. */
+  private lastVx = 0;
+  private lastVz = 0;
+  /** Bumped per lost sighting so the fan-out through the junctions differs each time. */
+  private searchSalt = 0;
 
   constructor(sim: SimWorld) {
     if (!sim.traffic || !sim.city) throw new Error('Police requires city traffic');
@@ -51,7 +91,11 @@ export class Police {
     this.withdrawing = new Uint8Array(this.units.length);
     this.rammed = new Uint8Array(this.units.length);
     this.ramCooldown = new Float32Array(this.units.length);
-    this.distance = new Float64Array(this.graph.nodes.length);
+    this.slotOf = new Int8Array(this.units.length);
+    this.slotOf.fill(-1);
+    this.assaultCooldown = new Float32Array(this.traffic.capacity);
+    this.fields = [new Float64Array(this.graph.nodes.length), new Float64Array(this.graph.nodes.length)];
+    this.targetLane.fill(-1);
     this.visited = new Uint8Array(this.graph.nodes.length);
     this.incoming = new Int16Array(this.graph.nodes.length);
     this.incoming.fill(-1);
@@ -76,7 +120,6 @@ export class Police {
     const traffic = this.traffic;
     const pursuit = this.sim.pursuit;
     const t = this.tuning;
-    const level = this.sim.heat.level;
     const cosHalf = Math.cos(t.viewHalfAngleDeg * Math.PI / 180);
     this.count = 0;
     for (let u = 0; u < this.units.length; u++) {
@@ -88,6 +131,7 @@ export class Police {
         this.units[u] = -1;
         this.seen[u] = 0;
         this.rammed[u] = 0;
+        this.slotOf[u] = -1;
         // A wrecked patrol is replaced, but the street gets a breather first.
         this.spawnLeft = Math.max(this.spawnLeft, t.reinforceSeconds);
         continue;
@@ -101,11 +145,15 @@ export class Police {
       this.rammed[u] = 0;
       traffic.clearPolicePlan(agent);
     }
+    const assaulted = this.assaults(dt);
+    const level = this.sim.heat.level;
     if (level === 0) {
       this.hot = false;
       this.spawnLeft = 0;
+      this.arresting = false;
       this.seen.fill(0);
       this.withdrawing.fill(0);
+      this.slotOf.fill(-1);
       pursuit.step(dt, level, false, player.x, player.z);
       this.standDown(player, cosHalf);
       return;
@@ -126,11 +174,13 @@ export class Police {
         this.seen[u] = 0;
         this.withdrawing[u] = 0;
         this.ramCooldown[u] = 0;
+        this.slotOf[u] = -1;
         this.count++;
       }
     }
 
-    let visible = false;
+    // a unit the player hit sees the player, whatever its ray said
+    let visible = assaulted;
     const every = Math.max(1, Math.round(t.sightEveryTicks));
     for (let u = 0; u < this.units.length; u++) {
       const agent = this.units[u] as number;
@@ -147,6 +197,10 @@ export class Police {
       else if (this.sim.tick % every === Math.floor(u * every / this.units.length)) this.seen[u] = this.canSee(agent, player, distance) ? 1 : 0;
       if (this.seen[u] === 1) visible = true;
     }
+    if (visible) {
+      this.lastVx = player.vx;
+      this.lastVz = player.vz;
+    }
     const before = pursuit.state;
     pursuit.step(dt, level, visible, player.x, player.z);
     if (before === 'lost' && pursuit.state === 'idle') {
@@ -154,16 +208,41 @@ export class Police {
       this.seen.fill(0);
     }
     const chasing = pursuit.state === 'detected' || pursuit.state === 'active';
+    const searching = pursuit.state === 'lost';
+    if (searching && before !== 'lost') this.searchSalt++;
     this.routeLeft -= dt;
-    if (chasing && (this.routeLeft <= 0 || this.targetLane < 0 || before === 'idle' || before === 'lost')) {
-      this.route(player);
+    const refresh = this.routeLeft <= 0 || (this.targetLane[CHASE] as number) < 0 || before === 'idle' || before !== pursuit.state;
+    if (chasing && refresh) {
+      this.route(CHASE, player.x + player.vx * t.projectSeconds, player.z + player.vz * t.projectSeconds, player.yaw);
+      if (level >= t.cutoff.fromLevel) this.route(AHEAD, player.x + player.vx * t.cutoff.seconds, player.z + player.vz * t.cutoff.seconds, player.yaw);
+      this.routeLeft = t.routeSeconds;
+    } else if (searching && refresh) {
+      // the radio's last fix: where the player was, a moment down the road it was taking
+      this.route(CHASE, pursuit.lastX + this.lastVx * t.projectSeconds, pursuit.lastZ + this.lastVz * t.projectSeconds, Math.atan2(this.lastVx, this.lastVz));
       this.routeLeft = t.routeSeconds;
     }
+
+    // arrest: a slow player is boxed; the slots are re-dealt twice a second
+    const a = t.arrest;
+    const arresting = chasing && (player.speed < a.playerSpeed || (this.arresting && player.speed < a.releaseSpeed));
+    if (arresting !== this.arresting) this.slotLeft = 0;
+    this.arresting = arresting;
+    if (arresting) {
+      this.placeSlots(player);
+      this.slotLeft -= dt;
+      if (this.slotLeft <= 0) {
+        this.dealSlots(player);
+        this.slotLeft = t.routeSeconds;
+      }
+    } else {
+      this.slotOf.fill(-1);
+    }
+
     for (let u = 0; u < this.units.length; u++) {
       const agent = this.units[u] as number;
       if (agent < 0) continue;
-      if (!chasing) {
-        // Lost means ordinary lane driving, not omniscient navigation to the player.
+      if (!chasing && !searching) {
+        // Idle means ordinary lane driving, not omniscient navigation to the player.
         if (this.withdrawing[u] === 1) {
           traffic.setPolicePlan(agent, this.awayExit(agent, player), 0);
           continue;
@@ -181,11 +260,23 @@ export class Police {
         }
         continue;
       }
-      const next = this.routeExit(agent);
-      const pit = traffic.kindOf(agent) === 'sports';
+      if (searching) {
+        // to the last fix at chase speed, then a different exit per unit at every junction around it
+        const x = traffic.x[agent] as number, z = traffic.z[agent] as number;
+        const toFix = Math.hypot(pursuit.lastX - x, pursuit.lastZ - z);
+        traffic.setPolicePlan(agent, toFix > t.search.reach ? this.routeExit(agent, CHASE) : this.searchExit(agent, u), t.chaseSpeed);
+        continue;
+      }
       const dx = player.x - (traffic.x[agent] as number);
       const dz = player.z - (traffic.z[agent] as number);
       const gap = Math.hypot(dx, dz);
+      const slot = this.slotOf[u] as number;
+      if (arresting && slot >= 0 && traffic.hasBody(agent) && gap < a.range) {
+        this.driveToSlot(u, agent, slot, player);
+        continue;
+      }
+      const pit = traffic.kindOf(agent) === 'sports';
+      const next = this.isCutter(u, agent, level) && gap > t.cutoff.breakRange ? this.routeExit(agent, AHEAD) : this.routeExit(agent, CHASE);
       // Close in, a unit drives its class speed; a street back it runs flat out to arrive at all.
       const speed = gap > t.catchUpRange ? t.catchUpSpeed : pit ? t.interceptorSpeed : t.chaseSpeed;
       const range = pit ? t.pitRange : t.ramRange;
@@ -226,6 +317,149 @@ export class Police {
       if (dx * dx + dz * dz <= r2) n++;
     }
     return n;
+  }
+
+  /**
+   * A police car the player hits while nobody is chasing: it costs heat and,
+   * from heat 1, the car has seen who did it. During a chase the contacts are
+   * the pursuit's own rams and cost nothing.
+   */
+  private assaults(dt: number): boolean {
+    const traffic = this.traffic;
+    const t = this.tuning;
+    let assaulted = false;
+    const idle = this.sim.pursuit.state === 'idle';
+    for (let i = 0; i < traffic.capacity; i++) {
+      const cool = this.assaultCooldown[i] as number;
+      if (cool > 0) this.assaultCooldown[i] = Math.max(0, cool - dt);
+      if (traffic.police[i] !== 1 || !idle || cool > 0 || !traffic.hasBody(i)) continue;
+      const state = traffic.state[i];
+      if (state === AgentState.Wrecked || state === AgentState.Free) continue;
+      if ((traffic.playerDv[i] as number) < t.assaultDv) continue;
+      this.assaultCooldown[i] = t.assaultCooldown;
+      this.sim.heat.add(BALANCE.heat.policeHit);
+      assaulted = true;
+    }
+    return assaulted;
+  }
+
+  /** The four slots around the player, and which of them a car can reach (no fixed collider between). */
+  private placeSlots(player: PlayerProbe): void {
+    const a = this.tuning.arrest;
+    const fx = Math.sin(player.yaw), fz = Math.cos(player.yaw);
+    // right of the heading; +X is left when facing +Z
+    const rx = -fz, rz = fx;
+    this.slotX[0] = player.x - fx * a.rear; this.slotZ[0] = player.z - fz * a.rear;
+    this.slotX[1] = player.x + fx * a.front; this.slotZ[1] = player.z + fz * a.front;
+    this.slotX[2] = player.x - rx * a.side; this.slotZ[2] = player.z - rz * a.side;
+    this.slotX[3] = player.x + rx * a.side; this.slotZ[3] = player.z + rz * a.side;
+  }
+
+  /** Deal the open slots to the nearest units, a unit keeping its own slot unless another is `keep` metres nearer. */
+  private dealSlots(player: PlayerProbe): void {
+    const traffic = this.traffic;
+    const a = this.tuning.arrest;
+    this.sim.vehicle.body.translation(this.pos);
+    for (let k = 0; k < SLOTS; k++) {
+      const dx = (this.slotX[k] as number) - player.x, dz = (this.slotZ[k] as number) - player.z;
+      const reach = Math.hypot(dx, dz);
+      this.ray.origin.x = player.x;
+      this.ray.origin.y = this.pos.y + 0.6;
+      this.ray.origin.z = player.z;
+      this.ray.dir.x = dx / reach;
+      this.ray.dir.y = 0;
+      this.ray.dir.z = dz / reach;
+      // a slot behind a wall or inside a building is no slot: the car beyond it would grind the wall
+      this.slotOpen[k] = this.sim.world.castRay(this.ray, reach + 1.5, true, RAPIER.QueryFilterFlags.ONLY_FIXED | RAPIER.QueryFilterFlags.EXCLUDE_SENSORS) === null ? 1 : 0;
+    }
+    const held = this.slotOf;
+    for (let k = 0; k < SLOTS; k++) {
+      if (this.slotOpen[k] === 0) {
+        for (let u = 0; u < this.units.length; u++) if (held[u] === k) held[u] = -1;
+        continue;
+      }
+      let best = -1, bestCost = Infinity;
+      for (let u = 0; u < this.units.length; u++) {
+        const agent = this.units[u] as number;
+        if (agent < 0 || !traffic.hasBody(agent) || this.withdrawing[u] === 1) continue;
+        const current = held[u] as number;
+        if (current >= 0 && current < k) continue;
+        const d = Math.hypot((traffic.x[agent] as number) - (this.slotX[k] as number), (traffic.z[agent] as number) - (this.slotZ[k] as number));
+        if (Math.hypot((traffic.x[agent] as number) - player.x, (traffic.z[agent] as number) - player.z) > a.range) continue;
+        const cost = d - (current === k ? a.keep : 0);
+        if (cost < bestCost) { bestCost = cost; best = u; }
+      }
+      for (let u = 0; u < this.units.length; u++) if (held[u] === k && u !== best) held[u] = -1;
+      if (best >= 0) held[best] = k;
+    }
+    // the rest stand by behind, one car length apart, ready to take a slot that opens
+    let standby = 0;
+    for (let u = 0; u < this.units.length; u++) {
+      const agent = this.units[u] as number;
+      if (agent < 0 || !traffic.hasBody(agent) || ((held[u] as number) >= 0 && (held[u] as number) < SLOTS)) continue;
+      held[u] = SLOTS + standby;
+      standby++;
+    }
+  }
+
+  /** Brake to arrive on the slot and hold there, lights on; the player's own push can still move the car. */
+  private driveToSlot(u: number, agent: number, slot: number, player: PlayerProbe): void {
+    const traffic = this.traffic;
+    const t = this.tuning;
+    const a = t.arrest;
+    let sx: number, sz: number;
+    if (slot < SLOTS) {
+      sx = this.slotX[slot] as number;
+      sz = this.slotZ[slot] as number;
+    } else {
+      const back = a.standby + (slot - SLOTS) * 6;
+      sx = player.x - Math.sin(player.yaw) * back;
+      sz = player.z - Math.cos(player.yaw) * back;
+    }
+    const ux = traffic.x[agent] as number, uz = traffic.z[agent] as number;
+    const d = Math.hypot(sx - ux, sz - uz);
+    // v² = 2 a d: a stopped player is reached at walking pace, never at chase speed
+    const arrive = d < a.arrive ? 0 : Math.min(t.chaseSpeed, Math.sqrt(2 * a.decel * (d - a.arrive)));
+    // a slot on the far side of the player is reached round the car, not through it
+    let tx = sx, tz = sz;
+    const vx = sx - ux, vz = sz - uz;
+    const along = d > 1e-6 ? Math.max(0, Math.min(1, ((player.x - ux) * vx + (player.z - uz) * vz) / (d * d))) : 0;
+    const cx = ux + vx * along, cz = uz + vz * along;
+    const miss = Math.hypot(cx - player.x, cz - player.z);
+    if (d > a.clear && along > 0 && along < 1 && miss < a.clear) {
+      let nx = cx - player.x, nz = cz - player.z;
+      if (miss < 1e-3) { nx = -vz / d; nz = vx / d; } else { nx /= miss; nz /= miss; }
+      tx = player.x + nx * (a.clear + 1.5);
+      tz = player.z + nz * (a.clear + 1.5);
+    }
+    // round the player's car at a walking pace: it is a detour past a stopped car, not a pass
+    traffic.setPolicePlan(agent, this.routeExit(agent, CHASE), t.chaseSpeed, tx, tz, tx === sx ? arrive : Math.min(arrive, a.detourSpeed), a.accel, true);
+    this.seen[u] = 1;
+  }
+
+  /** From heat 2 every second saloon heads for where the player is going instead of where the player is. */
+  private isCutter(u: number, agent: number, level: number): boolean {
+    return level >= this.tuning.cutoff.fromLevel && u % 2 === 1 && this.traffic.kindOf(agent) !== 'sports';
+  }
+
+  /** At a junction near the last fix each unit takes a different road out. */
+  private searchExit(agent: number, u: number): number {
+    const lane = this.traffic.lane[agent] as number;
+    if (lane < 0) return -1;
+    const outs = this.traffic.lanes.outs(lane);
+    const uturn = this.traffic.lanes.uturn(lane);
+    let choices = 0;
+    for (let i = 0; i < outs.length; i++) if (outs[i] !== uturn) choices++;
+    if (choices === 0) return outs[0] ?? -1;
+    const pick = (u + this.searchSalt) % choices;
+    let seen = 0;
+    for (let i = 0; i < outs.length; i++) {
+      const out = outs[i] as number;
+      if (out === uturn) continue;
+      if (seen === pick) return out;
+      seen++;
+    }
+    return -1;
   }
 
   /**
@@ -309,54 +543,57 @@ export class Police {
       : this.traffic.spawnPoliceAt(bestLane, bestS, interceptor ? 'sports' : 'police', player, t.viewNear, cosHalf, t.spawnClearance);
   }
 
-  /** Reverse Dijkstra on the authored road graph, using constructor-owned arrays. */
-  private route(player: PlayerProbe): void {
+  /** Reverse Dijkstra on the authored road graph toward the lane under a point, into one of the two fields. */
+  private route(field: number, x: number, z: number, heading: number): void {
     const lanes = this.traffic.lanes;
-    const x = player.x + player.vx * this.tuning.projectSeconds;
-    const z = player.z + player.vz * this.tuning.projectSeconds;
+    const distance = this.fields[field] as Float64Array;
     let best = Infinity;
-    this.targetLane = -1;
+    let targetLane = -1, targetS = 0;
     for (let i = 0; i < lanes.laneCount; i++) {
-      // Same bound as the dispatch: the player is on one of the lanes near the player.
+      // Same bound as the dispatch: the point is on one of the lanes near it.
       if (Math.hypot((lanes.midX[i] as number) - x, (lanes.midZ[i] as number) - z) > (lanes.length[i] as number) / 2 + 40) continue;
       lanes.project(i, x, z, this.projection);
-      const heading = Math.cos(this.projection.yaw - player.yaw);
-      const cost = this.projection.dist + (1 - heading) * this.tuning.targetHeadingWeight;
+      const along = Math.cos(this.projection.yaw - heading);
+      const cost = this.projection.dist + (1 - along) * this.tuning.targetHeadingWeight;
       if (cost < best) {
         best = cost;
-        this.targetLane = i;
-        this.targetS = this.projection.s;
+        targetLane = i;
+        targetS = this.projection.s;
       }
     }
-    this.distance.fill(Infinity);
+    this.targetLane[field] = targetLane;
+    this.targetS[field] = targetS;
+    distance.fill(Infinity);
     this.visited.fill(0);
-    if (this.targetLane < 0) return;
-    const target = this.graph.lanes[this.targetLane] as Lane;
-    this.distance[target.from] = this.targetS;
-    for (let pass = 0; pass < this.distance.length; pass++) {
+    if (targetLane < 0) return;
+    const target = this.graph.lanes[targetLane] as Lane;
+    distance[target.from] = targetS;
+    for (let pass = 0; pass < distance.length; pass++) {
       let node = -1, cost = Infinity;
-      for (let n = 0; n < this.distance.length; n++) {
-        if (this.visited[n] === 0 && (this.distance[n] as number) < cost) { node = n; cost = this.distance[n] as number; }
+      for (let n = 0; n < distance.length; n++) {
+        if (this.visited[n] === 0 && (distance[n] as number) < cost) { node = n; cost = distance[n] as number; }
       }
       if (node < 0) break;
       this.visited[node] = 1;
       for (let lane = this.incoming[node] as number; lane >= 0; lane = this.previousIncoming[lane] as number) {
         const from = (this.graph.lanes[lane] as Lane).from;
         const candidate = cost + (this.laneCost[lane] as number);
-        if (candidate < (this.distance[from] as number)) this.distance[from] = candidate;
+        if (candidate < (distance[from] as number)) distance[from] = candidate;
       }
     }
   }
 
-  private routeExit(agent: number): number {
+  private routeExit(agent: number, field: number): number {
     const lane = this.traffic.lane[agent] as number;
-    if (lane < 0 || this.targetLane < 0) return -1;
+    const targetLane = this.targetLane[field] as number;
+    if (lane < 0 || targetLane < 0) return -1;
+    const distance = this.fields[field] as Float64Array;
     const outs = this.traffic.lanes.outs(lane);
     let best = Infinity, next = -1;
     for (let i = 0; i < outs.length; i++) {
       const out = outs[i] as number;
-      const cost = out === this.targetLane ? this.targetS
-        : (this.laneCost[out] as number) + (this.distance[(this.graph.lanes[out] as Lane).to] as number);
+      const cost = out === targetLane ? (this.targetS[field] as number)
+        : (this.laneCost[out] as number) + (distance[(this.graph.lanes[out] as Lane).to] as number);
       if (cost < best) { best = cost; next = out; }
     }
     return next;

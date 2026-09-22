@@ -112,6 +112,10 @@ export class Traffic {
   readonly trafficDv: Float32Array;
   /** A lent body's speed before this step's physics: closing speeds are measured before the impact. */
   readonly prevSpeed: Float32Array;
+  /** Dents from contacts, 0..1; at 1 the car is a wreck (police take a fraction, `policeArmour`). */
+  readonly damage: Float32Array;
+  /** Set on the step a car was wrecked by its own damage or one big contact (not by a caller): Life reads it for takedowns. */
+  readonly justWrecked: Uint8Array;
   /** Collider handle of the player's chassis, so contacts can be attributed. The world refreshes it every step. */
   playerColliderHandle = -1;
   /** Bumps when paint or tint changes so the view reuploads instance colours. */
@@ -154,6 +158,8 @@ export class Traffic {
   private readonly ramZ: Float32Array;
   private readonly ramSpeed: Float32Array;
   private readonly ramAccel: Float32Array;
+  /** 1: the plan's point is a place to go to (an arrest slot), not a car to shove: lane gaps no longer hold the unit back. */
+  private readonly freeSteer: Uint8Array;
   private readonly lin = { x: 0, y: 0, z: 0 };
   private readonly ang = { x: 0, y: 0, z: 0 };
   private readonly pos = { x: 0, y: 0, z: 0 };
@@ -218,6 +224,8 @@ export class Traffic {
     this.wallDv = new Float32Array(n);
     this.trafficDv = new Float32Array(n);
     this.prevSpeed = new Float32Array(n);
+    this.damage = new Float32Array(n);
+    this.justWrecked = new Uint8Array(n);
     this.wobble = new Float32Array(n);
     this.turn = new Uint8Array(n);
     this.laneFill = new Uint8Array(this.lanes.laneCount);
@@ -246,6 +254,7 @@ export class Traffic {
     this.ramZ = new Float32Array(n);
     this.ramSpeed = new Float32Array(n);
     this.ramAccel = new Float32Array(n);
+    this.freeSteer = new Uint8Array(n);
     this.plannerLane.fill(-1);
     this.plannerNext.fill(-1);
     this.bodyAgent = new Int16Array(tuning.physicsBodies);
@@ -422,8 +431,9 @@ export class Traffic {
   }
 
   /** Bounded planner inputs: a connected exit, speed, and an optional physical ram target. */
-  setPolicePlan(agent: number, next: number, speed: number, ramX = 0, ramZ = 0, ramSpeed = 0, ramAccel = 0): void {
+  setPolicePlan(agent: number, next: number, speed: number, ramX = 0, ramZ = 0, ramSpeed = 0, ramAccel = 0, free = false): void {
     if (this.police[agent] !== 1) return;
+    this.freeSteer[agent] = free ? 1 : 0;
     const lane = this.lane[agent] as number;
     this.plannerLane[agent] = lane;
     this.plannerNext[agent] = lane >= 0 && this.lanes.outs(lane).includes(next) ? next : -1;
@@ -440,6 +450,7 @@ export class Traffic {
     this.plannerSpeed[agent] = 0;
     this.ramSpeed[agent] = 0;
     this.ramAccel[agent] = 0;
+    this.freeSteer[agent] = 0;
   }
 
   /** Test hook: a stopped car (wreck or abandoned) at a point, off the lane graph. */
@@ -485,6 +496,8 @@ export class Traffic {
     this.honkCooldown[i] = 0;
     this.disturbedFor[i] = 0;
     this.wreckedFor[i] = 0;
+    this.damage[i] = 0;
+    this.justWrecked[i] = 0;
     this.lastPlayerContactTick[i] = -100000;
     this.paintSerial++;
     const q = M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, yaw);
@@ -534,6 +547,8 @@ export class Traffic {
     this.wobble[agent] = 0;
     this.turn[agent] = 0;
     this.wreckedFor[agent] = 0;
+    this.damage[agent] = 0;
+    this.justWrecked[agent] = 0;
     this.lastPlayerContactTick[agent] = -100000;
     this.paintSerial++;
     const q = M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, oldPose.yaw);
@@ -551,6 +566,7 @@ export class Traffic {
   }
 
   step(player: PlayerProbe, dt: number, events: EventLog): void {
+    this.justWrecked.fill(0);
     this.despawn(player);
     this.tow(player, dt);
     this.spawn(player);
@@ -717,7 +733,8 @@ export class Traffic {
     if (ramming) {
       this.pose.x = this.ramX[i] as number;
       this.pose.z = this.ramZ[i] as number;
-      desired = Math.min(desired, this.ramSpeed[i] as number);
+      // a ram still keeps its lane gaps; a unit driving to an arrest slot steers straight there
+      desired = this.freeSteer[i] === 1 ? (this.ramSpeed[i] as number) : Math.min(desired, this.ramSpeed[i] as number);
     } else {
       this.lanes.positionAt(lane, (this.s[i] as number) + CARROT, this.laneOffset[i] as number, this.pose, this.next[i]);
     }
@@ -745,8 +762,10 @@ export class Traffic {
     // Heading: a first-order controller with a rate cap (stable while yawGain × dt < 1).
     // Moving, the nose follows the motion so the car never crabs; stopped, it turns toward the path.
     body.angvel(this.ang);
-    const moving = !turningBack && Math.hypot(this.lin.x, this.lin.z) > 1.5;
-    const headTarget = moving ? Math.atan2(this.lin.x, this.lin.z) : Math.atan2(dx, dz);
+    // a unit parked on its arrest slot holds its heading instead of turning to face a point under its own nose
+    const arrived = ramming && len < 1.5;
+    const moving = !turningBack && !arrived && Math.hypot(this.lin.x, this.lin.z) > 1.5;
+    const headTarget = arrived ? yaw : moving ? Math.atan2(this.lin.x, this.lin.z) : Math.atan2(dx, dz);
     let err = headTarget - yaw;
     err = Math.atan2(Math.sin(err), Math.cos(err));
     this.ang.y = M.clamp(err * t.yawGain, -t.yawRateMax, t.yawRateMax);
@@ -1211,11 +1230,16 @@ export class Traffic {
     this.trafficDv[i] = this.trafficSum / mass;
     const st = this.state[i];
     if (st === AgentState.Wrecked || st === AgentState.Abandoned || st === AgentState.Parked) return;
-    if (dv >= this.tuning.wreckImpact) {
+    const t = this.tuning;
+    // a police car takes a harder hit to shake and a much harder one to kill
+    const armour = this.police[i] === 1 ? t.policeArmour : 1;
+    if (dv > t.damageThreshold) this.damage[i] = Math.min(1, (this.damage[i] as number) + (dv - t.damageThreshold) * t.damagePerDv / armour);
+    if (dv >= t.wreckImpact * armour || (this.damage[i] as number) >= 1) {
       this.wreck(i);
+      this.justWrecked[i] = 1;
       return;
     }
-    if (dv > this.tuning.disturbedImpact) {
+    if (dv > t.disturbedImpact * armour) {
       if (st !== AgentState.Disturbed) this.loosen(i);
       this.state[i] = AgentState.Disturbed;
       this.disturbedFor[i] = this.tuning.disturbedTime;
@@ -1241,21 +1265,30 @@ export class Traffic {
     this.paintSerial++;
   }
 
+  /**
+   * After a disturbance an upright car that has stopped spinning drives back
+   * onto its path at whatever speed (the controller blends in over
+   * `reattachBlend`). A car on its side, pushed far off its road, or still
+   * tumbling after `disturbedMax` is a wreck. A shove is not a kill.
+   */
   private settle(i: number, dt: number): void {
+    const t = this.tuning;
     this.disturbedFor[i] = (this.disturbedFor[i] as number) - dt;
     if ((this.disturbedFor[i]) > 0) return;
     const body = this.bodies[this.agentBody[i] as number] as RAPIER.RigidBody;
     const r = body.rotation(this.rot);
     const up = 1 - 2 * (r.x * r.x + r.z * r.z);
-    body.linvel(this.lin);
-    const speed = Math.hypot(this.lin.x, this.lin.z);
+    body.angvel(this.ang);
+    const spin = Math.abs(this.ang.y);
     const lane = this.lane[i] as number;
     let lateral = Infinity;
     if (lane >= 0) {
       this.lanes.projectPath(lane, this.next[i] as number, this.x[i] as number, this.z[i] as number, this.proj, this.laneOffset[i]);
       lateral = Math.abs(this.proj.lateral);
     }
-    if (up > 0.7 && speed < 6 && lateral < this.tuning.reattachDistance) {
+    const overdue = -this.disturbedFor[i] > t.disturbedMax - t.disturbedTime;
+    if (up > 0.7 && spin > t.settleSpin && !overdue) return;
+    if (up > 0.7 && lateral < t.reattachDistance) {
       this.state[i] = AgentState.Physical;
       this.reattachLeft[i] = this.tuning.reattachBlend;
       if (this.proj.switched) this.switchLane(i, this.proj.s);
@@ -1267,8 +1300,17 @@ export class Traffic {
       this.pos.y = 0.03;
       this.pos.z = this.z[i] as number;
       body.setTranslation(this.pos, true);
+      // back on four wheels: keep the heading, drop the lean and the roll
+      body.setRotation(M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, this.yaw[i] as number), true);
+      this.ang.x = 0;
+      this.ang.z = 0;
+      body.setAngvel(this.ang, true);
+    } else if (up <= 0.7 && up > 0.3 && !overdue) {
+      // tilted but not over (a wheel on a kerb, a landing): give it a moment
+      return;
     } else {
       this.wreck(i);
+      this.justWrecked[i] = 1;
     }
   }
 
@@ -1308,6 +1350,8 @@ export class Traffic {
     this.honkCooldown[i] = 0;
     this.disturbedFor[i] = 0;
     this.wreckedFor[i] = 0;
+    this.damage[i] = 0;
+    this.justWrecked[i] = 0;
     this.lastPlayerContactTick[i] = -100000;
     this.lanes.positionAt(lane, s, offset, this.pose);
     this.x[i] = this.pose.x;

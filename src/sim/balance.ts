@@ -7,6 +7,8 @@ export const BALANCE = {
     billboard: 2,
     camera: 5,
     roadblock: 6,
+    /** Hitting a police car nobody was chasing you in. */
+    policeHit: 4,
   },
   /** Paid into the bag per event (docs/DESIGN.md §3.3). Coins never go here; the bag is at risk until a door. */
   bag: {

@@ -115,19 +115,31 @@ export class Life {
     for (let i = 0; i < traffic.capacity; i++) {
       const st = traffic.state[i];
       if (st === AgentState.Free) { this.takenDown[i] = 0; continue; }
-      if (this.takenDown[i] || st === AgentState.Wrecked || !traffic.hasBody(i)) continue;
+      if (this.takenDown[i]) continue;
       if (this.sim.tick - (traffic.lastPlayerContactTick[i] as number) > window) continue;
-      const wall = (traffic.wallDv[i] as number) >= ECONOMY.takedownDeltaV;
-      const other = (traffic.trafficDv[i] as number) >= ECONOMY.takedownDeltaV;
-      const flipped = traffic.upOf(i) < 0.3;
-      let direct = false;
-      if ((traffic.playerDv[i] as number) >= ECONOMY.takedownDeltaV) {
-        // closing speed before the impact, from the player's and the car's previous velocities
-        const ayaw = traffic.yaw[i] as number;
-        const speed = traffic.prevSpeed[i] as number;
-        direct = Math.hypot(this.prevVx - Math.sin(ayaw) * speed, this.prevVz - Math.cos(ayaw) * speed) >= ECONOMY.takedownClosingSpeed;
+      // a police car is built for contact: the same slam has to be harder by its armour
+      const armour = traffic.police[i] === 1 ? traffic.tuning.policeArmour : 1;
+      const deltaV = ECONOMY.takedownDeltaV * armour;
+      let wall: boolean, other: boolean, flipped: boolean, direct = false;
+      if (st === AgentState.Wrecked) {
+        // written off by its own damage (or one big contact) this step, inside the window: the player's takedown
+        if (traffic.justWrecked[i] !== 1) continue;
+        other = (traffic.trafficDv[i] as number) > (traffic.wallDv[i] as number);
+        wall = !other;
+        flipped = false;
+      } else {
+        if (!traffic.hasBody(i)) continue;
+        wall = (traffic.wallDv[i] as number) >= deltaV;
+        other = (traffic.trafficDv[i] as number) >= deltaV;
+        flipped = traffic.upOf(i) < 0.3;
+        if ((traffic.playerDv[i] as number) >= deltaV) {
+          // closing speed before the impact, from the player's and the car's previous velocities
+          const ayaw = traffic.yaw[i] as number;
+          const speed = traffic.prevSpeed[i] as number;
+          direct = Math.hypot(this.prevVx - Math.sin(ayaw) * speed, this.prevVz - Math.cos(ayaw) * speed) >= ECONOMY.takedownClosingSpeed * armour;
+        }
+        if (!wall && !other && !flipped && !direct) continue;
       }
-      if (!wall && !other && !flipped && !direct) continue;
       this.takenDown[i] = 1;
       traffic.wreck(i);
       const boost = other ? ECONOMY.takedownTrafficBoost : ECONOMY.takedownBoost;

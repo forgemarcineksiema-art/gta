@@ -31,11 +31,23 @@ export interface TrafficTuning {
   highwayGap: number;
   /** Chance a highway car takes the same lane out of a junction instead of choosing among every exit. */
   highwayKeepLane: number;
+  /** A contact above this dv (m/s) takes the car out of lane control for `disturbedTime` s. */
   disturbedImpact: number;
   disturbedTime: number;
+  /** After the disturbance an upright car within this distance of its path drives back onto it; further off it is a wreck, m. */
   reattachDistance: number;
   reattachBlend: number;
+  /** Still spinning faster than this (rad/s) after `disturbedTime`: wait before reattaching. */
+  settleSpin: number;
+  /** Disturbed this long without settling (on its side, spinning, stuck), a car is a wreck, s. */
+  disturbedMax: number;
+  /** A single contact of this dv wrecks outright, m/s. */
   wreckImpact: number;
+  /** Damage: every contact dents by (dv - threshold) x perDv; at 1 the car is a wreck. */
+  damageThreshold: number;
+  damagePerDv: number;
+  /** Police cars are built for contact: their thresholds are multiplied and their damage divided by this. */
+  policeArmour: number;
   wreckLinger: number;
   /** A wreck this old is towed away the moment the player is not looking at it: its agent slot (and its body) go back to the pool, s. */
   wreckTow: number;
@@ -105,9 +117,14 @@ export const TRAFFIC: TrafficTuning = {
   highwayKeepLane: 0.85,
   disturbedImpact: 1.5,
   disturbedTime: 2.0,
-  reattachDistance: 4,
+  reattachDistance: 14,
   reattachBlend: 1.5,
+  settleSpin: 2,
+  disturbedMax: 8,
   wreckImpact: 7,
+  damageThreshold: 3,
+  damagePerDv: 0.1,
+  policeArmour: 1.6,
   wreckLinger: 10,
   wreckTow: 60,
   wreckTowNear: 40,

@@ -192,7 +192,10 @@ export class ColdOpen {
   /** The current verb is the first not done; a new one starts its clock. */
   private advance(): void {
     let next: ColdOpenVerb | null = null;
-    for (const v of COLD_OPEN_VERBS) if (!this.isDone.has(v)) { next = v; break; }
+    for (let i = 0; i < COLD_OPEN_VERBS.length; i++) {
+      const v = COLD_OPEN_VERBS[i] as ColdOpenVerb;
+      if (!this.isDone.has(v)) { next = v; break; }
+    }
     if (next !== this.verb) this.verbTime = 0;
     this.verb = next;
   }

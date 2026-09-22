@@ -20,7 +20,7 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 |---|---|
 | `docs/BRIEF.md` | The project brief. Read-only. |
 | `docs/PROGRESS.md` | Session log: done, decided and why, next, open problems. Holds the current milestone and the design talks; older entries are archived under `docs/history/` at each gate. |
-| `docs/history/` | Past gate reports, reviews and archived session logs (`PROGRESS_M0-M3.md`). |
+| `docs/history/` | Past gate reports, reviews and archived session logs (`PROGRESS_M0-M3.md`, `PROGRESS_M4.md`). |
 | `docs/DESIGN.md` | Design decisions on top of the brief: the run, progression, the city as a level, platform KPIs, the M4 slice order. Each section is marked decided (Marcin) or set here (mine). |
 | `docs/M4_PLAN.md` | The current milestone contract: slices in order, done criteria, pins, the measurement each slice must record, starting numbers. Its §5 holds the contract for post-launch update 1. |
 | `docs/M5_PLAN.md`, `docs/M6_PLAN.md` | The next two contracts, same shape: the launch minimum (jobs, garage, save, cold open, balance script) and the platform (SDK adapter, touch, mobile tier, submission). Placeholders marked "M4" are filled from PROGRESS before the milestone starts. |

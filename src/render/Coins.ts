@@ -94,21 +94,22 @@ export class Coins {
 
   /** The run-time coins changed (laid or cleared): drop every extra slot and register the current ones. */
   private replaceExtra(coins: SimCoins, sim: SimWorld): void {
-    this.removeWhere((c) => c.id >= EXTRA_COIN_BASE);
+    this.removeWhere(coins, true);
     for (const id of this.known) if (id >= EXTRA_COIN_BASE) this.known.delete(id);
     this.add(coins.extra, sim);
   }
 
   /** Swap-remove every live slot whose coin was picked since the last look. */
   private removePicked(coins: SimCoins): void {
-    this.removeWhere((c) => coins.picked[c.id] === 1);
+    this.removeWhere(coins, false);
   }
 
-  private removeWhere(gone: (c: CoinDesc) => boolean): void {
+  /** Swap-remove the picked coins, or every run-time coin (`extra`); no closure, so nothing is allocated. */
+  private removeWhere(coins: SimCoins, extra: boolean): void {
     let changed = false;
     for (let slot = 0; slot < this.count; slot++) {
       const c = this.slotCoin[slot] as CoinDesc;
-      if (!gone(c)) continue;
+      if (extra ? c.id < EXTRA_COIN_BASE : coins.picked[c.id] !== 1) continue;
       const last = this.count - 1;
       const moved = this.slotCoin[last] as CoinDesc;
       this.slotOf.delete(c.id);

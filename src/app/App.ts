@@ -512,7 +512,8 @@ export class App {
       now,
     );
 
-    if (this.perf && !this.perf.done && this.started) {
+    // an ad's frames are a break's, not the game's: the probe measures play
+    if (this.perf && !this.perf.done && this.started && !this.adShowing) {
       this.perf.frame(rawDt * 1000, this.stepMsLast, stats, this.loop.droppedTime, this.bot?.resets ?? 0);
     }
   };

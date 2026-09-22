@@ -33,7 +33,8 @@ export class Siren {
     let nearest = Infinity, chief = Infinity;
     const on = police !== null && traffic !== null && sim.pursuit.state !== 'idle';
     if (on) {
-      for (const agent of police.units) {
+      for (let u = 0; u < police.units.length; u++) {
+        const agent = police.units[u] as number;
         if (agent < 0) continue;
         const d = Math.hypot((traffic.x[agent] as number) - sim.probe.x, (traffic.z[agent] as number) - sim.probe.z);
         if (d < nearest) nearest = d;

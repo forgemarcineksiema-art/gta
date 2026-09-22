@@ -68,7 +68,7 @@ export class Jobs {
   }
 
   defOf(id: number): JobDef | null {
-    for (const d of this.defs) if (d.id === id) return d;
+    for (let i = 0; i < this.defs.length; i++) if ((this.defs[i] as JobDef).id === id) return this.defs[i] as JobDef;
     return null;
   }
 
@@ -82,7 +82,8 @@ export class Jobs {
       this.serial++;
     }
     if (this.state === 'idle') {
-      for (const d of this.defs) {
+      for (let i = 0; i < this.defs.length; i++) {
+        const d = this.defs[i] as JobDef;
         if ((d.x - probe.x) ** 2 + (d.z - probe.z) ** 2 > r * r) continue;
         this.state = 'active';
         this.active = d.id;

@@ -154,7 +154,8 @@ export class Jumps {
 
   /** The ramp whose footprint holds the car's centre, -1 for none. */
   private rampUnder(probe: PlayerProbe): number {
-    for (const jd of this.descs) {
+    for (let i = 0; i < this.descs.length; i++) {
+      const jd = this.descs[i] as JumpDesc;
       const dx = probe.x - jd.x, dz = probe.z - jd.z;
       if (Math.abs(dx) > 30 || Math.abs(dz) > 30) continue;
       const fx = Math.sin(jd.yaw), fz = Math.cos(jd.yaw);

@@ -26,7 +26,8 @@ test('bot drives 60 s under 4x CPU throttle within budget', async ({ page, brows
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: throttle });
 
-  await page.goto(`/?bot=1&seed=${seed}&duration=${duration}&heat=${heat}`);
+  // PERF_PARAMS appends query parameters (e.g. `&ad=off`) for a diagnostic run
+  await page.goto(`/?bot=1&seed=${seed}&duration=${duration}&heat=${heat}${process.env.PERF_PARAMS ?? ''}`);
   await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 60_000 });
   await page.waitForFunction(() => window.__perfDone === true, null, { timeout: (duration + 60) * 1000 });
   const perf = (await page.evaluate(() => window.__perf)) as PerfResult;

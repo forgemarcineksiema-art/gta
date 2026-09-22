@@ -155,7 +155,8 @@ export class Roadblocks {
     let ahead = -s0;
     for (let hop = 0; hop < 8 && ahead <= t.maxAhead; hop++) {
       const list = this.byLane.get(lane);
-      if (list) for (const site of list) {
+      if (list) for (let i = 0; i < list.length; i++) {
+        const site = list[i] as Chokepoint;
         const d = ahead + site.s;
         if (d < t.minAhead || d > t.maxAhead) continue;
         if (Math.hypot(site.x - probe.x, site.z - probe.z) < t.minDistance) continue;
@@ -178,7 +179,9 @@ export class Roadblocks {
     const from = city.graph.lanes[lane] as Lane;
     const uturn = lanes.uturn(lane);
     let best = -1, bestCost = Infinity;
-    for (const out of lanes.outs(lane)) {
+    const outs = lanes.outs(lane);
+    for (let i = 0; i < outs.length; i++) {
+      const out = outs[i] as number;
       if (out === uturn) continue;
       const to = city.graph.lanes[out] as Lane;
       const cost = Math.abs(lanes.headingChange(lane, out)) + (to.highway === from.highway ? 0 : 1) + (to.offset === from.offset ? 0 : 0.2);

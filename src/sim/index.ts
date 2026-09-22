@@ -13,6 +13,8 @@ export { BALANCE } from './balance';
 export { Heat } from './heat/Heat';
 export { Police } from './police/Police';
 export { Pursuit, type PursuitState } from './police/Pursuit';
+export { Run, type RunState, type RunCounts } from './run/Run';
+export { coverSites, dropOffFor, hideoutStatics, toDropOff, DROP_OFF_LOTS, GARAGE, type DropOff, type DropOffLot, type DoorPose, type CoverSites } from './city/cover';
 export { POLICE, type PoliceTuning } from './police/tuning';
 export { PALETTE } from './palette';
 export { STRAIGHT, type SpawnPoint } from './playground';

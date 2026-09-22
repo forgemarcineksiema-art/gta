@@ -7,6 +7,7 @@ import { mulberry32 } from '../random';
 import { IDENTITY_QUAT as IDENTITY_ROT, quatFromYaw, type StaticDesc } from '../scene';
 import { Architecture, CITY_COLORS } from './architecture';
 import { placeBillboards, type BillboardDesc } from './collectibles';
+import { dropOffAt, hideoutStatics, nearDoor } from './cover';
 import { buildRoadMarkings } from './markings';
 import { BLOCK, CITY_HALF, HIGHWAY_HALF, HIGHWAY_LANE_OFFSETS, ROAD_HALF, buildCityRoute, buildRoadGraph, distanceToPolyline, projectOnLane, type Lane, type RoadPoint, type SpecialRoad } from './roads';
 
@@ -194,6 +195,12 @@ export class City {
           continue;
         }
         const variant = Math.floor(rnd() * 3);
+        // A drop-off garage stands on this lot instead of its building (the draw above keeps the lot stream).
+        const dropOff = dropOffAt(cx, cz, sx, sz, ox, oz);
+        if (dropOff) {
+          statics.push(...hideoutStatics(dropOff));
+          continue;
+        }
         const w = d.id === 'gardens' ? 7 + variant : (ox === 85 ? 15 : 10) + variant;
         const depth = d.id === 'gardens' ? 8 + variant : (oz === 85 ? 16 : 10) + variant;
         const setback = d.id === 'gardens' ? 6 : d.id === 'foundry' ? 7 : 1.3;
@@ -215,12 +222,12 @@ export class City {
         }
       }
       if (d.id !== 'foundry') for (const along of [57, 106]) {
-        if (roadClearance(x + sx * (vx + 2.7), z + sz * along) > 3) architecture.tree(x + sx * (vx + 2.7), z + sz * along, d.id === 'marina');
-        if (roadClearance(x + sx * along, z + sz * (vz + 2.7)) > 3) architecture.tree(x + sx * along, z + sz * (vz + 2.7), d.id === 'marina');
+        if (roadClearance(x + sx * (vx + 2.7), z + sz * along) > 3 && !nearDoor(x + sx * (vx + 2.7), z + sz * along, 4)) architecture.tree(x + sx * (vx + 2.7), z + sz * along, d.id === 'marina');
+        if (roadClearance(x + sx * along, z + sz * (vz + 2.7)) > 3 && !nearDoor(x + sx * along, z + sz * (vz + 2.7), 4)) architecture.tree(x + sx * along, z + sz * (vz + 2.7), d.id === 'marina');
       }
       // Street lamps and planted verges are outside the driving corridor.
       for (const offset of [36, 80]) {
-        if (roadClearance(x + sx * (vx + 2), z + sz * offset) < 1.5) continue;
+        if (roadClearance(x + sx * (vx + 2), z + sz * offset) < 1.5 || nearDoor(x + sx * (vx + 2), z + sz * offset, 4)) continue;
         box(x + sx * (vx + 2), 4, z + sz * offset, 0.18, 4, 0.18, 0x686678);
         box(x + sx * (vx + 1), 8, z + sz * offset, 1.4, 0.28, 0.45, PALETTE.laneMark);
       }

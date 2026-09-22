@@ -15,6 +15,7 @@ import { Life } from './life/Life';
 import { Heat } from './heat/Heat';
 import { Police } from './police/Police';
 import { Pursuit } from './police/Pursuit';
+import { Run } from './run/Run';
 import { buildPlayground, type PlaygroundLayout, type SpawnPoint } from './playground';
 import { POSE_STRIDE, Recorder } from './recorder';
 import type { DynamicDesc, StaticDesc } from './scene';
@@ -91,6 +92,8 @@ export class SimWorld {
   readonly heat: Heat;
   readonly pursuit: Pursuit;
   readonly police: Police | null;
+  /** Bag, bank, the doors and busted: what ends a run (M4). Empty drop-offs on the playground. */
+  readonly run: Run;
   /** The city's smashable billboards; null on the playground. */
   readonly collectibles: Collectibles | null;
   readonly statics: StaticDesc[];
@@ -174,6 +177,7 @@ export class SimWorld {
     this.heat.add(opts.heat ?? 0);
     this.pursuit = new Pursuit(this.events);
     this.police = this.traffic ? new Police(this) : null;
+    this.run = new Run(this);
     this.city?.sync(spawn.position.x, spawn.position.z, true);
   }
 
@@ -228,6 +232,7 @@ export class SimWorld {
     this.peds?.writeTransforms();
     this.life.postStep(FIXED_DT);
     this.heat.step();
+    this.run.step(this.probe, FIXED_DT);
     for (const t of this.tracked) {
       const p = t.body.translation(this.scratchPos);
       const r = t.body.rotation(this.scratchRot);

@@ -40,6 +40,8 @@ export interface PoliceTuning {
   pitRange: number;
   pitAcceleration: number;
   pitSideOffset: number;
+  /** Boxed in: `units` live police cars within `range` m while the player is under `speed` m/s fills the bar in `seconds`; moving drains it. */
+  busted: { units: number; range: number; speed: number; seconds: number; drainPerSecond: number };
 }
 
 export const POLICE: PoliceTuning = {
@@ -78,4 +80,5 @@ export const POLICE: PoliceTuning = {
   pitAcceleration: 22,
   pitSideOffset: 1.1,
   patrolRecycle: 260,
+  busted: { units: 2, range: 6, speed: 1.39, seconds: 3, drainPerSecond: 0.7 },
 };

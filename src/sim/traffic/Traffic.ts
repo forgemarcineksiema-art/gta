@@ -30,7 +30,8 @@ import { CAR_PRESETS, type CarId } from '../vehicle/presets';
 import { LaneTables, type LanePose, type PathProjection } from './lanes';
 import { TRAFFIC, type TrafficTuning } from './tuning';
 
-export enum AgentState { Free = 0, Kinematic = 1, Physical = 2, Disturbed = 3, Wrecked = 4, Abandoned = 5 }
+/** Appended, never renumbered: tests compare the numbers. `Parked` is a stopped police car (a roadblock, a patrol at a junction, a test setup). */
+export enum AgentState { Free = 0, Kinematic = 1, Physical = 2, Disturbed = 3, Wrecked = 4, Abandoned = 5, Parked = 6 }
 
 export interface PlayerProbe {
   x: number;
@@ -445,11 +446,30 @@ export class Traffic {
   spawnAtPoint(x: number, z: number, yaw: number, kind: CarId, state: AgentState.Wrecked | AgentState.Abandoned): number {
     const i = this.findFree();
     if (i < 0) return -1;
+    this.placeAtPoint(i, x, z, yaw, KIND_INDEX[kind], state, PAINTS[0] as number);
+    return i;
+  }
+
+  /**
+   * A stopped police car at a point, off the lane graph: solid when near the
+   * player (a lent body like any obstacle), a swap candidate, and counted by
+   * the busted rule. Roadblocks and parked patrols (slice 6) and the busted
+   * and door-race pins use it.
+   */
+  spawnParkedPolice(x: number, z: number, yaw: number, kind: 'police' | 'sports' | 'heavy'): number {
+    const i = this.findFree();
+    if (i < 0) return -1;
+    this.placeAtPoint(i, x, z, yaw, KIND_INDEX[kind], AgentState.Parked, PLAYER_PAINT.police);
+    this.police[i] = 1;
+    return i;
+  }
+
+  private placeAtPoint(i: number, x: number, z: number, yaw: number, kind: number, state: AgentState, paint: number): void {
     this.state[i] = state;
     this.police[i] = 0;
     this.clearPolicePlan(i);
-    this.kind[i] = KIND_INDEX[kind];
-    this.paint[i] = PAINTS[0] as number;
+    this.kind[i] = kind;
+    this.paint[i] = paint;
     this.lane[i] = -1;
     this.next[i] = -1;
     this.s[i] = 0;
@@ -469,7 +489,6 @@ export class Traffic {
     this.paintSerial++;
     const q = M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, yaw);
     this.transforms.writeBoth(this.slot[i] as number, x, 0.03, z, q.x, q.y, q.z, q.w);
-    return i;
   }
 
   /**
@@ -1015,7 +1034,7 @@ export class Traffic {
         this.senseImpact(i);
       } else if (st === AgentState.Wrecked) {
         this.senseImpact(i);
-      } else if (st === AgentState.Abandoned) {
+      } else if (st === AgentState.Abandoned || st === AgentState.Parked) {
         this.senseImpact(i);
       }
     }
@@ -1036,7 +1055,7 @@ export class Traffic {
     for (let i = 0; i < this.capacity; i++) {
       if ((this.agentBody[i] as number) >= 0) continue;
       const st = this.state[i];
-      if (st !== AgentState.Kinematic && st !== AgentState.Wrecked && st !== AgentState.Abandoned) continue;
+      if (st !== AgentState.Kinematic && st !== AgentState.Wrecked && st !== AgentState.Abandoned && st !== AgentState.Parked) continue;
       const dx = (this.x[i] as number) - player.x;
       const dz = (this.z[i] as number) - player.z;
       const dist = Math.hypot(dx, dz);
@@ -1191,7 +1210,7 @@ export class Traffic {
     this.wallDv[i] = this.wallSum / mass;
     this.trafficDv[i] = this.trafficSum / mass;
     const st = this.state[i];
-    if (st === AgentState.Wrecked || st === AgentState.Abandoned) return;
+    if (st === AgentState.Wrecked || st === AgentState.Abandoned || st === AgentState.Parked) return;
     if (dv >= this.tuning.wreckImpact) {
       this.wreck(i);
       return;
@@ -1280,7 +1299,7 @@ export class Traffic {
     this.next[i] = -1;
     this.s[i] = s;
     this.laneOffset[i] = offset;
-    const stopped = state === AgentState.Wrecked || state === AgentState.Abandoned;
+    const stopped = state === AgentState.Wrecked || state === AgentState.Abandoned || state === AgentState.Parked;
     this.speed[i] = stopped ? 0 : (this.lanes.limit[lane] as number);
     this.wait[i] = 0;
     this.forced[i] = 0;

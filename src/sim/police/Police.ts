@@ -14,6 +14,8 @@ export class Police {
   count = 0;
   budget = 0;
   ramsReceived = 0;
+  /** Test hook: false keeps new units from coming on duty (deterministic busted and door setups). */
+  dispatching = true;
 
   private readonly sim: SimWorld;
   private readonly traffic: Traffic;
@@ -105,6 +107,7 @@ export class Police {
       this.seen.fill(0);
       this.withdrawing.fill(0);
       pursuit.step(dt, level, false, player.x, player.z);
+      this.standDown(player, cosHalf);
       return;
     }
     if (!this.hot) {
@@ -113,7 +116,7 @@ export class Police {
     }
     this.budget = Math.min(this.units.length, t.budget[level] ?? 0);
     this.spawnLeft -= dt;
-    if (this.count < this.budget && this.spawnLeft <= 0) {
+    if (this.dispatching && this.count < this.budget && this.spawnLeft <= 0) {
       this.spawnLeft = t.spawnRetrySeconds;
       for (let u = 0; u < this.units.length && this.count < this.budget; u++) {
         if ((this.units[u] as number) >= 0) continue;
@@ -203,6 +206,51 @@ export class Police {
       traffic.setPolicePlan(agent, next, speed, aimX, aimZ,
         Math.min(speed, player.speed + t.ramClosingSpeed), pit ? t.pitAcceleration : t.ramAcceleration);
       this.rammed[u] = 1;
+    }
+  }
+
+  /**
+   * Live police cars (pursuit units, parked patrols, roadblock cars) within
+   * `range` of a point: what boxes the player in. A wreck or a car the player
+   * took no longer counts; a civilian never does.
+   */
+  unitsWithin(x: number, z: number, range: number): number {
+    const traffic = this.traffic;
+    const r2 = range * range;
+    let n = 0;
+    for (let i = 0; i < traffic.capacity; i++) {
+      if (traffic.police[i] !== 1) continue;
+      const state = traffic.state[i];
+      if (state === AgentState.Free || state === AgentState.Wrecked || state === AgentState.Abandoned) continue;
+      const dx = (traffic.x[i] as number) - x, dz = (traffic.z[i] as number) - z;
+      if (dx * dx + dz * dz <= r2) n++;
+    }
+    return n;
+  }
+
+  /**
+   * Heat 0 after a door or busted: the roster goes off duty. Each unit drives
+   * away from the player and goes back to the pool once it is `withdrawRange`
+   * away and out of view, so nobody pops out of existence on screen and a
+   * heat-5 roster does not answer the next heat-1 crime.
+   */
+  private standDown(player: PlayerProbe, cosHalf: number): void {
+    const traffic = this.traffic;
+    const t = this.tuning;
+    for (let u = 0; u < this.units.length; u++) {
+      const agent = this.units[u] as number;
+      if (agent < 0) continue;
+      const x = traffic.x[agent] as number, z = traffic.z[agent] as number;
+      const state = traffic.state[agent];
+      if ((state === AgentState.Kinematic || state === AgentState.Physical)
+        && Math.hypot(player.x - x, player.z - z) >= t.withdrawRange
+        && traffic.outOfView(x, z, this.radius, player, t.viewNear, cosHalf)) {
+        traffic.releasePolice(agent);
+        this.units[u] = -1;
+        this.count--;
+        continue;
+      }
+      traffic.setPolicePlan(agent, this.awayExit(agent, player), 0);
     }
   }
 

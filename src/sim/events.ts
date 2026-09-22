@@ -6,7 +6,9 @@
 export type EventKind =
   | 'nearMiss' | 'nearMissOncoming' | 'nearMissPed' | 'oncoming'
   | 'hit' | 'damage' | 'wrecked' | 'respawn'
-  | 'takedown' | 'takedownTraffic' | 'swap' | 'billboard' | 'honk' | 'escape';
+  | 'takedown' | 'takedownTraffic' | 'swap' | 'billboard' | 'honk' | 'escape'
+  // the run (M4): money and its endings; camera, roadblock and jump are pushed from slice 6
+  | 'camera' | 'roadblock' | 'jump' | 'door' | 'banked' | 'busted';
 
 export interface SimEvent {
   kind: EventKind;

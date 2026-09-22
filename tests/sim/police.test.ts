@@ -62,6 +62,23 @@ describe('police patrols', () => {
     } finally { sim.dispose(); }
   }, 120_000);
 
+  it('3.13 unitsWithin counts live police cars only, never the civilian beside the player', async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
+    const traffic = sim.traffic as Traffic;
+    const police = sim.police!;
+    try {
+      const x = 0, z = 700;
+      const a = traffic.spawnParkedPolice(x + 3.5, z, 0, 'police');
+      traffic.spawnParkedPolice(x - 3.5, z, 0, 'sports');
+      traffic.spawnAtPoint(x, z + 5, 0, 'compact', AgentState.Abandoned);
+      traffic.spawnParkedPolice(x + 10, z, 0, 'police');
+      expect(police.unitsWithin(x, z, POLICE.busted.range)).toBe(2);
+      traffic.wreck(a);
+      expect(police.unitsWithin(x, z, POLICE.busted.range)).toBe(1);
+      expect(police.unitsWithin(x, z, 12)).toBe(2);
+    } finally { sim.dispose(); }
+  });
+
   it('a ram shoves the player sideways and never stops them dead', async () => {
     const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
     const traffic = sim.traffic as Traffic;

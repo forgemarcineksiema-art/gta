@@ -36,6 +36,10 @@ export class Heat {
       this.add(this.traffic?.police[event.target] ? heat.policeTakedown : heat.trafficTakedown);
     } else if (event.kind === 'billboard') {
       this.add(heat.billboard);
+    } else if (event.kind === 'camera') {
+      this.add(heat.camera);
+    } else if (event.kind === 'roadblock') {
+      this.add(heat.roadblock);
     }
   };
 }

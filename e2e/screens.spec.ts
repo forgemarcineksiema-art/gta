@@ -39,8 +39,8 @@ for (const [w, h] of SIZES) {
     await page.waitForFunction(() => window.__game?.paused === false);
     // The life frame is polled, not set-and-shot: Life recomputes its state every step,
     // and a parked car beside a bot at 90 km/h is no swap candidate, so the companion drives the lane.
-    const needles = ['ONCOMING', 'DAMAGE', '12/50', 'SWAP'];
-    let lifeText = '';
+    // Visibility, not presence: every label is always in the DOM.
+    const shown = ['.hud__oncoming.is-on', '.hud__damage.is-visible', '.hud__swap.is-visible'];
     await page.waitForFunction((want: string[]) => {
       const sim = window.__game?.sim;
       const traffic = sim?.traffic;
@@ -49,9 +49,6 @@ for (const [w, h] of SIZES) {
       sim.life.state.damage = 0.6;
       sim.life.state.stage = 2;
       if (sim.collectibles) sim.collectibles.smashedCount = 12;
-      if (sim.events.entries[(sim.events.sequence - 1) % sim.events.capacity]?.kind !== 'nearMissOncoming') {
-        sim.events.push('nearMissOncoming', 0.2, 0, 1, 0, -1);
-      }
       if (sim.life.state.swapCandidate < 0) {
         const p = sim.vehicle.body.translation();
         const out = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };
@@ -62,21 +59,17 @@ for (const [w, h] of SIZES) {
         }
         if (best.lane >= 0 && best.dist < 14) traffic.spawnAt(best.lane, best.s, 'compact', 1, 3);
       }
-      const text = document.querySelector('.hud')?.textContent ?? '';
-      return want.every((n) => text.includes(n));
-    }, needles, { timeout: 30_000, polling: 100 }).catch(async () => {
-      lifeText = await page.evaluate(() => document.querySelector('.hud')?.textContent ?? '');
-      throw new Error(`life hud missing one of ${needles.join(', ')}: ${lifeText.slice(0, 300)}`);
+      const text = document.querySelector('.hud__collect')?.textContent ?? '';
+      return text.includes('12/50') && want.every((sel) => document.querySelector(sel) !== null);
+    }, shown, { timeout: 30_000, polling: 100 }).catch(async () => {
+      const state = await page.evaluate((want: string[]) => want.map((sel) => `${sel}: ${document.querySelector(sel) ? 'on' : 'off'}`).join(', '), shown);
+      throw new Error(`life hud incomplete: ${state}`);
     });
     await page.screenshot({ path: `screens/life-${w}x${h}.png` });
     if (w === 1280 && h === 720) {
-      const wreckedText = await page.evaluate(() => new Promise<string>((resolve) => {
-        const sim = window.__game?.sim;
-        if (!sim) { resolve('no sim'); return; }
-        (sim.life as unknown as { wreck(): void }).wreck();
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve(document.querySelector('.hud')?.textContent ?? '')));
-      }));
-      if (!wreckedText.includes('WRECKED')) throw new Error(`wrecked overlay missing: ${wreckedText.slice(0, 300)}`);
+      await page.evaluate(() => (window.__game?.sim.life as unknown as { wreck(): void }).wreck());
+      await page.waitForSelector('.hud__wrecked.is-visible', { timeout: 10_000 });
+      await page.waitForTimeout(400); // the overlay fades in
       await page.screenshot({ path: `screens/wrecked-${w}x${h}.png` });
     }
   });

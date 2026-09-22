@@ -2,6 +2,88 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-22 — M4 slice 0: housekeeping
+
+Session started on Opus 5, finished on Fable 5.1 (Opus overloaded). Verify was
+green at the start and at the end.
+
+### Done
+
+- **Wreck tow-away** (`Traffic.tow`, `wreckTow` 60 s, `wreckTowNear` 40 m,
+  `wreckTowConeDeg` 55). A wreck older than the tow time is freed the first
+  step the player is not looking at it. Measured, 300 s circling one highway
+  junction with two cars written off every 5 s (`tests/sim/traffic.test.ts`):
+  before 48/48 agents wrecked and traffic dead; after 118 wrecked, 94 towed,
+  peak 26/48, 0 bodies held by wrecks, 24 still driving. The hidden-for-timer
+  reading of the plan was tried first and never fired for a circling player
+  (decision 23). `towed` in the HUD debug line. Backlog entry closed.
+- **Classes `sports` and `police`** in `CAR_PRESETS`, `CAR_PROFILES`, traffic
+  kinds, `TRAFFIC.mass`, `PLAYER_PAINT`, the bot table; rows in
+  `tests/sim/cars.test.ts`. sports 0–100 4.62 s, top 198 km/h, 100–0 20.5 m,
+  bot lap 33.3 s; police 7.22 s, 171 km/h, 31.7 m, 35.1 s; muscle 6.48 s,
+  169 km/h, 29.7 m, 34.2 s. The patrol car is barely faster than the muscle
+  on purpose (a level-1 patrol has to be losable); its mass, yaw inertia and
+  planted rear are the ram. No pin loosened; the sports car's high-speed lock
+  came down to 4.2° to pass the 120 km/h composure pin as written. STYLE.md:
+  livery, light bar, hideout interior; the meshes for those land with
+  PoliceView/HideoutView.
+- **Real highway lanes**: two graph lanes per direction at 4 and 12 m
+  (`HIGHWAY_LANE_OFFSETS`, `Lane.offset`, `LaneTables.offset`), the offsets
+  the paint always had. `highwayKeepLane` 0.85. Lane count 178 → 226; sim
+  tour, e2e tour and the markings pin re-pinned with the arithmetic written;
+  minimap one segment per edge; the highway spawn on the inner lane. City tour
+  226/226 lanes, 0 resets, 2432 s of sim (was ~2000; the 190k-step budget has
+  ~45k steps left). Decision 14 revisited in ARCHITECTURE.
+- **Step profile by phase** (`SimWorld.mark`, `SimPhase`,
+  `src/app/simProfile.ts`, printed by `npm run perf`). Baseline under 4× CPU,
+  3608 steps, ms per step: vehicle 0.87 mean / 1.8 p95; **traffic 1.55 mean /
+  3.0 p95 / 4.5 p99**; peds 0.16 / 0.4; physics 0.63 / 0.9; post 0.25 / 0.6.
+  Whole step p50 3.0, p95 7.1 against the 12 ms budget. Node: traffic 0.318 ms
+  with 48 cars. This is the number the police slices measure against.
+- **Input**: a key down and up between two frames was never seen
+  (`KeyboardDevice.down` is a live set). Found by the screens spec: its second
+  P was dropped and every size but one timed out. Taps are latched until read;
+  input read while blocked is dropped, not replayed after an ad.
+  `tests/input/keyboard.test.ts`.
+- **Screens**: the life capture polls instead of set-and-shoot. See the run
+  note below.
+- Smoke after all of it: 60.0 fps, p95 16.7 ms, 97 draws, 196k tris, 3.49 MB,
+  gameplay-start 1.16 s; the M3 gate baseline to the decimal. e2e city: 3.05 s
+  to control under 20 Mbit + 4×, low 66 draws / 169k tris, high 93 / 243k.
+  A first smoke of the session read 48.7 fps / 10.2 s to control on a cold
+  machine; the re-run matched the gate, so noise (memory: ±3 fps is normal,
+  this was a cold start).
+
+### Decided
+
+- Tow by age plus an instantaneous sight test, not by hidden-for time
+  (decision 23). Reason above.
+- Both new classes are in `CAR_IDS` (playable, `?car=sports|police`), so the
+  class contract applies to them and Marcin can feel the ram by hand.
+- The `pulse120` composure cap stays hardcoded at 20° for every class; the
+  sports car was tuned to it rather than the pin widened.
+- The phase hook lives in the sim, the clock in the app (decision 24).
+
+### Next
+
+- Slice 1: `balance.ts`, `police/tuning.ts`, `Heat`, `Pursuit`, `Police`
+  units as traffic agents of class `police`, five stars in the HUD, the four
+  pins, the bot-at-heat-1 measurement. Police livery and light bar with
+  `render/PoliceView.ts`.
+- Marcin: `?car=police` and `?car=sports` by hand; say whether the saloon
+  shoves and the coupe feels like the fastest thing on the road.
+
+### Open problems
+
+- Session note for the next agent: this session read CLAUDE.md, M4_PLAN.md,
+  DESIGN.md in full and PROGRESS, STYLE, BACKLOG, ARCHITECTURE in parts;
+  BRIEF.md and CRAZYGAMES.md were not re-read. Read them before slice 1.
+- The screens run is slow (each size boots the game and waits for the bot);
+  ten sizes take about ten minutes when nothing fails. Fine for a gate, not
+  for a loop.
+- The MX330 frame-pacing hitches from M2 remain uninvestigated; the phase
+  profile now exists to look at them with.
+
 ## 2026-09-22 — Design session before M4
 
 ### Done

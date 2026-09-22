@@ -72,7 +72,6 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 - Traffic density per quality tier for the mobile tier: the pool size is one tuning number (`TRAFFIC.agents`); M2's decision 13 keeps gameplay identical across tiers until M6 needs the lever. (M3)
 - Junction reservations are first come first served with a forced override after 9 s (about one a minute in a busy run); traffic lights or a round-robin would look more deliberate at the big crossings. (M3)
 - A driving traffic body has no terrain contact (kerbs and the pavement apron pass under it) and a disturbed car beyond 70 m snaps back onto its lane when its body is returned; nobody has seen either in play, but a slow blend back would be cleaner than a snap. (M3)
-- Wrecks never despawn while the player stays near them; a scrapyard run leaves a street of wrecks and the pool of 16 bodies can fill with them (traffic then goes kinematic sooner). A slow tow-away after a minute would free bodies. (M3)
 - The takedown camera only focuses; a short cut to a side view with the wreck in the foreground would sell it more. The whip on swap has no cut either, by design. (M3)
 - Pedestrian variety: one walker mesh in a handful of tints; a second silhouette and a walk-cycle pose would help once perf budgets are known on the low tier. (M3)
 - Billboard state is per session; the M5 save carries `Collectibles.smashed`. (M3)

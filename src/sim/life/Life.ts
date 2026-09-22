@@ -11,6 +11,7 @@ import * as M from '../math';
 import type { SimWorld } from '../SimWorld';
 import { AgentState, PLAYER_PAINT, type SwapHandover } from '../traffic/Traffic';
 import { PedPose } from '../traffic/Pedestrians';
+import { POLICE } from '../police/tuning';
 
 export interface LifeState {
   damage: number;
@@ -41,6 +42,8 @@ export class Life {
   private readonly cool: Float32Array;
   /** Agents already taken down (one takedown each); cleared when the agent is freed. */
   private readonly takenDown: Uint8Array;
+  /** A spike strip punctured the tyres: grip down and a pull at the rear until a swap, the door or a fresh car. */
+  spiked = false;
   /** The player's velocity before this step's physics, for closing speeds. */
   private prevVx = 0;
   private prevVz = 0;
@@ -176,7 +179,7 @@ export class Life {
     const tm = this.sim.vehicle.telemetry;
     const over = tm.impact - DAMAGE.threshold;
     if (over <= 0) return;
-    const delta = over * DAMAGE.perMetrePerSecond * (kind === 'traffic' ? DAMAGE.trafficFactor : 1);
+    const delta = over * DAMAGE.perMetrePerSecond * (kind === 'traffic' ? this.trafficFactor(tm.hitHandle) : 1);
     st.damage = Math.min(1, st.damage + delta);
     let stage = 0;
     for (let k = 0; k < DAMAGE.stages.length; k++) if (st.damage >= (DAMAGE.stages[k] as number)) stage = k + 1;
@@ -184,6 +187,38 @@ export class Life {
     st.stage = stage as LifeState['stage'];
     this.sim.events.push('damage', stage, tm.contactX, tm.contactY, tm.contactZ, -1);
     if (stage >= 4) this.wreck();
+  }
+
+  /**
+   * Traffic weighs `trafficFactor`; a roadblock car is braced (`carDamageFactor`) unless the breach class
+   * hits it at `breachSpeed`: then the player takes `breachDamageFactor` and the car is shoved aside.
+   */
+  private trafficFactor(handle: number): number {
+    const traffic = this.sim.traffic;
+    const agent = traffic ? traffic.agentForCollider(handle) : -1;
+    const blocks = this.sim.roadblocks;
+    if (!traffic || agent < 0 || !blocks || (blocks.agents[0] !== agent && blocks.agents[1] !== agent)) return DAMAGE.trafficFactor;
+    const r = POLICE.roadblock;
+    if (this.sim.carId === r.breachClass && Math.hypot(this.prevVx, this.prevVz) >= r.breachSpeed) {
+      traffic.disturb(agent);
+      return r.breachDamageFactor;
+    }
+    return r.carDamageFactor;
+  }
+
+  /** Over a spike strip: the tyres go, the car pulls to `side` (+1 right). */
+  puncture(side: number): void {
+    if (this.spiked) return;
+    this.spiked = true;
+    this.sim.vehicle.gripMul = POLICE.spike.grip;
+    this.sim.vehicle.lateralPull = side * POLICE.spike.pull;
+  }
+
+  /** New tyres: the door, a swap, a fresh car. */
+  mend(): void {
+    this.spiked = false;
+    this.sim.vehicle.gripMul = 1;
+    this.sim.vehicle.lateralPull = 0;
   }
 
   private wreck(): void {
@@ -199,6 +234,7 @@ export class Life {
   }
 
   private heal(): void {
+    this.mend();
     const st = this.state;
     st.damage = 0;
     st.stage = 0;

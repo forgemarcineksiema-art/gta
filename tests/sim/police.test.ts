@@ -121,4 +121,72 @@ describe('police patrols', () => {
       expect(sim.life.state.wrecked).toBe(false);
     } finally { sim.dispose(); }
   }, 60_000);
+
+  it('6.7 / 6.9 at level 3 four patrols wait at the junctions within 450 m, lit within 200 m; at heat 0 the same car is dark and a swap candidate', async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 0, record: false, heat: 60 });
+    sim.police!.dispatching = false;
+    const traffic = sim.traffic as Traffic;
+    const police = sim.police!;
+    try {
+      // just north of the centre junction, looking south: the junction behind is 160 m off, the rest further
+      sim.city?.sync(0, 4.5, true);
+      sim.vehicle.teleport({ x: 4.5, y: 0.8, z: 30 }, Math.PI);
+      run(sim, 2, (_t, c) => { c.brake = 1; });
+      const sites = sim.cover!.parkedJunctions;
+      const live = Array.from(police.parked).filter((a) => a >= 0);
+      expect(live.length).toBe(POLICE.parked.count);
+      let near = -1;
+      for (let k = 0; k < police.parked.length; k++) {
+        const agent = police.parked[k] as number;
+        const site = sites[police.parkedAt[k] as number]!;
+        expect(Math.hypot((traffic.x[agent] as number) - site.x, (traffic.z[agent] as number) - site.z)).toBeLessThan(0.5);
+        expect(traffic.state[agent]).toBe(AgentState.Parked);
+        const d = Math.hypot(site.x - sim.probe.x, site.z - sim.probe.z);
+        expect(d).toBeLessThanOrEqual(POLICE.parked.radius);
+        expect(traffic.lights[agent]).toBe(d < POLICE.parked.lightsRange ? 1 : 0);
+        if (d < POLICE.parked.lightsRange && (near < 0 || d < Math.hypot((traffic.x[near] as number) - sim.probe.x, (traffic.z[near] as number) - sim.probe.z))) near = agent;
+      }
+      expect(near).toBeGreaterThanOrEqual(0);
+      // the run ends: heat 0; the nearest car keeps its place, dark, and takes a swap like any car
+      sim.heat.reset();
+      run(sim, 1, (_t, c) => { c.brake = 1; });
+      expect(traffic.state[near]).toBe(AgentState.Parked);
+      expect(traffic.lights[near]).toBe(0);
+      const x = traffic.x[near] as number, z = traffic.z[near] as number, yaw = traffic.yaw[near] as number;
+      sim.city?.sync(x, z, true);
+      sim.vehicle.teleport({ x: x + Math.cos(yaw) * 3.4, y: 0.8, z: z - Math.sin(yaw) * 3.4 }, yaw);
+      run(sim, 0.8, (_t, c) => { c.brake = 1; });
+      expect(sim.life.state.swapCandidate).toBe(near);
+    } finally { sim.dispose(); }
+  }, 60_000);
+
+  it('6.8 a parked patrol that sees the player pulls out with a chase plan inside one sight tick, and the pursuit is on', async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 0, record: false, heat: 60 });
+    sim.police!.dispatching = false;
+    const traffic = sim.traffic as Traffic;
+    const police = sim.police!;
+    try {
+      // a patrol waits at a junction 150 m down the player's street, out of view behind the car
+      const sites = sim.cover!.parkedJunctions;
+      const index = sites.findIndex((j) => Math.hypot(j.x, j.z) < 400);
+      const site = sites[index]!;
+      const pose = { x: 0, z: 0, yaw: 0 };
+      traffic.lanes.positionAt(site.lane, site.s - 150, 0, pose);
+      sim.city?.sync(pose.x, pose.z, true);
+      sim.vehicle.teleport({ x: pose.x, y: 0.8, z: pose.z }, pose.yaw + Math.PI);
+      expect(runUntil(sim, 3, () => Array.from(police.parkedAt).includes(index), (_t, c) => { c.brake = 1; })).toBeGreaterThan(0);
+      const agent = police.parked[Array.from(police.parkedAt).indexOf(index)] as number;
+      // then the player stops 45 m from it, still facing away: in its line of sight
+      traffic.lanes.positionAt(site.lane, site.s - 45, 0, pose);
+      traffic.clearAround(pose.x, pose.z, 30);
+      sim.vehicle.teleport({ x: pose.x, y: 0.8, z: pose.z }, pose.yaw + Math.PI);
+      const from = sim.tick;
+      const t = runUntil(sim, 2, () => Array.from(police.units).includes(agent), (_t, c) => { c.brake = 1; });
+      expect(t).toBeGreaterThan(0);
+      expect(sim.tick - from).toBeLessThanOrEqual(POLICE.sightEveryTicks + 1);
+      expect([AgentState.Kinematic, AgentState.Physical]).toContain(traffic.state[agent]);
+      run(sim, 1 / 60, (_t, c) => { c.brake = 1; });
+      expect(['detected', 'active']).toContain(sim.pursuit.state);
+    } finally { sim.dispose(); }
+  }, 60_000);
 });

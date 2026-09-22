@@ -23,6 +23,7 @@ import { Smoke } from './Smoke';
 import { HideoutView } from './HideoutView';
 import { Coins } from './Coins';
 import { MarkerView } from './MarkerView';
+import { RoadblockView } from './RoadblockView';
 import { AgentState } from '../sim/traffic/Traffic';
 import type { SimEvent } from '../sim';
 
@@ -52,6 +53,7 @@ export class Renderer {
   readonly hideoutView: HideoutView | null;
   readonly coinsView: Coins | null;
   readonly markerView: MarkerView;
+  readonly roadblockView: RoadblockView | null;
   quality: QualityTier = 'low';
   private qualityElapsed = 0;
   private qualityFrames = 0;
@@ -152,6 +154,7 @@ export class Renderer {
     this.pedView = sim.peds && sim.pedsDensity > 0 ? new PedView(this.scene, sim.peds) : null;
     this.hideoutView = sim.run.dropOffs.length > 0 ? new HideoutView(this.scene, sim) : null;
     this.markerView = new MarkerView(this.scene);
+    this.roadblockView = sim.roadblocks ? new RoadblockView(this.scene) : null;
     if (sim.city) this.scene.add(buildSkyline(sim.city));
     if (sim.statics.length) this.buildStatics(sim.statics);
     this.setQuality(this.quality);
@@ -340,6 +343,7 @@ export class Renderer {
     this.hideoutView?.update(this.sim);
     this.coinsView?.update(this.sim, dt);
     this.markerView.update(this.sim, dt);
+    this.roadblockView?.update(this.sim);
     this.car.update(tm);
     // ghost of the best lap
     if (this.sim.ghostPose(this.ghostPose)) {
@@ -487,6 +491,7 @@ export class Renderer {
     this.hideoutView?.dispose();
     this.coinsView?.dispose();
     this.markerView.dispose();
+    this.roadblockView?.dispose();
     this.renderer.dispose();
   }
 

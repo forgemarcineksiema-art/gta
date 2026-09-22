@@ -116,6 +116,8 @@ export class Traffic {
   readonly damage: Float32Array;
   /** Set on the step a car was wrecked by its own damage or one big contact (not by a caller): Life reads it for takedowns. */
   readonly justWrecked: Uint8Array;
+  /** 1 = the light bar is on (parked patrols near the player at heat 3+, roadblock cars); the view reads it. */
+  readonly lights: Uint8Array;
   /** Collider handle of the player's chassis, so contacts can be attributed. The world refreshes it every step. */
   playerColliderHandle = -1;
   /** Bumps when paint or tint changes so the view reuploads instance colours. */
@@ -226,6 +228,7 @@ export class Traffic {
     this.prevSpeed = new Float32Array(n);
     this.damage = new Float32Array(n);
     this.justWrecked = new Uint8Array(n);
+    this.lights = new Uint8Array(n);
     this.wobble = new Float32Array(n);
     this.turn = new Uint8Array(n);
     this.laneFill = new Uint8Array(this.lanes.laneCount);
@@ -403,23 +406,43 @@ export class Traffic {
     const index = KIND_INDEX[kind];
     const radius = Math.hypot(this.halfW[index] as number, this.halfL[index] as number);
     if (!this.outOfView(this.pose.x, this.pose.z, radius, player, near, cosHalf)) return -1;
-    let agent = this.findFree();
-    if (agent < 0) {
-      let farthest = 0;
-      for (let i = 0; i < this.capacity; i++) {
-        if (this.police[i] !== 0 || (this.state[i] !== AgentState.Kinematic && this.state[i] !== AgentState.Physical)) continue;
-        const x = this.x[i] as number, z = this.z[i] as number;
-        const r = Math.hypot(this.halfWidthOf(i), this.halfLengthOf(i));
-        if (!this.outOfView(x, z, r, player, near, cosHalf)) continue;
-        const d = (x - player.x) ** 2 + (z - player.z) ** 2;
-        if (d > farthest) { farthest = d; agent = i; }
-      }
-      if (agent < 0) return -1;
-      this.free(agent);
-    }
+    const agent = this.claim(player, near, cosHalf);
+    if (agent < 0) return -1;
     this.place(agent, lane, s, index, 0, AgentState.Kinematic, PLAYER_PAINT[kind]);
     this.police[agent] = 1;
     return agent;
+  }
+
+  /** A free record, or the farthest unseen driving civilian's, freed. -1 when there is neither. */
+  claim(player: PlayerProbe, near: number, cosHalf: number): number {
+    let agent = this.findFree();
+    if (agent >= 0) return agent;
+    let farthest = 0;
+    for (let i = 0; i < this.capacity; i++) {
+      if (this.police[i] !== 0 || (this.state[i] !== AgentState.Kinematic && this.state[i] !== AgentState.Physical)) continue;
+      const x = this.x[i] as number, z = this.z[i] as number;
+      const r = Math.hypot(this.halfWidthOf(i), this.halfLengthOf(i));
+      if (!this.outOfView(x, z, r, player, near, cosHalf)) continue;
+      const d = (x - player.x) ** 2 + (z - player.z) ** 2;
+      if (d > farthest) { farthest = d; agent = i; }
+    }
+    if (agent >= 0) this.free(agent);
+    return agent;
+  }
+
+  /** Knocked loose: a parked car shoved by a breach tumbles with full physics and settles or wrecks like any hit car. */
+  disturb(agent: number): void {
+    const st = this.state[agent];
+    if (st !== AgentState.Parked && st !== AgentState.Abandoned && st !== AgentState.Physical) return;
+    this.state[agent] = AgentState.Disturbed;
+    this.disturbedFor[agent] = this.tuning.disturbedTime;
+    this.lights[agent] = 0;
+  }
+
+  /** A parked police car off duty: only when nobody is watching (the caller's check). */
+  releaseParked(agent: number): void {
+    if (this.police[agent] !== 1 || this.state[agent] !== AgentState.Parked) return;
+    this.free(agent);
   }
 
   /** Off duty: the record goes back to the pool. The caller must have checked nobody is watching. */
@@ -482,16 +505,44 @@ export class Traffic {
    * the busted rule. Roadblocks and parked patrols (slice 6) and the busted
    * and door-race pins use it.
    */
-  spawnParkedPolice(x: number, z: number, yaw: number, kind: 'police' | 'sports' | 'heavy'): number {
-    const i = this.findFree();
+  spawnParkedPolice(x: number, z: number, yaw: number, kind: 'police' | 'sports' | 'heavy', player: PlayerProbe | null = null, near = 0, cosHalf = 1): number {
+    const i = player ? this.claim(player, near, cosHalf) : this.findFree();
     if (i < 0) return -1;
     this.placeAtPoint(i, x, z, yaw, KIND_INDEX[kind], AgentState.Parked, PLAYER_PAINT.police);
     this.police[i] = 1;
     return i;
   }
 
+  /**
+   * A parked car drives off along `lane` from `s`, `offset` m to its right (where it
+   * stood, so nothing jumps). With a lent body it becomes a driving body in place and
+   * turns onto the lane itself; without one the lane follower places it.
+   */
+  unpark(agent: number, lane: number, s: number, offset = 0): void {
+    if (this.state[agent] !== AgentState.Parked) return;
+    this.lane[agent] = lane;
+    this.next[agent] = -1;
+    this.s[agent] = s;
+    this.laneOffset[agent] = offset;
+    this.speed[agent] = 0;
+    this.wait[agent] = 0;
+    this.forced[agent] = 0;
+    this.turn[agent] = 0;
+    const slot = this.agentBody[agent] as number;
+    if (slot < 0) {
+      this.state[agent] = AgentState.Kinematic;
+      return;
+    }
+    const body = this.bodies[slot] as RAPIER.RigidBody;
+    (this.bodyCollider[slot] as RAPIER.Collider).setCollisionGroups(GROUPS_TRAFFIC);
+    body.setEnabledTranslations(true, false, true, true);
+    body.setAngvel(ZERO, true);
+    this.state[agent] = AgentState.Physical;
+  }
+
   private placeAtPoint(i: number, x: number, z: number, yaw: number, kind: number, state: AgentState, paint: number): void {
     this.state[i] = state;
+    this.lights[i] = 0;
     this.police[i] = 0;
     this.clearPolicePlan(i);
     this.kind[i] = kind;
@@ -545,6 +596,7 @@ export class Traffic {
     }
     this.releaseHolds(agent);
     this.police[agent] = 0;
+    this.lights[agent] = 0;
     this.clearPolicePlan(agent);
     this.state[agent] = oldWrecked ? AgentState.Wrecked : AgentState.Abandoned;
     this.kind[agent] = KIND_INDEX[oldKind];
@@ -1344,6 +1396,7 @@ export class Traffic {
 
   private place(i: number, lane: number, s: number, kind: number, offset: number, state: AgentState, paint: number): void {
     this.state[i] = state;
+    this.lights[i] = 0;
     this.police[i] = 0;
     this.clearPolicePlan(i);
     this.contactDv[i] = 0;
@@ -1382,6 +1435,7 @@ export class Traffic {
     this.releaseHolds(i);
     this.state[i] = AgentState.Free;
     this.police[i] = 0;
+    this.lights[i] = 0;
     this.clearPolicePlan(i);
     this.next[i] = -1;
     this.lane[i] = -1;

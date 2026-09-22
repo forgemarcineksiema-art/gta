@@ -197,7 +197,8 @@ export class PoliceView {
         kit.wrecked[n] = wrecked;
         kit.repaint = true;
       }
-      if (enabled && this.live[i] && !wrecked) kit.flashing.setMatrixAt(kit.on++, this.matrix);
+      // a unit in the chase, or a parked patrol or roadblock car with its bar on
+      if ((enabled && this.live[i] || traffic.lights[i] === 1) && !wrecked) kit.flashing.setMatrixAt(kit.on++, this.matrix);
       else kit.unlit.setMatrixAt(kit.off++, this.matrix);
       kit.n = n + 1;
     }

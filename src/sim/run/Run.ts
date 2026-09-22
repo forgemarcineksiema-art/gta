@@ -14,7 +14,7 @@
  */
 import RAPIER from '@dimforge/rapier3d-compat';
 import { BALANCE } from '../balance';
-import { coverSites, GARAGE, toDropOff, type DropOff } from '../city/cover';
+import { GARAGE, toDropOff, type DropOff } from '../city/cover';
 import { GROUPS_SOLID } from '../collision';
 import type { SimEvent } from '../events';
 import * as M from '../math';
@@ -76,7 +76,7 @@ export class Run {
 
   constructor(sim: SimWorld) {
     this.sim = sim;
-    this.dropOffs = sim.city ? coverSites(sim.city).dropOffs : [];
+    this.dropOffs = sim.cover ? sim.cover.dropOffs : [];
     this.cursor = sim.events.sequence;
     if (this.dropOffs.length > 0) {
       const g = GARAGE;
@@ -222,6 +222,8 @@ export class Run {
     this.lastBanked = Math.round(this.bag * this.lastMultiplier);
     this.lastFine = 0;
     this.bank += this.lastBanked;
+    // new tyres behind the door
+    this.sim.life.mend();
     this.bestRun = Math.max(this.bestRun, this.lastBanked);
     this.bag = 0;
     this.endRun();
@@ -262,6 +264,7 @@ export class Run {
     this.sim.heat.reset();
     this.sim.pursuit.reset();
     this.sim.jobs.abandon();
+    this.sim.roadblocks?.clear();
     // a new run: the police car you still sit in is a clean disguise again
     this.sim.pursuit.blown = false;
     this.bustedProgress = 0;

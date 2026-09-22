@@ -202,6 +202,10 @@ export class Vehicle {
   /** Blended grip multipliers (drop instantly, recover at gripBlendRate). */
   rearGripMul = 1;
   frontGripMul = 1;
+  /** Outside grip factor on every tyre (a spike strip's puncture, M4 slice 6); 1 is sound tyres. */
+  gripMul = 1;
+  /** A constant sideways force at the rear axle, N, + to the right (a puncture pulling the car); 0 is none. */
+  lateralPull = 0;
   /** Body slip angle of the previous step, radians (drift controller damping). */
   private bodySlipPrev = 0;
   /** Drift side (+1 right) and the rate-limited commanded angle in degrees (+ = right). */
@@ -783,7 +787,7 @@ export class Vehicle {
 
       // load sensitivity: a heavily loaded tyre gives less grip per newton
       const loadMul = M.clamp(1 - t.loadSensitivity * (w.load / staticLoad - 1), 0.6, 1.3);
-      const mu = (w.isFront ? t.muFront * this.frontGripMul : t.muRear * this.rearGripMul) * loadMul;
+      const mu = (w.isFront ? t.muFront * this.frontGripMul : t.muRear * this.rearGripMul) * loadMul * this.gripMul;
       const muLoad = mu * w.load;
       const r = t.wheelRadius;
       const vRef = Math.max(Math.abs(vFwd), t.slipLowSpeed);
@@ -884,6 +888,14 @@ export class Vehicle {
     }
     M.set(s.force, 0, -t.extraGravity * t.mass, 0);
     M.add(s.fSum, s.fSum, s.force);
+    // a puncture drags at the rear axle while the car is on its wheels
+    if (this.lateralPull !== 0 && grounded > 0) {
+      M.set(s.rearLocal, 0, 0, -t.wheelBase * 0.5);
+      M.rotate(s.a, s.q, s.rearLocal);
+      M.add(s.point, s.pos, s.a);
+      M.scale(s.force, s.right, this.lateralPull);
+      forceAt(s.force, s.point);
+    }
     if (grounded > 0 && speed < 0.5 && throttle === 0 && brakeIn === 0 && !handbrake) {
       M.scale(s.force, s.vel, -t.restDamping * t.mass);
       M.add(s.fSum, s.fSum, s.force);

@@ -8,6 +8,8 @@
  */
 import RAPIER from '@dimforge/rapier3d-compat';
 import { City } from './city/City';
+import { coverSites, type CoverSites } from './city/cover';
+import { Roadblocks } from './police/Roadblocks';
 import { createControls, type VehicleControls } from './controls';
 import { EventLog } from './events';
 import { Collectibles } from './city/collectibles';
@@ -95,6 +97,10 @@ export class SimWorld {
   readonly heat: Heat;
   readonly pursuit: Pursuit;
   readonly police: Police | null;
+  /** The drop-offs, roadblock chokepoints, parked-patrol junctions and camera sites; null on the playground. */
+  readonly cover: CoverSites | null;
+  /** Level 3's roadblocks and spike strips; null on the playground. */
+  readonly roadblocks: Roadblocks | null;
   /** Bag, bank, the doors and busted: what ends a run (M4). Empty drop-offs on the playground. */
   readonly run: Run;
   /** Markers, the clock and the payout (the slice-4 skeleton; the cold open adds the first def). */
@@ -188,7 +194,9 @@ export class SimWorld {
     this.pursuit = new Pursuit(this.events);
     this.pursuit.descriptor.kind = this.carId;
     this.pursuit.descriptor.paint = PLAYER_PAINT[this.carId];
+    this.cover = this.city ? coverSites(this.city) : null;
     this.police = this.traffic ? new Police(this) : null;
+    this.roadblocks = this.traffic && this.cover ? new Roadblocks(this, this.cover.chokepoints) : null;
     this.jobs = new Jobs(this, []);
     this.run = new Run(this);
     this.coldOpen = new ColdOpen(this);
@@ -247,6 +255,7 @@ export class SimWorld {
     this.peds?.writeTransforms();
     this.life.postStep(FIXED_DT);
     if (this.traffic) this.coins?.step(this.probe, FIXED_DT, this.events);
+    this.roadblocks?.step(this.probe, FIXED_DT, this.events);
     this.heat.step();
     // before the run: a delivery into a garage pays the bag before the door can drop the job
     this.jobs.step(this.probe, FIXED_DT);

@@ -1,3 +1,4 @@
+import type { CarId } from '../vehicle/presets';
 /** Unit rosters, sight and ramming. Heat picks the row; everything else is per unit. */
 export interface PoliceTuning {
   /** Units at once by heat level (index 0 = heat 0). */
@@ -53,6 +54,29 @@ export interface PoliceTuning {
   /** The disguise: the dispatcher notices the missing unit `seconds` after the player takes a police car, and the cover is blown. */
   disguise: { seconds: number };
   /**
+   * Roadblocks (level `fromLevel`+, the pursuit active): at a chokepoint `minAhead`..`maxAhead` m ahead on the
+   * player's road, out of view and never nearer than `minDistance`, every `retryAfter` s while none stands.
+   * Two cars `gap` m apart across the lane with a `sawhorseWidth` m sawhorse between (passing it costs
+   * `sawhorseLoss` of the speed); a spike strip `spikeBefore` m before it across the open side, `spikeLength`
+   * m across and `spikeDepth` m along. A `breachClass` car at `breachSpeed` m/s shoves a roadblock car aside
+   * taking `breachDamageFactor` of the damage; anything else hits a braced car and takes `carDamageFactor`
+   * (a wall is 1, traffic 0.7). Cleared `clearPast` m past it or when the chase ends.
+   */
+  roadblock: {
+    fromLevel: number; minAhead: number; maxAhead: number; minDistance: number; cars: number; gap: number;
+    sawhorseLoss: number; sawhorseWidth: number; spikeBefore: number; spikeLength: number; spikeDepth: number;
+    breachSpeed: number; breachClass: CarId; breachDamageFactor: number; carDamageFactor: number; retryAfter: number; clearPast: number;
+  };
+  /** A crossed spike strip: every tyre's grip × `grip` and a `pull` N sideways at the rear axle until a swap, the door or a fresh car. */
+  spike: { grip: number; pull: number };
+  /**
+   * Parked patrols (level `fromLevel`+): `count` cars, one per parked junction, at the junctions within
+   * `radius` m of the player; the light bar on within `lightsRange` m. One that sees the player joins the chase.
+   */
+  parked: { fromLevel: number; count: number; radius: number; lightsRange: number };
+  /** Speed cameras: a flash when the car crosses the line more than `overKmh` over the road's limit; `cooldown` s per camera. */
+  cameras: { count: number; overKmh: number; cooldown: number };
+  /**
    * The arrest: under `playerSpeed` m/s (released above `releaseSpeed`) units within `range` m take the slots
    * `rear` / `front` m along and `side` m across the player, braking at `decel` to arrive within `arrive` m;
    * the rest stand by `standby` m behind. `accel` caps the body's velocity change; `keep` m of hysteresis on a slot.
@@ -106,6 +130,14 @@ export const POLICE: PoliceTuning = {
   busted: { units: 2, range: 7, speed: 1.39, seconds: 3, drainPerSecond: 0.7 },
   box: { seconds: 5, range: 8, approach: 20, maxSeconds: 15, detourSpeed: 10 },
   disguise: { seconds: 30 },
+  roadblock: {
+    fromLevel: 3, minAhead: 150, maxAhead: 300, minDistance: 100, cars: 2, gap: 5,
+    sawhorseLoss: 0.05, sawhorseWidth: 3, spikeBefore: 25, spikeLength: 4, spikeDepth: 0.8,
+    breachSpeed: 22.2, breachClass: 'heavy', breachDamageFactor: 0.3, carDamageFactor: 3.5, retryAfter: 20, clearPast: 150,
+  },
+  spike: { grip: 0.6, pull: 900 },
+  parked: { fromLevel: 3, count: 4, radius: 450, lightsRange: 200 },
+  cameras: { count: 10, overKmh: 20, cooldown: 30 },
   // clear: a unit passes the player's car no closer than this (m), at detourSpeed (m/s)
   arrest: { playerSpeed: 6, releaseSpeed: 9, range: 60, rear: 5.6, front: 5.6, side: 3.2, standby: 12, decel: 6, arrive: 1.2, accel: 12, keep: 5, clear: 4, detourSpeed: 5 },
   search: { reach: 30 },

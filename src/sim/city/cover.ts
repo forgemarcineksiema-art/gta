@@ -11,9 +11,11 @@
  * right of that axis. The door line is `along = -GARAGE.depth / 2`.
  */
 import { PALETTE } from '../palette';
+import { POLICE } from '../police/tuning';
 import { quatFromYaw, type StaticDesc } from '../scene';
 import type { City } from './City';
-import { BLOCK, HIGHWAY_HALF, ROAD_HALF } from './roads';
+import { laneAt, laneLength } from './route';
+import { BLOCK, HIGHWAY_HALF, HIGHWAY_LANE_OFFSETS, ROAD_HALF, type RoadGraph } from './roads';
 
 export type DropOffName = 'hideout' | 'scrapyard' | 'hotel';
 
@@ -84,10 +86,26 @@ export interface DropOff {
   lot: DropOffLot;
 }
 
+/**
+ * Where a roadblock can stand (slice 6): a point on a lane's centre, the lane and
+ * the distance along it, and the spike strip's centre `spikeBefore` m before it
+ * across the open side (the other highway lane, or the oncoming lane of a street).
+ */
+export interface Chokepoint { x: number; z: number; yaw: number; lane: number; s: number; spikeX: number; spikeZ: number }
+
+/** A parked patrol's place: on an approach lane to a grid junction, at the kerb, facing the crossing. */
+export interface ParkedJunction { node: number; lane: number; s: number; offset: number; x: number; z: number; yaw: number }
+
+/** A speed camera's line across a road (both directions), its pole beside it, and the road's limit (m/s). */
+export interface CameraSite { x: number; z: number; yaw: number; halfWidth: number; poleX: number; poleZ: number; limitMs: number }
+
 export interface CoverSites {
   hideout: DropOff;
   /** All three, the hideout first: every one banks and holds the same wall. */
   dropOffs: DropOff[];
+  chokepoints: Chokepoint[];
+  parkedJunctions: ParkedJunction[];
+  cameraSites: CameraSite[];
 }
 
 /** The drop-off built on this lot, or null. Called by the generator for every lot. */
@@ -139,7 +157,95 @@ export function coverSites(city: City): CoverSites {
     site.approachLane = city.nearestLane(site.door.x - fx * 10, site.door.z - fz * 10);
     return site;
   });
-  return { hideout: dropOffs[0] as DropOff, dropOffs };
+  return { hideout: dropOffs[0] as DropOff, dropOffs, chokepoints: chokepoints(city.graph), parkedJunctions: parkedJunctions(city.graph, dropOffs[0] as DropOff), cameraSites: cameraSites(city.graph) };
+}
+
+/** Metres between roadblock sites along a highway lane, and kept clear of the junction boxes at its ends. */
+const CHOKE_PITCH = 75;
+const CHOKE_END = 40;
+/** The tower junction: roadblocks on its approaches, 60 m short of the stop line (docs/DESIGN.md §6.4). */
+const TOWER: readonly [number, number] = [-2, -2];
+const TOWER_APPROACH = 60;
+/** A parked patrol stands this far before the stop line, this far to the lane's right (kerb side). */
+const PARKED_BACK = 14;
+const PARKED_KERB = 3;
+/** Parked patrols keep this far from the hideout (docs/M4_PLAN.md slice 3a). */
+const PARKED_CLEAR_OF_HIDEOUT = 300;
+/** The laps' limits the cameras enforce: the traffic tuning's highway and avenue speeds (m/s). */
+const LIMIT_HIGHWAY = 22;
+const LIMIT_AVENUE = 16;
+
+function node(gx: number, gz: number): number {
+  return (gz + 3) * 7 + (gx + 3);
+}
+
+/** Every highway lane every 75 m, and the tower junction's approaches: the roadblock sites. */
+function chokepoints(graph: RoadGraph): Chokepoint[] {
+  const out: Chokepoint[] = [];
+  const tower = node(TOWER[0], TOWER[1]);
+  const [inner, outer] = HIGHWAY_LANE_OFFSETS;
+  for (const lane of graph.lanes) {
+    const len = laneLength(lane);
+    // the open side: the other highway lane, or across the centreline to the oncoming lane
+    const spikeRight = lane.highway ? (lane.offset === inner ? outer - inner : inner - outer) : -2 * lane.offset;
+    const at = (s: number): void => {
+      const p = laneAt(lane, s);
+      const q = laneAt(lane, Math.max(0, s - POLICE.roadblock.spikeBefore), spikeRight);
+      out.push({ x: p.x, z: p.z, yaw: p.yaw, lane: lane.id, s, spikeX: q.x, spikeZ: q.z });
+    };
+    if (lane.highway) for (let s = CHOKE_END; s <= len - CHOKE_END; s += CHOKE_PITCH) at(s);
+    else if (lane.to === tower && len > TOWER_APPROACH + CHOKE_END) at(len - TOWER_APPROACH);
+  }
+  return out;
+}
+
+/** One kerb-side spot on an approach to every interior grid junction at least 300 m from the hideout. */
+function parkedJunctions(graph: RoadGraph, hideout: DropOff): ParkedJunction[] {
+  const out: ParkedJunction[] = [];
+  for (const n of graph.nodes) {
+    if (Math.abs(n.x) > 2 * BLOCK || Math.abs(n.z) > 2 * BLOCK) continue;
+    if (Math.hypot(n.x - hideout.x, n.z - hideout.z) < PARKED_CLEAR_OF_HIDEOUT) continue;
+    // the lowest-numbered grid lane into it: deterministic, and never an authored road's bend
+    const lane = graph.lanes.find((l) => l.to === n.id && !l.special && !l.highway);
+    if (!lane) continue;
+    const s = laneLength(lane) - PARKED_BACK;
+    const p = laneAt(lane, s, PARKED_KERB);
+    out.push({ node: n.id, lane: lane.id, s, offset: PARKED_KERB, x: p.x, z: p.z, yaw: p.yaw });
+  }
+  return out;
+}
+
+/** Ten cameras: seven mid-segment on the highway's four sides, three along the Crown avenue's straight line. */
+function cameraSites(graph: RoadGraph): CameraSite[] {
+  const out: CameraSite[] = [];
+  const ring = 3 * BLOCK;
+  // mid-segment points of the ring (a node every 225 m): x or z at ±112.5, ±337.5, ±562.5
+  const highway: Array<readonly [number, number, number]> = [
+    [-ring, -337.5, 0], [-ring, 337.5, 0], [ring, -337.5, Math.PI], [ring, 337.5, Math.PI],
+    [-112.5, -ring, Math.PI / 2], [337.5, -ring, Math.PI / 2], [112.5, ring, -Math.PI / 2],
+  ];
+  for (const [x, z, yaw] of highway) {
+    const side = HIGHWAY_HALF + 2;
+    // the pole on the outer verge: away from the city centre
+    const ox = Math.abs(x) === ring ? Math.sign(x) * side : 0, oz = Math.abs(z) === ring ? Math.sign(z) * side : 0;
+    out.push({ x, z, yaw, halfWidth: HIGHWAY_HALF, poleX: x + ox, poleZ: z + oz, limitMs: LIMIT_HIGHWAY });
+  }
+  // the two Crown diagonals are one straight line from the highway to the highway through the tower junction
+  const avenue = graph.special.filter((r) => r.kind === 'avenue');
+  const a = avenue[0], b = avenue[avenue.length - 1];
+  if (a && b) {
+    const start = a.centre[0] as { x: number; z: number }, end = b.centre[b.centre.length - 1] as { x: number; z: number };
+    const len = Math.hypot(end.x - start.x, end.z - start.z);
+    const dx = (end.x - start.x) / len, dz = (end.z - start.z) / len;
+    const yaw = Math.atan2(dx, dz);
+    for (const d of [len * 0.18, len * 0.5, len * 0.82]) {
+      const x = start.x + dx * d, z = start.z + dz * d;
+      // the pole on the right-hand verge (right of the heading is (-dz, dx)), clear of the carriageway
+      const side = a.halfWidth + 2;
+      out.push({ x, z, yaw, halfWidth: a.halfWidth, poleX: x - dz * side, poleZ: z + dx * side, limitMs: LIMIT_AVENUE });
+    }
+  }
+  return out;
 }
 
 /** Along (inward) and across coordinates of a world point in a drop-off's frame. */

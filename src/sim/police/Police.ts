@@ -13,6 +13,8 @@
  * - search: sight lost, units drive to where the player was last seen and fan
  *   out through the junctions there until the escape timer runs out;
  * - react: a unit the player hits notices at once, and it costs heat;
+ * - parked patrols (slice 6): from level 3 cars wait at the junctions near the
+ *   player, lights on when close; one that sees the player pulls out and chases;
  * - identity (slice 5): a swap no unit saw ends the chase and the units box
  *   the abandoned car for a few seconds before they withdraw; in a police car
  *   the player is not detected until a unit sees a crime from it.
@@ -23,6 +25,7 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import { BALANCE } from '../balance';
 import type { SimEvent } from '../events';
+import type { ParkedJunction } from '../city/cover';
 import type { RoadGraph, Lane, RoadNode } from '../city/roads';
 import type { SimWorld } from '../SimWorld';
 import { AgentState, type PlayerProbe, type Traffic } from '../traffic/Traffic';
@@ -51,6 +54,13 @@ export class Police {
   arresting = false;
   /** Test hook: false keeps new units from coming on duty (deterministic busted and door setups). */
   dispatching = true;
+  /** Parked patrols: the agent at each place (-1 none) and its index into `parkedJunctions`. */
+  readonly parked: Int16Array;
+  readonly parkedAt: Int16Array;
+  private readonly parkedLos: Uint8Array;
+  private readonly parkedJunctions: readonly ParkedJunction[];
+  private readonly parkedTried: Uint8Array;
+  private parkLeft = 0;
   /** A swap nobody saw: the units box the abandoned car at (boxX, boxZ); `boxLeft` runs while two are round it. */
   boxing = false;
   boxX = 0;
@@ -113,6 +123,11 @@ export class Police {
     this.units.fill(-1);
     this.seen = new Uint8Array(this.units.length);
     this.los = new Uint8Array(this.units.length);
+    this.parkedJunctions = sim.cover?.parkedJunctions ?? [];
+    this.parked = new Int16Array(this.tuning.parked.count).fill(-1);
+    this.parkedAt = new Int16Array(this.tuning.parked.count).fill(-1);
+    this.parkedLos = new Uint8Array(this.tuning.parked.count);
+    this.parkedTried = new Uint8Array(this.parkedJunctions.length);
     this.leaving = new Float32Array(this.units.length);
     this.leaveX = new Float64Array(this.units.length);
     this.leaveZ = new Float64Array(this.units.length);
@@ -180,6 +195,7 @@ export class Police {
     // last step's crimes, judged by who could see the car when they happened
     this.cursor = this.sim.events.readFrom(this.cursor, this.onCrime);
     const level = this.sim.heat.level;
+    const parkedSaw = this.stepParked(player, level, dt, cosHalf);
     if (level === 0) {
       this.hot = false;
       this.spawnLeft = 0;
@@ -215,8 +231,8 @@ export class Police {
       }
     }
 
-    // a unit the player hit sees the player, whatever its ray said
-    let visible = assaulted;
+    // a unit the player hit sees the player, whatever its ray said; so does a parked patrol pulling out
+    let visible = assaulted || parkedSaw;
     const every = Math.max(1, Math.round(t.sightEveryTicks));
     for (let u = 0; u < this.units.length; u++) {
       const agent = this.units[u] as number;
@@ -370,10 +386,116 @@ export class Police {
     }
   }
 
-  /** True when any unit had a clear line to the player at its last sight tick, disguise or not: a crime now is seen. */
+  /** True when any unit or parked patrol had a clear line to the player at its last sight tick, disguise or not: a crime now is seen. */
   crimeSeen(): boolean {
     for (let u = 0; u < this.units.length; u++) if ((this.units[u] as number) >= 0 && this.los[u] === 1) return true;
+    for (let k = 0; k < this.parked.length; k++) if ((this.parked[k] as number) >= 0 && this.parkedLos[k] === 1) return true;
     return false;
+  }
+
+  /**
+   * The parked patrols: from `parked.fromLevel` the `count` junctions nearest the player within `radius`
+   * each get a car, put there out of view; lights on within `lightsRange`. Below the level, cars already
+   * parked keep their places, dark, until nobody sees them go. A patrol that sees the player pulls out onto
+   * its lane and joins the roster. Returns true when one did this step.
+   */
+  private stepParked(player: PlayerProbe, level: number, dt: number, cosHalf: number): boolean {
+    const traffic = this.traffic;
+    const t = this.tuning;
+    const p = t.parked;
+    const on = level >= p.fromLevel;
+    // a car the player took, wrecked or knocked loose is no longer a parked patrol
+    for (let k = 0; k < this.parked.length; k++) {
+      const agent = this.parked[k] as number;
+      if (agent < 0) continue;
+      if (traffic.police[agent] !== 1 || traffic.state[agent] !== AgentState.Parked) {
+        this.parked[k] = -1;
+        this.parkedAt[k] = -1;
+        this.parkedLos[k] = 0;
+        continue;
+      }
+      const d = Math.hypot((traffic.x[agent] as number) - player.x, (traffic.z[agent] as number) - player.z);
+      traffic.lights[agent] = on && d < p.lightsRange ? 1 : 0;
+    }
+    this.parkLeft -= dt;
+    if (this.parkLeft <= 0) {
+      this.parkLeft = t.routeSeconds;
+      this.manageParked(player, on, cosHalf);
+    }
+    if (level === 0) {
+      this.parkedLos.fill(0);
+      return false;
+    }
+    let saw = false;
+    const every = Math.max(1, Math.round(t.sightEveryTicks));
+    for (let k = 0; k < this.parked.length; k++) {
+      const agent = this.parked[k] as number;
+      if (agent < 0) continue;
+      const d = Math.hypot((traffic.x[agent] as number) - player.x, (traffic.z[agent] as number) - player.z);
+      if (d > t.sightRange) { this.parkedLos[k] = 0; continue; }
+      if (this.sim.tick % every !== Math.floor(k * every / this.parked.length)) continue;
+      this.parkedLos[k] = this.lineOfSight(agent, player, d) ? 1 : 0;
+      if (this.parkedLos[k] === 0 || this.sim.pursuit.disguised || this.boxing) continue;
+      // seen: out onto its lane, into the chase
+      const site = this.parkedJunctions[this.parkedAt[k] as number];
+      if (site) traffic.unpark(agent, site.lane, site.s, site.offset);
+      traffic.lights[agent] = 1;
+      this.parked[k] = -1;
+      this.parkedAt[k] = -1;
+      this.parkedLos[k] = 0;
+      if (this.enlist(agent) >= 0) saw = true;
+    }
+    return saw;
+  }
+
+  /** Fill the nearest places within reach out of view; send off the ones left behind, unseen. */
+  private manageParked(player: PlayerProbe, on: boolean, cosHalf: number): void {
+    const traffic = this.traffic;
+    const t = this.tuning;
+    const p = t.parked;
+    const sites = this.parkedJunctions;
+    for (let k = 0; k < this.parked.length; k++) {
+      const agent = this.parked[k] as number;
+      if (agent < 0) continue;
+      const site = sites[this.parkedAt[k] as number];
+      const far = !site || Math.hypot(site.x - player.x, site.z - player.z) > p.radius + 60;
+      if ((far || !on) && traffic.outOfView(traffic.x[agent] as number, traffic.z[agent] as number, this.radius, player, t.viewNear, cosHalf)
+        && Math.hypot((traffic.x[agent] as number) - player.x, (traffic.z[agent] as number) - player.z) > p.lightsRange) {
+        traffic.releaseParked(agent);
+        this.parked[k] = -1;
+        this.parkedAt[k] = -1;
+        this.parkedLos[k] = 0;
+      }
+    }
+    if (!on) return;
+    // the nearest junctions within reach, one car each, up to `count`; a place in view is passed over this time
+    this.parkedTried.fill(0);
+    for (let n = 0; n < sites.length; n++) {
+      let best = -1, bestD = p.radius;
+      for (let i = 0; i < sites.length; i++) {
+        const site = sites[i] as ParkedJunction;
+        if (this.parkedTried[i] === 1) continue;
+        let taken = false;
+        for (let k = 0; k < this.parkedAt.length; k++) if (this.parkedAt[k] === i) { taken = true; break; }
+        if (taken) continue;
+        const d = Math.hypot(site.x - player.x, site.z - player.z);
+        if (d < bestD) { bestD = d; best = i; }
+      }
+      if (best < 0) return;
+      this.parkedTried[best] = 1;
+      let slot = -1;
+      for (let k = 0; k < this.parked.length; k++) if ((this.parked[k] as number) < 0) { slot = k; break; }
+      if (slot < 0) return;
+      const site = sites[best] as ParkedJunction;
+      // a car appears only where nobody is looking, and beyond its own sight: one placed in plain view of
+      // the player would pull out at once and its place fill again, a unit a second
+      if (!traffic.outOfView(site.x, site.z, this.radius, player, t.viewNear, cosHalf) || bestD <= t.sightRange) continue;
+      const agent = traffic.spawnParkedPolice(site.x, site.z, site.yaw, 'police', player, t.viewNear, cosHalf);
+      if (agent < 0) return;
+      this.parked[slot] = agent;
+      this.parkedAt[slot] = best;
+      this.parkedLos[slot] = 0;
+    }
   }
 
   /** The swap nobody saw: box the abandoned car at this pose for `box.seconds`. */

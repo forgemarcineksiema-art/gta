@@ -76,12 +76,23 @@ back. Numbers in `balance.ts`; built in M4 slice 3 with the coins.
    a heat cost: a race adds little, mayhem a lot, a getaway delivery in
    between. Free-roam chaos pays and heats too: police takedowns, billboards,
    speed cameras, the skill chain (§7).
-3. Drive to the hideout or a drop-off (§6.3); entry needs no active pursuit.
-   The bag lands in the bank multiplied by the highest heat reached.
+3. Drive to the hideout or a drop-off (§6.3). Entry is always allowed
+   (revised 2026-09-22, decided: back to the brief, where reaching the
+   respray shop is itself an escape). The door takes 3 s to close behind a
+   stopped car, and busted still counts inside it: two units at the door
+   before it shuts, and the run ends on the threshold. The bag lands in the
+   bank multiplied by the highest heat at which the police had you (§2.6).
 4. The door closes, the totals, the door opens, heat 0. Same city, no load.
 
 The brief's respray shop and the hideout are one place with one verb: bank
-and reset.
+and reset. Why the door is an escape and not a test: the earlier rule
+("entry needs no active pursuit") turned every door into a skill check,
+and a novice at heat 3 who cannot shake the patrols could never bank, only
+wreck or get busted. The brief's version is kinder and more getaway: you
+dive in, the door drops, the cruisers scream past. The 3 s door keeps the
+tension where it belongs: the last hundred metres with sirens closing, the
+door crawling down, the bar filling. It is the climax of every run and the
+police comedy in one shot.
 
 ### 2.4 Busted
 
@@ -126,7 +137,13 @@ without a tutorial line.
 | 4 | heavy SUVs, helicopter with a spotlight | lose the helicopter under cover first (§5), then 12 s |
 | 5 | everything plus the Chief in a boss car | as 4, 15 s |
 
-Bag multiplier by the highest heat reached: ×1 / ×1.25 / ×1.6 / ×2.2 / ×3.
+Bag multiplier by the highest heat at which the pursuit went active, not
+merely reached (revised 2026-09-22, decided): ×1 / ×1.25 / ×1.6 / ×2.2 /
+×3. The disguise (§2.5) made "reached" exploitable: a cruiser, billboards
+and cameras with no witness, heat 5 without a single chase, the door at ×3.
+Now the city has to have seen you at that level; a crime nobody saw raises
+the stars but not the bounty. On the HUD the multiplier jumps when the
+stars pulse red at a new level, which is the legible version of the rule.
 Roadblocks come from the billboard placer's clear-footprint query on the lanes
 ahead and always have a weak point (a sawhorse instead of a car): a skill
 check, not a wall. Spike strips are a tuning state (grip drop and a pull),
@@ -175,10 +192,13 @@ the totals appear painted on the wall, the engine idles, any key opens the
 door and the player drives out. A cut camera as with the takedown focus. This
 is the only interior worth building: a straight box, no ramps. Ad points: §9.
 Two additions, set 2026-09-22: the multiplier the run is currently earning
-sits on the HUD beside the bag for the whole run (`×1.6`), which is the
-entire "one more level" pull without a word of text; and the wall shows one
-line of the run's counts under the totals (jobs, takedowns, escapes,
-billboards, coins), so a run reads as a story and not only as a sum.
+sits on the HUD beside the bag for the whole run (`×1.6`), rising when the
+police see you at a new level (§2.6), which is the entire "one more level"
+pull without a word of text; and the wall shows one line of the run's
+counts under the totals (jobs, takedowns, escapes, billboards, coins), so a
+run reads as a story and not only as a sum. The door itself is the run's
+last beat (§2.3): 3 s to close, busted live until it shuts, the camera
+already cut to the interior so the sirens are heard and not seen.
 
 ## 3. Audience and progression — set here, revised 2026-09-22
 
@@ -369,6 +389,9 @@ corners so they read from two streets.
 Three: the hideout in Crown Heights, the Sunset Works scrapyard, the Coral
 Hotel garage. Each has one approach street the police can block at heat 3+
 and a second, longer way in, so a blocked door is a detour, not a wall.
+Every one of the three has the same wall (set 2026-09-22): the totals and,
+from M5, the garage pages; banking at the scrapyard buys a car as well as
+banking at home. The wall is DOM, so the three doors cost one screen.
 
 ### 6.4 Chokepoints and cover
 
@@ -513,9 +536,10 @@ both.
   three jobs (getaway delivery, steal-to-order, pursuit escape), the Crazy
   Taxi arrow with its idle target, the daily police seed with the dailies,
   the balance script with the EV assertion
-  and the bot as the capture probe, the UI and audio passes. Dailies and the
-  streak ship with it if they fit after the three jobs: they are cheap once
-  the save exists and they are the D1 lever; else they open update 2.
+  and the bot as the capture probe, the UI and audio passes, dailies and the
+  streak (revised 2026-09-22: no longer conditional; the brief lists them in
+  v1 and they are the one D1 lever; if anything slips it is the day-7
+  topper).
 - **M6 Platform** as in the brief, then Basic Launch.
 - **Update 1, the air**: covered streets and the camera occlusion rule, the
   overpasses, the helicopter with the spotlight (§5).
@@ -529,6 +553,8 @@ both.
 - Is busted legible and fair: the bar, a clear last moment to break out; does
   the fine read as fair, or does the beginner still quit.
 - Do players go above heat 2 at all; if not, multipliers up or level 3 down.
+- The door race (§2.3): does 3 s read as a chance or as a trap; does a
+  novice at heat 3 reach a door at all now that it always opens.
 - Does "the pursuit ended but the heat stayed" land through the HUD alone.
 - Does a run stay under 15 minutes.
 - The ratchet's risk: two accidental takedowns early put roadblocks on a race

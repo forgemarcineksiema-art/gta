@@ -2,6 +2,47 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-22 — Design talk, part 4: the brief's and DESIGN's decisions
+
+Marcin: "and what about the brief's and design's decisions?" A pass over
+the six fixed decisions of brief §3 (left alone, every one has held up in
+the build) and the decided sections of DESIGN. Four items; he said to
+write them in.
+
+### Decided (Marcin, on my assessment)
+
+- **The multiplier counts the highest heat at which the police had you,
+  not the highest reached.** The disguise had made "reached" exploitable:
+  a cruiser, unseen billboards and cameras, heat 5 with no chase, ×3 at the
+  door. Now `Run.maxHeat` moves only on a step with the pursuit `active`,
+  and the HUD's multiplier pops when the stars pulse red at a new level.
+  DESIGN §2.6, M4_PLAN D3, the `Run` contract, slice 3a and test 3.2.
+- **The door is an escape again, as the brief says, with a 3 s race.**
+  Every drop-off always opens; the car stops in the entry box, the door
+  takes `door.closeSeconds` to shut, and busted stays live until it does:
+  two units at the threshold before the door is down and the run ends on
+  the doorstep. The earlier rule ("entry needs no active pursuit") turned
+  every door into a skill check a novice at heat 3 could fail forever. This
+  changes DESIGN §2.3 (Marcin's decision, revised by him). M4_PLAN D6, the
+  `closing` state, slice 3a's door bullet, tests 3.3 and 3.4, `BALANCE.door`.
+- **Dailies are in the launch minimum, not conditional.** My own deviation
+  reversed: the brief lists them in v1 and they are the one D1 lever; the
+  day-7 topper is what may slip. DESIGN §11, M5_PLAN §1.1, slice 6, §7.
+- **Every drop-off has the same wall.** Banking at the scrapyard or the
+  hotel garage shows the totals and, from M5, the garage pages; the idle
+  arrow points at the nearest drop-off, not only the hideout. DESIGN §6.3,
+  M5_PLAN D9, `idleTarget`, slice 1, slice 4.
+
+### Left alone, on purpose
+
+Brief §3's six fixed decisions; the heat ratchet; the fine at half; coins
+always kept; the swap out of sight ending the pursuit (slice 5 measures it
+before anyone touches it).
+
+### Next
+
+- Unchanged: M4 slice 3a, now with the `closing` state and the door race.
+
 ## 2026-09-22 — Design talk, part 3: ten improvements to the game and the plans
 
 Marcin: "let's think whether the game and the plans can be even better",

@@ -102,10 +102,13 @@ player's the moment they are picked; the bag is at risk until the door; the
 bank is safe. Reason: DESIGN.md §3.2; a twelve-year-old's money is never at
 risk and the strategist's is.
 
-D3. **The door pays `bag × multiplier[maxHeat]`; busted pays `bag × fine`;
-a wreck spills `spillShare` of the bag as coins for ten seconds.** Reason:
-DESIGN.md §2.2: the bet is the multiplier; half at ×1 keeps the beginner;
-the spill is the risk that does not need the police to be real.
+D3. **The door pays `bag × multiplier[maxHeat]` where `maxHeat` is the
+highest level at which the pursuit went `active`; busted pays `bag ×
+fine`; a wreck spills `spillShare` of the bag as coins for ten seconds.**
+Reason: DESIGN.md §2.2 and §2.6 (revised 2026-09-22): the bet is the
+multiplier; half at ×1 keeps the beginner; the spill is the risk that does
+not need the police to be real; and a level nobody saw you at must not pay,
+or the disguise turns unseen crime into the best strategy.
 
 D4. **Busted is a bar, not an instant.** Two units within `bustedRange`
 and the player under `bustedSpeed` for `bustedSeconds` fill it; movement
@@ -117,11 +120,15 @@ the units go off duty, the player keeps the car and drives on. Reason: no
 teleport, no loading, control back inside two seconds after the card.
 
 D6. **The hideout is a static box with one enabled/disabled door collider,
-and the door is a game-made break.** Entry box → controls zeroed, the door
-collider enabled, `gameplayStop()`, the totals; any key → the collider
-disabled, `gameplayStart()`, heat 0. Reason: DESIGN.md §2.9; a results
-screen is a break the platform expects (`docs/CRAZYGAMES.md` A1), and one
-collider is the whole physics cost.
+the door always opens, it takes `door.closeSeconds` to shut with busted
+live, and the shut door is a game-made break.** Entry box, car stopped →
+`closing` for 3 s (controls zeroed, the bar still fills if two units reach
+the door); shut → the collider enabled, `gameplayStop()`, the totals; any
+key → the collider disabled, `gameplayStart()`, heat 0. Reason: DESIGN.md
+§2.3 (revised 2026-09-22, back to the brief: reaching the shop is an
+escape) and §2.9; a results screen is a break the platform expects
+(`docs/CRAZYGAMES.md` A1); one collider is the whole physics cost; the 3 s
+is the run's climax.
 
 D7. **Coins are placed by the generator and picked by the chassis
 footprint.** Per chunk like the billboards, drawn as one instanced mesh,
@@ -244,16 +251,18 @@ tick++, time += dt
 
 ```ts
 // src/sim/run/Run.ts
-export type RunState = 'running' | 'door' | 'busted';
+export type RunState = 'running' | 'closing' | 'door' | 'busted';
 export class Run {
-  state: RunState; bag: number; bank: number; coins: number; maxHeat: number;
+  state: RunState; bag: number; bank: number; coins: number;
+  maxHeat: number;                                       // the highest level at which pursuit.state became 'active' this run (D3)
+  doorProgress: number;                                  // 0..1 while 'closing'
   runs: number; bestRun: number; firstDoor: boolean;     // firstDoor: the door that ends the cold open (no ad, M5's rule lives here)
   bustedProgress: number;                                // 0..1, the bar
   dropOff: number;                                       // index into cover.dropOffs while inside an entry box, -1 else
   lastBanked: number; lastMultiplier: number; lastFine: number;   // for the wall and the card
   constructor(sim: SimWorld);
   step(probe: PlayerProbe, dt: number): void;
-  /** The door: bank the bag × multiplier[maxHeat] (× fence bonus, M5), reset heat and pursuit, state 'door'. Called by the step when the entry box is reached with no active pursuit. */
+  /** The door: entry box + stopped → 'closing' for door.closeSeconds with busted live; then bank the bag × multiplier[maxHeat] (× fence bonus, M5), reset heat and pursuit, state 'door'. */
   /** Busted: bank the fine, reset heat and pursuit, state 'busted'. Called by the step when the bar fills. */
   openDoor(): void;      // App, any key at the door: state 'running', the collider disabled, the run restarts, runs++
   closeCard(): void;     // App, any key at the busted card: state 'running'
@@ -389,6 +398,7 @@ export const BALANCE = {
   bag: { billboard: 500, camera: 300, cameraPerKmh: 20, trafficTakedown: 800, policeTakedown: 1500, roadblock: 1000, escapePerLevel: 500, jump: 400, jumpPerSecond: 200 },
   multiplier: [1, 1, 1.25, 1.6, 2.2, 3],     // index = maxHeat level (0 and 1 both ×1)
   fine: 0.5,
+  door: { closeSeconds: 3, stopSpeed: 2.2 },
   spill: { share: 0.3, coins: 12, seconds: 10, startAhead: 10, pitch: 4 },
   coin: { value: 10, pitch: 6, runMin: 8, runMax: 12, gapMin: 40, gapMax: 90, ringAtBillboards: 8 },
   jumps: { count: 20, minAirSeconds: 0.5, length: 9, height: 1.6, runOut: 25 },
@@ -423,7 +433,9 @@ Behaviour:
   per event: `billboard`, `camera` (300 + 20 × km/h over, from the event's
   value), `takedownTraffic`, `takedown` on a police agent (told by
   `Traffic.police[target]`, as `Heat` does), `roadblock`, `escape` (500 ×
-  level). `maxHeat = max(maxHeat, heat.level)` every step. Coins go to
+  level). `maxHeat = max(maxHeat, heat.level)` on any step where
+  `pursuit.state === 'active'` (D3: seen at that level), never merely on a
+  threshold crossed unseen. Coins go to
   `run.coins` from `coin` events and never to the bag; spilled coins carry
   a `spill` flag in the event's `target` (−2) and return to the bag.
 - **cover.ts.** `coverSites`: the hideout under the Crown Tower block (the
@@ -441,27 +453,32 @@ Behaviour:
   `City.generate` appends them to the chunk. The door collider is created
   by `SimWorld` from the tagged desc and starts disabled.
 - **The door.** `Run.step`: inside an entry box (in the drop-off's frame,
-  |x| < hx, |z| < hz) and `pursuit.state` not `active` or `detected` and
-  speed under 8 m/s → `state = 'door'`: the bag banks (`lastMultiplier =
-  multiplier[maxHeat]`, `lastBanked = round(bag × m)`, `bank += lastBanked`,
-  `bestRun = max`), `bag = 0`, `heat.reset()`, `pursuit.reset()`, the
-  police go off duty (`Police` sees level 0), `door` event. While `door`:
-  `App` zeroes controls (the car rolls to a stop on `restDamping`), enables
-  the door collider, calls `platform.gameplayStop()`, `ChaseCamera.cut` to
-  the interior pose (from the door pose: 9 m inside, 2.4 m up, looking at
-  the car), the view slides the door mesh shut over 0.6 s, `ui/run.ts`
-  shows the totals (BAG, ×MULTIPLIER, BANKED, BEST RUN, BANK; the first-car
-  line is M5's). Any action edge (except `pause`, `mute`, `debug`) →
+  |x| < hx, |z| < hz) and speed under 8 m/s, whatever the pursuit is doing
+  → `state = 'closing'`, `doorProgress` runs from 0 to 1 over
+  `door.closeSeconds` (3 s): `App` zeroes controls (the car rolls to a
+  stop on `restDamping`), `ChaseCamera.cut` to the interior pose (from the
+  door pose: 9 m inside, 2.4 m up, looking at the car and through the
+  opening), the view slides the door mesh down over the 3 s, the sirens
+  keep playing. The busted rule stays live the whole time: two units within
+  `busted.range` of the car fill the bar as anywhere else, and the bar
+  reaching 1 before the door shuts is a normal busted on the threshold
+  (the door goes back up, the card, the fine). At `doorProgress = 1`:
+  `state = 'door'`, the bag banks (`lastMultiplier = multiplier[maxHeat]`,
+  `lastBanked = round(bag × m)`, `bank += lastBanked`, `bestRun = max`),
+  `bag = 0`, `heat.reset()`, `pursuit.reset()`, the police go off duty
+  (`Police` sees level 0), `door` event, the door collider enabled,
+  `platform.gameplayStop()`, `ui/run.ts` shows the totals (BAG,
+  ×MULTIPLIER, BANKED, BEST RUN, BANK; the first-car line is M5's). Any action edge (except `pause`, `mute`, `debug`) →
   `run.openDoor()`: the collider disabled, the door slides open, the
   camera released, `gameplayStart()`, `runs++`, state `running`. The wall
   also shows one line of the run's counts read from the ring since the last
   door (takedowns, escapes, billboards, coins; jobs join in M5), and the
   multiplier the run is currently earning is on the HUD the whole run,
-  `×1.6` beside the bag, changing on each heat threshold: the whole "one
-  more level" pull, no text (DESIGN.md §2.9). A drop-off with an active
-  pursuit refuses: the door stays shut, the car can
-  only turn around (the entry box test fails; no message; the light bars
-  behind are the message).
+  `×1.6` beside the bag, rising on the step the pursuit goes `active` at a
+  new level (the stars pulse red, the multiplier pops): the whole "one more
+  level" pull, no text (DESIGN.md §2.6, §2.9). No door ever refuses: the
+  three drop-offs are always open, and the 3 s is the whole test. All three
+  walls are the same screen (DESIGN.md §6.3).
 - **Busted.** `Run.step`: `police.unitsWithin(range) ≥ busted.units` and
   `probe.speed < busted.speed` → `bustedProgress += dt / seconds`; else
   `−= dt × drainPerSecond`, clamped. At 1: `lastFine = round(bag × fine)`,
@@ -486,11 +503,17 @@ Tests:
 - `run.test.ts` (city, seed 42, `traffic: 0` unless stated; drive the ring
   with `events.push` for money cases): 3.1 each bag event adds its value
   once, a camera event with value 30 (km/h over) adds 300 + 600; 3.2
-  `maxHeat` follows the highest level reached and never falls before the
-  door; 3.3 the door with `maxHeat` 3 and bag 10,000 banks 16,000, the bag
-  is 0, heat 0, pursuit idle, `door` pushed, state `door`; 3.4 the door
-  with a `pursuit.state === 'active'` refuses (state stays `running`, bag
-  kept) and accepts once `lost` → idle; 3.5 busted with bag 10,000 banks
+  `maxHeat` follows the highest level at which the pursuit was `active` and
+  never falls before the door: heat pushed to 60 by events with the pursuit
+  `idle` leaves `maxHeat` at its old value, and one step of `active` at
+  level 3 sets it to 3; 3.3 the door with `maxHeat` 3 and bag 10,000: the
+  car stopped in the entry box goes `closing`, and 3.0 ± 0.05 s later
+  banks 16,000, the bag is 0, heat 0, pursuit idle, `door` pushed, state
+  `door`; 3.4 the door race: the car stopped in the entry box with two
+  units parked within 6 m (`spawnParkedPolice`) goes `closing` and is
+  busted on the threshold at 3.0 s of the bar, with the fine paid and the
+  door back to `running`; with the units 20 m away the door wins; 3.5
+  busted with bag 10,000 banks
   5,000 and no multiplier; 3.6 the busted bar: two police agents parked
   within 6 m (`spawnParkedPolice` around the car) and the car at rest fill
   it in 3.0 ± 0.05 s; moving off at 8 km/h drains it at 0.7/s; one unit

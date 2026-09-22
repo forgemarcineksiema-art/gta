@@ -64,13 +64,14 @@ minimum; the rest ships as update 2 after the first Basic Launch numbers.
 3. Jobs framework: markers placed by the generator, one active job, the
    Crazy Taxi arrow, the job card and timer on the HUD.
 4. Three job types: getaway delivery, steal-to-order, pursuit escape.
-5. The garage on the hideout wall: the catalogue (five bodies), paint,
+5. The garage on the wall of every drop-off (DESIGN.md §6.3): the catalogue (five bodies), paint,
    upgrades (three stats × three tiers), prep items, the rewarded offers
    with cash alternatives, the door's midgame or "double the bag" offer.
 6. The cold open finished on the save's seen flag, with the final markers,
    arrow and captions, and no ad at its door.
-7. Dailies and the streak, if they fit after slice 5 (else they open update
-   2; the plan is written so the cut costs nothing).
+7. Dailies and the streak: in the launch minimum (DESIGN.md §11, revised
+   2026-09-22; the brief lists them in v1 and they are the D1 lever). If
+   anything in slice 6 slips, it is the day-7 topper.
 8. The balance script (`npm run balance`) with the bot as the capture probe
    and three assertions.
 9. UI and audio passes, the ten-size screens with the new states, the gate.
@@ -163,9 +164,11 @@ resulting `VehicleTuning`.
 
 D9. **The wall is a place, and its pages are DOM.** The garage lives inside
 the door screen M4 built, navigated with the existing actions (steer to
-move, throttle to confirm, brake to back out) and clickable. Reason: no
-menu before gameplay stays true, keyboard-first stays true, and touch (M6)
-gets the buttons for free.
+move, throttle to confirm, brake to back out) and clickable, and it is the
+same screen at all three drop-offs (DESIGN.md §6.3). Reason: no menu before
+gameplay stays true, keyboard-first stays true, touch (M6) gets the buttons
+for free, and a run banked at the scrapyard must be able to buy the car it
+just earned.
 
 D10. **At most one ad per door, and none at the door that ends the cold
 open.** The rewarded "double the bag" offer when the bag is above
@@ -327,7 +330,7 @@ export class Jobs {
   constructor(sim: SimWorld, defs: JobDef[]);
   step(probe: PlayerProbe, dt: number): void;
   target(out: { x: number; z: number }): boolean;   // the arrow's target; false when idle
-  idleTarget(out: { x: number; z: number }): boolean;   // idle: the nearest marker, or the hideout once the bag is above BALANCE.offer.doorThreshold
+  idleTarget(out: { x: number; z: number }): boolean;   // idle: the nearest marker, or the nearest drop-off once the bag is above BALANCE.offer.doorThreshold
   abandon(): void;                                   // the door and busted call it; no event
 }
 ```
@@ -517,7 +520,8 @@ Behaviour:
   0:48 · 620 m` in the STYLE.md popup type, top centre under the stars.
   Between jobs it does not vanish (DESIGN.md §4, set 2026-09-22): at 40 %
   opacity it points at `idleTarget`, the nearest marker by straight line,
-  or the hideout once the bag is above the door offer's threshold; so nobody
+  or the nearest drop-off once the bag is above the door offer's threshold
+  (all three doors bank and hold the wall, DESIGN.md §6.3); so nobody
   wanders, and the run's own exit is pointed at exactly when it is worth
   taking. Hidden only inside the cold open (its captions lead) and at the
   door.
@@ -550,8 +554,8 @@ Tests (`jobs.test.ts`, city world, seed 42, traffic off unless stated):
 - 1.7 the bot drives a delivery: from the marker to the target by
   `lanePath`, arrives inside the limit (this is also the measurement).
 - 1.8 idle: with no job the arrow's target is the nearest marker; with the
-  bag above `offer.doorThreshold` it is the hideout's door pose; during a
-  job it is the job's target.
+  bag above `offer.doorThreshold` it is the nearest drop-off's door pose;
+  during a job it is the job's target.
 
 Acceptance: verify green; smoke draw calls +2 to +4 (arrow, markers, their
 shadow draws); the bot's delivery time against the limit and the payout in
@@ -642,8 +646,8 @@ source), `render/PoliceView.ts` (the descriptor's paint on the respray),
 
 Behaviour:
 
-- The wall: after M4's totals, `steerRight` pages to CARS, PAINT, TUNE,
-  PREP, DAILIES (slice 6), `steerLeft` back, `throttle` confirms, `brake`
+- The wall, the same at all three drop-offs: after M4's totals, `steerRight`
+  pages to CARS, PAINT, TUNE, PREP, DAILIES (slice 6), `steerLeft` back, `throttle` confirms, `brake`
   backs out one level, any page's DRIVE OUT (or `throttle` on the door
   page) closes the wall and opens the door. Every button is a DOM button
   with the same handler, so a click does what the key does. Focus and the
@@ -726,7 +730,7 @@ does not run; 5.5 `platformCalls.adRequests` is 0 after the first door.
 Acceptance: verify green; Marcin's first minute on `?fresh=1` with a
 stopwatch, the time to each verb, in PROGRESS.
 
-### Slice 6 — dailies and the streak (1.5 days; ships if slice 5 lands with the milestone on schedule, else update 2)
+### Slice 6 — dailies and the streak (1.5 days)
 
 Files: `sim/dailies/Dailies.ts`, `SimWorld.ts`, `App.ts` (the date tick),
 `ui/garage.ts` (the DAILIES page), `render/carMesh.ts` (the topper),
@@ -905,8 +909,8 @@ knobs and where they live, known issues, the proposed M6 scope (which is
 
 ## 7. Gate criteria (definition of done for M5)
 
-1. Slices 0–5, 7 and 8 committed with their tests; slice 6 committed or
-   moved to update 2 with one line in BACKLOG and the reason in PROGRESS.
+1. Slices 0–8 committed with their tests (the day-7 topper is the one
+   item that may move to update 2, with one line in BACKLOG).
 2. `npm run verify:gate` green; `npm run balance` green with its table in
    PROGRESS; `npm run game` (the new e2e) 6/6; `npm run city` and `npm run
    life` still green; `npm run screens` seventy images captured and

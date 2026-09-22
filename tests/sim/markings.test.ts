@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CAR_PRESETS } from '../../src/sim';
 import { districtAt } from '../../src/sim/city/City';
 import { buildRoadMarkings, highwayLoop, PARKING, PARKING_STYLE } from '../../src/sim/city/markings';
-import { BLOCK, HIGHWAY_HALF, ROAD_HALF, SPECIAL_ROADS, buildRoadGraph, distanceToPolyline } from '../../src/sim/city/roads';
+import { BLOCK, HIGHWAY_HALF, HIGHWAY_LANE_OFFSETS, ROAD_HALF, SPECIAL_ROADS, buildRoadGraph, distanceToPolyline } from '../../src/sim/city/roads';
 import { PALETTE } from '../../src/sim/palette';
 import type { StaticDesc } from '../../src/sim/scene';
 
@@ -168,6 +168,24 @@ describe('road paint and usable parallel parking', () => {
     const lanes = marks.filter(m => m.tag === 'paint-lane');
     expect(lanes.length).toBeGreaterThan(800);
     expect(lanes.every(onPerimeter)).toBe(true);
+    // The dash separates the two graph lanes of a carriageway, and the edge line
+    // leaves the outer one a full lane: paint and graph describe the same road.
+    const [innerLane, outerLane] = HIGHWAY_LANE_OFFSETS;
+    const divider = (innerLane + outerLane) / 2;
+    expect(divider - innerLane).toBeCloseTo(outerLane - divider, 6);
+    expect(HIGHWAY_HALF - 3 - outerLane).toBeGreaterThanOrEqual(divider - innerLane);
+    const straightEnd = 3 * BLOCK - HIGHWAY_HALF - 10;
+    let checked = 0;
+    for (const m of lanes) {
+      const ax = Math.abs(m.position.x), az = Math.abs(m.position.z);
+      // On a straight one coordinate is well inside the perimeter; the four
+      // corner arcs, where neither is, have no single offset to check.
+      const across = az < straightEnd ? ax : ax < straightEnd ? az : -1;
+      if (across < 0) continue;
+      checked++;
+      expect(Math.abs(across - 3 * BLOCK)).toBeCloseTo(divider, 1);
+    }
+    expect(checked).toBeGreaterThan(600);
     const centre = marks.filter(m => m.tag === 'paint-centre' && onPerimeter(m));
     for (let k = -2; k <= 2; k++) for (const [x, z] of [[-3 * BLOCK, k * BLOCK], [3 * BLOCK, k * BLOCK], [k * BLOCK, -3 * BLOCK], [k * BLOCK, 3 * BLOCK]]) {
       expect(centre.some(m => Math.hypot(m.position.x - (x as number), m.position.z - (z as number)) < 6.5), `double yellow through ${x},${z}`).toBe(true);

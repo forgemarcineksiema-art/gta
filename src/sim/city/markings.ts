@@ -2,7 +2,10 @@
 import { PALETTE } from '../palette';
 import { quatFromYaw, type StaticDesc } from '../scene';
 import { Architecture } from './architecture';
-import { BLOCK, HIGHWAY_HALF, ROAD_HALF, distanceToPolyline, type RoadGraph, type RoadPoint, type SpecialRoad } from './roads';
+import { BLOCK, HIGHWAY_HALF, HIGHWAY_LANE_OFFSETS, ROAD_HALF, distanceToPolyline, type RoadGraph, type RoadPoint, type SpecialRoad } from './roads';
+
+/** Halfway between the two highway lane centres: where the lane dash goes. */
+const HIGHWAY_LANE_DIVIDER = (HIGHWAY_LANE_OFFSETS[0] + HIGHWAY_LANE_OFFSETS[1]) / 2;
 
 export const PARKING = { width: 3, length: 7, kerbGap: 0.35 } as const;
 /** How each district uses its kerb: spaces per group, groups kept (1 = all), line colour, P stencil. */
@@ -177,7 +180,8 @@ export function buildRoadMarkings(graph: RoadGraph, districtAt: (x: number, z: n
         // through every side-street mouth; only the inner edge line breaks there,
         // and it stops for the kerb corners.
         for (const side of [-1, 1]) stroke(s, length, side * 0.24, 0.18, PALETTE.roadYellow, 'paint-centre', false);
-        if (mid % LANE_DASH < 4) for (const side of [-1, 1]) stroke(s, length, side * 8, 0.22, PALETTE.roadWhite, 'paint-lane', false);
+        // The dash sits between the two carriageway lanes; the graph drives their centres.
+        if (mid % LANE_DASH < 4) for (const side of [-1, 1]) stroke(s, length, side * HIGHWAY_LANE_DIVIDER, 0.22, PALETTE.roadWhite, 'paint-lane', false);
         stroke(s, length, HIGHWAY_HALF - 3, 0.22, PALETTE.roadWhite, 'paint-edge', false);
         const f = frame(s), g = frame(s + length);
         if (Math.abs(f.tx - g.tx) + Math.abs(f.tz - g.tz) < 1e-9) stroke(s, length, -(HIGHWAY_HALF - 3), 0.22, PALETTE.roadWhite, 'paint-edge');

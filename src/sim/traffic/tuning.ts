@@ -25,6 +25,8 @@ export interface TrafficTuning {
   junctionWait: number;
   junctionClear: number;
   highwayGap: number;
+  /** Chance a highway car takes the same lane out of a junction instead of choosing among every exit. */
+  highwayKeepLane: number;
   disturbedImpact: number;
   disturbedTime: number;
   reattachDistance: number;
@@ -94,6 +96,7 @@ export const TRAFFIC: TrafficTuning = {
   junctionWait: 9,
   junctionClear: 4,
   highwayGap: 25,
+  highwayKeepLane: 0.85,
   disturbedImpact: 1.5,
   disturbedTime: 2.0,
   reattachDistance: 4,
@@ -107,7 +110,8 @@ export const TRAFFIC: TrafficTuning = {
   wobbleTime: 1,
   yawGain: 3,
   yawRateMax: 1.5,
-  subLaneOffsets: { highway: [-2, 6], street: [0] },
+  // The highway's two lanes per direction are real graph lanes now, so nothing sits off its lane.
+  subLaneOffsets: { highway: [0], street: [0] },
   kindWeights: { compact: 0.5, muscle: 0.3, heavy: 0.2 },
   mass: { compact: 1050, muscle: 1300, heavy: 2400, sports: 1180, police: 1620 },
   friction: 0.4,

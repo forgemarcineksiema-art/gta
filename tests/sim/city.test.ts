@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { FIXED_DT, SimWorld, initPhysics } from '../../src/sim';
 import { CITY_BOT_TUNING, TrackBot } from '../../src/app/trackBot';
-import { buildRoadGraph, roadTour } from '../../src/sim/city/roads';
+import { HIGHWAY_LANE_OFFSETS, buildRoadGraph, roadTour } from '../../src/sim/city/roads';
 
 beforeAll(initPhysics);
 
@@ -9,7 +9,12 @@ describe('M2 city', () => {
   it('has connected directed lanes and a closed tour covering every lane', () => {
     const graph = buildRoadGraph(), tour = roadTour(graph);
     expect(graph.nodes).toHaveLength(49);
-    expect(graph.lanes).toHaveLength(168 + 2 * graph.special.length);
+    // 84 grid edges: 60 street edges carry one lane per direction, the 24
+    // perimeter edges carry two (M4 slice 0: real highway lanes, so a roadblock
+    // has something to stand across). Each authored road adds two.
+    expect(graph.lanes).toHaveLength(2 * 60 + 4 * 24 + 2 * graph.special.length);
+    expect(graph.lanes.filter((l) => l.highway)).toHaveLength(96);
+    for (const lane of graph.lanes) expect(HIGHWAY_LANE_OFFSETS.includes(lane.offset as 4 | 12)).toBe(lane.highway);
     expect(graph.special).toHaveLength(5);
     expect(new Set(tour).size).toBe(graph.lanes.length);
     for (let i = 0; i < tour.length; i++) {

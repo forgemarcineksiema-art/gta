@@ -54,8 +54,13 @@ export interface RoadLayers {
 export function buildRoadLayers(graph: RoadGraph): RoadLayers {
   const grid: Segment[] = [];
   const highway: Segment[] = [];
+  const drawn = new Set<number>();
   for (const lane of graph.lanes) {
     if (lane.from > lane.to || lane.special) continue;
+    // The highway has two lanes per direction; one segment per edge is one road on the map.
+    const edge = lane.from * 64 + lane.to;
+    if (drawn.has(edge)) continue;
+    drawn.add(edge);
     const a = graph.nodes[lane.from];
     const b = graph.nodes[lane.to];
     if (!a || !b) continue;

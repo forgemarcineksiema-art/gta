@@ -47,6 +47,8 @@ export class LaneTables {
   private readonly pointCount: Int16Array;
   readonly length: Float32Array;
   readonly limit: Float32Array;
+  /** Metres right of the road centreline the lane was built at (`Lane.offset`). */
+  readonly offset: Float32Array;
   readonly toNode: Int16Array;
   readonly midX: Float32Array;
   readonly midZ: Float32Array;
@@ -62,6 +64,7 @@ export class LaneTables {
     this.pointCount = new Int16Array(this.laneCount);
     this.length = new Float32Array(this.laneCount);
     this.limit = new Float32Array(this.laneCount);
+    this.offset = new Float32Array(this.laneCount);
     this.toNode = new Int16Array(this.laneCount);
     this.midX = new Float32Array(this.laneCount);
     this.midZ = new Float32Array(this.laneCount);
@@ -84,6 +87,7 @@ export class LaneTables {
       }
       this.length[i] = this.cum[base + lane.points.length - 1] as number;
       this.limit[i] = limitFor(lane, graph, tuning);
+      this.offset[i] = lane.offset;
       this.toNode[i] = lane.to;
       this.sample(i, (this.length[i] as number) * 0.5, 0, this.scratch);
       this.midX[i] = this.scratch.x;

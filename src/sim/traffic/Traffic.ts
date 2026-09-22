@@ -832,6 +832,21 @@ export class Traffic {
     if ((this.s[i] as number) < len - 6) return;
     const outs = this.lanes.outs(lane);
     const uturn = this.lanes.uturn(lane);
+    // A highway car mostly keeps its lane. Choosing uniformly among the exits
+    // weaves it across the carriageway at every node (both lanes of a direction
+    // are now reachable from either) and drains the loop onto the side streets,
+    // which is the opposite of what the highway is for.
+    if (this.isHighway(lane) && this.rng() < this.tuning.highwayKeepLane) {
+      const off = this.lanes.offset[lane] as number;
+      for (let k = 0; k < outs.length; k++) {
+        const id = outs[k] as number;
+        if (id === uturn || !this.isHighway(id)) continue;
+        if (Math.abs((this.lanes.offset[id] as number) - off) > 0.01) continue;
+        this.next[i] = id;
+        this.turn[i] = this.lanes.straightThrough(lane, id) ? 0 : 1;
+        return;
+      }
+    }
     let choices = 0;
     for (let k = 0; k < outs.length; k++) if (outs[k] !== uturn) choices++;
     let pick = -1;

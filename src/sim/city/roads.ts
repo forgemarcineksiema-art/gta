@@ -11,6 +11,15 @@ export const BLOCK = 225;
 export const CITY_HALF = 787.5;
 export const ROAD_HALF = 12;
 export const HIGHWAY_HALF = 19;
+/**
+ * The highway carries two real graph lanes per direction, at these distances
+ * right of the centreline (decision 14, revisited in M4). They were sub-lane
+ * offsets on one graph lane until roadblocks, interceptors and the parked
+ * patrols needed a lane to be a thing the graph knows about: something a
+ * roadblock can stand across, a unit can be told to take, and the placer can
+ * test for a clear footprint.
+ */
+export const HIGHWAY_LANE_OFFSETS = [4, 12] as const;
 /** Lane endpoints stop this far from the junction centre; the connection curve fills the rest. */
 export const LANE_INSET = 23;
 
@@ -18,6 +27,8 @@ export interface RoadPoint { x: number; z: number }
 export interface RoadNode { id: number; x: number; z: number; outgoing: number[] }
 export interface Lane {
   id: number; from: number; to: number; highway: boolean;
+  /** Metres right of the road centreline this lane was built at. Two highway lanes per direction differ only in this. */
+  offset: number;
   /** Authored off-grid road this lane belongs to, if any. */
   special?: string;
   /** Lane centre path from the start point to the end point, inset from both junctions. */
@@ -143,13 +154,13 @@ export function buildRoadGraph(): RoadGraph {
     nodes.push({ id: nodes.length, x: x * BLOCK, z: z * BLOCK, outgoing: [] });
   }
   const nodeAt = (gx: number, gz: number): RoadNode => nodes[(gz + 3) * 7 + (gx + 3)] as RoadNode;
-  const add = (a: RoadNode, b: RoadNode, centre: RoadPoint[], highway: boolean, special?: string, halfWidth = ROAD_HALF) => {
-    const offset = highway ? 6 : Math.min(4.5, halfWidth - 3.5);
+  const add = (a: RoadNode, b: RoadNode, centre: RoadPoint[], highway: boolean, special?: string, halfWidth = ROAD_HALF, laneOffset?: number) => {
+    const offset = laneOffset ?? Math.min(4.5, halfWidth - 3.5);
     const points = offsetRight(trim(centre, LANE_INSET), offset);
     const first = points[0] as RoadPoint, second = points[1] as RoadPoint;
     const last = points[points.length - 1] as RoadPoint, before = points[points.length - 2] as RoadPoint;
     const lane: Lane = {
-      id: lanes.length, from: a.id, to: b.id, highway, points,
+      id: lanes.length, from: a.id, to: b.id, highway, offset, points,
       x0: first.x, z0: first.z, x1: last.x, z1: last.z,
       yaw0: Math.atan2(second.x - first.x, second.z - first.z), yaw: Math.atan2(last.x - before.x, last.z - before.z),
       next: [], ...(special ? { special } : {}),
@@ -159,7 +170,9 @@ export function buildRoadGraph(): RoadGraph {
   for (const a of nodes) for (const b of nodes) {
     if (Math.abs(a.x - b.x) + Math.abs(a.z - b.z) !== BLOCK) continue;
     const highway = (a.x === b.x && Math.abs(a.x) === 675) || (a.z === b.z && Math.abs(a.z) === 675);
-    add(a, b, [{ x: a.x, z: a.z }, { x: b.x, z: b.z }], highway);
+    const centre = [{ x: a.x, z: a.z }, { x: b.x, z: b.z }];
+    if (highway) for (const off of HIGHWAY_LANE_OFFSETS) add(a, b, centre, true, undefined, ROAD_HALF, off);
+    else add(a, b, centre, false);
   }
   for (const road of SPECIAL_ROADS) {
     const a = nodeAt(...road.from), b = nodeAt(...road.to);

@@ -8,7 +8,7 @@ import { IDENTITY_QUAT as IDENTITY_ROT, quatFromYaw, type StaticDesc } from '../
 import { Architecture, CITY_COLORS } from './architecture';
 import { placeBillboards, type BillboardDesc } from './collectibles';
 import { buildRoadMarkings } from './markings';
-import { BLOCK, CITY_HALF, HIGHWAY_HALF, ROAD_HALF, buildCityRoute, buildRoadGraph, distanceToPolyline, projectOnLane, type Lane, type RoadPoint, type SpecialRoad } from './roads';
+import { BLOCK, CITY_HALF, HIGHWAY_HALF, HIGHWAY_LANE_OFFSETS, ROAD_HALF, buildCityRoute, buildRoadGraph, distanceToPolyline, projectOnLane, type Lane, type RoadPoint, type SpecialRoad } from './roads';
 
 export const DISTRICTS = [
   { id: 'crown', name: 'CROWN HEIGHTS', color: 0xb497d6, accent: 0xf5cd75, landmark: 'Crown Tower' },
@@ -76,7 +76,8 @@ export class City {
     const start = this.route.start;
     this.spawns.unshift({ name: 'city', position: { x: start.x, y: 1, z: start.z }, yaw: start.yaw });
     for (const [name, x, z] of [['crown', -450, -450], ['foundry', 450, -450], ['gardens', -450, 450], ['marina', 450, 450], ['highway', -675, 0]] as const) {
-      this.spawns.push({ name, position: { x: x - (name === 'highway' ? 6 : 4.5), y: 1, z: z + 40 }, yaw: 0 });
+      // Facing +Z, right is -X: the highway spawn sits in its inner lane, the street spawns on their single lane.
+      this.spawns.push({ name, position: { x: x - (name === 'highway' ? HIGHWAY_LANE_OFFSETS[0] : 4.5), y: 1, z: z + 40 }, yaw: 0 });
     }
     // The authored loop starts on the first Crown diagonal, heading for the tower junction.
     const first = this.graph.lanes.find((l) => l.special === 'Crown Diagonal West' && this.graph.nodes[l.from]?.x === -675);

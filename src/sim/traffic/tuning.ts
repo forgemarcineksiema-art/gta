@@ -29,6 +29,12 @@ export interface TrafficTuning {
   reattachBlend: number;
   wreckImpact: number;
   wreckLinger: number;
+  /** A wreck this old is towed away the moment the player is not looking at it: its agent slot (and its body) go back to the pool, s. */
+  wreckTow: number;
+  /** A wreck closer than this counts as seen whatever the heading, m. */
+  wreckTowNear: number;
+  /** Half angle of the forward cone that counts as the player's view, deg. */
+  wreckTowConeDeg: number;
   honkCooldown: number;
   wobbleTime: number;
   /** Lent bodies: heading rate per radian of error (1/s) and its cap (rad/s). Stable while yawGain × dt < 1. */
@@ -91,6 +97,9 @@ export const TRAFFIC: TrafficTuning = {
   reattachBlend: 1.5,
   wreckImpact: 7,
   wreckLinger: 10,
+  wreckTow: 60,
+  wreckTowNear: 40,
+  wreckTowConeDeg: 55,
   honkCooldown: 3,
   wobbleTime: 1,
   yawGain: 3,

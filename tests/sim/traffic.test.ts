@@ -377,6 +377,71 @@ describe('traffic', () => {
       expect(traffic.state[agent]).not.toBe(AgentState.Disturbed);
     } finally { sim.dispose(); }
   }, 30_000);
+
+  it('tows a wreck away once it is old enough and out of sight, and never one in view', async () => {
+    const sim = await createWorld({ map: 'city', seed: 9, traffic: 0, peds: 0, record: false });
+    const traffic = sim.traffic as Traffic;
+    const tow = traffic.tuning.wreckTow;
+    try {
+      const lane = longLane(traffic, 14, 120);
+      traffic.lanes.positionAt(lane, 60, 0, pose);
+      // Facing +Z: a wreck 80 m up the +Z axis is inside the view cone, one 80 m down it is behind.
+      sim.vehicle.teleport({ x: pose.x, y: 1, z: pose.z }, 0);
+      const behind = traffic.spawnAtPoint(pose.x, pose.z - 80, 0, 'compact', AgentState.Wrecked);
+      const ahead = traffic.spawnAtPoint(pose.x, pose.z + 80, 0, 'compact', AgentState.Wrecked);
+      expect(behind).toBeGreaterThanOrEqual(0);
+      expect(ahead).toBeGreaterThanOrEqual(0);
+
+      run(sim, tow - 2);
+      expect(traffic.state[behind]).toBe(AgentState.Wrecked);
+      expect(traffic.wreckedFor[behind] as number).toBeGreaterThan(tow - 3);
+      expect(traffic.towedAway).toBe(0);
+
+      run(sim, 3);
+      expect(traffic.state[behind]).toBe(AgentState.Free);
+      expect(traffic.towedAway).toBe(1);
+      // The one the player is looking at stays where it died, however long it sits there.
+      expect(traffic.state[ahead]).toBe(AgentState.Wrecked);
+      expect(traffic.wreckedFor[ahead] as number).toBeGreaterThan(tow);
+      expect(sim.hasNaN()).toBe(false);
+    } finally { sim.dispose(); }
+  }, 60_000);
+
+  it('keeps the body pool out of the hands of wrecks over a scrapyard run in one place', async () => {
+    const sim = await createWorld({ map: 'city', seed: 3, traffic: 1, peds: 0, record: false });
+    const traffic = sim.traffic as Traffic;
+    try {
+      // The backlog's case: the player never leaves, so nothing despawns. Circling
+      // on the highway and writing off two cars every five seconds is a worse
+      // scrapyard run than anyone will drive, and the tow has to keep up with it.
+      const lane = longLane(traffic, traffic.tuning.speedHighway, 150);
+      traffic.lanes.positionAt(lane, 80, 0, pose);
+      sim.vehicle.teleport({ x: pose.x, y: 1, z: pose.z }, pose.yaw);
+      let peakWrecks = 0;
+      let peakWrecksWithBody = 0;
+      let wrecked = 0;
+      let travelled = 0;
+      for (let i = 0; i < 300 * 60; i++) {
+        sim.controls.throttle = 0.5;
+        sim.controls.steer = 1;
+        sim.step();
+        travelled = Math.max(travelled, Math.hypot(traffic.x[0] as number, 0));
+        if (i % 300 === 0) wrecked += wreckNearest(traffic, sim, 2);
+        if (i % 30 !== 0) continue;
+        let withBody = 0;
+        for (let a = 0; a < traffic.capacity; a++) {
+          if (traffic.state[a] === AgentState.Wrecked && traffic.hasBody(a)) withBody++;
+        }
+        peakWrecks = Math.max(peakWrecks, traffic.count(AgentState.Wrecked));
+        peakWrecksWithBody = Math.max(peakWrecksWithBody, withBody);
+      }
+      console.log(`[tow] scrapyard 300 s: wrecked ${wrecked}, towed ${traffic.towedAway}, peak wrecks ${peakWrecks}/${traffic.capacity}, peak wrecks holding a body ${peakWrecksWithBody}/${traffic.tuning.physicsBodies}, driving ${traffic.count(AgentState.Kinematic) + traffic.count(AgentState.Physical)}`);
+      expect(wrecked).toBeGreaterThan(80);
+      expect(traffic.towedAway).toBeGreaterThan(wrecked * 0.5);
+      expect(peakWrecksWithBody).toBeLessThan(traffic.tuning.physicsBodies);
+      expect(sim.hasNaN()).toBe(false);
+    } finally { sim.dispose(); }
+  }, 180_000);
 });
 
 function longLane(traffic: Traffic, limit: number, minLength: number): number {
@@ -384,6 +449,21 @@ function longLane(traffic: Traffic, limit: number, minLength: number): number {
     if ((traffic.lanes.limit[i] as number) === limit && (traffic.lanes.length[i] as number) > minLength) return i;
   }
   return 0;
+}
+
+/** Write off the `n` driving cars nearest the player; returns how many were written off. */
+function wreckNearest(traffic: Traffic, sim: { vehicle: { body: { translation(): { x: number; z: number } } } }, n: number): number {
+  const p = sim.vehicle.body.translation();
+  const order: Array<[number, number]> = [];
+  for (let a = 0; a < traffic.capacity; a++) {
+    const st = traffic.state[a];
+    if (st !== AgentState.Kinematic && st !== AgentState.Physical) continue;
+    order.push([a, Math.hypot((traffic.x[a] as number) - p.x, (traffic.z[a] as number) - p.z)]);
+  }
+  order.sort((a, b) => a[1] - b[1]);
+  const take = Math.min(n, order.length);
+  for (let k = 0; k < take; k++) traffic.wreck((order[k] as [number, number])[0]);
+  return take;
 }
 
 function upnessOf(sim: { vehicle: { slot: number }; transforms: { currRot: Float32Array } }): number {

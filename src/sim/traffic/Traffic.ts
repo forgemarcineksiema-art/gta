@@ -112,6 +112,8 @@ export class Traffic {
   paintSerial = 0;
   /** Agents that gave up waiting and entered a junction anyway. */
   waitedPast = 0;
+  /** Wrecks towed away since the run began. */
+  towedAway = 0;
   guardHops = 0;
 
   private readonly transforms: TransformBuffer;
@@ -434,6 +436,7 @@ export class Traffic {
 
   step(player: PlayerProbe, dt: number, events: EventLog): void {
     this.despawn(player);
+    this.tow(player, dt);
     this.spawn(player);
     this.releaseNodes(dt);
     for (let i = 0; i < this.capacity; i++) if ((this.agentBody[i] as number) >= 0) this.pullPose(i);
@@ -879,7 +882,6 @@ export class Traffic {
         this.driveBody(i, player, dt, events);
         this.senseImpact(i);
       } else if (st === AgentState.Wrecked) {
-        this.wreckedFor[i] = (this.wreckedFor[i] as number) + dt;
         this.senseImpact(i);
       } else if (st === AgentState.Abandoned) {
         this.senseImpact(i);
@@ -1138,6 +1140,34 @@ export class Traffic {
     this.state[i] = AgentState.Free;
     this.next[i] = -1;
     this.lane[i] = -1;
+  }
+
+  /**
+   * Tow-away. A wreck older than `wreckTow` is taken off the street the first
+   * moment the player is not looking at it, so a scrapyard run cannot leave the
+   * pool full of scenery (the backlog's Life case: nothing near the player ever
+   * despawns, and sixteen bodies end up parked in write-offs). The sight test is
+   * the instant one, never a clock of its own: the tow must not be watchable,
+   * and a player circling one junction would reset a hidden-for timer forever.
+   */
+  private tow(player: PlayerProbe, dt: number): void {
+    const t = this.tuning;
+    const near2 = t.wreckTowNear * t.wreckTowNear;
+    const cosHalf = Math.cos(t.wreckTowConeDeg * Math.PI / 180);
+    const fx = Math.sin(player.yaw);
+    const fz = Math.cos(player.yaw);
+    for (let i = 0; i < this.capacity; i++) {
+      if (this.state[i] !== AgentState.Wrecked) continue;
+      const age = (this.wreckedFor[i] as number) + dt;
+      this.wreckedFor[i] = age;
+      if (age < t.wreckTow) continue;
+      const dx = (this.x[i] as number) - player.x;
+      const dz = (this.z[i] as number) - player.z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < near2 || dx * fx + dz * fz >= cosHalf * Math.sqrt(d2)) continue;
+      this.free(i);
+      this.towedAway++;
+    }
   }
 
   private despawn(player: PlayerProbe): void {

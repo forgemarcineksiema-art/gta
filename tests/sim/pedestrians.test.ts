@@ -16,7 +16,7 @@ function probe(sim: Awaited<ReturnType<typeof createWorld>>): PlayerProbe {
   const yaw = Math.atan2(2 * ((q[i] as number) * (q[i + 2] as number) + (q[i + 3] as number) * (q[i + 1] as number)), 1 - 2 * ((q[i] as number) ** 2 + (q[i + 1] as number) ** 2));
   const tm = sim.vehicle.telemetry;
   const he = sim.vehicle.tuning.chassisHalfExtents;
-  return { x: p.x, z: p.z, yaw, vx: tm.vx, vz: tm.vz, speed: Math.hypot(tm.vx, tm.vz), halfWidth: he.x, halfLength: he.z };
+  return { x: p.x, y: p.y, z: p.z, yaw, vx: tm.vx, vz: tm.vz, speed: Math.hypot(tm.vx, tm.vz), halfWidth: he.x, halfLength: he.z };
 }
 
 /** Distance of a walking pedestrian from its lane's polyline, and the road half width of that lane. */

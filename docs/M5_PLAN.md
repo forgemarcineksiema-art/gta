@@ -427,7 +427,8 @@ export const BALANCE = {
   // placeholders replaced from M4's measurements before slice 0 (PROGRESS, M4 slices 3 and 6):
   measured: { bagPerMinute: 0, coinsPerMinute: 0, runSeconds: 0, bustedPerMinute: [0, 0, 0, 0, 0, 0], bustedPerMinuteSkilled: [0, 0, 0, 0, 0, 0] },
   // M4 gate values (docs/M4_REPORT.md, seeds 42 / 7 / 123, busted counts including a 10 s re-arm after each card):
-  //   bagPerMinute 336–476 from heat 0 (novice bot, 10 min), 600–800 at heat 2 (slice 3a); coinsPerMinute 42–53;
+  //   bagPerMinute 336–476 from heat 0 (novice bot, 10 min), 600–800 at heat 2 (slice 3a); coinsPerMinute 42–53 with the
+  //   slice-3b carpet, 32–40 worth 426–564 a minute with the coin lines of 2026-09-23 (DESIGN.md §3.5: the caps are a third of the take);
   //   runSeconds: no run ended in 10 min from heat 0 (the bot takes no door and nothing arrests it at heat 0–1);
   //   bustedPerMinute [0, 0.33, 0.67, 1.0 (median; mean 1.47), 1.0, 1.07]; bustedPerMinuteSkilled [0, 0.2, 0.33, 0.2, 0.73, 0.27].
 };

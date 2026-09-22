@@ -276,10 +276,11 @@ locked district. Revised around the audience.
 ### 3.2 Two currencies, not three
 
 - **Coins on the road** (Marcin's idea, 2026-09-22; an addition, not a
-  replacement for anything). Instanced, one draw call, placed in lines along
-  the lanes, in arcs over jumps, in rings around billboards and job markers.
-  They mark the suggested line of a time trial and the cold-open route, so
-  they are navigation as well as reward. Always kept, never at risk. Built
+  replacement for anything). Instanced, one draw call, laid as lines that
+  say something (§3.5, 2026-09-23): runs and weaves along the lanes, links
+  through turns, arcs over jumps, gate lines through billboards; rings round
+  job markers join in M5. They mark the suggested line of a time trial and
+  the cold-open route, so they are navigation as well as reward. Always kept, never at risk. Built
   in M4 slice 3 with the bag, not in M5 (decided 2026-09-22): they are the
   twelve-year-old's reward layer and the cheapest one. Boost is a means and
   the bag is a number; without coins M4 has nothing visible every 20–30 s.
@@ -297,7 +298,7 @@ locked district. Revised around the audience.
 
 | Source | Value |
 |---|---|
-| coin | 10; about 60 a minute at normal driving |
+| coin | 10, the cap a line ends on 50; 32–40 coins a minute worth 426–564 for a driver who ignores the lines (§3.5) |
 | billboard, jump, camera | 300–500 into the bag |
 | police takedown, roadblock breach | 1,000–1,500 into the bag |
 | skill chain | 50–300 per event, multiplier to ×5, banks on a clean end |
@@ -325,6 +326,69 @@ topper on day 7. Preparation items in the garage, one-shot: the **lawyer**
 this run, 8k); both are also rewarded-ad offers with these cash prices as the
 equal alternative. Save: versioned JSON through the platform's data module,
 under 1 MB, `Collectibles.smashed` included.
+
+### 3.5 The coin layer as lines — set here, 2026-09-23 (Marcin's playtest)
+
+Marcin after the M4 gate: the coins are placed "hopelessly and thoughtlessly",
+and their look and the moment of picking one up could be much better. What
+shipped in slice 3b was a carpet: runs of 8–12 at random along every directed
+lane, so a highway carriageway carried four unsynchronised dotted lines, one
+of them beside the double yellow, and no line began or ended anywhere; thin
+orange discs the colour of the cones, gone edge-on twice a spin; a pickup
+that blinked the coin out of the list. Redesigned in one slice, sim, view,
+HUD and audio together.
+
+**A coin line is a sentence.** It starts, it has a shape, and it ends on a
+bigger coin, the **cap** (worth five), at the thing it pointed at. Never a
+carpet: a road carries one figure (a street's two directions share it; the
+ring's carriageways are two roads), and every figure comes from the city
+seed, so the layout is the same for every player and the M5 time trial on a
+coin line is a route, not a lottery. The figures:
+
+| Figure | Where | What it says |
+|---|---|---|
+| run | the lane's centre, 8–12 coins at 4.5 m | rhythm: a scale on the bell while you hold the line |
+| weave | out to the oncoming lane over three coins, held, back | dodge the traffic for it (the near-miss pays the bag as well) |
+| link | the lane's last 18 m, the junction curve, the next lane's first 13.5 m | turn here: the trails' navigation |
+| sweep | three stretches on each authored bend, cutting to the inside by the local curvature (left onto the oncoming lane, right to the kerb) | the racing line |
+| gate | from the lane it stands beside, out onto the footway, through the panel (the cap), back to the road inside 22 m | this billboard, and you are back before the street tree |
+| hook | off the ring's outer lane on a 30 m radius, through the verge panel (the cap), two coins into the run-out | leave the highway for it |
+| arc | three up the ramp's face, the flight of a car launched at 97 km/h, the cap on the landing | jump, and jump fast: a coin in the air needs the car in the air |
+
+The layout: ten **trails**, random walks of eight lanes with a run or a weave
+on each and a link through every turn taken (a turn twice as likely as
+straight on, never a U-turn, one link per junction and per lane entered);
+fillers on about half of the roads left; sweeps on every bend; a gate line
+through every billboard; an arc over every ramp. Every lane keeps a **gate
+window** clear (the placer picks the panel's slot against the chunk's statics
+at generation time, so the layout cannot know which side it lands on; it
+keeps both directions' windows free of runs, weaves and link heads, and a
+weave also keeps the oncoming lane's). The island carries about 2,300 coins
+(2,405 / 2,303 / 2,344 for seeds 42 / 7 / 123), 400 of them the gate lines,
+100 in the air. Numbers in `balance.ts` `coin`.
+
+**The catch.** The pickup box reaches a metre past the bumpers and 1.2 m past
+the doors, 1.5 m up and down about the bonnet: a line a metre off the car's
+path still pays, the adjacent lane's does not. In the view the picked coin
+flies into the bonnet in 0.16 s, swelling a little and shrinking to nothing as
+it lands; the counter pops once per coin and flashes gold on a cap; the bell
+climbs a semitone per coin while they keep coming and a cap adds a fifth that
+rings on. No sparkle, no burst: the car catches the coin, that is the whole
+effect (Marcin's taste: no generic VFX).
+
+**The look.** Gold (`PALETTE.coin`, the one palette colour the HUD's accent
+shares, because the glyph on the counter and the coin on the road must be
+one thing), an octagonal prism a metre across and 16 cm thick standing on
+edge at bonnet height, lit from within so it never goes dark in shadow,
+spinning with a per-coin phase so a line ripples away from the player at
+about 30 m/s and bobbing 6 cm. The cap is half as big again; the spill's
+coins stay white and bigger still.
+
+Measured with the novice bot (lane centres, no intent), five minutes from
+heat 0, traffic on, seeds 42 / 7 / 123: 39 / 32 / 40 coins a minute worth
+534 / 426 / 564 a minute; the carpet gave 42–53 coins worth 420–530. So the
+economy of §3.3 holds for a player who ignores the lines, and a player who
+follows them earns more: the caps are a third of the take.
 
 ## 4. Activities — set here
 

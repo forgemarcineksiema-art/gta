@@ -36,6 +36,7 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 | ramp | `#e5533d` | sky top | `#706c9b` |
 | cone | `#ff8a2b` | sky horizon | `#e5b6a5` |
 | barrier | `#f7f3ea` | sun / fog | `#ffe3ba` / `#d9b8ac` |
+| coin | `#ffd23f` | | |
 
 - Blacks and greys for trim, rubber and metal, darkest to lightest: ink `#0c0c10`, rubber `#15151a`, charcoal `#25252c`, graphite `#35353e`, slate `#4a4a55`, steel `#6d6d78`, silver `#9d9da8`, light grey `#c4c4cd`, chrome `#e4e4ea`. A car uses at least three of them (pillars/seams in ink or charcoal, rims in graphite with light-grey spokes, badges and exhaust tips in chrome) so it does not read as one flat block of paint.
 - Districts (M2) each get one dominant building hue family from this palette plus one accent, so they read as different places from the minimap and from the road.
@@ -324,9 +325,16 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   0.3 s when the police see the player at a new level. Yellow means "not
   yours yet". Hidden behind a shut door and under the busted card.
 - The coin counter under it, smaller, in ink with the coin glyph: white
-  means safe. Placed coins are `carOrange` octagonal discs on the lane
-  centre, spinning slowly; spilled coins are `carWhite` and larger, so a
-  scramble reads from afar. Never a counter for the spill.
+  means safe; it pops once per coin and the number flashes the accent on a
+  cap. Coins are `coin` gold (`#ffd23f`, the accent's value: the glyph and
+  the coin are one thing, and the one palette colour the HUD shares),
+  octagonal prisms a metre across and 16 cm thick on edge at bonnet height,
+  lit from within (emissive 0.35) so they never go dark in shadow, spinning
+  with a per-coin phase so a line ripples away from the player, bobbing
+  6 cm. The cap a line ends on is half as big again. Spilled coins are
+  `carWhite` and larger still, so a scramble reads from afar. A picked coin
+  flies into the bonnet in 0.16 s and shrinks to nothing; no sparkle, no
+  burst. Never a counter for the spill. The layout itself is DESIGN.md §3.5.
 - The busted bar: a red skewed track with BUSTED over it, centre-bottom
   between the drift readout and the swap prompt, only while it is filling.
   The busted card (BAG, YOU KEEP, BANK) and the wall behind the door (BAG,

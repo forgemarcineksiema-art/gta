@@ -5,8 +5,12 @@
  * is not yours yet. DOM writes only on change; reads sim state only.
  */
 import type { CarId, RunState, SimWorld } from '../sim';
+import { BALANCE } from '../sim/balance';
 
 const TWEEN_SECONDS = 0.3;
+/** The coin counter's pop: on for the first half, off for the second, so a line's coins pulse one by one. */
+const COIN_POP_SECONDS = 0.14;
+const CAP_FLASH_SECONDS = 0.35;
 
 export class RunHud {
   readonly root: HTMLElement;
@@ -16,6 +20,10 @@ export class RunHud {
   private readonly coinRow: HTMLElement;
   private readonly coinValue: HTMLElement;
   private lastCoins = -1;
+  private coinPopLeft = 0;
+  private capFlashLeft = 0;
+  private coinPop = false;
+  private capFlash = false;
   private readonly bar: HTMLElement;
   private readonly barFill: HTMLElement;
   private readonly card: HTMLElement;
@@ -98,7 +106,21 @@ export class RunHud {
     }
     if (run.coins !== this.lastCoins) {
       this.coinValue.textContent = money(run.coins);
+      if (this.lastCoins >= 0) {
+        this.coinPopLeft = COIN_POP_SECONDS;
+        if (run.coins - this.lastCoins >= BALANCE.coin.cap) this.capFlashLeft = CAP_FLASH_SECONDS;
+      }
       this.lastCoins = run.coins;
+    }
+    if (this.coinPopLeft > 0 || this.coinPop) {
+      this.coinPopLeft = Math.max(0, this.coinPopLeft - dt);
+      const pop = this.coinPopLeft > COIN_POP_SECONDS / 2;
+      if (pop !== this.coinPop) { this.coinPop = pop; this.coinRow.classList.toggle('is-pop', pop); }
+    }
+    if (this.capFlashLeft > 0 || this.capFlash) {
+      this.capFlashLeft = Math.max(0, this.capFlashLeft - dt);
+      const flash = this.capFlashLeft > 0;
+      if (flash !== this.capFlash) { this.capFlash = flash; this.coinRow.classList.toggle('is-cap', flash); }
     }
     const m = run.multiplier;
     if (m !== this.lastMult) {

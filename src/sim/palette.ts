@@ -16,6 +16,8 @@ export const PALETTE = {
   ramp: 0xe5533d,
   cone: 0xff8a2b,
   barrier: 0xf7f3ea,
+  /** The coin on the road and its glyph on the HUD: the one palette colour the HUD's accent shares. */
+  coin: 0xffd23f,
 
   carRed: 0xff3b5c,
   carLime: 0xb6f542,

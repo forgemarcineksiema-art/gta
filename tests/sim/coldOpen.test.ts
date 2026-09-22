@@ -74,7 +74,7 @@ describe('cold open', () => {
     const sim = await coldWorld();
     try {
       const route = sim.coldOpen.route!;
-      const coins: Array<{ x: number; z: number }> = [...sim.coins!.extra, ...sim.city!.laneCoins];
+      const coins: Array<{ x: number; z: number }> = [...sim.coins!.extra, ...sim.city!.coinLayout];
       // the gate's own line lies in its chunk's list
       for (const s of route.samples) if (s.s % 225 < 3) coins.push(...sim.city!.generate(Math.round(s.x / 225), Math.round(s.z / 225)).coins);
       expect(sim.coins!.extra.length).toBeGreaterThan(50);

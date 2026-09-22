@@ -2,6 +2,84 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — The coin layer as lines
+
+Marcin: the coins are placed hopelessly and thoughtlessly; their look, how a
+coin reads and the moment of picking one up could be much better; think it
+through properly. Looked at the shipped layer from the chase camera: runs of
+8–12 at random along every directed lane, so the highway carried four
+unsynchronised dotted lines, one beside the double yellow; thin `carOrange`
+discs (the cones' colour) that vanished edge-on; a pickup that blinked the
+coin away. Redesigned in one slice: DESIGN.md §3.5 holds the design.
+
+### Done
+
+- `sim/city/coins.ts` rewritten: `layoutCoins` lays the island's lines from
+  the seed (ten trails of eight lanes with a run or a weave on each and a
+  link through every turn taken; fillers on about half of the roads left;
+  sweeps on the authored bends by their curvature; an arc over every ramp
+  laid for a 97 km/h launch under the car's gravity) and `placeCoins` adds
+  the gate line through each chunk's billboards (a swerve onto the footway
+  and back inside 22 m, so the line clears the street tree 13 m past the
+  panel; a 30 m hook off the ring's outer lane for the verge panels). One
+  figure per road; every line ends on a cap worth 50; every lane keeps its
+  gate window clear, a weave the oncoming lane's too; a link never lays its
+  head in one. The turn curve uses proportional handles (the ring's inner
+  corners have a 16 m gap; the route's fixed 24 m handles loop there).
+  `CoinDesc` carries `y`, `value` and `phase`; `PlayerProbe.y` is set.
+- The pickup box reaches 1 m past the bumpers, 1.2 m past the doors and
+  1.5 m up and down about the bonnet: a coin in the air needs the car in
+  the air (`BALANCE.coin.reach`).
+- `render/Coins.ts`: an octagonal prism (28 triangles) a metre across in
+  `PALETTE.coin` gold, emissive 0.35, spun and bobbed in the vertex shader
+  with a per-instance phase attribute so a line ripples away from the
+  player; the cap 1.5×, the spill 1.7× white; two flight pools (gold, white)
+  driven by the `coin` events fly a picked coin into the bonnet in 0.16 s.
+- HUD: the counter pops once per coin and flashes the accent on a cap; the
+  glyph is gold. Sfx: the bell is two sines that climb a semitone per coin,
+  a cap adds a fifth that rings on.
+- The cold open's route line at the same 4.5 m pitch, skipping the gate line
+  by `gateLine`.
+- Tests: `coins.test.ts` 3.8 rewritten for the new rules (deterministic;
+  no coin inside a solid, by an oriented test per shape; none doubled
+  island-wide; a cap on the centre of every billboard; three coins in the
+  air past every ridge and the cap beyond them; 1,500–3,000), 3.9 takes the
+  cap's value, 3.13 new: the reach and the height rule. The old 3.8 pinned
+  the carpet (every coin on a lane centre, 30 m clear of the lane's end,
+  2,000–3,500); those rules were the defect, so the pin changed with the
+  design.
+
+### Measured
+
+- Island: 2,405 / 2,303 / 2,344 coins for seeds 42 / 7 / 123 (about 400
+  in the gate lines, 100 in the air, 185 caps).
+- Novice bot, 5 min from heat 0, traffic on, seeds 42 / 7 / 123: 39.0 /
+  32.2 / 40.4 coins a minute worth 534 / 426 / 564 (the carpet: 42–53 worth
+  420–530). The economy of §3.3 holds for a driver who ignores the lines;
+  the caps are a third of the take. M5's `measured.coinsPerMinute` comment
+  updated.
+- Smoke (MX330, high): 60.0 fps, p95 16.7 ms, 100 draws (+2: the flight
+  pools while a coin flies), 243k triangles (+33k: about 1,200 resident
+  coins at 28 triangles instead of 8). Low tier stays under 250k by the
+  same margin as the gate's tour.
+
+### Decided (set here)
+
+- A coin line is a sentence: it starts, has a shape, and ends on a cap at
+  the thing it pointed at. One figure per road, never a carpet.
+- `PALETTE.coin` is the HUD accent's value: the glyph and the coin are one
+  thing. STYLE.md's "the accent is not a palette colour" now has this one
+  exception, written there.
+- No sparkle or burst on a pickup: the coin flies into the bonnet, the
+  counter pops, the bell climbs. The car catches the coin.
+- Trails wander at random for now; aiming them at content is a BACKLOG line
+  for M5, as is the spill's scatter animation.
+
+### Next
+
+- Marcin drives it: does a line read from the chase camera, does the catch
+  feel right, is the bell too much at six coins a second.
+
 ## 2026-09-23 — One game, one build
 
 Marcin: too many links, builds and versions; sort it out and run the main

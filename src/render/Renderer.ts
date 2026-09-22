@@ -344,7 +344,7 @@ export class Renderer {
     this.syncDoorCamera();
     this.chase.update(this.car.root, this.carVel, tm, dt, snap);
     this.hideoutView?.update(this.sim);
-    this.coinsView?.update(this.sim, dt);
+    this.coinsView?.update(this.sim, dt, this.car.root.position);
     this.markerView.update(this.sim, dt);
     this.roadblockView?.update(this.sim);
     this.car.update(tm);

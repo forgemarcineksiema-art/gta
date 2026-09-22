@@ -35,6 +35,13 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 - Paint is flat colour with one wear tone; no re-painted patches, no per-block
   wear variation. Cheap to add as a second `paint` underlay once the flicker
   capture shows it does not shimmer. (M2.2)
+- The coin trails wander at random (DESIGN.md §3.5); in M5 a trail could be
+  aimed, its walk preferring the lanes toward an unvisited billboard, ramp or
+  the day's job markers, so "follow the coins" tours the content. Same
+  machinery, one scoring term in the walk. (2026-09-23)
+- The spill's twelve coins appear on the lane in one step; a scatter from the
+  wreck to their spots over half a second (the fly pool run backwards) would
+  make the burst read as one. Render only. (2026-09-23)
 - The minimap has no lot, park or water data to draw: `City.generate` emits
   render descriptors only. A small `cityFootprints()` export (park rects, block
   outlines, the promenade and piers) would let a full-screen map show blocks

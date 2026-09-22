@@ -133,7 +133,7 @@ export class SimWorld {
   private readonly scratchPos = { x: 0, y: 0, z: 0 };
   private readonly scratchRot = { x: 0, y: 0, z: 0, w: 1 };
   /** The player's footprint and motion this step, filled before the life systems run. */
-  readonly probe: PlayerProbe = { x: 0, z: 0, yaw: 0, vx: 0, vz: 0, speed: 0, halfWidth: 0, halfLength: 0 };
+  readonly probe: PlayerProbe = { x: 0, y: 0.5, z: 0, yaw: 0, vx: 0, vz: 0, speed: 0, halfWidth: 0, halfLength: 0 };
   /** Pose stream of the best lap (x, y, z, qx, qy, qz, qw per tick), for the ghost. */
   bestLapPoses: Float32Array | null = null;
 
@@ -242,6 +242,7 @@ export class SimWorld {
       const he = this.vehicle.tuning.chassisHalfExtents;
       const probe = this.probe;
       probe.x = pos.x;
+      probe.y = pos.y;
       probe.z = pos.z;
       probe.yaw = M.yawOf(rot);
       probe.vx = tm.vx;

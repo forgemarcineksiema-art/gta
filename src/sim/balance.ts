@@ -28,8 +28,18 @@ export const BALANCE = {
   fine: 0.5,
   /** Pulling into a drop-off under `enterSpeed` (m/s) starts the door; it takes `closeSeconds` to shut, busted live. */
   door: { closeSeconds: 3, enterSpeed: 8 },
-  /** Coins on the road: value, and the runs along the lanes (m); `billboardLine` coins through each billboard. */
-  coin: { value: 10, pitch: 6, runMin: 8, runMax: 12, gapMin: 40, gapMax: 90, billboardLine: 8 },
+  /**
+   * Coins on the road (docs/DESIGN.md §3.5): a coin, the cap a line ends on, the pitch along a line (m) and a
+   * line's length; the layout's `trails` random walks of `trailLength` lanes, the share of the roads left that
+   * get a `filler`, the share of figures that `weave` onto the next lane; the pickup `reach` past the bumpers,
+   * the doors and about the bonnet (m); the launch a ramp's `arc` is laid for (m/s, m/s² with the car's gravity).
+   */
+  coin: {
+    value: 10, cap: 50, pitch: 4.5, runMin: 8, runMax: 12,
+    trails: 10, trailLength: 8, filler: 0.55, weave: 0.45,
+    reach: { side: 1.2, ahead: 1.0, up: 1.5 },
+    arc: { speed: 27, gravity: 13.3 },
+  },
   /** A wreck spills `share` of the bag as `coins` coins from `startAhead` m at `pitch` along the lane, for `seconds`. */
   spill: { share: 0.3, coins: 12, seconds: 10, startAhead: 10, pitch: 4 },
   /**
@@ -51,7 +61,7 @@ export const BALANCE = {
   coldOpen: {
     heat: 20, damage: 0.6, startSpeed: 12,
     candidateAhead: 40, candidateOffset: 3.2, candidateHold: 15, candidateGain: 0.5, candidateSpread: 6,
-    markerAt: 600, payout: 5000, limitSeconds: 150, coinPitch: 8,
+    markerAt: 600, payout: 5000, limitSeconds: 150, coinPitch: 4.5,
     gateRamp: 45, gatePlateau: 12,
     steerSeconds: 2, boostSeconds: 1, boostTimeout: 12, smashCue: 150, smashPass: 20,
     takedownRange: 20, takedownTimeout: 20, deliverCue: 200,

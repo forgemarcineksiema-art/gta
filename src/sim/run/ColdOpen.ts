@@ -18,6 +18,7 @@
  */
 import { BALANCE } from '../balance';
 import type { VehicleControls } from '../controls';
+import { gateLine } from '../city/coins';
 import type { BillboardDesc } from '../city/collectibles';
 import type { DropOff } from '../city/cover';
 import { GARAGE } from '../city/cover';
@@ -391,20 +392,14 @@ function routeCoins(sim: SimWorld, route: ColdOpenRoute, hideout: DropOff): Pt[]
     minX = Math.min(minX, s.x); maxX = Math.max(maxX, s.x); minZ = Math.min(minZ, s.z); maxZ = Math.max(maxZ, s.z);
   }
   const existing: Pt[] = [];
-  for (const c of city.laneCoins) {
+  for (const c of city.coinLayout) {
     if (c.x < minX - 6 || c.x > maxX + 6 || c.z < minZ - 6 || c.z > maxZ + 6) continue;
     for (const s of route.samples) {
       if (Math.abs(s.x - c.x) < 6 && Math.abs(s.z - c.z) < 6) { existing.push(c); break; }
     }
   }
-  if (route.gate) {
-    // the gate's own line (placeCoins): along its normal at 2.5 m
-    const g = route.gate, n = BALANCE.coin.billboardLine;
-    for (let k = 0; k < n; k++) {
-      const d = (k - (n - 1) / 2) * 2.5;
-      if (Math.abs(d) >= 1) existing.push({ x: g.x + Math.sin(g.yaw) * d, z: g.z + Math.cos(g.yaw) * d });
-    }
-  }
+  // the gate's own line lies in its chunk's list (placeCoins)
+  if (route.gate) existing.push(...(gateLine(city.graph, route.gate) ?? []));
   const out: Pt[] = [];
   const pitch = BALANCE.coldOpen.coinPitch;
   const fx = Math.sin(hideout.yaw), fz = Math.cos(hideout.yaw);

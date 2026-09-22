@@ -5,6 +5,7 @@
  */
 import type { EngineAudio } from './EngineAudio';
 import type { SimEvent, SimWorld } from '../sim';
+import { BALANCE } from '../sim/balance';
 
 export class Sfx {
   private seq = 0;
@@ -25,7 +26,7 @@ export class Sfx {
     else if (e.kind === 'takedown' || e.kind === 'takedownTraffic') { this.crunch(ctx, master, 4); this.boom(ctx, master); }
     else if (e.kind === 'billboard') { this.splinter(ctx, master); this.ding(ctx, master); }
     else if (e.kind === 'door') this.thud(ctx, master);
-    else if (e.kind === 'coin') this.coin(ctx, master);
+    else if (e.kind === 'coin') this.coin(ctx, master, e.value);
     else if (e.kind === 'spill') this.cascade(ctx, master);
     else if (e.kind === 'busted') this.fall(ctx, master);
     else if (e.kind === 'camera') this.shutter(ctx, master);
@@ -221,25 +222,35 @@ export class Sfx {
   private coinStreak = 0;
   private coinAt = -1;
 
-  /** A coin: a short bright blip that climbs a semitone per coin while they keep coming (a run plays a scale). */
-  private coin(ctx: BaseAudioContext, master: AudioNode): void {
+  /**
+   * A coin: a small bell (a sine and its octave) that climbs a semitone per
+   * coin while they keep coming, so a line plays a scale; the cap a line ends
+   * on adds a fifth that rings on.
+   */
+  private coin(ctx: BaseAudioContext, master: AudioNode, value: number): void {
     const t = ctx.currentTime;
     this.coinStreak = t - this.coinAt < 0.45 ? Math.min(this.coinStreak + 1, 12) : 0;
     this.coinAt = t;
     const freq = 1318.5 * Math.pow(2, this.coinStreak / 12);
+    this.bell(ctx, master, freq, t, 0.05, 0.14);
+    this.bell(ctx, master, freq * 2, t, 0.016, 0.09);
+    if (value >= BALANCE.coin.cap) {
+      this.bell(ctx, master, freq * 1.5, t + 0.06, 0.05, 0.32);
+      this.bell(ctx, master, freq * 3, t + 0.06, 0.012, 0.2);
+    }
+  }
+
+  private bell(ctx: BaseAudioContext, master: AudioNode, freq: number, t: number, peak: number, decay: number): void {
     const osc = ctx.createOscillator();
-    osc.type = 'square';
+    osc.type = 'sine';
     osc.frequency.setValueAtTime(freq, t);
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(3200, t);
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.0001, t);
-    gain.gain.exponentialRampToValueAtTime(0.05, t + 0.005);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
-    osc.connect(filter).connect(gain).connect(master);
+    gain.gain.exponentialRampToValueAtTime(peak, t + 0.004);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+    osc.connect(gain).connect(master);
     osc.start(t);
-    osc.stop(t + 0.1);
+    osc.stop(t + decay + 0.01);
   }
 
   /** The spill: six falling blips, the bag bursting. */

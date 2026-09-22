@@ -35,6 +35,8 @@ export enum AgentState { Free = 0, Kinematic = 1, Physical = 2, Disturbed = 3, W
 
 export interface PlayerProbe {
   x: number;
+  /** The chassis centre's height: about 0.5 m on the road, more in the air. */
+  y: number;
   z: number;
   yaw: number;
   vx: number;

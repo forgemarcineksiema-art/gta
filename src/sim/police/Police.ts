@@ -87,7 +87,7 @@ export class Police {
   private readonly leaveX: Float64Array;
   private readonly leaveZ: Float64Array;
   /** The abandoned car's pose, in the shape the slot planner takes. */
-  private readonly boxProbe: PlayerProbe = { x: 0, z: 0, yaw: 0, vx: 0, vz: 0, speed: 0, halfWidth: 1, halfLength: 2.3 };
+  private readonly boxProbe: PlayerProbe = { x: 0, y: 0.5, z: 0, yaw: 0, vx: 0, vz: 0, speed: 0, halfWidth: 1, halfLength: 2.3 };
   private cursor: number;
   private readonly withdrawing: Uint8Array;
   private readonly rammed: Uint8Array;

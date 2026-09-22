@@ -35,9 +35,13 @@ Useful URLs:
 | `/?car=compact` | vehicle class: `muscle` (default), `compact`, `heavy` (also buttons in the panel) |
 | `/?bot=track&spawn=track` | the track autopilot (its lap time is the tuning benchmark) |
 | `/?bot=1&seed=42&duration=60` | autopilot with the perf probe (`window.__perf`) |
+| `/?heat=3` | start the run at heat level 1-5 (the police answer at that level once they see you) |
+| `/?bot=door&spawn=crown` | the road bot drives to the hideout and parks; the door shuts behind it |
 | `/?ad=error&adError=adblock` | force an ad error code in `LocalPlatform` (`?ad=off`, `?adblock=1` also work) |
 
-Controls: `W A S D` / arrows drive, `Space` handbrake (drift), `Shift` boost, `E` swap into the car beside you, `R` reset (or respawn when wrecked), `C` camera, `P` pause, `M` mute, `` ` `` tuning panel. Any key skips the takedown slow motion.
+Controls: `W A S D` / arrows drive, `Space` handbrake (drift), `Shift` boost, `E` swap into the car beside you, `R` reset (or respawn when wrecked), `C` camera, `P` pause, `M` mute, `` ` `` tuning panel. Any key skips the takedown slow motion, opens the garage door after the totals and closes the busted card.
+
+The run: crimes fill the bag (yellow, top right, with the multiplier the police have seen you at). Pull into one of the three garages (orange on the radar) and stop: the door takes 3 s to shut and banks the bag times the multiplier; back out to cancel. Two police cars boxing you in while you are wanted fill the BUSTED bar: half the bag is kept, no multiplier.
 
 ## Verify
 
@@ -50,6 +54,7 @@ npm run perf:headed  # same, visible browser (real-device numbers)
 npm run screens      # HUD/pause screenshots at every required size -> screens/
 npm run city         # M2 startup, whole-road-graph scene budgets, controls and quality
 npm run life         # M3: a bot run with traffic and pedestrians on, events flowing, budgets held
+npm run heat         # M4: the bot into the hideout, the door as a game-made break
 ```
 
 The whole-map check is accelerated fixed-step driving with sampled rendering; it

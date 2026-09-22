@@ -1,6 +1,6 @@
 # M4 "Heat" — implementation plan
 
-Executor: the agent working M4 now (slices 0–2 are done; slice 3 is next).
+Executor: the agent working M4 now (slices 0–2 and 3a are done; 3b is next).
 Reviewer: Claude, at the gate. Director and playtester: Marcin. This
 document is the milestone contract: what to build, in which order, with
 which numbers, and what "done" means; each fixed decision carries its
@@ -56,6 +56,7 @@ update 1 (§5).
 | 0 housekeeping | wreck tow-away; `sports` and `police` presets, profiles, traffic kinds; real highway lanes (226); the step profile by phase; latched taps; screens polling | traffic 1.55 ms mean / 3.0 p95 per step under 4×; smoke 60.0 fps / p95 16.7 / 97 draws / 196k tris; city 3.05 s to control |
 | 1 heat and pursuit | `Heat` ratchet from the ring; `Pursuit` idle → detected → active → lost → idle; level-1 pair as traffic agents with a plan; sight rays; spawn out of view; stars; livery and light bar | bot at heat 1, 120 s: 23 % in pursuit, 2 escapes, 1 ram, first unit at 0.02 s, never in the view cone; Node step 0.62 ms |
 | 2 units per level | budgets 2/4/5/6/8, interceptors 0/1/2/2/3; the police-first lender with a hard share; rams and the PIT; catch-up speed; patrol recycling | level 2 → 4 units / 1 interceptor, level 5 → 8 / 3; peak police bodies 2 / 3 / 6 with 41–44 civilians alive; a shove costs no speed and 0.7 m, a PIT 5.8 m and 0.48 rad/s; Node step 0.64–0.91 ms at every level |
+| 3a the run | `Run`: bag, bank, `maxHeat`, the door race (control kept, bail-out, busted first), busted and the fine; three garages on generator lots; the roster stands down at heat 0; the wall, the card, the bag on the HUD; `?bot=door` | road bot from heat 0: bag 0, hideout in 99–130 s; from heat 2: 0 busted in 15 bot-minutes, 600–800 bag a minute, banked 5,000–6,250; smoke 60.0 fps / 97 draws unchanged |
 
 ### 1.2 In scope (gate-critical, §4 slices 3–8)
 
@@ -266,14 +267,19 @@ export class Run {
   doorProgress: number;                                  // 0..1 while 'closing'
   runs: number; bestRun: number; firstDoor: boolean;     // firstDoor: the door that ends the cold open (no ad, M5's rule lives here)
   bustedProgress: number;                                // 0..1, the bar
-  dropOff: number;                                       // index into cover.dropOffs while inside an entry box, -1 else
-  lastBanked: number; lastMultiplier: number; lastFine: number;   // for the wall and the card
+  dropOff: number;                                       // the drop-off closing or shut, index into dropOffs; -1 else
+  lastBag: number; lastBanked: number; lastMultiplier: number; lastFine: number;   // for the wall and the card
+  readonly counts: { takedowns: number; escapes: number; billboards: number; coins: number };   // this run, for the wall
+  readonly dropOffs: readonly DropOff[];                 // from coverSites, the hideout first; empty on the playground
+  get multiplier(): number;                              // multiplier[maxHeat]: the HUD's live figure
+  get doorShut(): boolean;                               // the roller-door collider is down
   constructor(sim: SimWorld);
   step(probe: PlayerProbe, dt: number): void;
   /** The door: entry box under door.enterSpeed → 'closing' for door.closeSeconds with busted live and control kept (back out over the door line cancels); then bank the bag × multiplier[maxHeat] (× fence bonus, M5), reset heat and pursuit, state 'door'. */
   /** Busted: bank the fine, reset heat and pursuit, state 'busted'. Called by the step when the bar fills. */
-  openDoor(): void;      // App, any key at the door: state 'running', the collider disabled, the run restarts, runs++
-  closeCard(): void;     // App, any key at the busted card: state 'running'
+  openDoor(): void;      // App, any key at the door: state 'running', the collider disabled, the car turned to face the street, runs++
+  closeCard(): void;     // App, any key at the busted card: state 'running', runs++
+  // after either, the entry boxes re-arm only once the car has left them (as built, slice 3a)
   spill(x: number, z: number, yaw: number): void;   // Life on wrecked: moves spillShare of the bag into Coins.spill
 }
 ```
@@ -294,13 +300,17 @@ export class Coins {
 ```
 
 ```ts
-// src/sim/city/cover.ts
-export interface DoorPose { x: number; z: number; yaw: number; width: number }
-export interface DropOff { name: 'hideout' | 'scrapyard' | 'hotel'; x: number; z: number; yaw: number; door: DoorPose; approachLane: number; entry: { hx: number; hz: number } }
-export interface Chokepoint { x: number; z: number; yaw: number; lane: number }
-export interface CoverSites { hideout: DropOff; dropOffs: DropOff[]; chokepoints: Chokepoint[]; parkedJunctions: number[]; cameraSites: Chokepoint[] }
-export function coverSites(city: City): CoverSites;    // deterministic from the road plan; the hideout under the Crown Tower block
-export function hideoutStatics(site: DropOff): StaticDesc[];   // walls, floor, roof, the door as a separate desc with tag 'door'
+// src/sim/city/cover.ts (as built in slice 3a; slice 6 adds the chokepoints, parked junctions and camera sites to CoverSites)
+export const DROP_OFF_LOTS: readonly DropOffLot[];     // { name, cx, cz, sx, sz, ox, oz, setback }: the generator lots the garages replace
+export const GARAGE: { width: 14; depth: 20; height: 6; wall: 0.3; doorWidth: 8; doorHeight: 4.2; doorThickness: 0.2; entryAcross: 4.5; entryAlong: 8; floorTop: 0.16 };
+export interface DoorPose { x: number; z: number; yaw: number; width: number; height: number }
+export interface DropOff { name: 'hideout' | 'scrapyard' | 'hotel'; x: number; z: number; yaw: number /* inward */; door: DoorPose; entry: { across: number; along: number }; approachLane: number; lot: DropOffLot }
+export interface Chokepoint { x: number; z: number; yaw: number; lane: number }                  // slice 6
+export interface CoverSites { hideout: DropOff; dropOffs: DropOff[] /* + chokepoints, parkedJunctions, cameraSites in slice 6 */ }
+export function coverSites(city: City): CoverSites;    // deterministic; approach lanes from the road graph
+export function dropOffAt(cx, cz, sx, sz, ox, oz): DropOff | null;   // City.generate asks per lot
+export function toDropOff(site, x, z, out): { along: number; across: number };
+export function hideoutStatics(site: DropOff): StaticDesc[];   // walls, roof, floor, the band and the light; the door is the view's and the run's
 ```
 
 ```ts
@@ -446,20 +456,21 @@ Behaviour:
   threshold crossed unseen. Coins go to
   `run.coins` from `coin` events and never to the bag; spilled coins carry
   a `spill` flag in the event's `target` (−2) and return to the bag.
-- **cover.ts.** `coverSites`: the hideout under the Crown Tower block (the
-  chunk that holds the tower: the box on the block's south-west lot,
-  20 × 12 × 6 m, the door on the street face 6 m wide facing the street,
-  an entry box 8 × 6 m inside the door); the scrapyard drop-off in Sunset
-  Works (a yard on the service road) and the Coral Hotel garage (the
-  hotel's parcel edge on the quay), each with a door pose and an entry box;
-  the chokepoints (the four highway on-ramps' lanes and the tower junction's
-  four approaches) for slice 6; `parkedJunctions` (four grid nodes, one per
-  district, at least 300 m from the hideout); `cameraSites` (ten: six on
-  the highway straights, four on the avenue) for slice 6.
-  `hideoutStatics` returns the box's walls, floor and roof (`concrete`,
-  `graphite` roof) with `GROUPS_SOLID` and the door desc tagged `door`;
-  `City.generate` appends them to the chunk. The door collider is created
-  by `SimWorld` from the tagged desc and starts disabled.
+- **cover.ts** (as built): three garages on ordinary generator lots,
+  each replacing that lot's building after the lot's random draw: the
+  hideout beside the Crown Tower (the street west of the tower block), the
+  scrapyard beside the Waterworks, the Coral Hotel garage (the street north
+  of the hotel); 14 × 20 × 6 m, an 8 m opening, an entry box 9 × 16 m
+  around the garage centre, the approach lane the kerb-side lane past the
+  door. `hideoutStatics` returns walls (`concrete`, tag `building`), the
+  `graphite` roof, the floor, a carOrange band over the door and a strip
+  light; lamps and trees stay out of the doorway. The roller door is not a
+  static: the run creates one collider, disabled, and moves it to the
+  drop-off that shuts. The chokepoints (the four highway on-ramps' lanes
+  and the tower junction's four approaches), `parkedJunctions` (four grid
+  nodes, one per district, at least 300 m from the hideout) and
+  `cameraSites` (ten: six on the highway straights, four on the avenue) are
+  slice 6's, where they are used.
 - **The door.** `Run.step`: inside an entry box (in the drop-off's frame,
   |x| < hx, |z| < hz) and speed under `door.enterSpeed` (8 m/s), whatever
   the pursuit is doing → `state = 'closing'`, `doorProgress` runs from 0 to
@@ -494,7 +505,7 @@ Behaviour:
   level" pull, no text (DESIGN.md §2.6, §2.9). No door ever refuses: the
   three drop-offs are always open, and the 3 s is the whole test. All three
   walls are the same screen (DESIGN.md §6.3).
-- **Busted.** `Run.step`: `police.unitsWithin(range) ≥ busted.units` and
+- **Busted.** `Run.step`: heat ≥ 1, `police.unitsWithin(range) ≥ busted.units` and
   `probe.speed < busted.speed` → `bustedProgress += dt / seconds`; else
   `−= dt × drainPerSecond`, clamped. At 1: `lastFine = round(bag × fine)`,
   `bank += lastFine`, `bag = 0`, `heat.reset()`, `pursuit.reset()`, `busted`
@@ -523,7 +534,7 @@ Tests:
   `idle` leaves `maxHeat` at its old value, and one step of `active` at
   level 3 sets it to 3; 3.3 the door with `maxHeat` 3 and bag 10,000: the
   car rolling into the entry box at 25 km/h goes `closing` on that step
-  (at 35 km/h it does not), stops inside under the player's brake, and
+  (at 50 km/h it does not, only once braked under 8 m/s), stops inside under the player's brake, and
   3.0 ± 0.05 s after the start banks 16,000, the bag is 0, heat 0, pursuit
   idle, `door` pushed, state `door`; throttle and steer reach the vehicle
   on every step of the closing (`vehicle` controls non-zero when set); 3.4

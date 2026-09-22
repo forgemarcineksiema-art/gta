@@ -102,4 +102,5 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 ## City v2 (after the M4 run loop works; docs/DESIGN.md §5–6)
 
 - Highway overpasses at the four avenue crossings: a third dimension in the road graph (lane height, kinematic traffic at height, the bot route, road meshes, markings, the minimap, the city pins). Moved from M4 to update 1 on 2026-09-22; the contract is §5 of `docs/M4_PLAN.md`. (update 1)
-- A lit hideout sign visible from the highway; drop-off approaches with a second, longer way in. (M4/M5)
+- A lit hideout sign visible from the highway (the garages have an orange band over the door and a radar glyph); drop-off approaches with a second, longer way in. (M4/M5)
+- The garage interior reads dark: the roof's underside gets only the hemisphere's ground colour; a lighter ceiling or a brighter strip light if Marcin finds it gloomy. (M4)

@@ -2,6 +2,130 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-22 — M4 slice 3a: the run, the door race, busted
+
+Verify green before the first edit (after the consistency pass) and at both
+commits: quick set 184 → 193 tests, long pins 198. Commits `7cf4c97` (sim)
+and `deec5cf` (render, UI, app, audio, e2e); the first one's message says
+194 tests, one of which was a scratch probe left in `tests/_scratch` for the
+run; the slice's count is 193.
+
+### Done
+
+- **The run** (`src/sim/run/Run.ts`). Its own cursor into the event ring
+  pays the bag per `BALANCE.bag`: billboard 500, camera 300 + 20 per km/h
+  over, takedown 800 or 1,500 for a police record (by `Traffic.police`, not
+  the class), roadblock 1,000, escape 500 × level, jump 400 + 200 per second
+  of air; the camera, roadblock and jump producers land in slice 6.
+  `maxHeat` moves only on steps with the pursuit `active`. Busted: two live
+  police cars within 6 m, heat ≥ 1, the player under 1.39 m/s for 3 s; the
+  bar drains at 0.7/s; half the bag banks with no multiplier. The door:
+  inside an entry box under 8 m/s starts a 3 s close, the player still
+  driving; the car's centre back over the door line cancels it; busted is
+  evaluated first (a tie goes to the police); the door shuts only with the
+  whole chassis inside the line. Banking: bag × `multiplier[maxHeat]`, best
+  run, heat and pursuit reset, `door` and `banked` events, one roller-door
+  collider moved to that drop-off and enabled. `openDoor()` turns the car to
+  face the street; `closeCard()` drives on where the player stands; after
+  either, the entry boxes re-arm only once the car has left them. The wall's
+  counts (takedowns, escapes, billboards, coins) reset at each new run.
+- **Three garages** (`src/sim/city/cover.ts`): the hideout beside the Crown
+  Tower (Crown Heights, the street west of the tower block), the scrapyard
+  beside the Waterworks (Sunset Works) and the Coral Hotel garage (Coral
+  Quay, the street north of the hotel), each built by `City.generate` on an
+  ordinary lot instead of that lot's building, after the lot's random draw:
+  14 × 20 × 6 m, concrete walls tagged `building`, a graphite roof, a
+  concrete floor, an 8 m opening with a carOrange band over it, a warm strip
+  light; lamps and trees stay out of the doorways. `coverSites(city)` gives
+  each its approach lane (the kerb-side lane past the door).
+- **Police**: `unitsWithin(x, z, range)` counts live police records (units,
+  parked patrols, roadblock cars; never a wreck, a taken car or a civilian);
+  at heat 0 the roster stands down (drives away, released once 120 m away
+  and out of view), so a heat-5 roster never answers the next heat-1 crime;
+  `dispatching` is a test hook. **Traffic**: `AgentState.Parked` appended,
+  `spawnParkedPolice(x, z, yaw, kind)`: a stopped, solid police car.
+- **Presentation**: `render/HideoutView.ts` (the roller doors unroll with
+  the door's progress, hidden while up), a held camera cut from the garage's
+  back corner past the car and out through the opening during the race and
+  behind the shut door (`ChaseCamera.cut / releaseCut`), `ui/run.ts` (the bag
+  under the stars with the live multiplier, the busted bar, the busted card,
+  the wall), the three garages on the radar as glyphs that clamp to the rim,
+  the swap prompt hidden during those breaks, the door's thud and busted's
+  two-note fall. `App`: `gameplayStop/Start` follow the run's edges (a user
+  pause during a break adds no bracket), keys ignored for 0.6 s, measured
+  bot runs dismiss breaks after 1.5 s, `?bot=door` drives the road bot to
+  the hideout on its own lane path (`app/doorRoute.ts`, `TrackBot.setPath`).
+- **Tests**: `run.test.ts` 3.0 (placement clear of every neighbour taller
+  than 0.3 m and a 4 m apron, seeds 42/7/123, approach lane kerb-side and
+  parallel) and 3.1–3.7; `police.test.ts` 3.13; `e2e/heat.spec.ts` 3.14
+  (`npm run heat`); the screens spec captures the busted bar, the card and
+  the wall at all ten sizes (3.15, extended).
+
+### Measured
+
+- **The acceptance run** (headless, traffic and pedestrians on): the road
+  bot 300 s from heat 0, then routed to the hideout. Seeds 42 / 7: bag 0
+  (the road bot commits no crime: 16–22 hits, no takedown, no billboard),
+  the hideout reached 129.8 / 99.1 s later over 1.2–1.5 km of lane path,
+  banked 0. Bag per minute 0 is this bot's honest number and useless for
+  M5's `BALANCE.measured`: slice 5's skilled policy is the probe that earns.
+- **The same from heat 2** (four units, one interceptor), seeds 42 / 7 /
+  123: 190–220 s of the 300 in an active pursuit, 3–4 escapes, **0 busted in
+  15 bot-minutes**; bag 3,000–4,000 (600–800 a minute, all escape bounties).
+  To the hideout: 132.6 s (a fifth escape on the way, banked 6,250 at
+  ×1.25) and 61.6 s (banked 5,000); seed 7 never arrived inside 240 s (12
+  stuck resets and two wrecks under the rams). The DESIGN §12 worry holds so
+  far at level 2; slice 6 measures levels 1–3 with both policies and applies
+  the decision rule.
+- **The door bot** from five spawns (crown, city, foundry → scrapyard,
+  marina → hotel): 25 to 79 s to the shut door, no resets, no damage.
+- **Timings pinned**: closing to shut 180 steps (3.0 s); the tie busted on
+  step 180; the bar 3.0 s; the drain 0.7/s.
+- **Smoke**: 60.0 fps, p95 16.7 ms, 97 draws, 193k tris, the slice-2
+  baseline (a door is drawn only while it moves; the plan's +1 draw is
+  therefore 0 at rest). Startup 3.53 MB (+0.02).
+
+### Decided (set here)
+
+- **Busted needs heat ≥ 1, not a pursuit state.** Two cruisers within 6 m
+  see the player by construction, the pursuit's sight is sampled every six
+  steps, and parked police (roadblocks, junction patrols) are not pursuit
+  units. A wanted player who stops between two police cars is busted; the
+  bar shows it coming.
+- **Garages on ordinary lots**, after the lot's random draw, so the stream
+  and the rest of the city are unchanged; the scrapyard is beside the
+  Waterworks, not in a yard on the service road (the yards' containers and
+  fences make a clear footprint a search; a lot is clear by construction).
+- **14 × 20 m with an 8 m door** (the plan said 12 × 20 and 6 m: a 6 m door
+  off a 24 m street at a right angle under sirens is a needle's eye), and an
+  **entry box of 9 × 16 m** around the garage centre (the plan's 6 × 8 m would
+  let a car pulling in at 29 km/h roll out of it before it stops).
+- **`openDoor` turns the car** to face the street: nobody reverses out of a
+  box. **The entry boxes re-arm** only after the car has left them: without
+  it the door dropped again the moment it opened, and after a busted card on
+  a doorstep it dropped on an empty bag.
+- `hideoutStatics` returns everything but the door: the door slides, so the
+  view draws it and the run owns its one collider.
+- The chokepoints, parked-patrol junctions and camera sites of `cover.ts`
+  land in slice 6, where they are used and pinned, not here unused.
+- The radar shows the garages now: the hideout must be findable in a chase
+  before M5's arrow exists.
+- Test 3.3's too-fast case is 50 km/h: coasting 14 m over the kerb brings a
+  35 km/h car under 8 m/s before the box.
+
+### Next
+
+- Slice 3b: coins and the spill.
+
+### Open problems
+
+- The garage interior reads dark: the roof's underside gets only the
+  hemisphere's ground colour. Marcin's eye decides; a lighter ceiling is one
+  colour.
+- The road bot's stuck reset teleports it to the city spawn, which under a
+  pursuit is a free escape for the bot; slice 5's policies should not
+  inherit it.
+
 ## 2026-09-22 — Docs consistency pass before slice 3a
 
 Marcin asked for a full read of the documentation, then what to do about the

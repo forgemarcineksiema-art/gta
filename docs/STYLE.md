@@ -298,28 +298,38 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 - Interceptor livery is the same two colours on the sports body with the band
   running higher and no roof bar: a low-profile bar behind the rear window, so
   the two unit types are told apart at a glance from behind.
-- The hideout is a one-room drive-in box: `concrete` walls and floor, a
-  `graphite` roof, one `charcoal` roller door on the street face with a
-  `carOrange` warning stripe along its bottom edge, and a single warm interior
-  light. The totals are painted on the back wall in the HUD's own type, big
-  enough to read at 800x450. No props, no clutter, no second room; the camera
-  cut does the work.
+- The hideout is a one-room drive-in box, the same at all three drop-offs:
+  14 × 20 × 6 m, `concrete` walls and floor, a `graphite` roof, an 8 m
+  opening with a `carOrange` band over it (the one colour a chase has time to
+  read), one `charcoal` roller door with a `carOrange` bar along its bottom
+  edge that unrolls from the lintel, and a warm strip light on the ceiling.
+  The door race and the shut door are seen from the back corner, past the
+  car, out through the opening. The totals are a panel over that view in the
+  HUD's own type, legible at 800x450. No props, no clutter, no second room.
+- On the radar the three garages are a pitched outline in `carOrange` with
+  the door as a dark band across its foot, clamped to the rim like the
+  landmarks: where a run can end is always on the map.
 
 ## The run HUD, coins and ramps (M4)
 
-- The bag sits top right under the stars: the primary number (≥ 44 px, the
-  heavy italic, skewed, accent yellow, a flat black shadow) with the live
-  multiplier beside it at 18 px in the same accent (`×1`, `×1.25`, `×1.6`,
-  `×2.2`, `×3`), popping 0.3 s on a threshold. Yellow means "not yours yet".
+- The bag sits top right under the stars (70 px from the top): the primary
+  number (44 px, the heavy italic, skewed, accent yellow, a flat black
+  shadow, counting up over 0.3 s) with the live multiplier beside it at
+  18 px in the same accent (`×1`, `×1.25`, `×1.6`, `×2.2`, `×3`), popping
+  0.3 s when the police see the player at a new level. Yellow means "not
+  yours yet". Hidden behind a shut door and under the busted card.
 - The coin counter under it, smaller, in ink with the coin glyph: white
   means safe. Placed coins are `carOrange` octagonal discs on the lane
   centre, spinning slowly; spilled coins are `carWhite` and larger, so a
   scramble reads from afar. Never a counter for the spill.
-- The busted bar: a red skewed track centre-bottom above the speedo, only
-  while it is filling; the busted card and the door screen use the popup
-  type at 54 px for the title and 18 px for the lines, panel background
-  from the UI palette, the totals right-aligned; one line of run counts
-  under the totals in 16 px.
+- The busted bar: a red skewed track with BUSTED over it, centre-bottom
+  between the drift readout and the swap prompt, only while it is filling.
+  The busted card (BAG, YOU KEEP, BANK) and the wall behind the door (BAG,
+  MULTIPLIER, BANKED, BEST RUN, BANK) are one panel style: 54 px titles
+  (BUSTED in danger red, BANKED in accent yellow), 18 px lines with the
+  values right-aligned and the one that counts in yellow, one line of run
+  counts in 16 px that wraps only at its separators, and a keycap with ANY
+  KEY. The swap prompt hides while either is up.
 - The swap prompt reads SWAP for a civilian car and BORROW for a police
   car, same keycap, same size, accent cyan.
 - Ramps are `ramp` red gables with a kerb-height lip, the run-out kept clear

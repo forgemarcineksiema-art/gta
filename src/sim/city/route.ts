@@ -9,7 +9,7 @@
 import type { TrackSample } from '../track';
 import type { DropOff } from './cover';
 import { GARAGE } from './cover';
-import { lanePath, type Lane, type RoadGraph } from './roads';
+import { lanePath, type Lane, type RoadGraph, type RoadPoint } from './roads';
 
 export interface Pt { x: number; z: number }
 
@@ -85,20 +85,20 @@ export function alongLane(lane: Lane, x: number, z: number): { s: number; latera
 }
 
 /** A lane's point at distance `s`, shifted `right` metres to its right, with the heading there. */
-export function laneAt(lane: Lane, s: number, right = 0): Pt & { yaw: number } {
+export function laneAt(lane: Lane, s: number, right = 0): Pt & { yaw: number; y: number } {
   let travelled = 0;
   for (let i = 0; i + 1 < lane.points.length; i++) {
-    const a = lane.points[i] as Pt, b = lane.points[i + 1] as Pt;
+    const a = lane.points[i] as RoadPoint, b = lane.points[i + 1] as RoadPoint;
     const len = Math.hypot(b.x - a.x, b.z - a.z);
     if (s <= travelled + len || i + 2 === lane.points.length) {
       const t = len > 0 ? Math.max(0, Math.min(1, (s - travelled) / len)) : 0;
       const nx = len > 0 ? -(b.z - a.z) / len : 0, nz = len > 0 ? (b.x - a.x) / len : 0;
-      return { x: a.x + (b.x - a.x) * t + nx * right, z: a.z + (b.z - a.z) * t + nz * right, yaw: Math.atan2(b.x - a.x, b.z - a.z) };
+      return { x: a.x + (b.x - a.x) * t + nx * right, z: a.z + (b.z - a.z) * t + nz * right, yaw: Math.atan2(b.x - a.x, b.z - a.z), y: (a.y ?? 0) + ((b.y ?? 0) - (a.y ?? 0)) * t };
     }
     travelled += len;
   }
-  const p = lane.points[0] as Pt;
-  return { x: p.x, z: p.z, yaw: lane.yaw0 };
+  const p = lane.points[0] as RoadPoint;
+  return { x: p.x, z: p.z, yaw: lane.yaw0, y: p.y ?? 0 };
 }
 
 /**

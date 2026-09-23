@@ -10,14 +10,15 @@ import { MINIMAP, advance, buildRoadLayers, clampToRim, project, wrapAngle, type
 describe('minimap model', () => {
   test('road layers: every undirected grid road once, junction to junction, authored roads at real width', () => {
     const layers = buildRoadLayers(buildRoadGraph());
-    expect(layers.grid.length + layers.highway.length).toBe(84);
-    expect(layers.highway.length).toBe(24);
+    // the four overpasses (M5.5 slice 8) are one highway road over two blocks each
+    expect(layers.grid.length + layers.highway.length).toBe(80);
+    expect(layers.highway.length).toBe(20);
     expect(layers.special.length).toBe(5);
     expect(layers.highwayWidth).toBe(38);
     expect(layers.gridWidth).toBe(24);
     expect(layers.special.map((r) => r.width).sort((a, b) => a - b)).toEqual([16, 20, 24, 24, 24]);
     for (const seg of [...layers.grid, ...layers.highway]) {
-      expect(Math.abs(seg.x1 - seg.x0) + Math.abs(seg.z1 - seg.z0)).toBe(225);
+      expect([225, 450]).toContain(Math.abs(seg.x1 - seg.x0) + Math.abs(seg.z1 - seg.z0));
       for (const v of [seg.x0, seg.z0, seg.x1, seg.z1]) expect(Math.abs(v % 225)).toBe(0);
     }
   });

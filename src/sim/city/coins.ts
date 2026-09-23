@@ -136,6 +136,8 @@ export function gateLine(graph: RoadGraph, b: BillboardDesc): CoinPoint[] | null
     const { s, lateral } = alongLane(lane, b.x, b.z);
     if (verge) {
       if (lateral < 14 || lateral > 20 || s > len - 10) continue;
+      // a panel beside an overpass's ramp: its hook would run through the wall
+      if (laneAt(lane, s).y > 0.05) continue;
       const theta = Math.acos(1 - lateral / HOOK_RADIUS);
       const sArc = s - HOOK_RADIUS * Math.sin(theta);
       // the corner chunks' slots sit 39 m along the lane: the arc must start on it
@@ -194,7 +196,10 @@ export function routeLine(graph: RoadGraph, chain: readonly number[], s0: number
   const pitch = c.pitch;
   let phase = 0;
   const run = (lane: Lane, from: number, n: number): void => {
-    for (let k = 0; k < n; k++) push(out, laneAt(lane, from + k * pitch), COIN_HEIGHT, TAG_LANE.route, c.value, phase++);
+    for (let k = 0; k < n; k++) {
+      const p = laneAt(lane, from + k * pitch);
+      push(out, p, COIN_HEIGHT + p.y, TAG_LANE.route, c.value, phase++);
+    }
   };
   const turnSpan = (r.turn - 1) * pitch;
   for (let i = 0; i < chain.length; i++) {

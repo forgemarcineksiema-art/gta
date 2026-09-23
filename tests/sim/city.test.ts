@@ -10,9 +10,11 @@ describe('M2 city', () => {
     expect(graph.nodes).toHaveLength(49);
     // 84 grid edges: 60 street edges carry one lane per direction, the 24
     // perimeter edges carry two (M4 slice 0: real highway lanes, so a roadblock
-    // has something to stand across). Each authored road adds two.
-    expect(graph.lanes).toHaveLength(2 * 60 + 4 * 24 + 2 * graph.special.length);
-    expect(graph.lanes.filter((l) => l.highway)).toHaveLength(96);
+    // has something to stand across). Each authored road adds two. The four
+    // overpasses (M5.5 slice 8) join the two perimeter edges at each crossing
+    // into one over it: 20 perimeter edges.
+    expect(graph.lanes).toHaveLength(2 * 60 + 4 * 20 + 2 * graph.special.length);
+    expect(graph.lanes.filter((l) => l.highway)).toHaveLength(80);
     for (const lane of graph.lanes) expect(HIGHWAY_LANE_OFFSETS.includes(lane.offset as 4 | 12)).toBe(lane.highway);
     expect(graph.special).toHaveLength(5);
     expect(new Set(tour).size).toBe(graph.lanes.length);

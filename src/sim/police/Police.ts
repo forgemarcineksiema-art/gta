@@ -987,7 +987,8 @@ export class Police {
     if (distance === 0) return true;
     this.sim.vehicle.body.translation(this.pos);
     this.ray.origin.x = this.traffic.x[agent] as number;
-    this.ray.origin.y = this.tuning.sightHeight;
+    // from the unit's height: a patrol on an overpass looks from the deck, not from the ground under it
+    this.ray.origin.y = (this.traffic.y[agent] as number) + this.tuning.sightHeight;
     this.ray.origin.z = this.traffic.z[agent] as number;
     const dx = player.x - this.ray.origin.x;
     const dz = player.z - this.ray.origin.z;

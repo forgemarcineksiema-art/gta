@@ -2,6 +2,17 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M5.5 slice 8: overpasses
+
+Done: the highway climbs over its four crossings with the central streets (x = 0 and z = 0 at the ring): a 7.5 m
+deck over a 48 m span on a girder, 110 m smoothstep ramps (grade under 11 %, the car stays on its wheels at 25 m/s)
+between retaining walls, parapets, abutments and lane lines, all pitched boxes along the graph's new height profile
+(RoadPoint.y). The ring meets those four streets no more; they run on under the deck to their stubs. Traffic drives
+at the road's height, nose up the ramps (lent bodies held at it); resets, police sight, route coins and the highway
+spawn take the height; no roadblock, camera, verge coin hook, lamp or tree on a ramp (two cameras moved a segment
+out). Jobs re-baked (one delivery's drop-off moved). Pins 8.1–8.4; city and minimap counts re-pinned (80 lanes on
+the highway). The long pins (the city tour, the bot laps) are re-pinned at the gate.
+
 ## 2026-09-23 — M5.5 slice 7: covered streets and the camera occlusion rule
 
 Done: one covered street per district over the middle of a grid street near its door (the Gardens': near the

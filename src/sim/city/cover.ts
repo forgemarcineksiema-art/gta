@@ -245,7 +245,8 @@ function chokepoints(graph: RoadGraph): Chokepoint[] {
       const q = laneAt(lane, Math.max(0, s - POLICE.roadblock.spikeBefore), spikeRight);
       out.push({ id: out.length, x: p.x, z: p.z, yaw: p.yaw, lane: lane.id, s, spikeX: q.x, spikeZ: q.z });
     };
-    if (lane.highway) for (let s = CHOKE_END; s <= len - CHOKE_END; s += CHOKE_PITCH) at(s);
+    // not on an overpass's ramp or deck (M5.5 slice 8): a roadblock stands on the ground
+    if (lane.highway) for (let s = CHOKE_END; s <= len - CHOKE_END; s += CHOKE_PITCH) if (laneAt(lane, s).y < 0.05) at(s);
     else if (lane.to === tower && len > TOWER_APPROACH + CHOKE_END) at(len - TOWER_APPROACH);
   }
   return out;
@@ -278,7 +279,8 @@ export function cameraSites(graph: RoadGraph): CameraSite[] {
   // mid-segment points of the ring (a node every 225 m): x or z at ±112.5, ±337.5, ±562.5
   const highway: Array<readonly [number, number, number]> = [
     [-ring, -562.5, 0], [-ring, 337.5, 0], [ring, -337.5, Math.PI], [ring, 337.5, Math.PI],
-    [-112.5, -ring, Math.PI / 2], [337.5, -ring, Math.PI / 2], [112.5, ring, -Math.PI / 2],
+    // not on an overpass's ramps (M5.5 slice 8): the north one moved from -112.5 to 562.5, the south one from 112.5 to 337.5
+    [562.5, -ring, Math.PI / 2], [337.5, -ring, Math.PI / 2], [337.5, ring, -Math.PI / 2],
   ];
   for (const [x, z, yaw] of highway) {
     const side = HIGHWAY_HALF + 2;

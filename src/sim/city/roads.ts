@@ -16,7 +16,52 @@ export const HIGHWAY_LANE_OFFSETS = [4, 12] as const;
 /** Lane endpoints stop this far from the junction centre; the connection curve fills the rest. */
 export const LANE_INSET = 23;
 
-export interface RoadPoint { x: number; z: number }
+/** A point of a road's centreline or a lane; `y` is its height over the ground (the highway over the crossings), 0 when absent. */
+export interface RoadPoint { x: number; z: number; y?: number }
+
+/**
+ * The highway over the four crossings with the central streets (M5.5 slice 8; DESIGN.md §5, M4_PLAN §5 B):
+ * the deck's height (m), its flat half length over the crossing, each ramp's length. The street passes
+ * under to its stub by the sea; the ring no longer meets it there.
+ */
+export const OVERPASS = { height: 7.5, deck: 24, ramp: 110 } as const;
+export const OVERPASS_NODES: ReadonlyArray<readonly [number, number]> = [[0, -3], [0, 3], [-3, 0], [3, 0]];
+
+/** The deck's height `d` m along the ring from an overpass's crossing: flat over it, then a smooth ramp to the ground. */
+export function overpassProfile(d: number): number {
+  const a = Math.abs(d), o = OVERPASS;
+  if (a <= o.deck) return o.height;
+  if (a >= o.deck + o.ramp) return 0;
+  const t = (o.deck + o.ramp - a) / o.ramp;
+  return o.height * t * t * (3 - 2 * t);
+}
+
+/** An overpass's frame at a point: along the ring from its crossing, across it, and whether the ring runs along X there. */
+export function overpassFrame(k: number, x: number, z: number): { along: number; across: number; alongX: boolean } {
+  const [gx, gz] = OVERPASS_NODES[k] as readonly [number, number];
+  const alongX = Math.abs(gz) === 3;
+  return alongX ? { along: x - gx * BLOCK, across: z - gz * BLOCK, alongX } : { along: z - gz * BLOCK, across: x - gx * BLOCK, alongX };
+}
+
+/** The highway's height at a point on its carriageway (within `margin` m of its edges), 0 off the overpasses. */
+export function highwayHeightAt(x: number, z: number, margin = 0): number {
+  for (let k = 0; k < OVERPASS_NODES.length; k++) {
+    const f = overpassFrame(k, x, z);
+    if (Math.abs(f.across) > HIGHWAY_HALF + margin) continue;
+    const h = overpassProfile(f.along);
+    if (h > 0) return h;
+  }
+  return 0;
+}
+
+/** Inside an overpass's footprint (its ramps and deck, grown by `margin` m): the ground's highway things stay out. */
+export function underOverpass(x: number, z: number, margin = 0): boolean {
+  for (let k = 0; k < OVERPASS_NODES.length; k++) {
+    const f = overpassFrame(k, x, z);
+    if (Math.abs(f.across) <= HIGHWAY_HALF + margin && Math.abs(f.along) <= OVERPASS.deck + OVERPASS.ramp + margin) return true;
+  }
+  return false;
+}
 export interface RoadNode { id: number; x: number; z: number; outgoing: number[] }
 export interface Lane {
   id: number; from: number; to: number; highway: boolean;
@@ -54,7 +99,7 @@ export function resample(points: RoadPoint[], spacing: number): RoadPoint[] {
   for (let i = 0; i + 1 < points.length; i++) {
     const a = points[i] as RoadPoint, b = points[i + 1] as RoadPoint;
     const len = Math.hypot(b.x - a.x, b.z - a.z);
-    for (let d = carried; d < len; d += spacing) out.push({ x: a.x + (b.x - a.x) * d / len, z: a.z + (b.z - a.z) * d / len });
+    for (let d = carried; d < len; d += spacing) out.push(height({ x: a.x + (b.x - a.x) * d / len, z: a.z + (b.z - a.z) * d / len }, a, b, d / len));
     carried = ((carried - len) % spacing + spacing) % spacing;
   }
   out.push({ ...(points[points.length - 1] as RoadPoint) });
@@ -115,12 +160,19 @@ export const SPECIAL_ROADS: SpecialRoad[] = [
   arc('Quay Sweep', [2, 1], [1, 2], { x: 675, z: 675 }, 12, 'quay'),
 ];
 
+/** A point between `a` and `b` at `t` keeps their height when they have one. */
+function height(p: RoadPoint, a: RoadPoint, b: RoadPoint, t: number): RoadPoint {
+  if (a.y === undefined && b.y === undefined) return p;
+  p.y = (a.y ?? 0) + ((b.y ?? 0) - (a.y ?? 0)) * t;
+  return p;
+}
+
 /** Offset a polyline to its right (facing along it); +X is left when facing +Z. */
 function offsetRight(points: RoadPoint[], offset: number): RoadPoint[] {
   return points.map((p, i) => {
     const prev = points[Math.max(0, i - 1)] as RoadPoint, next = points[Math.min(points.length - 1, i + 1)] as RoadPoint;
     const tx = next.x - prev.x, tz = next.z - prev.z, len = Math.hypot(tx, tz) || 1;
-    return { x: p.x - tz / len * offset, z: p.z + tx / len * offset };
+    return p.y === undefined ? { x: p.x - tz / len * offset, z: p.z + tx / len * offset } : { x: p.x - tz / len * offset, z: p.z + tx / len * offset, y: p.y };
   });
 }
 
@@ -133,7 +185,7 @@ function trim(points: RoadPoint[], inset: number): RoadPoint[] {
       const len = Math.hypot(b.x - a.x, b.z - a.z);
       if (len < left) { left -= len; continue; }
       const t = left / len;
-      return [{ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t }, ...pts.slice(i + 1)];
+      return [height({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t }, a, b, t), ...pts.slice(i + 1)];
     }
     return pts.slice(-1);
   };
@@ -160,12 +212,22 @@ export function buildRoadGraph(): RoadGraph {
     };
     lanes.push(lane); a.outgoing.push(lane.id);
   };
+  const overpass = (n: RoadNode): boolean => OVERPASS_NODES.some(([gx, gz]) => n.x === gx * BLOCK && n.z === gz * BLOCK);
   for (const a of nodes) for (const b of nodes) {
     if (Math.abs(a.x - b.x) + Math.abs(a.z - b.z) !== BLOCK) continue;
     const highway = (a.x === b.x && Math.abs(a.x) === 675) || (a.z === b.z && Math.abs(a.z) === 675);
+    // the ring over a crossing is one lane from the node before to the node after (below)
+    if (highway && (overpass(a) || overpass(b))) continue;
     const centre = [{ x: a.x, z: a.z }, { x: b.x, z: b.z }];
     if (highway) for (const off of HIGHWAY_LANE_OFFSETS) add(a, b, centre, true, undefined, ROAD_HALF, off);
     else add(a, b, centre, false);
+  }
+  for (const [gx, gz] of OVERPASS_NODES) {
+    const alongX = Math.abs(gz) === 3;
+    const before = alongX ? nodeAt(gx - 1, gz) : nodeAt(gx, gz - 1), after = alongX ? nodeAt(gx + 1, gz) : nodeAt(gx, gz + 1);
+    const centre = resample([{ x: before.x, z: before.z }, { x: after.x, z: after.z }], 6).map((p) => ({ ...p, y: highwayHeightAt(p.x, p.z) }));
+    for (const off of HIGHWAY_LANE_OFFSETS) add(before, after, centre, true, undefined, ROAD_HALF, off);
+    for (const off of HIGHWAY_LANE_OFFSETS) add(after, before, [...centre].reverse(), true, undefined, ROAD_HALF, off);
   }
   for (const road of SPECIAL_ROADS) {
     const a = nodeAt(...road.from), b = nodeAt(...road.to);
@@ -219,14 +281,16 @@ export function lanePath(lane: Lane, next: Lane): TrackSample[] {
 }
 
 /** Closest point on a lane's polyline; returns squared distance and writes the projection. */
-export function projectOnLane(lane: Lane, x: number, z: number, out: { x: number; z: number; yaw: number }): number {
+export function projectOnLane(lane: Lane, x: number, z: number, out: { x: number; z: number; yaw: number; y?: number }, y?: number): number {
   let best = Infinity;
   for (let i = 0; i + 1 < lane.points.length; i++) {
     const a = lane.points[i] as RoadPoint, b = lane.points[i + 1] as RoadPoint;
     const dx = b.x - a.x, dz = b.z - a.z;
     const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / (dx * dx + dz * dz || 1)));
-    const px = a.x + dx * t, pz = a.z + dz * t, dist = (x - px) ** 2 + (z - pz) ** 2;
-    if (dist < best) { best = dist; out.x = px; out.z = pz; out.yaw = Math.atan2(dx, dz); }
+    const px = a.x + dx * t, pz = a.z + dz * t, py = (a.y ?? 0) + ((b.y ?? 0) - (a.y ?? 0)) * t;
+    // with a height given, a lane over or under counts its height gap (the street under a bridge is not the bridge)
+    const dist = (x - px) ** 2 + (z - pz) ** 2 + (y === undefined ? 0 : 4 * (y - py) ** 2);
+    if (dist < best) { best = dist; out.x = px; out.z = pz; out.yaw = Math.atan2(dx, dz); out.y = py; }
   }
   return best;
 }

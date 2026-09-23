@@ -112,6 +112,9 @@ export class Traffic {
   readonly x: Float32Array;
   readonly z: Float32Array;
   readonly yaw: Float32Array;
+  /** The road's height under the record (the highway's overpasses; M5.5 slice 8) and its grade along, for the transform. */
+  readonly y: Float32Array;
+  readonly grade: Float32Array;
   readonly disturbedFor: Float32Array;
   readonly wreckedFor: Float32Array;
   readonly lastPlayerContactTick: Int32Array;
@@ -197,6 +200,7 @@ export class Traffic {
   private readonly colliderAgent = new Map<number, number>();
   private readonly pose: LanePose = { x: 0, z: 0, yaw: 0 };
   private readonly proj: PathProjection = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0, switched: false };
+  private readonly scratchQ2: Quat = { x: 0, y: 0, z: 0, w: 1 };
   private readonly scratchQ: Quat = { x: 0, y: 0, z: 0, w: 1 };
   private readonly world: RAPIER.World;
   private readonly bodies: RAPIER.RigidBody[] = [];
@@ -269,6 +273,8 @@ export class Traffic {
     this.x = new Float32Array(n);
     this.z = new Float32Array(n);
     this.yaw = new Float32Array(n);
+    this.y = new Float32Array(n);
+    this.grade = new Float32Array(n);
     this.disturbedFor = new Float32Array(n);
     this.wreckedFor = new Float32Array(n);
     this.lastPlayerContactTick = new Int32Array(n);
@@ -842,7 +848,13 @@ export class Traffic {
       let yaw = this.yaw[i] as number;
       if ((this.wobble[i] as number) > 0) yaw += Math.sin((this.wobble[i] as number) * 18) * WOBBLE_RAD;
       const q = M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, yaw);
-      tb.write(slot, this.x[i] as number, 0.03, this.z[i] as number, q.x, q.y, q.z, q.w);
+      const grade = this.grade[i] as number;
+      if (grade !== 0) {
+        // nose up on a climb: a turn about the car's own left axis
+        M.quatSetAxisAngle(this.scratchQ2, 1, 0, 0, -Math.atan(grade));
+        M.quatMul(q, q, this.scratchQ2);
+      }
+      tb.write(slot, this.x[i] as number, (this.y[i] as number) + 0.03, this.z[i] as number, q.x, q.y, q.z, q.w);
     }
   }
 
@@ -1020,6 +1032,14 @@ export class Traffic {
     this.lin.x += dvx * gain;
     this.lin.z += dvz * gain;
     body.setLinvel(this.lin, true);
+    // on an overpass's ramp the body rides at the road's height: its height is held, not simulated
+    const h = this.lanes.heightAt(lane, this.s[i] as number);
+    this.y[i] = h;
+    body.translation(this.pos);
+    if (Math.abs(this.pos.y - (h + 0.03)) > 0.001) {
+      this.pos.y = h + 0.03;
+      body.setTranslation(this.pos, true);
+    }
     // Heading: a first-order controller with a rate cap (stable while yawGain × dt < 1).
     // Moving, the nose follows the motion so the car never crabs; stopped, it turns toward the path.
     body.angvel(this.ang);
@@ -1468,7 +1488,7 @@ export class Traffic {
     const driving = this.state[i] === AgentState.Kinematic;
     body.setEnabled(true);
     this.pos.x = this.x[i] as number;
-    this.pos.y = 0.03;
+    this.pos.y = (this.y[i] as number) + 0.03;
     this.pos.z = this.z[i] as number;
     body.setTranslation(this.pos, true);
     body.setRotation(q, true);
@@ -1608,7 +1628,7 @@ export class Traffic {
       col.setCollisionGroups(GROUPS_TRAFFIC);
       body.setEnabledTranslations(true, false, true, true);
       this.pos.x = this.x[i] as number;
-      this.pos.y = 0.03;
+      this.pos.y = (lane >= 0 ? this.lanes.heightAt(lane, this.s[i] as number) : 0) + 0.03;
       this.pos.z = this.z[i] as number;
       body.setTranslation(this.pos, true);
       // back on four wheels: keep the heading, drop the lean and the roll
@@ -1847,7 +1867,7 @@ export class Traffic {
           const dz = (this.z[j] as number) - (this.z[i] as number);
           const dist = Math.hypot(dx, dz);
           const gap = this.spacing(i, j);
-          if (dist >= gap) continue;
+          if (dist >= gap || Math.abs((this.y[i] as number) - (this.y[j] as number)) > 3) continue;
           // side by side (a pass, a pull-over, a lane change easing over): not in each other's spacing
           const across = Math.abs(dx * -Math.cos(this.yaw[i] as number) + dz * Math.sin(this.yaw[i] as number));
           if (across > (this.halfW[this.body[i] as number] as number) + (this.halfW[this.body[j] as number] as number) + 0.3) continue;
@@ -1889,6 +1909,8 @@ export class Traffic {
     this.x[i] = this.pose.x;
     this.z[i] = this.pose.z;
     this.yaw[i] = this.pose.yaw;
+    this.y[i] = this.pose.y ?? 0;
+    this.grade[i] = this.pose.grade ?? 0;
   }
 
   /** Last resort when the body pool is exhausted and a kinematic car overlaps the player. */
@@ -1916,7 +1938,9 @@ export class Traffic {
     const side = dx * -Math.cos(yaw) + dz * Math.sin(yaw);
     const body = this.body[i] as number;
     return Math.abs(side) <= (this.halfW[body] as number) + player.halfWidth
-      && Math.abs(along) <= (this.halfL[body] as number) + player.halfLength;
+      && Math.abs(along) <= (this.halfL[body] as number) + player.halfLength
+      // the player on a bridge over it (or under one) is not on top of it
+      && Math.abs(player.y - 0.5 - (this.y[i] as number)) < 2.5;
   }
 
   /** Metres to the right of a pose, the car's shift across its lane. */

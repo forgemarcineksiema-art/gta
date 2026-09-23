@@ -267,7 +267,7 @@ export class SimWorld {
       // The reset pose only has to be fresh when a reset can happen this step;
       // otherwise a 10 Hz refresh keeps the projection within a car length.
       if (this.controls.reset || this.tick % 6 === 0 || this.vehicle.telemetry.groundedWheels === 0) {
-        const nearest = this.nearestSpawn(pos.x, pos.z);
+        const nearest = this.nearestSpawn(pos.x, pos.z, pos.y);
         this.vehicle.resetPose.position = nearest.position;
         this.vehicle.resetPose.yaw = nearest.yaw;
       }
@@ -333,7 +333,7 @@ export class SimWorld {
     }
     // keep the reset target on the nearest spawn point and catch falls
     const pos = this.vehicle.body.translation(this.scratchPos);
-    const nearest = this.nearestSpawn(pos.x, pos.z);
+    const nearest = this.nearestSpawn(pos.x, pos.z, pos.y);
     this.vehicle.resetPose.position = nearest.position;
     this.vehicle.resetPose.yaw = nearest.yaw;
     if (pos.y < KILL_Y) {
@@ -381,8 +381,8 @@ export class SimWorld {
     return true;
   }
 
-  nearestSpawn(x: number, z: number): SpawnPoint {
-    if (this.city) return this.city.nearestRoad(x, z, this.roadReset);
+  nearestSpawn(x: number, z: number, y = 0.5): SpawnPoint {
+    if (this.city) return this.city.nearestRoad(x, z, this.roadReset, y);
     let best = this.spawns[0] as SpawnPoint;
     let bestD = Infinity;
     for (const s of this.spawns) {

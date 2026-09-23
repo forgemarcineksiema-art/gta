@@ -15,6 +15,9 @@ export interface LanePose {
   x: number;
   z: number;
   yaw: number;
+  /** The road's height there (the highway's overpasses; M5.5 slice 8) and its rise per metre along: 0 on the flat. */
+  y?: number;
+  grade?: number;
 }
 
 export interface LaneProjection extends LanePose {
@@ -305,6 +308,17 @@ export class LaneTables {
     const z = a.z + (b.z - a.z) * t;
     const yaw = Math.atan2(b.x - a.x, b.z - a.z);
     applyOffset(x, z, yaw, offset, out);
+    const ya = a.y ?? 0, yb = b.y ?? 0;
+    out.y = ya + (yb - ya) * t;
+    out.grade = (yb - ya) / span;
+  }
+
+  /** The road's height `s` m along a lane (0 past its end, on the junction curves). */
+  heightAt(lane: number, s: number): number {
+    const len = this.length[lane] as number;
+    if (s > len || s < 0) return 0;
+    this.sample(lane, s, 0, this.scratch);
+    return this.scratch.y ?? 0;
   }
 
   private sampleConnection(conn: Connection, s: number, out: LanePose): void {
@@ -322,6 +336,9 @@ export class LaneTables {
     out.x = x0 + (x1 - x0) * t;
     out.z = z0 + (z1 - z0) * t;
     out.yaw = Math.atan2(x1 - x0, z1 - z0);
+    // the junctions are on the ground
+    out.y = 0;
+    out.grade = 0;
   }
 
   /**

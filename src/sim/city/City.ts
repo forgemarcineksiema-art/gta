@@ -15,7 +15,8 @@ import { cameraStatics, placeCameras, type CameraDesc } from './cameras';
 import { jumpStatics, placeJumps, type JumpDesc } from './jumps';
 import { layoutCoins, placeCoins, type CoinDesc, type CoinPoint } from './coins';
 import { buildRoadMarkings } from './markings';
-import { BLOCK, CITY_HALF, HIGHWAY_HALF, HIGHWAY_LANE_OFFSETS, ROAD_HALF, buildCityRoute, buildRoadGraph, distanceToPolyline, projectOnLane, type Lane, type RoadPoint, type SpecialRoad } from './roads';
+import { BLOCK, CITY_HALF, HIGHWAY_HALF, HIGHWAY_LANE_OFFSETS, OVERPASS_NODES, ROAD_HALF, buildCityRoute, buildRoadGraph, distanceToPolyline, highwayHeightAt, projectOnLane, underOverpass, type Lane, type RoadPoint, type SpecialRoad } from './roads';
+import { overpassStatics } from './overpass';
 
 export const DISTRICTS = [
   { id: 'crown', name: 'CROWN HEIGHTS', color: 0xb497d6, accent: 0xf5cd75, landmark: 'Crown Tower' },
@@ -79,6 +80,8 @@ export class City {
   /** The four covered streets (M5.5 slice 7); their boxes go into the chunks that hold them. */
   readonly covers: readonly CoverDesc[];
   private readonly coverBoxes: readonly StaticDesc[];
+  /** The highway's four overpasses (M5.5 slice 8), likewise by chunk. */
+  private readonly overpassBoxes: readonly StaticDesc[];
   constructor(readonly world: RAPIER.World, readonly seed = 42) {
     this.cameras = placeCameras(cameraSites(this.graph), POLICE.cameras.count);
     this.jumps = placeJumps(seed, BALANCE.jumps.count);
@@ -99,6 +102,7 @@ export class City {
     ];
     this.covers = placeCovers(this.graph, anchors, avoid);
     this.coverBoxes = this.covers.flatMap((c) => coverStatics(c));
+    this.overpassBoxes = OVERPASS_NODES.flatMap((_, k) => overpassStatics(k));
     // The one unbroken collision plane eliminates suspension seams at roads and chunk borders.
     world.createCollider(RAPIER.ColliderDesc.cuboid(CITY_HALF, 0.5, CITY_HALF)
       .setTranslation(0, -0.5, 0).setFriction(1).setCollisionGroups(GROUPS_TERRAIN));
@@ -112,7 +116,8 @@ export class City {
     this.spawns.unshift({ name: 'city', position: { x: start.x, y: 1, z: start.z }, yaw: start.yaw });
     for (const [name, x, z] of [['crown', -450, -450], ['foundry', 450, -450], ['gardens', -450, 450], ['marina', 450, 450], ['highway', -675, 0]] as const) {
       // Facing +Z, right is -X: the highway spawn sits in its inner lane, the street spawns on their single lane.
-      this.spawns.push({ name, position: { x: x - (name === 'highway' ? HIGHWAY_LANE_OFFSETS[0] : 4.5), y: 1, z: z + 40 }, yaw: 0 });
+      const px = x - (name === 'highway' ? HIGHWAY_LANE_OFFSETS[0] : 4.5), pz = z + 40;
+      this.spawns.push({ name, position: { x: px, y: 1 + (name === 'highway' ? highwayHeightAt(px, pz) : 0), z: pz }, yaw: 0 });
     }
     // The authored loop starts on the first Crown diagonal, heading for the tower junction.
     const first = this.graph.lanes.find((l) => l.special === 'Crown Diagonal West' && this.graph.nodes[l.from]?.x === -675);
@@ -137,7 +142,7 @@ export class City {
     }
     // One owner per whole-road marking, including marks across chunk boundaries.
     // Non-colliding top faces: road .010/.034, parking pad .040, paint .064.
-    statics.push(...(this.roadMarkings.chunks.get(`${cx},${cz}`) ?? []));
+    for (const st of this.roadMarkings.chunks.get(`${cx},${cz}`) ?? []) if (!underOverpass(st.position.x, st.position.z, 1)) statics.push(st);
     // Authored roads that come near this chunk. Their corridor (half width plus
     // pavement) overrides the grid apron and lots, so nothing is built on them.
     const corridors = this.graph.special.filter((road) => road.centre.some((pt) => Math.abs(pt.x - x) < BLOCK / 2 + road.halfWidth + 8 && Math.abs(pt.z - z) < BLOCK / 2 + road.halfWidth + 8));
@@ -256,12 +261,12 @@ export class City {
         }
       }
       if (d.id !== 'foundry') for (const along of [57, 106]) {
-        if (roadClearance(x + sx * (vx + 2.7), z + sz * along) > 3 && !nearDoor(x + sx * (vx + 2.7), z + sz * along, 4) && !insideCover(this.covers, x + sx * (vx + 2.7), z + sz * along, 4)) architecture.tree(x + sx * (vx + 2.7), z + sz * along, d.id === 'marina');
-        if (roadClearance(x + sx * along, z + sz * (vz + 2.7)) > 3 && !nearDoor(x + sx * along, z + sz * (vz + 2.7), 4) && !insideCover(this.covers, x + sx * along, z + sz * (vz + 2.7), 4)) architecture.tree(x + sx * along, z + sz * (vz + 2.7), d.id === 'marina');
+        if (roadClearance(x + sx * (vx + 2.7), z + sz * along) > 3 && !nearDoor(x + sx * (vx + 2.7), z + sz * along, 4) && !insideCover(this.covers, x + sx * (vx + 2.7), z + sz * along, 4) && !underOverpass(x + sx * (vx + 2.7), z + sz * along, 4)) architecture.tree(x + sx * (vx + 2.7), z + sz * along, d.id === 'marina');
+        if (roadClearance(x + sx * along, z + sz * (vz + 2.7)) > 3 && !nearDoor(x + sx * along, z + sz * (vz + 2.7), 4) && !insideCover(this.covers, x + sx * along, z + sz * (vz + 2.7), 4) && !underOverpass(x + sx * along, z + sz * (vz + 2.7), 4)) architecture.tree(x + sx * along, z + sz * (vz + 2.7), d.id === 'marina');
       }
       // Street lamps and planted verges are outside the driving corridor.
       for (const offset of [36, 80]) {
-        if (roadClearance(x + sx * (vx + 2), z + sz * offset) < 1.5 || nearDoor(x + sx * (vx + 2), z + sz * offset, 4) || insideCover(this.covers, x + sx * (vx + 2), z + sz * offset, 4)) continue;
+        if (roadClearance(x + sx * (vx + 2), z + sz * offset) < 1.5 || nearDoor(x + sx * (vx + 2), z + sz * offset, 4) || insideCover(this.covers, x + sx * (vx + 2), z + sz * offset, 4) || underOverpass(x + sx * (vx + 2), z + sz * offset, 4)) continue;
         box(x + sx * (vx + 2), 4, z + sz * offset, 0.18, 4, 0.18, 0x686678);
         box(x + sx * (vx + 1), 8, z + sz * offset, 1.4, 0.28, 0.45, PALETTE.laneMark);
       }
@@ -331,8 +336,9 @@ export class City {
       box(x, quay ? 0.55 : 2, Math.sign(cz) * CITY_HALF, BLOCK / 2, quay ? 0.55 : 2, 1, PALETTE.kerb, 'boundary');
       if (quay) box(x, 1.16, Math.sign(cz) * CITY_HALF, BLOCK / 2, 0.07, 1.15, CITY_COLORS.trim, 'boundary');
     }
-    // the covered streets' boxes, each in the chunk holding its centre
+    // the covered streets' and the overpasses' boxes, each in the chunk holding its centre
     for (const st of this.coverBoxes) if (chunkCoord(st.position.x) === cx && chunkCoord(st.position.z) === cz) statics.push(st);
+    for (const st of this.overpassBoxes) if (chunkCoord(st.position.x) === cx && chunkCoord(st.position.z) === cz) statics.push(st);
     // Last: the billboards need every static in place to find clear ground.
     const billboards = placeBillboards(cx, cz, statics, roadClearance);
     const coins = placeCoins(cx, cz, this.coinLayout, billboards, this.graph);
@@ -731,15 +737,16 @@ export class City {
   }
 
   /** Project onto the closest driveable lane instead of resetting to a distant junction. */
-  nearestRoad(x: number, z: number, out: SpawnPoint): SpawnPoint {
+  nearestRoad(x: number, z: number, out: SpawnPoint, y = 0.5): SpawnPoint {
     let best = Infinity;
-    const hit = { x: 0, z: 0, yaw: 0 };
+    const hit: { x: number; z: number; yaw: number; y?: number } = { x: 0, z: 0, yaw: 0 };
     for (let i = 0; i < this.graph.lanes.length; i++) {
       const b = this.laneBounds[i] as { minX: number; maxX: number; minZ: number; maxZ: number };
       const dx = Math.max(b.minX - x, 0, x - b.maxX), dz = Math.max(b.minZ - z, 0, z - b.maxZ);
       if (dx * dx + dz * dz >= best) continue;
-      const dist = projectOnLane(this.graph.lanes[i] as Lane, x, z, hit);
-      if (dist < best) { best = dist; out.position.x = hit.x; out.position.z = hit.z; out.yaw = hit.yaw; }
+      // the height gap counts: under a bridge the street is nearer than the deck over it
+      const dist = projectOnLane(this.graph.lanes[i] as Lane, x, z, hit, y - 0.5);
+      if (dist < best) { best = dist; out.position.x = hit.x; out.position.z = hit.z; out.position.y = 1 + (hit.y ?? 0); out.yaw = hit.yaw; }
     }
     return out;
   }

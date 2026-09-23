@@ -9,7 +9,7 @@ import type { VehicleControls } from '../controls';
 import { DAMAGE, ECONOMY, SWAP } from '../economy';
 import * as M from '../math';
 import type { SimWorld } from '../SimWorld';
-import { AgentState, PLAYER_PAINT, type SwapHandover } from '../traffic/Traffic';
+import { AgentState, type SwapHandover } from '../traffic/Traffic';
 import { PedPose } from '../traffic/Pedestrians';
 import { POLICE } from '../police/tuning';
 
@@ -233,7 +233,8 @@ export class Life {
     this.sim.run.spill(p.x, p.z, M.yawOf(this.sim.vehicle.body.rotation(this.rot)));
   }
 
-  private heal(): void {
+  /** A fresh car: no damage, no wreck, new tyres (a reset, a swap, a respawn, the garage's drive-out). */
+  heal(): void {
     this.mend();
     const st = this.state;
     st.damage = 0;
@@ -298,7 +299,7 @@ export class Life {
     this.oldPose.z = p.z;
     this.oldPose.yaw = oldYaw;
     const oldKind = this.sim.carId;
-    traffic.takeOver(agent, oldKind, PLAYER_PAINT[oldKind], this.oldPose, this.state.wrecked, this.handover);
+    traffic.takeOver(agent, oldKind, this.sim.garage.paintOf(oldKind), this.oldPose, this.state.wrecked, this.handover);
     const h = this.handover;
     this.sim.carId = h.kind;
     v.tuning = cloneTuning(CAR_PRESETS[h.kind]);
@@ -319,7 +320,7 @@ export class Life {
     this.state.swapCandidate = -1;
     // identity (docs/DESIGN.md §2.5): a swap no unit saw loses them, and they box the car you left
     const police = this.sim.police;
-    if (this.sim.pursuit.onSwap(police?.crimeSeen() ?? false, h.kind, PLAYER_PAINT[h.kind])) police?.box(this.oldPose.x, this.oldPose.z, oldYaw);
+    if (this.sim.pursuit.onSwap(police?.crimeSeen() ?? false, h.kind, this.sim.garage.paintOf(h.kind))) police?.box(this.oldPose.x, this.oldPose.z, oldYaw);
   }
 
   /** Set the damage directly (the cold open's beat-up van); the stage follows, silently, and a wreck is never set this way. */

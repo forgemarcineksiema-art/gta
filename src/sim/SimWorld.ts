@@ -23,12 +23,15 @@ import { Pursuit } from './police/Pursuit';
 import { ColdOpen } from './run/ColdOpen';
 import { Run } from './run/Run';
 import { Jobs } from './jobs/Jobs';
+import { Garage } from './garage/Garage';
+import { Dailies } from './dailies/Dailies';
+import { apply as applySave, type SaveV1 } from './save/format';
 import { buildPlayground, type PlaygroundLayout, type SpawnPoint } from './playground';
 import { POSE_STRIDE, Recorder } from './recorder';
 import type { DynamicDesc, StaticDesc } from './scene';
 import { LapTimer, type LapState, type TrackDef } from './track';
 import { Pedestrians } from './traffic/Pedestrians';
-import { PLAYER_PAINT, Traffic, type PlayerProbe } from './traffic/Traffic';
+import { Traffic, type PlayerProbe } from './traffic/Traffic';
 import { PEDS, TRAFFIC } from './traffic/tuning';
 import { SimPhase, type PhaseMark } from './profile';
 import { TransformBuffer } from './transforms';
@@ -66,6 +69,12 @@ export interface SimWorldOptions {
   damage?: boolean;
   /** Initial heat points for pursuit probes. Normal play starts quiet. */
   heat?: number;
+  /**
+   * The player's save (docs/M5_PLAN.md slice 0), applied once every subsystem exists: the garage car, its
+   * paint and tiers, the seen flag, the bank, the coins, the billboards, the dailies and the streak. `car`
+   * still wins for dev runs.
+   */
+  save?: SaveV1;
 }
 
 interface TrackedBody {
@@ -113,6 +122,10 @@ export class SimWorld {
   readonly jobs: Jobs;
   /** The first run's script; inactive until `start()`. */
   readonly coldOpen: ColdOpen;
+  /** The catalogue, paint, upgrades and prep: the wall's pages (M5 slice 4). */
+  readonly garage: Garage;
+  /** The day's three challenges and the streak (M5 slice 6). */
+  readonly dailies: Dailies;
   /** The city's smashable billboards; null on the playground. */
   readonly collectibles: Collectibles | null;
   /** Coins on the road and the spill pool; null on the playground. */
@@ -190,6 +203,7 @@ export class SimWorld {
     this.carId = opts.car ?? 'muscle';
     const tuning = opts.tuning ?? cloneTuning(CAR_PRESETS[this.carId]);
     this.vehicle = new Vehicle(this.world, this.transforms, tuning, spawn.position, spawn.yaw);
+    this.garage = new Garage(this);
     this.traffic = this.city ? new Traffic(this.world, this.transforms, this.city, opts.seed ?? 42, TRAFFIC, this.trafficDensity) : null;
     this.peds = this.city && this.traffic ? new Pedestrians(this.transforms, this.city, this.traffic.lanes, opts.seed ?? 42, PEDS, this.pedsDensity) : null;
     this.collectibles = this.city ? new Collectibles(this.city) : null;
@@ -199,7 +213,7 @@ export class SimWorld {
     this.heat.add(opts.heat ?? 0);
     this.pursuit = new Pursuit(this.events);
     this.pursuit.descriptor.kind = this.carId;
-    this.pursuit.descriptor.paint = PLAYER_PAINT[this.carId];
+    this.pursuit.descriptor.paint = this.garage.paintOf(this.carId);
     this.cover = this.city ? coverSites(this.city) : null;
     this.police = this.traffic ? new Police(this) : null;
     this.roadblocks = this.traffic && this.cover ? new Roadblocks(this, this.cover.chokepoints) : null;
@@ -208,7 +222,17 @@ export class SimWorld {
     this.jobs = new Jobs(this, []);
     this.run = new Run(this);
     this.coldOpen = new ColdOpen(this);
+    this.dailies = new Dailies(this);
     this.city?.sync(spawn.position.x, spawn.position.z, true);
+    if (opts.save) {
+      applySave(this, opts.save);
+      // a dev run's class wins over the garage car, for this session only
+      if (opts.car && opts.car !== this.carId) this.setCar(opts.car);
+      if (opts.tuning) {
+        this.vehicle.tuning = opts.tuning;
+        this.vehicle.applyTuning();
+      }
+    }
   }
 
   /** Advance the simulation by exactly one fixed step using the current `controls`. */
@@ -271,6 +295,7 @@ export class SimWorld {
     // before the run: a delivery into a garage pays the bag before the door can drop the job
     this.jobs.step(this.probe, FIXED_DT);
     this.run.step(this.probe, FIXED_DT);
+    this.dailies.step();
     this.coldOpen.postStep(FIXED_DT);
     for (const t of this.tracked) {
       const p = t.body.translation(this.scratchPos);
@@ -347,7 +372,7 @@ export class SimWorld {
   setCar(kind: CarId): void {
     this.carId = kind;
     this.pursuit.descriptor.kind = kind;
-    this.pursuit.descriptor.paint = PLAYER_PAINT[kind];
+    this.pursuit.descriptor.paint = this.garage.paintOf(kind);
     this.vehicle.tuning = cloneTuning(CAR_PRESETS[kind]);
     this.vehicle.applyTuning();
   }

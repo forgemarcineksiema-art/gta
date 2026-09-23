@@ -2,6 +2,59 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M5, the launch minimum
+
+Marcin: carry out the whole M5 plan. Working autonomously per
+`docs/M5_PLAN.md`, slice by slice.
+
+### Before slice 0
+
+- §1.2 checked against the code at 3ae1f72: every row exists (Run with the
+  bag, bank, coins, `maxHeat`, the fine and the spill; `cover.ts` with the
+  three drop-offs and the chokepoints; the coins; the door and the wall;
+  the cold open on the jobs skeleton; the bot policies; the twenty jumps;
+  the descriptor, the disguise and `blown`; the ad points; the events; the
+  measurements). One gap: `cover.ts` has no Palm Gardens fence; slice 2
+  adds it, as the plan allows.
+- `npm run verify` green before the first edit: 231 tests in 62.5 s.
+
+### Slice 0 — save and prices
+
+- `sim/save/format.ts`: `SaveV1`, frozen `DEFAULT_SAVE`, `serialize` in a
+  fixed key order, `parse` that never throws, the migrations table
+  (v0 → v1), field-by-field sanitising (a broken field falls back alone),
+  `collect` / `apply`, and the billboards as a bit set in base64 ('' when
+  none). `app/save.ts`: `SaveStore` (load, the debounce as a throttle with
+  the first write at once, `flush` that skips an unchanged text,
+  `unknownRaw` for a newer version, `pagehide` and hidden flushes).
+- `SimWorld` owns `garage` and `dailies` (state from now; the wall in slice
+  4, the draw in slice 6); `SimWorldOptions.save` is applied last in the
+  constructor; `?car=` still wins. `App.boot` loads before the world,
+  `?fresh=1` clears the key; the store marks dirty from the ring and
+  flushes at the door and the card; the debug line shows `save n kB`.
+- `balance.ts` carries §3.4, `measured` filled from the M4 gate.
+- Tests: `save.test.ts` 0.1–0.6, `tests/app/save.test.ts` 0.7–0.10.
+
+Measured: everything filled serializes to 1.1 kB (guard 32 kB); a
+15-minute novice bot session with traffic and peds saves 359 bytes (15 min
+of sim took 16 s of wall in Node). A reload in the browser kept the bank,
+the compact, its respray and the billboard count.
+
+Decided (set here):
+- `jobs.timeBonus` stays at the jobs level where M4 put it, not inside
+  `delivery` as §3.4 writes it: M4's pin 4.7 reads it there, and it is the
+  rule for any timed arrival.
+- `BALANCE.measured.runSeconds` is 600 as a floor: no bot run ended in the
+  M4 measurement's ten minutes. `bagPerMinute` 406 and `coinsPerMinute` 36
+  are the midpoints of the measured ranges.
+- Money in the save is kept to the cent, not rounded to whole units:
+  `playSeconds` is fractional and one rule serves every amount.
+- The garage's drive-out sets the descriptor directly (kind, paint, a clean
+  disguise on the dispatcher's clock) instead of `Pursuit.onSwap`, which
+  would count an escape if a chase were on.
+- The player's paint for a class is the garage's (`Garage.paintOf`): the
+  swap leaves the old car in it and the descriptor takes it.
+
 ## 2026-09-23 — The coin layer as lines
 
 Marcin: the coins are placed hopelessly and thoughtlessly; their look, how a

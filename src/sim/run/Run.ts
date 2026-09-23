@@ -51,6 +51,8 @@ export class Run {
   runs = 0;
   /** Most banked in one run. */
   bestRun = 0;
+  /** Seconds driven (running or closing) over every session: the save carries it. */
+  playSeconds = 0;
   /** True until the first door has been opened again: that door ends the cold open and gets no ad (M5 D10). */
   firstDoor = true;
   /** The drop-off being closed or shut, index into `dropOffs`; -1 otherwise. */
@@ -105,6 +107,7 @@ export class Run {
     // this step's crimes first: the bag must hold them before a door or a fine can end the run
     this.cursor = this.sim.events.readFrom(this.cursor, this.onEvent);
     if (this.state === 'door' || this.state === 'busted') return;
+    this.playSeconds += dt;
     if (this.sim.pursuit.state === 'active') this.maxHeat = Math.max(this.maxHeat, this.sim.heat.level);
     if (this.stepBusted(probe, dt)) return;
     this.stepDoor(probe, dt);
@@ -133,6 +136,18 @@ export class Run {
     this.firstDoor = false;
     this.armed = false;
     this.startRun();
+  }
+
+  /** The garage takes from the bank; false (and nothing taken) when it holds less. */
+  spend(amount: number): boolean {
+    if (!(amount >= 0) || this.bank < amount) return false;
+    this.bank -= amount;
+    return true;
+  }
+
+  /** Dailies and the streak pay into the bank, never the bag (docs/M5_PLAN.md D14). */
+  earn(amount: number): void {
+    if (amount > 0 && Number.isFinite(amount)) this.bank += amount;
   }
 
   /** A wreck: `spill.share` of the bag leaves it as a pool of coins on the lane ahead (Life calls this). */

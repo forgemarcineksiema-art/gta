@@ -9,8 +9,12 @@ export type EventKind =
   | 'takedown' | 'takedownTraffic' | 'swap' | 'billboard' | 'honk' | 'escape'
   // the run (M4): money and its endings; camera, roadblock and jump are pushed from slice 6
   | 'camera' | 'roadblock' | 'jump' | 'door' | 'banked' | 'busted' | 'coin' | 'spill'
-  // jobs (M4 slice 4 skeleton): value = payout on start, paid on done; target = the def's id
-  | 'jobStart' | 'jobDone' | 'jobFailed'
+  // jobs (M4 slice 4 skeleton, M5): value = payout on start, paid on done; target = the def's id;
+  // orderFound: the wanted car exists (target: its agent)
+  | 'jobStart' | 'jobDone' | 'jobFailed' | 'orderFound'
+  // the wall and the day (M5): purchase value = the price, target = the car's index or -1;
+  // dailyDone value = the reward, target = the slot; streak value = the day's cash, target = the count
+  | 'purchase' | 'dailyDone' | 'streak'
   // identity (slice 5): a crime seen from the police car the player drives
   | 'blown';
 

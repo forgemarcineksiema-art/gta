@@ -24,7 +24,8 @@ import { CITY_BOT_TUNING, TrackBot } from './trackBot';
 import { FixedStepLoop } from './loop';
 import { PerfProbe, heapMb } from './perf';
 import { SimProfile } from './simProfile';
-import { BALANCE, POLICE } from '../sim';
+import { SaveStore } from './save';
+import { BALANCE, POLICE, defaultSave, type SaveV1, type SimEvent } from '../sim';
 
 /** Filled during `App.boot`; copied into the handle for `?dev` and the startup gate. */
 const bootTimings: Record<string, number> = {};
@@ -60,6 +61,8 @@ export interface GameHandle {
   audio: EngineAudio;
   /** True from an ad request at a break until the ad finished or failed. */
   adShowing: boolean;
+  /** The save store (e2e: bytes, writes, the flush). */
+  save: SaveStore;
 }
 
 declare global {
@@ -115,10 +118,25 @@ export class App {
   /** An ad requested at this break is still running: the break cannot be dismissed. */
   private adShowing = false;
   private readonly autoDismiss: boolean;
+  private readonly store: SaveStore;
+  private saveCursor: number;
+  /** Bound once: the save's dirty marks come from the event ring. */
+  private readonly onSaveEvent = (e: SimEvent): void => {
+    switch (e.kind) {
+      case 'banked': case 'busted': case 'purchase': case 'dailyDone': case 'streak': case 'billboard':
+        this.store.markDirty();
+        break;
+      default:
+        break;
+    }
+  };
 
-  private constructor(platform: Platform, sim: SimWorld, canvas: HTMLCanvasElement, params: URLSearchParams) {
+  private constructor(platform: Platform, sim: SimWorld, canvas: HTMLCanvasElement, params: URLSearchParams, store: SaveStore) {
     this.platform = platform;
     this.sim = sim;
+    this.store = store;
+    this.saveCursor = sim.events.sequence;
+    store.bindLifecycle(window, sim);
     this.manual = params.get('manual') === '1';
     const quality = params.get('quality');
     this.renderer = new Renderer(canvas, sim, quality === 'low' || quality === 'high' ? quality : undefined);
@@ -239,6 +257,7 @@ export class App {
       roadBot: sim.city && this.bot instanceof TrackBot ? this.bot : this.bot instanceof BotPolicy ? this.bot.bot : null,
       audio: this.audio,
       adShowing: false,
+      save: store,
     };
     window.__game = this.handle;
     window.render_game_to_text = () => {
@@ -307,6 +326,16 @@ export class App {
     bootTimings['platform'] = performance.now();
     await initPhysics();
     bootTimings['physics'] = performance.now();
+    // the save before the world: the garage car, the bank and the seen flag are in place for the first step
+    const store = new SaveStore(platform);
+    let save: SaveV1;
+    if (params.get('fresh') === '1') {
+      await platform.clearData(BALANCE.save.key);
+      save = defaultSave();
+    } else {
+      save = await store.load();
+    }
+    bootTimings['save'] = performance.now();
     const spawn = params.get('spawn') ?? undefined;
     const carParam = params.get('car');
     const car = (CAR_IDS as string[]).includes(carParam ?? '') ? (carParam as CarId) : undefined;
@@ -326,6 +355,7 @@ export class App {
       heat: Math.max(0, Math.min(100, Number(params.get('heat') ?? 0) * 20)),
       ...(spawn ? { spawn } : coldOpen ? { spawn: 'loop' } : {}),
       ...(car ? { car } : {}),
+      save,
     });
     // the flag is set as it starts, so a reload never repeats it
     if (coldOpen) {
@@ -335,7 +365,7 @@ export class App {
       }
     }
     bootTimings['sim'] = performance.now();
-    const app = new App(platform, sim, canvas, params);
+    const app = new App(platform, sim, canvas, params, store);
     platform.loadingStop();
     app.start();
     return app;
@@ -468,11 +498,16 @@ export class App {
     if (this.started && this.wasPlaying && !playing) {
       this.platform.gameplayStop();
       this.breakAt = now;
+      // the totals are final: the door's bank and the card's fine are written at once
+      void this.store.flush(this.sim);
       this.adBreak(run.state === 'door' && run.firstDoor);
     } else if (this.started && !this.wasPlaying && playing) {
       this.platform.gameplayStart();
     }
     this.wasPlaying = playing;
+
+    this.saveCursor = this.sim.events.readFrom(this.saveCursor, this.onSaveEvent);
+    this.store.tick(this.sim, frameDt);
 
     this.renderer.render(alpha, this.paused ? 0 : frameDt);
     this.audio.update(this.sim.vehicle.telemetry, frameDt);
@@ -508,6 +543,7 @@ export class App {
         dpr: stats.dpr,
         tick: this.sim.tick,
         steps: this.loop.lastSteps,
+        saveBytes: this.store.bytes,
       },
       now,
     );

@@ -55,7 +55,7 @@ export function buildBodyGeometry(profile: CarProfile, t: VehicleTuning): THREE.
       b.quad([P(side * a.hwFloor, a.floor, a.z), P(side * c.hwFloor, c.floor, c.z), P(side * c.hwBelt, c.belt, c.z), P(side * a.hwBelt, a.belt, a.z)], out, color);
       const upper = [P(side * a.hwBelt, a.belt, a.z), P(side * c.hwBelt, c.belt, c.z), P(side * c.hwRoof, c.roof, c.z), P(side * a.hwRoof, a.roof, a.z)] as const;
       b.quad(upper, out, color);
-      if (glassSide(i)) b.inset(upper, out, i === profile.aPillar ? 0.12 : 0.07, 0.06, GLASS);
+      if (glassSide(i)) b.inset(upper, out, i === profile.aPillar ? 0.12 : 0.07, profile.windowMargins?.bottom ?? 0.06, GLASS, profile.windowMargins?.top ?? 0.06);
     }
     const out = P(0, 1, Math.sign(c.roof - a.roof));
     const top = [P(a.hwRoof, a.roof, a.z), P(c.hwRoof, c.roof, c.z), P(-c.hwRoof, c.roof, c.z), P(-a.hwRoof, a.roof, a.z)] as const;
@@ -202,17 +202,17 @@ class Builder {
 
   /**
    * A panel inset into a quad (corners: start-low, end-low, end-high, start-high), `along` metres in from
-   * the ends and `up` metres from the edges, lifted off it: a window framed by the panel's paint.
+   * the ends, `up` metres from the low edge and `top` from the high one, lifted off it: a window framed by the paint.
    */
-  inset(q: readonly V3[], out: V3, along: number, up: number, color: number): void {
+  inset(q: readonly V3[], out: V3, along: number, up: number, color: number, top = up): void {
     const [c0, c1, c2, c3] = q as [V3, V3, V3, V3];
     const length = Math.hypot(c1.x - c0.x, c1.y - c0.y, c1.z - c0.z);
     const height = Math.hypot(c3.x - c0.x, c3.y - c0.y, c3.z - c0.z);
     if (length < 0.12 || height < 0.12) return;
-    const u0 = Math.min(0.4, along / length), v0 = Math.min(0.35, up / height);
+    const u0 = Math.min(0.4, along / length), v0 = Math.min(0.35, up / height), v1 = Math.min(0.35, top / height);
     const lerp = (p: V3, q2: V3, f: number): V3 => ({ x: p.x + (q2.x - p.x) * f, y: p.y + (q2.y - p.y) * f, z: p.z + (q2.z - p.z) * f });
     const pt = (u: number, v: number): V3 => lerp(lerp(c0, c1, u), lerp(c3, c2, u), v);
-    const corners = [pt(u0, v0), pt(1 - u0, v0), pt(1 - u0, 1 - v0), pt(u0, 1 - v0)];
+    const corners = [pt(u0, v0), pt(1 - u0, v0), pt(1 - u0, 1 - v1), pt(u0, 1 - v1)];
     // lift along the panel's own normal, toward `out`
     const ex = c1.x - c0.x, ey = c1.y - c0.y, ez = c1.z - c0.z, fx = c3.x - c0.x, fy = c3.y - c0.y, fz = c3.z - c0.z;
     let nx = ey * fz - ez * fy, ny = ez * fx - ex * fz, nz = ex * fy - ey * fx;

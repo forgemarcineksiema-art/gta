@@ -241,6 +241,7 @@ export const BUS: CarProfile = {
   headlight: { width: 0.36, height: 0.16, y: 0.75, inset: 0.22 },
   taillight: { width: 0.2, height: 0.3, y: 0.85, inset: 0.12 },
   grille: null,
+  windowMargins: { bottom: 0.12, top: 0.5 },
   bumperHeight: 0.14,
   lipSpoiler: false,
   mirrors: true,

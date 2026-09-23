@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { SimWorld } from '../../src/sim';
-import { BODIES, BODY_INDEX, CIVILIAN_BODIES, bodySpec, pickBody, type CivilianBody } from '../../src/sim/traffic/bodies';
+import { BODIES, BODY_INDEX, CIVILIAN_BODIES, bodySpec, pickBody, type CivilianBody, type RoadKind } from '../../src/sim/traffic/bodies';
 import { AgentState, type Traffic } from '../../src/sim/traffic/Traffic';
 import { TRAFFIC } from '../../src/sim/traffic/tuning';
 import { CAR_IDS, CAR_PRESETS } from '../../src/sim/vehicle/presets';
@@ -15,10 +15,10 @@ import { PALETTE } from '../../src/sim/palette';
 import { createWorld, run } from './helpers';
 
 /** Shares of each body over a fine grid of the pick's roll. */
-function shares(district: string, avenue: boolean, highway = false): Record<CivilianBody, number> {
+function shares(district: string, road: RoadKind): Record<CivilianBody, number> {
   const out = Object.fromEntries(CIVILIAN_BODIES.map((b) => [b, 0])) as Record<CivilianBody, number>;
   const n = 4000;
-  for (let k = 0; k < n; k++) out[pickBody((k + 0.5) / n, district, avenue, highway, TRAFFIC.bodies)] += 1 / n;
+  for (let k = 0; k < n; k++) out[pickBody((k + 0.5) / n, district, road, TRAFFIC.bodies)] += 1 / n;
   return out;
 }
 
@@ -41,13 +41,16 @@ function pose(sim: SimWorld, lane: number, s: number, offset = 0): { x: number; 
 }
 
 describe('traffic\'s own bodies', () => {
-  it('19.1 the pick by place: buses only on the avenues, taxis round the tower, trucks in the Works', () => {
-    for (const d of ['crown', 'foundry', 'gardens', 'marina']) expect(shares(d, false).bus).toBe(0);
-    expect(shares('gardens', true).bus).toBeGreaterThan(0.05);
-    expect(shares('crown', false).taxi).toBeGreaterThan(shares('marina', false).taxi * 3);
-    expect(shares('foundry', false).truck).toBeGreaterThan(shares('gardens', false).truck * 2);
-    // every civilian body can come up somewhere
-    for (const b of CIVILIAN_BODIES) expect(Math.max(shares('crown', true)[b], shares('foundry', true)[b])).toBeGreaterThan(0.02);
+  it('19.1 the pick by place: buses on the streets and more on the avenues, never on the highway; taxis round the tower, trucks in the Works', () => {
+    for (const d of ['crown', 'foundry', 'gardens', 'marina']) {
+      expect(shares(d, 'highway').bus).toBe(0);
+      expect(shares(d, 'street').bus).toBeGreaterThan(0.02);
+    }
+    expect(shares('crown', 'avenue').bus).toBeGreaterThan(shares('crown', 'street').bus * 2);
+    expect(shares('crown', 'street').taxi).toBeGreaterThan(shares('marina', 'street').taxi * 3);
+    expect(shares('foundry', 'street').truck).toBeGreaterThan(shares('gardens', 'street').truck * 2);
+    // every civilian body comes up on a street
+    for (const b of CIVILIAN_BODIES) expect(Math.max(shares('crown', 'street')[b], shares('foundry', 'street')[b])).toBeGreaterThan(0.02);
   });
 
   it('19.2 the city spawns its own bodies, never the player\'s shells, each with its footprint and its collider', async () => {
@@ -59,7 +62,7 @@ describe('traffic\'s own bodies', () => {
       for (let b = 0; b < CAR_IDS.length; b++) expect(traffic.bodySpawns[b]).toBe(0);
       let kinds = 0;
       for (let b = CAR_IDS.length; b < BODIES.length; b++) if ((traffic.bodySpawns[b] as number) > 0) kinds++;
-      expect(kinds).toBeGreaterThanOrEqual(5);
+      expect(kinds).toBeGreaterThanOrEqual(6);
       let checked = 0;
       for (let i = 0; i < traffic.capacity; i++) {
         if (traffic.state[i] === AgentState.Free || traffic.police[i] === 1) continue;

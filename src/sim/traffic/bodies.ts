@@ -112,31 +112,30 @@ export function bodyTuning(body: BodyId): VehicleTuning {
   return t;
 }
 
+/** The kind of road a lane is, for the spawn's factors: the grid's streets, the Crown diagonals, the highway, the Works chicane, the parkway, the quay. */
+export type RoadKind = 'street' | 'avenue' | 'highway' | 'service' | 'parkway' | 'quay';
+
 /** Spawn shares and the place's factors on them (TRAFFIC.bodies). */
 export interface BodyWeights {
-  /** Shares of the civilian bodies; the bus's counts only on an avenue lane. */
+  /** Shares of the civilian bodies. */
   base: Readonly<Record<CivilianBody, number>>;
-  /** Factors by district id (city/City.ts DISTRICTS) and on the highway. */
+  /** Factors by district id (city/City.ts DISTRICTS) and by road kind; a missing factor is 1. */
   places: Readonly<Record<string, Partial<Record<CivilianBody, number>>>>;
 }
 
-/**
- * The civilian body for a spawn: the base shares times the district's factors (and the highway's on a
- * highway lane); the bus only on an avenue lane. `u` in [0, 1).
- */
-export function pickBody(u: number, district: string, avenue: boolean, highway: boolean, w: BodyWeights): CivilianBody {
-  const d = w.places[district], h = highway ? w.places.highway : undefined;
+/** The civilian body for a spawn: the base shares times the district's and the road's factors. `u` in [0, 1). */
+export function pickBody(u: number, district: string, road: RoadKind, w: BodyWeights): CivilianBody {
+  const d = w.places[district], r = w.places[road];
   let total = 0;
-  for (const id of CIVILIAN_BODIES) total += weightOf(id, w, d, h, avenue);
+  for (const id of CIVILIAN_BODIES) total += weightOf(id, w, d, r);
   let x = u * total;
   for (const id of CIVILIAN_BODIES) {
-    x -= weightOf(id, w, d, h, avenue);
+    x -= weightOf(id, w, d, r);
     if (x < 0) return id;
   }
   return 'sedan';
 }
 
-function weightOf(id: CivilianBody, w: BodyWeights, d: Partial<Record<CivilianBody, number>> | undefined, h: Partial<Record<CivilianBody, number>> | undefined, avenue: boolean): number {
-  if (id === 'bus' && !avenue) return 0;
-  return w.base[id] * (d?.[id] ?? 1) * (h?.[id] ?? 1);
+function weightOf(id: CivilianBody, w: BodyWeights, d: Partial<Record<CivilianBody, number>> | undefined, r: Partial<Record<CivilianBody, number>> | undefined): number {
+  return w.base[id] * (d?.[id] ?? 1) * (r?.[id] ?? 1);
 }

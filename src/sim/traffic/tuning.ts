@@ -63,8 +63,9 @@ export interface TrafficTuning {
   yawRateMax: number;
   subLaneOffsets: { highway: readonly number[]; street: readonly number[] };
   /**
-   * The civilian bodies' spawn shares and the place's factors (docs/DESIGN.md §13.11): buses only on the
-   * avenues, trucks and pickups in the Works, taxis round the tower. The player's shells never spawn ambient.
+   * The civilian bodies' spawn shares and the place's factors (docs/DESIGN.md §13.11): buses on the streets and
+   * three times as many on the Crown avenues, never on the highway or the chicane; trucks and pickups in the
+   * Works, taxis round the tower. The player's shells never spawn ambient.
    */
   bodies: BodyWeights;
   /** Each driver's share of the lane's limit, drawn at spawn (docs/DESIGN.md §13.8); the weights sum to 1. */
@@ -169,13 +170,15 @@ export const TRAFFIC: TrafficTuning = {
   // The highway's two lanes per direction are real graph lanes now, so nothing sits off its lane.
   subLaneOffsets: { highway: [0], street: [0] },
   bodies: {
-    base: { sedan: 0.24, hatch: 0.22, estate: 0.1, suv: 0.14, pickup: 0.1, taxi: 0.06, truck: 0.06, bus: 0.12 },
+    base: { sedan: 0.24, hatch: 0.2, estate: 0.1, suv: 0.14, pickup: 0.1, taxi: 0.06, truck: 0.06, bus: 0.06 },
     places: {
       crown: { taxi: 4 },
       foundry: { truck: 3, pickup: 2 },
       gardens: { estate: 1.6, suv: 1.5 },
       marina: { hatch: 1.5, sedan: 1.2 },
-      highway: { truck: 2, taxi: 0.5 },
+      avenue: { bus: 3, taxi: 1.5 },
+      highway: { truck: 2, taxi: 0.5, bus: 0 },
+      service: { bus: 0 },
     },
   },
   pace: { values: [0.85, 1.0, 1.1, 1.18], weights: [0.15, 0.55, 0.22, 0.08] },

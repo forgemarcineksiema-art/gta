@@ -77,6 +77,8 @@ export interface CarProfile {
   darkTops?: number[];
   /** Segments [from, to) that keep their own colour instead of the paint (a box truck's box), the tail with them when they reach it. */
   fixed?: { from: number; to: number; color: number };
+  /** The paint left below and above the side windows, metres (the traffic's shells; 0.06 each when absent): a bus's roof band. */
+  windowMargins?: { bottom: number; top: number };
 }
 
 /** A box fitted to a body: size and centre in metres (heights above the ground), a colour or one of the paint's tones; `mirror` adds the one at -x. */

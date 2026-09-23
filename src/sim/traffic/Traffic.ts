@@ -29,7 +29,7 @@ import type { TransformBuffer } from '../transforms';
 import { BALANCE } from '../balance';
 import type { CarId } from '../vehicle/presets';
 import { districtAt } from '../city/City';
-import { BODIES, BODY_IDS, BODY_INDEX, CIVILIAN_PAINTS, pickBody, type BodyId } from './bodies';
+import { BODIES, BODY_IDS, BODY_INDEX, CIVILIAN_PAINTS, pickBody, type BodyId, type RoadKind } from './bodies';
 import { LaneTables, type LanePose, type PathProjection } from './lanes';
 import { TRAFFIC, type TrafficTuning } from './tuning';
 
@@ -1747,7 +1747,7 @@ export class Traffic {
       const len = lanes.length[lane] as number;
       const s = this.rng() * len;
       // the city's own cars (DESIGN.md §13.11): buses on the avenues, trucks in the Works, taxis round the tower
-      const id = pickBody(this.rng(), districtAt(lanes.midX[lane] as number, lanes.midZ[lane] as number).id, (lanes.limit[lane] as number) === t.speedAvenue, this.isHighway(lane), t.bodies);
+      const id = pickBody(this.rng(), districtAt(lanes.midX[lane] as number, lanes.midZ[lane] as number).id, this.roadKind(lane), t.bodies);
       const body = BODY_INDEX[id];
       const spec = BODIES[body] as (typeof BODIES)[number];
       const extra = Math.max(0, spec.halfLength - CAR_GAP / 2);
@@ -1770,6 +1770,13 @@ export class Traffic {
       return true;
     }
     return false;
+  }
+
+  /** The road a lane belongs to, read off its limit (every kind has its own). */
+  private roadKind(lane: number): RoadKind {
+    const t = this.tuning, limit = this.lanes.limit[lane] as number;
+    return limit === t.speedHighway ? 'highway' : limit === t.speedAvenue ? 'avenue' : limit === t.speedService ? 'service'
+      : limit === t.speedParkway ? 'parkway' : limit === t.speedQuay ? 'quay' : 'street';
   }
 
   private isHighway(lane: number): boolean {

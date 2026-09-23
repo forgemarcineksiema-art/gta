@@ -2,6 +2,17 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M5.5 slice 13: fares with hot passengers
+
+Done: fares are the taxi's job. Driving a taxi with no job, every 6 s a walker 40–140 m ahead on the pavement stops
+and hails (right arm up, a yellow beacon over them); stopping within 7 m takes them in (gone from the pavement) and
+starts a fare to a lane's middle 300–900 m on by path: the arrow, the clock (the path at 9 m/s plus 8 s plus the
+last fare's leftover), 1.6 a metre, +20 % for each fare in a row. Near misses tip 50, jumps 150. One in four is hot:
+a crook with a suitcase, double pay, the heat rising 0.8 a second while they ride. The delivered fare pays the ride
+and the tips and the next passenger waves just up the road; out of the taxi, a failed or dropped fare ends the
+chain. A fare's def lives only for its ride. Pins 13.1–13.3. Choice: fares only in a taxi (the taxi body now has a
+job).
+
 ## 2026-09-23 — M5.5 slice 12: takedown rage and mayhem
 
 Done: one timed-zone rule set for the brief's takedown rage and mayhem: a 160 m ring round the marker (drawn on the

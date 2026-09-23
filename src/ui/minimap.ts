@@ -15,7 +15,7 @@ export interface MinimapMarker { x: number; z: number; kind: MarkerKind; color: 
 
 /** The job rings by kind (the marker's own colours, docs/STYLE.md). */
 const RIVAL = hex(PALETTE.carLime);
-const JOB_COLORS = { delivery: hex(PALETTE.carOrange), order: hex(PALETTE.carMagenta), escape: hex(PALETTE.policeBlue), trial: hex(PALETTE.coin), race: hex(PALETTE.carLime), rage: hex(PALETTE.carRed), mayhem: hex(PALETTE.carWhite) } as const;
+const JOB_COLORS = { delivery: hex(PALETTE.carOrange), order: hex(PALETTE.carMagenta), escape: hex(PALETTE.policeBlue), trial: hex(PALETTE.coin), race: hex(PALETTE.carLime), rage: hex(PALETTE.carRed), mayhem: hex(PALETTE.carWhite), fare: hex(PALETTE.coin) } as const;
 
 const FONT = "'Segoe UI', 'Helvetica Neue', Arial, system-ui, sans-serif";
 const INK = '#f7f3ea';

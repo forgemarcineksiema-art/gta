@@ -10,7 +10,7 @@ import { PLAYER_PAINT } from '../traffic/Traffic';
 import { CAR_IDS, type CarId } from '../vehicle/presets';
 import { BODIES, BODY_IDS, type BodyId } from '../traffic/bodies';
 
-export type JobKind = 'delivery' | 'order' | 'escape' | 'trial' | 'race' | 'rage' | 'mayhem';
+export type JobKind = 'delivery' | 'order' | 'escape' | 'trial' | 'race' | 'rage' | 'mayhem' | 'fare';
 
 export interface JobDef {
   id: number;

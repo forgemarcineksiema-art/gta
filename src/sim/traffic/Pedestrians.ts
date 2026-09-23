@@ -20,7 +20,7 @@ import { AgentState, type PlayerProbe, type Traffic } from './Traffic';
 import type { LanePose, LaneProjection } from './lanes';
 import { PEDS, type PedTuning } from './tuning';
 
-export enum PedPose { Walk = 0, Dive = 1, GetUp = 2, Fist = 3 }
+export enum PedPose { Walk = 0, Dive = 1, GetUp = 2, Fist = 3, Hail = 4 }
 /** The four silhouettes (M5.5 slice 20; render/pedMesh.ts draws them). Appended, never renumbered. */
 export enum PedLook { Coat = 0, Bag = 1, Worker = 2, Old = 3 }
 export const PED_LOOKS = 4;
@@ -200,6 +200,27 @@ export class Pedestrians {
     return this.time;
   }
 
+  /** A fare (M5.5 slice 13): the walker stops and hails, facing `yaw` (the taxi). */
+  hail(i: number, yaw: number): void {
+    if (!this.active[i]) return;
+    this.pose[i] = PedPose.Hail;
+    this.poseFor[i] = 0;
+    this.yaw[i] = yaw;
+  }
+
+  /** The arm goes down: walking on. */
+  unhail(i: number): void {
+    if (this.pose[i] !== PedPose.Hail) return;
+    this.pose[i] = PedPose.Walk;
+    this.poseFor[i] = 0;
+  }
+
+  /** In the taxi: gone from the pavement. */
+  pickUp(i: number): void {
+    this.active[i] = 0;
+    this.writeOne(i, true);
+  }
+
   /** A silhouette and clothes for where the pedestrian stands: the district's shares and palette. */
   private dress(i: number): void {
     const district = districtAt(this.x[i] as number, this.z[i] as number).id;
@@ -239,6 +260,7 @@ export class Pedestrians {
       if (pose === PedPose.Walk) this.walk(i, dt);
       else if (pose === PedPose.Dive) this.dive(i, dt);
       else if (pose === PedPose.GetUp) this.getUp(i, dt);
+      else if (pose === PedPose.Hail) this.poseFor[i] = (this.poseFor[i] as number) + dt;
       else this.fist(i, dt);
     }
     for (let i = 0; i < this.capacity; i++) {

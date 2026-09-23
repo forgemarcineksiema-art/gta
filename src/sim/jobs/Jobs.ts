@@ -26,6 +26,9 @@
  * - rage, mayhem (M5.5 slice 12): one timed zone round the marker; inside it the
  *   takedowns (rage) or the property damage's price (mayhem) count toward the
  *   quota; reaching it pays with the delivery's time bonus; the clock fails it.
+ * - fare (M5.5 slice 13): no marker; `Fares` adds one when a hailer hops into the
+ *   taxi and starts it; arriving pays the fare and its tips; its def goes when
+ *   it is over.
  *
  * Money goes into the bag through the `jobDone` event (`Run` reads it). While
  * the cold open runs only its own marker is live. No allocation per step.
@@ -145,8 +148,11 @@ export class Jobs {
     if (this.state === 'done' || this.state === 'failed') {
       this.hold -= dt;
       if (this.hold > 0) return;
+      // a fare's def was only for its ride
+      const over = this.defOf(this.active);
       this.state = 'idle';
       this.active = -1;
+      if (over?.kind === 'fare') this.remove(over.id);
       this.serial++;
     }
     if (this.state === 'idle') {
@@ -199,6 +205,16 @@ export class Jobs {
     const reach = d.kind === 'trial' ? BALANCE.jobs.trial.finishRadius : d.kind === 'race' ? BALANCE.jobs.race.finishRadius : r;
     if ((d.targetX - probe.x) ** 2 + (d.targetZ - probe.z) ** 2 <= reach * reach && this.canArrive(d)) {
       let paid: number;
+      if (d.kind === 'fare') {
+        // the ride and its tips; the leftover time carries into the next fare
+        const fares = this.sim.fares;
+        this.lastPaid = d.payout + fares.tips;
+        this.lastTip = false;
+        fares.delivered(this.remaining);
+        this.finish('done', probe);
+        this.sim.events.push('jobDone', this.lastPaid, d.targetX, 0, d.targetZ, d.id);
+        return;
+      }
       if (d.kind === 'race') {
         // over the line: the place the rivals already home leave, and its pay; fourth pays nothing
         const place = this.race.finished + 1;
@@ -238,8 +254,21 @@ export class Jobs {
     // Fixed 60 Hz subtraction must finish on the limit's last step, not one after from rounding.
     if (this.remaining > 1e-9) return;
     this.remaining = 0;
+    if (d.kind === 'fare') this.sim.fares.broken();
     this.finish('failed', probe);
     this.sim.events.push('jobFailed', 0, probe.x, 0, probe.z, d.id);
+  }
+
+  /** A fare's ride starts at once (Fares added its def): the clock, no heat, no coins. */
+  startFare(id: number): void {
+    const d = this.defOf(id);
+    if (!d || this.state === 'hunting' || this.state === 'active') return;
+    this.active = id;
+    this.elapsed = 0;
+    this.state = 'active';
+    this.remaining = d.limitSeconds;
+    this.serial++;
+    this.sim.events.push('jobStart', d.payout, d.x, 0, d.z, d.id);
   }
 
   /** The running job's target: the drop-off or fence, the wanted car while it exists; false for none (idle, an escape). */
@@ -289,6 +318,12 @@ export class Jobs {
     if (this.state === 'idle') return;
     this.release();
     this.race.stop();
+    const over = this.defOf(this.active);
+    if (over?.kind === 'fare') {
+      this.sim.fares.broken();
+      const i = this.defs.indexOf(over);
+      if (i >= 0) this.defs.splice(i, 1);
+    }
     this.sim.coins?.clearExtra('route');
     this.state = 'idle';
     this.active = -1;

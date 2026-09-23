@@ -30,6 +30,8 @@ export const KIND_COLORS: Record<JobDef['kind'], number> = {
   // the zones: rage red, mayhem white
   rage: PALETTE.carRed,
   mayhem: PALETTE.carWhite,
+  // a fare's mark: the taxi's yellow
+  fare: PALETTE.coin,
 };
 
 export class MarkerView {
@@ -66,7 +68,8 @@ export class MarkerView {
     this.zone.frustumCulled = false;
     scene.add(this.zone);
     // every def, plus the running job's target and the wanted car
-    this.capacity = Math.max(4, sim.jobs.defs.length + 2);
+    // and a fare's hailer, and a few fares' defs over the placed ones
+    this.capacity = Math.max(4, sim.jobs.defs.length + 6);
     this.idleX = new Float32Array(this.capacity);
     this.idleZ = new Float32Array(this.capacity);
     this.rings = new THREE.InstancedMesh(this.ringGeometry, this.material, this.capacity);
@@ -112,6 +115,14 @@ export class MarkerView {
     } else if (running && jobs.state === 'hunting' && jobs.wantedAgent >= 0 && this.wantedPose(sim, jobs.wantedAgent, alpha)) {
       this.put(this.rings, n, this.t.x, this.t.z, 0.8 + 0.1 * phase, 1);
       n++;
+    }
+    // a pedestrian hailing the taxi (M5.5 slice 13): a yellow beacon over them
+    const hailer = sim.fares.hailer, peds = sim.peds;
+    if (hailer >= 0 && peds && beacons < this.capacity) {
+      this.put(this.beacons, beacons, peds.x[hailer] as number, peds.z[hailer] as number, 1, 1);
+      this.beacons.setColorAt(beacons, this.color.setHex(PALETTE.coin));
+      if (this.beacons.instanceColor) this.beacons.instanceColor.needsUpdate = true;
+      beacons++;
     }
     if (this.rings.count !== n) this.rings.count = n;
     if (this.beacons.count !== beacons) this.beacons.count = beacons;

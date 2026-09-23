@@ -106,6 +106,11 @@ export class PedView {
         arr[k] = 0;
         arr[k + 1] = Math.max(0, 1 - t / peds.tuning.getUpTime);
         arr[k + 2] = 2;
+      } else if (pose === PedPose.Hail) {
+        // the arm up and still, waving the taxi down
+        arr[k] = 0;
+        arr[k + 1] = 1;
+        arr[k + 2] = 4;
       } else {
         arr[k] = clock * FIST_RATE + i;
         arr[k + 1] = 1;

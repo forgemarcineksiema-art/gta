@@ -124,6 +124,19 @@ export const BALANCE = {
     race: { pace: 1.85, band: [0.72, 1.25], bandRange: 250, gridAhead: 16, finishRadius: 12, pay: [6000, 2500, 1000], minPath: 1200, maxPath: 2000, limitSpeed: 10 },
   },
   /**
+   * Fares (M5.5 slice 13, DESIGN.md §4 item 1): in a taxi with no job, a walker `hailAhead` m ahead hails every
+   * `hailEvery` s; stopping within `pickupRadius` m under `pickupSpeed` m/s takes them; the ride is `path` m by lane
+   * path, `payPerM` a metre, the clock the path at `speed` m/s plus `slack` s plus the last fare's leftover; each
+   * fare in a row adds `chainBonus` to the pay; near misses and jumps tip; one in `hot.share` is hot (× `hot.pay`,
+   * the heat rising `hot.heatPerSecond` while they ride). A hailer left `giveUp` m behind lowers the arm.
+   */
+  fares: {
+    hailEvery: 6, hailAhead: [40, 140], pickupRadius: 7, pickupSpeed: 3, giveUp: 220,
+    path: [300, 900], payPerM: 1.6, speed: 9, slack: 8, chainBonus: 0.2,
+    tips: { nearMiss: 50, jump: 150 },
+    hot: { share: 0.25, pay: 2, heatPerSecond: 0.8 },
+  },
+  /**
    * The garage's catalogue (docs/M5_PLAN.md D13): cash only; the muscle car is owned from the start. The van at
    * 20,000, not 30,000 (balance script, 2026-09-23): at a novice's 2.5k a minute 30,000 is a 12-minute save and
    * breaks the first hour's something-new-every-3-to-10-minutes; the sports car stays the second hour's goal.

@@ -186,7 +186,7 @@ export function buildPed(look: PedLook): THREE.BufferGeometry {
 
 /**
  * The crowd's material: flat, vertex colours, the tint where the mask says so, and the limbs posed per
- * instance by `anim` (x the phase, y the amount, z the pose: 0 walk, 1 dive, 2 getting up, 3 the fist).
+ * instance by `anim` (x the phase, y the amount, z the pose: 0 walk, 1 dive, 2 getting up, 3 the fist, 4 hailing a taxi).
  */
 export function pedMaterial(): THREE.MeshLambertMaterial {
   const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
@@ -206,7 +206,9 @@ float limbAngle() {
   if ( anim.z < 0.5 ) return leg * side * 0.5 * swing - arm * side * 0.45 * swing;
   if ( anim.z < 1.5 ) return leg * ( side > 0.0 ? 0.35 : 0.1 ) * anim.y - arm * 2.6 * anim.y;
   if ( anim.z < 2.5 ) return -arm * 0.9 * anim.y;
-  return side < 0.0 ? -arm * ( 2.6 + 0.25 * sin( anim.x ) ) : arm * 0.15;
+  if ( anim.z < 3.5 ) return side < 0.0 ? -arm * ( 2.6 + 0.25 * sin( anim.x ) ) : arm * 0.15;
+  // hailing: the right arm straight up and still
+  return side < 0.0 ? -arm * 2.9 : 0.0;
 }`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
 float limbA = limb > 0.5 ? limbAngle() : 0.0;

@@ -2,7 +2,9 @@
  * M5 in the browser (docs/M5_PLAN.md §5.2), against the preview build: the
  * garage on the wall by keys and by clicks, the door's offer on every ad
  * path (off, an error, a finished video), the save across a reload, a
- * delivery and an order by the bot, the cold open once and not twice.
+ * delivery and an order by the bot, the cold open once and not twice; M6
+ * (docs/M6_PLAN.md §5.2): a rival's race driven by the bot, the STYLE page's
+ * kit on the car, the horn.
  * Every case ends with no page errors.
  */
 import { expect, test, type Page } from '@playwright/test';
@@ -244,5 +246,60 @@ test('2.8e an order: the bot finds the wanted car, the swap takes it, the clock 
   expect(taken.car).toBe(taken.kind);
   expect(taken.state).toBe('active');
   expect(taken.remaining).toBeGreaterThan(200);
+  expect(errors).toEqual([]);
+});
+
+test("M6 1.9e the first rival's race at ?board=10: pulled up at her bay the duel starts, the bot drives it to its end", async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors = watch(page);
+  await page.goto('/?board=10&job=duel&bot=job&quality=low&fresh=1&police=off');
+  await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 60_000 });
+  await page.waitForFunction(() => window.__game?.sim.jobs.state === 'active' && window.__game.sim.jobs.running?.kind === 'duel', null, { timeout: 10_000 });
+  const limit = await page.evaluate(() => window.__game!.sim.jobs.running!.limitSeconds);
+  await page.waitForFunction(() => window.__game?.sim.jobs.state === 'done' || window.__game?.sim.jobs.state === 'failed', null, { timeout: (limit + 30) * 1000, polling: 200 });
+  const end = await page.evaluate(() => {
+    const sim = window.__game!.sim;
+    return { state: sim.jobs.state, place: sim.jobs.lastPlace, beaten: sim.board.isBeaten(0), owned: [...sim.garage.owned] };
+  });
+  // won: Granny beaten and her wagon in the garage; lost: she crossed first (the win itself is the long pin's, G.1)
+  if (end.state === 'done') {
+    expect(end.beaten).toBe(true);
+    expect(end.owned).toContain('wagon');
+  } else {
+    expect(end.beaten).toBe(false);
+  }
+  console.info(`the first rival's race by the bot: ${end.state === 'done' ? 'won' : end.place === 2 ? 'Granny first' : 'too late'}`);
+  expect(errors).toEqual([]);
+});
+
+test('M6 6.5e the STYLE page: a kit card clicked is worn on the roof of the car driven out', async ({ page }) => {
+  const errors = watch(page);
+  await boot(page, '&ad=off&kit=all');
+  await shutDoor(page, 0);
+  await page.locator('.wall__tab', { hasText: 'STYLE' }).click();
+  await page.locator('.wall__page--paint.is-current .wall__card[data-kit="duck"]').click();
+  await page.evaluate(() => window.advanceTime?.(34));
+  await expect(page.locator('.wall__card[data-kit="duck"]')).toHaveClass(/is-selected/);
+  const worn = await page.evaluate(() => {
+    const g = window.__game!;
+    return { topper: g.sim.kit.worn('topper'), shown: (g.renderer as unknown as { topperId: string }).topperId };
+  });
+  expect(worn.shown).toBe('duck');
+  expect(worn.topper).toBeGreaterThanOrEqual(0);
+  expect(errors).toEqual([]);
+});
+
+test('M6 7.1e the horn on H: one horn a press, carrying the horn worn', async ({ page }) => {
+  const errors = watch(page);
+  await boot(page, '');
+  const from = await page.evaluate(() => window.__game!.sim.events.sequence);
+  await key(page, 'KeyH');
+  await page.evaluate(() => window.advanceTime?.(200));
+  const horns = await page.evaluate((from) => {
+    let n = 0;
+    window.__game!.sim.events.readFrom(from, (e) => { if (e.kind === 'horn') n++; });
+    return n;
+  }, from);
+  expect(horns).toBe(1);
   expect(errors).toEqual([]);
 });

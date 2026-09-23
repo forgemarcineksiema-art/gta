@@ -5,7 +5,7 @@
  * road bot in the city will reuse.
  */
 import type { CarId, SimWorld, TrackSample, VehicleControls } from '../sim';
-import { AgentState } from '../sim/traffic/Traffic';
+import { AgentState, type Traffic } from '../sim/traffic/Traffic';
 
 export interface TrackBotTuning {
   /** Lookahead distance = base + speed * perSpeed, clamped. */
@@ -31,6 +31,11 @@ export interface TrackBotTuning {
    * pins keep their baseline (the skilled bot's escapes need its speed); the delivery pin turns it on.
    */
   careful: boolean;
+  /**
+   * Backs off and goes round a car that will not move on for it (M6 gate): a careful driver always does; the cold
+   * open's scripted bot turns it on. Off by default, so the other bot-driven pins keep their baseline.
+   */
+  unblock: boolean;
 }
 
 export const DEFAULT_TRACK_BOT: TrackBotTuning = {
@@ -45,6 +50,7 @@ export const DEFAULT_TRACK_BOT: TrackBotTuning = {
   vMax: 58,
   boostAbove: 0,
   careful: false,
+  unblock: false,
 };
 
 /**
@@ -81,6 +87,11 @@ export class TrackBot {
   private offset = 0;
   private pass = 0;
   private passing = -1;
+  /** Blocked (M6 gate): seconds held up by a car that will not move on, seconds left backing off, the car gone round. */
+  private blockedFor = 0;
+  private backLeft = 0;
+  private dodging = -1;
+  private dodgeLeft = 0;
   readonly visitedLanes = new Set<number>();
   tourComplete = false;
   resets = 0;
@@ -97,6 +108,9 @@ export class TrackBot {
     this.offset = 0;
     this.pass = 0;
     this.passing = -1;
+    this.blockedFor = 0;
+    this.backLeft = 0;
+    this.dodging = -1;
   }
 
   /** Metres left on an open path of its own; Infinity on the map's loop. */
@@ -196,9 +210,11 @@ export class TrackBot {
       controls.brake = speed > 0.5 ? 1 : 0;
       controls.boost = 0;
     }
+    const boxed = (sim.police?.unitsWithin(px, pz, BOXED_RANGE) ?? 0) > 0;
+    if (sim.traffic && (t.careful || t.unblock) && this.unblock(sim.traffic, controls, px, pz, yaw, speed, queued || boxed, dt)) return;
 
     // stuck: no progress while trying to drive; boxed in by the police is an arrest, not a stuck car
-    if (speed < 0.8 && controls.throttle > 0 && !queued && (sim.police?.unitsWithin(px, pz, BOXED_RANGE) ?? 0) === 0) {
+    if (speed < 0.8 && controls.throttle > 0 && !queued && !boxed) {
       this.stuckTime += dt;
       if (this.stuckTime > 2.5) {
         sim.spawnAt(sim.city ? 'city' : 'track');
@@ -209,6 +225,63 @@ export class TrackBot {
     } else {
       this.stuckTime = 0;
     }
+  }
+
+  /**
+   * Blocked (M6 gate: a wreck the bot pushed at walking pace for a minute, a crossing car nose to nose in the middle
+   * of a U-turn): held up for 1.5 s under 2 m/s by a car within 7 m ahead that will not move on for it (a dead car,
+   * or one facing it), it backs off for 1.2 s with the wheel the other way, a three-point turn, then goes round it
+   * 3 m to the side away from it until it is 6 m behind. A queue, and a stop the police box in, are not blocks.
+   * True while it backs off (the controls are set).
+   */
+  private unblock(traffic: Traffic, controls: VehicleControls, px: number, pz: number, yaw: number, speed: number, waiting: boolean, dt: number): boolean {
+    const fx = Math.sin(yaw), fz = Math.cos(yaw);
+    if (this.backLeft > 0) {
+      this.backLeft -= dt;
+      controls.throttle = 0;
+      controls.brake = 1;
+      controls.boost = 0;
+      controls.steer = -controls.steer;
+      return true;
+    }
+    if (this.dodging >= 0) {
+      const i = this.dodging;
+      this.dodgeLeft -= dt;
+      const behind = traffic.state[i] === AgentState.Free || ((traffic.x[i] as number) - px) * fx + ((traffic.z[i] as number) - pz) * fz < -6;
+      if (behind || this.dodgeLeft <= 0) {
+        this.dodging = -1;
+        this.pass = 0;
+      }
+    }
+    let blocker = -1, side = 0;
+    if (speed < 2 && !waiting) {
+      for (let i = 0; i < traffic.capacity; i++) {
+        const st = traffic.state[i];
+        if (st === AgentState.Free) continue;
+        const dx = (traffic.x[i] as number) - px, dz = (traffic.z[i] as number) - pz;
+        const along = dx * fx + dz * fz, across = dx * -fz + dz * fx;
+        if (along < 0.5 || along > 7 || Math.abs(across) > 2.6) continue;
+        const driving = st === AgentState.Kinematic || st === AgentState.Physical;
+        if (driving && Math.cos((traffic.yaw[i] as number) - yaw) > 0) continue;
+        blocker = i;
+        side = across;
+        break;
+      }
+    }
+    if (blocker < 0) {
+      this.blockedFor = 0;
+      return false;
+    }
+    this.blockedFor += dt;
+    if (this.blockedFor < 1.5) return false;
+    this.blockedFor = 0;
+    this.backLeft = 1.2;
+    this.passing = -1;
+    this.dodging = blocker;
+    this.dodgeLeft = 10;
+    // round on the far side: a car on the left is passed on the right, one dead ahead or on the right on the left
+    this.pass = side < -0.3 ? -3 : 3;
+    return false;
   }
 
   /** A car within 8 m ahead in the bot's corridor, nearly stopped: the bot is in a queue behind it. */
@@ -226,6 +299,8 @@ export class TrackBot {
       const along = dx * fx + dz * fz;
       if (along < 1 || along > 8) continue;
       if (Math.abs(dx * -fz + dz * fx) > 2.2) continue;
+      // a queue faces the bot's way: a car nose to nose (a U-turn in a junction) never moves on for it
+      if (Math.cos((traffic.yaw[i] as number) - yaw) < 0.5) continue;
       if ((traffic.speed[i] as number) < 1.5) return true;
     }
     return false;
@@ -261,7 +336,7 @@ export class TrackBot {
       }
       return;
     }
-    if (Math.abs(this.offset) > 0.2) return;
+    if (Math.abs(this.offset) > 0.2 || this.dodging >= 0) return;
     // a straight ahead: no bend over the next 60 m, and not within 60 m of the path's end
     for (let k = 0; k < 20; k++) {
       const i = best + k;
@@ -298,7 +373,7 @@ export class TrackBot {
     px += ox;
     pz += oz;
     for (let i = 0; i < traffic.capacity; i++) {
-      if (traffic.state[i] === AgentState.Free || i === this.passing) continue;
+      if (traffic.state[i] === AgentState.Free || i === this.passing || i === this.dodging) continue;
       const dx = (traffic.x[i] as number) - px;
       const dz = (traffic.z[i] as number) - pz;
       const along = dx * fx + dz * fz;

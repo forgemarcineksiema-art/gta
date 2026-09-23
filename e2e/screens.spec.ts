@@ -5,7 +5,7 @@
  * wrecked overlay at 1280x720; and the run (M4): the bag and the busted bar
  * filling, the busted card, and the wall behind the hideout's shut door; M5:
  * a delivery's line and card, and the garage's CARS and DAILIES pages on the wall; M5.5: the goal line, a chain
- * step's card, the skill chain and the full-screen map.
+ * step's card, the skill chain and the full-screen map; M6: the wall's BOARD and STYLE pages and a rival's race.
  * Output: screens/<state>-<w>x<h>.png. Look at them.
  */
 import { expect, test } from '@playwright/test';
@@ -147,6 +147,29 @@ for (const [w, h] of SIZES) {
     await page.locator('.wall__tab', { hasText: 'DAILIES' }).click();
     await page.waitForSelector('.wall__page--dailies.is-current .wall__daily', { timeout: 10_000 });
     await page.screenshot({ path: `screens/dailies-${w}x${h}.png` });
+    // the wanted board (M6): the posters' strip and the next rival's poster
+    await page.locator('.wall__tab', { hasText: 'BOARD' }).click();
+    await page.waitForSelector('.wall__page--board.is-current .wall__chip', { timeout: 10_000 });
+    await page.screenshot({ path: `screens/board-${w}x${h}.png` });
+    // STYLE (M6): the paint, the car's kit and the driver's
+    await page.locator('.wall__tab', { hasText: 'STYLE' }).click();
+    await page.waitForSelector('.wall__page--paint.is-current .wall__kit', { timeout: 10_000 });
+    await page.screenshot({ path: `screens/style-${w}x${h}.png` });
+  });
+}
+
+for (const [w, h] of SIZES) {
+  test(`M6 states at ${w}x${h}`, async ({ page }) => {
+    mkdirSync('screens', { recursive: true });
+    await page.setViewportSize({ width: w, height: h });
+    // the first rival ready, the player pulled up at her bay: the race's card, then its line
+    await page.goto('/?manual=1&quality=low&ad=off&fresh=1&board=10&job=duel');
+    await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 30_000 });
+    await page.evaluate(() => window.advanceTime?.(400));
+    await page.waitForSelector('.jobs__card.is-visible', { timeout: 10_000 });
+    await page.screenshot({ path: `screens/duel-${w}x${h}.png` });
+    await page.evaluate(() => window.advanceTime?.(2000));
+    await page.screenshot({ path: `screens/duel-line-${w}x${h}.png` });
   });
 }
 

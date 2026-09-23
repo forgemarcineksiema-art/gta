@@ -108,7 +108,7 @@ export class GarageUi {
   private dailySerial = -1;
   private keys = { left: 'A', right: 'D', confirm: 'W', back: 'S' };
 
-  constructor(parent: HTMLElement, private readonly sim: SimWorld, private readonly actions: GarageActions, pages: readonly WallPage[] = ['wall', 'board', 'cars', 'paint', 'tune', 'prep', 'dailies']) {
+  constructor(parent: HTMLElement, private readonly sim: SimWorld, private readonly actions: GarageActions, pages: readonly WallPage[] = ['wall', 'cars', 'board', 'paint', 'tune', 'prep', 'dailies']) {
     this.order = [...pages];
     this.root = parent;
     const tabBar = el('div', 'wall__tabs');

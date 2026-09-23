@@ -1095,6 +1095,10 @@ kbd.key {
 .jobs__dot[data-ring='delivery'] { display: inline-block; background: #ff9f1c; }
 .jobs__dot[data-ring='order'] { display: inline-block; background: #f45bff; }
 .jobs__dot[data-ring='escape'] { display: inline-block; background: #1d4ed8; }
+/* the wanted board (M6): a rival's ring, the duel's line and card in the cyan no other ring wears */
+.jobs__dot[data-ring='duel'] { display: inline-block; background: #2bd1ff; }
+.jobs__line.is-duel .jobs__kind { color: #2bd1ff; }
+.jobs__card[data-kind='duel'] { border-left-color: #2bd1ff; }
 .jobs__line.is-lose .jobs__kind { color: var(--ui-danger); }
 .jobs__coins:empty { display: none; }
 .jobs__coins::before { content: '· '; color: var(--ui-ink-dim); }

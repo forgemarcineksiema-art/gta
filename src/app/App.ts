@@ -452,6 +452,8 @@ export class App {
       sim.board.force = true;
       sim.run.chain = CHAIN_ALL;
     }
+    // `kit=all` (M6): every item of the kit had, to try them on (tests and playtests)
+    if (params.get('kit') === 'all') sim.kit.owned.fill(1);
     // `job=<id>` or `job=delivery|order|escape`: into that marker's ring at boot (tests and playtests); `job=duel`
     // is the next rival's
     const jobParam = params.get('job');

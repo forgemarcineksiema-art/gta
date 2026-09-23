@@ -15,7 +15,9 @@ describe('cold open (long)', () => {
     sim.coldOpen.start();
     const co = sim.coldOpen;
     try {
-      const bot = new TrackBot('heavy', { ...CITY_BOT_TUNING });
+      // it backs off a car that will not move on (M6 gate: slice 9's hidden cars moved the traffic, and the bot pushed
+      // a wreck it had made at walking pace for the rest of the two minutes)
+      const bot = new TrackBot('heavy', { ...CITY_BOT_TUNING, unblock: true });
       bot.setPath(co.route!.samples);
       const order: string[] = [];
       const captions: ColdOpenVerb[] = [];

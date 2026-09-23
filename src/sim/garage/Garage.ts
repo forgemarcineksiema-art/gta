@@ -2,7 +2,7 @@
  * The garage on the wall of every drop-off (docs/M5_PLAN.md slice 4, D8,
  * D13): the catalogue of the five bodies, the paint per car, three upgrade
  * stats in three tiers, the two prep items, and the police car's unlock.
- * Cash only, from the bank. Upgrades are multipliers on the preset applied
+ * Cash only: the bank and the coins (`Run.funds`). Upgrades are multipliers on the preset applied
  * at drive-out, tier 0 equal to the preset bitwise, so every handling pin
  * stands and `CAR_PRESETS` is never edited.
  *
@@ -53,7 +53,7 @@ export class Garage {
   canBuy(car: CarId): BuyResult {
     if (this.owned.has(car)) return 'owned';
     if (car === 'police' && !this.policeUnlocked) return 'locked';
-    return this.sim.run.bank >= this.price(car) ? 'ok' : 'cash';
+    return this.sim.run.funds >= this.price(car) ? 'ok' : 'cash';
   }
 
   /** Takes the price from the bank on 'ok' and pushes 'purchase' (value: the price). */
@@ -96,7 +96,7 @@ export class Garage {
     if (!this.owned.has(car)) return 'locked';
     const price = this.tierPrice(car, stat);
     if (!Number.isFinite(price)) return 'owned';
-    if (this.sim.run.bank < price) return 'cash';
+    if (this.sim.run.funds < price) return 'cash';
     this.sim.run.spend(price);
     const tiers = this.tiers[car];
     const i = STATS.indexOf(stat);
@@ -110,7 +110,7 @@ export class Garage {
   buyPrep(item: PrepItem): BuyResult {
     if (this.prep[item]) return 'owned';
     const price = BALANCE.prep[item];
-    if (this.sim.run.bank < price) return 'cash';
+    if (this.sim.run.funds < price) return 'cash';
     this.sim.run.spend(price);
     this.prep[item] = true;
     this.serial++;

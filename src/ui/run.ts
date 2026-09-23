@@ -28,8 +28,12 @@ export class RunHud {
   private readonly barFill: HTMLElement;
   private readonly card: HTMLElement;
   private readonly cardLines: HTMLElement;
-  private readonly wall: HTMLElement;
+  /** The panel behind the shut door: the garage's tabs and pages are added to it by `GarageUi`. */
+  readonly wall: HTMLElement;
   private readonly wallLines: HTMLElement;
+  /** The first door's line: how far the first new car is. */
+  private readonly wallFirst: HTMLElement;
+  private lastSerial = -1;
   private readonly wallCounts: HTMLElement;
   /** The wanted poster: the car the police will look for (the descriptor's class and paint). */
   private readonly wanted: HTMLElement;
@@ -73,7 +77,11 @@ export class RunHud {
     this.wantedSwatch = el('span', 'run__wanted-swatch');
     this.wantedCar = el('span', 'run__wanted-car');
     this.wanted.append(el('span', 'run__wanted-title', 'WANTED'), this.wantedSwatch, this.wantedCar);
-    this.wall.append(el('div', 'run__title', 'BANKED'), this.wallLines, this.wallCounts, this.wanted, this.prompt());
+    this.wallFirst = el('div', 'run__first');
+    // the totals page: the garage's pages sit beside it in the same panel
+    const page = el('div', 'run__wall-page wall__page wall__page--wall');
+    page.append(el('div', 'run__title', 'BANKED'), this.wallLines, this.wallFirst, this.wallCounts, this.wanted);
+    this.wall.append(page);
     this.root.append(this.bag, this.coinRow, this.bar, this.card, this.wall);
     parent.appendChild(this.root);
     this.bag.classList.toggle('is-visible', sim.city !== null);
@@ -141,6 +149,11 @@ export class RunHud {
       const bar = Math.round(run.bustedProgress * 200);
       if (bar !== this.lastBar) { this.barFill.style.transform = `scaleX(${bar / 200})`; this.lastBar = bar; }
     }
+    if (run.state === 'door' && run.lastSerial !== this.lastSerial) {
+      // the double offer paid after the door shut: the totals again
+      this.lastSerial = run.lastSerial;
+      this.fillWall(sim);
+    }
     if (run.state !== this.state) {
       this.state = run.state;
       if (run.state === 'busted') this.fillCard(sim);
@@ -156,20 +169,26 @@ export class RunHud {
     const run = sim.run;
     this.cardLines.replaceChildren(
       line('BAG', money(run.lastBag)),
-      line('YOU KEEP', money(run.lastFine), true),
+      line(run.lastLawyer ? 'THE LAWYER KEEPS' : 'YOU KEEP', money(run.lastFine), true),
       line('BANK', money(run.bank)),
     );
   }
 
   private fillWall(sim: SimWorld): void {
     const run = sim.run;
+    this.lastSerial = run.lastSerial;
     this.wallLines.replaceChildren(
-      line('BAG', money(run.lastBag)),
-      line('MULTIPLIER', `×${run.lastMultiplier}`),
+      line(run.lastDoubled ? 'BAG, DOUBLED' : 'BAG', money(run.lastBag)),
+      line(run.lastFence ? 'MULTIPLIER + FENCE' : 'MULTIPLIER', `×${run.lastMultiplier}`),
       line('BANKED', money(run.lastBanked), true),
       line('BEST RUN', money(run.bestRun)),
       line('BANK', money(run.bank)),
     );
+    // the first new car is the next goal (docs/M5_PLAN.md slice 5): from the cold open's door until it is bought
+    const first = !sim.garage.owned.has('compact');
+    const price = BALANCE.prices.compact;
+    this.wallFirst.textContent = !first ? '' : run.funds >= price ? `FIRST NEW CAR: ${money(price)} · IT IS YOURS IN CARS` : `FIRST NEW CAR: ${money(price)} · YOU HAVE ${money(run.funds)}`;
+    this.wallFirst.classList.toggle('is-visible', first);
     const c = run.counts;
     this.wallCounts.textContent = `${plural(c.takedowns, 'TAKEDOWN')} · ${plural(c.escapes, 'ESCAPE')} · ${plural(c.billboards, 'BILLBOARD')} · ${plural(c.coins, 'COIN')}`;
     // the poster: the police remember the car, not the driver (the identity rule, taught without a line of text)

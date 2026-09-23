@@ -9,6 +9,7 @@ import { BALANCE } from '../../src/sim/balance';
 import { POLICE } from '../../src/sim/police/tuning';
 import type { SimWorld } from '../../src/sim';
 import type { Traffic } from '../../src/sim/traffic/Traffic';
+import { collect, defaultSave } from '../../src/sim/save/format';
 import { createWorld, runUntil } from './helpers';
 
 /** Angle between the player's nose and the bearing to a point, degrees. */
@@ -120,6 +121,39 @@ describe('cold open', () => {
       sim.coldOpen.start();
       expect(sim.coldOpen.active).toBe(false);
       expect(sim.jobs.defs.length).toBe(defs);
+    } finally { sim.dispose(); }
+  }, 60_000);
+
+  it('5.1 the save decides at boot: not seen, the script runs; seen, it does not', async () => {
+    const fresh = defaultSave();
+    const a = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 0, record: false, spawn: 'loop', save: fresh, coldOpen: true });
+    try {
+      expect(a.coldOpen.active).toBe(true);
+      expect(a.carId).toBe('heavy');
+      // the start counts: a reload mid-way never repeats it
+      const out = defaultSave();
+      collect(a, out);
+      expect(out.seen).toBe(true);
+    } finally { a.dispose(); }
+    const seen = { ...defaultSave(), seen: true };
+    const b = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 0, record: false, spawn: 'loop', save: seen, coldOpen: true });
+    try {
+      expect(b.coldOpen.active).toBe(false);
+      expect(b.carId).toBe('muscle');
+    } finally { b.dispose(); }
+  }, 60_000);
+
+  it('5.2 finishing it at the door sets seen, and the save carries it', async () => {
+    const sim = await coldWorld();
+    try {
+      expect(sim.coldOpen.seen).toBe(false);
+      sim.events.push('door', 0, 0, 0, 0, 0);
+      sim.step();
+      expect(sim.coldOpen.active).toBe(false);
+      expect(sim.coldOpen.seen).toBe(true);
+      const out = defaultSave();
+      collect(sim, out);
+      expect(out.seen).toBe(true);
     } finally { sim.dispose(); }
   }, 60_000);
 });

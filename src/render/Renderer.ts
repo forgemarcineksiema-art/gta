@@ -9,7 +9,7 @@ import { ChaseCamera } from './ChaseCamera';
 import { CAR_PROFILES } from './carProfiles';
 import { Sparks } from './Sparks';
 import { SpeedLines } from './SpeedLines';
-import { buildCarMesh, type CarMesh } from './carMesh';
+import { buildCarMesh, buildTopper, type CarMesh } from './carMesh';
 import { CityView, QUALITY, type QualityTier } from './CityView';
 import { SHADOW_HALF, SUN_OFFSET, stableShadowTarget } from './shadows';
 import { gableGeometry, prismGeometry } from './geometry';
@@ -84,6 +84,12 @@ export class Renderer {
   private readonly debris: Debris;
   private readonly smoke = new Smoke();
   private eventSeq = 0;
+  /** The garage's serial last applied to the player's meshes (the resprays). */
+  private garageSerial = -1;
+  /** The streak's topper, on the roof of the car the player drives. */
+  private readonly topper = buildTopper();
+  /** Each class's roof height above its body origin, for the topper. */
+  private readonly roofY: Record<CarId, number>;
   private smokeAcc = 0;
   private fireAcc = 0;
   private readonly wreckSmokeAcc: Float32Array;
@@ -183,6 +189,15 @@ export class Renderer {
     this.cars = cars as Record<CarId, CarMesh>;
     this.carId = sim.carId;
     this.car = this.cars[sim.carId];
+    const roofY: Partial<Record<CarId, number>> = {};
+    for (const id of CAR_IDS) {
+      const body = this.cars[id].root.getObjectByName('body-and-trim') as THREE.Mesh | undefined;
+      body?.geometry.computeBoundingBox();
+      roofY[id] = body?.geometry.boundingBox?.max.y ?? 1.2;
+    }
+    this.roofY = roofY as Record<CarId, number>;
+    this.car.root.add(this.topper);
+    this.topper.position.set(0, this.roofY[sim.carId] - 0.02, -0.2);
     this.policeView = new PoliceView(this.scene, sim, this.cars.police);
     // the best-lap ghost: the same car, translucent, no shadow, wheels carried by the body
     this.ghost = buildCarMesh(sim.vehicle.tuning, profile, PALETTE.carBlue);
@@ -326,11 +341,21 @@ export class Renderer {
     for (const w of this.car.wheels) w.visible = true;
     this.car.setDamage(0);
     this.carId = id;
+    // the topper is the player's: it moves to the new car's roof
+    this.car.root.add(this.topper);
+    this.topper.position.set(0, this.roofY[id] - 0.02, -0.2);
     this.chase.whip(SWAP.whipSeconds);
   }
 
   render(alpha: number, dt: number): void {
+    if (this.sim.garage.serial !== this.garageSerial) {
+      // a respray on the wall shows on the car behind the door at once
+      this.garageSerial = this.sim.garage.serial;
+      for (const id of CAR_IDS) this.cars[id].setPaint(this.sim.garage.paintOf(id));
+    }
     this.syncCar();
+    const topper = this.sim.dailies.streak.topper;
+    if (this.topper.visible !== topper) this.topper.visible = topper;
     this.applyTransforms(alpha);
     this.trafficView?.update(this.sim.transforms, alpha);
     this.pedView?.update(this.sim.transforms, alpha);
@@ -387,7 +412,7 @@ export class Renderer {
   /** Sim events with a visible consequence: parts fly off, a wreck bursts. */
   private handleEvent(e: SimEvent): void {
     const car = this.car.root;
-    const paint = CAR_PROFILES[this.sim.carId].paint;
+    const paint = this.sim.garage.paintOf(this.sim.carId);
     if (e.kind === 'damage') {
       this.tmpFwd.set(0, 0, 1).applyQuaternion(car.quaternion);
       const front = e.value === 1;

@@ -53,8 +53,12 @@ export class Cameras {
   private readonly side: Int8Array;
   private readonly rest: Float32Array;
 
-  constructor(sites: readonly CameraSite[]) {
+  /** 1 where the camera is switched on today (the cover's daily order); all on without one. */
+  private readonly active: Uint8Array;
+
+  constructor(sites: readonly CameraSite[], active?: Uint8Array) {
     this.descs = placeCameras(sites, POLICE.cameras.count);
+    this.active = active ?? new Uint8Array(this.descs.length).fill(1);
     this.side = new Int8Array(this.descs.length);
     this.rest = new Float32Array(this.descs.length);
   }
@@ -74,6 +78,7 @@ export class Cameras {
       this.side[i] = side;
       // a crossing: the side changed between two steps, near the line and on the road
       if (was === 0 || was === side || Math.abs(along) > 8 || Math.abs(across) > cam.halfWidth) continue;
+      if (this.active[i] === 0) continue;
       const over = (probe.speed - cam.limitMs) * 3.6;
       if (over <= c.overKmh || (this.rest[i] as number) > 0) continue;
       this.rest[i] = c.cooldown;

@@ -508,6 +508,8 @@ export class Police {
       for (let i = 0; i < sites.length; i++) {
         const site = sites[i] as ParkedJunction;
         if (this.parkedTried[i] === 1) continue;
+        // today's patrols park only at today's junctions
+        if (this.sim.cover && this.sim.cover.daily.parked[i] !== 1) continue;
         let taken = false;
         for (let k = 0; k < this.parkedAt.length; k++) if (this.parkedAt[k] === i) { taken = true; break; }
         if (taken) continue;

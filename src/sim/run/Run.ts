@@ -62,6 +62,13 @@ export class Run {
   lastBanked = 0;
   lastMultiplier = 1;
   lastFine = 0;
+  /** The door's rewarded offer doubled this door's bag (at most once a door). */
+  lastDoubled = false;
+  /** Prep items that paid out at the last run's end (the wall and the card name them). */
+  lastLawyer = false;
+  lastFence = false;
+  /** Bumps when the last door's totals change after the door shut (the double). */
+  lastSerial = 0;
   readonly counts: RunCounts = { takedowns: 0, escapes: 0, billboards: 0, coins: 0 };
   /** Hideout first; empty on the playground. */
   readonly dropOffs: readonly DropOff[];
@@ -138,10 +145,20 @@ export class Run {
     this.startRun();
   }
 
-  /** The garage takes from the bank; false (and nothing taken) when it holds less. */
+  /**
+   * What the garage can spend: the bank and the coins (DESIGN.md §3.3 counts both toward the first car; the
+   * pools stay apart, D14: coins never enter the bank).
+   */
+  get funds(): number {
+    return this.bank + this.coins;
+  }
+
+  /** The garage takes from the bank first, then the coins; false (and nothing taken) when both hold less. */
   spend(amount: number): boolean {
-    if (!(amount >= 0) || this.bank < amount) return false;
-    this.bank -= amount;
+    if (!(amount >= 0) || this.funds < amount) return false;
+    const fromBank = Math.min(this.bank, amount);
+    this.bank -= fromBank;
+    this.coins -= amount - fromBank;
     return true;
   }
 
@@ -231,9 +248,30 @@ export class Run {
     return this.local.along - reach > -GARAGE.depth / 2 + GARAGE.doorThickness / 2 + 0.1;
   }
 
+  /**
+   * The door's rewarded offer, after the video finished: the bag doubled before the multiplier, so the bank
+   * gains the banked amount again (docs/M5_PLAN.md D10). Once a door; false otherwise.
+   */
+  doubleLastBag(): boolean {
+    if (this.state !== 'door' || this.lastDoubled || this.lastBag <= 0) return false;
+    const extra = Math.round(this.lastBanked * (BALANCE.offer.doorMultiplier - 1));
+    this.lastDoubled = true;
+    this.lastBag *= BALANCE.offer.doorMultiplier;
+    this.lastBanked += extra;
+    this.bank += extra;
+    this.bestRun = Math.max(this.bestRun, this.lastBanked);
+    this.lastSerial++;
+    return true;
+  }
+
   private bankAt(site: DropOff): void {
+    const prep = this.sim.garage.prep;
+    this.lastFence = prep.fence;
+    this.lastLawyer = false;
+    this.lastDoubled = false;
     this.lastBag = this.bag;
-    this.lastMultiplier = this.multiplier;
+    // the fence adds to the multiplier this run earned
+    this.lastMultiplier = this.multiplier + (prep.fence ? BALANCE.prep.fenceBonus : 0);
     this.lastBanked = Math.round(this.bag * this.lastMultiplier);
     this.lastFine = 0;
     this.bank += this.lastBanked;
@@ -241,7 +279,7 @@ export class Run {
     this.sim.life.mend();
     this.bestRun = Math.max(this.bestRun, this.lastBanked);
     this.bag = 0;
-    this.endRun();
+    this.endRun(false);
     this.state = 'door';
     this.doorProgress = 1;
     if (this.door) {
@@ -259,13 +297,18 @@ export class Run {
   }
 
   private bust(): void {
+    const prep = this.sim.garage.prep;
+    this.lastLawyer = prep.lawyer;
+    this.lastFence = false;
+    this.lastDoubled = false;
     this.lastBag = this.bag;
     this.lastMultiplier = 1;
     this.lastBanked = 0;
-    this.lastFine = Math.round(this.bag * BALANCE.fine);
+    // the lawyer keeps three quarters instead of half
+    this.lastFine = Math.round(this.bag * (prep.lawyer ? BALANCE.prep.lawyerKeep : BALANCE.fine));
     this.bank += this.lastFine;
     this.bag = 0;
-    this.endRun();
+    this.endRun(true);
     this.state = 'busted';
     // on a doorstep the door goes back up
     this.doorProgress = 0;
@@ -274,8 +317,16 @@ export class Run {
     this.sim.events.push('busted', this.lastFine, p.x, 0, p.z, -1);
   }
 
-  /** Heat 0, the chase over and any job dropped; the police read level 0 on the next step and stand down. */
-  private endRun(): void {
+  /** Heat 0, the chase over and any job dropped, the prep spent; the police read level 0 on the next step and stand down. */
+  private endRun(busted: boolean): void {
+    const prep = this.sim.garage.prep;
+    if (prep.lawyer || prep.fence) {
+      prep.lawyer = false;
+      prep.fence = false;
+      this.sim.garage.serial++;
+    }
+    // the day's run challenges read the totals before the heat and the multiplier reset
+    this.sim.dailies.onRunEnd(busted ? this.lastFine : this.lastBanked, this.maxHeat, busted);
     this.sim.heat.reset();
     this.sim.pursuit.reset();
     this.sim.jobs.abandon();
@@ -320,9 +371,13 @@ export class Run {
         this.counts.takedowns++;
         break;
       case 'escape':
-        // value: the heat level escaped from
+        // value: the heat level escaped from; one escape from level 5 opens the police car in the garage
         this.bag += bag.escapePerLevel * e.value;
         this.counts.escapes++;
+        if (e.value >= 5 && !this.sim.garage.policeUnlocked) {
+          this.sim.garage.policeUnlocked = true;
+          this.sim.garage.serial++;
+        }
         break;
       case 'jobDone':
         // value: the payout with its time bonus, already rounded

@@ -11,6 +11,7 @@
  * right of that axis. The door line is `along = -GARAGE.depth / 2`.
  */
 import { PALETTE } from '../palette';
+import { mulberry32 } from '../random';
 import { POLICE } from '../police/tuning';
 import { quatFromYaw, type StaticDesc } from '../scene';
 import type { City } from './City';
@@ -91,13 +92,27 @@ export interface DropOff {
  * the distance along it, and the spike strip's centre `spikeBefore` m before it
  * across the open side (the other highway lane, or the oncoming lane of a street).
  */
-export interface Chokepoint { x: number; z: number; yaw: number; lane: number; s: number; spikeX: number; spikeZ: number }
+export interface Chokepoint { id: number; x: number; z: number; yaw: number; lane: number; s: number; spikeX: number; spikeZ: number }
 
 /** A parked patrol's place: on an approach lane to a grid junction, at the kerb, facing the crossing. */
 export interface ParkedJunction { node: number; lane: number; s: number; offset: number; x: number; z: number; yaw: number }
 
 /** A speed camera's line across a road (both directions), its pole beside it, and the road's limit (m/s). */
 export interface CameraSite { x: number; z: number; yaw: number; halfWidth: number; poleX: number; poleZ: number; limitMs: number }
+
+/**
+ * Today's police (docs/M5_PLAN.md slice 6, DESIGN.md §8): the date seeds an
+ * order over each fixed site list and the first share of it is manned today.
+ * Nothing new is placed; before a date is set every site is manned.
+ */
+export interface DailyCover {
+  seed: number;
+  order: { chokepoints: Int16Array; parked: Int16Array; cameras: Int16Array };
+  /** 1 where the site is manned today, by the site's index. */
+  chokepoints: Uint8Array;
+  parked: Uint8Array;
+  cameras: Uint8Array;
+}
 
 export interface CoverSites {
   hideout: DropOff;
@@ -106,6 +121,36 @@ export interface CoverSites {
   chokepoints: Chokepoint[];
   parkedJunctions: ParkedJunction[];
   cameraSites: CameraSite[];
+  daily: DailyCover;
+}
+
+/** The share of each list manned on a day. */
+export const DAILY_SHARE = { chokepoints: 0.6, parked: 0.6, cameras: 0.8 };
+
+function identity(n: number): Int16Array {
+  const a = new Int16Array(n);
+  for (let i = 0; i < n; i++) a[i] = i;
+  return a;
+}
+
+/** A seed's order over each list (Fisher–Yates on mulberry32) and today's manned share, in place. */
+export function setDailyOrder(cover: CoverSites, seed: number): void {
+  const d = cover.daily;
+  d.seed = seed;
+  const rng = mulberry32(seed ^ 0x5eed);
+  const shuffle = (order: Int16Array, active: Uint8Array, share: number): void => {
+    for (let i = 0; i < order.length; i++) order[i] = i;
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = (rng() * (i + 1)) | 0;
+      const t = order[i] as number; order[i] = order[j] as number; order[j] = t;
+    }
+    active.fill(0);
+    const n = Math.ceil(order.length * share);
+    for (let i = 0; i < n; i++) active[order[i] as number] = 1;
+  };
+  shuffle(d.order.chokepoints, d.chokepoints, DAILY_SHARE.chokepoints);
+  shuffle(d.order.parked, d.parked, DAILY_SHARE.parked);
+  shuffle(d.order.cameras, d.cameras, DAILY_SHARE.cameras);
 }
 
 /** The drop-off built on this lot, or null. Called by the generator for every lot. */
@@ -157,7 +202,15 @@ export function coverSites(city: City): CoverSites {
     site.approachLane = city.nearestLane(site.door.x - fx * 10, site.door.z - fz * 10);
     return site;
   });
-  return { hideout: dropOffs[0] as DropOff, dropOffs, chokepoints: chokepoints(city.graph), parkedJunctions: parkedJunctions(city.graph, dropOffs[0] as DropOff), cameraSites: cameraSites(city.graph) };
+  const chokes = chokepoints(city.graph), parked = parkedJunctions(city.graph, dropOffs[0] as DropOff), cameras = cameraSites(city.graph);
+  const daily: DailyCover = {
+    seed: 0,
+    order: { chokepoints: identity(chokes.length), parked: identity(parked.length), cameras: identity(cameras.length) },
+    chokepoints: new Uint8Array(chokes.length).fill(1),
+    parked: new Uint8Array(parked.length).fill(1),
+    cameras: new Uint8Array(cameras.length).fill(1),
+  };
+  return { hideout: dropOffs[0] as DropOff, dropOffs, chokepoints: chokes, parkedJunctions: parked, cameraSites: cameras, daily };
 }
 
 /** Metres between roadblock sites along a highway lane, and kept clear of the junction boxes at its ends. */
@@ -191,7 +244,7 @@ function chokepoints(graph: RoadGraph): Chokepoint[] {
     const at = (s: number): void => {
       const p = laneAt(lane, s);
       const q = laneAt(lane, Math.max(0, s - POLICE.roadblock.spikeBefore), spikeRight);
-      out.push({ x: p.x, z: p.z, yaw: p.yaw, lane: lane.id, s, spikeX: q.x, spikeZ: q.z });
+      out.push({ id: out.length, x: p.x, z: p.z, yaw: p.yaw, lane: lane.id, s, spikeX: q.x, spikeZ: q.z });
     };
     if (lane.highway) for (let s = CHOKE_END; s <= len - CHOKE_END; s += CHOKE_PITCH) at(s);
     else if (lane.to === tower && len > TOWER_APPROACH + CHOKE_END) at(len - TOWER_APPROACH);

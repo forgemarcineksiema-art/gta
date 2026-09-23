@@ -34,7 +34,7 @@ export interface SaveStreak {
 
 export interface SaveV1 {
   v: 1;
-  /** The cold open was completed or skipped. */
+  /** The cold open was shown (started, completed or skipped): never again for this profile. */
   seen: boolean;
   bank: number;
   coins: number;
@@ -218,7 +218,8 @@ function sanitize(raw: Record<string, unknown>): SaveV1 {
 export function collect(sim: SimWorld, into: SaveV1): void {
   const run = sim.run, garage = sim.garage, dailies = sim.dailies;
   into.v = 1;
-  into.seen = sim.coldOpen.seen;
+  // shown once per profile: a cold open that has started counts, so a reload mid-way never repeats it
+  into.seen = sim.coldOpen.seen || sim.coldOpen.active;
   into.bank = run.bank;
   into.coins = run.coins;
   into.bestRun = run.bestRun;

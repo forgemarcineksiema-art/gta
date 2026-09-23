@@ -176,6 +176,110 @@ Decided (set here):
   file. Moving its bot drives into a long file is M3 housekeeping, in
   BACKLOG, not done here.
 
+### Slice 4 — the garage: catalogue, paint, upgrades, prep, the offers
+
+- `sim/garage/Garage.ts` (from slice 0) is complete: buy, select, the free
+  respray, three stats in three tiers as multipliers on the preset
+  (`tuningFor`), the lawyer and the fence (cash, or granted by a video),
+  the police car locked until one escape from level 5 (`Run` sets it on the
+  `escape` event), `applyToVehicle` (retune in place, heal, the descriptor).
+  `CarMesh.setPaint` recolours the three paint tones with the damage kept;
+  the renderer applies the garage's paints when its serial moves.
+- `Run`: the fence adds `prep.fenceBonus` to the door's multiplier, the lawyer
+  keeps `lawyerKeep` of a busted bag, both are spent at any run's end;
+  `doubleLastBag()` once a door; `lastSerial` refreshes the totals.
+- `ui/garage.ts` (`GarageUi`): tabs TOTALS / CARS / PAINT / TUNE / PREP /
+  DAILIES in M4's wall panel, two levels of keys (steer between pages or
+  items, throttle confirms and drives out on the totals, brake backs out),
+  every item a button with the key's handler. The door's offer (DOUBLE THE
+  BAG with the video icon beside BANK IT, same size, BANK IT focused) is
+  answered before the pages open. Video buttons are hidden with no rewarded
+  ad. `WallNav` replaces the plan's `ActionState` argument: `ui` may not
+  import `input`.
+- `App`: the one caller of the garage and of the ads. The shut door shows
+  the garage car at once (a purchase or a respray is seen on the car behind
+  the door); at most one ad a door: the offer when the bag is above 8,000
+  and a rewarded ad exists, else the midgame request, never at the session's
+  first door; the rewarded path blocks input, mutes only on `adStarted`,
+  rewards only a finished ad, and answers the offer either way. DRIVE OUT
+  applies the car, opens the door, flushes the save. `happyTime()` on the
+  first car bought.
+- Tests: `garage.test.ts` 4.1–4.6; `e2e/game.spec.ts` 4.7–4.10 (`npm run
+  game`); the screens add `job`, `garage` and `dailies` at the ten sizes.
+
+Measured: the door to driving out in a new car by keys, 6 presses (D, W,
+W, S, S, W; target under 8). The compact's 0–100 is 8.87 s at tier 0 (in
+cars.test.ts's 8.5–13 band) and 7.23 s at tier 3 power. `npm run heat` 10/10
+on this build. Screens 31/31, looked at: the wall fits at 800×450 (the
+key-hint strip overlapped its tabs for the first 12 s, the M4 known issue:
+the hints now hide off the road). Perf after slice 4: 56.8 fps, frame p95
+16.8 ms, step p95 6.4 ms, draws max 104, heap 48 MB, frame max 500 ms
+(`perf/m5-slice4.json`; the M4 long-frame issue).
+
+Decided (set here):
+- The garage spends the bank and the coins (`Run.funds`, the bank first):
+  DESIGN.md §3.3's first car is "3k in coins plus 8k in the bag at ×1.25",
+  so coins must buy; the pools stay apart (D14: coins never enter the bank).
+  The wall says CASH.
+- The garage car is applied when the door shuts, not only at drive-out:
+  the respray is "applied at once to the mesh in the garage", and the car
+  behind the door is the one the next run starts in.
+- FIRST NEW CAR shows at every door until the compact is owned (YOU HAVE n,
+  or IT IS YOURS IN CARS once the cash is there), not only at the cold
+  open's door: the goal stays in view.
+- A video for a prep item already bought is never requested.
+
+### Slice 5 — the cold open finished
+
+- `SimWorldOptions.coldOpen` starts the script at boot unless the save has
+  seen it; `App` asks for it on a plain load of a profile that has not
+  (`coldopen=1` forces it, test parameters turn it off); the session flag
+  is gone. The save's `seen` counts a started cold open, and the store is
+  flushed as it starts: a reload mid-way never repeats it (M4's 4.9 pin,
+  unchanged, and M5's e2e 5.4). The delivery inside is the real delivery
+  on def id 0, the arrow shows while it runs; its door asks for no ad and
+  offers nothing.
+- Tests: `coldOpen.test.ts` 5.1–5.2 (5.3 is M4's long pin, kept);
+  `e2e/game.spec.ts` 5.4–5.5.
+
+Not measured: Marcin's first minute on `?fresh=1` with a stopwatch is his
+(the gate report asks for it).
+
+Decided (set here):
+- `seen` is written when the cold open starts, not when it ends: the plan's
+  slice text says completion or skip, but its own e2e 5.4 and M4's 4.9 want
+  a reload after the first caption not to repeat it. The first minute is
+  shown once per profile.
+
+### Slice 6 — dailies and the streak
+
+- `sim/dailies/Dailies.ts`: thirteen templates in the language of runs
+  (bank N in one run, escape from heat 3 or 5, takedowns in a compact,
+  billboards, an order without a scratch, deliveries, police takedowns,
+  coins, near misses, banked runs in a row); `setDate` draws three distinct
+  ones from `mulberry32(fnv1a(date))`, moves the streak by the civil
+  calendar (`dayNumber`, no `Date`), pays the day's streak cash once;
+  `step` counts from the ring (completions paid after the read);
+  `onRunEnd` from `Run.endRun`; every reward into the bank.
+- The daily police seed: `setDailyOrder(cover, seed)` orders each fixed site
+  list and mans the first share today (chokepoints 60 %, parked junctions
+  60 %, cameras 80 %); the roadblocks, the parked patrols and the cameras
+  skip unmanned sites. Before a date every site is manned.
+- `App` feeds the local date at boot and once a minute; `?date=` overrides;
+  test sessions without it keep M4's all-manned police and draw nothing.
+  The DAILIES page, DAILY DONE and DAY n STREAK popups, the day-7 topper (a
+  40-triangle `carOrange` cone on whichever car the player drives).
+- Tests: `dailies.test.ts` 6.0–6.5.
+
+Decided (set here):
+- The topper, once earned, stays when a streak breaks: a cosmetic a player
+  earned is not taken back.
+- Cameras join the daily share at 80 %: an unmanned camera keeps its pole
+  (nothing new placed, nothing removed) and does not flash that day.
+- Test sessions (`bot`, `manual`, `spawn`, …) draw no dailies and man every
+  site unless `date` is given, so the perf runs and the M4 suites stay
+  deterministic across calendar days.
+
 ## 2026-09-23 — The coin layer as lines
 
 Marcin: the coins are placed hopelessly and thoughtlessly; their look, how a

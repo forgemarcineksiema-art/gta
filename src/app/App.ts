@@ -17,6 +17,7 @@ import { Hud } from '../ui/hud';
 import { RunHud } from '../ui/run';
 import { ColdOpenHud } from '../ui/coldOpen';
 import { JobsHud } from '../ui/jobs';
+import { GarageUi, type GarageActions } from '../ui/garage';
 import { routeToDropOff } from './doorRoute';
 import { BotDriver } from './bot';
 import { BotPolicy } from './botPolicy';
@@ -79,8 +80,6 @@ const MAX_FRAME_DT = 0.25;
 const BREAK_MIN_MS = 600;
 /** Measured bot runs dismiss the wall and the card themselves after this long. */
 const BREAK_AUTO_MS = 1500;
-/** The session flag: the cold open has been shown in this tab (M5's save takes over). */
-const COLD_OPEN_KEY = 'coldOpenSeen';
 /** Any of these on the URL is a test or a dev session: no cold open unless `coldopen=1` forces it. */
 const COLD_OPEN_OFF_PARAMS = ['bot', 'spawn', 'heat', 'car', 'map', 'manual'];
 
@@ -96,6 +95,7 @@ export class App {
   private readonly runHud: RunHud;
   private readonly coldOpenHud: ColdOpenHud;
   private readonly jobsHud: JobsHud;
+  private readonly garageUi: GarageUi;
   private readonly audio: EngineAudio;
   private readonly sfx: Sfx;
   private readonly siren: Siren;
@@ -120,12 +120,19 @@ export class App {
   /** An ad requested at this break is still running: the break cannot be dismissed. */
   private adShowing = false;
   private readonly autoDismiss: boolean;
+  /** The wall's key edges this frame, reused. */
+  private readonly nav = { left: false, right: false, confirm: false, back: false };
   private readonly store: SaveStore;
   private saveCursor: number;
+  /** `?date=YYYY-MM-DD` for tests and playtests; null reads the local clock. */
+  private readonly fixedDate: string | null;
+  /** Test sessions (a bot, manual stepping, a spawn…) keep every police site manned and draw no dailies, unless `date` is given. */
+  private readonly datesOn: boolean;
+  private nextDateCheck = 0;
   /** Bound once: the save's dirty marks come from the event ring. */
   private readonly onSaveEvent = (e: SimEvent): void => {
     switch (e.kind) {
-      case 'banked': case 'busted': case 'purchase': case 'dailyDone': case 'streak': case 'billboard':
+      case 'banked': case 'busted': case 'purchase': case 'dailyDone': case 'streak': case 'billboard': case 'escape':
         this.store.markDirty();
         break;
       default:
@@ -139,6 +146,11 @@ export class App {
     this.store = store;
     this.saveCursor = sim.events.sequence;
     store.bindLifecycle(window, sim);
+    const date = params.get('date');
+    this.fixedDate = date !== null && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null;
+    this.datesOn = this.fixedDate !== null || !COLD_OPEN_OFF_PARAMS.some((k) => params.has(k));
+    // the day's three, the streak and today's police before the first step (docs/M5_PLAN.md D3)
+    if (this.datesOn) sim.dailies.setDate(this.today());
     this.manual = params.get('manual') === '1';
     const quality = params.get('quality');
     this.renderer = new Renderer(canvas, sim, quality === 'low' || quality === 'high' ? quality : undefined);
@@ -151,6 +163,39 @@ export class App {
     this.hud = new Hud(uiRoot, sim);
     this.runHud = new RunHud(uiRoot, sim);
     this.runHud.setKeys({ any: this.input.label('throttle') });
+    // the garage on the wall: App is the one caller of Garage and of the rewarded ads (docs/M5_PLAN.md §3.3)
+    const actions: GarageActions = {
+      buy: (car) => {
+        if (this.adShowing) return;
+        const first = sim.garage.owned.size === 1;
+        if (sim.garage.buy(car) !== 'ok') return;
+        sim.garage.select(car);
+        sim.garage.applyToVehicle();
+        if (first) this.platform.happyTime();
+      },
+      select: (car) => {
+        if (this.adShowing || !sim.garage.select(car)) return;
+        sim.garage.applyToVehicle();
+      },
+      respray: (car, paint) => {
+        if (this.adShowing) return;
+        sim.garage.respray(car, paint);
+        sim.garage.applyToVehicle();
+        this.store.markDirty();
+      },
+      upgrade: (car, stat) => {
+        if (this.adShowing || sim.garage.upgrade(car, stat) !== 'ok') return;
+        sim.garage.applyToVehicle();
+      },
+      buyPrep: (item) => {
+        if (this.adShowing) return;
+        sim.garage.buyPrep(item);
+      },
+      offer: (kind) => this.rewarded(kind),
+      driveOut: () => this.driveOut(),
+    };
+    this.garageUi = new GarageUi(this.runHud.wall, sim, actions);
+    this.garageUi.setKeys({ left: this.input.label('steerLeft'), right: this.input.label('steerRight'), confirm: this.input.label('throttle'), back: this.input.label('brake') });
     this.coldOpenHud = new ColdOpenHud(uiRoot);
     this.jobsHud = new JobsHud(uiRoot);
     this.coldOpenHud.setKeys({
@@ -349,7 +394,9 @@ export class App {
     const traffic = lifeOff ? 0 : densityParam(params.get('traffic'));
     const peds = lifeOff ? 0 : densityParam(params.get('peds'));
     // the first run of a session is the cold open; the world is built at its spawn so the chunks load once
-    const coldOpen = map === 'city' && coldOpenWanted(params);
+    const coldOpen = map === 'city' && coldOpenWanted(params, save);
+    // forced (`coldopen=1`): shown even to a profile that has seen it
+    if (coldOpen) save.seen = false;
     const sim = new SimWorld({
       map,
       seed: Number.isFinite(seed) ? seed : 42,
@@ -359,14 +406,10 @@ export class App {
       ...(spawn ? { spawn } : coldOpen ? { spawn: 'loop' } : {}),
       ...(car ? { car } : {}),
       save,
+      coldOpen,
     });
-    // the flag is set as it starts, so a reload never repeats it
-    if (coldOpen) {
-      sim.coldOpen.start();
-      if (sim.coldOpen.active) {
-        try { sessionStorage.setItem(COLD_OPEN_KEY, '1'); } catch { /* storage blocked: it shows again next load */ }
-      }
-    }
+    // the save's flag is written as it starts, so a reload never repeats it (the M4 session flag's rule)
+    if (sim.coldOpen.active) void store.flush(sim);
     bootTimings['sim'] = performance.now();
     const app = new App(platform, sim, canvas, params, store);
     platform.loadingStop();
@@ -423,6 +466,64 @@ export class App {
     });
   }
 
+  /** The local date as `YYYY-MM-DD` (the sim never reads a clock), or the `date` parameter. */
+  private today(): string {
+    if (this.fixedDate) return this.fixedDate;
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  /**
+   * The door shut (docs/M5_PLAN.md D10): at most one ad per door and none at the session's first. With a bag
+   * above the threshold and a rewarded ad to give, the wall offers DOUBLE THE BAG beside BANK IT; otherwise
+   * the midgame request fires once as the totals appear. The garage car stands behind the door.
+   */
+  private openWall(): void {
+    const run = this.sim.run;
+    const rewarded = this.platform.adsAvailable('rewarded');
+    const offer = !run.firstDoor && rewarded && run.lastBag > BALANCE.offer.doorThreshold;
+    this.sim.garage.applyToVehicle();
+    this.garageUi.setAdsAvailable(rewarded);
+    this.garageUi.open({ offer });
+    if (!offer) this.adBreak(run.firstDoor);
+  }
+
+  /** The wall's DRIVE OUT: the garage car, the door up, a new run; the save written. */
+  private driveOut(): void {
+    const run = this.sim.run;
+    if (run.state !== 'door' || this.adShowing) return;
+    this.sim.garage.applyToVehicle();
+    run.openDoor();
+    this.garageUi.close();
+    void this.store.flush(this.sim);
+  }
+
+  /**
+   * A rewarded video for the door's double or a prep item (CRAZYGAMES.md A5–A8, A12): input blocked from the
+   * request, the sound cut only by `adStarted`, the reward only on a finished ad, nothing on an error, and the
+   * cash path stays. The double is answered either way: one video per reward, never a second ask.
+   */
+  private rewarded(kind: 'lawyer' | 'fence' | 'double'): void {
+    if (this.adShowing || !this.platform.adsAvailable('rewarded')) return;
+    // nothing to win: an item already bought for the next run
+    if (kind !== 'double' && this.sim.garage.prep[kind]) return;
+    this.adShowing = true;
+    this.handle.adShowing = true;
+    this.input.blocked = true;
+    void this.platform.requestAd('rewarded').then((result) => {
+      this.adShowing = false;
+      this.handle.adShowing = false;
+      this.input.blocked = false;
+      this.breakAt = performance.now();
+      if (result.status === 'finished') {
+        if (kind === 'double') this.sim.run.doubleLastBag();
+        else this.sim.garage.grantPrep(kind);
+        this.store.markDirty();
+      }
+      if (kind === 'double') this.garageUi.offerSettled();
+    });
+  }
+
   private toggleUserPause(): void {
     this.userPaused = !this.userPaused;
     this.hud.setPaused(this.paused, 'user');
@@ -453,21 +554,32 @@ export class App {
     }
     if (st.pressed.camera) this.renderer.chase.toggleMode();
     if (st.pressed.mute) this.hud.showToast(this.audio.toggleUserMute() ? 'MUTED' : 'SOUND ON', 1);
-    if (st.pressed.skip && this.sim.coldOpen.active) this.sim.coldOpen.skip();
+    if (st.pressed.skip && this.sim.coldOpen.active) {
+      this.sim.coldOpen.skip();
+      this.store.markDirty();
+    }
 
     // takedown slow motion: the fixed-step loop gets scaled time (the sim never sees wall time); any key skips it
     if (this.sim.life.state.slowMo > 0 && !this.bot) {
       for (const action of ACTIONS) if (st.pressed[action]) { this.sim.life.skipSlowMo(); break; }
     }
-    // behind the shut door and on the busted card, any driving key drives on
+    // behind the shut door the wall has the keys; on the busted card any driving key drives on
     const run = this.sim.run;
     if ((run.state === 'door' || run.state === 'busted') && !this.paused && !this.adShowing) {
       const shown = now - this.breakAt;
-      let go = this.autoDismiss && shown > BREAK_AUTO_MS;
-      if (!this.bot && shown > BREAK_MIN_MS) for (const action of DISMISS) if (st.pressed[action]) { go = true; break; }
-      if (go) {
-        if (run.state === 'door') run.openDoor();
+      if (this.autoDismiss && shown > BREAK_AUTO_MS) {
+        if (run.state === 'door') this.driveOut();
         else run.closeCard();
+      } else if (!this.bot && shown > BREAK_MIN_MS) {
+        if (run.state === 'door') {
+          this.nav.left = st.pressed.steerLeft;
+          this.nav.right = st.pressed.steerRight;
+          this.nav.confirm = st.pressed.throttle;
+          this.nav.back = st.pressed.brake;
+          this.garageUi.navigate(this.nav);
+        } else {
+          for (const action of DISMISS) if (st.pressed[action]) { run.closeCard(); break; }
+        }
       }
     }
     const timeScale = this.sim.life.state.slowMo > 0 ? ECONOMY.slowMoScale : 1;
@@ -503,12 +615,20 @@ export class App {
       this.breakAt = now;
       // the totals are final: the door's bank and the card's fine are written at once
       void this.store.flush(this.sim);
-      this.adBreak(run.state === 'door' && run.firstDoor);
+      if (run.state === 'door') this.openWall();
+      else this.adBreak(false);
     } else if (this.started && !this.wasPlaying && playing) {
+      // the door opened (the wall's drive-out or a test hook): the wall is gone
+      this.garageUi.close();
       this.platform.gameplayStart();
     }
     this.wasPlaying = playing;
 
+    // midnight is a string compare: the date goes in once a minute
+    if (this.datesOn && now >= this.nextDateCheck) {
+      this.nextDateCheck = now + 60_000;
+      this.sim.dailies.setDate(this.today());
+    }
     this.saveCursor = this.sim.events.readFrom(this.saveCursor, this.onSaveEvent);
     this.store.tick(this.sim, frameDt);
 
@@ -530,10 +650,12 @@ export class App {
     this.frameMsSmooth += (frameMs - this.frameMsSmooth) * 0.05;
     const stats = this.renderer.stats;
     // the cold open's captions sit where the hints do and teach the same keys
-    this.hud.setHintsVisible(now < this.hintsUntil && !this.bot && !this.sim.coldOpen.active && !this.jobsHud.showing);
+    // the hints are for driving: behind a shut door or under the card the wall and the card have the keys
+    this.hud.setHintsVisible(now < this.hintsUntil && !this.bot && !this.sim.coldOpen.active && !this.jobsHud.showing && playing);
     this.runHud.update(this.sim, frameDt);
     this.coldOpenHud.update(this.sim);
     this.jobsHud.update(this.sim, frameDt);
+    this.garageUi.update(this.sim);
     this.hud.update(
       this.sim,
       frameDt,
@@ -567,15 +689,11 @@ export class App {
   }
 }
 
-/** The cold open runs on a plain load until the session has seen it; `coldopen=1` forces it, `coldopen=0` and test parameters turn it off. */
-function coldOpenWanted(params: URLSearchParams): boolean {
+/** The cold open runs on a plain load until the save has seen it; `coldopen=1` forces it, `coldopen=0` and test parameters turn it off. */
+function coldOpenWanted(params: URLSearchParams, save: SaveV1): boolean {
   const forced = params.get('coldopen');
   if (forced === '1') return true;
   if (forced === '0') return false;
   if (COLD_OPEN_OFF_PARAMS.some((k) => params.has(k))) return false;
-  try {
-    return sessionStorage.getItem(COLD_OPEN_KEY) !== '1';
-  } catch {
-    return true;
-  }
+  return !save.seen;
 }

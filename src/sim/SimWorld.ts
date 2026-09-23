@@ -76,6 +76,8 @@ export interface SimWorldOptions {
    * still wins for dev runs.
    */
   save?: SaveV1;
+  /** Start the cold open at boot (after the save: a save that has seen it keeps it off). */
+  coldOpen?: boolean;
 }
 
 interface TrackedBody {
@@ -218,7 +220,7 @@ export class SimWorld {
     this.cover = this.city ? coverSites(this.city) : null;
     this.police = this.traffic ? new Police(this) : null;
     this.roadblocks = this.traffic && this.cover ? new Roadblocks(this, this.cover.chokepoints) : null;
-    this.cameras = this.cover ? new Cameras(this.cover.cameraSites) : null;
+    this.cameras = this.cover ? new Cameras(this.cover.cameraSites, this.cover.daily.cameras) : null;
     this.jumps = this.city ? new Jumps(this, this.city.jumps) : null;
     // the generator's sixteen markers (docs/M5_PLAN.md D4); the cold open adds its own as id 0
     this.jobs = new Jobs(this, this.city && this.traffic ? placeJobs(this.city, opts.seed ?? 42, this.traffic.lanes) : []);
@@ -235,6 +237,7 @@ export class SimWorld {
         this.vehicle.applyTuning();
       }
     }
+    if (opts.coldOpen) this.coldOpen.start();
   }
 
   /** Advance the simulation by exactly one fixed step using the current `controls`. */

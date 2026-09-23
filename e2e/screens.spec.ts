@@ -3,7 +3,8 @@
  * (popup, damage bar, swap prompt, billboard counter) at every viewport size
  * CrazyGames requires legibility at (docs/CRAZYGAMES.md), at DPR 1, plus the
  * wrecked overlay at 1280x720; and the run (M4): the bag and the busted bar
- * filling, the busted card, and the wall behind the hideout's shut door.
+ * filling, the busted card, and the wall behind the hideout's shut door; M5:
+ * a delivery's line and card, and the garage's CARS and DAILIES pages on the wall.
  * Output: screens/<state>-<w>x<h>.png. Look at them.
  */
 import { expect, test } from '@playwright/test';
@@ -92,8 +93,20 @@ for (const [w, h] of SIZES) {
     mkdirSync('screens', { recursive: true });
     await page.setViewportSize({ width: w, height: h });
     // ads off: these frames are the card and the wall, not the ad that follows them
-    await page.goto('/?manual=1&quality=low&spawn=crown&ad=off');
+    await page.goto('/?manual=1&quality=low&spawn=crown&ad=off&fresh=1&date=2026-09-23');
     await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 30_000 });
+    // a delivery just taken: its line at the top and its card
+    await page.evaluate(() => {
+      const sim = window.__game!.sim;
+      const d = sim.jobs.defs.find((k) => k.kind === 'delivery')!;
+      sim.city!.sync(d.x, d.z, true);
+      sim.vehicle.teleport({ x: d.x, y: 0.9, z: d.z }, d.yaw + Math.PI);
+      window.advanceTime!(400);
+    });
+    await page.waitForSelector('.jobs__card.is-visible', { timeout: 10_000 });
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `screens/job-${w}x${h}.png` });
+    await page.evaluate(() => { window.__game!.sim.jobs.abandon(); window.__game!.sim.heat.reset(); window.advanceTime!(50); });
     // boxed on the street outside the hideout at heat 3, the bag full: the busted bar half way
     await page.evaluate(`${RUN_STATES}
       sim.police.dispatching = false;
@@ -121,6 +134,18 @@ for (const [w, h] of SIZES) {
     `);
     await page.waitForSelector('.run__wall.is-visible', { timeout: 10_000 });
     await page.screenshot({ path: `screens/door-${w}x${h}.png` });
+    // the garage: the CARS page with the compact in reach and the rest not
+    await page.evaluate(() => { window.__game!.sim.run.bank = 24000; window.advanceTime!(700); });
+    for (const code of ['KeyD', 'KeyW']) {
+      await page.keyboard.press(code);
+      await page.evaluate(() => window.advanceTime?.(34));
+    }
+    await page.waitForSelector('.wall__card.is-focus', { timeout: 10_000 });
+    await page.screenshot({ path: `screens/garage-${w}x${h}.png` });
+    // the day's three and the streak
+    await page.locator('.wall__tab', { hasText: 'DAILIES' }).click();
+    await page.waitForSelector('.wall__page--dailies.is-current .wall__daily', { timeout: 10_000 });
+    await page.screenshot({ path: `screens/dailies-${w}x${h}.png` });
   });
 }
 

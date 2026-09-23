@@ -359,10 +359,58 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   `N SKIP` underneath. A caption slides in over 0.25 s and shows only while
   its cue holds; the bottom swap prompt hides while the caption says SWAP.
   Never a modal, never over the car.
-- Job markers: a flat `carOrange` ring (4 m radius, 24 segments) on the
-  road with a 3 m beacon post, unlit so it reads in the towers' shade,
-  pulsing ±8 % in scale; a ring glyph on the radar. Hidden while a job
-  runs.
+- Job markers (M5): a flat ring (4 m radius, 24 segments) on the corner
+  apron with a 3 m beacon post, unlit so it reads in the towers' shade,
+  pulsing ±8 % in scale, in the kind's colour: a delivery `carOrange`, a
+  steal-to-order `carMagenta`, an escape `policeBlue`. Sixteen, always
+  resident, two instanced draws. While a job runs the others hide and its
+  target (the drop-off, the fence) gets the ring and beacon pulsing ±16 %;
+  the wanted car of an order carries a magenta ring under it within 150 m
+  and in front of the camera. On the radar the rings show only inside the
+  circle (sixteen rim chevrons would be noise); the running job's target
+  clamps to the rim in its colour.
+
+## Jobs, the arrow and the wall (M5)
+
+- The arrow: one chevron in `carOrange`, 1.2 m long, 12 triangles, unlit,
+  2.5 m above the roof. It lies in a plane tipped 45° toward the camera and
+  turns inside it to the bearing (a flat arrow is edge-on to a chase camera
+  below it): up the screen is ahead, down is behind. Full colour on a job;
+  40 % between jobs, pointing at the nearest marker, or at the nearest door
+  once the bag is above the door offer's threshold. Hidden behind a shut
+  door, on the busted card, within 6 m of its target, and in the cold open
+  until its delivery runs (the captions lead).
+- The job line: top centre where the key hints sit (they give way), 20 px
+  heavy italic uppercase skewed −10° in the popup type: the job, its clock
+  in accent yellow (danger red from 10 s), the distance in ink at 16 px
+  (`DELIVERY 1:15 · 370 m`, `FIND A LIME COMPACT · 420 m`, `ESCAPE ★★★`).
+  The kind's words take its colour (an order magenta, an escape cyan). The
+  result replaces it for 2 s at 24 px: DELIVERED / SOLD / BOUNTY +n in
+  accent yellow, TOO LATE in danger red.
+- The job card: under the line for the first 1.5 s, the panel style with a
+  4 px left edge in the kind's colour, the title at 26 px (DELIVERY, STEAL
+  TO ORDER, ESCAPE), what it asks at 14 px (GET IT TO THE DROP-OFF, WANTED:
+  CYAN COMPACT, THE POLICE HAVE YOU), the payout at 44 px in accent yellow,
+  the limit at 14 px dim (`1:15 · FASTER PAYS MORE`, `4:00 FROM THE SWAP ·
+  NO SCRATCHES`, `LOSE THEM`).
+- The wall behind the door is one panel at every drop-off: a row of tabs
+  (TOTALS, CARS, PAINT, TUNE, PREP, DAILIES; the current one on accent
+  yellow), one page at a time, and a footer with the key hint, BANK in
+  accent yellow and DRIVE OUT. The totals page is M4's (BANKED, the lines,
+  the counts, the wanted poster) plus, at the first door, FIRST NEW CAR:
+  10,000 · YOU HAVE n in accent cyan. CARS: five cards with the car's paint
+  swatch, its word, and SELECTED / OWNED / the price (danger red when the
+  bank is short) / ESCAPE HEAT 5 FIRST. PAINT: seven 52 × 40 px swatches of
+  the palette's car paints; the current one ringed in ink. TUNE: three rows,
+  the stat at 18 px, ●●○ dots in accent, the next price or MAX. PREP: each
+  item with its line and two buttons of the same size, the cash price and
+  ▶ FREE (the video icon: a cyan frame with a play triangle). A focused
+  item has an accent border and a flat black shadow; everything is a
+  button, so a click does what the key does. On screens under 560 px tall
+  the title drops to 38 px and the lines to 15 px.
+- The door's offer: under the totals, DOUBLE THE BAG with the video icon and
+  BANK IT, the same size side by side, BANK IT focused; the tabs and DRIVE
+  OUT dim until it is answered. Never at the session's first door.
 - Ramps are `ramp` red kickers drawn from their collision profile (an
   eased-in slope up, one slab down), a `barrier` white lip at the ridge, on
   the park strip outside the highway with the run-out kept clear; the

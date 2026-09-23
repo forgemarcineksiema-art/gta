@@ -157,6 +157,8 @@ export class Roadblocks {
       const list = this.byLane.get(lane);
       if (list) for (let i = 0; i < list.length; i++) {
         const site = list[i] as Chokepoint;
+        // today's roadblocks stand only at today's sites
+        if (this.sim.cover && this.sim.cover.daily.chokepoints[site.id] !== 1) continue;
         const d = ahead + site.s;
         if (d < t.minAhead || d > t.maxAhead) continue;
         if (Math.hypot(site.x - probe.x, site.z - probe.z) < t.minDistance) continue;

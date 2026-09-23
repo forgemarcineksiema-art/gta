@@ -26,6 +26,9 @@ export interface CarMesh {
   /** Damage stage 0..4: paint darkens toward graphite, parts collapse (front bumper at 1, rear at 2, mirrors and spoiler at 3), glass darkens at 4. Stage 0 restores everything. */
   setDamage(stage: number): void;
   damageStage: number;
+  /** A respray (the garage's PAINT page): the body's three paint tones from a new colour, the damage kept. */
+  setPaint(hex: number): void;
+  paint: number;
 }
 
 /** One cross-section of the body at longitudinal position z (metres, + = front). */
@@ -547,9 +550,11 @@ export function buildCarMesh(t: VehicleTuning, profile: CarProfile = MUSCLE, col
     const c = lightColor.setHex(hex);
     return Math.abs((originalCol[k * 3] as number) - c.r) < 0.004 && Math.abs((originalCol[k * 3 + 1] as number) - c.g) < 0.004 && Math.abs((originalCol[k * 3 + 2] as number) - c.b) < 0.004;
   };
-  const paintIdx: number[] = [], glassIdx: number[] = [];
+  const paintIdx: number[] = [], paintTone: number[] = [], glassIdx: number[] = [];
   for (let k = 0; k < colorAttr.count; k++) {
-    if (isTone(k, paint) || isTone(k, paintDark) || isTone(k, paintLight)) paintIdx.push(k);
+    if (isTone(k, paint)) { paintIdx.push(k); paintTone.push(0); }
+    else if (isTone(k, paintDark)) { paintIdx.push(k); paintTone.push(1); }
+    else if (isTone(k, paintLight)) { paintIdx.push(k); paintTone.push(2); }
     else if (isTone(k, glass) || isTone(k, glassLight)) glassIdx.push(k);
   }
   const graphite = new THREE.Color(PALETTE.graphite), soot = new THREE.Color(PALETTE.ink);
@@ -561,17 +566,7 @@ export function buildCarMesh(t: VehicleTuning, profile: CarProfile = MUSCLE, col
         (originalCol[k * 3 + 2] as number) + (toward.b - (originalCol[k * 3 + 2] as number)) * amount);
     }
   };
-  const mesh: CarMesh = { root, wheels, damageStage: 0, update(tm) {
-    const state = (tm.brake > 0.1 && tm.gear > 0 ? 1 : 0) | (tm.gear === -1 ? 2 : 0);
-    if (state !== lastState) {
-      paintRange(tailLightRanges, state & 1 ? 0xff6972 : 0xba2338);
-      paintRange(reverseRanges, state & 2 ? 0xfff6dc : 0x95a4a5);
-      lastState = state;
-    }
-  }, setDamage(stage) {
-    stage = Math.max(0, Math.min(4, Math.round(stage)));
-    if (stage === mesh.damageStage) return;
-    mesh.damageStage = stage;
+  const applyStage = (stage: number) => {
     tint(paintIdx, graphite, Math.min(0.85, 0.25 * stage));
     tint(glassIdx, soot, stage >= 4 ? 0.6 : 0);
     for (const part of detachable) {
@@ -590,6 +585,46 @@ export function buildCarMesh(t: VehicleTuning, profile: CarProfile = MUSCLE, col
     posAttr.needsUpdate = true;
     colorAttr.needsUpdate = true;
     lastState = -1; // the lights repaint over the restored colours on the next update
+  };
+  const tones = [new THREE.Color(), new THREE.Color(), new THREE.Color()];
+  const mesh: CarMesh = { root, wheels, damageStage: 0, paint: color, update(tm) {
+    const state = (tm.brake > 0.1 && tm.gear > 0 ? 1 : 0) | (tm.gear === -1 ? 2 : 0);
+    if (state !== lastState) {
+      paintRange(tailLightRanges, state & 1 ? 0xff6972 : 0xba2338);
+      paintRange(reverseRanges, state & 2 ? 0xfff6dc : 0x95a4a5);
+      lastState = state;
+    }
+  }, setDamage(stage) {
+    stage = Math.max(0, Math.min(4, Math.round(stage)));
+    if (stage === mesh.damageStage) return;
+    mesh.damageStage = stage;
+    applyStage(stage);
+  }, setPaint(hex) {
+    if (hex === mesh.paint) return;
+    mesh.paint = hex;
+    (tones[0] as THREE.Color).setHex(hex);
+    (tones[1] as THREE.Color).setHex(shade(hex, 0.72));
+    (tones[2] as THREE.Color).setHex(shade(hex, 1.13));
+    for (let i = 0; i < paintIdx.length; i++) {
+      const k = paintIdx[i] as number, c = tones[paintTone[i] as number] as THREE.Color;
+      originalCol[k * 3] = c.r; originalCol[k * 3 + 1] = c.g; originalCol[k * 3 + 2] = c.b;
+    }
+    applyStage(mesh.damageStage);
   } };
+  return mesh;
+}
+
+/**
+ * The streak's day-7 topper (docs/M5_PLAN.md slice 6): a `carOrange` cone on
+ * the roof, 20 sides (40 triangles), flat-shaded. The renderer puts it on
+ * whichever car the player drives, so it survives a swap.
+ */
+export function buildTopper(): THREE.Mesh {
+  const geometry = new THREE.ConeGeometry(0.26, 0.55, 20, 1, false).translate(0, 0.275, 0);
+  const material = new THREE.MeshLambertMaterial({ color: PALETTE.carOrange, flatShading: true });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = 'topper';
+  mesh.castShadow = true;
+  mesh.visible = false;
   return mesh;
 }

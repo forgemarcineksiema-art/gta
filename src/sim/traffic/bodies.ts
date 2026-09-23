@@ -14,10 +14,10 @@ import { cloneTuning, type VehicleTuning } from '../vehicle/tuning';
 
 /** The wanted board's cars (M6, DESIGN.md §14.3): the ten rivals' and the Chief's, never spawned as traffic. */
 export type RivalBody = 'wagon' | 'pizza' | 'wrecker' | 'twin' | 'fakecop' | 'partybus' | 'lowrider' | 'limo' | 'bubble' | 'phantom' | 'chiefcar';
-export type CivilianBody = 'sedan' | 'hatch' | 'estate' | 'suv' | 'pickup' | 'taxi' | 'truck' | 'bus' | 'icecream' | RivalBody;
+export type CivilianBody = 'sedan' | 'hatch' | 'estate' | 'suv' | 'pickup' | 'taxi' | 'truck' | 'bus' | 'icecream' | RivalBody | 'roadster' | 'sweeper' | 'hotdog';
 export type BodyId = CarId | CivilianBody;
 export const RIVAL_BODIES: readonly RivalBody[] = ['wagon', 'pizza', 'wrecker', 'twin', 'fakecop', 'partybus', 'lowrider', 'limo', 'bubble', 'phantom', 'chiefcar'];
-export const CIVILIAN_BODIES: readonly CivilianBody[] = ['sedan', 'hatch', 'estate', 'suv', 'pickup', 'taxi', 'truck', 'bus', 'icecream', ...RIVAL_BODIES];
+export const CIVILIAN_BODIES: readonly CivilianBody[] = ['sedan', 'hatch', 'estate', 'suv', 'pickup', 'taxi', 'truck', 'bus', 'icecream', ...RIVAL_BODIES, 'roadster', 'sweeper', 'hotdog'];
 export const BODY_IDS: readonly BodyId[] = [...CAR_IDS, ...CIVILIAN_BODIES];
 
 /** Traffic's paints (the order cards name them in jobs/catalog.ts). */
@@ -96,6 +96,10 @@ export const BODIES: readonly BodySpec[] = [
   civilian('bubble', 'compact', 0.72, 1.45, 1.75, 1.2, 550, 1, { paints: [PALETTE.carLime] }),
   onShell('phantom', 'sports', PALETTE.carBlack),
   onShell('chiefcar', 'police', PALETTE.policeWhite),
+  // three more hidden cars (M6 slice 9), stashed like the ice-cream truck: a roadster, a street sweeper, a hot-dog van
+  civilian('roadster', 'muscle', 0.84, 2.2, 2.9, 1.5, 1100, 1, { paints: [PALETTE.carRed] }),
+  civilian('sweeper', 'heavy', 1.1, 2.9, 3.2, 1.86, 3200, 0.8, { paints: [PALETTE.carWhite], big: true, stretch: true }),
+  civilian('hotdog', 'heavy', 1.08, 2.8, 3.3, 1.86, 2600, 0.85, { paints: [PALETTE.coin], big: true, stretch: true }),
 ];
 
 export const BODY_INDEX = Object.fromEntries(BODY_IDS.map((id, i) => [id, i])) as Record<BodyId, number>;

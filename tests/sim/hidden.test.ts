@@ -7,7 +7,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../src/sim/balance';
-import { GIANT_BALL, STASH_SPOTS } from '../../src/sim/city/stash';
+import { GIANT_BALL, HIDDEN_CARS, STASH_SPOTS } from '../../src/sim/city/stash';
+import { districtAt } from '../../src/sim/city/City';
 import { apply, collect, defaultSave } from '../../src/sim/save/format';
 import type { SimWorld } from '../../src/sim';
 import { AgentState, type Traffic } from '../../src/sim/traffic/Traffic';
@@ -90,6 +91,56 @@ describe('hidden cars', () => {
       expect(sim.carBody).toBe('muscle');
     } finally { sim.dispose(); }
   }, 60_000);
+});
+
+describe('hidden cars (M6 slice 9)', () => {
+  it('M6 9.1 the roadster, the sweeper and the hot-dog van each stand in a quiet bay of their district, away from every job; a swap finds each for good', async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
+    try {
+      sim.police!.dispatching = false;
+      const traffic = sim.traffic as Traffic;
+      const district = { roadster: 'crown', sweeper: 'foundry', hotdog: 'marina' } as const;
+      for (const id of ['roadster', 'sweeper', 'hotdog'] as const) {
+        const k = HIDDEN_CARS.indexOf(id);
+        const spot = sim.stash.spots[id];
+        expect(districtAt(spot.x, spot.z).id, id).toBe(district[id]);
+        for (const d of sim.jobs.defs) expect(Math.hypot(d.x - spot.x, d.z - spot.z), `${id} by job ${d.id}`).toBeGreaterThanOrEqual(60);
+        // alongside it on whichever side the swap reaches
+        let found = false;
+        for (const side of [1, -1]) {
+          const lx = Math.cos(spot.yaw) * side, lz = -Math.sin(spot.yaw) * side;
+          sim.city?.sync(spot.x, spot.z, true);
+          sim.vehicle.teleport({ x: spot.x + lx * 3.2, y: 1, z: spot.z + lz * 3.2 }, spot.yaw);
+          sim.vehicle.setVelocity(0, 0, 0);
+          run(sim, 1);
+          const a = sim.stash.agents[k] as number;
+          expect(a, id).toBeGreaterThanOrEqual(0);
+          expect(traffic.bodyOf(a)).toBe(id);
+          expect(Math.hypot((traffic.x[a] as number) - spot.x, (traffic.z[a] as number) - spot.z)).toBeLessThan(0.5);
+          if (sim.life.state.swapCandidate !== a) continue;
+          sim.controls.swap = true;
+          sim.step();
+          run(sim, 2 / 60);
+          found = true;
+          break;
+        }
+        expect(found, id).toBe(true);
+        expect(sim.carBody).toBe(id);
+        expect(sim.stash.found.has(id)).toBe(true);
+        expect(sim.garage.owned.has(id)).toBe(true);
+        // found for good: back to the garage car, away and back, its spot stays empty
+        sim.garage.select('muscle');
+        sim.garage.applyToVehicle();
+        sim.city?.sync(0, 0, true);
+        sim.vehicle.teleport({ x: 0, y: 1, z: 0 }, 0);
+        run(sim, 0.5);
+        sim.city?.sync(spot.x, spot.z, true);
+        sim.vehicle.teleport({ x: spot.x + 6, y: 1, z: spot.z }, spot.yaw);
+        run(sim, 0.5);
+        expect(sim.stash.agents[k]).toBe(-1);
+      }
+    } finally { sim.dispose(); }
+  }, 90_000);
 });
 
 describe('toys', () => {

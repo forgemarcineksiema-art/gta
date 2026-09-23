@@ -205,6 +205,7 @@ export const TRAFFIC: TrafficTuning = {
       sedan: 0.24, hatch: 0.2, estate: 0.1, suv: 0.14, pickup: 0.1, taxi: 0.06, truck: 0.06, bus: 0.06, icecream: 0,
       // the wanted board's cars (M6) are never traffic
       wagon: 0, pizza: 0, wrecker: 0, twin: 0, fakecop: 0, partybus: 0, lowrider: 0, limo: 0, bubble: 0, phantom: 0, chiefcar: 0,
+      roadster: 0, sweeper: 0, hotdog: 0,
     },
     places: {
       crown: { taxi: 4 },

@@ -77,6 +77,7 @@ export const BODY_WORDS: Record<BodyId, string> = {
   ...CAR_WORDS, sedan: 'SEDAN', hatch: 'HATCHBACK', estate: 'ESTATE', suv: 'SUV', pickup: 'PICKUP', taxi: 'TAXI', truck: 'BOX TRUCK', bus: 'BUS', icecream: 'ICE-CREAM TRUCK',
   wagon: 'WAGON', pizza: 'PIZZA HATCH', wrecker: 'WRECKER', twin: 'TWIN', fakecop: 'FAKE CRUISER', partybus: 'PARTY BUS',
   lowrider: 'LOWRIDER', limo: 'GOLD LIMO', bubble: 'BUBBLE', phantom: 'PHANTOM', chiefcar: "CHIEF'S CRUISER",
+  roadster: 'ROADSTER', sweeper: 'STREET SWEEPER', hotdog: 'HOT-DOG VAN',
 };
 
 /** A trial's medal times from its bronze limit (M5.5 slice 10): gold, silver, bronze, seconds. */

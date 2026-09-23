@@ -544,10 +544,115 @@ export const CHIEFCAR: CarProfile = {
   paint: PALETTE.policeWhite,
 };
 
+/**
+ * Three more hidden cars (M6 slice 9, DESIGN.md §14.6), parked in quiet bays: a 1930s roadster with an open cockpit,
+ * a long bonnet and running boards; a municipal street sweeper with its brushes and hopper; a hot-dog van with the
+ * sausage in its bun on the roof.
+ */
+export const ROADSTER: CarProfile = {
+  name: 'roadster',
+  sections: [
+    { z: 2.2, floor: 0.42, belt: 0.74, roof: 0.78, hwFloor: 0.5, hwBelt: 0.54, hwRoof: 0.5 },
+    { z: 1.95, floor: 0.4, belt: 0.88, roof: 0.92, hwFloor: 0.54, hwBelt: 0.58, hwRoof: 0.54 },
+    { z: 0.55, floor: 0.4, belt: 0.92, roof: 0.96, hwFloor: 0.6, hwBelt: 0.64, hwRoof: 0.6 },
+    { z: 0.45, floor: 0.4, belt: 0.94, roof: 1.24, hwFloor: 0.74, hwBelt: 0.78, hwRoof: 0.72 },
+    { z: 0.35, floor: 0.4, belt: 0.94, roof: 0.98, hwFloor: 0.76, hwBelt: 0.8, hwRoof: 0.76 },
+    { z: -1.0, floor: 0.4, belt: 0.94, roof: 0.98, hwFloor: 0.78, hwBelt: 0.82, hwRoof: 0.78 },
+    { z: -1.6, floor: 0.42, belt: 0.9, roof: 0.94, hwFloor: 0.74, hwBelt: 0.78, hwRoof: 0.74 },
+    { z: -2.2, floor: 0.48, belt: 0.72, roof: 0.76, hwFloor: 0.56, hwBelt: 0.6, hwRoof: 0.56 },
+  ],
+  glassSides: [0, 0],
+  glassTops: [2],
+  darkTops: [4],
+  aPillar: 3,
+  cPillar: -1,
+  pillars: [],
+  doorSeams: [0.1, -0.7],
+  handleZ: -0.3,
+  headlight: { width: 0.2, height: 0.16, y: 0.72, inset: 0.12 },
+  taillight: { width: 0.12, height: 0.1, y: 0.74, inset: 0.1 },
+  grille: { width: 0.44, height: 0.3, y: 0.6 },
+  bumperHeight: 0.08,
+  lipSpoiler: false,
+  mirrors: false,
+  exhausts: 1,
+  wheelInset: -0.04,
+  wheelStyle: 'wire',
+  parts: [
+    // running boards between the wheels, chrome lamps on the wings, the spare on the tail, the seats' backs
+    { size: [0.16, 0.05, 1.5], at: [0.72, 0.42, -0.1], color: PALETTE.ink, mirror: true },
+    { size: [0.16, 0.16, 0.12], at: [0.5, 0.95, 1.95], color: PALETTE.chrome, mirror: true },
+    { size: [0.48, 0.48, 0.12], at: [0, 0.74, -2.22], color: PALETTE.rubber },
+    { size: [0.2, 0.2, 0.13], at: [0, 0.74, -2.23], color: PALETTE.chrome },
+    { size: [1.3, 0.3, 0.1], at: [0, 1.1, -0.95], color: PALETTE.wafer },
+  ],
+  paint: PALETTE.carRed,
+};
+
+export const SWEEPER: CarProfile = {
+  ...TRUCK,
+  name: 'sweeper',
+  sections: [
+    { z: 2.9, floor: 0.55, belt: 1.25, roof: 1.3, hwFloor: 1.0, hwBelt: 1.04, hwRoof: 1.0 },
+    { z: 2.82, floor: 0.5, belt: 1.35, roof: 2.3, hwFloor: 1.04, hwBelt: 1.08, hwRoof: 0.98 },
+    { z: 1.75, floor: 0.5, belt: 1.37, roof: 2.4, hwFloor: 1.04, hwBelt: 1.08, hwRoof: 1.0 },
+    { z: 1.35, floor: 0.5, belt: 1.37, roof: 2.4, hwFloor: 1.04, hwBelt: 1.08, hwRoof: 1.0 },
+    { z: 1.3, floor: 0.6, belt: 1.4, roof: 2.2, hwFloor: 1.08, hwBelt: 1.1, hwRoof: 1.0 },
+    { z: -2.85, floor: 0.6, belt: 1.4, roof: 2.0, hwFloor: 1.08, hwBelt: 1.1, hwRoof: 1.0 },
+    { z: -2.9, floor: 0.6, belt: 1.37, roof: 1.96, hwFloor: 1.06, hwBelt: 1.08, hwRoof: 0.98 },
+  ],
+  doorSeams: [2.75, 1.85],
+  handleZ: 1.95,
+  fixed: { from: 3, to: 6, color: PALETTE.carOrange },
+  parts: [
+    // the two front brushes under the nose, the suction mouth between, the amber bar, the hopper's lid and stripes
+    { size: [0.62, 0.12, 0.62], at: [0.72, 0.1, 2.35], color: PALETTE.charcoal, mirror: true },
+    { size: [0.16, 0.2, 0.16], at: [0.72, 0.24, 2.35], color: PALETTE.carOrange, mirror: true },
+    { size: [1.1, 0.14, 0.4], at: [0, 0.12, 1.2], color: PALETTE.ink },
+    { size: [1.0, 0.1, 0.22], at: [0, 2.45, 2.2], color: PALETTE.charcoal },
+    { size: [0.3, 0.12, 0.24], at: [0.3, 2.51, 2.2], color: PALETTE.cone, mirror: true },
+    { size: [1.9, 0.05, 3.6], at: [0, 2.03, -0.8], color: PALETTE.steel },
+    { size: [0.012, 0.18, 4.0], at: [1.105, 1.1, -0.8], color: PALETTE.carWhite, mirror: true },
+  ],
+  paint: PALETTE.carWhite,
+};
+
+export const HOTDOG: CarProfile = {
+  ...ICECREAM,
+  name: 'hotdog',
+  sections: [
+    { z: 2.8, floor: 0.55, belt: 1.25, roof: 1.3, hwFloor: 1.0, hwBelt: 1.04, hwRoof: 1.0 },
+    { z: 2.72, floor: 0.5, belt: 1.35, roof: 2.25, hwFloor: 1.04, hwBelt: 1.08, hwRoof: 0.98 },
+    { z: 1.95, floor: 0.5, belt: 1.37, roof: 2.35, hwFloor: 1.04, hwBelt: 1.08, hwRoof: 1.0 },
+    { z: 1.45, floor: 0.5, belt: 1.37, roof: 2.35, hwFloor: 1.04, hwBelt: 1.08, hwRoof: 1.0 },
+    { z: 1.4, floor: 0.6, belt: 1.4, roof: 2.8, hwFloor: 1.08, hwBelt: 1.1, hwRoof: 1.08 },
+    { z: -2.75, floor: 0.6, belt: 1.4, roof: 2.8, hwFloor: 1.08, hwBelt: 1.1, hwRoof: 1.08 },
+    { z: -2.8, floor: 0.6, belt: 1.37, roof: 2.76, hwFloor: 1.06, hwBelt: 1.08, hwRoof: 1.06 },
+  ],
+  doorSeams: [2.68, 2.0],
+  handleZ: 2.1,
+  fixed: { from: 3, to: 6, color: PALETTE.carWhite },
+  parts: [
+    // red bands on the box, the serving hatch and its striped awning on the kerb side
+    { size: [0.012, 0.22, 4.0], at: [1.086, 2.3, -0.65], color: PALETTE.carRed, mirror: true },
+    { size: [0.03, 0.75, 1.6], at: [-1.09, 1.8, -0.6], color: 0x294653 },
+    { size: [0.22, 0.05, 1.6], at: [-1.2, 1.42, -0.6], color: PALETTE.lightGrey },
+    { size: [0.36, 0.04, 1.8], at: [-1.26, 2.28, -0.6], color: PALETTE.carRed },
+    { size: [0.37, 0.045, 0.3], at: [-1.26, 2.285, -0.9], color: PALETTE.carWhite },
+    { size: [0.37, 0.045, 0.3], at: [-1.26, 2.285, -0.3], color: PALETTE.carWhite },
+    // the hot dog on the roof: the bun either side, the sausage long past it, the mustard's zigzag on top
+    { size: [0.34, 0.3, 2.2], at: [0.18, 3.0, -0.6], color: PALETTE.wafer, mirror: true },
+    { size: [0.3, 0.3, 2.9], at: [0, 3.08, -0.6], color: 0xa4452f },
+    ...[-1.6, -1.05, -0.5, 0.05, 0.6].map((z, k): BodyPart => ({ size: [0.2, 0.04, 0.12], at: [k % 2 === 0 ? 0.04 : -0.04, 3.245, z], color: PALETTE.coin })),
+  ],
+  paint: PALETTE.coin,
+};
+
 /** Every body's profile: the player's five classes, the city's eight, the hidden truck and the wanted board's cars. */
 export const BODY_PROFILES: Record<BodyId, CarProfile> = {
   ...CAR_PROFILES,
   sedan: SEDAN, hatch: HATCH, estate: ESTATE, suv: SUV, pickup: PICKUP, taxi: TAXI, truck: TRUCK, bus: BUS, icecream: ICECREAM,
   wagon: WAGON, pizza: PIZZA, wrecker: WRECKER, twin: TWIN, fakecop: FAKECOP, partybus: PARTYBUS,
   lowrider: LOWRIDER, limo: LIMO, bubble: BUBBLE, phantom: PHANTOM, chiefcar: CHIEFCAR,
+  roadster: ROADSTER, sweeper: SWEEPER, hotdog: HOTDOG,
 };

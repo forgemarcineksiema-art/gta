@@ -199,7 +199,7 @@ export const BALANCE = {
    * What a civilian body is worth (M6 slice 0, DESIGN.md §14.6): never for sale, only kept for `keep.share` of
    * this when it is driven home (a taxi 4,200); a hidden car is found, not kept, and is worth nothing here.
    */
-  bodyPrices: { sedan: 12000, hatch: 9000, estate: 13000, suv: 18000, pickup: 16000, taxi: 14000, truck: 24000, bus: 30000, icecream: 0 },
+  bodyPrices: { sedan: 12000, hatch: 9000, estate: 13000, suv: 18000, pickup: 16000, taxi: 14000, truck: 24000, bus: 30000, icecream: 0, roadster: 0, sweeper: 0, hotdog: 0 },
   /**
    * Each upgrade tier's price, tier 1 to 3, the same for every stat and car: 12,000 / 16,000 / 22,000 (balance
    * script, M5.5 slice 1; M5's 8,000 / 14,000 / 22,000 fell tier 1 to the first car's door once the beat's

@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M6 slice 9: three hidden cars
+
+Done: a roadster (1930s, open cockpit, long bonnet, running boards, wire wheels) in Crown Heights, a street sweeper
+(brushes, suction mouth, amber bar, hopper) in Sunset Works, a hot-dog van (the sausage in its bun on the roof, a
+striped awning) on the Coral Quay, appended bodies never spawned. Each waits in its district's kerbside bay furthest
+from the middle and 60 m from every job and door (`stashSpots`; the bays kept clear of parked civilians), stands there
+within 260 m, is found for good by a swap; `Stash` keeps a record each. The clue: the nearest unfound car's own figure
+(a low jaunty motif, reversing beeps, a bell). 28 cars now. Pin M6 9.1. Verify green (373 tests).
+
 ## 2026-09-23 — M6 slice 8: the car's kit
 
 Done: three car slots in the kit, bought once and fitted per car in the garage (`Garage.carKit`, the save's

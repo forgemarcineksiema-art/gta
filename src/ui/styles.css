@@ -118,9 +118,55 @@ body {
   animation: heat-pulse 1s ease-in-out infinite;
 }
 @keyframes heat-pulse { 50% { opacity: 0.45; } }
+/* a star that just filled scales up once; every discrete gain pops a red +n under the row (M5.5) */
+.hud__heat-star.is-pop { animation: heat-pop 0.3s ease-out; }
+@keyframes heat-pop { 50% { transform: scale(1.35); } }
+.hud__heat-gain {
+  position: absolute;
+  right: 8px;
+  top: 100%;
+  margin-top: 4px;
+  font-size: 16px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.06em;
+  color: var(--ui-danger);
+  text-shadow: 2px 3px 0 #000;
+  opacity: 0;
+  pointer-events: none;
+}
+.hud__heat-gain.is-on { animation: heat-gain 0.6s ease-out forwards; }
+@keyframes heat-gain {
+  0% { opacity: 0; transform: translateY(6px); }
+  20% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-8px); }
+}
 @media (prefers-reduced-motion: reduce) {
   .hud__heat.is-active .hud__heat-star.is-filled { animation: none; }
+  .hud__heat-star.is-pop { animation: none; }
+  .hud__heat-gain.is-on { animation: none; opacity: 1; }
 }
+
+/* the ticker: one line at the top centre, the job line and the hints make room (M5.5) */
+.hud__ticker {
+  position: absolute;
+  left: 50%;
+  top: calc(16px + var(--safe-top));
+  transform: translateX(-50%) skewX(-10deg);
+  font-size: 20px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--ui-ink);
+  text-shadow: 2px 3px 0 #000;
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+.hud__ticker.is-on { opacity: 1; }
+.hud__ticker-level { color: var(--ui-danger); margin-right: 12px; }
 
 /* speedometer, bottom right */
 .hud__speedo {
@@ -933,6 +979,7 @@ kbd.key {
   font-family: var(--font-display);
 }
 .jobs.is-visible { display: flex; }
+.jobs.is-yield { display: none; }
 .jobs__line {
   display: flex;
   flex-wrap: wrap;

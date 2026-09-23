@@ -2,6 +2,123 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M5.5 slice 0: heat that moves
+
+Marcin: "Lecisz". Working autonomously per `docs/M5.5_PLAN.md`, slice 0
+(DESIGN.md §13.3). Verify green before the first edit (264 quick tests
+after the doc commits).
+
+### Done
+
+- **The beat.** `POLICE.budget[0]` is 2: two saloons drive their lanes at
+  heat 0 with the lights off, recycled near the player (`Police.recycle`),
+  watching (`Police.watch` runs the sight rays at every level). The roster
+  beyond the beat goes off duty after a door or busted (`standDown` keeps
+  the first `budget` live units). The beat is part of the traffic: a world
+  with `traffic: 0` (the tours, the sandboxes) has none.
+- **Heat judged by what the police see.** `Heat.add(points, seen)`: a crime
+  in a unit's or a parked patrol's sight (`Police.crimeSeen()`, wired in
+  `SimWorld`) pays `seenFactor` 2 and never leaves the player below level 1
+  (`Heat.wanted`); unseen, the ratchet rises quietly. Reckless driving
+  counts: a civilian rammed above the disturb threshold (`heat.hit` 2, once
+  per car per 3 s), the chase's drip (`chasePerSecond` 0.1 while the
+  pursuit is active, `Heat.tick`), speeding within a patrol's sight by 30
+  km/h over the road's limit (`Police.speeding`: wanted at once and
+  `speedingSeen` 3 flat, once per 20 s; the limit under the player from the
+  nearest lane every `routeSeconds`). A rammed police car is the witness
+  (`policeHit` 6 seen). The numbers: delivery 10, order 8, billboard 3,
+  camera 6, traffic takedown 5, police takedown 12, roadblock 8.
+- **Fault follows speed.** A contact is the player's crime only when the
+  other car was not the faster one (`faultMargin` 1 m/s): found by jobs
+  4.8, where a beat patrol braking late behind a stopped player, and then
+  the player reversing into it, made the player wanted and boxed. The
+  police read a contact two steps after it (the manifolds of physics N are
+  sensed in Traffic.step N+1, read in Police.preStep N+2), so both speeds
+  come from a decaying maximum (×0.8 a step). Heat's hit rule reads the
+  speeds of the same step (Life pushes the hit right after physics).
+- **Legible.** `HeatHud`: a red `+n` under the stars for 0.6 s on every
+  discrete gain (`Heat.lastGain` / `gainSerial`), the star that fills
+  scales 1.35× once. A level-up is an event (`heatLevel`): the HUD's
+  ticker shows `LEVEL n · <news>` for 2 s at the top centre (the job line
+  yields, the hints hide), `Sfx` plays a two-tone wail. The intro's initial
+  heat is `set`, not added: no ticker at boot.
+- The balance probe holds its level (`Heat.set`) against the drip and the
+  seen crimes; a `time to level` row joins the tables. The shipping seed's
+  jobs re-baked (heat 10 / 8).
+- Tests: `heat.test.ts` 0.1–0.4 (seen ×2 and the floor, the hit cooldown
+  and the exclusions, the drip, the numbers and the event);
+  `heat.long.test.ts` 0.5 (the novice bot from heat 0 at three seeds: level
+  2 inside 300 s, level 3 inside 540 s, never level 3 inside a minute);
+  `police.long` "heat 0 keeps the beat driving its lanes with no chase";
+  `brain` 3c.3 now pins the witness rule and the chase after it.
+- Pins touched, each with its reason in the file: `jobs.test` (the job
+  pins run with the beat off: a scripted brake past standstill reverses
+  into a patrol), `cameras` 6.11, `traffic.pool.long` (the tow pin) and
+  `jobs.long` 1.7 likewise; `traffic.long` "under the limit" and
+  `traffic.pool.long` "returns the body far away" skip police records (a
+  chasing unit runs its plan's speed and keeps its body further out by
+  M4's rule); `roadblocks` 6.3 floors the drip; `police.long` "the level-1
+  pair" holds level 1 (the bot's speeding and the drip escalate it).
+
+### Measured
+
+- Time to level from heat 0 (the novice bot, traffic on, seeds 42 / 7 /
+  123): level 2 at 41 / 42 / 83 s, level 3 at 200 / 74 / 152 s (speedings
+  8 / 3 / 4). Before the flat speeding and the 20 s cooldown: level 3 at
+  34–71 s, a runaway. The skilled bot (seed 42): level 2 at 159 s, level 3
+  at 319 s. The bot speeds everywhere and rams; a human's curve is slower.
+- `npm run balance`: busted a minute (novice / skilled) level 1 0.00 /
+  0.00, 2 0.67 / 0.00, 3 1.00 / 0.00, 4 2.33 / 1.00, 5 2.00 / 0.33. The
+  novice's bag from heat 0 is now **1,453 a minute** (M4: 406): with the
+  beat the speeding bot is chased at once and wrecks cruisers (police
+  takedown 1,500 into the bag). Best cash-out novice L2 / skilled L3 (the
+  ordering assertion holds); the first hour buys the compact **and** tier 1
+  power at minute 5.0, so the script's assertion (c) (no gap under three
+  minutes) is **red**: the economy was tuned without police income at heat
+  0. Not loosened; slice 1 re-times the hour with the new coin income and
+  retunes the prices, as the plan says.
+- Verify: quick 264 tests; `verify:gate` 288 green after the pin work
+  (135 s of tests); `heat` 10 / 10, `game` 9 / 9, `life` 4 / 4; smoke 60
+  fps, 104 draws, 3.67 MB.
+- Perf (MX330, 4× CPU, 60 s bot, `perf/m5.5-slice0-1..2.json`): 55.3 /
+  55.6 fps, frame p95 33.3 / 33.3 ms, step p95 7.8 / 7.6 ms, frame max 100
+  / 133 ms, against the M5.1 bases 56.9 / 55.7 / 56.6 fps, p95 16.8 / 33.3
+  / 16.8, step 6.4 / 7.1 / 7.1, max 100 / 133 / 83. The step p95 is up
+  0.5–0.7 ms: the perf route now carries the beat and, when the bot speeds
+  past a patrol, a chase; the fps sits at the bottom of the bases' spread
+  (the ±3 fps noise band). Watched at the slice 3 / 4 A/B, where the
+  protocol asks for alternating runs.
+- In the build (this session's browser pane): the ticker `LEVEL 1 ·
+  PATROLS ON YOUR TAIL`, the `+20` and `+12` pops under the stars, the
+  star fill, two beat units at heat 0, the chase after a seen crime.
+
+### Decided (set here)
+
+- Speeding past a patrol is not doubled: the sighting is the crime, so it
+  makes the player wanted and pays 3 flat, once per 20 s. At 6 every 5 s
+  the road bot reached level 3 in 34 s.
+- The faster car is at fault (the rule above); a decaying maximum stands
+  in for the speeds at the contact because the police read it late.
+- The beat exists only with civilians (`trafficDensity > 0`): the tours
+  and the sandbox pins keep their road, and the beat is what the city's
+  traffic includes.
+- The plan's `Pursuit.detect()` is not needed: the level-1 floor plus the
+  unit's own sight start the chase on the next step.
+
+### Next
+
+- Slice 1: coins as breadcrumbs (DESIGN §13.5), then the balance re-run
+  and the price retune.
+
+### Open problems
+
+- The balance script's assertion (c) is red until slice 1 retunes (above).
+- The delivery limits were measured clean; with the beat a speeding
+  novice takes a delivery under two cruisers, and the limit factor 1.3 may
+  be tight. Marcin's playtest decides; the knob is
+  `BALANCE.jobs.delivery.limitFactor`.
+- The perf step p95 +0.5–0.7 ms with the beat (above).
+
 ## 2026-09-23 — Marcin's M5 playtest: polish before the platform
 
 Marcin played the gate build and answered the watch list. Busted is fair;

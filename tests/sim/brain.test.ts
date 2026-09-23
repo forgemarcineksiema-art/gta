@@ -48,9 +48,11 @@ describe('the police brain', () => {
     } finally { sim.dispose(); }
   }, 30_000);
 
-  it('3c.3 hitting a police car nobody was chasing you in costs heat, once per contact', async () => {
+  it('3c.3 hitting a police car nobody was chasing you in costs heat, once per contact, and the car has seen you', async () => {
     const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
     const traffic = sim.traffic as Traffic;
+    // the beat stays out of it: this pins the rammed car's own reaction
+    sim.police!.dispatching = false;
     try {
       const lane = streetLane(traffic);
       const pose = { x: 0, z: 0, yaw: 0 };
@@ -64,7 +66,10 @@ describe('the police brain', () => {
       expect(sim.heat.points).toBe(0);
       // roll into its back bumper at 20 km/h and stay against it
       run(sim, 2.5, (_t, c, s) => { if (s.probe.speed < 20 / 3.6) c.throttle = 0.4; });
-      expect(sim.heat.points).toBe(BALANCE.heat.policeHit);
+      // a seen crime: double, and never below level 1 (M5.5, docs/DESIGN.md §13.3)
+      expect(sim.heat.points).toBe(Math.max(BALANCE.heat.policeHit * BALANCE.heat.seenFactor, BALANCE.heatThresholds[0] as number));
+      expect(sim.heat.level).toBe(1);
+      expect(sim.pursuit.state).not.toBe('idle');
     } finally { sim.dispose(); }
   }, 30_000);
 

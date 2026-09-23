@@ -26,7 +26,7 @@ import { BotPolicy, type PolicyName } from '../../src/app/botPolicy';
 import { CITY_BOT_TUNING, TrackBot } from '../../src/app/trackBot';
 import { BALANCE } from '../../src/sim/balance';
 import type { SimWorld } from '../../src/sim';
-import { createWorld, run } from './helpers';
+import { createWorld, run, runUntil } from './helpers';
 
 const SECONDS = 180;
 const LEVELS = [1, 2, 3, 4, 5];
@@ -55,8 +55,10 @@ async function capture(policy: PolicyName, level: number): Promise<Capture> {
       }
       if (rearm > 0) {
         rearm -= 1 / 60;
-        if (rearm <= 0) s.heat.add(Math.max(0, threshold - s.heat.points));
+        if (rearm <= 0) s.heat.set(threshold);
       }
+      // the probe is a level, not a run: the chase's drip and the seen crimes (M5.5) are put back
+      else if (s.heat.level !== level) s.heat.set(threshold);
       bot.drive(s, c, 1 / 60);
     });
   } finally { sim.dispose(); }
@@ -81,6 +83,22 @@ async function earnings(): Promise<{ bag: number; coins: number; jobMean: number
     const jobs = sim.jobs.defs.filter((d) => d.kind !== 'escape');
     const jobMean = jobs.reduce((n, d) => n + d.payout, 0) / jobs.length;
     return { bag: bag / (SECONDS / 60), coins: sim.run.coins / (SECONDS / 60), jobMean };
+  } finally { sim.dispose(); }
+}
+
+/** Seconds from heat 0 to levels 2 and 3 for a policy that only drives (M5.5 slice 0; -1 = not inside the cap). */
+async function timeToLevel(policy: PolicyName, cap = 540): Promise<{ t2: number; t3: number }> {
+  const sim = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 0, record: false });
+  try {
+    const bot = new BotPolicy(policy, new TrackBot(sim.carId, CITY_BOT_TUNING));
+    let t2 = -1;
+    const t3 = runUntil(sim, cap, (s) => {
+      if (t2 < 0 && s.heat.level >= 2) t2 = s.time;
+      if (s.run.state === 'busted') s.run.closeCard();
+      else if (s.run.state === 'door') s.run.openDoor();
+      return s.heat.level >= 3;
+    }, (_t, c, s) => bot.drive(s, c, 1 / 60));
+    return { t2, t3 };
   } finally { sim.dispose(); }
 }
 
@@ -142,6 +160,11 @@ describe('the balance script', () => {
     }
     const earn = await earnings();
     const out: string[] = [];
+    for (const policy of ['novice', 'skilled'] as const) {
+      const t = await timeToLevel(policy);
+      const fmt = (v: number): string => (v < 0 ? 'not inside the cap' : `${v.toFixed(0)} s`);
+      out.push(`time to level from heat 0, ${policy}: level 2 ${fmt(t.t2)}, level 3 ${fmt(t.t3)}`);
+    }
     out.push(`busted a minute (seed 42, traffic on, ${SECONDS} s a level, M4 measured novice ${BALANCE.measured.bustedPerMinute.slice(1).join(' / ')}, skilled ${BALANCE.measured.bustedPerMinuteSkilled.slice(1).join(' / ')}):`, ...rows);
     out.push(`bag ${earn.bag.toFixed(0)} a minute, coins ${earn.coins.toFixed(0)} a minute from heat 0 (M4: ${BALANCE.measured.bagPerMinute}, ${BALANCE.measured.coinsPerMinute} coins); the placed jobs' mean payout ${earn.jobMean.toFixed(0)}`);
 

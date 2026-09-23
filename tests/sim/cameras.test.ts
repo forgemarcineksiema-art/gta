@@ -62,6 +62,8 @@ describe('speed cameras', () => {
 
   it('6.11 30 over the limit flashes once for 30; 10 over nothing; a second pass inside the cooldown nothing', async () => {
     const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
+    // the beat stays out of it (M5.5): a patrol watching the flash would double it and report the speeding
+    sim.police!.dispatching = false;
     try {
       const cam = sim.cameras!.descs[0]!;
       const limit = cam.limitMs * 3.6;

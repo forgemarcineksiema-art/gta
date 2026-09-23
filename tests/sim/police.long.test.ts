@@ -32,6 +32,8 @@ describe('police patrols (long)', () => {
       for (let tick = 0; tick < 90 * 60; tick++) {
         bot.drive(sim, sim.controls, 1 / 60);
         sim.step();
+        // the pin is level 1's pair: the bot's speeding past them and the chase's drip (M5.5) are put back
+        if (sim.heat.level > 1) sim.heat.set(20);
         for (let u = 0; u < police.units.length; u++) {
           const agent = police.units[u] as number;
           if (agent < 0 || seen.has(agent)) continue;
@@ -98,9 +100,10 @@ describe('police patrols (long)', () => {
 
 // Moved unchanged from `police.test.ts` in M5.1: over ~10 s of wall time under the parallel suite.
 describe('police patrols (long)', () => {
-  it('detects a patrol in the open, and heat 0 leaves the same car driving its lane', async () => {
+  it('detects a patrol in the open, and heat 0 keeps the beat driving its lanes with no chase', async () => {
     for (const heat of [0, 20]) {
-      const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false, heat });
+      // the beat is part of the traffic (M5.5): the heat-0 case runs with civilians on
+      const sim = await createWorld({ map: 'city', seed: 42, traffic: heat === 0 ? 1 : 0, peds: 0, record: false, heat });
       const traffic = sim.traffic as Traffic;
       try {
         // Stand on the highway, where a spawned patrol has a clear line to the player.
@@ -109,9 +112,18 @@ describe('police patrols (long)', () => {
         expect(sim.heat.level).toBe(heat === 0 ? 0 : 1);
         const police = sim.police!;
         if (heat === 0) {
+          // the beat (M5.5): budget[0] patrols on duty, lane drivers with the lights off, and no chase
+          // without a crime, however long they look at the player
           run(sim, 12);
-          expect(police.count).toBe(0);
+          expect(police.count).toBe(POLICE.budget[0] as number);
           expect(sim.pursuit.state).toBe('idle');
+          expect(sim.heat.level).toBe(0);
+          for (const agent of police.units) {
+            if (agent < 0) continue;
+            expect(traffic.police[agent]).toBe(1);
+            expect(traffic.lights[agent]).toBe(0);
+            expect([AgentState.Kinematic, AgentState.Physical]).toContain(traffic.state[agent]);
+          }
           continue;
         }
         // the pair is on duty and sees the player within the window...

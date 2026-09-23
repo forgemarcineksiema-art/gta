@@ -16,7 +16,9 @@ export type EventKind =
   // dailyDone value = the reward, target = the slot; streak value = the day's cash, target = the count
   | 'purchase' | 'dailyDone' | 'streak'
   // identity (slice 5): a crime seen from the police car the player drives
-  | 'blown';
+  | 'blown'
+  // the ratchet crossed a threshold (M5.5): value = the new level; the ticker and the siren sting
+  | 'heatLevel';
 
 export interface SimEvent {
   kind: EventKind;

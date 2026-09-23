@@ -39,6 +39,8 @@ export class Sfx {
     else if (e.kind === 'orderFound') this.note(ctx, master, 1318.5, 0, 0.18, 0.06, 'sine');
     else if (e.kind === 'purchase') { this.note(ctx, master, 1567.98, 0, 0.08, 0.07, 'square'); this.note(ctx, master, 2093, 0.07, 0.35, 0.07, 'triangle'); this.coin(ctx, master, 50); }
     else if (e.kind === 'dailyDone') { [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.note(ctx, master, f, i * 0.09, i === 3 ? 0.55 : 0.12, 0.08, 'square')); }
+    // the ratchet crossed a level (M5.5): a short two-tone wail, the siren's shape in a sting
+    else if (e.kind === 'heatLevel') { this.note(ctx, master, 440, 0, 0.16, 0.07, 'sawtooth'); this.note(ctx, master, 587.33, 0.15, 0.3, 0.07, 'sawtooth'); }
     else if (e.kind === 'streak') { this.note(ctx, master, 880, 0, 0.12, 0.06, 'triangle'); this.note(ctx, master, 1174.66, 0.1, 0.3, 0.06, 'triangle'); }
   };
 

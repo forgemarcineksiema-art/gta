@@ -12,6 +12,9 @@ import { createWorld, runUntil } from './helpers';
 describe('jobs (long)', () => {
   it('1.7 the bot drives every delivery from its ring into its drop-off inside the limit', async () => {
     const sim = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 0, record: false });
+    // the limits are measured clean: with the beat on (M5.5) the speeding bot gets a chase and the cruisers'
+    // rams cost it a delivery; what the police do to a delivery is the balance script's and Marcin's question
+    sim.police!.dispatching = false;
     try {
       const deliveries = sim.jobs.defs.filter((d) => d.kind === 'delivery');
       expect(deliveries.length).toBe(6);

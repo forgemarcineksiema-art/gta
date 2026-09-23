@@ -213,12 +213,15 @@ export class SimWorld {
     this.coins = this.city && this.traffic ? new Coins(this.city, this.traffic.lanes) : null;
     this.life = new Life(this, opts.damage ?? this.city !== null);
     this.heat = new Heat(this.events, this.traffic);
-    this.heat.add(opts.heat ?? 0);
+    this.heat.set(opts.heat ?? 0);
     this.pursuit = new Pursuit(this.events);
     this.pursuit.descriptor.kind = this.carId;
     this.pursuit.descriptor.paint = this.garage.paintOf(this.carId);
     this.cover = this.city ? coverSites(this.city) : null;
     this.police = this.traffic ? new Police(this) : null;
+    // a crime in a unit's sight pays double and makes the player wanted (DESIGN.md §13.3)
+    this.heat.seen = () => this.police?.crimeSeen() ?? false;
+    this.heat.playerSpeed = () => this.probe.speed;
     this.roadblocks = this.traffic && this.cover ? new Roadblocks(this, this.cover.chokepoints) : null;
     this.cameras = this.cover ? new Cameras(this.cover.cameraSites, this.cover.daily.cameras) : null;
     this.jumps = this.city ? new Jumps(this, this.city.jumps) : null;
@@ -297,6 +300,7 @@ export class SimWorld {
     this.roadblocks?.step(this.probe, FIXED_DT, this.events);
     this.jumps?.step(this.probe, this.vehicle.telemetry.groundedWheels === 0, FIXED_DT, this.events);
     this.heat.step();
+    this.heat.tick(FIXED_DT, this.pursuit.state === 'active');
     // before the run: a delivery into a garage pays the bag before the door can drop the job
     this.jobs.step(this.probe, FIXED_DT);
     this.run.step(this.probe, FIXED_DT);

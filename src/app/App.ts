@@ -669,9 +669,11 @@ export class App {
     const stats = this.renderer.stats;
     // the cold open's captions sit where the hints do and teach the same keys
     // the hints are for driving: behind a shut door or under the card the wall and the card have the keys
-    this.hud.setHintsVisible(now < this.hintsUntil && !this.bot && !this.sim.coldOpen.active && !this.jobsHud.showing && playing);
+    // the ticker (a heat level's news) takes the top centre for its two seconds: the job line and the hints make room
+    this.hud.setHintsVisible(now < this.hintsUntil && !this.bot && !this.sim.coldOpen.active && !this.jobsHud.showing && !this.hud.tickerShowing && playing);
     this.runHud.update(this.sim, frameDt);
     this.coldOpenHud.update(this.sim);
+    this.jobsHud.setYield(this.hud.tickerShowing);
     this.jobsHud.update(this.sim, frameDt);
     this.garageUi.update(this.sim);
     this.hud.update(

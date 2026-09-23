@@ -27,6 +27,7 @@ export class JobsHud {
   private lastSeconds = -2;
   private lastDist = -2;
   private visible = false;
+  private yielding = false;
   private cardVisible = false;
   private kindText = '';
   /** A class set on the line for the state: is-order, is-escape, is-done, is-failed. */
@@ -52,6 +53,13 @@ export class JobsHud {
   /** True while the line is up (the key hints make room). */
   get showing(): boolean {
     return this.visible;
+  }
+
+  /** The ticker has the top centre: the line hides meanwhile. */
+  setYield(v: boolean): void {
+    if (v === this.yielding) return;
+    this.yielding = v;
+    this.root.classList.toggle('is-yield', v);
   }
 
   update(sim: SimWorld, _dt: number): void {

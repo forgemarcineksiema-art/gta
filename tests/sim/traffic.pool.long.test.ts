@@ -74,7 +74,8 @@ describe('traffic pool (long)', () => {
           const held = traffic.hasBody(i);
           if (held) lent++;
           if (dist < 35) expect(st).not.toBe(AgentState.Kinematic);
-          if (dist > 70) expect(held).toBe(false);
+          // a pursuit unit keeps its body `policeBodyReach` further out (M4); the beat can be chasing the bot here (M5.5)
+          if (dist > 70 && traffic.police[i] !== 1) expect(held).toBe(false);
           const lane = traffic.lane[i] as number;
           if (st !== AgentState.Physical) physicalSince[i] = step;
           if ((traffic.contactDv[i] as number) > 0) contactAt[i] = step;
@@ -116,6 +117,8 @@ describe('traffic pool (long)', () => {
   it('keeps the body pool out of the hands of wrecks over a scrapyard run in one place', async () => {
     const sim = await createWorld({ map: 'city', seed: 3, traffic: 1, peds: 0, record: false });
     const traffic = sim.traffic as Traffic;
+    // the pin is the tow rule: the beat (M5.5) would see the circling player wreck cars and start a chase
+    sim.police!.dispatching = false;
     try {
       // The backlog's case: the player never leaves, so nothing despawns. Circling
       // on the highway and writing off two cars every five seconds is a worse

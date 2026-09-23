@@ -53,6 +53,11 @@ export class Hud {
   private readonly soundState: HTMLElement;
   private readonly hints: HTMLElement;
   private readonly toast: HTMLElement;
+  /** One line at the top centre for 2 s: the heat level's news (M5.5 slice 0); the dispatch lines join in slice 4. */
+  private readonly ticker: HTMLElement;
+  private readonly tickerLevel: HTMLElement;
+  private readonly tickerText: HTMLElement;
+  private tickerLeft = 0;
   private readonly lap: HTMLElement;
   private readonly lapCurrent: HTMLElement;
   private readonly lapLast: HTMLElement;
@@ -175,6 +180,11 @@ export class Hud {
 
     this.toast = el('div', 'hud__toast');
     this.root.appendChild(this.toast);
+    this.ticker = el('div', 'hud__ticker');
+    this.tickerLevel = el('span', 'hud__ticker-level', '');
+    this.tickerText = el('span', 'hud__ticker-text', '');
+    this.ticker.append(this.tickerLevel, this.tickerText);
+    this.root.appendChild(this.ticker);
 
     this.lap = el('div', 'hud__lap');
     this.lapCurrent = el('div', 'hud__lap-current', '--:--.--');
@@ -242,6 +252,19 @@ export class Hud {
     this.debug.classList.toggle('is-visible', v);
   }
 
+  /** True while the ticker line is up: the job line and the key hints make room. */
+  get tickerShowing(): boolean {
+    return this.tickerLeft > 0;
+  }
+
+  /** The ticker: a lead word (the level, in danger red) and the news, for `seconds`. */
+  showTicker(lead: string, text: string, seconds = 2): void {
+    this.tickerLevel.textContent = lead;
+    this.tickerText.textContent = text;
+    this.ticker.classList.add('is-on');
+    this.tickerLeft = seconds;
+  }
+
   showToast(text: string, seconds = 1.5): void {
     this.toast.textContent = text;
     this.toast.classList.add('is-visible');
@@ -267,6 +290,12 @@ export class Hud {
   }
 
   private showEvent(kind: string, value: number, target = -1): void {
+    if (kind === 'heatLevel') {
+      // the level's news, one line (DESIGN.md §13.3): what the city sends now
+      const news = HEAT_NEWS[value] ?? '';
+      if (news) this.showTicker(`LEVEL ${value}`, news);
+      return;
+    }
     if (kind === 'camera') {
       // the flash, then the photo's caption: the speed it caught
       this.flash.classList.add('is-on');
@@ -303,7 +332,7 @@ export class Hud {
     // radar paints its own canvas at its own cadence, off the layout path.
     this.frameIndex++;
     this.minimap?.update(sim, dt, now);
-    this.heat.update(sim);
+    this.heat.update(sim, dt);
     const tm = sim.vehicle.telemetry;
     const kmh = Math.round(Math.abs(tm.speedKmh));
     const speedText = String(kmh);
@@ -378,6 +407,10 @@ export class Hud {
       this.toastTimer -= dt;
       if (this.toastTimer <= 0) this.toast.classList.remove('is-visible');
     }
+    if (this.tickerLeft > 0) {
+      this.tickerLeft -= dt;
+      if (this.tickerLeft <= 0) this.ticker.classList.remove('is-on');
+    }
 
     const lap = sim.lap;
     this.setLapVisible(lap.lapStartTick >= 0 || lap.best >= 0);
@@ -401,6 +434,15 @@ export class Hud {
     }
   }
 }
+
+/** The ticker's line per heat level: what the city sends from now on. */
+const HEAT_NEWS: Record<number, string> = {
+  1: 'PATROLS ON YOUR TAIL',
+  2: 'INTERCEPTORS ON THE ROAD',
+  3: 'ROADBLOCKS UP',
+  4: 'HEAVY UNITS ROLLING',
+  5: 'THE CHIEF IS COMING',
+};
 
 function fmtLap(seconds: number): string {
   const m = Math.floor(seconds / 60);

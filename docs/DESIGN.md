@@ -800,10 +800,19 @@ the longer they hold you, the more they send. Both apply here:
   new level. The disguise rule is unchanged: a crime seen from the police
   car blows the cover.
 - **Reckless driving is a crime.** A `hit` on a civilian above the disturb
-  threshold: `heat.hit` 2 (2 s cooldown per car); the chase itself:
+  threshold: `heat.hit` 2 (3 s cooldown per car); the chase itself:
   `heat.chasePerSecond` 0.1 while the pursuit is active (a minute of chase is
   a third of a level, NFS's escalation); speeding within a patrol's sight
-  by 30 km/h over the limit: `heat.speedingSeen` 3 (5 s cooldown).
+  by 30 km/h over the limit makes the player wanted and pays
+  `heat.speedingSeen` 3 flat, once per 20 s (as built: the sighting is the
+  crime, so it is not doubled; at 6 every 5 s the road bot reached level 3
+  in 34 s).
+- **Fault follows speed** (as built, slice 0). A contact is the player's
+  crime only when the other car was not the faster one (`faultMargin` 1
+  m/s): the beat's patrols brake late for a stopped player and a cruiser
+  rear-ending you at a junction must not make you wanted, while reversing
+  into one, or shoving a parked one, does. The police read a contact two
+  steps after it, so both speeds come from a decaying maximum.
 - **The numbers move:** delivery 10, order 8, billboard 3, camera 6, traffic
   takedown 5, police takedown 12, roadblock 8, police hit 6. Target: the
   novice bot from heat 0 reaches level 2 inside 5 minutes of one job and

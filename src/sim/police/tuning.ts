@@ -1,7 +1,7 @@
 import type { CarId } from '../vehicle/presets';
 /** Unit rosters, sight and ramming. Heat picks the row; everything else is per unit. */
 export interface PoliceTuning {
-  /** Units at once by heat level (index 0 = heat 0). */
+  /** Units at once by heat level (index 0 = heat 0: the patrols on the beat, no chase). */
   budget: number[];
   /** How many of that roster are interceptors, by level. */
   interceptors: number[];
@@ -99,7 +99,8 @@ export interface PoliceTuning {
 }
 
 export const POLICE: PoliceTuning = {
-  budget: [0, 2, 4, 5, 6, 8],
+  // two on the beat at heat 0 (M5.5): the city's eyes, lane drivers with the lights off
+  budget: [2, 2, 4, 5, 6, 8],
   interceptors: [0, 0, 1, 2, 2, 3],
   escapeSeconds: [0, 6, 8, 10, 12, 15],
   sightRange: 90,

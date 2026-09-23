@@ -21,7 +21,8 @@ describe('traffic (long)', () => {
         bot.drive(sim, sim.controls, 1 / 60);
         sim.step();
         for (let a = 0; a < traffic.capacity; a++) {
-          if (traffic.state[a] !== AgentState.Kinematic) continue;
+          // civilians: a police unit chasing the bot (M5.5's beat sees it speed) runs its plan's speed by design
+          if (traffic.state[a] !== AgentState.Kinematic || traffic.police[a] === 1) continue;
           const lane = traffic.lane[a] as number;
           traffic.lanes.positionAt(lane, traffic.s[a] as number, traffic.laneOffset[a] as number, pose, traffic.next[a]);
           const dx = (traffic.x[a] as number) - pose.x;

@@ -66,7 +66,8 @@ describe('roadblocks', () => {
       run(sim, 0.5);
       expect(sim.life.state.stage).toBe(0);
       expect(sim.run.bag - bag).toBe(BALANCE.bag.roadblock);
-      expect(sim.heat.points - heat).toBe(BALANCE.heat.roadblock);
+      // the forced pursuit drips heat meanwhile (M5.5): the breach's points plus under a second of chase
+      expect(Math.floor(sim.heat.points - heat)).toBe(BALANCE.heat.roadblock);
       expect(sim.roadblocks!.active).toBe(0);
     } finally { sim.dispose(); }
   }, 60_000);

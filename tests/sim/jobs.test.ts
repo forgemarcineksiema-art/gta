@@ -60,6 +60,8 @@ function count(sim: SimWorld, from: number, kind: EventKind): number {
 /** A delivery 25 m ahead of the car on a street, its target 300 m away. */
 async function jobWorld(): Promise<{ sim: SimWorld; id: number; from: { x: number; z: number; yaw: number } }> {
   const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
+  // these pin the job rules: the beat stays out (a scripted brake past standstill reverses into a patrol)
+  sim.police!.dispatching = false;
   const from = street(sim, 20);
   const fx = Math.sin(from.yaw), fz = Math.cos(from.yaw);
   const id = sim.jobs.add({

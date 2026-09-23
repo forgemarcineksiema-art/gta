@@ -1,14 +1,30 @@
 /** Run economy. Heat is a ratchet; only ending a run resets it. Every money number lives here. */
 export const BALANCE = {
   heatThresholds: [20, 40, 60, 80, 100],
+  /**
+   * Points per crime (docs/DESIGN.md §13.3). A crime in a unit's sight pays `seenFactor` times as much and
+   * never leaves the player below level 1; `hit` is a civilian rammed off its lane (once per car per
+   * `hitCooldown` s); `speedingSeen` a patrol watching the player `speedingOverKmh` over the road's limit
+   * (once per `speedingCooldown` s); `chasePerSecond` drips while the pursuit is active.
+   */
   heat: {
-    trafficTakedown: 4,
-    policeTakedown: 10,
-    billboard: 2,
-    camera: 5,
-    roadblock: 6,
-    /** Hitting a police car nobody was chasing you in. */
-    policeHit: 4,
+    trafficTakedown: 5,
+    policeTakedown: 12,
+    billboard: 3,
+    camera: 6,
+    roadblock: 8,
+    /** Hitting a police car nobody was chasing you in: the car itself is the witness. */
+    policeHit: 6,
+    hit: 2,
+    hitCooldown: 3,
+    /** Speeding past a patrol makes the player wanted and pays this flat (not doubled: the sighting is the crime), once per `speedingCooldown` s. */
+    speedingSeen: 3,
+    speedingOverKmh: 30,
+    speedingCooldown: 20,
+    chasePerSecond: 0.1,
+    seenFactor: 2,
+    /** A contact is the player's crime only when the other car was not more than this much faster (m/s): the faster car is at fault, so a patrol driving into a stopped player is the patrol's. */
+    faultMargin: 1,
   },
   /** Paid into the bag per event (docs/DESIGN.md §3.3). Coins never go here; the bag is at risk until a door. */
   bag: {
@@ -65,9 +81,9 @@ export const BALANCE = {
     counts: { delivery: 6, order: 6, escape: 4 },
     // payoutPerKm 9,000 (balance script, 2026-09-23; the plan's 4,000 paid every placed delivery the 5,000 floor on
     // their 0.55–1.27 km paths): now 5,000–11,400, DESIGN.md §3.3's 5–12k
-    delivery: { payoutPerKm: 9000, payoutMin: 5000, payoutMax: 12000, limitFactor: 1.3, limitMin: 45, heat: 6, minPath: 400 },
+    delivery: { payoutPerKm: 9000, payoutMin: 5000, payoutMax: 12000, limitFactor: 1.3, limitMin: 45, heat: 10, minPath: 400 },
     order: {
-      payout: { compact: 4000, heavy: 5000, muscle: 6000, sports: 8000 }, stagePenalty: 0.1, limitSeconds: 240, heat: 4,
+      payout: { compact: 4000, heavy: 5000, muscle: 6000, sports: 8000 }, stagePenalty: 0.1, limitSeconds: 240, heat: 8,
       ensureMin: 300, ensureMax: 600, ensureSeconds: 5, ringRange: 150, cruise: 0.5,
     },
     escape: { bounty: 1500, levels: [2, 2, 3, 4], radioSeconds: 8 },

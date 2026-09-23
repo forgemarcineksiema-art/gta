@@ -13,6 +13,10 @@
  * - search: sight lost, units drive to where the player was last seen and fan
  *   out through the junctions there until the escape timer runs out;
  * - react: a unit the player hits notices at once, and it costs heat;
+ * - the beat (M5.5, docs/DESIGN.md §13.3): at heat 0 `budget[0]` units drive
+ *   their lanes with the lights off and keep watching; a crime in their sight
+ *   pays double and makes the player wanted (the heat's rule), speeding past
+ *   one is a crime, and the roster beyond the beat goes off duty out of view;
  * - heavies and the Chief (slice 7): from level 4 half the roster is the heavy
  *   van with a harder shove; at level 5 one unit is the Chief, an interceptor
  *   whose PIT leads the player's turn;
@@ -121,6 +125,18 @@ export class Police {
   private lastVz = 0;
   /** Bumped per lost sighting so the fan-out through the junctions differs each time. */
   private searchSalt = 0;
+  /** Speeding in a patrol's sight: the cooldown, the road's limit under the player and when it was last looked up. */
+  private speedLeft = 0;
+  private limitLeft = 0;
+  private playerLimit = Infinity;
+  /** Speeding offences seen so far (the pins). */
+  speedings = 0;
+  /**
+   * A contact's impulse is read two steps after the contact, when both cars have already slowed: these
+   * decaying maxima (×0.8 a step) keep the speeds the cars had going in, for the fault rule.
+   */
+  private readonly copSpeedMax: Float32Array;
+  private playerSpeedMax = 0;
 
   constructor(sim: SimWorld) {
     if (!sim.traffic || !sim.city) throw new Error('Police requires city traffic');
@@ -146,6 +162,7 @@ export class Police {
     this.slotOf = new Int8Array(this.units.length);
     this.slotOf.fill(-1);
     this.assaultCooldown = new Float32Array(this.traffic.capacity);
+    this.copSpeedMax = new Float32Array(this.traffic.capacity);
     this.fields = [new Float64Array(this.graph.nodes.length), new Float64Array(this.graph.nodes.length)];
     this.targetLane.fill(-1);
     this.visited = new Uint8Array(this.graph.nodes.length);
@@ -209,69 +226,39 @@ export class Police {
     this.cursor = this.sim.events.readFrom(this.cursor, this.onCrime);
     const level = this.sim.heat.level;
     const parkedSaw = this.stepParked(player, level, dt, cosHalf);
+    // the beat is part of the traffic: a world without civilians (the tours, the sandboxes) has none
+    this.budget = Math.min(this.units.length, level === 0 && this.sim.trafficDensity <= 0 ? 0 : (t.budget[level] ?? 0));
+    this.spawnLeft -= dt;
     if (level === 0) {
+      // the beat: the roster beyond `budget[0]` goes off duty out of view, the rest drive their lanes with
+      // the lights off and keep watching; a crime they see makes the player wanted (Heat's rule), nothing
+      // else does, and speeding past one is a crime
       this.hot = false;
-      this.spawnLeft = 0;
       this.arresting = false;
       this.boxing = false;
       this.chiefWait = 0;
       this.leaving.fill(0);
       this.seen.fill(0);
-      this.los.fill(0);
       this.withdrawing.fill(0);
       this.slotOf.fill(-1);
       pursuit.step(dt, level, false, player.x, player.z);
       this.standDown(player, cosHalf);
+      this.dispatch(player, cosHalf, level);
+      this.recycle(player, cosHalf);
+      this.watch(player, cosHalf);
+      this.speeding(player, dt);
       return;
     }
     if (!this.hot) {
       this.hot = true;
       this.spawnLeft = 0;
     }
-    this.budget = Math.min(this.units.length, t.budget[level] ?? 0);
-    this.spawnLeft -= dt;
-    if (this.dispatching && this.count < this.budget && this.spawnLeft <= 0) {
-      this.spawnLeft = t.spawnRetrySeconds;
-      for (let u = 0; u < this.units.length && this.count < this.budget; u++) {
-        if ((this.units[u] as number) >= 0) continue;
-        const kind = this.wantedKind(level);
-        if (kind === null) break;
-        const agent = this.spawn(player, cosHalf, kind);
-        if (agent < 0) break;
-        if (kind === 'chief') this.chief = agent;
-        this.units[u] = agent;
-        this.seen[u] = 0;
-        this.withdrawing[u] = 0;
-        this.ramCooldown[u] = 0;
-        this.slotOf[u] = -1;
-        this.count++;
-      }
-    }
+    this.dispatch(player, cosHalf, level);
 
     // a unit the player hit sees the player, whatever its ray said; so does a parked patrol pulling out
     let visible = assaulted || parkedSaw;
-    const every = Math.max(1, Math.round(t.sightEveryTicks));
-    for (let u = 0; u < this.units.length; u++) {
-      const agent = this.units[u] as number;
-      if (agent < 0) continue;
-      const x = traffic.x[agent] as number, z = traffic.z[agent] as number;
-      const distance = Math.hypot(player.x - x, player.z - z);
-      if (this.withdrawing[u] === 1) {
-        this.seen[u] = 0;
-        this.los[u] = 0;
-        // Once it has really withdrawn, this same patrol may encounter the player again.
-        if (distance >= t.withdrawRange && traffic.outOfView(x, z, this.radius, player, t.viewNear, cosHalf)) this.withdrawing[u] = 0;
-        continue;
-      }
-      if (distance > t.sightRange) {
-        this.seen[u] = 0;
-        this.los[u] = 0;
-      } else if (this.sim.tick % every === Math.floor(u * every / this.units.length)) {
-        this.los[u] = this.lineOfSight(agent, player, distance) ? 1 : 0;
-        this.seen[u] = this.los[u] === 1 && !pursuit.disguised ? 1 : 0;
-      }
-      if (this.seen[u] === 1) visible = true;
-    }
+    if (this.watch(player, cosHalf)) visible = true;
+    this.speeding(player, dt);
     // boxing the abandoned car: nobody is looking for the player until it is over
     if (this.boxing) {
       this.boxAge += dt;
@@ -664,15 +651,21 @@ export class Police {
     const t = this.tuning;
     let assaulted = false;
     const idle = this.sim.pursuit.state === 'idle';
+    this.playerSpeedMax = Math.max(this.sim.probe.speed, this.playerSpeedMax * 0.8);
     for (let i = 0; i < traffic.capacity; i++) {
       const cool = this.assaultCooldown[i] as number;
       if (cool > 0) this.assaultCooldown[i] = Math.max(0, cool - dt);
-      if (traffic.police[i] !== 1 || !idle || cool > 0 || !traffic.hasBody(i)) continue;
+      if (traffic.police[i] !== 1) continue;
+      this.copSpeedMax[i] = Math.max(traffic.speed[i] as number, (this.copSpeedMax[i] as number) * 0.8);
+      if (!idle || cool > 0 || !traffic.hasBody(i)) continue;
       const state = traffic.state[i];
       if (state === AgentState.Wrecked || state === AgentState.Free) continue;
       if ((traffic.playerDv[i] as number) < t.assaultDv) continue;
+      // the faster car is at fault: a patrol that drives into a slower or stopped player pays nothing
+      if ((this.copSpeedMax[i] as number) > this.playerSpeedMax + BALANCE.heat.faultMargin) continue;
       this.assaultCooldown[i] = t.assaultCooldown;
-      this.sim.heat.add(BALANCE.heat.policeHit);
+      // the car you rammed is the witness: a seen crime, and the player is wanted from here
+      this.sim.heat.add(BALANCE.heat.policeHit, true);
       assaulted = true;
       // the car you rammed knows the police car that did it
       this.sim.pursuit.markBlown(this.sim.probe.x, this.sim.probe.z);
@@ -807,17 +800,24 @@ export class Police {
   }
 
   /**
-   * Heat 0 after a door or busted: the roster goes off duty. Each unit drives
-   * away from the player and goes back to the pool once it is `withdrawRange`
-   * away and out of view, so nobody pops out of existence on screen and a
-   * heat-5 roster does not answer the next heat-1 crime.
+   * Heat 0 after a door or busted: the roster beyond the beat goes off duty.
+   * Each surplus unit drives away from the player and goes back to the pool
+   * once it is `withdrawRange` away and out of view, so nobody pops out of
+   * existence on screen and a heat-5 roster does not answer the next heat-1
+   * crime. The first `budget` live units stay on the beat: no plan, lane
+   * driving, lights off.
    */
   private standDown(player: PlayerProbe, cosHalf: number): void {
     const traffic = this.traffic;
     const t = this.tuning;
+    let kept = 0;
     for (let u = 0; u < this.units.length; u++) {
       const agent = this.units[u] as number;
       if (agent < 0) continue;
+      if (kept < this.budget) {
+        kept++;
+        continue;
+      }
       const x = traffic.x[agent] as number, z = traffic.z[agent] as number;
       const state = traffic.state[agent];
       if ((state === AgentState.Kinematic || state === AgentState.Physical)
@@ -831,6 +831,120 @@ export class Police {
       }
       traffic.setPolicePlan(agent, this.awayExit(agent, player), 0);
     }
+  }
+
+  /** Fill the roster up to the level's budget, out of view, one retry window at a time. */
+  private dispatch(player: PlayerProbe, cosHalf: number, level: number): void {
+    const t = this.tuning;
+    if (!this.dispatching || this.count >= this.budget || this.spawnLeft > 0) return;
+    this.spawnLeft = t.spawnRetrySeconds;
+    for (let u = 0; u < this.units.length && this.count < this.budget; u++) {
+      if ((this.units[u] as number) >= 0) continue;
+      const kind = this.wantedKind(level);
+      if (kind === null) break;
+      const agent = this.spawn(player, cosHalf, kind);
+      if (agent < 0) break;
+      if (kind === 'chief') this.chief = agent;
+      this.units[u] = agent;
+      this.seen[u] = 0;
+      this.withdrawing[u] = 0;
+      this.ramCooldown[u] = 0;
+      this.slotOf[u] = -1;
+      this.count++;
+    }
+  }
+
+  /**
+   * The sight rays, staggered one unit a tick: `los` is a clear line whatever
+   * the player drives (what sees a crime), `seen` is that without the
+   * disguise (what starts a chase). True when any unit sees the player.
+   */
+  private watch(player: PlayerProbe, cosHalf: number): boolean {
+    const traffic = this.traffic;
+    const t = this.tuning;
+    const pursuit = this.sim.pursuit;
+    let visible = false;
+    const every = Math.max(1, Math.round(t.sightEveryTicks));
+    for (let u = 0; u < this.units.length; u++) {
+      const agent = this.units[u] as number;
+      if (agent < 0) continue;
+      const x = traffic.x[agent] as number, z = traffic.z[agent] as number;
+      const distance = Math.hypot(player.x - x, player.z - z);
+      if (this.withdrawing[u] === 1) {
+        this.seen[u] = 0;
+        this.los[u] = 0;
+        // Once it has really withdrawn, this same patrol may encounter the player again.
+        if (distance >= t.withdrawRange && traffic.outOfView(x, z, this.radius, player, t.viewNear, cosHalf)) this.withdrawing[u] = 0;
+        continue;
+      }
+      if (distance > t.sightRange) {
+        this.seen[u] = 0;
+        this.los[u] = 0;
+      } else if (this.sim.tick % every === Math.floor(u * every / this.units.length)) {
+        this.los[u] = this.lineOfSight(agent, player, distance) ? 1 : 0;
+        this.seen[u] = this.los[u] === 1 && !pursuit.disguised ? 1 : 0;
+      }
+      if (this.seen[u] === 1) visible = true;
+    }
+    return visible;
+  }
+
+  /** Off duty across town: a beat car far from the player goes back to the depot, unseen, and another comes on duty near the player. */
+  private recycle(player: PlayerProbe, cosHalf: number): void {
+    const traffic = this.traffic;
+    const t = this.tuning;
+    for (let u = 0; u < this.units.length; u++) {
+      const agent = this.units[u] as number;
+      if (agent < 0) continue;
+      const x = traffic.x[agent] as number, z = traffic.z[agent] as number;
+      if (Math.hypot(player.x - x, player.z - z) <= t.patrolRecycle || !traffic.outOfView(x, z, this.radius, player, t.viewNear, cosHalf)) continue;
+      traffic.releasePolice(agent);
+      if (agent === this.chief) this.chief = -1;
+      this.units[u] = -1;
+      this.seen[u] = 0;
+      this.los[u] = 0;
+      this.count--;
+    }
+  }
+
+  /**
+   * Speeding in a patrol's sight (DESIGN.md §13.3): a unit that sees the
+   * player more than `speedingOverKmh` over the road's limit makes the player
+   * wanted and pays `speedingSeen` flat, once per `speedingCooldown`. The
+   * limit under the player is looked up every `routeSeconds` while someone
+   * is watching.
+   */
+  private speeding(player: PlayerProbe, dt: number): void {
+    const h = BALANCE.heat;
+    this.speedLeft = Math.max(0, this.speedLeft - dt);
+    this.limitLeft -= dt;
+    if (this.speedLeft > 0) return;
+    let watching = false;
+    for (let u = 0; u < this.units.length; u++) if ((this.units[u] as number) >= 0 && this.seen[u] === 1) { watching = true; break; }
+    if (!watching) return;
+    if (this.limitLeft <= 0 || this.playerLimit === Infinity) {
+      this.playerLimit = this.limitUnder(player.x, player.z);
+      this.limitLeft = this.tuning.routeSeconds;
+    }
+    if ((player.speed - this.playerLimit) * 3.6 <= h.speedingOverKmh) return;
+    this.speedLeft = h.speedingCooldown;
+    this.speedings++;
+    this.sim.heat.wanted(h.speedingSeen);
+  }
+
+  /** The limit of the nearest lane to a point (the lanes' own bound, as the route search uses it). */
+  private limitUnder(x: number, z: number): number {
+    const lanes = this.traffic.lanes;
+    let best = Infinity, limit = Infinity;
+    for (let i = 0; i < lanes.laneCount; i++) {
+      if (Math.hypot((lanes.midX[i] as number) - x, (lanes.midZ[i] as number) - z) > (lanes.length[i] as number) / 2 + 40) continue;
+      lanes.project(i, x, z, this.projection);
+      if (this.projection.dist < best) {
+        best = this.projection.dist;
+        limit = lanes.limit[i] as number;
+      }
+    }
+    return limit;
   }
 
   /** A unit sees the player: a clear line and no disguise. */

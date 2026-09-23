@@ -1,11 +1,21 @@
 import type { SimWorld } from '../sim';
 
-/** Heat persists after escape; only the active pursuit makes the filled stars pulse. */
+/**
+ * Heat persists after escape; only the active pursuit makes the filled stars
+ * pulse. Every discrete gain pops a small red `+n` under the stars and the
+ * star that fills scales up once (docs/DESIGN.md §13.3): the number is the
+ * one teacher the ratchet needs.
+ */
 export class HeatHud {
   readonly root: HTMLElement;
   private readonly stars: SVGSVGElement[] = [];
+  private readonly gain: HTMLElement;
   private level = -1;
   private state = '';
+  private gainSerial: number;
+  private gainLeft = 0;
+  private popLeft = 0;
+  private popped = -1;
 
   constructor(parent: HTMLElement, sim: SimWorld) {
     this.root = document.createElement('div');
@@ -23,14 +33,49 @@ export class HeatHud {
       this.root.appendChild(star);
       this.stars.push(star);
     }
+    this.gain = document.createElement('div');
+    this.gain.className = 'hud__heat-gain';
+    this.root.appendChild(this.gain);
+    this.gainSerial = sim.heat.gainSerial;
     parent.appendChild(this.root);
-    this.update(sim);
+    this.update(sim, 0);
   }
 
-  update(sim: SimWorld): void {
-    const level = sim.heat.level, state = sim.pursuit.state;
+  update(sim: SimWorld, dt: number): void {
+    const heat = sim.heat;
+    if (heat.gainSerial !== this.gainSerial) {
+      this.gainSerial = heat.gainSerial;
+      if (heat.lastGain > 0) {
+        this.gain.textContent = `+${Math.round(heat.lastGain)}`;
+        // restart the animation for a gain that lands while the last one shows
+        this.gain.classList.remove('is-on');
+        void this.gain.offsetWidth;
+        this.gain.classList.add('is-on');
+        this.gainLeft = 0.6;
+      }
+    }
+    if (this.gainLeft > 0) {
+      this.gainLeft -= dt;
+      if (this.gainLeft <= 0) this.gain.classList.remove('is-on');
+    }
+    if (this.popLeft > 0) {
+      this.popLeft -= dt;
+      if (this.popLeft <= 0 && this.popped >= 0) {
+        this.stars[this.popped]?.classList.remove('is-pop');
+        this.popped = -1;
+      }
+    }
+    const level = heat.level, state = sim.pursuit.state;
     if (level === this.level && state === this.state) return;
-    if (level !== this.level) for (let i = 0; i < this.stars.length; i++) this.stars[i]?.classList.toggle('is-filled', i < level);
+    if (level !== this.level) {
+      for (let i = 0; i < this.stars.length; i++) this.stars[i]?.classList.toggle('is-filled', i < level);
+      if (level > this.level && this.level >= 0) {
+        if (this.popped >= 0) this.stars[this.popped]?.classList.remove('is-pop');
+        this.popped = level - 1;
+        this.stars[this.popped]?.classList.add('is-pop');
+        this.popLeft = 0.3;
+      }
+    }
     this.root.classList.toggle('is-active', state === 'active');
     this.root.setAttribute('aria-label', `Heat ${level} of 5. Pursuit ${state}.`);
     this.level = level;

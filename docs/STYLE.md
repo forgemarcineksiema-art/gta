@@ -324,6 +324,15 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   18 px in the same accent (`×1`, `×1.25`, `×1.6`, `×2.2`, `×3`), popping
   0.3 s when the police see the player at a new level. Yellow means "not
   yours yet". Hidden behind a shut door and under the busted card.
+- The stars answer every crime (M5.5): the star that fills scales up
+  1.35× for 0.3 s, and a `+n` in danger red at 16 px pops under the row for
+  0.6 s (rises 14 px and fades), so the ratchet is never silent. The number
+  is the one text the stars allow themselves.
+- The ticker (M5.5): one line at the top centre where the job line sits,
+  20 px heavy italic uppercase skewed −10°, ink with a flat black shadow,
+  the lead word in danger red (`LEVEL 2` · `INTERCEPTORS ON THE ROAD`), 2 s;
+  the job line and the key hints hide meanwhile, the intro's captions
+  outrank it. The dispatch lines of the police pass join it.
 - The coin counter under it, smaller, in ink with the coin glyph: white
   means safe; it pops once per coin and the number flashes the accent on a
   cap. Coins are `coin` gold (`#ffd23f`, the accent's value: the glyph and

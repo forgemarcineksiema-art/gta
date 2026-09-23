@@ -398,6 +398,13 @@ export function collect(sim: SimWorld, into: SaveDoc): void {
   into.medals = medals.replace(/0+$/, '');
   if (sim.jumps) into.jumps = encodeBits(sim.jumps.found);
   into.board.beaten = sim.board.beaten;
+  // the car's kits (M6 slice 8): the cars with anything fitted
+  for (let i = 0; i < BODY_IDS.length; i++) {
+    const id = BODY_IDS[i] as BodyId;
+    const k = garage.carKit.get(id);
+    if (!k || (k[0] === 0 && k[1] === 0 && k[2] === 0 && k[3] === 0)) delete into.carKit[id];
+    else into.carKit[id] = [k[0], k[1], k[2], k[3]];
+  }
   // the driver's kit: bought as bits, worn per slot
   into.kit.owned = encodeBits(sim.kit.owned);
   for (let i = 0; i < 5; i++) into.kit.on[i] = sim.kit.on[i] as number;
@@ -443,6 +450,12 @@ export function apply(sim: SimWorld, save: SaveDoc): void {
   // a hidden car owned is one found: its stash stays empty
   sim.stash.found.clear();
   for (const id of HIDDEN_CARS) if (garage.owned.has(id)) sim.stash.found.add(id);
+  // the car's kits (M6 slice 8)
+  garage.carKit.clear();
+  for (const id of BODY_IDS) {
+    const k = save.carKit[id];
+    if (k) garage.carKit.set(id, [k[0], k[1], k[2], k[3]]);
+  }
   // the driver's kit (M6 slice 6)
   decodeBits(save.kit.owned, sim.kit.owned);
   for (let i = 0; i < 5; i++) sim.kit.on[i] = save.kit.on[i] as number;

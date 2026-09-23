@@ -33,6 +33,8 @@ export class Garage {
   readonly paint = new Map<BodyId, number>();
   /** Per class: every body of the class drives with them. */
   readonly tiers: Record<CarId, [number, number, number]>;
+  /** The car's kit per car (M6 slice 8): the wheels', (a rim's, unused), the spoiler's and the stance's option numbers, 0 stock. */
+  readonly carKit = new Map<BodyId, [number, number, number, number]>();
   /** Bought for the next run; `Run` consumes both at the run's end. */
   readonly prep = { lawyer: false, fence: false };
   /** One escape from heat 5 opens the police car. */
@@ -51,6 +53,16 @@ export class Garage {
     const p = this.paint.get(body);
     if (p !== undefined) return p;
     return isShell(body) ? PLAYER_PAINT[body] : (bodySpec(body).paints[0] as number);
+  }
+
+  /** A car's kit options, made on first use. */
+  carKitOf(body: BodyId): [number, number, number, number] {
+    let k = this.carKit.get(body);
+    if (!k) {
+      k = [0, 0, 0, 0];
+      this.carKit.set(body, k);
+    }
+    return k;
   }
 
   /** The class a body drives as: its tiers, its handling. */
@@ -198,6 +210,8 @@ export class Garage {
     v.applyTuning();
     sim.carId = this.classOf(body);
     sim.carBody = body;
+    // the garage's car, with its own kit (M6 slice 8) until a swap takes another
+    sim.garageDriven = true;
     sim.carPaint = this.paintOf(body);
     sim.life.heal();
     // a fresh car: the descriptor is this one, and a police car starts as a clean disguise on the dispatcher's clock

@@ -161,6 +161,8 @@ export class SimWorld {
   readonly career: Career;
   /** The driver's kit (M6): what the player wears into every car. */
   readonly kit: Kit;
+  /** The player drives the garage's car (its own kit fitted, M6 slice 8); false after a swap into another. */
+  garageDriven = true;
   /** The day's three challenges and the streak (M5 slice 6). */
   readonly dailies: Dailies;
   /** The city's smashable billboards; null on the playground. */

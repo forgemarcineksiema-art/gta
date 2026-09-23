@@ -307,6 +307,8 @@ export class Life {
     const h = this.handover;
     this.sim.carId = h.kind;
     this.sim.carBody = h.body;
+    // a car taken on the road has no kit of the garage's (M6 slice 8)
+    this.sim.garageDriven = false;
     // a civilian body keeps the paint it had (the yellow taxi stays yellow); a class's own shell takes the garage's
     this.sim.carPaint = isShell(h.body) ? this.sim.garage.paintOf(h.kind) : h.paint;
     v.tuning = bodyTuning(h.body);

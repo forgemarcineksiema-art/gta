@@ -15,8 +15,8 @@
  * to draw. Rebuilds only when the garage, the bank or the totals change.
  */
 import {
-  BALANCE, BODY_IDS, BODY_WORDS, CHIEF, DISTRICTS, KIT, MEDAL_WORDS, PALETTE, RIVALS, STATS, STREAK, isShell, posterNumber, reqText,
-  type BodyId, type KitSlot, type PrepItem, type RivalDef, type SimWorld, type Stat,
+  BALANCE, BODY_IDS, BODY_WORDS, CHIEF, DISTRICTS, KIT, MEDAL_WORDS, PALETTE, RIVALS, STATS, STREAK, isCarSlot, isShell, posterNumber, reqText,
+  type BodyId, type CarSlot, type KitSlot, type PrepItem, type RivalDef, type SimWorld, type Stat,
 } from '../sim';
 
 export interface GarageActions {
@@ -47,8 +47,11 @@ export type WallPage = 'wall' | 'board' | 'cars' | 'paint' | 'tune' | 'prep' | '
 const PAGE_TITLES: Record<WallPage, string> = { wall: 'TOTALS', board: 'BOARD', cars: 'CARS', paint: 'STYLE', tune: 'TUNE', prep: 'PREP', dailies: 'DAILIES' };
 
 /** The driver's kit's slots on the STYLE page (M6), in order, and each row's heading. */
-export const STYLE_SLOTS: readonly KitSlot[] = ['topper', 'neon', 'horn', 'flame', 'smoke'];
-const SLOT_WORDS: Record<KitSlot, string> = { topper: 'ON THE ROOF · GOES INTO EVERY CAR YOU TAKE', neon: 'NEON', horn: 'HORN · H', flame: 'BOOST FLAME', smoke: 'TYRE SMOKE' };
+export const STYLE_SLOTS: readonly KitSlot[] = ['wheels', 'spoiler', 'stance', 'topper', 'neon', 'horn', 'flame', 'smoke'];
+const SLOT_WORDS: Record<KitSlot, string> = {
+  wheels: 'WHEELS · THIS CAR', spoiler: 'SPOILER · THIS CAR', stance: 'STANCE · THIS CAR',
+  topper: 'ON THE ROOF · YOURS, IN EVERY CAR YOU TAKE', neon: 'NEON · YOURS', horn: 'HORN · H · YOURS', flame: 'BOOST FLAME · YOURS', smoke: 'TYRE SMOKE · YOURS',
+};
 
 /** The seven car paints of the palette (docs/STYLE.md): the respray is free. */
 export const GARAGE_PAINTS: readonly number[] = [
@@ -381,14 +384,17 @@ export class GarageUi {
     for (const { el: b, item } of this.kitCards) {
       const k = KIT[item];
       if (!k) continue;
-      const has = kit.has(item), worn = kit.worn(k.slot) === item, price = kit.priceOf(item);
+      // a car part is fitted to the selected car; the rest is worn by the driver
+      const car = isCarSlot(k.slot);
+      const has = kit.has(item), price = kit.priceOf(item), fits = kit.fits(item, g.car);
+      const worn = car ? kit.fitted(g.car, k.slot as CarSlot) === item : kit.worn(k.slot) === item;
       const status = b.querySelector('.wall__card-status') as HTMLElement;
       b.classList.toggle('is-selected', worn);
       b.classList.toggle('is-owned', has);
-      b.classList.toggle('is-locked', !has && k.price <= 0);
+      b.classList.toggle('is-locked', (!has && k.price <= 0) || !fits);
       b.classList.toggle('is-hot', !has && item === pick);
       b.classList.toggle('is-short', !has && k.price > 0 && funds < price);
-      status.textContent = worn ? 'WORN' : has ? 'WEAR IT'
+      status.textContent = !fits ? 'NOT ON THIS CAR' : worn ? (car ? 'FITTED' : 'WORN') : has ? (car ? 'FIT IT' : 'WEAR IT')
         : k.won === STREAK ? '7-DAY STREAK' : k.won >= 0 ? `BEAT ${RIVALS[k.won]?.name ?? ''}`
           : item === pick ? `TODAY ${money(price)}` : money(price);
     }

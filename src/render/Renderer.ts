@@ -13,8 +13,8 @@ import { CAR_PROFILES } from './carProfiles';
 import { BODY_PROFILES } from './bodyProfiles';
 import { Sparks } from './Sparks';
 import { SpeedLines } from './SpeedLines';
-import { buildCarMesh, restHeight, type CarMesh } from './carMesh';
-import { buildFlame, buildNeon, setNeonColours, topperGeometry } from './kitMesh';
+import { buildCarMesh, restHeight, wheelGeometry, type CarMesh } from './carMesh';
+import { buildFlame, buildNeon, setNeonColours, spoilerGeometry, topperGeometry } from './kitMesh';
 import { CityView, QUALITY, type QualityTier } from './CityView';
 import { SHADOW_HALF, SUN_OFFSET, stableShadowTarget } from './shadows';
 import { gableGeometry, prismGeometry } from './geometry';
@@ -135,6 +135,15 @@ export class Renderer {
   private flameId = -2;
   private tyreAcc = 0;
   private tyreSide = 0;
+  /** The car's kit on the car shown (M6 slice 8): the wheels', spoiler's and stance's items, the spoiler's mesh, the stance's lift. */
+  private wheelsId = -2;
+  private spoilerId = -2;
+  private stanceId = -2;
+  private kitBody: BodyId | '' = '';
+  private readonly spoiler = new THREE.Mesh(new THREE.BufferGeometry(), this.topperMaterial);
+  private stanceY = 0;
+  /** Wheel geometries built for a style, by body and style, and each shown car's own. */
+  private readonly wheelGeoms = new Map<string, THREE.BufferGeometry>();
   /** Each shown body's roof height above its origin, for the topper and the camera's fit. */
   private readonly roofY: Partial<Record<BodyId, number>>;
   private smokeAcc = 0;
@@ -377,6 +386,8 @@ export class Renderer {
     };
     for (const d of this.dynamics) apply(d.object, d.slot);
     apply(this.car.root, this.sim.vehicle.slot);
+    // the stance (M6 slice 8): the body over its wheels, drawn only
+    this.car.root.position.y += this.stanceY;
     // Neon Niko's lowrider bounces on its hydraulics at a standstill (M6 slice 5): the body only, drawn
     if (this.sim.carBody === 'lowrider') this.car.root.position.y += lowriderBounce(this.sim.time, this.sim.probe.speed, 0);
     const wheels = this.sim.vehicle.wheels;
@@ -431,6 +442,7 @@ export class Renderer {
       const colour = flame >= 0 ? (KIT[flame]?.colour ?? PALETTE.carOrange) : PALETTE.carOrange;
       for (const f of this.flames) (f.material as THREE.MeshBasicMaterial).color.setHex(colour);
     }
+    this.syncCarKit();
     const tm = this.sim.vehicle.telemetry;
     const burning = tm.boosting && !this.sim.life.state.wrecked;
     for (let k = 0; k < this.flames.length; k++) {
@@ -440,12 +452,59 @@ export class Renderer {
     }
   }
 
+  /** The car's kit on the car shown: its wheels restyled, a spoiler on its boot, its stance; stock on a car taken on the road. */
+  private syncCarKit(): void {
+    const kit = this.sim.kit, body = this.sim.carBody;
+    const wheels = kit.worn('wheels'), spoiler = kit.worn('spoiler'), stance = kit.worn('stance');
+    if (body !== this.kitBody) {
+      this.kitBody = body;
+      this.wheelsId = -2;
+      this.spoilerId = -2;
+      this.stanceId = -2;
+    }
+    if (wheels !== this.wheelsId) {
+      this.wheelsId = wheels;
+      const style = wheels >= 0 ? ({ wheelStar: 'star', wheelDish: 'dish', wheelWire: 'wire', wheelDisc: 'disc' } as Record<string, string>)[KIT[wheels]?.id ?? ''] ?? '' : '';
+      const profile = BODY_PROFILES[body];
+      const key = `${body}:${style || 'own'}`;
+      let g = this.wheelGeoms.get(key);
+      if (!g) {
+        g = wheelGeometry(this.sim.vehicle.tuning, style || (profile.wheelStyle ?? profile.name));
+        this.wheelGeoms.set(key, g);
+      }
+      for (const w of this.car.wheels) w.traverse((o) => { if (o instanceof THREE.Mesh) o.geometry = g; });
+    }
+    if (spoiler !== this.spoilerId) {
+      this.spoilerId = spoiler;
+      const kind = ({ spoilerLip: 'lip', spoilerWing: 'wing', spoilerGiant: 'giant' } as Record<string, 'lip' | 'wing' | 'giant'>)[KIT[spoiler]?.id ?? ''];
+      this.spoiler.geometry.dispose();
+      this.spoiler.visible = kind !== undefined;
+      if (kind) {
+        const spec = bodySpec(body), profile = BODY_PROFILES[body], S = profile.sections;
+        const deck = S[S.length - 2] ?? S[S.length - 1];
+        const tail = S[S.length - 1];
+        this.spoiler.geometry = spoilerGeometry(kind, spec.halfWidth * 1.7);
+        this.car.root.add(this.spoiler);
+        this.spoiler.position.set(0, (deck ? deck.roof : 0.9) - restHeight(bodyTuning(body)), (tail ? tail.z : -spec.halfLength) + 0.3);
+        this.spoiler.castShadow = true;
+      } else {
+        this.spoiler.geometry = new THREE.BufferGeometry();
+      }
+    }
+    if (stance !== this.stanceId) {
+      this.stanceId = stance;
+      const id = KIT[stance]?.id ?? '';
+      this.stanceY = id === 'stanceLow' ? -0.06 : id === 'stanceHigh' ? 0.1 : 0;
+      this.neon.position.y = -restHeight(bodyTuning(body)) + 0.035 - this.stanceY;
+    }
+  }
+
   /** Seats the neon and the flames on a newly shown car: its footprint, its ground, its tail. */
   private fitKit(body: BodyId): void {
     const spec = bodySpec(body), t = bodyTuning(body), profile = BODY_PROFILES[body];
     const ground = -restHeight(t);
     this.car.root.add(this.neon);
-    this.neon.position.set(0, ground + 0.035, 0);
+    this.neon.position.set(0, ground + 0.035 - this.stanceY, 0);
     this.neon.scale.set(spec.halfWidth * 2 + 0.5, 1, spec.halfLength * 2 + 0.4);
     const tail = profile.sections[profile.sections.length - 1];
     const tz = tail ? tail.z : -spec.halfLength, ty = (tail ? tail.floor : 0.35) + ground + 0.06;

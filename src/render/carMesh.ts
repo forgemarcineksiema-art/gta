@@ -306,7 +306,12 @@ function clipHalfPlane(input: UV[], inside: (p: UV) => number): UV[] {
   return out;
 }
 
-function wheelGeometry(t: VehicleTuning, style: string): THREE.BufferGeometry {
+/**
+ * A wheel: the tyre and a hub by style, the classes' ('heavy' six spokes, 'compact' four, five otherwise) or the
+ * car's kit's (M6 slice 8): 'star' five long chrome spokes, 'dish' a deep dish with a wide chrome lip and bolts,
+ * 'wire' twelve thin gold spokes, 'disc' a white disc with a red cap.
+ */
+export function wheelGeometry(t: VehicleTuning, style: string): THREE.BufferGeometry {
   const r = t.wheelRadius, w = t.wheelWidth;
   const parts: THREE.BufferGeometry[] = [];
   // Revolved shoulder and sidewall with an open centre: the rim is not buried in a capped cylinder.
@@ -319,14 +324,33 @@ function wheelGeometry(t: VehicleTuning, style: string): THREE.BufferGeometry {
     const face = side * (w * 0.5 + 0.004);
     cylinder(r * 0.65, 0.022, face - side * 0.025, PALETTE.steel);
     cylinder(r * 0.56, 0.026, face - side * 0.01, PALETTE.ink);
-    parts.push(coloured(new THREE.TorusGeometry(r * 0.61, r * 0.045, 4, 20).rotateY(Math.PI / 2).translate(face, 0, 0), PALETTE.lightGrey));
-    const count = style === 'heavy' ? 6 : style === 'compact' ? 4 : 5;
+    if (style === 'dish') {
+      parts.push(coloured(new THREE.TorusGeometry(r * 0.6, r * 0.075, 4, 20).rotateY(Math.PI / 2).translate(face, 0, 0), PALETTE.chrome));
+      cylinder(r * 0.36, 0.03, face - side * 0.004, PALETTE.charcoal, 16);
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        parts.push(coloured(new THREE.BoxGeometry(0.03, r * 0.06, r * 0.06).translate(face + side * 0.012, Math.cos(a) * r * 0.26, Math.sin(a) * r * 0.26), PALETTE.chrome));
+      }
+      cylinder(r * 0.12, 0.05, face + side * 0.02, PALETTE.chrome, 8);
+      continue;
+    }
+    if (style === 'disc') {
+      parts.push(coloured(new THREE.TorusGeometry(r * 0.61, r * 0.045, 4, 20).rotateY(Math.PI / 2).translate(face, 0, 0), PALETTE.lightGrey));
+      cylinder(r * 0.58, 0.03, face + side * 0.002, PALETTE.carWhite, 20);
+      cylinder(r * 0.16, 0.045, face + side * 0.018, PALETTE.carRed, 10);
+      continue;
+    }
+    const gold = style === 'wire';
+    parts.push(coloured(new THREE.TorusGeometry(r * 0.61, r * 0.045, 4, 20).rotateY(Math.PI / 2).translate(face, 0, 0), gold ? PALETTE.carGold : style === 'star' ? PALETTE.chrome : PALETTE.lightGrey));
+    const count = style === 'heavy' ? 6 : style === 'compact' ? 4 : style === 'wire' ? 12 : 5;
+    const spoke = style === 'compact' ? 0.23 : style === 'wire' ? 0.05 : style === 'star' ? 0.1 : 0.14;
+    const colour = style === 'heavy' ? PALETTE.silver : gold ? PALETTE.carGold : style === 'star' ? PALETTE.chrome : PALETTE.lightGrey;
     for (let i = 0; i < count; i++) {
       const angle = (i / count) * Math.PI * 2;
-      parts.push(coloured(new THREE.BoxGeometry(0.035, r * 0.48, r * (style === 'compact' ? 0.23 : 0.14))
-        .translate(0, r * 0.32, 0).rotateX(angle).translate(face + side * 0.005, 0, 0), style === 'heavy' ? PALETTE.silver : PALETTE.lightGrey));
+      parts.push(coloured(new THREE.BoxGeometry(0.035, r * (style === 'star' ? 0.56 : 0.48), r * spoke)
+        .translate(0, r * (style === 'star' ? 0.3 : 0.32), 0).rotateX(angle).translate(face + side * 0.005, 0, 0), colour));
     }
-    cylinder(r * (style === 'heavy' ? 0.28 : 0.2), 0.04, face + side * 0.015, PALETTE.graphite, 10);
+    cylinder(r * (style === 'heavy' ? 0.28 : 0.2), 0.04, face + side * 0.015, gold ? PALETTE.carGold : PALETTE.graphite, 10);
     cylinder(r * 0.10, 0.047, face + side * 0.023, PALETTE.chrome, 8);
   }
   const result = mergeGeometries(parts, false);

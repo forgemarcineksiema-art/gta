@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M6 slice 8: the car's kit
+
+Done: three car slots in the kit, bought once and fitted per car in the garage (`Garage.carKit`, the save's
+`[wheels, rim, spoiler, stance]`, the rim unused): four wheels (chrome stars, a deep dish, gold wires, white discs, new
+hub styles in `wheelGeometry`), three spoilers on the boot (a lip, a wing, the giant red one; the vans, trucks and buses
+take none), two stances (slammed 6 cm, lifted 10 cm: the body over its wheels, drawn only). Shown while the garage's car
+is driven (`SimWorld.garageDriven`, false after a swap); nothing of it touches the tuning. STYLE lists the car's rows
+first (THIS CAR) and the driver's after (YOURS). Pins M6 8.1–8.3. Verify green (372 tests).
+
 ## 2026-09-23 — M6 slice 7: neon, horns, the boost's flame, tyre smoke
 
 Done: the horn is a verb on H (hint strip, `horn` edge in the controls): a civilian ahead in the player's lane within 25

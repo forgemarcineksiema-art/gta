@@ -205,3 +205,23 @@ export function buildFlame(): THREE.Mesh {
   mesh.visible = false;
   return mesh;
 }
+
+/**
+ * A spoiler on the car's tail (M6 slice 8), its origin on the boot lid at the tail's middle, `width` across: a lip,
+ * a wing on two short posts, or the giant one, tall, wide and red with end plates.
+ */
+export function spoilerGeometry(kind: 'lip' | 'wing' | 'giant', width: number): THREE.BufferGeometry {
+  const parts: Part[] = [];
+  if (kind === 'lip') {
+    parts.push(box(width, 0.05, 0.22, 0, 0.025, 0, PALETTE.charcoal));
+  } else {
+    const tall = kind === 'giant' ? 0.55 : 0.2, w = kind === 'giant' ? width + 0.2 : width;
+    const hex = kind === 'giant' ? PALETTE.carRed : PALETTE.charcoal;
+    for (const x of [-width * 0.32, width * 0.32]) parts.push(box(0.06, tall, 0.1, x, tall / 2, 0, PALETTE.ink));
+    parts.push(box(w, 0.05, kind === 'giant' ? 0.45 : 0.3, 0, tall + 0.025, -0.03, hex));
+    if (kind === 'giant') for (const x of [-w / 2, w / 2]) parts.push(box(0.04, 0.22, 0.5, x, tall + 0.05, -0.03, hex));
+  }
+  const merged = mergeGeometries(parts, false);
+  for (const p of parts) p.dispose();
+  return merged;
+}

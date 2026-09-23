@@ -29,7 +29,7 @@ export { BODIES, BODY_IDS, BODY_INDEX, CIVILIAN_BODIES, RIVAL_BODIES, bodySpec, 
 export { placeJobs, lanePathTo, dropOffTarget, fenceTargets, palmFence, type JobTarget } from './jobs/place';
 export { Garage, STATS, type Stat, type BuyResult, type PrepItem } from './garage/Garage';
 export { Board } from './board/Board';
-export { Kit, KIT, KIT_INDEX, KIT_SLOTS, BARE, STREAK, type KitItem, type KitSlot } from './garage/kit';
+export { Kit, KIT, KIT_INDEX, KIT_SLOTS, CAR_SLOTS, BARE, STREAK, isCarSlot, slotItem, slotOption, type KitItem, type KitSlot, type CarSlot } from './garage/kit';
 export { Career } from './board/Career';
 export { RIVALS, CHIEF, posterNumber, reqText, type RivalDef, type Req, type ReqKind, type DuelFormat, type Twist, type Turf } from './board/rivals';
 export { Dailies } from './dailies/Dailies';

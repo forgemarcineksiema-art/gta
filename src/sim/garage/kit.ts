@@ -11,9 +11,16 @@
 import { BALANCE } from '../balance';
 import { CITY_COLORS, PALETTE } from '../palette';
 import type { SimWorld } from '../SimWorld';
+import { bodySpec, type BodyId } from '../traffic/bodies';
 
-export type KitSlot = 'topper' | 'neon' | 'horn' | 'flame' | 'smoke';
+export type KitSlot = 'topper' | 'neon' | 'horn' | 'flame' | 'smoke' | CarSlot;
+/** The driver's slots: worn into every car. */
 export const KIT_SLOTS: readonly KitSlot[] = ['topper', 'neon', 'horn', 'flame', 'smoke'];
+/** The car's kit (M6 slice 8): fitted to one car in the garage, bought once and fitted to any. */
+export type CarSlot = 'wheels' | 'spoiler' | 'stance';
+export const CAR_SLOTS: readonly CarSlot[] = ['wheels', 'spoiler', 'stance'];
+/** Where each car slot's option sits in a car's fitting (the save's `[wheels, rim, spoiler, stance]`; the rim unused). */
+const FITTING: Record<CarSlot, number> = { wheels: 0, spoiler: 2, stance: 3 };
 
 /** `won`: the rival (a `RIVALS` index) whose win gives it, `STREAK` for the streak's seventh day, -1 for the shop's. */
 export const STREAK = -2;
@@ -88,9 +95,39 @@ export const KIT: readonly KitItem[] = [
   sold('smokePink', 'smoke', 'PINK SMOKE', 2000, PALETTE.iceCream),
   sold('smokeGold', 'smoke', 'GOLD SMOKE', 3000, PALETTE.coin),
   won('ghostSmoke', 'smoke', 'GHOST SMOKE', 9, PALETTE.ink),
+  // the car's kit (slice 8): four wheels, three spoilers, two stances, fitted per car
+  sold('wheelStar', 'wheels', 'CHROME STARS', 2500, PALETTE.chrome),
+  sold('wheelDish', 'wheels', 'DEEP DISH', 3500, PALETTE.ink),
+  sold('wheelWire', 'wheels', 'GOLD WIRES', 5000, PALETTE.carGold),
+  sold('wheelDisc', 'wheels', 'WHITE DISCS', 2000, PALETTE.carWhite),
+  sold('spoilerLip', 'spoiler', 'LIP SPOILER', 1500, PALETTE.charcoal),
+  sold('spoilerWing', 'spoiler', 'WING', 3500, PALETTE.charcoal),
+  sold('spoilerGiant', 'spoiler', 'GIANT WING', 6000, PALETTE.carRed),
+  sold('stanceLow', 'stance', 'SLAMMED', 1200, PALETTE.slate),
+  sold('stanceHigh', 'stance', 'LIFTED', 1200, PALETTE.sand),
 ];
 
 export const KIT_INDEX: Readonly<Record<string, number>> = Object.fromEntries(KIT.map((k, i) => [k.id, i]));
+
+export function isCarSlot(slot: KitSlot): slot is CarSlot {
+  return slot === 'wheels' || slot === 'spoiler' || slot === 'stance';
+}
+
+/** A car part's option number in its slot (1 for the slot's first item in `KIT`): what a car's fitting stores. */
+export function slotOption(i: number): number {
+  const k = KIT[i];
+  if (!k) return 0;
+  let n = 0;
+  for (let j = 0; j <= i; j++) if (KIT[j]?.slot === k.slot) n++;
+  return n;
+}
+
+/** The item for a car slot's option number (the inverse of `slotOption`), -1 for none. */
+export function slotItem(slot: CarSlot, opt: number): number {
+  let n = 0;
+  for (let j = 0; j < KIT.length; j++) if (KIT[j]?.slot === slot && ++n === opt) return j;
+  return -1;
+}
 
 /** The worn value that means "chosen: nothing" (a slot left bare on purpose); -1 is "never chosen". */
 export const BARE = -2;
@@ -114,11 +151,19 @@ export class Kit {
     return k.won >= 0 && this.sim.board.isBeaten(k.won);
   }
 
+  /** The item fitted to a car in the garage for a car slot (M6 slice 8), -1 for stock. */
+  fitted(body: BodyId, slot: CarSlot): number {
+    const opt = this.sim.garage.carKit.get(body)?.[FITTING[slot]] ?? 0;
+    return opt > 0 ? slotItem(slot, opt) : -1;
+  }
+
   /**
    * The item worn in a slot, -1 for none. A slot never chosen wears the streak's cone when it is had (the M5
-   * topper, worn since the day it was won).
+   * topper, worn since the day it was won). A car slot reads the garage car's fitting while the player drives it,
+   * and stock in any car taken on the road.
    */
   worn(slot: KitSlot): number {
+    if (isCarSlot(slot)) return this.sim.garageDriven ? this.fitted(this.sim.carBody, slot) : -1;
     const s = KIT_SLOTS.indexOf(slot);
     const v = this.on[s] as number;
     if (v >= 0) return this.has(v) ? v : -1;
@@ -147,26 +192,48 @@ export class Kit {
     return i === this.pick(this.sim.dailies.date) ? Math.round(k.price * BALANCE.kit.pickShare) : k.price;
   }
 
-  /** Buys an item for sale: 'owned', 'locked' (won only), 'cash', or 'ok' (paid, bought, worn, a 'purchase' event). */
+  /** Buys an item for sale: 'owned', 'locked' (won only, or a car part the garage car cannot take), 'cash', or 'ok' (paid, bought, worn or fitted, a 'purchase' event). */
   buy(i: number): 'ok' | 'cash' | 'locked' | 'owned' {
     const k = KIT[i];
     if (!k) return 'locked';
     if (this.has(i)) return 'owned';
-    if (k.price <= 0) return 'locked';
+    if (k.price <= 0 || !this.fits(i, this.sim.garage.car)) return 'locked';
     const price = this.priceOf(i);
     if (this.sim.run.funds < price) return 'cash';
     this.sim.run.spend(price);
     this.owned[i] = 1;
-    this.on[KIT_SLOTS.indexOf(k.slot)] = i;
+    if (isCarSlot(k.slot)) this.fit(i, this.sim.garage.car);
+    else this.on[KIT_SLOTS.indexOf(k.slot)] = i;
     this.serial++;
     this.sim.events.push('purchase', price, 0, 0, 0, -1);
     return 'ok';
   }
 
-  /** Wears an item had (or takes it off when it is the one worn); false for one not had. */
+  /** Whether a car part goes on a body: the big ones (the vans, the trucks, the buses) take no spoiler. */
+  fits(i: number, body: BodyId): boolean {
+    const k = KIT[i];
+    if (!k) return false;
+    return k.slot !== 'spoiler' || !(bodySpec(body).big || bodySpec(body).car === 'heavy');
+  }
+
+  /** Fits a car part to a car in the garage, or back to stock when it is the one fitted. */
+  fit(i: number, body: BodyId): boolean {
+    const k = KIT[i];
+    if (!k || !isCarSlot(k.slot) || !this.has(i) || !this.fits(i, body)) return false;
+    const opts = this.sim.garage.carKitOf(body);
+    const s = FITTING[k.slot];
+    const opt = slotOption(i);
+    opts[s] = opts[s] === opt ? 0 : opt;
+    this.sim.garage.serial++;
+    this.serial++;
+    return true;
+  }
+
+  /** Wears an item had (or takes it off when it is the one worn); a car part fits (or comes off) the garage car. False for one not had. */
   wear(i: number): boolean {
     const k = KIT[i];
     if (!k || !this.has(i)) return false;
+    if (isCarSlot(k.slot)) return this.fit(i, this.sim.garage.car);
     const s = KIT_SLOTS.indexOf(k.slot);
     this.on[s] = this.worn(k.slot) === i ? BARE : i;
     this.serial++;

@@ -329,6 +329,49 @@ Decided (set here):
   novice 0.67 here, 1.0 there): 180 s at one seed is a short sample; the
   assertions are about the ordering, which both samples agree on.
 
+### Slice 8 — the UI and audio pass, the gate
+
+- The pause screen names the mute key and the sound's state; the key hints
+  hide off the road (they overlapped the wall's tabs at 800×450 for the
+  first 12 s, an M4 known issue) and give way to the job line.
+- `?job=<id|kind>` starts in that ring; `?bot=job` (`app/jobBot.ts`) drives
+  a delivery into its drop-off and hunts an order's car with
+  `routeToAgent` (shared with the hunt measurement). `e2e/game.spec.ts` has
+  the plan's six cases and three more: 9 / 9.
+- The music bed is not in: a track means downloading a third-party file,
+  which needs Marcin's yes on the file, its source and its licence
+  (ASSETS.md, BACKLOG). Every other sound (the job stings, the purchase,
+  the daily fanfare, the streak's chime) is oscillator notes on the master
+  gain.
+- Docs: CRAZYGAMES rows, ARCHITECTURE 41–49, STYLE, README, DEV, ASSETS,
+  BACKLOG, M6_PLAN's as-built notes, `docs/M5_REPORT.md`. Package 0.5.0.
+  The entries before M5 moved to `docs/history/PROGRESS_M4-gate.md`.
+
+Gate (d21cedd and the report's commit): `verify:gate` green (282 tests),
+`balance` green, `game` 9 / 9, `heat` 10 / 10, `city` 5 / 5, `life` 4 / 4,
+`screens` 31 / 31 (100 images at the ten sizes, looked at). Startup 3.66 MB,
+time to control 3.70 s, the low tour 74 draws / 199k triangles, heap 48–61
+MB. Perf: 54.8 / 54.6 fps, frame p95 33.3 / 16.8 ms, step p95 8.4 / 7.3 ms,
+against the M4 bases 54.7 / 55.4, 16.8 / 16.8, 7.6 / 7.0: no regression by
+the protocol. Frame max 200 ms and 1.0 s (the M4 long-frame issue).
+
+### Next
+
+- Marcin plays the gate (`docs/M5_REPORT.md`, the five-minute script); his
+  notes drive the M5.1 pass before M6. Asked of him: the first minute on
+  `?fresh=1` with a stopwatch, `npm run perf:headed`, a yes or no on a music
+  track.
+
+### Open problems
+
+- Single long frames (0.2–1.0 s) in some 4× runs; the trace on Marcin's
+  machine is still the next step.
+- The quick verify's tests take 73–75 s: M3's `traffic.test.ts` is the long
+  pole (BACKLOG).
+- The skilled bot never escaped a level-4 marker; the naive hunter reaches
+  4 of 6 wanted cars. Both are the bots' limits until a human says
+  otherwise.
+
 ---
 
 Older entries: the M4 gate and the sessions after it (2026-09-23) in

@@ -81,7 +81,7 @@ export function buildBodyGeometry(profile: CarProfile, t: VehicleTuning): THREE.
     for (const side of [-1, 1]) {
       const cx = side * (s.hwBelt - lamp.inset);
       b.rectZ(cx, lamp.y, lamp.width + 0.05, lamp.height + 0.06, zAt(0.01), out, front ? PALETTE.charcoal : PALETTE.ink);
-      b.rectZ(cx, lamp.y, lamp.width, lamp.height, zAt(0.014), out, front ? HEADLIGHT : TAILLIGHT);
+      b.rectZ(cx, lamp.y, lamp.width, lamp.height, zAt(0.014), out, front ? (profile.lampsOff ? PALETTE.graphite : HEADLIGHT) : TAILLIGHT);
     }
     if (front && profile.grille) {
       const g = profile.grille;

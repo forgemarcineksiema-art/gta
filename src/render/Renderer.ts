@@ -18,7 +18,7 @@ import { CityView, QUALITY, type QualityTier } from './CityView';
 import { SHADOW_HALF, SUN_OFFSET, stableShadowTarget } from './shadows';
 import { gableGeometry, prismGeometry } from './geometry';
 import { buildSkyline } from './skyline';
-import { TrafficView } from './TrafficView';
+import { TrafficView, lowriderBounce } from './TrafficView';
 import { PedView } from './PedView';
 import { PoliceView } from './PoliceView';
 import { HeliView } from './HeliView';
@@ -364,6 +364,8 @@ export class Renderer {
     };
     for (const d of this.dynamics) apply(d.object, d.slot);
     apply(this.car.root, this.sim.vehicle.slot);
+    // Neon Niko's lowrider bounces on its hydraulics at a standstill (M6 slice 5): the body only, drawn
+    if (this.sim.carBody === 'lowrider') this.car.root.position.y += lowriderBounce(this.sim.time, this.sim.probe.speed, 0);
     const wheels = this.sim.vehicle.wheels;
     for (let i = 0; i < 4; i++) {
       const w = this.car.wheels[i];

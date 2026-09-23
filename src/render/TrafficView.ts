@@ -7,7 +7,7 @@
  * their own colour.
  */
 import * as THREE from 'three';
-import { BODY_IDS, PALETTE, bodyTuning, type TransformBuffer } from '../sim';
+import { BODY_IDS, BODY_INDEX, PALETTE, bodyTuning, type TransformBuffer } from '../sim';
 import { AgentState, type Traffic } from '../sim/traffic/Traffic';
 import { BODY_PROFILES } from './bodyProfiles';
 import { buildBodyGeometry, paintMaskMaterial } from './bodyMesh';
@@ -23,6 +23,8 @@ export class TrafficView {
   private readonly scratchS = new THREE.Vector3(1, 1, 1);
   private readonly color = new THREE.Color();
   private paintSerial = -1;
+  /** Seconds of frames drawn (the lowrider's hop). */
+  private clock = 0;
 
   constructor(scene: THREE.Scene, private readonly traffic: Traffic, private readonly civilians = true) {
     const material = paintMaskMaterial();
@@ -44,6 +46,7 @@ export class TrafficView {
 
   update(transforms: TransformBuffer, alpha: number): void {
     const traffic = this.traffic;
+    this.clock += 1 / 60;
     const repaint = traffic.paintSerial !== this.paintSerial;
     const counts = this.counts;
     counts.fill(0);
@@ -69,6 +72,8 @@ export class TrafficView {
         lerp(transforms.prevRot[r + 3] as number, transforms.currRot[r + 3] as number, alpha),
       );
       this.scratchQ.normalize();
+      // Neon Niko's lowrider hops on its hydraulics while it waits (M6)
+      if (b === LOWRIDER) this.scratchP.y += lowriderBounce(this.clock, traffic.speed[i] as number, i);
       mesh.setMatrixAt(n, this.scratchM.compose(this.scratchP, this.scratchQ, this.scratchS));
       if (repaint || pack[n] !== i) {
         const wrecked = traffic.state[i] === AgentState.Wrecked;
@@ -96,6 +101,15 @@ export class TrafficView {
     }
     this.paintSerial = traffic.paintSerial;
   }
+}
+
+const LOWRIDER = BODY_INDEX.lowrider;
+
+/** The lowrider's hop (M6): up to 7 cm, twice a second, only while it stands still; `phase` offsets one car from another. */
+export function lowriderBounce(time: number, speed: number, phase: number): number {
+  if (speed > 0.8) return 0;
+  const k = Math.sin(time * 6 + phase);
+  return k > 0 ? k * 0.07 : 0;
 }
 
 function lerp(a: number, b: number, t: number): number {

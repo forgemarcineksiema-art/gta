@@ -11,27 +11,46 @@
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { GARAGE, PALETTE, type SimWorld } from '../sim';
+import { CHIEF, GARAGE, PALETTE, RIVALS, type SimWorld } from '../sim';
+
+/** A wanted poster's state on the back wall (M6 slice 5): the rival beaten, the next one, or still waiting. */
+export type PosterState = 'beaten' | 'next' | 'waiting';
+
+/** The posters from the board: a bit per rival beaten, the next rival's index (-1 when none). */
+export function posterStates(beaten: number, next: number): PosterState[] {
+  const out: PosterState[] = [];
+  for (let i = 0; i <= CHIEF; i++) out.push((beaten & (1 << i)) !== 0 ? 'beaten' : i === next ? 'next' : 'waiting');
+  return out;
+}
 
 export class HideoutView {
   private readonly doors: THREE.Mesh[] = [];
   private readonly geometry: THREE.BufferGeometry;
   private readonly material: THREE.MeshLambertMaterial;
   private readonly propsGeometry: THREE.BufferGeometry;
+  /** The wanted board's posters (M6 slice 5): one geometry shared by the garages, rebuilt on a win. */
+  private boardGeometry: THREE.BufferGeometry;
+  private readonly boards: THREE.Mesh[] = [];
+  private boardSerial = -1;
 
   constructor(scene: THREE.Scene, sim: SimWorld) {
     this.geometry = doorGeometry();
     this.material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
     this.propsGeometry = propsGeometry();
+    this.boardGeometry = boardGeometry(posterStates(sim.board.beaten, sim.board.next()));
+    this.boardSerial = sim.board.serial;
     for (const site of sim.run.dropOffs) {
-      const props = new THREE.Mesh(this.propsGeometry, this.material);
-      props.position.set(site.x, GARAGE.floorTop, site.z);
-      props.rotation.y = site.yaw;
-      props.castShadow = false;
-      props.receiveShadow = false;
-      props.updateMatrix();
-      props.matrixAutoUpdate = false;
-      scene.add(props);
+      for (const geometry of [this.propsGeometry, this.boardGeometry]) {
+        const props = new THREE.Mesh(geometry, this.material);
+        props.position.set(site.x, GARAGE.floorTop, site.z);
+        props.rotation.y = site.yaw;
+        props.castShadow = false;
+        props.receiveShadow = false;
+        props.updateMatrix();
+        props.matrixAutoUpdate = false;
+        scene.add(props);
+        if (geometry === this.boardGeometry) this.boards.push(props);
+      }
     }
     for (const site of sim.run.dropOffs) {
       const mesh = new THREE.Mesh(this.geometry, this.material);
@@ -48,6 +67,14 @@ export class HideoutView {
   }
 
   update(sim: SimWorld): void {
+    if (sim.board.serial !== this.boardSerial) {
+      // a rival beaten: the posters again (a few dozen boxes, once a win)
+      this.boardSerial = sim.board.serial;
+      const old = this.boardGeometry;
+      this.boardGeometry = boardGeometry(posterStates(sim.board.beaten, sim.board.next()));
+      for (const m of this.boards) m.geometry = this.boardGeometry;
+      old.dispose();
+    }
     const run = sim.run;
     for (let i = 0; i < this.doors.length; i++) {
       const door = this.doors[i] as THREE.Mesh;
@@ -61,6 +88,7 @@ export class HideoutView {
   dispose(): void {
     this.geometry.dispose();
     this.propsGeometry.dispose();
+    this.boardGeometry.dispose();
     this.material.dispose();
   }
 }
@@ -142,6 +170,32 @@ export function propsGeometry(): THREE.BufferGeometry {
   box(1.2, 1.6, 0.02, 9.68, 0, 2.4, PALETTE.carWhite);
   box(1.0, 0.25, 0.03, 9.66, 0, 2.95, PALETTE.carRed);
   box(0.8, 0.55, 0.03, 9.66, 0, 2.3, PALETTE.charcoal);
+  const merged = mergeGeometries(parts, false);
+  for (const p of parts) p.dispose();
+  return merged;
+}
+
+/**
+ * The wanted board on the back wall (M6 slice 5, DESIGN.md §14.2), either side of the player's own poster: #10 to #6
+ * on the left, #5 to #1 on the right, the Chief's over the middle. Each a card with a band (red waiting, cyan the next,
+ * grey beaten), the rival's car as a swatch of their paint, and a gold bar under a beaten one.
+ */
+export function boardGeometry(states: readonly PosterState[]): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  const box = (w: number, h: number, d: number, along: number, across: number, y: number, hex: number): void => {
+    parts.push(paint(new THREE.BoxGeometry(w, h, d).translate(-across, y, along), hex));
+  };
+  for (let i = 0; i < states.length; i++) {
+    const st = states[i] as PosterState;
+    const chief = i === CHIEF;
+    const across = chief ? 0 : i < 5 ? -5.3 + i * 0.95 : 1.5 + (i - 5) * 0.95;
+    const y = chief ? 3.55 : 2.45;
+    const w = chief ? 1.1 : 0.7, h = chief ? 0.62 : 0.95;
+    box(w, h, 0.02, 9.68, across, y, st === 'beaten' ? PALETTE.lightGrey : PALETTE.carWhite);
+    box(w - 0.1, 0.13, 0.03, 9.665, across, y + h / 2 - 0.12, st === 'next' ? PALETTE.carBlue : st === 'beaten' ? PALETTE.steel : PALETTE.carRed);
+    box(w * 0.66, chief ? 0.22 : 0.3, 0.03, 9.665, across, y - (chief ? 0.06 : 0.02), (RIVALS[i]?.paints[0] ?? PALETTE.charcoal));
+    if (st === 'beaten') box(w * 0.5, 0.08, 0.035, 9.66, across, y - h / 2 + 0.12, PALETTE.carGold);
+  }
   const merged = mergeGeometries(parts, false);
   for (const p of parts) p.dispose();
   return merged;

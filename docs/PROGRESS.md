@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M6 slices 4–5: the rivals' cars and the posters
+
+Done: eleven profiles (`bodyProfiles.ts`) on their bodies: Granny's lavender wagon (a blower, side pipes, flower pots on
+the rack), Pete's pizza hatch (a giant slice sign), Tina's wrecker (winch, crane, hook, amber bar), the twins' striped
+winged coupe, Frank's fake cruiser (a disco bar, a magenta band, a drawn star), Bernie's party bus (a railed roof deck,
+speakers, a disco ball, stripes), Niko's long low lowrider (chrome, pinstripes, the spare on the tail; it hops at a
+standstill, the player's and a waiting one), the Nephew's 6.8 m gold limo (stretched, flags), Pip's one-door bubble,
+the Ghost's black phantom (`lampsOff`), the Chief's gold-trimmed cruiser. The hideout's back wall: ten posters and the
+Chief's either side of yours, rebuilt on a win. Pins M6 4.1–4.2, 5.1–5.3. Verify green (361 tests).
+
 ## 2026-09-23 — M6 slice 3: the rivals' twists
 
 Done, each a flag on the duel (DESIGN §14.3): Pete races as the bad driver; a twin 150 m behind the player swaps, out of

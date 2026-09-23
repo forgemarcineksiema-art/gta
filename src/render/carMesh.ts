@@ -87,6 +87,8 @@ export interface CarProfile {
   fixed?: { from: number; to: number; color: number };
   /** The paint left below and above the side windows, metres (the traffic's shells; 0.06 each when absent): a bus's roof band. */
   windowMargins?: { bottom: number; top: number };
+  /** The headlamps dark (M6: the Ghost's car drives with its lights off). */
+  lampsOff?: boolean;
 }
 
 /** A box fitted to a body: size and centre in metres (heights above the ground), a colour or one of the paint's tones; `mirror` adds the one at -x. */
@@ -476,8 +478,8 @@ export function buildCarMesh(t: VehicleTuning, profile: CarProfile = MUSCLE, col
       bb.decal(noseLower, circle(h.y, cx + dx, 0.083), PALETTE.chrome, 0.006);
       bb.decal(noseLower, circle(h.y, cx + dx, 0.061), 0xffebbb, 0.009);
     } else {
-      bb.decal(noseLower, rectYX(h.y - h.height / 2, h.y + h.height / 2, cx - h.width / 2, cx + h.width / 2), 0xffefca, 0.006);
-      bb.decal(noseLower, rectYX(h.y - 0.05, h.y + 0.05, cx + side * h.width * 0.2, cx + side * h.width * 0.45), PALETTE.carOrange, 0.008);
+      bb.decal(noseLower, rectYX(h.y - h.height / 2, h.y + h.height / 2, cx - h.width / 2, cx + h.width / 2), profile.lampsOff ? PALETTE.graphite : 0xffefca, 0.006);
+      if (!profile.lampsOff) bb.decal(noseLower, rectYX(h.y - 0.05, h.y + 0.05, cx + side * h.width * 0.2, cx + side * h.width * 0.45), PALETTE.carOrange, 0.008);
     }
   }
   if (profile.grille) {

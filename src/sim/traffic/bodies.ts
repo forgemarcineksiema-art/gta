@@ -83,8 +83,7 @@ export const BODIES: readonly BodySpec[] = [
   civilian('bus', 'heavy', 1.27, 6.0, 6.6, 2.24, 6500, 0.8, { paints: BUS_PAINTS, big: true, keepsLane: true, stretch: true }),
   // the hidden car (M5.5 slice 16): never drawn by the spawner (its share is 0), stashed by city/stash.ts
   civilian('icecream', 'heavy', 1.12, 2.9, 3.4, 1.9, 2800, 0.85, { paints: [CITY_COLORS.mint], big: true, stretch: true }),
-  // the wanted board's cars (M6 slice 1): on the footprints of the bodies they are drawn as until slices 4–5 give
-  // them their own; never spawned (share 0), raced or hunted by jobs/Duel, won into the garage
+  // the wanted board's cars (M6 slices 1, 4–5): never spawned (share 0), raced or hunted in a duel, won into the garage
   civilian('wagon', 'muscle', 0.92, 2.42, 2.85, 1.6, 1450, 1, { paints: [CITY_COLORS.lavender] }),
   civilian('pizza', 'compact', 0.87, 2.05, 2.55, 1.52, 1150, 1, { paints: [PALETTE.carRed] }),
   civilian('wrecker', 'heavy', 0.98, 2.7, 3.3, 1.72, 2100, 1, { paints: [PALETTE.carOrange] }),
@@ -92,9 +91,9 @@ export const BODIES: readonly BodySpec[] = [
   onShell('fakecop', 'police', PALETTE.policeWhite),
   // Big Bernie's bus races: it overtakes where the city's buses keep their lane
   civilian('partybus', 'heavy', 1.27, 6.0, 6.6, 2.24, 6500, 1, { paints: [PALETTE.carMagenta], big: true, stretch: true }),
-  onShell('lowrider', 'sports', PALETTE.carBlue),
-  civilian('limo', 'muscle', 0.92, 2.35, 2.8, 1.6, 1400, 1, { paints: [PALETTE.carGold] }),
-  civilian('bubble', 'compact', 0.87, 2.05, 2.55, 1.52, 1150, 1, { paints: [PALETTE.carLime] }),
+  civilian('lowrider', 'sports', 0.95, 2.55, 3.1, 1.62, 1500, 1, { paints: [PALETTE.carBlue] }),
+  civilian('limo', 'muscle', 0.95, 3.4, 4.6, 1.62, 2400, 1, { paints: [PALETTE.carGold], stretch: true }),
+  civilian('bubble', 'compact', 0.72, 1.45, 1.75, 1.2, 550, 1, { paints: [PALETTE.carLime] }),
   onShell('phantom', 'sports', PALETTE.carBlack),
   onShell('chiefcar', 'police', PALETTE.policeWhite),
 ];

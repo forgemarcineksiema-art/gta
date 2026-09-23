@@ -8,8 +8,8 @@
  * one after a swap with carMesh.ts in full detail.
  */
 import { PALETTE, type BodyId } from '../sim';
-import type { CarProfile } from './carMesh';
-import { CAR_PROFILES } from './carProfiles';
+import type { BodyPart, CarProfile } from './carMesh';
+import { CAR_PROFILES, POLICE as POLICE_CAR, SPORTS } from './carProfiles';
 
 /** A three-box saloon, 4.7 m: the city's most common car. */
 export const SEDAN: CarProfile = {
@@ -302,11 +302,252 @@ export const ICECREAM: CarProfile = {
   paint: 0x91aca3,
 };
 
+/**
+ * The wanted board's cars (M6 slices 4–5, DESIGN.md §14.3): each rival's own, won in their duel. Built as the
+ * city's set is, on their bodies' axles and footprints (sim/traffic/bodies.ts).
+ */
+
+/** Granny Gears' wagon: the estate hot-rodded, a blower through the bonnet, side pipes, flower pots on the rack. */
+export const WAGON: CarProfile = {
+  ...ESTATE,
+  name: 'wagon',
+  exhausts: 0,
+  wheelStyle: 'muscle',
+  parts: [
+    { size: [0.05, 0.05, 1.8], at: [0.6, 1.475, -0.92], color: PALETTE.silver, mirror: true },
+    { size: [1.25, 0.04, 0.05], at: [0, 1.5, -0.25], color: PALETTE.silver },
+    { size: [1.25, 0.04, 0.05], at: [0, 1.5, -1.6], color: PALETTE.silver },
+    // three pots across the rack, their leaves and a pink bloom on each
+    ...[-0.45, -0.95, -1.45].flatMap((z, k): BodyPart[] => [
+      { size: [0.3, 0.24, 0.3], at: [k === 1 ? 0 : (k === 0 ? 0.28 : -0.28), 1.64, z], color: PALETTE.wafer },
+      { size: [0.36, 0.14, 0.36], at: [k === 1 ? 0 : (k === 0 ? 0.28 : -0.28), 1.83, z], color: PALETTE.grass },
+      { size: [0.14, 0.1, 0.14], at: [k === 1 ? 0 : (k === 0 ? 0.28 : -0.28), 1.95, z], color: PALETTE.iceCream },
+    ]),
+    // the blower: its case through the bonnet and the intake on top
+    { size: [0.44, 0.2, 0.56], at: [0, 1.0, 1.35], color: PALETTE.chrome },
+    { size: [0.32, 0.14, 0.3], at: [0, 1.16, 1.35], color: PALETTE.ink },
+    // side pipes along the sills
+    { size: [0.09, 0.09, 1.9], at: [0.97, 0.33, -0.1], color: PALETTE.chrome, mirror: true },
+  ],
+  paint: 0xb1a8ba,
+};
+
+/** Pepperoni Pete's pizza hatch: the hatchback under a giant slice sign, point down, crust up, pepperoni on it. */
+export const PIZZA: CarProfile = {
+  ...HATCH,
+  name: 'pizza',
+  parts: [
+    { size: [0.1, 0.12, 0.1], at: [0, 1.52, -0.35], color: PALETTE.ink },
+    ...[0.16, 0.34, 0.52, 0.7].map((w, k): BodyPart => ({ size: [w, 0.12, 0.06], at: [0, 1.64 + k * 0.12, -0.35], color: PALETTE.coin })),
+    { size: [0.84, 0.13, 0.1], at: [0, 2.12, -0.35], color: PALETTE.wafer },
+    { size: [0.12, 0.1, 0.08], at: [0.14, 1.94, -0.35], color: PALETTE.carRed },
+    { size: [0.12, 0.1, 0.08], at: [-0.18, 1.88, -0.35], color: PALETTE.carRed },
+    { size: [0.1, 0.09, 0.08], at: [0.06, 1.74, -0.35], color: PALETTE.carRed },
+    { size: [0.12, 0.1, 0.08], at: [-0.04, 2.02, -0.35], color: PALETTE.carRed },
+    // the hot bag strapped to the tailgate side
+    { size: [0.012, 0.12, 1.9], at: [0.875, 0.62, 0.1], color: PALETTE.coin, mirror: true },
+  ],
+  paint: PALETTE.carRed,
+};
+
+/** Tow Truck Tina's wrecker: the pickup with a winch, a crane over the bed, its hook, a tow bar and an amber bar. */
+export const WRECKER: CarProfile = {
+  ...PICKUP,
+  name: 'wrecker',
+  parts: [
+    { size: [0.07, 0.05, 2.02], at: [0.925, 1.225, -1.61], color: 'paint', mirror: true },
+    { size: [0.9, 0.22, 0.22], at: [0, 1.32, -0.78], color: PALETTE.steel },
+    { size: [0.18, 0.9, 0.18], at: [0, 1.65, -0.95], color: PALETTE.charcoal },
+    { size: [0.14, 0.14, 1.62], at: [0, 2.06, -1.72], color: PALETTE.charcoal },
+    { size: [0.03, 0.55, 0.03], at: [0, 1.76, -2.5], color: PALETTE.ink },
+    { size: [0.16, 0.14, 0.09], at: [0, 1.44, -2.5], color: PALETTE.steel },
+    { size: [1.2, 0.08, 0.1], at: [0, 0.52, -2.64], color: PALETTE.charcoal },
+    { size: [1.2, 0.1, 0.22], at: [0, 1.89, 0.05], color: PALETTE.charcoal },
+    { size: [0.3, 0.12, 0.24], at: [0.38, 1.95, 0.05], color: PALETTE.cone, mirror: true },
+  ],
+  paint: PALETTE.carOrange,
+};
+
+/** The Twins' coupe: the sports car with twin stripes in its dark tone and a wing on the tail. */
+export const TWIN: CarProfile = {
+  ...SPORTS,
+  name: 'twin',
+  lipSpoiler: false,
+  parts: [
+    { size: [0.12, 0.012, 1.25], at: [0.15, 0.818, 1.18], color: 'dark', mirror: true },
+    { size: [0.12, 0.012, 0.78], at: [0.15, 1.207, -0.52], color: 'dark', mirror: true },
+    { size: [0.06, 0.2, 0.1], at: [0.55, 0.97, -1.95], color: PALETTE.charcoal, mirror: true },
+    { size: [1.5, 0.05, 0.3], at: [0, 1.09, -1.95], color: 'paint' },
+  ],
+  paint: 0x91aca3,
+};
+
+/** Fake Frank's cruiser: the police saloon under a disco bar, a magenta band and a star he drew himself. */
+export const FAKECOP: CarProfile = {
+  ...POLICE_CAR,
+  name: 'fakecop',
+  parts: [
+    { size: [1.2, 0.08, 0.26], at: [0, 1.54, -0.45], color: PALETTE.charcoal },
+    ...[PALETTE.iceCream, PALETTE.carLime, PALETTE.coin, PALETTE.carBlue, PALETTE.carMagenta].map((c, k): BodyPart => ({ size: [0.2, 0.12, 0.22], at: [-0.48 + k * 0.24, 1.63, -0.45], color: c })),
+    { size: [0.012, 0.14, 2.6], at: [0.955, 0.72, -0.1], color: PALETTE.carMagenta, mirror: true },
+    { size: [0.012, 0.16, 0.16], at: [0.96, 0.84, 0.3], color: PALETTE.coin, mirror: true },
+  ],
+  paint: PALETTE.policeWhite,
+};
+
+/** Big Bernie's party bus: the bus with a railed roof deck, speaker stacks, a disco ball and party stripes. */
+export const PARTYBUS: CarProfile = {
+  ...BUS,
+  name: 'partybus',
+  parts: [
+    ...(BUS.parts ?? []).filter((p) => p.at[1] < 3.0),
+    { size: [0.05, 0.05, 10.6], at: [1.15, 3.46, -0.3], color: PALETTE.chrome, mirror: true },
+    { size: [2.3, 0.05, 0.05], at: [0, 3.46, 4.95], color: PALETTE.chrome },
+    { size: [2.3, 0.05, 0.05], at: [0, 3.46, -5.6], color: PALETTE.chrome },
+    ...[4.95, 2.4, -0.2, -2.8, -5.6].map((z): BodyPart => ({ size: [0.05, 0.45, 0.05], at: [1.15, 3.22, z], color: PALETTE.chrome, mirror: true })),
+    { size: [0.5, 0.7, 0.5], at: [0.7, 3.35, 3.7], color: PALETTE.ink, mirror: true },
+    { size: [0.3, 0.3, 0.02], at: [0.7, 3.45, 3.95], color: PALETTE.steel, mirror: true },
+    { size: [0.05, 0.8, 0.05], at: [0, 3.4, -1.5], color: PALETTE.steel },
+    { size: [0.42, 0.42, 0.42], at: [0, 3.95, -1.5], color: PALETTE.chrome },
+    { size: [0.012, 0.16, 11.4], at: [1.275, 1.28, 0], color: PALETTE.carLime, mirror: true },
+    { size: [0.012, 0.1, 11.4], at: [1.275, 1.08, 0], color: PALETTE.coin, mirror: true },
+  ],
+  paint: PALETTE.carMagenta,
+};
+
+/** Neon Niko's lowrider: a long low coupe on hydraulics, chrome bumpers, pink pinstripes, the spare on the tail. */
+export const LOWRIDER: CarProfile = {
+  name: 'lowrider',
+  sections: [
+    { z: 2.55, floor: 0.26, belt: 0.62, roof: 0.66, hwFloor: 0.84, hwBelt: 0.9, hwRoof: 0.82 },
+    { z: 2.3, floor: 0.24, belt: 0.72, roof: 0.76, hwFloor: 0.9, hwBelt: 0.98, hwRoof: 0.88 },
+    { z: 1.2, floor: 0.24, belt: 0.76, roof: 0.8, hwFloor: 0.9, hwBelt: 1.0, hwRoof: 0.9 },
+    { z: 0.45, floor: 0.24, belt: 0.77, roof: 0.81, hwFloor: 0.9, hwBelt: 1.0, hwRoof: 0.9 },
+    { z: -0.2, floor: 0.24, belt: 0.79, roof: 1.2, hwFloor: 0.9, hwBelt: 1.0, hwRoof: 0.76 },
+    { z: -1.2, floor: 0.24, belt: 0.8, roof: 1.19, hwFloor: 0.9, hwBelt: 1.0, hwRoof: 0.76 },
+    { z: -1.75, floor: 0.25, belt: 0.82, roof: 0.86, hwFloor: 0.9, hwBelt: 1.0, hwRoof: 0.9 },
+    { z: -2.55, floor: 0.28, belt: 0.78, roof: 0.82, hwFloor: 0.86, hwBelt: 0.94, hwRoof: 0.86 },
+  ],
+  glassSides: [4, 5],
+  glassTops: [3, 5],
+  aPillar: 3,
+  cPillar: 5,
+  pillars: [-0.7],
+  doorSeams: [0.5, -0.75],
+  handleZ: -0.4,
+  headlight: { width: 0.36, height: 0.12, y: 0.52, inset: 0.24 },
+  taillight: { width: 0.3, height: 0.1, y: 0.62, inset: 0.24 },
+  grille: { width: 0.9, height: 0.14, y: 0.46 },
+  bumperHeight: 0.1,
+  lipSpoiler: false,
+  mirrors: true,
+  exhausts: 2,
+  wheelInset: -0.02,
+  wheelStyle: 'sports',
+  parts: [
+    { size: [1.7, 0.1, 0.08], at: [0, 0.34, 2.56], color: PALETTE.chrome },
+    { size: [1.7, 0.1, 0.08], at: [0, 0.36, -2.56], color: PALETTE.chrome },
+    { size: [0.5, 0.5, 0.12], at: [0, 0.62, -2.6], color: PALETTE.rubber },
+    { size: [0.22, 0.22, 0.13], at: [0, 0.62, -2.61], color: PALETTE.chrome },
+    { size: [0.012, 0.03, 4.4], at: [0.955, 0.66, 0], color: PALETTE.iceCream, mirror: true },
+  ],
+  paint: PALETTE.carBlue,
+};
+
+/** The Mayor's Nephew's limo: the saloon stretched to 6.8 m, three windows a side, chrome trim, flags on the wings. */
+export const LIMO: CarProfile = {
+  ...SEDAN,
+  name: 'limo',
+  sections: [
+    { z: 3.4, floor: 0.36, belt: 0.72, roof: 0.77, hwFloor: 0.78, hwBelt: 0.85, hwRoof: 0.79 },
+    { z: 3.15, floor: 0.33, belt: 0.83, roof: 0.87, hwFloor: 0.86, hwBelt: 0.91, hwRoof: 0.86 },
+    { z: 2.3, floor: 0.33, belt: 0.87, roof: 0.91, hwFloor: 0.87, hwBelt: 0.92, hwRoof: 0.87 },
+    { z: 1.9, floor: 0.33, belt: 0.89, roof: 0.93, hwFloor: 0.87, hwBelt: 0.92, hwRoof: 0.87 },
+    { z: 1.05, floor: 0.33, belt: 0.91, roof: 1.43, hwFloor: 0.87, hwBelt: 0.92, hwRoof: 0.72 },
+    { z: -2.0, floor: 0.33, belt: 0.92, roof: 1.42, hwFloor: 0.87, hwBelt: 0.92, hwRoof: 0.72 },
+    { z: -2.65, floor: 0.34, belt: 0.94, roof: 0.99, hwFloor: 0.87, hwBelt: 0.92, hwRoof: 0.86 },
+    { z: -3.4, floor: 0.38, belt: 0.9, roof: 0.95, hwFloor: 0.8, hwBelt: 0.87, hwRoof: 0.83 },
+  ],
+  pillars: [0.05, -1.0],
+  doorSeams: [1.85, 0.05, -1.0, -1.95],
+  handleZ: 0.95,
+  parts: [
+    { size: [0.02, 0.36, 0.02], at: [0.72, 1.1, 3.0], color: PALETTE.chrome, mirror: true },
+    { size: [0.012, 0.16, 0.26], at: [0.72, 1.2, 2.86], color: PALETTE.carRed, mirror: true },
+    { size: [0.014, 0.06, 0.26], at: [0.72, 1.2, 2.86], color: PALETTE.carWhite, mirror: true },
+    { size: [0.012, 0.03, 6.4], at: [0.93, 0.6, 0], color: PALETTE.chrome, mirror: true },
+    { size: [0.015, 0.42, 0.015], at: [0.42, 1.16, -3.05], color: PALETTE.steel },
+  ],
+  paint: PALETTE.carGold,
+};
+
+/** Professor Pip's bubble: a one-door microcar, the whole nose a door, glass all round. */
+export const BUBBLE: CarProfile = {
+  name: 'bubble',
+  sections: [
+    { z: 1.45, floor: 0.3, belt: 0.55, roof: 0.62, hwFloor: 0.7, hwBelt: 0.8, hwRoof: 0.7 },
+    { z: 1.2, floor: 0.28, belt: 0.72, roof: 1.05, hwFloor: 0.82, hwBelt: 0.92, hwRoof: 0.78 },
+    { z: 0.7, floor: 0.28, belt: 0.78, roof: 1.42, hwFloor: 0.86, hwBelt: 0.96, hwRoof: 0.8 },
+    { z: -0.3, floor: 0.28, belt: 0.8, roof: 1.46, hwFloor: 0.86, hwBelt: 0.96, hwRoof: 0.8 },
+    { z: -1.0, floor: 0.3, belt: 0.8, roof: 1.2, hwFloor: 0.84, hwBelt: 0.94, hwRoof: 0.78 },
+    { z: -1.45, floor: 0.34, belt: 0.72, roof: 0.82, hwFloor: 0.76, hwBelt: 0.84, hwRoof: 0.74 },
+  ],
+  glassSides: [2, 3],
+  glassTops: [1, 3],
+  aPillar: 1,
+  cPillar: 3,
+  pillars: [],
+  doorSeams: [1.15],
+  handleZ: 1.3,
+  headlight: { width: 0.2, height: 0.14, y: 0.52, inset: 0.16 },
+  taillight: { width: 0.16, height: 0.12, y: 0.64, inset: 0.12 },
+  grille: null,
+  bumperHeight: 0.08,
+  lipSpoiler: false,
+  mirrors: false,
+  exhausts: 1,
+  wheelInset: 0.005,
+  wheelStyle: 'compact',
+  parts: [
+    { size: [0.9, 0.06, 0.06], at: [0, 0.4, 1.47], color: PALETTE.chrome },
+    { size: [0.9, 0.06, 0.06], at: [0, 0.42, -1.47], color: PALETTE.chrome },
+  ],
+  paint: PALETTE.carLime,
+};
+
+/** The Ghost's phantom: the sports car in matte black, skirts and a slim wing, its lamps dark. */
+export const PHANTOM: CarProfile = {
+  ...SPORTS,
+  name: 'phantom',
+  lipSpoiler: false,
+  lampsOff: true,
+  parts: [
+    { size: [0.03, 0.08, 2.2], at: [0.96, 0.32, -0.1], color: PALETTE.ink, mirror: true },
+    { size: [0.06, 0.18, 0.1], at: [0.55, 0.96, -1.98], color: PALETTE.ink, mirror: true },
+    { size: [1.55, 0.04, 0.26], at: [0, 1.06, -1.98], color: PALETTE.charcoal },
+  ],
+  paint: PALETTE.carBlack,
+};
+
+/** The Chief's cruiser: the police saloon in gold trim, a gold star a side, his own light bar and a push bar. */
+export const CHIEFCAR: CarProfile = {
+  ...POLICE_CAR,
+  name: 'chiefcar',
+  parts: [
+    { size: [0.012, 0.12, 3.9], at: [0.955, 0.78, -0.05], color: PALETTE.carGold, mirror: true },
+    { size: [0.014, 0.22, 0.22], at: [0.96, 0.84, 0.25], color: PALETTE.carGold, mirror: true },
+    { size: [1.25, 0.09, 0.28], at: [0, 1.545, -0.45], color: PALETTE.charcoal },
+    { size: [0.5, 0.12, 0.26], at: [0.32, 1.64, -0.45], color: PALETTE.carRed },
+    { size: [0.5, 0.12, 0.26], at: [-0.32, 1.64, -0.45], color: PALETTE.policeBlue },
+    { size: [1.3, 0.3, 0.08], at: [0, 0.6, 2.34], color: PALETTE.ink },
+  ],
+  paint: PALETTE.policeWhite,
+};
+
 /** Every body's profile: the player's five classes, the city's eight, the hidden truck and the wanted board's cars. */
 export const BODY_PROFILES: Record<BodyId, CarProfile> = {
   ...CAR_PROFILES,
   sedan: SEDAN, hatch: HATCH, estate: ESTATE, suv: SUV, pickup: PICKUP, taxi: TAXI, truck: TRUCK, bus: BUS, icecream: ICECREAM,
-  // the rivals' cars on the bodies they stand in for until M6 slices 4–5 draw their own
-  wagon: ESTATE, pizza: HATCH, wrecker: PICKUP, twin: CAR_PROFILES.sports, fakecop: CAR_PROFILES.police, partybus: BUS,
-  lowrider: CAR_PROFILES.sports, limo: SEDAN, bubble: HATCH, phantom: CAR_PROFILES.sports, chiefcar: CAR_PROFILES.police,
+  wagon: WAGON, pizza: PIZZA, wrecker: WRECKER, twin: TWIN, fakecop: FAKECOP, partybus: PARTYBUS,
+  lowrider: LOWRIDER, limo: LIMO, bubble: BUBBLE, phantom: PHANTOM, chiefcar: CHIEFCAR,
 };

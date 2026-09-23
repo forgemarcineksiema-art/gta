@@ -18,7 +18,7 @@ export interface SpawnPoint {
 export interface PropSpawn {
   position: Vec3;
   rotation: Quat;
-  shape: { kind: 'cylinder'; radius: number; halfHeight: number } | { kind: 'box'; hx: number; hy: number; hz: number };
+  shape: { kind: 'cylinder'; radius: number; halfHeight: number } | { kind: 'box'; hx: number; hy: number; hz: number } | { kind: 'ball'; radius: number };
   color: number;
   mass: number;
 }

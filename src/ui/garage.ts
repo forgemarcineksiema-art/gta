@@ -14,13 +14,15 @@
  * Reports intents through `GarageActions` and never writes the sim; reads it
  * to draw. Rebuilds only when the garage, the bank or the totals change.
  */
-import { BALANCE, CAR_IDS, CAR_WORDS, MEDAL_WORDS, PALETTE, STATS, type CarId, type PrepItem, type SimWorld, type Stat } from '../sim';
+import { BALANCE, BODY_WORDS, CAR_IDS, CAR_WORDS, HIDDEN_CARS, MEDAL_WORDS, PALETTE, STATS, bodySpec, type CarId, type HiddenCar, type PrepItem, type SimWorld, type Stat } from '../sim';
 
 export interface GarageActions {
   buy(car: CarId): void;
   /** Keep the car driven in (DESIGN.md §13.7). */
   keep(car: CarId): void;
   select(car: CarId): void;
+  /** A hidden car found in the city (M5.5 slice 16) as the drive-out. */
+  selectHidden(id: HiddenCar): void;
   respray(car: CarId, paint: number): void;
   upgrade(car: CarId, stat: Stat): void;
   buyPrep(item: PrepItem): void;
@@ -124,6 +126,17 @@ export class GarageUi {
       b.append(el('span', 'wall__card-swatch'), el('span', 'wall__card-name', CAR_WORDS[id]), el('span', 'wall__card-status'));
       grid.appendChild(b);
       carItems.push(this.item('cars', b, () => this.carAction(id)));
+    }
+    // the hidden cars (M5.5 slice 16): a card each, shown once found in the city
+    for (const id of HIDDEN_CARS) {
+      const b = button('wall__card wall__card--hidden', '');
+      b.dataset['car'] = id;
+      b.append(el('span', 'wall__card-swatch'), el('span', 'wall__card-name', BODY_WORDS[id]), el('span', 'wall__card-status'));
+      grid.appendChild(b);
+      const it = this.item('cars', b, () => this.actions.selectHidden(id));
+      it.hidden = true;
+      b.hidden = true;
+      carItems.push(it);
     }
     cars.appendChild(grid);
     this.items.set('cars', carItems);
@@ -301,13 +314,25 @@ export class GarageUi {
       const can = g.canBuy(id);
       // the car you drove in: the class's card offers to keep it for a share of its price
       const hot = sim.run.hot === id && !g.owned.has(id);
-      b.classList.toggle('is-selected', g.car === id);
+      b.classList.toggle('is-selected', g.car === id && g.hidden === null);
       b.classList.toggle('is-owned', g.owned.has(id));
       b.classList.toggle('is-locked', can === 'locked');
       b.classList.toggle('is-hot', hot && can !== 'locked');
       b.classList.toggle('is-short', hot ? funds < g.keepPrice(id) : can === 'cash');
-      status.textContent = g.car === id ? 'SELECTED' : g.owned.has(id) ? 'OWNED' : can === 'locked' ? 'ESCAPE HEAT 5 FIRST'
+      status.textContent = g.car === id && g.hidden === null ? 'SELECTED' : g.owned.has(id) ? 'OWNED' : can === 'locked' ? 'ESCAPE HEAT 5 FIRST'
         : hot ? `HOT · KEEP IT ${money(g.keepPrice(id))}` : money(g.price(id));
+    }
+    // the hidden cars found
+    for (let k = 0; k < HIDDEN_CARS.length; k++) {
+      const id = HIDDEN_CARS[k] as HiddenCar;
+      const it = cars[CAR_IDS.length + k] as Item;
+      const found = sim.stash.found.has(id);
+      it.hidden = !found;
+      it.el.hidden = !found;
+      (it.el.querySelector('.wall__card-swatch') as HTMLElement).style.background = `#${(bodySpec(id).paints[0] as number).toString(16).padStart(6, '0')}`;
+      it.el.classList.toggle('is-selected', g.hidden === id);
+      it.el.classList.add('is-owned');
+      (it.el.querySelector('.wall__card-status') as HTMLElement).textContent = g.hidden === id ? 'SELECTED' : 'FOUND';
     }
     // PAINT
     this.paintFor.textContent = `PAINT: ${CAR_WORDS[g.car]} · FREE`;

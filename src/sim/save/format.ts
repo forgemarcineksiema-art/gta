@@ -10,6 +10,7 @@
  * parses to the defaults here; the store keeps the raw text and never writes
  * over it (an older build must not destroy a newer save).
  */
+import { HIDDEN_CARS } from '../city/stash';
 import type { SimWorld } from '../SimWorld';
 import { CAR_IDS, type CarId } from '../vehicle/presets';
 
@@ -75,6 +76,9 @@ export interface SaveDoc {
   medals: string;
   /** The hunt's ramps found (M5.5 slice 14): `Jumps.found` as bits, base64; '' when none. */
   jumps: string;
+  /** The hidden cars found (M5.5 slice 16), their ids joined by commas; the one the garage drives out, '' for the class. */
+  hidden: string;
+  drive: string;
 }
 
 /** The current document's type under the name the app and the tests used since M5. */
@@ -103,6 +107,8 @@ function defaults(): SaveDoc {
     borrowHints: 0,
     medals: '',
     jumps: '',
+    hidden: '',
+    drive: '',
   };
 }
 
@@ -154,6 +160,8 @@ export function serialize(save: SaveDoc): string {
     borrowHints: save.borrowHints,
     medals: save.medals,
     jumps: save.jumps,
+    hidden: save.hidden,
+    drive: save.drive,
   });
 }
 
@@ -251,6 +259,12 @@ function sanitize(raw: Record<string, unknown>): SaveDoc {
   // added within v2: a document without it has found no ramps
   const jumps = raw['jumps'];
   out.jumps = typeof jumps === 'string' && /^[A-Za-z0-9+/]*={0,2}$/.test(jumps) && jumps.length <= 8 ? jumps : '';
+  // added within v2: the known hidden cars only, each once
+  const hidden = raw['hidden'];
+  const hiddenFound: string[] = typeof hidden === 'string' ? HIDDEN_CARS.filter((id) => hidden.split(',').includes(id)) : [];
+  out.hidden = hiddenFound.join(',');
+  const drive = raw['drive'];
+  out.drive = typeof drive === 'string' && hiddenFound.includes(drive) ? drive : '';
   return out;
 }
 
@@ -309,6 +323,8 @@ export function collect(sim: SimWorld, into: SaveDoc): void {
   for (const d of sim.jobs.defs) if (d.kind === 'trial') medals += String(sim.jobs.medals.get(d.id) ?? 0);
   into.medals = medals.replace(/0+$/, '');
   if (sim.jumps) into.jumps = encodeBits(sim.jumps.found);
+  into.hidden = HIDDEN_CARS.filter((id) => sim.stash.found.has(id)).join(',');
+  into.drive = garage.hidden ?? '';
 }
 
 /** A document into a freshly built world, once, before the first step: the garage car is driven out at once. */
@@ -342,6 +358,9 @@ export function apply(sim: SimWorld, save: SaveDoc): void {
   garage.prep.lawyer = save.prep.lawyer;
   garage.prep.fence = save.prep.fence;
   garage.policeUnlocked = save.policeUnlocked;
+  sim.stash.found.clear();
+  for (const id of HIDDEN_CARS) if (save.hidden.split(',').includes(id)) sim.stash.found.add(id);
+  garage.hidden = HIDDEN_CARS.find((id) => id === save.drive && sim.stash.found.has(id)) ?? null;
   garage.serial++;
   garage.applyToVehicle();
   const c = sim.collectibles;

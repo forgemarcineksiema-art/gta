@@ -12,6 +12,8 @@
 import { BALANCE } from '../balance';
 import { POLICE } from '../police/tuning';
 import type { SimWorld } from '../SimWorld';
+import type { HiddenCar } from '../city/stash';
+import { bodySpec, bodyTuning } from '../traffic/bodies';
 import { PLAYER_PAINT } from '../traffic/Traffic';
 import { CAR_IDS, CAR_PRESETS, type CarId } from '../vehicle/presets';
 import { cloneTuning, type VehicleTuning } from '../vehicle/tuning';
@@ -24,6 +26,8 @@ export type PrepItem = 'lawyer' | 'fence';
 export class Garage {
   /** What the player drives out in. */
   car: CarId = 'muscle';
+  /** A found hidden car driven out instead of `car` (M5.5 slice 16), null for the class; PAINT and TUNE stay the class's. */
+  hidden: HiddenCar | null = null;
   readonly owned = new Set<CarId>(['muscle']);
   /** Resprays; absent = the class's paint. */
   readonly paint = new Map<CarId, number>();
@@ -88,6 +92,7 @@ export class Garage {
     this.owned.add(car);
     this.paint.set(car, paint);
     this.car = car;
+    this.hidden = null;
     this.serial++;
     this.sim.events.push('purchase', price, 0, 0, 0, CAR_IDS.indexOf(car));
     return 'ok';
@@ -96,8 +101,19 @@ export class Garage {
   /** Owned cars only: the one the next drive-out uses. */
   select(car: CarId): boolean {
     if (!this.owned.has(car)) return false;
-    if (this.car !== car) {
+    if (this.car !== car || this.hidden !== null) {
       this.car = car;
+      this.hidden = null;
+      this.serial++;
+    }
+    return true;
+  }
+
+  /** A hidden car the player has found: the one the next drive-out uses. */
+  selectHidden(id: HiddenCar): boolean {
+    if (!this.sim.stash.found.has(id)) return false;
+    if (this.hidden !== id) {
+      this.hidden = id;
       this.serial++;
     }
     return true;
@@ -170,17 +186,20 @@ export class Garage {
   applyToVehicle(): void {
     const sim = this.sim;
     const v = sim.vehicle;
-    v.tuning = this.tuningFor(this.car);
+    const hidden = this.hidden !== null && sim.stash.found.has(this.hidden) ? this.hidden : null;
+    // a hidden car drives as its body's class stretched to it, untuned, in its own paint
+    const spec = hidden ? bodySpec(hidden) : null;
+    v.tuning = hidden ? bodyTuning(hidden) : this.tuningFor(this.car);
     v.applyTuning();
-    sim.carId = this.car;
-    sim.carBody = this.car;
-    sim.carPaint = this.paintOf(this.car);
+    sim.carId = spec ? spec.car : this.car;
+    sim.carBody = hidden ?? this.car;
+    sim.carPaint = spec ? (spec.paints[0] as number) : this.paintOf(this.car);
     sim.life.heal();
     // a fresh car: the descriptor is this one, and a police car starts as a clean disguise on the dispatcher's clock
     const pursuit = sim.pursuit;
-    pursuit.descriptor.kind = this.car;
-    pursuit.descriptor.body = this.car;
-    pursuit.descriptor.paint = this.paintOf(this.car);
+    pursuit.descriptor.kind = sim.carId;
+    pursuit.descriptor.body = sim.carBody;
+    pursuit.descriptor.paint = sim.carPaint;
     pursuit.blown = false;
     pursuit.coverLeft = POLICE.disguise.seconds;
   }

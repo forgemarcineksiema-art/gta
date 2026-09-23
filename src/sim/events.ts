@@ -26,7 +26,9 @@ export type EventKind =
   // the skill chain (M5.5 slice 14): value = the pay banked into the bag, or what was lost; target = the tricks
   | 'skill' | 'skillLost'
   // the hunts (M5.5 slice 14): value = the set's reward into the bank (0 but for the last), target = 0 jumps, 1 billboards
-  | 'hunt';
+  | 'hunt'
+  // a hidden car found (M5.5 slice 16): target = its index in HIDDEN_CARS
+  | 'hiddenCar';
 
 export interface SimEvent {
   kind: EventKind;

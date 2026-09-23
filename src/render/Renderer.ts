@@ -128,6 +128,8 @@ export class Renderer {
   private readonly tmpFwd = new THREE.Vector3();
   private readonly onEvent = (e: SimEvent): void => this.handleEvent(e);
   private readonly tmpPos = new THREE.Vector3();
+  /** The last damage's contact in the car's frame: where the wreck caves in. */
+  private readonly lastDent = new THREE.Vector3(0, 0.5, 2);
   private readonly lastCarPos = new THREE.Vector3(Infinity, Infinity, Infinity);
   private readonly carVel = new THREE.Vector3();
   private readonly sky: THREE.Mesh;
@@ -309,8 +311,9 @@ export class Renderer {
   }
 
   private addDynamic(d: DynamicDesc): void {
-    const g = geometryFor(d.shape);
-    const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: d.color, flatShading: true }));
+    const ball = d.shape.kind === 'ball';
+    const g = d.shape.kind === 'ball' ? beachBall(d.shape.radius) : geometryFor(d.shape);
+    const mesh = new THREE.Mesh(g, ball ? new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }) : new THREE.MeshLambertMaterial({ color: d.color, flatShading: true }));
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     this.scene.add(mesh);
@@ -480,6 +483,7 @@ export class Renderer {
   private handleEvent(e: SimEvent): void {
     const car = this.car.root;
     const paint = this.sim.carPaint;
+    if (e.kind === 'damage' || e.kind === 'wrecked') this.crumple(e);
     if (e.kind === 'damage') {
       this.tmpFwd.set(0, 0, 1).applyQuaternion(car.quaternion);
       const front = e.value === 1;
@@ -502,6 +506,24 @@ export class Renderer {
       this.debris.burst(e.x, e.y, e.z, this.carVel.x * 0.6, 4, this.carVel.z * 0.6, 14, 0.5, tint, 5);
       this.debris.burst(e.x, e.y - 1, e.z, this.carVel.x * 0.4, 3, this.carVel.z * 0.4, 6, 0.25, PALETTE.steel, 3);
       this.chase.kick(0.35);
+    }
+  }
+
+  /**
+   * The crumple (M5.5 slice 16): each damage stage dents the shell where the hit landed, deeper stage by stage;
+   * the wreck caves it in there and squashes the roof. Render only; a fresh car restores the shell.
+   */
+  private crumple(e: SimEvent): void {
+    const car = this.car;
+    car.root.updateMatrixWorld();
+    if (e.kind === 'damage') {
+      this.tmpPos.set(e.x, e.y, e.z);
+      car.root.worldToLocal(this.tmpPos);
+      this.lastDent.copy(this.tmpPos);
+      car.dent(this.tmpPos.x, this.tmpPos.y, this.tmpPos.z, 0.8 + 0.15 * e.value, 0.05 + 0.03 * e.value);
+    } else {
+      car.dent(this.lastDent.x, this.lastDent.y, this.lastDent.z, 1.5, 0.3);
+      car.dent(0, car.roofY, 0, 1.4, 0.22);
     }
   }
 
@@ -642,7 +664,29 @@ function geometryFor(shape: ShapeDesc): THREE.BufferGeometry {
       g.rotateZ(Math.PI / 2);
       return g;
     }
+    case 'ball':
+      return new THREE.IcosahedronGeometry(shape.radius, 1);
   }
+}
+
+/** The giant ball (M5.5 slice 16): a beach ball, six gores in the palette's loud colours and white caps, flat-shaded. */
+function beachBall(radius: number): THREE.BufferGeometry {
+  const g = new THREE.IcosahedronGeometry(radius, 2);
+  const pos = g.getAttribute('position');
+  const colors = new Float32Array(pos.count * 3);
+  const gores = [PALETTE.carRed, PALETTE.coin, PALETTE.carBlue, PALETTE.carWhite, PALETTE.carLime, PALETTE.carOrange].map((h) => new THREE.Color(h));
+  const cap = new THREE.Color(PALETTE.carWhite);
+  for (let t = 0; t + 2 < pos.count; t += 3) {
+    // the face's centroid picks its gore by longitude, or the cap near a pole
+    const cx = pos.getX(t) + pos.getX(t + 1) + pos.getX(t + 2);
+    const cy = (pos.getY(t) + pos.getY(t + 1) + pos.getY(t + 2)) / 3;
+    const cz = pos.getZ(t) + pos.getZ(t + 1) + pos.getZ(t + 2);
+    const gore = Math.floor((Math.atan2(cx, cz) / (Math.PI * 2) + 1) * 6) % 6;
+    const c = Math.abs(cy) > radius * 0.8 ? cap : (gores[gore] as THREE.Color);
+    for (let k = 0; k < 3; k++) colors.set([c.r, c.g, c.b], (t + k) * 3);
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  return g;
 }
 
 /** A large inverted sphere with a vertex-colour gradient: sky for free. */

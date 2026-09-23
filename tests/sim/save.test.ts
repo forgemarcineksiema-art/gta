@@ -39,6 +39,9 @@ function filled(smashedIds: number[]): SaveV1 {
     borrowHints: 2,
     medals: '3102',
     jumps: encodeBits(ramps),
+    hidden: 'icecream',
+    // the class drives out (0.5 pins the sports car); 16.2 pins a hidden car as the drive-out
+    drive: '',
   };
 }
 

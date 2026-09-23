@@ -16,6 +16,7 @@ import { coverSites, type CoverSites } from './city/cover';
 import { Roadblocks } from './police/Roadblocks';
 import { Cameras } from './city/cameras';
 import { Jumps } from './city/jumps';
+import { Stash, cityToys } from './city/stash';
 import { createControls, type VehicleControls } from './controls';
 import { EventLog } from './events';
 import { Collectibles } from './city/collectibles';
@@ -135,6 +136,8 @@ export class SimWorld {
   readonly fares: Fares;
   /** The skill chain (M5.5 slice 14): tricks into a chain that banks into the bag; before the run each step. */
   readonly skill: Skill;
+  /** Hidden cars (M5.5 slice 16): the stashed truck, and which the player has found. */
+  readonly stash: Stash;
   /** The first run's script; inactive until `start()`. */
   readonly coldOpen: ColdOpen;
   /** The catalogue, paint, upgrades and prep: the wall's pages (M5 slice 4). */
@@ -186,7 +189,7 @@ export class SimWorld {
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
     this.world.timestep = FIXED_DT;
     this.city = opts.map === 'city' ? new City(this.world, opts.seed) : null;
-    this.layout = this.city ? { statics: [], props: [], spawns: this.city.spawns, track: this.city.route, groundSize: 1575 } : buildPlayground(this.world);
+    this.layout = this.city ? { statics: [], props: cityToys(), spawns: this.city.spawns, track: this.city.route, groundSize: 1575 } : buildPlayground(this.world);
     this.statics = this.layout.statics;
     this.spawns = this.layout.spawns;
     this.track = this.layout.track;
@@ -203,7 +206,9 @@ export class SimWorld {
       const colliderDesc =
         p.shape.kind === 'cylinder'
           ? RAPIER.ColliderDesc.cylinder(p.shape.halfHeight, p.shape.radius)
-          : RAPIER.ColliderDesc.cuboid(p.shape.hx, p.shape.hy, p.shape.hz);
+          : p.shape.kind === 'ball'
+            ? RAPIER.ColliderDesc.ball(p.shape.radius)
+            : RAPIER.ColliderDesc.cuboid(p.shape.hx, p.shape.hy, p.shape.hz);
       // props keep their old contact numbers against the slippery chassis: the Max rule wins
       // over the chassis Min for friction (0.55 was the previous average), Multiply gives 0.12 bounce
       colliderDesc
@@ -251,6 +256,7 @@ export class SimWorld {
     this.jobs = new Jobs(this, this.city && this.traffic ? jobsFor(this.city, opts.seed ?? 42, this.traffic.lanes) : []);
     this.fares = new Fares(this, this.events);
     this.skill = new Skill(this);
+    this.stash = new Stash(this);
     this.run = new Run(this);
     this.coldOpen = new ColdOpen(this);
     this.dailies = new Dailies(this);
@@ -331,6 +337,7 @@ export class SimWorld {
     this.heat.tick(FIXED_DT, this.pursuit.state === 'active');
     // before the run: a delivery into a garage pays the bag before the door can drop the job
     this.skill.step(FIXED_DT);
+    if (this.traffic) this.stash.step(this.probe);
     this.fares.step(this.probe, FIXED_DT);
     this.jobs.step(this.probe, FIXED_DT);
     this.run.step(this.probe, FIXED_DT);

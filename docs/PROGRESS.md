@@ -2,6 +2,17 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M5.5 slice 16: hidden cars and the toys
+
+Done: the ice-cream truck (a new body at the end of the list, never drawn by the spawner: a shortened box truck, mint
+cab, white box, a serving hatch under a pink awning, a wafer cone with a scoop and a cherry on the roof) stands on
+the south edge park's lawn in Palm Gardens whenever the player is within 260 m, a music-box tune of our own audible
+from 160 m. A swap into it finds it for good (HIDDEN CAR FOUND): the wall shows its card, it drives out as the van
+stretched to its body in its own paint, no upgrades; the save carries the find and the choice. The giant ball: a
+4.4 m beach ball (180 kg) on the open yard south of the Works street; a car sends it rolling. The crumple: each damage
+stage dents the shell where the hit landed, the wreck caves it in there and squashes the roof; a fresh car restores
+it. Pins 16.1–16.4.
+
 ## 2026-09-23 — M5.5 slice 15: the full-screen map
 
 Done: holding Tab (its focus hop prevented; the hint strip names it) lays a map over the drive: north up and west

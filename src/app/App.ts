@@ -6,6 +6,7 @@
 import { EngineAudio } from '../audio/EngineAudio';
 import { Sfx } from '../audio/Sfx';
 import { Siren } from '../audio/Siren';
+import { Jingle } from '../audio/Jingle';
 import { Rotor } from '../audio/Rotor';
 import { InputManager } from '../input/InputManager';
 import { KeyboardDevice } from '../input/KeyboardDevice';
@@ -102,6 +103,8 @@ export class App {
   private readonly sfx: Sfx;
   private readonly siren: Siren;
   private readonly rotor: Rotor;
+  /** The ice-cream truck's music box (M5.5 slice 16). */
+  private readonly jingle: Jingle;
   private readonly panel: DebugPanel | null;
   private readonly loop = new FixedStepLoop(FIXED_DT, 5);
   private readonly bot: BotDriver | TrackBot | BotPolicy | JobBot | null;
@@ -164,6 +167,7 @@ export class App {
     this.sfx = new Sfx(this.audio);
     this.siren = new Siren(this.audio);
     this.rotor = new Rotor(this.audio);
+    this.jingle = new Jingle(this.audio);
     const uiRoot = document.getElementById('ui') ?? document.body;
     this.hud = new Hud(uiRoot, sim);
     this.runHud = new RunHud(uiRoot, sim);
@@ -189,6 +193,10 @@ export class App {
       },
       select: (car) => {
         if (this.adShowing || !sim.garage.select(car)) return;
+        sim.garage.applyToVehicle();
+      },
+      selectHidden: (id) => {
+        if (this.adShowing || !sim.garage.selectHidden(id)) return;
         sim.garage.applyToVehicle();
       },
       respray: (car, paint) => {
@@ -669,6 +677,7 @@ export class App {
     this.sfx.update(this.sim);
     this.siren.update(this.sim, this.paused ? 0 : frameDt);
     this.rotor.update(this.sim);
+    this.jingle.update(this.sim);
 
     if (!this.started) {
       // the player is in control from this frame on

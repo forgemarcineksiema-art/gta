@@ -261,8 +261,49 @@ export const BUS: CarProfile = {
   paint: PALETTE.carOrange,
 };
 
-/** Every body's profile: the player's five classes and the city's eight. */
+/**
+ * The hidden ice-cream truck (M5.5 slice 16), 5.8 m: the box truck's shape shortened, a mint cab, a white box
+ * with mint bands, the serving hatch with its counter and a pink awning on the kerb side, and on the roof a
+ * wafer cone narrowing down under a pink scoop and a cherry.
+ */
+export const ICECREAM: CarProfile = {
+  ...TRUCK,
+  name: 'icecream',
+  sections: [
+    { z: 2.9, floor: 0.55, belt: 1.25, roof: 1.3, hwFloor: 1.0, hwBelt: 1.04, hwRoof: 1.0 },
+    { z: 2.82, floor: 0.5, belt: 1.35, roof: 2.25, hwFloor: 1.04, hwBelt: 1.08, hwRoof: 0.98 },
+    { z: 2.05, floor: 0.5, belt: 1.37, roof: 2.35, hwFloor: 1.04, hwBelt: 1.08, hwRoof: 1.0 },
+    { z: 1.55, floor: 0.5, belt: 1.37, roof: 2.35, hwFloor: 1.04, hwBelt: 1.08, hwRoof: 1.0 },
+    { z: 1.5, floor: 0.6, belt: 1.4, roof: 2.9, hwFloor: 1.1, hwBelt: 1.12, hwRoof: 1.1 },
+    { z: -2.85, floor: 0.6, belt: 1.4, roof: 2.9, hwFloor: 1.1, hwBelt: 1.12, hwRoof: 1.1 },
+    { z: -2.9, floor: 0.6, belt: 1.37, roof: 2.86, hwFloor: 1.08, hwBelt: 1.1, hwRoof: 1.08 },
+  ],
+  doorSeams: [2.78, 2.1],
+  handleZ: 2.2,
+  fixed: { from: 3, to: 6, color: PALETTE.carWhite },
+  parts: [
+    // mint bands along the box, the rear doors' seam, the bumper
+    { size: [0.012, 0.22, 4.1], at: [1.126, 2.4, -0.65], color: 'paint', mirror: true },
+    { size: [0.012, 0.1, 4.1], at: [1.126, 1.05, -0.65], color: 'paint', mirror: true },
+    { size: [0.03, 1.9, 0.02], at: [0, 1.75, -2.91], color: PALETTE.slate },
+    { size: [1.9, 0.12, 0.12], at: [0, 0.48, -2.8], color: PALETTE.charcoal },
+    // the serving hatch on the kerb side (-X), its counter and the awning over it
+    { size: [0.03, 0.75, 1.7], at: [-1.13, 1.85, -0.55], color: 0x294653 },
+    { size: [0.22, 0.05, 1.7], at: [-1.24, 1.45, -0.55], color: PALETTE.lightGrey },
+    { size: [0.36, 0.04, 1.9], at: [-1.3, 2.32, -0.55], color: PALETTE.iceCream },
+    // the cone on the roof: the wafer narrowing down, the scoop, a cherry
+    { size: [0.14, 0.14, 0.14], at: [0, 2.99, -0.9], color: PALETTE.wafer },
+    { size: [0.24, 0.14, 0.24], at: [0, 3.12, -0.9], color: PALETTE.wafer },
+    { size: [0.34, 0.14, 0.34], at: [0, 3.25, -0.9], color: PALETTE.wafer },
+    { size: [0.52, 0.32, 0.52], at: [0, 3.48, -0.9], color: PALETTE.iceCream },
+    { size: [0.34, 0.12, 0.34], at: [0, 3.69, -0.9], color: PALETTE.iceCream },
+    { size: [0.1, 0.1, 0.1], at: [0, 3.8, -0.9], color: PALETTE.carRed },
+  ],
+  paint: 0x91aca3,
+};
+
+/** Every body's profile: the player's five classes, the city's eight and the hidden truck. */
 export const BODY_PROFILES: Record<BodyId, CarProfile> = {
   ...CAR_PROFILES,
-  sedan: SEDAN, hatch: HATCH, estate: ESTATE, suv: SUV, pickup: PICKUP, taxi: TAXI, truck: TRUCK, bus: BUS,
+  sedan: SEDAN, hatch: HATCH, estate: ESTATE, suv: SUV, pickup: PICKUP, taxi: TAXI, truck: TRUCK, bus: BUS, icecream: ICECREAM,
 };

@@ -704,11 +704,11 @@ export class Traffic {
     this.freeSteer[agent] = 0;
   }
 
-  /** Test hook: a stopped car (wreck or abandoned) at a point, off the lane graph. */
-  spawnAtPoint(x: number, z: number, yaw: number, body: BodyId, state: AgentState.Wrecked | AgentState.Abandoned): number {
+  /** A stopped car (wreck or abandoned) at a point, off the lane graph: the tests, and the stash's hidden car. */
+  spawnAtPoint(x: number, z: number, yaw: number, body: BodyId, state: AgentState.Wrecked | AgentState.Abandoned, paint = PAINTS[0] as number): number {
     const i = this.findFree();
     if (i < 0) return -1;
-    this.placeAtPoint(i, x, z, yaw, BODY_INDEX[body], state, PAINTS[0] as number);
+    this.placeAtPoint(i, x, z, yaw, BODY_INDEX[body], state, paint);
     return i;
   }
 

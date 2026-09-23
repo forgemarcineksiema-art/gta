@@ -1181,7 +1181,9 @@ kbd.key {
 }
 .wall__cars {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  /* one row: the five classes, and a hidden car's card once found */
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: 6px;
 }
 .wall__card {

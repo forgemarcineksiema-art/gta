@@ -18,6 +18,7 @@ export { Cameras, placeCameras, type CameraDesc } from './city/cameras';
 export { Jumps, placeJumps, type JumpDesc } from './city/jumps';
 export { Run, type RunState, type RunCounts } from './run/Run';
 export { Skill, Trick, TRICK_WORDS } from './run/Skill';
+export { Stash, HIDDEN_CARS, STASH_SPOTS, GIANT_BALL, type HiddenCar } from './city/stash';
 export { goalFor, newGoal, chainStep, CHAIN_STEPS, CHAIN_ALL, STEP, type Goal, type GoalKind } from './run/goal';
 export { ColdOpen, COLD_OPEN_VERBS, coldOpenRoute, type ColdOpenVerb, type ColdOpenRoute } from './run/ColdOpen';
 export { Jobs, type JobDef, type JobKind, type JobState } from './jobs/Jobs';

@@ -86,6 +86,8 @@ export const BALANCE = {
   },
   /** The hunts (M5.5 slice 14): the last of the twenty jumps and the last of the fifty billboards pay the set's reward into the bank. */
   hunts: { jumps: 20000, billboards: 30000 },
+  /** Hidden cars (M5.5 slice 16): the stashed car is placed when the player comes within `range` m of its spot. */
+  stash: { range: 260 },
   /**
    * Jobs (docs/M5_PLAN.md slices 1–3): a `markerRadius` m ring starts one, arriving within the same radius of
    * its target pays payout × (1 + timeBonus × remaining / limit) for a timed delivery; done and failed show for

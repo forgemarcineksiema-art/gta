@@ -12,9 +12,9 @@ import { CITY_COLORS, PALETTE } from '../palette';
 import { CAR_IDS, CAR_PRESETS, type CarId } from '../vehicle/presets';
 import { cloneTuning, type VehicleTuning } from '../vehicle/tuning';
 
-export type CivilianBody = 'sedan' | 'hatch' | 'estate' | 'suv' | 'pickup' | 'taxi' | 'truck' | 'bus';
+export type CivilianBody = 'sedan' | 'hatch' | 'estate' | 'suv' | 'pickup' | 'taxi' | 'truck' | 'bus' | 'icecream';
 export type BodyId = CarId | CivilianBody;
-export const CIVILIAN_BODIES: readonly CivilianBody[] = ['sedan', 'hatch', 'estate', 'suv', 'pickup', 'taxi', 'truck', 'bus'];
+export const CIVILIAN_BODIES: readonly CivilianBody[] = ['sedan', 'hatch', 'estate', 'suv', 'pickup', 'taxi', 'truck', 'bus', 'icecream'];
 export const BODY_IDS: readonly BodyId[] = [...CAR_IDS, ...CIVILIAN_BODIES];
 
 /** Traffic's paints (the order cards name them in jobs/catalog.ts). */
@@ -72,6 +72,8 @@ export const BODIES: readonly BodySpec[] = [
   civilian('taxi', 'muscle', 0.92, 2.35, 2.8, 1.6, 1450, 1.1, { paints: [PALETTE.coin], hops: 0.5 }),
   civilian('truck', 'heavy', 1.12, 3.5, 4.2, 1.9, 4000, 0.85, { big: true, stretch: true }),
   civilian('bus', 'heavy', 1.27, 6.0, 6.6, 2.24, 6500, 0.8, { paints: BUS_PAINTS, big: true, keepsLane: true, stretch: true }),
+  // the hidden car (M5.5 slice 16): never drawn by the spawner (its share is 0), stashed by city/stash.ts
+  civilian('icecream', 'heavy', 1.12, 2.9, 3.4, 1.9, 2800, 0.85, { paints: [CITY_COLORS.mint], big: true, stretch: true }),
 ];
 
 export const BODY_INDEX = Object.fromEntries(BODY_IDS.map((id, i) => [id, i])) as Record<BodyId, number>;

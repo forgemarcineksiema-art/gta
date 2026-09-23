@@ -10,6 +10,8 @@ export const PALETTE = {
   kerb: 0xc9c3b3,
   concrete: 0x9a938a,
   sand: 0xd9b57a,
+  /** The ice-cream truck's scoop and cone (M5.5 slice 16). */
+  iceCream: 0xf4a6c4, wafer: 0xd49a55,
   grass: 0x879b74,
   water: 0x3fa7c9,
   glass: 0x9fd8ff,

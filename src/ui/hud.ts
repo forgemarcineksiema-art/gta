@@ -393,6 +393,7 @@ export class Hud {
       : kind === 'dailyDone' ? `DAILY DONE +${value.toLocaleString('en-US')}`
       : kind === 'skill' ? `SKILL CHAIN +${value.toLocaleString('en-US')}`
       : kind === 'skillLost' ? 'CHAIN LOST'
+      : kind === 'hiddenCar' ? 'HIDDEN CAR FOUND · IN THE GARAGE NOW'
       : kind === 'hunt' ? (target === 0
         ? (value > 0 ? `ALL ${this.huntTotal} JUMPS +${value.toLocaleString('en-US')}` : `NEW JUMP ${this.huntFound}/${this.huntTotal}`)
         : `ALL BILLBOARDS +${value.toLocaleString('en-US')}`)
@@ -405,7 +406,7 @@ export class Hud {
     if (!popup) return;
     popup.textContent = text;
     popup.classList.toggle('is-gain', value > 0);
-    popup.classList.toggle('is-big', kind === 'takedown' || kind === 'takedownTraffic' || kind === 'jump' || kind === 'dailyDone' || kind === 'skill' || (kind === 'hunt' && value > 0) || (kind === 'cache' && value > 0));
+    popup.classList.toggle('is-big', kind === 'takedown' || kind === 'takedownTraffic' || kind === 'jump' || kind === 'dailyDone' || kind === 'skill' || kind === 'hiddenCar' || (kind === 'hunt' && value > 0) || (kind === 'cache' && value > 0));
     popup.classList.add('is-on');
     this.popupLeft[i] = 1.2;
   }

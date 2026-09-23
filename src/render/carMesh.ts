@@ -29,6 +29,14 @@ export interface CarMesh {
   /** A respray (the garage's PAINT page): the body's three paint tones from a new colour, the damage kept. */
   setPaint(hex: number): void;
   paint: number;
+  /**
+   * The crumple (M5.5 slice 16): the shell pushed in round a point of the body (metres, the car's own frame)
+   * toward its middle, `depth` m at the point falling off to nothing at `radius` m. Kept until stage 0.
+   */
+  dent(x: number, y: number, z: number, radius: number, depth: number): void;
+  /** The body's top and vertical middle in its own frame (the wreck's squash aims from the roof). */
+  roofY: number;
+  midY: number;
 }
 
 /** One cross-section of the body at longitudinal position z (metres, + = front). */
@@ -573,6 +581,24 @@ export function buildCarMesh(t: VehicleTuning, profile: CarProfile = MUSCLE, col
   // detachable parts collapse onto their centroid. Originals are kept for the restore at stage 0.
   const posAttr = geometry.getAttribute('position') as THREE.BufferAttribute;
   const originalPos = new Float32Array(posAttr.array as Float32Array);
+  // the shell with its dents: what the stages collapse and restore to
+  const basePos = new Float32Array(originalPos);
+  geometry.computeBoundingBox();
+  const bounds = geometry.boundingBox as THREE.Box3;
+  const midY = (bounds.min.y + bounds.max.y) / 2;
+  /** Every vertex at its dented place, the detached parts collapsed onto their centroids. */
+  const writePositions = (stage: number) => {
+    (posAttr.array as Float32Array).set(basePos);
+    for (const part of detachable) {
+      if (stage < part.stage) continue;
+      let cx = 0, cy = 0, cz = 0;
+      const n = part.to - part.from;
+      for (let k = part.from; k < part.to; k++) { cx += basePos[k * 3] as number; cy += basePos[k * 3 + 1] as number; cz += basePos[k * 3 + 2] as number; }
+      cx /= n; cy /= n; cz /= n;
+      for (let k = part.from; k < part.to; k++) posAttr.setXYZ(k, cx, cy, cz);
+    }
+    posAttr.needsUpdate = true;
+  };
   const originalCol = new Float32Array(colorAttr.array as Float32Array);
   const isTone = (k: number, hex: number) => {
     const c = lightColor.setHex(hex);
@@ -597,25 +623,12 @@ export function buildCarMesh(t: VehicleTuning, profile: CarProfile = MUSCLE, col
   const applyStage = (stage: number) => {
     tint(paintIdx, graphite, Math.min(0.85, 0.25 * stage));
     tint(glassIdx, soot, stage >= 4 ? 0.6 : 0);
-    for (const part of detachable) {
-      const detached = stage >= part.stage;
-      let cx = 0, cy = 0, cz = 0;
-      const n = part.to - part.from;
-      if (detached) {
-        for (let k = part.from; k < part.to; k++) { cx += originalPos[k * 3] as number; cy += originalPos[k * 3 + 1] as number; cz += originalPos[k * 3 + 2] as number; }
-        cx /= n; cy /= n; cz /= n;
-      }
-      for (let k = part.from; k < part.to; k++) {
-        if (detached) posAttr.setXYZ(k, cx, cy, cz);
-        else posAttr.setXYZ(k, originalPos[k * 3] as number, originalPos[k * 3 + 1] as number, originalPos[k * 3 + 2] as number);
-      }
-    }
-    posAttr.needsUpdate = true;
+    writePositions(stage);
     colorAttr.needsUpdate = true;
     lastState = -1; // the lights repaint over the restored colours on the next update
   };
   const tones = [new THREE.Color(), new THREE.Color(), new THREE.Color()];
-  const mesh: CarMesh = { root, wheels, damageStage: 0, paint: color, update(tm) {
+  const mesh: CarMesh = { root, wheels, damageStage: 0, paint: color, roofY: bounds.max.y, midY, update(tm) {
     const state = (tm.brake > 0.1 && tm.gear > 0 ? 1 : 0) | (tm.gear === -1 ? 2 : 0);
     if (state !== lastState) {
       paintRange(tailLightRanges, state & 1 ? 0xff6972 : 0xba2338);
@@ -626,7 +639,25 @@ export function buildCarMesh(t: VehicleTuning, profile: CarProfile = MUSCLE, col
     stage = Math.max(0, Math.min(4, Math.round(stage)));
     if (stage === mesh.damageStage) return;
     mesh.damageStage = stage;
+    // a fresh car: the dents go with the damage
+    if (stage === 0) basePos.set(originalPos);
     applyStage(stage);
+  }, dent(x, y, z, radius, depth) {
+    // inward: from the point toward the body's middle, flattened a little so a side hit stays a side hit
+    let dx = -x, dy = (midY - y) * 0.6, dz = -z;
+    const len = Math.hypot(dx, dy, dz) || 1;
+    dx /= len; dy /= len; dz /= len;
+    const r2 = radius * radius;
+    for (let k = 0; k < posAttr.count; k++) {
+      const ox = (basePos[k * 3] as number) - x, oy = (basePos[k * 3 + 1] as number) - y, oz = (basePos[k * 3 + 2] as number) - z;
+      const d2 = ox * ox + oy * oy + oz * oz;
+      if (d2 >= r2) continue;
+      const f = 1 - Math.sqrt(d2) / radius, push = depth * f * f;
+      basePos[k * 3] = (basePos[k * 3] as number) + dx * push;
+      basePos[k * 3 + 1] = (basePos[k * 3 + 1] as number) + dy * push;
+      basePos[k * 3 + 2] = (basePos[k * 3 + 2] as number) + dz * push;
+    }
+    writePositions(mesh.damageStage);
   }, setPaint(hex) {
     if (hex === mesh.paint) return;
     mesh.paint = hex;

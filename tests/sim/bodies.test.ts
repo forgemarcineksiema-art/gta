@@ -5,6 +5,7 @@
  * its body's footprint and its collider's box; a car keeps its distance behind a bus;
  * a swap takes the body: the bus is the heavy stretched, the taxi stays yellow.
  */
+import { HIDDEN_CARS } from '../../src/sim/city/stash';
 import { describe, expect, it } from 'vitest';
 import type { SimWorld } from '../../src/sim';
 import { BODIES, BODY_INDEX, CIVILIAN_BODIES, bodySpec, pickBody, type CivilianBody, type RoadKind } from '../../src/sim/traffic/bodies';
@@ -49,8 +50,8 @@ describe('traffic\'s own bodies', () => {
     expect(shares('crown', 'avenue').bus).toBeGreaterThan(shares('crown', 'street').bus * 2);
     expect(shares('crown', 'street').taxi).toBeGreaterThan(shares('marina', 'street').taxi * 3);
     expect(shares('foundry', 'street').truck).toBeGreaterThan(shares('gardens', 'street').truck * 2);
-    // every civilian body comes up on a street
-    for (const b of CIVILIAN_BODIES) expect(Math.max(shares('crown', 'street')[b], shares('foundry', 'street')[b])).toBeGreaterThan(0.02);
+    // every civilian body the spawner draws comes up on a street (a hidden car is stashed, never drawn: M5.5 slice 16)
+    for (const b of CIVILIAN_BODIES.filter((id) => !(HIDDEN_CARS as readonly string[]).includes(id))) expect(Math.max(shares('crown', 'street')[b], shares('foundry', 'street')[b])).toBeGreaterThan(0.02);
   });
 
   it('19.2 the city spawns its own bodies, never the player\'s shells, each with its footprint and its collider', async () => {

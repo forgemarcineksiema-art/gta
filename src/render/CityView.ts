@@ -56,7 +56,7 @@ export function partIndex(st: StaticDesc, cx: number, cz: number): number {
     for (const pt of shape.points) { minX = Math.min(minX, pt.x); maxX = Math.max(maxX, pt.x); minZ = Math.min(minZ, pt.z); maxZ = Math.max(maxZ, pt.z); }
     hx = (maxX - minX) / 2; hz = (maxZ - minZ) / 2;
   } else {
-    const round = shape.kind === 'cylinder' || shape.kind === 'wheel';
+    const round = shape.kind === 'cylinder' || shape.kind === 'wheel' || shape.kind === 'ball';
     // A rotated box straddles a centre line when its bounding circle does.
     const rotated = !round && staticYaw(st) !== 0;
     hx = round ? shape.radius : rotated ? Math.hypot(shape.hx, shape.hz) : shape.hx;
@@ -147,7 +147,7 @@ export class GeometryBuild {
     for (; this.cursor < stop; this.cursor++) {
       const st = this.order[this.cursor] as StaticDesc;
       const shape = st.shape;
-      if (shape.kind === 'wheel') continue;
+      if (shape.kind === 'wheel' || shape.kind === 'ball') continue;
       const absolute = shape.kind === 'prism';
       const rectangular = shape.kind === 'box' || shape.kind === 'gable';
       const sx = absolute ? 1 : rectangular ? shape.hx : shape.radius;

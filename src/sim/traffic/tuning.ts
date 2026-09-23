@@ -176,7 +176,7 @@ export const TRAFFIC: TrafficTuning = {
   // The highway's two lanes per direction are real graph lanes now, so nothing sits off its lane.
   subLaneOffsets: { highway: [0], street: [0] },
   bodies: {
-    base: { sedan: 0.24, hatch: 0.2, estate: 0.1, suv: 0.14, pickup: 0.1, taxi: 0.06, truck: 0.06, bus: 0.06 },
+    base: { sedan: 0.24, hatch: 0.2, estate: 0.1, suv: 0.14, pickup: 0.1, taxi: 0.06, truck: 0.06, bus: 0.06, icecream: 0 },
     places: {
       crown: { taxi: 4 },
       foundry: { truck: 3, pickup: 2 },

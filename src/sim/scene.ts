@@ -7,6 +7,8 @@ export type ShapeDesc =
   | { kind: 'gable'; hx: number; hy: number; hz: number }
   | { kind: 'cylinder'; radius: number; halfHeight: number }
   | { kind: 'wheel'; radius: number; width: number }
+  /** A sphere (the giant ball, M5.5 slice 16). */
+  | { kind: 'ball'; radius: number }
   /** Convex polygon in world XZ (any winding), extruded from y0 to y1; `position` is its centroid. */
   | { kind: 'prism'; points: Array<{ x: number; z: number }>; y0: number; y1: number };
 

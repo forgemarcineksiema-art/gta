@@ -11,7 +11,9 @@
  * `Jumps.step`: a car that leaves the ground within a moment of being on a
  * ramp is flying from it; the M3 slow motion runs through the flight, and a
  * landing after `jumps.minAirSeconds` pushes `jump` with the airtime (the bag
- * pays from the ring). A hop off a kerb pays nothing. No allocation per step.
+ * pays from the ring). A hop off a kerb pays nothing. The first paid jump off
+ * each ramp counts for the hunt (`found`, M5.5 slice 14): a `hunt` event, and
+ * the last of the twenty pays the set's reward. No allocation per step.
  */
 import { BALANCE } from '../balance';
 import { ECONOMY } from '../economy';
@@ -116,10 +118,15 @@ export class Jumps {
   flightTime = 0;
   /** Paid jumps this session. */
   landed = 0;
+  /** The hunt (M5.5 slice 14): the ramps a paid jump has been made from, by id; the save carries them. */
+  readonly found: Uint8Array;
+  foundCount = 0;
   private lastRamp = -1;
   private sinceRamp = Infinity;
 
-  constructor(private readonly sim: SimWorld, readonly descs: readonly JumpDesc[]) {}
+  constructor(private readonly sim: SimWorld, readonly descs: readonly JumpDesc[]) {
+    this.found = new Uint8Array(descs.length);
+  }
 
   step(probe: PlayerProbe, airborne: boolean, dt: number, events: EventLog): void {
     if (this.flying >= 0) {
@@ -133,6 +140,12 @@ export class Jumps {
       if (this.flightTime >= BALANCE.jumps.minAirSeconds) {
         this.landed++;
         events.push('jump', this.flightTime, probe.x, 0, probe.z, ramp);
+        if (!this.found[ramp]) {
+          // a new ramp for the hunt; the last of the set pays its reward into the bank
+          this.found[ramp] = 1;
+          this.foundCount++;
+          events.push('hunt', this.foundCount === this.descs.length ? BALANCE.hunts.jumps : 0, probe.x, 0, probe.z, 0);
+        }
       }
       return;
     }

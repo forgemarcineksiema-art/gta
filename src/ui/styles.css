@@ -413,6 +413,53 @@ body {
   text-shadow: 2px 3px 0 #000;
 }
 
+/* the skill chain (M5.5 slice 14): the multiplier, the points and the last trick over a draining bar, bottom centre */
+.hud__skill {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100px + var(--safe-bottom));
+  transform: translateX(-50%) skewX(-8deg);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+}
+.hud__skill.is-visible { display: flex; }
+.hud__skill-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-weight: 900;
+  font-style: italic;
+  text-shadow: 2px 2px 0 #000;
+}
+.hud__skill-mult {
+  font-size: clamp(20px, 3.4vh, 30px);
+  color: var(--ui-accent);
+}
+.hud__skill.is-max .hud__skill-mult { color: var(--ui-accent-2); }
+.hud__skill-points {
+  font-size: clamp(18px, 3vh, 26px);
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-ink);
+}
+.hud__skill-word {
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  color: var(--ui-ink-dim);
+}
+.hud__skill-track {
+  width: 160px;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.45);
+}
+.hud__skill-fill {
+  height: 100%;
+  background: var(--ui-accent);
+  transform-origin: left center;
+}
+
 /* drift readout, bottom centre */
 .hud__drift {
   position: absolute;

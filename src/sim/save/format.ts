@@ -73,6 +73,8 @@ export interface SaveDoc {
   borrowHints: number;
   /** The time trials' best medals (M5.5 slice 10), a digit 0..3 per trial in the defs' order; '' for none. */
   medals: string;
+  /** The hunt's ramps found (M5.5 slice 14): `Jumps.found` as bits, base64; '' when none. */
+  jumps: string;
 }
 
 /** The current document's type under the name the app and the tests used since M5. */
@@ -100,6 +102,7 @@ function defaults(): SaveDoc {
     chain: 0,
     borrowHints: 0,
     medals: '',
+    jumps: '',
   };
 }
 
@@ -150,6 +153,7 @@ export function serialize(save: SaveDoc): string {
     chain: save.chain,
     borrowHints: save.borrowHints,
     medals: save.medals,
+    jumps: save.jumps,
   });
 }
 
@@ -244,6 +248,9 @@ function sanitize(raw: Record<string, unknown>): SaveDoc {
   // added within v2: a document without it has no medals
   const medals = raw['medals'];
   out.medals = typeof medals === 'string' && /^[0-3]{0,16}$/.test(medals) ? medals : '';
+  // added within v2: a document without it has found no ramps
+  const jumps = raw['jumps'];
+  out.jumps = typeof jumps === 'string' && /^[A-Za-z0-9+/]*={0,2}$/.test(jumps) && jumps.length <= 8 ? jumps : '';
   return out;
 }
 
@@ -301,6 +308,7 @@ export function collect(sim: SimWorld, into: SaveDoc): void {
   let medals = '';
   for (const d of sim.jobs.defs) if (d.kind === 'trial') medals += String(sim.jobs.medals.get(d.id) ?? 0);
   into.medals = medals.replace(/0+$/, '');
+  if (sim.jumps) into.jumps = encodeBits(sim.jumps.found);
 }
 
 /** A document into a freshly built world, once, before the first step: the garage car is driven out at once. */
@@ -342,6 +350,13 @@ export function apply(sim: SimWorld, save: SaveDoc): void {
     let n = 0;
     for (let i = 0; i < c.smashed.length; i++) if (c.smashed[i]) n++;
     c.smashedCount = n;
+  }
+  const j = sim.jumps;
+  if (j) {
+    decodeBits(save.jumps, j.found);
+    let n = 0;
+    for (let i = 0; i < j.found.length; i++) if (j.found[i]) n++;
+    j.foundCount = n;
   }
   const d = save.dailies;
   dailies.date = d.date;

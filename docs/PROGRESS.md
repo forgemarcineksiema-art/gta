@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M5.5 slice 14: the hunts and the skill chain
+
+Done: the skill chain (DESIGN §7). Near misses (100), oncoming near misses (200), each second in the oncoming lane
+(50), drifts (100 a second) and flights (150 a second past 0.3 s, a drift or a flight capped at 300) are tricks;
+every three tricks add one to the multiplier, up to ×5. The chain lives 4 s after its last trick (held while a drift,
+a flight or the oncoming lane lasts), then banks points × multiplier into the bag; a wall hit at 5 m/s or more, a
+wreck or busted loses it; pulling into a door banks it first. The HUD shows it bottom centre over a draining bar.
+The hunts: the first paid jump off each ramp counts (saved within v2); the 20th ramp pays 20,000 and the 50th
+billboard 30,000 into the bank; JUMPS n/20 under BILLBOARDS (whose counter now refreshes on a smash). Pins 14.1–14.5.
+
 ## 2026-09-23 — M5.5 slice 13: fares with hot passengers
 
 Done: fares are the taxi's job. Driving a taxi with no job, every 6 s a walker 40–140 m ahead on the pavement stops

@@ -362,6 +362,15 @@ export class GarageUi {
       medals.textContent = `TIME TRIALS: ${trials.map((j) => MEDAL_WORDS[sim.jobs.medals.get(j.id) ?? 0] || '—').join(' · ')}`;
       rows.push(medals);
     }
+    // the hunts (M5.5 slice 14): how many of each set
+    if (sim.jumps || sim.collectibles) {
+      const hunts = el('div', 'wall__streak wall__medals');
+      const parts: string[] = [];
+      if (sim.jumps) parts.push(`JUMPS ${sim.jumps.foundCount}/${sim.jumps.descs.length}`);
+      if (sim.collectibles) parts.push(`BILLBOARDS ${sim.collectibles.smashedCount}/${sim.collectibles.total}`);
+      hunts.textContent = `HUNTS: ${parts.join(' · ')}`;
+      rows.push(hunts);
+    }
     this.dailiesBody.replaceChildren(...rows);
   }
 

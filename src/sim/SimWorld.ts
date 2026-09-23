@@ -27,6 +27,7 @@ import { Police } from './police/Police';
 import { Pursuit } from './police/Pursuit';
 import { ColdOpen } from './run/ColdOpen';
 import { Run } from './run/Run';
+import { Skill } from './run/Skill';
 import { Jobs } from './jobs/Jobs';
 import { Fares } from './jobs/Fares';
 import { jobsFor } from './jobs/place';
@@ -132,6 +133,8 @@ export class SimWorld {
   readonly jobs: Jobs;
   /** Fares (M5.5 slice 13): hails, pick-ups, tips, the hot fare's heat; before the jobs each step. */
   readonly fares: Fares;
+  /** The skill chain (M5.5 slice 14): tricks into a chain that banks into the bag; before the run each step. */
+  readonly skill: Skill;
   /** The first run's script; inactive until `start()`. */
   readonly coldOpen: ColdOpen;
   /** The catalogue, paint, upgrades and prep: the wall's pages (M5 slice 4). */
@@ -247,6 +250,7 @@ export class SimWorld {
     // the generator's sixteen markers (docs/M5_PLAN.md D4); the cold open adds its own as id 0
     this.jobs = new Jobs(this, this.city && this.traffic ? jobsFor(this.city, opts.seed ?? 42, this.traffic.lanes) : []);
     this.fares = new Fares(this, this.events);
+    this.skill = new Skill(this);
     this.run = new Run(this);
     this.coldOpen = new ColdOpen(this);
     this.dailies = new Dailies(this);
@@ -326,6 +330,7 @@ export class SimWorld {
     this.heat.step();
     this.heat.tick(FIXED_DT, this.pursuit.state === 'active');
     // before the run: a delivery into a garage pays the bag before the door can drop the job
+    this.skill.step(FIXED_DT);
     this.fares.step(this.probe, FIXED_DT);
     this.jobs.step(this.probe, FIXED_DT);
     this.run.step(this.probe, FIXED_DT);

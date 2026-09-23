@@ -15,6 +15,8 @@ function filled(smashedIds: number[]): SaveV1 {
   for (const id of smashedIds) smashed[id] = 1;
   const found = new Uint8Array(30);
   for (const k of [0, 3, 29]) found[k] = 1;
+  const ramps = new Uint8Array(20);
+  for (const k of [1, 7, 19]) ramps[k] = 1;
   return {
     v: 2,
     seen: true,
@@ -36,6 +38,7 @@ function filled(smashedIds: number[]): SaveV1 {
     chain: 4,
     borrowHints: 2,
     medals: '3102',
+    jumps: encodeBits(ramps),
   };
 }
 

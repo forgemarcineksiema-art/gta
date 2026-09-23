@@ -2,7 +2,7 @@
  * In-game HUD: plain DOM over the canvas. Speedometer, boost bar, drift readout,
  * a debug block, a pause overlay and the keycap hint strip. Reads sim state only.
  */
-import { AgentState, BALANCE, BODY_WORDS, POLICE, paintName, unpackDescriptor } from '../sim';
+import { AgentState, BALANCE, BODY_WORDS, POLICE, TRICK_WORDS, paintName, unpackDescriptor } from '../sim';
 import type { SimEvent, SimWorld } from '../sim';
 import { Minimap } from './minimap';
 import { HeatHud } from './heat';
@@ -81,7 +81,21 @@ export class Hud {
   private readonly damageWrap: HTMLElement;
   private readonly collect: HTMLElement;
   private readonly collectValue: HTMLElement;
-  private lastCollectText = '';
+  private lastSmashed = -1;
+  /** The hunt's ramps found (M5.5 slice 14), under the billboards. */
+  private readonly jumps: HTMLElement;
+  private readonly jumpsValue: HTMLElement;
+  private lastFound = -1;
+  /** The skill chain (M5.5 slice 14): the multiplier, the points, the last trick, the window draining. */
+  private readonly skill: HTMLElement;
+  private readonly skillMult: HTMLElement;
+  private readonly skillPoints: HTMLElement;
+  private readonly skillWord: HTMLElement;
+  private readonly skillFill: HTMLElement;
+  private skillOn = false;
+  private skillSerial = -1;
+  private skillShown = -1;
+  private lastSkillFill = '';
   /** The day's caches under the billboards (M5.5). */
   private readonly caches: HTMLElement;
   private readonly cachesValue: HTMLElement;
@@ -108,6 +122,9 @@ export class Hud {
   private readonly popupLeft = [0, 0, 0, 0];
   private popupCursor = 0;
   private eventSeq = 0;
+  /** The hunt's count when this frame's events are read: the popup names it. */
+  private huntFound = 0;
+  private huntTotal = 0;
   private lastLifeAt = 0;
   private lastLifeSeq = 0;
   private boostFlash = 0;
@@ -147,6 +164,10 @@ export class Hud {
     this.collectValue = el('span', 'hud__collect-value', '0/50');
     this.collect.append(el('span', 'hud__collect-label', 'BILLBOARDS'), this.collectValue);
     speedo.append(this.collect);
+    this.jumps = el('div', 'hud__collect');
+    this.jumpsValue = el('span', 'hud__collect-value', '0/20');
+    this.jumps.append(el('span', 'hud__collect-label', 'JUMPS'), this.jumpsValue);
+    speedo.append(this.jumps);
     this.caches = el('div', 'hud__collect hud__collect--caches');
     this.cachesValue = el('span', 'hud__collect-value', '0/30');
     this.caches.append(el('span', 'hud__collect-label', 'CACHES'), this.cachesValue);
@@ -171,6 +192,18 @@ export class Hud {
       return popup;
     });
     this.root.appendChild(stack);
+
+    this.skill = el('div', 'hud__skill');
+    this.skillMult = el('span', 'hud__skill-mult', '×1');
+    this.skillPoints = el('span', 'hud__skill-points', '0');
+    this.skillWord = el('span', 'hud__skill-word', '');
+    const skillTrack = el('div', 'hud__skill-track');
+    this.skillFill = el('div', 'hud__skill-fill');
+    skillTrack.appendChild(this.skillFill);
+    const skillRow = el('div', 'hud__skill-row');
+    skillRow.append(this.skillMult, this.skillPoints, this.skillWord);
+    this.skill.append(skillRow, skillTrack);
+    this.root.appendChild(this.skill);
 
     this.drift = el('div', 'hud__drift');
     this.driftAngle = el('div', 'hud__drift-angle', '');
@@ -345,6 +378,11 @@ export class Hud {
                     : kind === 'blown' ? 'COVER BLOWN'
                       : kind === 'cache' ? (value > 0 ? `CACHE ${target}/30 +${value.toLocaleString('en-US')}` : `CACHE ${target}/30`)
       : kind === 'dailyDone' ? `DAILY DONE +${value.toLocaleString('en-US')}`
+      : kind === 'skill' ? `SKILL CHAIN +${value.toLocaleString('en-US')}`
+      : kind === 'skillLost' ? 'CHAIN LOST'
+      : kind === 'hunt' ? (target === 0
+        ? (value > 0 ? `ALL ${this.huntTotal} JUMPS +${value.toLocaleString('en-US')}` : `NEW JUMP ${this.huntFound}/${this.huntTotal}`)
+        : `ALL BILLBOARDS +${value.toLocaleString('en-US')}`)
                         : kind === 'streak' ? `DAY ${target} STREAK +${value.toLocaleString('en-US')}`
                           : '';
     if (!text) return;
@@ -354,7 +392,7 @@ export class Hud {
     if (!popup) return;
     popup.textContent = text;
     popup.classList.toggle('is-gain', value > 0);
-    popup.classList.toggle('is-big', kind === 'takedown' || kind === 'takedownTraffic' || kind === 'jump' || kind === 'dailyDone' || (kind === 'cache' && value > 0));
+    popup.classList.toggle('is-big', kind === 'takedown' || kind === 'takedownTraffic' || kind === 'jump' || kind === 'dailyDone' || kind === 'skill' || (kind === 'hunt' && value > 0) || (kind === 'cache' && value > 0));
     popup.classList.add('is-on');
     this.popupLeft[i] = 1.2;
   }
@@ -393,20 +431,26 @@ export class Hud {
       this.caches.classList.toggle('is-visible', caches.today.length > 0);
       this.caches.classList.toggle('is-done', caches.count >= caches.total);
     }
+    const c = sim.collectibles;
+    if (c && c.smashedCount !== this.lastSmashed) {
+      this.lastSmashed = c.smashedCount;
+      this.collectValue.textContent = `${c.smashedCount}/${c.total}`;
+      this.collect.classList.add('is-visible');
+      this.collect.classList.toggle('is-done', c.smashedCount >= c.total);
+    }
+    const jumps = sim.jumps;
+    if (jumps && jumps.foundCount !== this.lastFound) {
+      this.lastFound = jumps.foundCount;
+      this.jumpsValue.textContent = `${jumps.foundCount}/${jumps.descs.length}`;
+      this.jumps.classList.add('is-visible');
+      this.jumps.classList.toggle('is-done', jumps.foundCount >= jumps.descs.length);
+    }
     const life = sim.life.state;
     const damageText = `scaleX(${life.damage.toFixed(3)})`;
     if (damageText !== this.lastDamageText) { this.damageFill.style.transform = damageText; this.lastDamageText = damageText; }
     if (life.stage !== this.lastStage || life.wrecked !== this.lastWrecked) {
       this.lastStage = life.stage;
       this.lastWrecked = life.wrecked;
-      const c = sim.collectibles;
-      const collectText = c ? `${c.smashedCount}/${c.total}` : '';
-      if (collectText !== this.lastCollectText) {
-        this.collectValue.textContent = collectText;
-        this.collect.classList.toggle('is-visible', c !== null);
-        this.collect.classList.toggle('is-done', c !== null && c.smashedCount >= c.total);
-        this.lastCollectText = collectText;
-      }
       this.damageWrap.classList.toggle('is-visible', life.damage > 0);
       this.damageWrap.classList.toggle('is-danger', life.stage >= 3);
       this.damageWrap.classList.toggle('is-wrecked', life.stage >= 4);
@@ -429,7 +473,31 @@ export class Hud {
       this.swapHintOn = hint;
       this.swapHint.classList.toggle('is-on', hint);
     }
+    this.huntFound = sim.jumps?.foundCount ?? 0;
+    this.huntTotal = sim.jumps?.descs.length ?? 0;
     this.eventSeq = sim.events.readFrom(this.eventSeq, this.onEvent);
+    // the skill chain: shown while it runs; the window drains under it
+    const skill = sim.skill;
+    const chainOn = skill.points > 0;
+    if (chainOn !== this.skillOn) {
+      this.skillOn = chainOn;
+      this.skill.classList.toggle('is-visible', chainOn);
+    }
+    if (chainOn) {
+      const shown = Math.round(skill.points);
+      if (skill.serial !== this.skillSerial || shown !== this.skillShown) {
+        if (skill.serial !== this.skillSerial) {
+          this.skillMult.textContent = `×${skill.multiplier}`;
+          this.skillWord.textContent = TRICK_WORDS[skill.last] ?? '';
+          this.skill.classList.toggle('is-max', skill.multiplier >= BALANCE.skill.maxMult);
+        }
+        this.skillSerial = skill.serial;
+        this.skillShown = shown;
+        this.skillPoints.textContent = shown.toLocaleString('en-US');
+      }
+      const fill = `scaleX(${Math.max(0, Math.min(1, skill.left / BALANCE.skill.window)).toFixed(2)})`;
+      if (fill !== this.lastSkillFill) { this.skillFill.style.transform = fill; this.lastSkillFill = fill; }
+    }
     for (let i = 0; i < this.popups.length; i++) {
       const left = this.popupLeft[i] ?? 0;
       if (left <= 0) continue;

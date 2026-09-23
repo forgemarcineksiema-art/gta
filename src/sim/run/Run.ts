@@ -466,6 +466,14 @@ export class Run {
         // every tenth cache of the day pays its bonus straight into the bank (never at risk)
         this.bank += e.value;
         break;
+      case 'skill':
+        // a skill chain that ended clean (M5.5 slice 14): its points × its multiplier, at risk like any crime
+        this.bag += e.value;
+        break;
+      case 'hunt':
+        // the last of a hunt's set (M5.5 slice 14): the reward is the player's for good
+        this.bank += e.value;
+        break;
       case 'coin':
         // a spilled coin (target -2) was the bag's and goes back into it; a road coin is the player's for good
         if (e.target === -2) this.bag += e.value;

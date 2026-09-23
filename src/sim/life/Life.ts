@@ -2,6 +2,7 @@
  * Risk economy and hit classification. Damage, swap and takedowns land in
  * later slices; this one pays boost for a near miss and for the oncoming lane.
  */
+import { BALANCE } from '../balance';
 import { BILLBOARD_BOTTOM, BILLBOARD_HEIGHT } from '../city/collectibles';
 import { bodyTuning, isShell } from '../traffic/bodies';
 import type { VehicleControls } from '../controls';
@@ -49,8 +50,8 @@ export class Life {
   private lastHit = -10;
   /** Collider handle of the previous step's contact, so a hit is reported once per contact, not per step. */
   private lastHitHandle = -1;
-  /** What the strongest contact of this step was, for the damage rules. */
-  private hitKind: 'traffic' | 'wall' | 'terrain' | 'prop' | 'none' = 'none';
+  /** What the strongest contact of this step was: the damage rules and the skill chain read it. */
+  hitKind: 'traffic' | 'wall' | 'terrain' | 'prop' | 'none' = 'none';
   private oncomingLeft = 0;
   private oncomingEvent = 0;
   private readonly proj = { x: 0, y: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };
@@ -167,6 +168,8 @@ export class Life {
     v.setVelocity(tm.vx * keep, tm.vy, tm.vz * keep);
     const board = c.descOf(id);
     this.sim.events.push('billboard', ECONOMY.billboardBoost, board ? board.x : this.sim.probe.x, BILLBOARD_BOTTOM + BILLBOARD_HEIGHT / 2, board ? board.z : this.sim.probe.z, id);
+    // the fiftieth (M5.5 slice 14): the hunt's reward for the set, into the bank through the ring
+    if (c.smashedCount === c.total) this.sim.events.push('hunt', BALANCE.hunts.billboards, this.sim.probe.x, 0, this.sim.probe.z, 1);
   }
 
   /** Damage from this step's strongest contact: walls at full weight, traffic at `trafficFactor`, props and terrain never. */

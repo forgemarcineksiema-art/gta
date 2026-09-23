@@ -73,6 +73,20 @@ export const BALANCE = {
    */
   jumps: { count: 20, minAirSeconds: 0.5, length: 9, height: 1.6, runOut: 25 },
   /**
+   * The skill chain (M5.5 slice 14, DESIGN.md §7 and §3.3): the points of a near miss, an oncoming near miss and
+   * each second in the oncoming lane; a drift's and a flight's points by the second (`driftPerSecond`, and
+   * `airPerSecond` once `airMin` s off the ground), each capped at `perTrickCap`. A drift at `minSpeed` m/s or more
+   * counts as a trick after `driftTrick` s, a flight on a landing after `airTrick` s. The multiplier gains one every
+   * `multEvery` tricks up to `maxMult`; the chain banks into the bag `window` s after its last trick; a wall hit at
+   * `crashImpact` m/s or more loses it.
+   */
+  skill: {
+    nearMiss: 100, oncomingMiss: 200, oncoming: 50, driftPerSecond: 100, airPerSecond: 150, perTrickCap: 300,
+    minSpeed: 8, driftTrick: 1, airMin: 0.3, airTrick: 0.5, multEvery: 3, maxMult: 5, window: 4, crashImpact: 5,
+  },
+  /** The hunts (M5.5 slice 14): the last of the twenty jumps and the last of the fifty billboards pay the set's reward into the bank. */
+  hunts: { jumps: 20000, billboards: 30000 },
+  /**
    * Jobs (docs/M5_PLAN.md slices 1–3): a `markerRadius` m ring starts one, arriving within the same radius of
    * its target pays payout × (1 + timeBonus × remaining / limit) for a timed delivery; done and failed show for
    * `holdSeconds`, the card for `cardSeconds`. The generator places `counts` of each kind at least

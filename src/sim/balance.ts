@@ -180,6 +180,16 @@ export const BALANCE = {
      * bag bursts as `burst` in coins on the lane ahead of the wreck (the spill's pool).
      */
     hunt: { seconds: 180, lead: 40, pace: 0.85, armour: [1.5, 1.6, 1.7, 1.8, 2, 2.2, 2.4, 2.6, 2.8, 3] as readonly number[], heavy: 2, burst: 1500 },
+    /**
+     * The twists (M6 slice 3, DESIGN.md §14.3): a twin `twins.behind` m further from the finish than the player
+     * swaps, out of the player's sight, into the car nearest ahead of the player (`twins.within` m of them, at
+     * least `twins.ahead` m nearer the finish), at most every `twins.every` s; Neon Niko drops a scaffold tower
+     * he passes within `breakers.reach` m of while the player is at most `breakers.behind` m behind him; the
+     * Mayor's Nephew brings `escort` units.
+     */
+    twins: { behind: 150, within: 260, ahead: 30, every: 12 },
+    breakers: { reach: 10, behind: 120 },
+    escort: 2,
   },
   /** Bring it home, pay to keep it (DESIGN.md §13.7): a car driven through a door, not owned yet, is kept for this share of its price (the police car for `police`). */
   keep: { share: 0.3, police: 0.6 },

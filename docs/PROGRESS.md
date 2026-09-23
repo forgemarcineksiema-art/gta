@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M6 slice 3: the rivals' twists
+
+Done, each a flag on the duel (DESIGN §14.3): Pete races as the bad driver; a twin 150 m behind the player swaps, out of
+the player's sight, into the civilian nearest ahead of them (at most every 12 s), the car races on as the twin, its driver
+shakes a fist on the pavement and the radio names it; Fake Frank wears `Traffic.badge` (a hit on him is a hit on a unit:
+the police's assault rule, seen, wanted); the party bus overtakes; Niko pulls a scaffold tower down within 10 m while the
+player is within 120 m behind (`Breakers.pullAt`); the Nephew's two escort units join the roster at once with the chase
+forced (`Police.escort`); the helicopter starts over Pip's race (`Helicopter.overhead`); the Ghost is off both maps.
+Pins 3.1–3.9 in `twists.test.ts`. Verify green (356 tests).
+
 ## 2026-09-23 — M6 slice 2: the hunt and the Chief
 
 Done: a hunt's rival pulls out 40 m ahead and drives home at 0.85 of their race pace with armour by rank (1.5 → 3; Tina

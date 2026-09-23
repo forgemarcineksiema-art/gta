@@ -382,6 +382,12 @@ export class Hud {
       this.ticker2(n > 0 ? `#${n}` : 'BOARD', `${r.name} ${r.call} · ${where}`);
       return;
     }
+    if (kind === 'twinSwap') {
+      // the radio calls the twins' new car (M6 slice 3): the only way to know which one to beat
+      const d = unpackDescriptor(target);
+      this.ticker2('RADIO', `THE TWINS SWAPPED · NOW IN A ${paintName(d.paint)} ${BODY_WORDS[d.body]}`);
+      return;
+    }
     if (kind === 'rivalBeaten') {
       const r = RIVALS[target];
       if (r) this.ticker2('NEWS', target === CHIEF ? 'THE CHIEF LOSES HIS OWN CAR · THE BOARD IS YOURS' : `${r.name} BEATEN · A NEW NAME AT #${value} ON THE BOARD`);

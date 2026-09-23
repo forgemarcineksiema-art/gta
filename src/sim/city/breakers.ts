@@ -109,6 +109,23 @@ export class Breakers {
     }
   }
 
+  /**
+   * A standing tower within `reach` m of a point falls (M6 slice 3: Neon Niko pulls them down behind him); it lands
+   * across its lane as when the player drives through one. Returns whether one fell.
+   */
+  pullAt(x: number, z: number, reach: number): boolean {
+    const sim = this.sim;
+    for (let k = 0; k < this.descs.length; k++) {
+      const d = this.descs[k] as BreakerDesc;
+      if (this.state[k] !== BreakerState.Standing || Math.hypot(d.x - x, d.z - z) > reach) continue;
+      this.state[k] = BreakerState.Falling;
+      this.fellAt[k] = sim.time;
+      sim.events.push('breaker', k, d.x, BREAKER.height / 2, d.z, k);
+      return true;
+    }
+    return false;
+  }
+
   /** The car's footprint over the tower's. */
   private touches(probe: PlayerProbe, d: BreakerDesc): boolean {
     const fx = Math.sin(probe.yaw), fz = Math.cos(probe.yaw);

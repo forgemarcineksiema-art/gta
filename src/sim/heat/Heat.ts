@@ -115,7 +115,8 @@ export class Heat {
       // is at fault, so one that drives into a slower or stopped player pays nothing
       const agent = event.target;
       const traffic = this.traffic;
-      if (agent < 0 || !traffic || traffic.police[agent] === 1) return;
+      // a unit, or a car the law takes for one (Fake Frank), is the police's own rule
+      if (agent < 0 || !traffic || traffic.police[agent] === 1 || traffic.badge[agent] === 1) return;
       if (event.value < traffic.tuning.disturbedImpact || (this.hitCooldown[agent] as number) > 0) return;
       const other = Math.max(traffic.speed[agent] as number, traffic.prevSpeed[agent] as number);
       if (other > this.playerSpeed() + heat.faultMargin) return;

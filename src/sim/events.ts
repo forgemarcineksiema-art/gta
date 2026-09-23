@@ -33,7 +33,9 @@ export type EventKind =
   | 'breaker'
   // the wanted board (M6): a rival ready for the player, or beaten for the first time (value = the player's new
   // place on the board); target = the rival's index in RIVALS
-  | 'rivalReady' | 'rivalBeaten';
+  | 'rivalReady' | 'rivalBeaten'
+  // a twin swapped cars (M6 slice 3): target = the new car's body index over its paint (the radio names it)
+  | 'twinSwap';
 
 export interface SimEvent {
   kind: EventKind;

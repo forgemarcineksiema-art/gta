@@ -138,6 +138,8 @@ export class Traffic {
   readonly rival: Uint8Array;
   /** A hunted rival's armour (M6 slice 2): the police's rule with its own factor; 1 for every other car. */
   readonly armour: Float32Array;
+  /** A car the law takes for a police car (M6 slice 3, Fake Frank): hitting it is hitting a unit. */
+  readonly badge: Uint8Array;
   readonly paint: Uint32Array;
   readonly slot: Int16Array;
   readonly lane: Int16Array;
@@ -312,6 +314,7 @@ export class Traffic {
     this.racer = new Uint8Array(n);
     this.rival = new Uint8Array(n);
     this.armour = new Float32Array(n).fill(1);
+    this.badge = new Uint8Array(n);
     this.paint = new Uint32Array(n);
     this.slot = new Int16Array(n);
     this.lane = new Int16Array(n);
@@ -755,6 +758,14 @@ export class Traffic {
     return i;
   }
 
+  /** A driving civilian becomes a rival's racer where it is (M6 slice 3: a twin swapped into it). */
+  makeRacer(agent: number): void {
+    this.racer[agent] = 1;
+    this.rival[agent] = 1;
+    this.bad[agent] = 0;
+    this.gapT[agent] = 0.5;
+  }
+
   isRacer(agent: number): boolean {
     return this.racer[agent] === 1 && this.state[agent] !== AgentState.Free;
   }
@@ -873,6 +884,7 @@ export class Traffic {
     this.racer[i] = 0;
     this.rival[i] = 0;
     this.armour[i] = 1;
+    this.badge[i] = 0;
     this.lights[i] = 0;
     this.police[i] = 0;
     this.clearPolicePlan(i);
@@ -1914,6 +1926,7 @@ export class Traffic {
     this.racer[i] = 0;
     this.rival[i] = 0;
     this.armour[i] = 1;
+    this.badge[i] = 0;
     this.drawDriver(i);
     this.lights[i] = 0;
     this.police[i] = 0;
@@ -1959,6 +1972,7 @@ export class Traffic {
     this.racer[i] = 0;
     this.rival[i] = 0;
     this.armour[i] = 1;
+    this.badge[i] = 0;
     this.lights[i] = 0;
     this.clearPolicePlan(i);
     this.next[i] = -1;

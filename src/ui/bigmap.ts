@@ -293,7 +293,7 @@ export class BigMap {
         const p = this.at(traffic.x[agent] as number, traffic.z[agent] as number, s);
         this.unitDot(c, p.x, p.y, lit ? UNIT_LIT : UNIT_BEAT);
       }
-      if (jobs.race.running) {
+      if (jobs.race.running && !jobs.race.hidden) {
         for (const agent of jobs.race.rivals) {
           if (agent < 0) continue;
           const p = this.at(traffic.x[agent] as number, traffic.z[agent] as number, s);

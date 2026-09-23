@@ -498,8 +498,8 @@ export class Minimap {
         c.fill();
         c.stroke();
       }
-      // a street race's rivals (M5.5 slice 11): lime dots
-      const rivals = sim.jobs.race.running ? sim.jobs.race.rivals : null;
+      // a street race's rivals (M5.5 slice 11): lime dots; none for the Ghost (M6)
+      const rivals = sim.jobs.race.running && !sim.jobs.race.hidden ? sim.jobs.race.rivals : null;
       if (rivals) {
         c.fillStyle = RIVAL;
         for (let k = 0; k < rivals.length; k++) {

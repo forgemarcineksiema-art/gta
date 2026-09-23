@@ -90,6 +90,15 @@ export class Helicopter {
     return this.sees;
   }
 
+  /** Over the player at once, the light on them (M6 slice 3: Professor Pip's race). The level and the chase keep it. */
+  overhead(player: PlayerProbe): void {
+    this.arrive(player);
+    this.x = player.x;
+    this.z = player.z;
+    this.lightX = player.x;
+    this.lightZ = player.z;
+  }
+
   /** In from the island's edge on the far side of the player from the centre, at its height, the light on the player. */
   private arrive(player: PlayerProbe): void {
     const h = this.tuning.heli;

@@ -90,6 +90,7 @@ export const BODIES: readonly BodySpec[] = [
   civilian('wrecker', 'heavy', 0.98, 2.7, 3.3, 1.72, 2100, 1, { paints: [PALETTE.carOrange] }),
   onShell('twin', 'sports', CITY_COLORS.mint),
   onShell('fakecop', 'police', PALETTE.policeWhite),
+  // Big Bernie's bus races: it overtakes where the city's buses keep their lane
   civilian('partybus', 'heavy', 1.27, 6.0, 6.6, 2.24, 6500, 1, { paints: [PALETTE.carMagenta], big: true, stretch: true }),
   onShell('lowrider', 'sports', PALETTE.carBlue),
   civilian('limo', 'muscle', 0.92, 2.35, 2.8, 1.6, 1400, 1, { paints: [PALETTE.carGold] }),

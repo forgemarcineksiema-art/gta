@@ -88,6 +88,36 @@ export class Police {
     this.chiefWait = 0;
     this.spawnLeft = 0;
   }
+
+  /**
+   * The Mayor's Nephew's escort (M6 slice 3): `count` saloons on the roster at once, on `lane` behind `s` (the
+   * player's position), in view; the pursuit the duel forced sends them after the player. Returns how many came.
+   */
+  escort(lane: number, s: number, count: number): number {
+    const t = this.tuning, player = this.sim.probe;
+    const cosHalf = Math.cos(t.viewHalfAngleDeg * Math.PI / 180);
+    const len = this.traffic.lanes.length[lane] as number;
+    let n = 0;
+    for (let u = 0; u < this.units.length && n < count; u++) {
+      if ((this.units[u] as number) >= 0) continue;
+      // behind the player first, then ahead of them, further out each time: whichever spot on the lane is clear
+      let agent = -1;
+      for (let k = 0; k < 8 && agent < 0; k++) {
+        const along = s + (k % 2 === 0 ? -1 : 1) * (20 + 16 * (k >> 1) + 8 * n);
+        if (along < 2 || along > len - 2) continue;
+        agent = this.traffic.spawnPoliceAt(lane, along, 'police', player, t.viewNear, cosHalf, t.spawnClearance, -1, true);
+      }
+      if (agent < 0) break;
+      this.units[u] = agent;
+      this.seen[u] = 0;
+      this.withdrawing[u] = 0;
+      this.ramCooldown[u] = 0;
+      this.slotOf[u] = -1;
+      this.count++;
+      n++;
+    }
+    return n;
+  }
   /** Parked patrols: the agent at each place (-1 none) and its index into `parkedJunctions`. */
   readonly parked: Int16Array;
   readonly parkedAt: Int16Array;
@@ -705,7 +735,8 @@ export class Police {
     for (let i = 0; i < traffic.capacity; i++) {
       const cool = this.assaultCooldown[i] as number;
       if (cool > 0) this.assaultCooldown[i] = Math.max(0, cool - dt);
-      if (traffic.police[i] !== 1) continue;
+      // a car in a police livery the law takes for its own (Fake Frank, M6) counts as one
+      if (traffic.police[i] !== 1 && traffic.badge[i] !== 1) continue;
       this.copSpeedMax[i] = Math.max(traffic.speed[i] as number, (this.copSpeedMax[i] as number) * 0.8);
       if (!idle || cool > 0 || !traffic.hasBody(i)) continue;
       const state = traffic.state[i];

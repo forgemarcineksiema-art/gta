@@ -10,10 +10,12 @@
  * No allocation per step.
  */
 import { BALANCE } from '../balance';
+import { POLICE } from '../police/tuning';
+import { PedPose } from '../traffic/Pedestrians';
 import type { Lane } from '../city/roads';
 import { alongLane } from '../city/route';
 import type { SimWorld } from '../SimWorld';
-import type { PlayerProbe } from '../traffic/Traffic';
+import { AgentState, type PlayerProbe } from '../traffic/Traffic';
 import type { BodyId } from '../traffic/bodies';
 import { PALETTE } from '../palette';
 
@@ -30,6 +32,10 @@ export interface RaceField {
   band: readonly [number, number];
   lead?: number;
   armour?: number;
+  /** The twists the race plays itself (M6 slice 3): the twins' swap, Niko's towers, the Ghost off the radar. */
+  twins?: boolean;
+  breakers?: boolean;
+  hidden?: boolean;
 }
 
 export class Race {
@@ -43,6 +49,13 @@ export class Race {
   private pace = 1;
   private bandLow = 1;
   private bandHigh = 1;
+  /** The twists (M6 slice 3); `hidden`: the maps draw no rival (the Ghost). */
+  private twins = false;
+  private breakers = false;
+  hidden = false;
+  /** Seconds until each twin may swap again, and the swaps so far. */
+  private readonly swapLeft = new Float32Array(FIELD.length);
+  swaps = 0;
   /** Rivals over the line so far. */
   finished = 0;
   running = false;
@@ -78,6 +91,11 @@ export class Race {
     this.pace = r.pace * (duel ? duel.pace : 1);
     this.bandLow = duel ? duel.band[0] : (r.band[0] as number);
     this.bandHigh = duel ? duel.band[1] : (r.band[1] as number);
+    this.twins = duel?.twins ?? false;
+    this.breakers = duel?.breakers ?? false;
+    this.hidden = duel?.hidden ?? false;
+    this.swapLeft.fill(0);
+    this.swaps = 0;
     const lead = duel?.lead ?? r.gridAhead;
     for (let k = 0; k < this.count; k++) {
       const [body, paint] = cars[k] as readonly [BodyId, number];
@@ -92,7 +110,7 @@ export class Race {
   }
 
   /** Each rival onto the best exit at its rubber-banded pace; the ones over the line take their places. */
-  step(probe: PlayerProbe): void {
+  step(probe: PlayerProbe, dt = 1 / 60): void {
     if (!this.running) return;
     const traffic = this.sim.traffic;
     if (!traffic) return;
@@ -110,6 +128,23 @@ export class Race {
         traffic.endRace(agent);
         continue;
       }
+      // the twins never drive the same car twice: one fallen far behind swaps, out of sight, into a car ahead
+      if (this.twins) {
+        this.swapLeft[k] = Math.max(0, (this.swapLeft[k] as number) - dt);
+        if (theirs - mine > BALANCE.board.twins.behind && this.swapLeft[k] === 0) {
+          const into = this.swapTarget(probe, mine);
+          if (into >= 0) {
+            this.swap(k, agent, into);
+            continue;
+          }
+        }
+      }
+      // Neon Niko pulls the scaffold towers down behind him while the player is on his tail
+      if (this.breakers && this.sim.breakers) {
+        const b = BALANCE.board.breakers;
+        const gap = Math.hypot(probe.x - x, probe.z - z);
+        if (mine > theirs && gap <= b.behind) this.sim.breakers.pullAt(x, z, b.reach);
+      }
       const lane = traffic.lane[agent] as number;
       if (lane < 0) continue;
       // the exit whose way on to the finish is shortest
@@ -122,6 +157,44 @@ export class Race {
       const band = Math.max(this.bandLow, Math.min(this.bandHigh, 1 - (mine - theirs) / r.bandRange * (1 - this.bandLow)));
       traffic.setRacePlan(agent, next, (lanes.limit[lane] as number) * this.pace * band);
     }
+  }
+
+  /**
+   * The car a twin swaps into: a driving civilian out of the player's sight, within `twins.within` m of the player
+   * and at least `twins.ahead` m nearer the finish than them, the nearest to the player; -1 when there is none.
+   */
+  private swapTarget(probe: PlayerProbe, mine: number): number {
+    const traffic = this.sim.traffic;
+    if (!traffic) return -1;
+    const tw = BALANCE.board.twins, p = POLICE;
+    const cosHalf = Math.cos(p.viewHalfAngleDeg * Math.PI / 180);
+    let best = -1, bestD = Infinity;
+    for (let i = 0; i < traffic.capacity; i++) {
+      const st = traffic.state[i];
+      if ((st !== AgentState.Kinematic && st !== AgentState.Physical) || traffic.police[i] !== 0 || traffic.racer[i] !== 0 || traffic.rival[i] !== 0 || i === traffic.wanted) continue;
+      const x = traffic.x[i] as number, z = traffic.z[i] as number;
+      const d = Math.hypot(x - probe.x, z - probe.z);
+      if (d > tw.within || d >= bestD) continue;
+      if (Math.hypot(this.finishX - x, this.finishZ - z) > mine - tw.ahead) continue;
+      if (!traffic.outOfView(x, z, 3, probe, p.viewNear, cosHalf)) continue;
+      best = i;
+      bestD = d;
+    }
+    return best;
+  }
+
+  /** The twin leaves their car to the road and takes this one; its driver is left on the pavement shaking a fist. */
+  private swap(k: number, from: number, into: number): void {
+    const sim = this.sim, traffic = sim.traffic;
+    if (!traffic) return;
+    traffic.endRace(from);
+    traffic.makeRacer(into);
+    this.rivals[k] = into;
+    this.swapLeft[k] = BALANCE.board.twins.every;
+    this.swaps++;
+    const x = traffic.x[into] as number, z = traffic.z[into] as number, yaw = traffic.yaw[into] as number;
+    sim.peds?.spawnAt(x + Math.cos(yaw) * 2.4, z - Math.sin(yaw) * 2.4, yaw + Math.PI / 2, PedPose.Fist);
+    sim.events.push('twinSwap', 0, x, 0, z, ((traffic.body[into] as number) << 24) | ((traffic.paint[into] as number) & 0xffffff));
   }
 
   /** The player's place now: one plus the rivals over the line or nearer it. */

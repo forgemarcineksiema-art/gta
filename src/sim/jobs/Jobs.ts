@@ -437,15 +437,41 @@ export class Jobs {
     const b = BALANCE.board, h = b.hunt;
     const cars: Array<readonly [BodyId, number]> = rival.paints.map((paint) => [rival.body, paint] as const);
     const pace = b.pace[d.level] ?? 1, band = b.band[d.level] ?? [0.8, 1.2];
+    const tw = rival.twist;
+    const twists = { twins: tw === 'twins', breakers: tw === 'breakers', hidden: tw === 'ghost' };
     if (rival.format === 'hunt') {
       // the rival drives home with a bag: wreck their car first
       this.remaining = h.seconds;
-      const armour = (h.armour[d.level] ?? 2) * (rival.twist === 'heavy' ? h.heavy : 1);
-      this.race.start(d.targetX, d.targetZ, this.sim.probe, { cars, pace: pace * h.pace, band, lead: h.lead, armour });
-      return;
+      const armour = (h.armour[d.level] ?? 2) * (tw === 'heavy' ? h.heavy : 1);
+      this.race.start(d.targetX, d.targetZ, this.sim.probe, { cars, pace: pace * h.pace, band, lead: h.lead, armour, ...twists });
+    } else {
+      this.remaining = d.limitSeconds;
+      this.race.start(d.targetX, d.targetZ, this.sim.probe, { cars, pace, band, ...twists });
     }
-    this.remaining = d.limitSeconds;
-    this.race.start(d.targetX, d.targetZ, this.sim.probe, { cars, pace, band });
+    this.twist(tw);
+  }
+
+  /**
+   * The twists that are not the race's own (M6 slice 3, DESIGN.md §14.3): Pete drives like the bad driver; Frank
+   * wears a badge (units leave him alone, a hit on him is a hit on a unit); the Nephew's escort comes after the
+   * player at once; the helicopter hangs over the player from the first second of Pip's race.
+   */
+  private twist(tw: RivalDef['twist']): void {
+    const sim = this.sim, traffic = sim.traffic, a = this.race.rivals[0] as number;
+    if (!traffic || a < 0) return;
+    if (tw === 'bad') traffic.bad[a] = 1;
+    else if (tw === 'disguise') traffic.badge[a] = 1;
+    else if (tw === 'escort' && sim.police) {
+      sim.pursuit.force(BALANCE.jobs.escape.radioSeconds);
+      const city = sim.city, p = sim.probe;
+      if (!city) return;
+      const lane = city.nearestLane(p.x, p.z, p.y - 0.5);
+      const s = alongLane(city.graph.lanes[lane] as Lane, p.x, p.z).s;
+      sim.police.escort(lane, s, BALANCE.board.escort);
+    } else if (tw === 'heli' && sim.police) {
+      sim.pursuit.force(BALANCE.jobs.escape.radioSeconds);
+      sim.police.heli.overhead(sim.probe);
+    }
   }
 
   /**
@@ -468,7 +494,7 @@ export class Jobs {
       this.winDuel(d, probe);
       return;
     }
-    this.race.step(probe);
+    this.race.step(probe, dt);
     if (this.race.finished > 0) {
       this.lastPlace = 2;
       this.finish('failed', probe);

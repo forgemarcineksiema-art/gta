@@ -10,7 +10,7 @@ import { PLAYER_PAINT } from '../traffic/Traffic';
 import { CAR_IDS, type CarId } from '../vehicle/presets';
 import { BODIES, BODY_IDS, type BodyId } from '../traffic/bodies';
 
-export type JobKind = 'delivery' | 'order' | 'escape' | 'trial' | 'race';
+export type JobKind = 'delivery' | 'order' | 'escape' | 'trial' | 'race' | 'rage' | 'mayhem';
 
 export interface JobDef {
   id: number;
@@ -22,7 +22,7 @@ export interface JobDef {
   /** The delivery's drop-off or the order's fence (a point inside the ring's radius wins); unused for an escape. */
   targetX: number;
   targetZ: number;
-  /** An escape's heat level (2..4); 0 otherwise. */
+  /** An escape's heat level (2..4); a zone job's quota (takedowns, or dollars of damage); 0 otherwise. */
   level: number;
   /** An order's wanted car, `packDescriptor`; -1 otherwise. */
   descriptor: number;

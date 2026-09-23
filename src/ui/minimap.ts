@@ -5,7 +5,7 @@
  * Repaints at most every `MINIMAP.repaintMs` and never while nothing moved, so
  * a parked or paused game costs no canvas work. The maths is in `minimapModel`.
  */
-import { CITY_HALF, DISTRICTS, PALETTE, districtAt, type SimWorld } from '../sim';
+import { BALANCE, CITY_HALF, DISTRICTS, PALETTE, districtAt, type SimWorld } from '../sim';
 import { LANDMARKS } from '../sim/city/City';
 import { MINIMAP, advance, buildRoadLayers, clampToRim, project, yawFromQuat, type MinimapState, type Vec2 } from './minimapModel';
 
@@ -15,7 +15,7 @@ export interface MinimapMarker { x: number; z: number; kind: MarkerKind; color: 
 
 /** The job rings by kind (the marker's own colours, docs/STYLE.md). */
 const RIVAL = hex(PALETTE.carLime);
-const JOB_COLORS = { delivery: hex(PALETTE.carOrange), order: hex(PALETTE.carMagenta), escape: hex(PALETTE.policeBlue), trial: hex(PALETTE.coin), race: hex(PALETTE.carLime) } as const;
+const JOB_COLORS = { delivery: hex(PALETTE.carOrange), order: hex(PALETTE.carMagenta), escape: hex(PALETTE.policeBlue), trial: hex(PALETTE.coin), race: hex(PALETTE.carLime), rage: hex(PALETTE.carRed), mayhem: hex(PALETTE.carWhite) } as const;
 
 const FONT = "'Segoe UI', 'Helvetica Neue', Arial, system-ui, sans-serif";
 const INK = '#f7f3ea';
@@ -328,6 +328,15 @@ export class Minimap {
       c.strokeStyle = ACCENT;
       c.lineWidth = highW;
       c.stroke(this.highwayPath);
+    }
+    // a zone job's edge (M5.5 slice 12)
+    const zoneJob = this.sim?.jobs.running;
+    if (zoneJob && this.sim?.jobs.state === 'active' && (zoneJob.kind === 'rage' || zoneJob.kind === 'mayhem')) {
+      c.beginPath();
+      c.arc(zoneJob.x, zoneJob.z, BALANCE.jobs.zone.radius, 0, Math.PI * 2);
+      c.lineWidth = 3 / s;
+      c.strokeStyle = JOB_COLORS[zoneJob.kind];
+      c.stroke();
     }
     // the search: where they last saw you, growing as they look (get away from it)
     const pursuit = this.sim?.pursuit;

@@ -366,5 +366,33 @@ export function placeJobs(city: City, seed: number, lanes: LaneTables): JobDef[]
       payout: rc.pay[0] as number, limitSeconds: Math.round(t.length / rc.limitSpeed), heat: 0,
     });
   }
+  // the zones (M5.5 slice 12): takedown rage and mayhem
+  const zones: Array<{ c: Candidate; kind: 'rage' | 'mayhem' }> = [];
+  const want: Array<'rage' | 'mayhem'> = [];
+  for (let i = 0; i < Math.max(cfg.counts.rage, cfg.counts.mayhem); i++) {
+    if (i < cfg.counts.rage) want.push('rage');
+    if (i < cfg.counts.mayhem) want.push('mayhem');
+  }
+  // any free clear corner, in a seeded order, each zone well apart from the others (the corners round the districts
+  // are mostly taken by now)
+  const order = inner.filter((c) => !picked.includes(c));
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = (rng() * (i + 1)) | 0;
+    const t = order[i] as Candidate; order[i] = order[j] as Candidate; order[j] = t;
+  }
+  for (const c of order) {
+    if (zones.length >= want.length) break;
+    if (!gapOk(c) || zones.some((z) => Math.hypot(z.c.x - c.x, z.c.z - c.z) < cfg.zone.radius * 2.5) || !clear(city, c)) continue;
+    picked.push(c);
+    zones.push({ c, kind: want[zones.length] as 'rage' | 'mayhem' });
+  }
+  const zc = cfg.zone;
+  for (const z of zones) {
+    const rule = zc[z.kind];
+    defs.push({
+      id: defs.length + 1, kind: z.kind, x: z.c.x, z: z.c.z, yaw: z.c.yaw, targetX: z.c.x, targetZ: z.c.z, level: rule.quota, descriptor: -1,
+      payout: rule.payout, limitSeconds: zc.seconds, heat: rule.heat,
+    });
+  }
   return defs;
 }

@@ -23,6 +23,9 @@
  * - race (M5.5 slice 11): three rivals start just ahead, everybody to one finish
  *   by any route (no coins); the player's place over the line pays (1st, 2nd,
  *   3rd), fourth fails it, and so does the clock.
+ * - rage, mayhem (M5.5 slice 12): one timed zone round the marker; inside it the
+ *   takedowns (rage) or the property damage's price (mayhem) count toward the
+ *   quota; reaching it pays with the delivery's time bonus; the clock fails it.
  *
  * Money goes into the bag through the `jobDone` event (`Run` reads it). While
  * the cold open runs only its own marker is live. No allocation per step.
@@ -66,6 +69,9 @@ export class Jobs {
   /** The running street race's rivals (M5.5 slice 11), and the player's place in the last one. */
   readonly race: Race;
   lastPlace = 0;
+  /** A zone job's count toward its quota (takedowns, or dollars of damage), and whether the car is inside the zone. */
+  zoneCount = 0;
+  inZone = false;
   /** Ensures run so far for this hunt that repainted a car, and that spawned one (the slice-2 measurement). */
   repaints = 0;
   spawns = 0;
@@ -164,6 +170,24 @@ export class Jobs {
       return;
     }
     if (d.kind === 'race') this.race.step(probe);
+    if (d.kind === 'rage' || d.kind === 'mayhem') {
+      this.inZone = (d.x - probe.x) ** 2 + (d.z - probe.z) ** 2 <= BALANCE.jobs.zone.radius ** 2;
+      if (this.zoneCount >= d.level) {
+        // the quota reached: the pay with the time bonus
+        const paid = Math.round(d.payout * (1 + BALANCE.jobs.timeBonus * Math.max(0, this.remaining) / d.limitSeconds));
+        this.lastPaid = paid;
+        this.lastTip = false;
+        this.finish('done', probe);
+        this.sim.events.push('jobDone', paid, probe.x, 0, probe.z, d.id);
+        return;
+      }
+      this.remaining -= dt;
+      if (this.remaining > 1e-9) return;
+      this.remaining = 0;
+      this.finish('failed', probe);
+      this.sim.events.push('jobFailed', 0, probe.x, 0, probe.z, d.id);
+      return;
+    }
     if (d.kind === 'escape') {
       // the chase was lost (by the cooldown or a swap nobody saw): the bounty
       if (!this.escaped) return;
@@ -321,6 +345,12 @@ export class Jobs {
       this.race.start(d.targetX, d.targetZ, this.sim.probe);
       return;
     }
+    if (d.kind === 'rage' || d.kind === 'mayhem') {
+      // the zone round the marker: nothing laid, the count from nothing
+      this.zoneCount = 0;
+      this.inZone = true;
+      return;
+    }
     // the coins along the way (DESIGN.md §13.5); the cold open lays its own line
     if (d.id !== this.sim.coldOpen.job) this.layRoute(d.x, d.z, d.targetX, d.targetZ);
   }
@@ -415,5 +445,28 @@ export class Jobs {
 
   private readonly onEvent = (e: SimEvent): void => {
     if (e.kind === 'escape') this.escaped = true;
+    // a running zone job counts what happened inside the zone
+    if (this.state !== 'active' || !this.inZone) return;
+    const d = this.defOf(this.active);
+    if (!d) return;
+    if (d.kind === 'rage') {
+      if (e.kind === 'takedown' || e.kind === 'takedownTraffic') this.zoneCount++;
+    } else if (d.kind === 'mayhem') {
+      this.zoneCount += damagePrice(e);
+    }
   };
+}
+
+/** What an event is worth to mayhem (DESIGN.md §4): a traffic hit by its impact, capped; a wall by less; the rest priced. */
+function damagePrice(e: SimEvent): number {
+  const m = BALANCE.jobs.zone.mayhem;
+  switch (e.kind) {
+    case 'hit': return e.target >= 0 ? Math.min(m.hitCap, Math.round(e.value * m.hitPerMs)) : Math.min(m.wallCap, Math.round(e.value * m.wallPerMs));
+    case 'takedownTraffic': return m.takedownTraffic;
+    case 'takedown': return m.takedown;
+    case 'billboard': return m.billboard;
+    case 'camera': return m.camera;
+    case 'roadblock': return m.roadblock;
+    default: return 0;
+  }
 }

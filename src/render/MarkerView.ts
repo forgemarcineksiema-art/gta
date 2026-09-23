@@ -27,6 +27,9 @@ export const KIND_COLORS: Record<JobDef['kind'], number> = {
   trial: PALETTE.coin,
   // the street race: the racing lime
   race: PALETTE.carLime,
+  // the zones: rage red, mayhem white
+  rage: PALETTE.carRed,
+  mayhem: PALETTE.carWhite,
 };
 
 export class MarkerView {
@@ -48,6 +51,8 @@ export class MarkerView {
   private readonly s = new THREE.Vector3();
   private readonly t = { x: 0, z: 0 };
   private targetKind: JobDef['kind'] = 'delivery';
+  /** A zone job's edge on the ground (M5.5 slice 12): a thin ring its radius round the marker. */
+  private readonly zone: THREE.Mesh;
 
   constructor(scene: THREE.Scene, sim: SimWorld, private readonly camera: THREE.Camera | null = null) {
     const r = BALANCE.jobs.markerRadius;
@@ -55,6 +60,11 @@ export class MarkerView {
     const h = BALANCE.jobs.beaconHeight;
     this.beaconGeometry = new THREE.CylinderGeometry(0.18, 0.18, h, 6).translate(0, h / 2, 0);
     this.material = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    this.zone = new THREE.Mesh(new THREE.RingGeometry(0.985, 1, 128).rotateX(-Math.PI / 2).translate(0, 0.09, 0),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, depthWrite: false }));
+    this.zone.visible = false;
+    this.zone.frustumCulled = false;
+    scene.add(this.zone);
     // every def, plus the running job's target and the wanted car
     this.capacity = Math.max(4, sim.jobs.defs.length + 2);
     this.idleX = new Float32Array(this.capacity);
@@ -86,7 +96,14 @@ export class MarkerView {
     }
     let beacons = n;
     const running = jobs.running;
-    if (running && jobs.state === 'active' && running.kind !== 'escape') {
+    const zone = running !== null && jobs.state === 'active' && (running.kind === 'rage' || running.kind === 'mayhem');
+    if (this.zone.visible !== zone) this.zone.visible = zone;
+    if (zone && running) {
+      this.zone.position.set(running.x, 0, running.z);
+      this.zone.scale.setScalar(BALANCE.jobs.zone.radius);
+      (this.zone.material as THREE.MeshBasicMaterial).color.setHex(KIND_COLORS[running.kind]);
+    }
+    if (running && jobs.state === 'active' && running.kind !== 'escape' && !zone) {
       // the drop-off or the fence: where to stop (instance 0, tinted at the rebuild)
       this.put(this.rings, n, running.targetX, running.targetZ, 1 + TARGET_PULSE * phase, 1);
       this.put(this.beacons, beacons, running.targetX, running.targetZ, 1, 1);

@@ -14,7 +14,7 @@ import {
   type GoalKind, type JobDef, type SimWorld,
 } from '../sim';
 
-const KIND_TITLE: Record<JobDef['kind'], string> = { delivery: 'DELIVERY', order: 'STEAL TO ORDER', escape: 'ESCAPE', trial: 'TIME TRIAL', race: 'STREET RACE' };
+const KIND_TITLE: Record<JobDef['kind'], string> = { delivery: 'DELIVERY', order: 'STEAL TO ORDER', escape: 'ESCAPE', trial: 'TIME TRIAL', race: 'STREET RACE', rage: 'TAKEDOWN RAGE', mayhem: 'MAYHEM' };
 
 export class JobsHud {
   readonly root: HTMLElement;
@@ -38,6 +38,9 @@ export class JobsHud {
   private lastDist = -2;
   /** The running race's place last shown. */
   private racePlace = 0;
+  /** The running zone's count and out-of-zone flag last shown. */
+  private zoneCount = -1;
+  private zoneOut = false;
   private lastRoute = -1;
   private visible = false;
   private yielding = false;
@@ -167,6 +170,12 @@ export class JobsHud {
       if (this.cardMode === 'job') this.fillJobCard(sim, d);
     }
     if (jobs.state === 'done' || jobs.state === 'failed') return;
+    // a zone's count and whether the car is in it, live
+    if ((d.kind === 'rage' || d.kind === 'mayhem') && jobs.state === 'active' && (jobs.zoneCount !== this.zoneCount || !jobs.inZone !== this.zoneOut)) {
+      this.zoneCount = jobs.zoneCount;
+      this.zoneOut = !jobs.inZone;
+      this.fillJobLine(sim, d);
+    }
     // a race's place, live: the line's words when it changes
     if (d.kind === 'race' && jobs.state === 'active') {
       const place = jobs.race.place(sim.probe);
@@ -250,10 +259,10 @@ export class JobsHud {
   private fillJobLine(sim: SimWorld, d: JobDef): void {
     const jobs = sim.jobs;
     let kind: string;
-    let state = d.kind === 'order' ? 'is-order' : d.kind === 'escape' ? 'is-escape' : d.kind === 'trial' ? 'is-trial' : d.kind === 'race' ? 'is-race' : '';
+    let state = d.kind === 'order' ? 'is-order' : d.kind === 'escape' ? 'is-escape' : d.kind === 'trial' ? 'is-trial' : d.kind === 'race' ? 'is-race' : d.kind === 'rage' || d.kind === 'mayhem' ? 'is-zone' : '';
     if (jobs.state === 'done') {
       const what = d.kind === 'order' ? 'SOLD' : d.kind === 'escape' ? 'BOUNTY' : d.kind === 'trial' ? MEDAL_WORDS[jobs.lastMedal]
-        : d.kind === 'race' ? `${PLACE_WORDS[jobs.lastPlace] ?? ''} PLACE` : 'DELIVERED';
+        : d.kind === 'race' ? `${PLACE_WORDS[jobs.lastPlace] ?? ''} PLACE` : d.kind === 'rage' ? 'RAGE DONE' : d.kind === 'mayhem' ? 'MAYHEM DONE' : 'DELIVERED';
       kind = `${what} +${money(jobs.lastPaid)}${jobs.lastTip ? ' · CLEAN LINE' : ''}`;
       state = 'is-done';
     } else if (jobs.state === 'failed') {
@@ -268,6 +277,9 @@ export class JobsHud {
       kind = 'TIME TRIAL · FOLLOW THE COINS';
     } else if (d.kind === 'race') {
       kind = `RACE · ${PLACE_WORDS[this.racePlace] ?? ''}`;
+    } else if (d.kind === 'rage' || d.kind === 'mayhem') {
+      const count = d.kind === 'rage' ? `${Math.min(this.zoneCount, d.level)}/${d.level} TAKEDOWNS` : `${money(Math.min(this.zoneCount, d.level))} / ${money(d.level)}`;
+      kind = `${d.kind === 'rage' ? 'RAGE' : 'MAYHEM'} · ${count}${this.zoneOut ? ' · BACK INTO THE ZONE' : ''}`;
     } else {
       kind = 'DELIVERY';
     }
@@ -295,6 +307,10 @@ export class JobsHud {
     } else if (d.kind === 'escape') {
       this.cardSub.textContent = 'THE POLICE HAVE YOU';
       this.cardLimit.textContent = 'LOSE THEM';
+    } else if (d.kind === 'rage' || d.kind === 'mayhem') {
+      const z = BALANCE.jobs.zone;
+      this.cardSub.textContent = d.kind === 'rage' ? 'WRECK CARS INSIDE THE RING' : 'SMASH IT UP INSIDE THE RING';
+      this.cardLimit.textContent = d.kind === 'rage' ? `${d.level} TAKEDOWNS IN ${z.seconds} S` : `${money(d.level)} OF DAMAGE IN ${z.seconds} S`;
     } else if (d.kind === 'race') {
       const pay = BALANCE.jobs.race.pay;
       this.cardSub.textContent = 'FIRST TO THE FINISH · ANY ROUTE';

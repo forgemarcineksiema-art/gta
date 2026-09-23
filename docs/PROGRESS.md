@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M5.5 slice 12: takedown rage and mayhem
+
+Done: one timed-zone rule set for the brief's takedown rage and mayhem: a 160 m ring round the marker (drawn on the
+ground and on the radar in the job's colour), 60 s on the clock, counted only inside it (the line says BACK INTO THE
+ZONE outside). Rage: six takedowns (a car or a unit wrecked); mayhem: 5,000 of property damage priced per event (a
+traffic hit 40 a m/s of impact up to 600, a wall 10 up to 150, a wreck 600, a unit 1,000, a billboard 400, a camera
+500, a roadblock 800). The quota pays 10,000 / 8,000 with the delivery's time bonus (up to 15,000 / 12,000); the
+start adds heat 10 / 15; the clock fails it. Two of each at free corners well apart (placed after the others; jobs
+re-baked, 28 defs); the marker rings' coin pool grew to 32 markers. Pins 12.1–12.3.
+
 ## 2026-09-23 — M5.5 slice 11: street races
 
 Done: four street races (lime markers), placed like the trials after them (the other jobs unchanged), to a finish

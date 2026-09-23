@@ -50,8 +50,8 @@ const CHUNKS = 49;
 /** Run-time coins take ids after every chunk's, each pool in its own range. */
 export const EXTRA_COIN_BASE = CHUNKS * COINS_PER_CHUNK_MAX;
 export type ExtraTag = 'rings' | 'caches' | 'route';
-/** Each pool's slot range within the extras (the rings: 16 markers × 8; the caches: 30 × 9; a route: 120 at most). */
-export const EXTRA_RANGES: Readonly<Record<ExtraTag, readonly [number, number]>> = { rings: [0, 192], caches: [192, 512], route: [512, 1024] };
+/** Each pool's slot range within the extras (the rings: 32 markers × 8, M5.5's 28 jobs; the caches: 30 × 9; a route: 300 at most). */
+export const EXTRA_RANGES: Readonly<Record<ExtraTag, readonly [number, number]>> = { rings: [0, 256], caches: [256, 576], route: [576, 1024] };
 export const EXTRA_COINS_MAX = 1024;
 const TAG_LANE: Readonly<Record<ExtraTag, number>> = { rings: -3, caches: -4, route: -5 };
 /** A coin's centre hovers this high over the road: bonnet height, half a metre of air under it. */

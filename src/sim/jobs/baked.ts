@@ -30,5 +30,9 @@ export const BAKED_JOBS: Readonly<Record<number, readonly JobDef[]>> = {
     { id: 22, kind: 'race', x: -207, z: 243, yaw: -2.356194490192345, targetX: 337.5, targetZ: -687, level: 0, descriptor: -1, payout: 6000, limitSeconds: 160, heat: 0 },
     { id: 23, kind: 'race', x: 650, z: -243, yaw: 0.9467732738181398, targetX: -562.5, targetZ: 4.5, level: 0, descriptor: -1, payout: 6000, limitSeconds: 161, heat: 0 },
     { id: 24, kind: 'race', x: -650, z: 432, yaw: -0.9467732738181398, targetX: 679, targetZ: 562.5, level: 0, descriptor: -1, payout: 6000, limitSeconds: 163, heat: 0 },
+    { id: 25, kind: 'rage', x: 18, z: -243, yaw: -0.7853981633974483, targetX: 18, targetZ: -243, level: 6, descriptor: -1, payout: 10000, limitSeconds: 60, heat: 10 },
+    { id: 26, kind: 'mayhem', x: 18, z: -650, yaw: -2.5175696006130366, targetX: 18, targetZ: -650, level: 5000, descriptor: -1, payout: 8000, limitSeconds: 60, heat: 15 },
+    { id: 27, kind: 'rage', x: -18, z: 243, yaw: 2.356194490192345, targetX: -18, targetZ: 243, level: 6, descriptor: -1, payout: 10000, limitSeconds: 60, heat: 10 },
+    { id: 28, kind: 'mayhem', x: 432, z: -18, yaw: 0.7853981633974483, targetX: 432, targetZ: -18, level: 5000, descriptor: -1, payout: 8000, limitSeconds: 60, heat: 15 },
   ],
 };

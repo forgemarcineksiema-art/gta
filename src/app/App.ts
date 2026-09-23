@@ -275,7 +275,7 @@ export class App {
         policy: this.bot instanceof BotPolicy ? { name: this.bot.name, swaps: this.bot.swaps, escapesBySwap: this.bot.escapesBySwap, escapesByCooldown: this.bot.escapesByCooldown, disguiseEscapes: this.bot.disguiseEscapes } : null,
         run: { state: sim.run.state, bag: sim.run.bag, bank: sim.run.bank, multiplier: sim.run.multiplier, maxHeat: sim.run.maxHeat, door: sim.run.doorProgress, busted: sim.run.bustedProgress, dropOff: sim.run.dropOffs[sim.run.dropOff]?.name ?? null, runs: sim.run.runs },
         coldOpen: { active: sim.coldOpen.active, verb: sim.coldOpen.verb, caption: sim.coldOpen.caption, done: sim.coldOpen.done },
-        job: { state: sim.jobs.state, remaining: sim.jobs.remaining },
+        job: { state: sim.jobs.state, id: sim.jobs.active, kind: sim.jobs.running?.kind ?? null, remaining: sim.jobs.remaining, wanted: sim.jobs.wantedAgent, lastPaid: sim.jobs.lastPaid },
         traffic: sim.traffic ? { kinematic: sim.traffic.count(AgentState.Kinematic), physical: sim.traffic.count(AgentState.Physical), wrecked: sim.traffic.count(AgentState.Wrecked) } : null,
         peds: sim.peds ? { count: sim.peds.count(), hops: sim.peds.guaranteeHops } : null,
         billboards: sim.collectibles ? { smashed: sim.collectibles.smashedCount, total: sim.collectibles.total } : null,

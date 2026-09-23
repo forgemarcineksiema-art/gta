@@ -216,6 +216,7 @@ export class Jobs {
   /** The door and busted: back to idle with no event. */
   abandon(): void {
     if (this.state === 'idle') return;
+    this.release();
     this.state = 'idle';
     this.active = -1;
     this.remaining = 0;
@@ -282,7 +283,12 @@ export class Jobs {
         this.ensureLeft = 0;
       }
     }
-    if (this.wantedAgent >= 0) return;
+    if (this.wantedAgent >= 0) {
+      // it cruises, so a hunter can close on it; the guide holds per lane and is renewed every step
+      const lane = traffic.lane[this.wantedAgent] as number;
+      if (lane >= 0) traffic.setGuidePlan(this.wantedAgent, (traffic.lanes.limit[lane] as number) * BALANCE.jobs.order.cruise);
+      return;
+    }
     this.ensureLeft -= dt;
     if (this.ensureLeft > 0) return;
     this.ensureLeft = BALANCE.jobs.order.ensureSeconds;
@@ -308,13 +314,21 @@ export class Jobs {
     return this.sim.carId === kind && this.sim.life.state.stage < 4 && !this.sim.life.state.wrecked;
   }
 
+  /** The wanted car goes back to being traffic. */
+  private release(): void {
+    const traffic = this.sim.traffic;
+    if (!traffic) return;
+    if (this.wantedAgent >= 0 && traffic.police[this.wantedAgent] !== 1) traffic.clearPolicePlan(this.wantedAgent);
+    traffic.wanted = -1;
+  }
+
   private finish(state: 'done' | 'failed', probe: PlayerProbe): void {
+    this.release();
     const d = this.defOf(this.active);
     if (d && (d.x - probe.x) ** 2 + (d.z - probe.z) ** 2 <= BALANCE.jobs.markerRadius ** 2) this.rearm = d.id;
     this.state = state;
     this.hold = BALANCE.jobs.holdSeconds;
     this.wantedAgent = -1;
-    if (this.sim.traffic) this.sim.traffic.wanted = -1;
     this.serial++;
   }
 

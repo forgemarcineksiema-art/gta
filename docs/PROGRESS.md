@@ -105,6 +105,51 @@ Decided (set here):
 - An order arrives only in the ordered class and not as a wreck; a swap away
   from the stolen car leaves the job waiting for it.
 
+Perf after slice 1 (MX330, 4× CPU, 60 s bot): 56.5 fps, frame p95 16.8 ms,
+step p95 7.0 ms, draws max 104, triangles max 266k, heap 48 MB, frame max
+167 ms (`perf/m5-slice1.json`). The M4 bases were 54.7 / 55.4.
+
+### Slice 2 — steal-to-order
+
+- `Traffic.ensure(kind, paint, player, near, cosHalf)`: the nearest unseen
+  driving civilian of the class in the 300–600 m band is repainted, else a
+  car is spawned on a lane in the band out of view through `claim`;
+  `paintOf`; `wanted` keeps the car from the despawn and from `claim`.
+- `Jobs`: hunting keeps the wanted car while it is the class, the paint and
+  a driving civilian, and asks again every `ensureSeconds` otherwise;
+  `orderFound` once; Life's swap tells `Jobs.onSwap` before the record
+  changes hands (the clock and the heat start there); the fence pays
+  `payout × (1 − 0.1 × stage)`, a wreck never arrives. The wanted car cruises
+  at `order.cruise` (0.5) of its lanes' limits, renewed every step as the
+  cold open holds its candidate, and goes back to traffic when the job ends.
+- The Palm Gardens fence is `palmFence(city)` in `place.ts`: the first clear
+  lot 2 m past the Garden Parkway's pavement from the middle of the arc
+  (−369, 419 at seed 42). The orders' fences are it, the scrapyard and the
+  hotel; each order goes to the nearest one at least 400 m by path.
+- `MarkerView` rings the wanted car within 150 m and in front of the camera;
+  the job line says FIND A LIME COMPACT · 20 m, then DELIVER THE COMPACT.
+- Tests: `order.test.ts` 2.1–2.6; `order.long.test.ts` 2.7 (the hunt).
+
+Measured (seed 42, traffic on), the naive hunter (the road bot re-planning
+the shortest lane path to the wanted car every 2 s): before the cruise, 2 of
+6 reached within 15 m in 240 s (130 and 153 s); with the cruise at 0.5,
+4 of 6 in 20.1, 81.3, 21.8 and 78.0 s. The traffic spawned the car in 17 of
+18 hunts over three runs and repainted one: civilians live within the 320 m
+despawn radius, so the 300–600 m band rarely holds one. Perf after slice 2:
+56.9 fps, frame p95 16.8 ms, step p95 6.8 ms, draws max 104, heap 51 MB,
+frame max 83 ms (`perf/m5-slice2.json`).
+
+Decided (set here):
+- The wanted car cruises at half its lanes' limits (`order.cruise`): at the
+  full limit a hunter at 30 m/s through junctions closes too slowly and the
+  car turns away at random; a car idling along is also what the job's
+  fantasy is (spot it, pull alongside, take it).
+- `order.long.test.ts` floors the naive hunter at 4 of 6: it loses the car
+  where its re-plan routes through a U-turn; the player has the radar, the
+  arrow and the ring.
+- The fence lives in `place.ts`, not `cover.ts`: finding a clear lot needs
+  the chunk's statics, and `cover.ts` is a pure function of constants.
+
 ## 2026-09-23 — The coin layer as lines
 
 Marcin: the coins are placed hopelessly and thoughtlessly; their look, how a

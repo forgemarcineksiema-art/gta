@@ -56,7 +56,8 @@ export const BALANCE = {
    * floored at `limitMin` s, its payout `payoutPerKm` of that path clamped; its drop-off is the nearest at least
    * `minPath` m away by path. An order pays by class less `stagePenalty` per damage stage, `limitSeconds` from
    * the swap; the traffic guarantees the car `ensureMin`–`ensureMax` m away, re-checked every `ensureSeconds`,
-   * and its ring shows within `ringRange` m. An escape pays `bounty` × level on the escape.
+   * cruising at `cruise` of its lanes' limits so a hunter can close on it, and its ring shows within `ringRange`
+   * m. An escape pays `bounty` × level on the escape.
    */
   jobs: {
     markerRadius: 4, beaconHeight: 3, timeBonus: 0.5, holdSeconds: 2, cardSeconds: 1.5, markerMinGap: 60,
@@ -64,7 +65,7 @@ export const BALANCE = {
     delivery: { payoutPerKm: 4000, payoutMin: 5000, payoutMax: 12000, limitFactor: 1.3, limitMin: 45, heat: 6, minPath: 400 },
     order: {
       payout: { compact: 4000, heavy: 5000, muscle: 6000, sports: 8000 }, stagePenalty: 0.1, limitSeconds: 240, heat: 4,
-      ensureMin: 300, ensureMax: 600, ensureSeconds: 5, ringRange: 150,
+      ensureMin: 300, ensureMax: 600, ensureSeconds: 5, ringRange: 150, cruise: 0.5,
     },
     escape: { bounty: 1500, levels: [2, 2, 3, 4] },
   },

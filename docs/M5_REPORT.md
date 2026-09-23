@@ -153,14 +153,16 @@ All live-editable in the dev panel (backtick) unless noted.
 
 ## Known issues
 
-- **Single long frames at 4× CPU** (the M4 issue, unchanged): 500 ms and
-  1.0 s in two of five M5 runs, none in three. Not the budgets (p95 holds).
-  It needs the trace on Marcin's machine.
+- **Single long frames at 4× CPU** (the M4 issue): 500 ms and 1.0 s in two
+  of five M5 runs. Closed in M5.1 (2026-09-23): the GPU process waited out
+  whole-buffer `bufferSubData` uploads on ANGLE/D3D11; whole-buffer updates
+  now orphan the buffer (ARCHITECTURE record 50); worst frame 83–133 ms
+  over three runs.
 - **No music bed**: downloading a track needs Marcin's yes on the exact
   file, its source and its licence (docs/ASSETS.md, BACKLOG).
-- **The quick `verify` runs 73–75 s of tests**, over the minute: the long
-  pole is M3's `traffic.test.ts` (68 s under the parallel load); its
-  traffic-pool drives belong in a long file (BACKLOG).
+- **The quick `verify` ran 73–75 s of tests**: eleven tests over ~10 s
+  moved to the long set in M5.1; the quick suite reads ~60 s on the 4-core
+  laptop, at the limit (Marcin: not worth more time).
 - **The naive hunter** reaches 4 of 6 wanted cars in 240 s (20–81 s) at seed
   42: it loses the car where its re-plan runs through a U-turn. The player
   has the radar, the arrow and the ring; Marcin's hunt decides whether the
@@ -172,9 +174,9 @@ All live-editable in the dev panel (backtick) unless noted.
   novice income, purchases at the doors. The sports car (60,000) is the
   second hour's goal; the first hour's cadence is the tiers. Marcin's feel
   for the prices is the check.
-- **Placement generates tens of chunks at boot** (70–130 ms in Node); the
-  time to control rose 0.23 s to 3.70 s. Caching the sixteen defs per seed
-  is in BACKLOG.
+- **Placement generated tens of chunks at boot** (70–130 ms in Node); the
+  time to control rose 0.23 s to 3.70 s. Closed in M5.1: seed 42's sixteen
+  defs are baked (`npm run bake:jobs`), time to control 3.30–3.43 s.
 - **The wall is 660 px wide at every size**: legible at 1920×1080 but small
   there (BACKLOG).
 - Deviations from the plan, each with its reason in PROGRESS: `timeBonus`

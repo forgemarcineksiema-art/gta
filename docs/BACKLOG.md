@@ -4,11 +4,6 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 ## Performance / size
 
-- (Resolved in M5.1, 2026-09-23.) M2 frame pacing: the isolated 167–767 ms
-  intervals on the MX330 (and M4's 0.5–1.25 s) were the GPU process waiting
-  inside a whole-buffer `glBufferSubData` on ANGLE/D3D11; whole-buffer
-  updates now orphan the buffer (ARCHITECTURE record 50).
-
 - Rapier `-compat` inlines the WASM as base64 (~2.7 MB vs ~2.0 MB raw). If startup bytes ever approach the 8 MB target, switch to the bundler build with `vite-plugin-wasm` and keep `-compat` only for Vitest. (M0)
 - `RigidBody.translation()/rotation()` calls allocate per body per step in the JS bindings; fine for tens of bodies, revisit if traffic ever uses many rigid bodies (M3 plans kinematic traffic). (M0)
 - Headless Chromium (software GL) renders the playground at a few fps; the perf run is a CPU-side signal only, as the brief expects. Real GPU numbers need `npm run perf:headed` on Marcin's machines. (M0)
@@ -116,6 +111,5 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 - A lit hideout sign visible from the highway (the garages have an orange band over the door and a radar glyph); drop-off approaches with a second, longer way in. (M4/M5)
 - The garage interior reads dark: the roof's underside gets only the hemisphere's ground colour; a lighter ceiling or a brighter strip light if Marcin finds it gloomy. (M4)
 - The music bed (M5 slice 8): one CC0 loop fetched after `gameplayStart()` through the master gain at -14 dB; needs Marcin's yes on the exact file, source and licence before anything is downloaded (docs/ASSETS.md).
-- Coin rings round the job markers (DESIGN.md §3.2 says they join in M5): not built; the markers are rings already and the lines end on caps.
 - The naive hunter (`order.long.test.ts`) loses the wanted car where its re-plan routes through a U-turn: a hunter aiming at the car's next junction would make the order e2e and the measurement faster.
 - The wall panel is 660 px wide at every size: at 1920x1080 it could grow with the viewport (legible already at DPR 1).

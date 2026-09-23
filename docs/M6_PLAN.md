@@ -65,7 +65,7 @@ Launch first and iterate on the three KPIs before anything else."*
 The save through `Platform.saveData/loadData` (one key), the door's and the
 garage's ad calls through `Platform.requestAd` with the input block and the
 mute, `adsAvailable` hiding the video buttons, the seen flag, the ten-size
-screens spec with seven states, `npm run game`. Slice 0 checks each.
+screens spec with ten states, `npm run game`. Slice 0 checks each.
 
 As built in M5 (docs/M5_REPORT.md; read before slice 0):
 

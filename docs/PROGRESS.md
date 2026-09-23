@@ -419,12 +419,12 @@ the protocol. Frame max 200 ms and 1.0 s (the M4 long-frame issue).
   `?fresh=1` with a stopwatch, `npm run perf:headed`, a yes or no on a music
   track.
 
-### Open problems
+### Open problems (as written at the gate; the first two closed in M5.1 above)
 
-- Single long frames (0.2–1.0 s) in some 4× runs; the trace on Marcin's
-  machine is still the next step.
-- The quick verify's tests take 73–75 s: M3's `traffic.test.ts` is the long
-  pole (BACKLOG).
+- Single long frames (0.2–1.0 s) in some 4× runs: closed in M5.1 (the
+  whole-buffer upload stall, ARCHITECTURE record 50).
+- The quick verify's tests took 73–75 s: eleven tests moved to the long set
+  in M5.1; the quick suite reads ~60 s on this laptop.
 - The skilled bot never escaped a level-4 marker; the naive hunter reaches
   4 of 6 wanted cars. Both are the bots' limits until a human says
   otherwise.

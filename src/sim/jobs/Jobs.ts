@@ -34,12 +34,14 @@
  * the cold open runs only its own marker is live. No allocation per step.
  */
 import { BALANCE } from '../balance';
+import { RIVALS, type RivalDef } from '../board/rivals';
 import type { SimEvent } from '../events';
 import type { SimWorld } from '../SimWorld';
 import { routeLine, type CoinPoint } from '../city/coins';
 import { alongLane, laneChain } from '../city/route';
 import type { Lane } from '../city/roads';
 import { AgentState, type PlayerProbe } from '../traffic/Traffic';
+import type { BodyId } from '../traffic/bodies';
 import { CAR_IDS } from '../vehicle/presets';
 import { trialMedal, type JobDef } from './catalog';
 import { Race } from './Race';
@@ -72,6 +74,8 @@ export class Jobs {
   /** The running street race's rivals (M5.5 slice 11), and the player's place in the last one. */
   readonly race: Race;
   lastPlace = 0;
+  /** The last duel won was a rematch (M6): the line says so, no car. */
+  lastRematch = false;
   /** A zone job's count toward its quota (takedowns, or dollars of damage), and whether the car is inside the zone. */
   zoneCount = 0;
   inZone = false;
@@ -126,17 +130,19 @@ export class Jobs {
     return this.state === 'hunting' || this.state === 'active' ? this.defOf(this.active) : null;
   }
 
-  /** A marker the player can start now: idle, and during the cold open only its own. */
+  /** A marker the player can start now: idle, and during the cold open only its own; a rival's ring while the board says so (M6). */
   live(d: JobDef): boolean {
     const co = this.sim.coldOpen;
-    return co.active ? d.id === co.job : d.id !== co.job;
+    if (co.active) return d.id === co.job;
+    return d.id !== co.job && (d.kind !== 'duel' || this.sim.board.live(d.level));
   }
 
   step(probe: PlayerProbe, dt: number): void {
     if (!this.ringsLaid) {
       this.ringsLaid = true;
-      // a ring of coins round every placed marker (DESIGN.md §3.2); not the cold open's, whose line leads there
-      this.sim.coins?.addExtra(markerRingCoins(this.defs.filter((d) => d.id !== 0)));
+      // a ring of coins round every placed marker (DESIGN.md §3.2); not the cold open's, whose line leads there, nor
+      // a rival's, which is there only while the board says so (M6)
+      this.sim.coins?.addExtra(markerRingCoins(this.defs.filter((d) => d.id !== 0 && d.kind !== 'duel')));
     }
     this.escaped = false;
     this.cursor = this.sim.events.readFrom(this.cursor, this.onEvent);
@@ -158,8 +164,11 @@ export class Jobs {
     if (this.state === 'idle') {
       for (let i = 0; i < this.defs.length; i++) {
         const d = this.defs[i] as JobDef;
-        if (d.id === this.rearm || !this.live(d)) continue;
-        if ((d.x - probe.x) ** 2 + (d.z - probe.z) ** 2 > r * r) continue;
+        // a rival waits at the kerb (M6): pull up beside them, slowly, inside the wider ring; driving past does nothing
+        const duel = d.kind === 'duel';
+        const rr = duel ? BALANCE.board.ringRadius : r;
+        if (d.id === this.rearm || (d.x - probe.x) ** 2 + (d.z - probe.z) ** 2 > rr * rr) continue;
+        if ((duel && probe.speed > BALANCE.board.pullUp) || !this.live(d)) continue;
         this.start(d);
         return;
       }
@@ -173,6 +182,10 @@ export class Jobs {
     this.elapsed += dt;
     if (this.state === 'hunting') {
       this.hunt(d, probe, dt);
+      return;
+    }
+    if (d.kind === 'duel') {
+      this.duelStep(d, probe, dt);
       return;
     }
     if (d.kind === 'race') this.race.step(probe);
@@ -282,7 +295,7 @@ export class Jobs {
       out.z = traffic.z[this.wantedAgent] as number;
       return true;
     }
-    if (d.kind === 'escape') return false;
+    if (d.kind === 'escape' || (d.kind === 'duel' && RIVALS[d.level]?.format === 'chief')) return false;
     out.x = d.targetX;
     out.z = d.targetZ;
     return true;
@@ -364,6 +377,10 @@ export class Jobs {
       return;
     }
     this.state = 'active';
+    if (d.kind === 'duel') {
+      this.startDuel(d);
+      return;
+    }
     if (d.kind === 'escape') {
       // straight into a chase at the level: the heat to its threshold (the ratchet never lowers), the police on the player now
       this.remaining = NaN;
@@ -388,6 +405,68 @@ export class Jobs {
     }
     // the coins along the way (DESIGN.md §13.5); the cold open lays its own line
     if (d.id !== this.sim.coldOpen.job) this.layRoute(d.x, d.z, d.targetX, d.targetZ);
+  }
+
+  /**
+   * A wanted board's duel (M6, DESIGN.md §14.3): the heat to the rival's level (the ratchet never lowers), then
+   * their race to the finish with the pace and band of their place on the board; the Chief's is an escape at five
+   * stars with no clock. A hunt races until slice 2 gives it its own rule.
+   */
+  private startDuel(d: JobDef): void {
+    const rival = RIVALS[d.level] as RivalDef;
+    this.lastPlace = 0;
+    // the rival's parked car pulls out: the racer takes its place on the road
+    this.sim.board.unpark(d.level);
+    const threshold = rival.heat > 0 ? (BALANCE.heatThresholds[rival.heat - 1] ?? 0) : 0;
+    this.sim.heat.add(Math.max(0, threshold - this.sim.heat.points));
+    if (rival.format === 'chief') {
+      this.remaining = NaN;
+      this.sim.pursuit.force(BALANCE.jobs.escape.radioSeconds);
+      return;
+    }
+    this.remaining = d.limitSeconds;
+    const b = BALANCE.board;
+    const cars: Array<readonly [BodyId, number]> = rival.paints.map((paint) => [rival.body, paint] as const);
+    this.race.start(d.targetX, d.targetZ, this.sim.probe, { cars, pace: b.pace[d.level] ?? 1, band: b.band[d.level] ?? [0.8, 1.2] });
+  }
+
+  /** The duel's step: a rival over the line first loses it at once; the player over it wins; the clock fails it. */
+  private duelStep(d: JobDef, probe: PlayerProbe, dt: number): void {
+    const rival = RIVALS[d.level] as RivalDef;
+    if (rival.format === 'chief') {
+      if (this.escaped) this.winDuel(d, probe);
+      return;
+    }
+    this.race.step(probe);
+    if (this.race.finished > 0) {
+      this.lastPlace = 2;
+      this.finish('failed', probe);
+      this.sim.events.push('jobFailed', 0, probe.x, 0, probe.z, d.id);
+      return;
+    }
+    const reach = BALANCE.jobs.race.finishRadius;
+    if ((d.targetX - probe.x) ** 2 + (d.targetZ - probe.z) ** 2 <= reach * reach) {
+      this.lastPlace = 1;
+      this.winDuel(d, probe);
+      return;
+    }
+    this.remaining -= dt;
+    if (this.remaining > 1e-9) return;
+    this.remaining = 0;
+    this.finish('failed', probe);
+    this.sim.events.push('jobFailed', 0, probe.x, 0, probe.z, d.id);
+  }
+
+  /** The purse into the bag (the whole, or a rematch's share), then the board's first win: the rival's car, the news. */
+  private winDuel(d: JobDef, probe: PlayerProbe): void {
+    const board = this.sim.board;
+    const paid = board.purse(d.level);
+    this.lastPaid = paid;
+    this.lastTip = false;
+    this.lastRematch = board.isBeaten(d.level);
+    this.finish('done', probe);
+    this.sim.events.push('jobDone', paid, probe.x, 0, probe.z, d.id);
+    board.win(d.level);
   }
 
   /**

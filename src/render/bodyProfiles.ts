@@ -302,8 +302,11 @@ export const ICECREAM: CarProfile = {
   paint: 0x91aca3,
 };
 
-/** Every body's profile: the player's five classes, the city's eight and the hidden truck. */
+/** Every body's profile: the player's five classes, the city's eight, the hidden truck and the wanted board's cars. */
 export const BODY_PROFILES: Record<BodyId, CarProfile> = {
   ...CAR_PROFILES,
   sedan: SEDAN, hatch: HATCH, estate: ESTATE, suv: SUV, pickup: PICKUP, taxi: TAXI, truck: TRUCK, bus: BUS, icecream: ICECREAM,
+  // the rivals' cars on the bodies they stand in for until M6 slices 4–5 draw their own
+  wagon: ESTATE, pizza: HATCH, wrecker: PICKUP, twin: CAR_PROFILES.sports, fakecop: CAR_PROFILES.police, partybus: BUS,
+  lowrider: CAR_PROFILES.sports, limo: SEDAN, bubble: HATCH, phantom: CAR_PROFILES.sports, chiefcar: CAR_PROFILES.police,
 };

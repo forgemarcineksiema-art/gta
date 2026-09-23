@@ -37,6 +37,8 @@ import { Jobs } from './jobs/Jobs';
 import { Fares } from './jobs/Fares';
 import { jobsFor } from './jobs/place';
 import { Garage } from './garage/Garage';
+import { Board } from './board/Board';
+import { Career } from './board/Career';
 import { Dailies } from './dailies/Dailies';
 import { apply as applySave, type SaveV1 } from './save/format';
 import { buildPlayground, type PlaygroundLayout, type SpawnPoint } from './playground';
@@ -152,6 +154,10 @@ export class SimWorld {
   readonly coldOpen: ColdOpen;
   /** The catalogue, paint, upgrades and prep: the wall's pages (M5 slice 4). */
   readonly garage: Garage;
+  /** The wanted board (M6): the rivals beaten, the next one's requirements, their duels' rings. */
+  readonly board: Board;
+  /** Lifetime counts the board's requirements read (M6). */
+  readonly career: Career;
   /** The day's three challenges and the streak (M5 slice 6). */
   readonly dailies: Dailies;
   /** The city's smashable billboards; null on the playground. */
@@ -241,6 +247,8 @@ export class SimWorld {
     const tuning = opts.tuning ?? cloneTuning(CAR_PRESETS[this.carId]);
     this.vehicle = new Vehicle(this.world, this.transforms, tuning, spawn.position, spawn.yaw);
     this.garage = new Garage(this);
+    this.board = new Board(this);
+    this.career = new Career(this);
     this.traffic = this.city ? new Traffic(this.world, this.transforms, this.city, opts.seed ?? 42, TRAFFIC, this.trafficDensity) : null;
     this.peds = this.city && this.traffic ? new Pedestrians(this.transforms, this.city, this.traffic.lanes, opts.seed ?? 42, PEDS, this.pedsDensity) : null;
     this.collectibles = this.city ? new Collectibles(this.city) : null;
@@ -357,6 +365,9 @@ export class SimWorld {
     this.donuts?.step(this.probe);
     this.fares.step(this.probe, FIXED_DT);
     this.jobs.step(this.probe, FIXED_DT);
+    // after the jobs (a fare's def and a race's place are still there), before the run banks anything
+    this.career.step();
+    this.board.step(this.probe);
     this.run.step(this.probe, FIXED_DT);
     this.ticket.step(FIXED_DT);
     this.dailies.step();

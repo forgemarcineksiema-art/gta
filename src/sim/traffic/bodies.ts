@@ -12,9 +12,12 @@ import { CITY_COLORS, PALETTE } from '../palette';
 import { CAR_IDS, CAR_PRESETS, type CarId } from '../vehicle/presets';
 import { cloneTuning, type VehicleTuning } from '../vehicle/tuning';
 
-export type CivilianBody = 'sedan' | 'hatch' | 'estate' | 'suv' | 'pickup' | 'taxi' | 'truck' | 'bus' | 'icecream';
+/** The wanted board's cars (M6, DESIGN.md §14.3): the ten rivals' and the Chief's, never spawned as traffic. */
+export type RivalBody = 'wagon' | 'pizza' | 'wrecker' | 'twin' | 'fakecop' | 'partybus' | 'lowrider' | 'limo' | 'bubble' | 'phantom' | 'chiefcar';
+export type CivilianBody = 'sedan' | 'hatch' | 'estate' | 'suv' | 'pickup' | 'taxi' | 'truck' | 'bus' | 'icecream' | RivalBody;
 export type BodyId = CarId | CivilianBody;
-export const CIVILIAN_BODIES: readonly CivilianBody[] = ['sedan', 'hatch', 'estate', 'suv', 'pickup', 'taxi', 'truck', 'bus', 'icecream'];
+export const RIVAL_BODIES: readonly RivalBody[] = ['wagon', 'pizza', 'wrecker', 'twin', 'fakecop', 'partybus', 'lowrider', 'limo', 'bubble', 'phantom', 'chiefcar'];
+export const CIVILIAN_BODIES: readonly CivilianBody[] = ['sedan', 'hatch', 'estate', 'suv', 'pickup', 'taxi', 'truck', 'bus', 'icecream', ...RIVAL_BODIES];
 export const BODY_IDS: readonly BodyId[] = [...CAR_IDS, ...CIVILIAN_BODIES];
 
 /** Traffic's paints (the order cards name them in jobs/catalog.ts). */
@@ -61,6 +64,12 @@ function civilian(id: CivilianBody, car: CarId, halfWidth: number, halfLength: n
   return { id, car, halfWidth, halfLength, wheelBase, trackWidth, mass, pace, paints: CIVILIAN_PAINTS, big: false, keepsLane: false, hops: 1, stretch: false, ...more };
 }
 
+/** A rival's car on a class's own shell's footprint (the Twin, the Fake Cruiser, the Phantom, the Chief's Cruiser). */
+function onShell(id: RivalBody, car: CarId, paint: number): BodySpec {
+  const p = CAR_PRESETS[car];
+  return civilian(id, car, p.chassisHalfExtents.x, p.chassisHalfExtents.z, p.wheelBase, p.trackWidth, p.mass, 1, { paints: [paint] });
+}
+
 /** Indexed like BODY_IDS. Sizes in metres; the profiles in render/bodyProfiles.ts are drawn on these wheels. */
 export const BODIES: readonly BodySpec[] = [
   ...CAR_IDS.map(shell),
@@ -74,6 +83,19 @@ export const BODIES: readonly BodySpec[] = [
   civilian('bus', 'heavy', 1.27, 6.0, 6.6, 2.24, 6500, 0.8, { paints: BUS_PAINTS, big: true, keepsLane: true, stretch: true }),
   // the hidden car (M5.5 slice 16): never drawn by the spawner (its share is 0), stashed by city/stash.ts
   civilian('icecream', 'heavy', 1.12, 2.9, 3.4, 1.9, 2800, 0.85, { paints: [CITY_COLORS.mint], big: true, stretch: true }),
+  // the wanted board's cars (M6 slice 1): on the footprints of the bodies they are drawn as until slices 4–5 give
+  // them their own; never spawned (share 0), raced or hunted by jobs/Duel, won into the garage
+  civilian('wagon', 'muscle', 0.92, 2.42, 2.85, 1.6, 1450, 1, { paints: [CITY_COLORS.lavender] }),
+  civilian('pizza', 'compact', 0.87, 2.05, 2.55, 1.52, 1150, 1, { paints: [PALETTE.carRed] }),
+  civilian('wrecker', 'heavy', 0.98, 2.7, 3.3, 1.72, 2100, 1, { paints: [PALETTE.carOrange] }),
+  onShell('twin', 'sports', CITY_COLORS.mint),
+  onShell('fakecop', 'police', PALETTE.policeWhite),
+  civilian('partybus', 'heavy', 1.27, 6.0, 6.6, 2.24, 6500, 1, { paints: [PALETTE.carMagenta], big: true, stretch: true }),
+  onShell('lowrider', 'sports', PALETTE.carBlue),
+  civilian('limo', 'muscle', 0.92, 2.35, 2.8, 1.6, 1400, 1, { paints: [PALETTE.carGold] }),
+  civilian('bubble', 'compact', 0.87, 2.05, 2.55, 1.52, 1150, 1, { paints: [PALETTE.carLime] }),
+  onShell('phantom', 'sports', PALETTE.carBlack),
+  onShell('chiefcar', 'police', PALETTE.policeWhite),
 ];
 
 export const BODY_INDEX = Object.fromEntries(BODY_IDS.map((id, i) => [id, i])) as Record<BodyId, number>;
@@ -85,6 +107,11 @@ export function bodySpec(body: BodyId): BodySpec {
 /** One of the player's five shells, not a civilian body. */
 export function isShell(body: BodyId): body is CarId {
   return BODY_INDEX[body] < CAR_IDS.length;
+}
+
+/** A wanted board's car (M6): won from a rival, never kept at a door or spawned. */
+export function isRivalBody(body: BodyId): body is RivalBody {
+  return (RIVAL_BODIES as readonly BodyId[]).includes(body);
 }
 
 /** Forces and inertias that scale with the mass when a class is stretched to a bigger body. */

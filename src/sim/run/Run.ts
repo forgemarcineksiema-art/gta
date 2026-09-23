@@ -22,7 +22,7 @@ import { POLICE } from '../police/tuning';
 import type { Quat } from '../scene';
 import type { SimWorld } from '../SimWorld';
 import type { PlayerProbe } from '../traffic/Traffic';
-import type { BodyId } from '../traffic/bodies';
+import { isRivalBody, type BodyId } from '../traffic/bodies';
 import { STEP } from './goal';
 
 export type RunState = 'running' | 'closing' | 'door' | 'busted';
@@ -307,7 +307,7 @@ export class Run {
     const prep = this.sim.garage.prep;
     // the car you drove in: yours to keep for a share of its price, if the garage does not own it yet
     const car = this.sim.carBody;
-    this.hot = this.sim.garage.owned.has(car) ? null : car;
+    this.hot = this.sim.garage.owned.has(car) || isRivalBody(car) ? null : car;
     this.hotPaint = this.sim.pursuit.descriptor.paint;
     this.lastFence = prep.fence;
     this.lastLawyer = false;

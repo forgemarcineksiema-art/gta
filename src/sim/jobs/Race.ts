@@ -17,14 +17,27 @@ import type { PlayerProbe } from '../traffic/Traffic';
 import type { BodyId } from '../traffic/bodies';
 import { PALETTE } from '../palette';
 
-/** The rivals' cars and paints. */
-const RIVALS: ReadonlyArray<readonly [BodyId, number]> = [['sports', PALETTE.carLime], ['muscle', PALETTE.carMagenta], ['sports', PALETTE.carBlue]];
+/** The street race's field: the rivals' cars and paints. */
+const FIELD: ReadonlyArray<readonly [BodyId, number]> = [['sports', PALETTE.carLime], ['muscle', PALETTE.carMagenta], ['sports', PALETTE.carBlue]];
+
+/** A wanted board's duel (M6): its rivals (one, the twins two), their pace on the lane's limit and their band. */
+export interface RaceField {
+  cars: ReadonlyArray<readonly [BodyId, number]>;
+  pace: number;
+  band: readonly [number, number];
+}
 
 export class Race {
   /** The rivals' traffic records, -1 when gone. */
-  readonly rivals = new Int16Array(RIVALS.length).fill(-1);
+  readonly rivals = new Int16Array(FIELD.length).fill(-1);
   /** Each rival's finishing place (0 still racing). */
-  readonly placeOf = new Uint8Array(RIVALS.length);
+  readonly placeOf = new Uint8Array(FIELD.length);
+  /** Rivals in this race: three in a street race, one or two in a duel. */
+  count = 0;
+  /** This race's pace (a factor on the lane's limit) and band. */
+  private pace = 1;
+  private bandLow = 1;
+  private bandHigh = 1;
   /** Rivals over the line so far. */
   finished = 0;
   running = false;
@@ -43,8 +56,8 @@ export class Race {
     for (const lane of lanes) for (const n of lane.next) (this.preds[n] as number[]).push(lane.id);
   }
 
-  /** The rivals on the road ahead, the way to the finish worked out once. */
-  start(finishX: number, finishZ: number, probe: PlayerProbe): void {
+  /** The rivals on the road ahead, the way to the finish worked out once; a duel brings its own field. */
+  start(finishX: number, finishZ: number, probe: PlayerProbe, duel?: RaceField): void {
     const city = this.sim.city, traffic = this.sim.traffic;
     if (!city || !traffic) return;
     this.stop();
@@ -55,10 +68,15 @@ export class Race {
     const s0 = alongLane(city.graph.lanes[lane] as Lane, probe.x, probe.z).s;
     const len = traffic.lanes.length[lane] as number;
     const r = BALANCE.jobs.race;
-    for (let k = 0; k < RIVALS.length; k++) {
-      const [body, paint] = RIVALS[k] as readonly [BodyId, number];
+    const cars = duel ? duel.cars : FIELD;
+    this.count = Math.min(cars.length, this.rivals.length);
+    this.pace = r.pace * (duel ? duel.pace : 1);
+    this.bandLow = duel ? duel.band[0] : (r.band[0] as number);
+    this.bandHigh = duel ? duel.band[1] : (r.band[1] as number);
+    for (let k = 0; k < this.count; k++) {
+      const [body, paint] = cars[k] as readonly [BodyId, number];
       const s = Math.min(len - 2, s0 + r.gridAhead * (k + 1));
-      const agent = traffic.spawnRacer(lane, s, body, paint);
+      const agent = traffic.spawnRacer(lane, s, body, paint, duel !== undefined);
       this.rivals[k] = agent;
       this.placeOf[k] = 0;
     }
@@ -74,7 +92,7 @@ export class Race {
     const r = BALANCE.jobs.race;
     const lanes = traffic.lanes;
     const mine = Math.hypot(this.finishX - probe.x, this.finishZ - probe.z);
-    for (let k = 0; k < this.rivals.length; k++) {
+    for (let k = 0; k < this.count; k++) {
       const agent = this.rivals[k] as number;
       if (agent < 0 || this.placeOf[k] !== 0) continue;
       if (!traffic.isRacer(agent)) { this.rivals[k] = -1; continue; }
@@ -94,8 +112,8 @@ export class Race {
         if (d < best) { best = d; next = out; }
       }
       // the rubber band: ahead of the player it eases off, behind it pushes
-      const band = Math.max(r.band[0] as number, Math.min(r.band[1] as number, 1 - (mine - theirs) / r.bandRange * (1 - (r.band[0] as number))));
-      traffic.setRacePlan(agent, next, (lanes.limit[lane] as number) * r.pace * band);
+      const band = Math.max(this.bandLow, Math.min(this.bandHigh, 1 - (mine - theirs) / r.bandRange * (1 - this.bandLow)));
+      traffic.setRacePlan(agent, next, (lanes.limit[lane] as number) * this.pace * band);
     }
   }
 
@@ -105,7 +123,7 @@ export class Race {
     let ahead = this.finished;
     if (!traffic) return ahead + 1;
     const mine = Math.hypot(this.finishX - probe.x, this.finishZ - probe.z);
-    for (let k = 0; k < this.rivals.length; k++) {
+    for (let k = 0; k < this.count; k++) {
       const agent = this.rivals[k] as number;
       if (agent < 0 || this.placeOf[k] !== 0) continue;
       if (Math.hypot(this.finishX - (traffic.x[agent] as number), this.finishZ - (traffic.z[agent] as number)) < mine) ahead++;

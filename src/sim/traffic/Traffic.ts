@@ -125,6 +125,8 @@ export class Traffic {
   readonly police: Uint8Array;
   /** A street race's rival (M5.5 slice 11): drives in the police's driving mode while its race plan holds. */
   readonly racer: Uint8Array;
+  /** A wanted board's rival's car (M6): never a swap candidate, during its duel and after, until the record is freed. */
+  readonly rival: Uint8Array;
   readonly paint: Uint32Array;
   readonly slot: Int16Array;
   readonly lane: Int16Array;
@@ -297,6 +299,7 @@ export class Traffic {
     this.body = new Uint8Array(n);
     this.police = new Uint8Array(n);
     this.racer = new Uint8Array(n);
+    this.rival = new Uint8Array(n);
     this.paint = new Uint32Array(n);
     this.slot = new Int16Array(n);
     this.lane = new Int16Array(n);
@@ -726,12 +729,13 @@ export class Traffic {
     this.freeSteer[agent] = 0;
   }
 
-  /** A street race's rival on a lane (M5.5 slice 11): a civilian record in the race's paint, the race's plan to follow. */
-  spawnRacer(lane: number, s: number, body: BodyId, paint: number): number {
+  /** A street race's rival on a lane (M5.5 slice 11): a civilian record in the race's paint, the race's plan to follow; a wanted board's rival's (M6) is never a swap candidate. */
+  spawnRacer(lane: number, s: number, body: BodyId, paint: number, rival = false): number {
     const i = this.findFree();
     if (i < 0) return -1;
     this.place(i, lane, s, BODY_INDEX[body], 0, AgentState.Kinematic, paint);
     this.racer[i] = 1;
+    this.rival[i] = rival ? 1 : 0;
     this.bad[i] = 0;
     // a standing start, and a racer's short gap to the car ahead
     this.speed[i] = 0;
@@ -784,12 +788,29 @@ export class Traffic {
     this.freeSteer[agent] = 0;
   }
 
-  /** A stopped car (wreck or abandoned) at a point, off the lane graph: the tests, and the stash's hidden car. */
-  spawnAtPoint(x: number, z: number, yaw: number, body: BodyId, state: AgentState.Wrecked | AgentState.Abandoned, paint = PAINTS[0] as number): number {
+  /** A stopped car (wreck, abandoned or parked) at a point, off the lane graph: the tests, the stash's hidden car, a rival waiting (M6). */
+  spawnAtPoint(x: number, z: number, yaw: number, body: BodyId, state: AgentState.Wrecked | AgentState.Abandoned | AgentState.Parked, paint = PAINTS[0] as number): number {
     const i = this.findFree();
     if (i < 0) return -1;
     this.placeAtPoint(i, x, z, yaw, BODY_INDEX[body], state, paint);
     return i;
+  }
+
+  /** A record gone at once (a rival's parked car when the duel starts, M6): the same free as the despawn's. */
+  remove(agent: number): void {
+    if (agent >= 0 && agent < this.capacity && this.state[agent] !== AgentState.Free) this.free(agent);
+  }
+
+  /** The kerbside bay at a point is a rival's (M6): no civilian parks in it, and one standing there now goes. */
+  reserveBayAt(x: number, z: number): void {
+    for (let b = 0; b < this.bays.length; b++) {
+      const bay = this.bays[b] as ParkingBay;
+      if (Math.hypot(bay.x - x, bay.z - z) > 0.5) continue;
+      this.bayUsed[b] = 0;
+      const a = this.bayCar[b] as number;
+      if (a >= 0 && this.parkBay[a] === b) this.free(a);
+      this.bayCar[b] = -1;
+    }
   }
 
   /**
@@ -838,6 +859,7 @@ export class Traffic {
     this.parkedCiv[i] = 0;
     this.parkBay[i] = -1;
     this.racer[i] = 0;
+    this.rival[i] = 0;
     this.lights[i] = 0;
     this.police[i] = 0;
     this.clearPolicePlan(i);
@@ -1877,6 +1899,7 @@ export class Traffic {
     this.parkedCiv[i] = 0;
     this.parkBay[i] = -1;
     this.racer[i] = 0;
+    this.rival[i] = 0;
     this.drawDriver(i);
     this.lights[i] = 0;
     this.police[i] = 0;
@@ -1920,6 +1943,7 @@ export class Traffic {
     this.parkBay[i] = -1;
     this.police[i] = 0;
     this.racer[i] = 0;
+    this.rival[i] = 0;
     this.lights[i] = 0;
     this.clearPolicePlan(i);
     this.next[i] = -1;

@@ -10,7 +10,7 @@ import { PLAYER_PAINT } from '../traffic/Traffic';
 import { CAR_IDS, type CarId } from '../vehicle/presets';
 import { BODIES, BODY_IDS, type BodyId } from '../traffic/bodies';
 
-export type JobKind = 'delivery' | 'order' | 'escape' | 'trial' | 'race' | 'rage' | 'mayhem' | 'fare';
+export type JobKind = 'delivery' | 'order' | 'escape' | 'trial' | 'race' | 'rage' | 'mayhem' | 'fare' | 'duel';
 
 export interface JobDef {
   id: number;
@@ -22,7 +22,7 @@ export interface JobDef {
   /** The delivery's drop-off or the order's fence (a point inside the ring's radius wins); unused for an escape. */
   targetX: number;
   targetZ: number;
-  /** An escape's heat level (2..4); a zone job's quota (takedowns, or dollars of damage); 0 otherwise. */
+  /** An escape's heat level (2..4); a zone job's quota (takedowns, or dollars of damage); a duel's rival (M6: `RIVALS`' index); 0 otherwise. */
   level: number;
   /** An order's wanted car, `packDescriptor`; -1 otherwise. */
   descriptor: number;
@@ -75,6 +75,8 @@ export const CAR_WORDS: Record<CarId, string> = { muscle: 'MUSCLE CAR', compact:
 /** What the radio calls a body. */
 export const BODY_WORDS: Record<BodyId, string> = {
   ...CAR_WORDS, sedan: 'SEDAN', hatch: 'HATCHBACK', estate: 'ESTATE', suv: 'SUV', pickup: 'PICKUP', taxi: 'TAXI', truck: 'BOX TRUCK', bus: 'BUS', icecream: 'ICE-CREAM TRUCK',
+  wagon: 'WAGON', pizza: 'PIZZA HATCH', wrecker: 'WRECKER', twin: 'TWIN', fakecop: 'FAKE CRUISER', partybus: 'PARTY BUS',
+  lowrider: 'LOWRIDER', limo: 'GOLD LIMO', bubble: 'BUBBLE', phantom: 'PHANTOM', chiefcar: "CHIEF'S CRUISER",
 };
 
 /** A trial's medal times from its bronze limit (M5.5 slice 10): gold, silver, bronze, seconds. */

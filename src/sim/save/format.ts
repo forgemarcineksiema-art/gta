@@ -10,6 +10,7 @@
  * parses to the defaults here; the store keeps the raw text and never writes
  * over it (an older build must not destroy a newer save).
  */
+import { CHIEF, RIVALS } from '../board/rivals';
 import { HIDDEN_CARS } from '../city/stash';
 import type { SimWorld } from '../SimWorld';
 import { BODY_IDS, type BodyId } from '../traffic/bodies';
@@ -395,6 +396,11 @@ export function collect(sim: SimWorld, into: SaveDoc): void {
   for (const d of sim.jobs.defs) if (d.kind === 'trial') medals += String(sim.jobs.medals.get(d.id) ?? 0);
   into.medals = medals.replace(/0+$/, '');
   if (sim.jumps) into.jumps = encodeBits(sim.jumps.found);
+  into.board.beaten = sim.board.beaten;
+  const c = sim.career, out = into.career;
+  out.races = c.races; out.zones = c.zones; out.fares = c.fares; out.hotFares = c.hotFares;
+  out.orders = c.orders; out.takedowns = c.takedowns; out.caches = c.caches;
+  for (let i = 0; i < 5; i++) out.escapes[i] = c.escapes[i] as number;
 }
 
 /** A document into a freshly built world, once, before the first step: the garage car is driven out at once. */
@@ -433,6 +439,13 @@ export function apply(sim: SimWorld, save: SaveDoc): void {
   // a hidden car owned is one found: its stash stays empty
   sim.stash.found.clear();
   for (const id of HIDDEN_CARS) if (garage.owned.has(id)) sim.stash.found.add(id);
+  // the wanted board: the rivals beaten own their cars (their bodies may be newer than the save)
+  sim.board.beaten = save.board.beaten;
+  for (let i = 0; i <= CHIEF && i < RIVALS.length; i++) if (sim.board.isBeaten(i)) sim.board.ownCar(i);
+  const cr = save.career, career = sim.career;
+  career.races = cr.races; career.zones = cr.zones; career.fares = cr.fares; career.hotFares = cr.hotFares;
+  career.orders = cr.orders; career.takedowns = cr.takedowns; career.caches = cr.caches;
+  for (let i = 0; i < 5; i++) career.escapes[i] = cr.escapes[i] as number;
   garage.serial++;
   garage.applyToVehicle();
   const c = sim.collectibles;

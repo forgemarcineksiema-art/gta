@@ -10,11 +10,11 @@
  * top centre. DOM writes only on change; reads sim state only.
  */
 import {
-  BALANCE, CAR_WORDS, CHAIN_STEPS, MEDAL_WORDS, PLACE_WORDS, STEP, chainStep, goalFor, newGoal, paintName, trialTimes, unpackDescriptor,
-  type GoalKind, type JobDef, type SimWorld,
+  BALANCE, BODY_WORDS, CAR_WORDS, CHAIN_STEPS, CHIEF, MEDAL_WORDS, PLACE_WORDS, RIVALS, STEP, chainStep, goalFor, newGoal, paintName, posterNumber, reqText,
+  trialTimes, unpackDescriptor, type GoalKind, type JobDef, type RivalDef, type SimWorld,
 } from '../sim';
 
-const KIND_TITLE: Record<JobDef['kind'], string> = { delivery: 'DELIVERY', order: 'STEAL TO ORDER', escape: 'ESCAPE', trial: 'TIME TRIAL', race: 'STREET RACE', rage: 'TAKEDOWN RAGE', mayhem: 'MAYHEM', fare: 'FARE' };
+const KIND_TITLE: Record<JobDef['kind'], string> = { delivery: 'DELIVERY', order: 'STEAL TO ORDER', escape: 'ESCAPE', trial: 'TIME TRIAL', race: 'STREET RACE', rage: 'TAKEDOWN RAGE', mayhem: 'MAYHEM', fare: 'FARE', duel: 'WANTED BOARD' };
 
 export class JobsHud {
   readonly root: HTMLElement;
@@ -54,6 +54,8 @@ export class JobsHud {
   private goalKind: GoalKind = 'none';
   private goalRing = '';
   private goalAmount = -1;
+  /** The goal's rival and requirement (M6), packed: the line's words change with them. */
+  private goalWho = -1;
   /** Who has the card, and for how long the chain's card still shows. */
   private cardMode: '' | 'job' | 'chain' = '';
   private chainSeen = -1;
@@ -183,8 +185,8 @@ export class JobsHud {
       this.zoneOut = !jobs.inZone;
       this.fillJobLine(sim, d);
     }
-    // a race's place, live: the line's words when it changes
-    if (d.kind === 'race' && jobs.state === 'active') {
+    // a race's place, live: the line's words when it changes (a rival's race too)
+    if ((d.kind === 'race' || d.kind === 'duel') && jobs.state === 'active') {
       const place = jobs.race.place(sim.probe);
       if (place !== this.racePlace) {
         this.racePlace = place;
@@ -230,10 +232,12 @@ export class JobsHud {
       this.lineCoins.textContent = '';
       this.line.classList.remove('is-hurry');
     }
-    if (g.kind !== this.goalKind || g.ring !== this.goalRing || g.amount !== this.goalAmount) {
+    const who = g.rival * 16 + g.req;
+    if (g.kind !== this.goalKind || g.ring !== this.goalRing || g.amount !== this.goalAmount || who !== this.goalWho) {
       this.goalKind = g.kind;
       this.goalRing = g.ring;
       this.goalAmount = g.amount;
+      this.goalWho = who;
       let words = '', extra = '';
       switch (g.kind) {
         case 'take': words = 'TAKE A JOB'; break;
@@ -246,6 +250,19 @@ export class JobsHud {
         case 'escape': words = 'ESCAPE THE COPS'; break;
         case 'order': words = 'STEAL TO ORDER'; break;
         case 'fill': words = 'FILL THE BAG'; extra = `${money(g.amount)}/${money(BALANCE.chain.bankGoal)}`; break;
+        // the wanted board (M6): the rival ready, or what they want first
+        case 'rival': {
+          const r = RIVALS[g.rival];
+          words = !r ? '' : g.rival === CHIEF ? 'FACE THE CHIEF' : `CHALLENGE ${r.name}`;
+          break;
+        }
+        case 'needs': {
+          const r = RIVALS[g.rival], q = r?.reqs[g.req];
+          if (!r || !q) break;
+          words = `#${posterNumber(g.rival)} NEEDS: ${reqText(q)}`;
+          if (q.count > 1 && q.kind !== 'bestRun') extra = `${money(Math.min(g.amount, q.count))}/${money(q.count)}`;
+          break;
+        }
         default: break;
       }
       this.lineKind.textContent = words;
@@ -266,8 +283,19 @@ export class JobsHud {
   private fillJobLine(sim: SimWorld, d: JobDef): void {
     const jobs = sim.jobs;
     let kind: string;
-    let state = d.kind === 'order' ? 'is-order' : d.kind === 'escape' ? 'is-escape' : d.kind === 'trial' ? 'is-trial' : d.kind === 'race' ? 'is-race' : d.kind === 'rage' || d.kind === 'mayhem' ? 'is-zone' : '';
-    if (jobs.state === 'done') {
+    let state = d.kind === 'order' ? 'is-order' : d.kind === 'escape' ? 'is-escape' : d.kind === 'trial' ? 'is-trial' : d.kind === 'race' ? 'is-race'
+      : d.kind === 'rage' || d.kind === 'mayhem' ? 'is-zone' : d.kind === 'duel' ? 'is-duel' : '';
+    const rival = d.kind === 'duel' ? (RIVALS[d.level] as RivalDef) : null;
+    if (jobs.state === 'done' && rival) {
+      // beaten: the purse, and the car the first time
+      kind = jobs.lastRematch ? `REMATCH WON +${money(jobs.lastPaid)}` : `BEATEN +${money(jobs.lastPaid)} · THE ${BODY_WORDS[rival.body]} IS YOURS`;
+      state = 'is-done';
+    } else if (jobs.state === 'failed' && rival) {
+      kind = jobs.lastPlace === 2 ? `${rival.name} WIN${rival.name.startsWith('THE TWINS') ? '' : 'S'} · TRY AGAIN` : 'TOO LATE · TRY AGAIN';
+      state = 'is-failed';
+    } else if (rival) {
+      kind = rival.format === 'chief' ? 'LOSE THE CHIEF' : `${rival.name} · ${PLACE_WORDS[this.racePlace] ?? ''}`;
+    } else if (jobs.state === 'done') {
       const what = d.kind === 'order' ? 'SOLD' : d.kind === 'escape' ? 'BOUNTY' : d.kind === 'trial' ? MEDAL_WORDS[jobs.lastMedal]
         : d.kind === 'race' ? `${PLACE_WORDS[jobs.lastPlace] ?? ''} PLACE` : d.kind === 'rage' ? 'RAGE DONE' : d.kind === 'mayhem' ? 'MAYHEM DONE' : d.kind === 'fare' ? 'FARE PAID' : 'DELIVERED';
       kind = `${what} +${money(jobs.lastPaid)}${jobs.lastTip ? ' · CLEAN LINE' : ''}`;
@@ -309,7 +337,17 @@ export class JobsHud {
   /** The card: what was taken on; the first order's says how to take the car. */
   private fillJobCard(sim: SimWorld, d: JobDef): void {
     this.cardTitle.textContent = KIND_TITLE[d.kind];
-    if (d.kind === 'order') {
+    this.cardPay.textContent = money(d.payout);
+    if (d.kind === 'duel') {
+      // the rival's poster: the name and the line, the race (a hunt races until M6 slice 2), the purse and the car
+      const r = RIVALS[d.level] as RivalDef;
+      const n = posterNumber(d.level);
+      const board = sim.board;
+      this.cardTitle.textContent = n > 0 ? `#${n} ${r.name}` : r.name;
+      this.cardSub.textContent = r.line;
+      this.cardLimit.textContent = r.format === 'chief' ? 'LOSE HIM AT ★★★★★' : 'FIRST TO THE FINISH · ANY ROUTE';
+      this.cardPay.textContent = board.isBeaten(d.level) ? `REMATCH · ${money(board.purse(d.level))}` : `${money(board.purse(d.level))} + THE ${BODY_WORDS[r.body]}`;
+    } else if (d.kind === 'order') {
       const w = unpackDescriptor(d.descriptor);
       const first = (sim.run.chain & (1 << STEP.order)) === 0 && sim.jobs.state === 'hunting';
       this.cardSub.textContent = first ? `WANTED: ${paintName(w.paint)} ${CAR_WORDS[w.kind]} · IT'S IN TRAFFIC · SWAP INTO IT` : `WANTED: ${paintName(w.paint)} ${CAR_WORDS[w.kind]}`;
@@ -337,7 +375,6 @@ export class JobsHud {
       this.cardSub.textContent = 'GET IT TO THE DROP-OFF';
       this.cardLimit.textContent = `${clock(d.limitSeconds)} · FASTER PAYS MORE`;
     }
-    this.cardPay.textContent = money(d.payout);
     this.card.dataset['kind'] = d.kind;
   }
 

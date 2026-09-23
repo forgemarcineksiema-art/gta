@@ -24,6 +24,8 @@ export class Fares {
   /** The running fare's def id, -1 when none; whether it is hot; its tips so far; fares delivered in a row. */
   fare = -1;
   hot = false;
+  /** Whether the last fare delivered was hot. */
+  lastHot = false;
   tips = 0;
   chain = 0;
   /** Time left over from the last fare, carried into the next one's clock (0 once the chain breaks). */
@@ -132,6 +134,8 @@ export class Fares {
 
   /** The jobs' word on a delivered fare: the chain grows, the leftover carries, the next passenger waves up the road. */
   delivered(remaining: number): void {
+    // the career counts the hot ones (M6): read after this, when `hot` is cleared
+    this.lastHot = this.hot;
     this.chain++;
     this.carry = Math.max(0, remaining);
     this.hailLeft = 0;

@@ -4,7 +4,7 @@
  * busted card and the wall of totals behind a shut door. Yellow is money that
  * is not yours yet. DOM writes only on change; reads sim state only.
  */
-import { CHAIN_STEPS, STEP, chainStep, type CarId, type RunState, type SimWorld } from '../sim';
+import { CHAIN_STEPS, RIVALS, STEP, chainStep, posterNumber, reqText, type CarId, type RunState, type SimWorld } from '../sim';
 import { BALANCE } from '../sim/balance';
 
 const TWEEN_SECONDS = 0.3;
@@ -209,7 +209,7 @@ export class RunHud {
     const firstCar = run.funds >= price ? `FIRST NEW CAR: ${money(price)} · IT IS YOURS IN CARS` : `FIRST NEW CAR: ${money(price)} · YOU HAVE ${money(run.funds)}`;
     const next = step >= 0 && step <= STEP.car && noCar ? firstCar
       : step >= 0 ? `NEXT: ${CHAIN_STEPS[step] ?? ''} · STEP ${step + 1} OF ${CHAIN_STEPS.length}`
-        : noCar ? firstCar : '';
+        : noCar ? firstCar : boardLine(sim);
     this.wallFirst.textContent = next;
     this.wallFirst.classList.toggle('is-visible', next !== '');
     this.wallSentence.classList.toggle('is-visible', (run.chain & (1 << STEP.escape)) === 0);
@@ -250,4 +250,16 @@ function el(tag: string, className: string, text?: string): HTMLElement {
   e.className = className;
   if (text !== undefined) e.textContent = text;
   return e;
+}
+
+/** After the chain (M6): the next rival on the wanted board and what they want first, or that they are ready. */
+function boardLine(sim: SimWorld): string {
+  const b = sim.board;
+  const i = b.next();
+  const r = RIVALS[i];
+  if (!r) return '';
+  const n = posterNumber(i);
+  const who = n > 0 ? `#${n} ${r.name}` : r.name;
+  const open = r.reqs[b.firstOpen(i)];
+  return b.ready(i) || !open ? `NEXT ON THE BOARD: ${who} · READY FOR YOU` : `NEXT ON THE BOARD: ${who} · ${reqText(open)}`;
 }

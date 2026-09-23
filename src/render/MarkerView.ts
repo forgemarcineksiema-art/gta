@@ -30,6 +30,8 @@ export const KIND_COLORS: Record<JobDef['kind'], number> = {
   // the zones: rage red, mayhem white
   rage: PALETTE.carRed,
   mayhem: PALETTE.carWhite,
+  // a wanted board's rival (M6): the cyan no other ring wears
+  duel: PALETTE.carBlue,
   // a fare's mark: the taxi's yellow
   fare: PALETTE.coin,
 };
@@ -46,6 +48,8 @@ export class MarkerView {
   private idleCount = 0;
   private readonly idleX: Float32Array;
   private readonly idleZ: Float32Array;
+  /** The ring's scale per idle marker (a rival's is wider). */
+  private readonly idleScale: Float32Array;
   private readonly color = new THREE.Color();
   private readonly m = new THREE.Matrix4();
   private readonly q = new THREE.Quaternion();
@@ -72,6 +76,7 @@ export class MarkerView {
     this.capacity = Math.max(4, sim.jobs.defs.length + 6);
     this.idleX = new Float32Array(this.capacity);
     this.idleZ = new Float32Array(this.capacity);
+    this.idleScale = new Float32Array(this.capacity).fill(1);
     this.rings = new THREE.InstancedMesh(this.ringGeometry, this.material, this.capacity);
     this.beacons = new THREE.InstancedMesh(this.beaconGeometry, this.material, this.capacity);
     for (const mesh of [this.rings, this.beacons]) {
@@ -93,7 +98,7 @@ export class MarkerView {
     const pulse = 1 + PULSE * phase;
     let n = 0;
     for (let i = 0; i < this.idleCount; i++) {
-      this.put(this.rings, n, this.idleX[i] as number, this.idleZ[i] as number, pulse, 1);
+      this.put(this.rings, n, this.idleX[i] as number, this.idleZ[i] as number, pulse * (this.idleScale[i] as number), 1);
       this.put(this.beacons, n, this.idleX[i] as number, this.idleZ[i] as number, 1, 1);
       n++;
     }
@@ -106,10 +111,10 @@ export class MarkerView {
       this.zone.scale.setScalar(BALANCE.jobs.zone.radius);
       (this.zone.material as THREE.MeshBasicMaterial).color.setHex(KIND_COLORS[running.kind]);
     }
-    if (running && jobs.state === 'active' && running.kind !== 'escape' && !zone) {
-      // the drop-off or the fence: where to stop (instance 0, tinted at the rebuild)
-      this.put(this.rings, n, running.targetX, running.targetZ, 1 + TARGET_PULSE * phase, 1);
-      this.put(this.beacons, beacons, running.targetX, running.targetZ, 1, 1);
+    if (running && jobs.state === 'active' && !zone && jobs.target(this.t)) {
+      // the drop-off, the fence, the finish: where to stop (instance 0, tinted at the rebuild); none for an escape
+      this.put(this.rings, n, this.t.x, this.t.z, 1 + TARGET_PULSE * phase, 1);
+      this.put(this.beacons, beacons, this.t.x, this.t.z, 1, 1);
       n++;
       beacons++;
     } else if (running && jobs.state === 'hunting' && jobs.wantedAgent >= 0 && this.wantedPose(sim, jobs.wantedAgent, alpha)) {
@@ -148,6 +153,8 @@ export class MarkerView {
         if (!jobs.live(d) || this.idleCount >= this.capacity - 2) continue;
         this.idleX[this.idleCount] = d.x;
         this.idleZ[this.idleCount] = d.z;
+        // a rival's ring is wider: it circles the car parked at the kerb (M6)
+        this.idleScale[this.idleCount] = d.kind === 'duel' ? BALANCE.board.ringRadius / BALANCE.jobs.markerRadius : 1;
         this.tint(this.idleCount, KIND_COLORS[d.kind]);
         this.idleCount++;
       }

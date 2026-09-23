@@ -142,11 +142,15 @@ describe('the chain and the goal line', () => {
       r.bag = BALANCE.chain.bankGoal;
       goalFor(sim, g);
       expect(g.kind).toBe('bank');
-      // the chain done: the defaults again
+      // the chain done: the wanted board's first rival (M6, DESIGN.md §14.2), and with the board done the defaults again
       r.chain = CHAIN_ALL;
       r.bag = 0;
       goalFor(sim, g);
+      expect(g.kind).toBe('rival');
+      sim.board.beaten = (1 << 11) - 1;
+      goalFor(sim, g);
       expect(g.kind).toBe('take');
+      sim.board.beaten = 0;
       // the police on you: LOSE THEM, the door only with something in the bag
       sim.pursuit.force();
       goalFor(sim, g);

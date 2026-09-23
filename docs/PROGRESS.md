@@ -2,6 +2,17 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M6 slice 1: the wanted board and the race
+
+Done: `sim/board` (the ten rivals and the Chief, `Career`'s lifetime counts from the events, `Board`: the next rival,
+requirements, rank, rematches at a quarter); duels as `JobKind` 'duel'. The corners' rings are all taken (three of eleven
+fitted), so decided: a rival waits parked at a kerbside bay in their turf (the bay reserved, their car there within 220 m,
+never a swap) and a pull-up under 4 m/s inside a 7 m ring starts the race; the rival pulls out as a racer at their rank's
+pace and band; first over the line wins the purse (bag), the car (garage) and the place; the rival first or the clock
+loses. The goal line follows the board after the chain; BOARD page, ticker news, `?board=n`. Hunts race until slice 2; the
+cars are stand-in bodies until 4–5. Pins M6 1.1–1.6; 1.1 placement (39 defs), 1.10 rings, 19.1 bodies, 2.3 goal re-pinned
+for the board. Verify green (348 tests).
+
 ## 2026-09-23 — M6 slice 0: the garage keeps bodies
 
 Marcin: "Lecisz z M6". Done: the garage owns bodies (`Garage.car/owned/paint` by `BodyId`), upgrades stay per class (a

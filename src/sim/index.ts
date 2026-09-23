@@ -25,9 +25,12 @@ export { goalFor, newGoal, chainStep, CHAIN_STEPS, CHAIN_ALL, STEP, type Goal, t
 export { ColdOpen, COLD_OPEN_VERBS, coldOpenRoute, type ColdOpenVerb, type ColdOpenRoute } from './run/ColdOpen';
 export { Jobs, type JobDef, type JobKind, type JobState } from './jobs/Jobs';
 export { ORDER_KINDS, CAR_WORDS, BODY_WORDS, MEDAL_WORDS, PLACE_WORDS, orderPaints, packDescriptor, unpackDescriptor, paintName, trialMedal, trialTimes } from './jobs/catalog';
-export { BODIES, BODY_IDS, BODY_INDEX, CIVILIAN_BODIES, bodySpec, bodyTuning, isShell, pickBody, type BodyId, type BodySpec, type CivilianBody } from './traffic/bodies';
+export { BODIES, BODY_IDS, BODY_INDEX, CIVILIAN_BODIES, RIVAL_BODIES, bodySpec, bodyTuning, isShell, isRivalBody, pickBody, type BodyId, type BodySpec, type CivilianBody, type RivalBody } from './traffic/bodies';
 export { placeJobs, lanePathTo, dropOffTarget, fenceTargets, palmFence, type JobTarget } from './jobs/place';
 export { Garage, STATS, type Stat, type BuyResult, type PrepItem } from './garage/Garage';
+export { Board } from './board/Board';
+export { Career } from './board/Career';
+export { RIVALS, CHIEF, posterNumber, reqText, type RivalDef, type Req, type ReqKind, type DuelFormat, type Twist, type Turf } from './board/rivals';
 export { Dailies } from './dailies/Dailies';
 export { SAVE_VERSION, DEFAULT_SAVE, defaultSave, serialize, parse, migrate, collect, apply, versionOf, type SaveV1 } from './save/format';
 export { coverSites, dropOffFor, hideoutStatics, toDropOff, DROP_OFF_LOTS, GARAGE, type DropOff, type DropOffLot, type DoorPose, type CoverSites, type Chokepoint, type ParkedJunction, type CameraSite } from './city/cover';

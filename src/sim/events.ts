@@ -30,7 +30,10 @@ export type EventKind =
   // a hidden car found (M5.5 slice 16): target = its index in HIDDEN_CARS
   | 'hiddenCar'
   // a pursuit breaker brought down (M5.5 slice 18): value and target = its id
-  | 'breaker';
+  | 'breaker'
+  // the wanted board (M6): a rival ready for the player, or beaten for the first time (value = the player's new
+  // place on the board); target = the rival's index in RIVALS
+  | 'rivalReady' | 'rivalBeaten';
 
 export interface SimEvent {
   kind: EventKind;

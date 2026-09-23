@@ -274,7 +274,8 @@ export class Life {
     let best = -1;
     let bestD = Infinity;
     for (let i = 0; i < traffic.capacity; i++) {
-      if (traffic.state[i] === AgentState.Free) continue;
+      // a wanted board's rival's car is won in the duel, never taken (M6 D9)
+      if (traffic.state[i] === AgentState.Free || traffic.rival[i] === 1) continue;
       const dx = (traffic.x[i] as number) - p.x;
       const dz = (traffic.z[i] as number) - p.z;
       const along = dx * fx + dz * fz;

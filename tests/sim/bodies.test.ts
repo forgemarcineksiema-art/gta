@@ -8,7 +8,7 @@
 import { HIDDEN_CARS } from '../../src/sim/city/stash';
 import { describe, expect, it } from 'vitest';
 import type { SimWorld } from '../../src/sim';
-import { BODIES, BODY_INDEX, CIVILIAN_BODIES, bodySpec, pickBody, type CivilianBody, type RoadKind } from '../../src/sim/traffic/bodies';
+import { BODIES, BODY_INDEX, CIVILIAN_BODIES, bodySpec, isRivalBody, pickBody, type CivilianBody, type RoadKind } from '../../src/sim/traffic/bodies';
 import { AgentState, type Traffic } from '../../src/sim/traffic/Traffic';
 import { TRAFFIC } from '../../src/sim/traffic/tuning';
 import { CAR_IDS, CAR_PRESETS } from '../../src/sim/vehicle/presets';
@@ -50,8 +50,9 @@ describe('traffic\'s own bodies', () => {
     expect(shares('crown', 'avenue').bus).toBeGreaterThan(shares('crown', 'street').bus * 2);
     expect(shares('crown', 'street').taxi).toBeGreaterThan(shares('marina', 'street').taxi * 3);
     expect(shares('foundry', 'street').truck).toBeGreaterThan(shares('gardens', 'street').truck * 2);
-    // every civilian body the spawner draws comes up on a street (a hidden car is stashed, never drawn: M5.5 slice 16)
-    for (const b of CIVILIAN_BODIES.filter((id) => !(HIDDEN_CARS as readonly string[]).includes(id))) expect(Math.max(shares('crown', 'street')[b], shares('foundry', 'street')[b])).toBeGreaterThan(0.02);
+    // every civilian body the spawner draws comes up on a street (a hidden car is stashed, never drawn: M5.5 slice
+    // 16; a rival's car is won, never drawn: M6)
+    for (const b of CIVILIAN_BODIES.filter((id) => !(HIDDEN_CARS as readonly string[]).includes(id) && !isRivalBody(id))) expect(Math.max(shares('crown', 'street')[b], shares('foundry', 'street')[b])).toBeGreaterThan(0.02);
   });
 
   it('19.2 the city spawns its own bodies, never the player\'s shells, each with its footprint and its collider', async () => {

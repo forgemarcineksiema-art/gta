@@ -29,7 +29,7 @@ const BREAKER_COLOR = hex(PALETTE.carOrange);
 /** The placed jobs' kinds, in the legend's order (fares have no marker: a hailer waves the taxi down). */
 const LEGEND_JOBS: ReadonlyArray<[JobKind, string]> = [
   ['delivery', 'DELIVERY'], ['order', 'STEAL TO ORDER'], ['escape', 'ESCAPE'], ['trial', 'TIME TRIAL'],
-  ['race', 'STREET RACE'], ['rage', 'TAKEDOWN RAGE'], ['mayhem', 'MAYHEM'],
+  ['race', 'STREET RACE'], ['rage', 'TAKEDOWN RAGE'], ['mayhem', 'MAYHEM'], ['duel', 'RIVAL'],
 ];
 
 function el(tag: string, className: string, text = ''): HTMLElement {

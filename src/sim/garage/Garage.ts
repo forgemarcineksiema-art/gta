@@ -15,7 +15,7 @@
 import { BALANCE } from '../balance';
 import { POLICE } from '../police/tuning';
 import type { SimWorld } from '../SimWorld';
-import { BODY_INDEX, bodySpec, bodyTuning, isShell, type BodyId } from '../traffic/bodies';
+import { BODY_INDEX, bodySpec, bodyTuning, isRivalBody, isShell, type BodyId } from '../traffic/bodies';
 import { PLAYER_PAINT } from '../traffic/Traffic';
 import { CAR_IDS, type CarId } from '../vehicle/presets';
 import type { VehicleTuning } from '../vehicle/tuning';
@@ -95,7 +95,7 @@ export class Garage {
    */
   keep(body: BodyId, paint: number): BuyResult {
     if (this.owned.has(body)) return 'owned';
-    if (body === 'police' && !this.policeUnlocked) return 'locked';
+    if ((body === 'police' && !this.policeUnlocked) || isRivalBody(body)) return 'locked';
     const price = this.keepPrice(body);
     if (this.sim.run.funds < price) return 'cash';
     this.sim.run.spend(price);

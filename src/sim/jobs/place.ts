@@ -19,7 +19,9 @@
  * about (a candidate's clearance is checked when it is about to be picked).
  */
 import { BALANCE } from '../balance';
-import type { City } from '../city/City';
+import { CHIEF, RIVALS, type RivalDef } from '../board/rivals';
+import { LANDMARKS, districtAt, type City } from '../city/City';
+import { DONUT_SHOP } from '../police/Donuts';
 import { CAR_TOP, tallFootprint } from '../city/collectibles';
 import { coverSites, nearDoor, type DropOff } from '../city/cover';
 import { alongLane, laneChain } from '../city/route';
@@ -394,5 +396,87 @@ export function placeJobs(city: City, seed: number, lanes: LaneTables): JobDef[]
       payout: rule.payout, limitSeconds: zc.seconds, heat: rule.heat,
     });
   }
+  // the wanted board's rivals (M6 slice 1): placed last, so nothing above moves
+  placeRivals(city, lanes, rng, finishes, sites, defs);
   return defs;
+}
+
+/** A place's nearest lane point as a job's end: the finish on the road beside a landmark, never inside its plaza. */
+function laneTarget(city: City, lanes: LaneTables, x: number, z: number): JobTarget {
+  const t = pointTarget(city, x, z);
+  const p = { x: 0, z: 0, yaw: 0 };
+  lanes.positionAt(t.lane, t.s, 0, p);
+  return { x: p.x, z: p.z, lane: t.lane, s: t.s };
+}
+
+/** Metres a rival's bay keeps from every other job's marker and door, and from another rival's bay. */
+const RIVAL_CLEAR = 60;
+const RIVAL_APART = 150;
+
+/**
+ * Where each rival waits (DESIGN.md §14.3; M6 slice 1): a kerbside parking bay in its turf, the car parked in it
+ * and the ring round it (the corners' rings are all taken), tried from a seeded start; the Ghost's is the bay
+ * nearest the highway's edge. Its finish or door `rival.path` m away by lane path, the nearest to the band's
+ * middle; the bay whose way is nearest the band when none is inside it. The Chief waits at the bay nearest the
+ * donut shop and has no target (his duel is an escape).
+ */
+function placeRivals(city: City, lanes: LaneTables, rng: () => number, finishes: readonly JobTarget[], sites: readonly DropOff[], defs: JobDef[]): void {
+  const bays = city.roadMarkings.parking;
+  const scrapyard = sites.find((s) => districtAt(s.door.x, s.door.z).id === 'foundry');
+  const glass = LANDMARKS.find((l) => l.district === 'gardens');
+  const tower = LANDMARKS.find((l) => l.district === 'crown');
+  const markers = defs.map((d) => ({ x: d.x, z: d.z }));
+  for (const site of sites) markers.push({ x: site.door.x, z: site.door.z });
+  const taken: Array<{ x: number; z: number }> = [];
+  const free = (b: { x: number; z: number }): boolean => markers.every((m) => Math.hypot(m.x - b.x, m.z - b.z) >= RIVAL_CLEAR)
+    && taken.every((t) => Math.hypot(t.x - b.x, t.z - b.z) >= RIVAL_APART);
+  for (let i = 0; i <= CHIEF; i++) {
+    const rival = RIVALS[i] as RivalDef;
+    let pool: typeof bays[number][];
+    if (rival.target === 'none') {
+      pool = bays.filter(free).sort((a, b) => Math.hypot(a.x - DONUT_SHOP.x, a.z - DONUT_SHOP.z) - Math.hypot(b.x - DONUT_SHOP.x, b.z - DONUT_SHOP.z));
+    } else if (rival.turf === 'highway') {
+      pool = bays.filter(free).sort((a, b) => Math.max(Math.abs(b.x), Math.abs(b.z)) - Math.max(Math.abs(a.x), Math.abs(a.z)));
+    } else {
+      const own = bays.filter((b) => free(b) && districtAt(b.x, b.z).id === rival.turf);
+      const start = (rng() * Math.max(1, own.length)) | 0;
+      pool = own.map((_b, k) => own[(start + k) % own.length] as typeof bays[number]);
+    }
+    const fixed: JobTarget | null = rival.target === 'glasshouse' && glass ? laneTarget(city, lanes, glass.x, glass.z)
+      : rival.target === 'scrapyard' && scrapyard ? dropOffTarget(city, scrapyard)
+        : rival.target === 'donuts' ? laneTarget(city, lanes, DONUT_SHOP.laneX, DONUT_SHOP.laneZ)
+          : rival.target === 'tower' && tower ? laneTarget(city, lanes, tower.x, tower.z)
+            : null;
+    const [lo, hi] = rival.path;
+    let chosen: { b: typeof bays[number]; target: JobTarget | null; length: number } | null = null;
+    let near: { b: typeof bays[number]; target: JobTarget; length: number; err: number } | null = null;
+    // every bay for a fixed end (one path each), a dozen for a lane point (each a search over the finishes)
+    for (const b of fixed ? pool : pool.slice(0, 12)) {
+      if (rival.target === 'none') {
+        chosen = { b, target: null, length: 0 };
+        break;
+      }
+      let best: JobTarget | null = null, bestLen = 0, bestErr = Infinity;
+      for (const t of fixed ? [fixed] : finishes) {
+        const p = lanePathTo(city, lanes, b.x, b.z, t);
+        if (!Number.isFinite(p.length)) continue;
+        const err = p.length < lo ? lo - p.length : p.length > hi ? p.length - hi : Math.abs(p.length - (lo + hi) / 2) * 1e-3;
+        if (err < bestErr) { bestErr = err; best = t; bestLen = p.length; }
+      }
+      if (!best) continue;
+      if (bestLen >= lo && bestLen <= hi) {
+        chosen = { b, target: best, length: bestLen };
+        break;
+      }
+      if (!near || bestErr < near.err) near = { b, target: best, length: bestLen, err: bestErr };
+    }
+    const pick = chosen ?? near;
+    if (!pick) continue;
+    taken.push(pick.b);
+    const t = pick.target;
+    defs.push({
+      id: defs.length + 1, kind: 'duel', x: pick.b.x, z: pick.b.z, yaw: pick.b.yaw, targetX: t ? t.x : pick.b.x, targetZ: t ? t.z : pick.b.z,
+      level: i, descriptor: -1, payout: rival.purse, limitSeconds: t ? Math.round(pick.length / BALANCE.board.limitSpeed) : 0, heat: 0,
+    });
+  }
 }

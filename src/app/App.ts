@@ -30,7 +30,7 @@ import { FixedStepLoop } from './loop';
 import { PerfProbe, heapMb } from './perf';
 import { SimProfile } from './simProfile';
 import { SaveStore } from './save';
-import { BALANCE, POLICE, defaultSave, type SaveV1, type SimEvent } from '../sim';
+import { BALANCE, CHAIN_ALL, POLICE, defaultSave, type SaveV1, type SimEvent } from '../sim';
 
 /** Filled during `App.boot`; copied into the handle for `?dev` and the startup gate. */
 const bootTimings: Record<string, number> = {};
@@ -84,7 +84,7 @@ const BREAK_MIN_MS = 600;
 /** Measured bot runs dismiss the wall and the card themselves after this long. */
 const BREAK_AUTO_MS = 1500;
 /** Any of these on the URL is a test or a dev session: no cold open unless `coldopen=1` forces it. */
-const COLD_OPEN_OFF_PARAMS = ['bot', 'spawn', 'heat', 'car', 'map', 'manual', 'job'];
+const COLD_OPEN_OFF_PARAMS = ['bot', 'spawn', 'heat', 'car', 'map', 'manual', 'job', 'board'];
 
 /** Every action ends a break except the ones that are not about driving on. */
 const DISMISS: readonly Action[] = ACTIONS.filter((a) => a !== 'pause' && a !== 'mute' && a !== 'debug' && a !== 'camera');
@@ -435,10 +435,22 @@ export class App {
     if (sim.coldOpen.active) void store.flush(sim);
     // `police=off`: the dispatcher sends nobody, the beat included (a job's flow measured clean: tests, playtests)
     if (params.get('police') === 'off' && sim.police) sim.police.dispatching = false;
-    // `job=<id>` or `job=delivery|order|escape`: into that marker's ring at boot (tests and playtests)
+    // `board=<n>` (M6): the wanted board as if every rival under #n was beaten and #n's requirements met (0: the
+    // Chief next); the chain done, since the board follows it (tests and playtests)
+    const boardParam = Number(params.get('board') ?? 'NaN');
+    if (Number.isInteger(boardParam) && boardParam >= 0 && boardParam <= 10) {
+      const next = 10 - boardParam;
+      sim.board.beaten = (1 << next) - 1;
+      for (let i = 0; i < next; i++) sim.board.ownCar(i);
+      sim.board.force = true;
+      sim.run.chain = CHAIN_ALL;
+    }
+    // `job=<id>` or `job=delivery|order|escape`: into that marker's ring at boot (tests and playtests); `job=duel`
+    // is the next rival's
     const jobParam = params.get('job');
     if (jobParam !== null && sim.city) {
-      const d = sim.jobs.defs.find((k) => String(k.id) === jobParam || k.kind === jobParam);
+      const d = jobParam === 'duel' ? sim.jobs.defs.find((k) => k.kind === 'duel' && k.level === sim.board.next())
+        : sim.jobs.defs.find((k) => String(k.id) === jobParam || k.kind === jobParam);
       if (d) {
         sim.city.sync(d.x, d.z, true);
         sim.vehicle.teleport({ x: d.x, y: 0.9, z: d.z }, d.yaw);

@@ -2,7 +2,7 @@
  * In-game HUD: plain DOM over the canvas. Speedometer, boost bar, drift readout,
  * a debug block, a pause overlay and the keycap hint strip. Reads sim state only.
  */
-import { AgentState, BALANCE, BODY_WORDS, POLICE, TRICK_WORDS, districtAt, paintName, unpackDescriptor } from '../sim';
+import { AgentState, BALANCE, BODY_WORDS, CHIEF, DISTRICTS, POLICE, RIVALS, TRICK_WORDS, districtAt, paintName, posterNumber, unpackDescriptor } from '../sim';
 import type { SimEvent, SimWorld } from '../sim';
 import { BigMap } from './bigmap';
 import { Minimap } from './minimap';
@@ -329,6 +329,16 @@ export class Hud {
     this.tickerLeft = seconds;
   }
 
+  /** The ticker now, or next when it is busy (a level's news keeps the top centre). */
+  private ticker2(lead: string, text: string): void {
+    if (this.tickerLeft > 0) {
+      this.queuedLead = lead;
+      this.queuedText = text;
+    } else {
+      this.showTicker(lead, text, 3);
+    }
+  }
+
   showToast(text: string, seconds = 1.5): void {
     this.toast.textContent = text;
     this.toast.classList.add('is-visible');
@@ -363,6 +373,19 @@ export class Hud {
       return;
     }
     if (kind === 'escape') this.newsFor = -1;
+    // the wanted board (M6): a rival ready is the ticker's news; a rival beaten pops big, then the news
+    if (kind === 'rivalReady') {
+      const r = RIVALS[target];
+      if (!r) return;
+      const n = posterNumber(target);
+      const where = r.turf === 'highway' ? 'THE HIGHWAY' : DISTRICTS.find((d) => d.id === r.turf)?.name ?? '';
+      this.ticker2(n > 0 ? `#${n}` : 'BOARD', `${r.name} ${r.call} · ${where}`);
+      return;
+    }
+    if (kind === 'rivalBeaten') {
+      const r = RIVALS[target];
+      if (r) this.ticker2('NEWS', target === CHIEF ? 'THE CHIEF LOSES HIS OWN CAR · THE BOARD IS YOURS' : `${r.name} BEATEN · A NEW NAME AT #${value} ON THE BOARD`);
+    }
     if (kind === 'dispatch') {
       // the radio (DESIGN.md §13.9): one line, never over a level's news, at most every few seconds
       if (this.dispatchQuiet < DISPATCH_EVERY || this.tickerLeft > 0) return;
@@ -401,6 +424,7 @@ export class Hud {
       : kind === 'skill' ? `SKILL CHAIN +${value.toLocaleString('en-US')}`
       : kind === 'skillLost' ? 'CHAIN LOST'
       : kind === 'hiddenCar' ? 'HIDDEN CAR FOUND · IN THE GARAGE NOW'
+      : kind === 'rivalBeaten' ? `${RIVALS[target]?.name ?? ''} BEATEN`
       : kind === 'breaker' ? 'PURSUIT BREAKER!'
       : kind === 'hunt' ? (target === 0
         ? (value > 0 ? `ALL ${this.huntTotal} JUMPS +${value.toLocaleString('en-US')}` : `NEW JUMP ${this.huntFound}/${this.huntTotal}`)
@@ -414,7 +438,7 @@ export class Hud {
     if (!popup) return;
     popup.textContent = text;
     popup.classList.toggle('is-gain', value > 0);
-    popup.classList.toggle('is-big', kind === 'takedown' || kind === 'takedownTraffic' || kind === 'jump' || kind === 'dailyDone' || kind === 'skill' || kind === 'hiddenCar' || (kind === 'hunt' && value > 0) || (kind === 'cache' && value > 0));
+    popup.classList.toggle('is-big', kind === 'takedown' || kind === 'takedownTraffic' || kind === 'jump' || kind === 'dailyDone' || kind === 'skill' || kind === 'hiddenCar' || kind === 'rivalBeaten' || (kind === 'hunt' && value > 0) || (kind === 'cache' && value > 0));
     popup.classList.add('is-on');
     this.popupLeft[i] = 1.2;
   }

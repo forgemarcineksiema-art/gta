@@ -171,12 +171,16 @@ function firstDelivery(sim: SimWorld): JobDef {
 }
 
 describe('jobs (M5 slice 1)', () => {
-  it('1.1 placement: 28 defs (6/6/4/4/4/2/2), deterministic, off the carriageway, 60 m apart, deliveries at least 400 m by path', async () => {
+  it('1.1 placement: 39 defs (6/6/4/4/4/2/2 and the eleven rivals), deterministic, off the carriageway, 60 m apart, deliveries at least 400 m by path', async () => {
     const sim = await placedWorld();
     try {
       const defs = sim.jobs.defs;
-      // the four time trials (M5.5 slice 10), the four street races (slice 11), two rage and two mayhem zones (12)
-      expect(defs.length).toBe(28);
+      // the four time trials (M5.5 slice 10), the four street races (slice 11), two rage and two mayhem zones (12);
+      // the wanted board's eleven (M6 slice 1: the ten rivals and the Chief, each waiting at a kerbside bay)
+      expect(defs.length).toBe(39);
+      expect(defs.filter((d) => d.kind === 'duel').map((d) => d.level)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+      const bays = sim.city!.roadMarkings.parking;
+      for (const d of defs.filter((k) => k.kind === 'duel')) expect(bays.some((b) => Math.hypot(b.x - d.x, b.z - d.z) < 0.01)).toBe(true);
       expect(defs.filter((d) => d.kind === 'delivery').length).toBe(6);
       expect(defs.filter((d) => d.kind === 'order').length).toBe(6);
       expect(defs.filter((d) => d.kind === 'escape').length).toBe(4);
@@ -189,7 +193,8 @@ describe('jobs (M5 slice 1)', () => {
       // the boot reads the baked table: `npm run bake:jobs` rewrites it when the generator moves
       else expect(JSON.stringify(placed)).toBe(JSON.stringify(defs));
       for (const d of defs) {
-        expect(roadClearance(sim, d.x, d.z)).toBeGreaterThanOrEqual(BALANCE.jobs.markerRadius + 1);
+        // a rival's ring is round its car at the kerb, on the road by design
+        if (d.kind !== 'duel') expect(roadClearance(sim, d.x, d.z)).toBeGreaterThanOrEqual(BALANCE.jobs.markerRadius + 1);
         for (const e of defs) if (e !== d) expect(Math.hypot(d.x - e.x, d.z - e.z)).toBeGreaterThanOrEqual(BALANCE.jobs.markerMinGap);
       }
       for (const d of defs.filter((k) => k.kind === 'delivery')) {
@@ -320,7 +325,8 @@ describe('jobs (M5 slice 1)', () => {
       // laid on the jobs' first step
       sim.step();
       const extra = sim.coins!.extra;
-      for (const d of sim.jobs.defs) {
+      // a rival's ring has none: it is there only while the board says so (M6)
+      for (const d of sim.jobs.defs.filter((k) => k.kind !== 'duel')) {
         const ring = extra.filter((c) => Math.hypot(c.x - d.x, c.z - d.z) <= BALANCE.jobs.markerRadius + 0.01);
         expect(ring.length).toBe(8);
         expect(ring.filter((c) => c.value === BALANCE.coin.cap).length).toBe(1);

@@ -14,7 +14,10 @@
  * Reports intents through `GarageActions` and never writes the sim; reads it
  * to draw. Rebuilds only when the garage, the bank or the totals change.
  */
-import { BALANCE, BODY_IDS, BODY_WORDS, MEDAL_WORDS, PALETTE, STATS, isShell, type BodyId, type PrepItem, type SimWorld, type Stat } from '../sim';
+import {
+  BALANCE, BODY_IDS, BODY_WORDS, CHIEF, DISTRICTS, MEDAL_WORDS, PALETTE, RIVALS, STATS, isShell, posterNumber, reqText,
+  type BodyId, type PrepItem, type RivalDef, type SimWorld, type Stat,
+} from '../sim';
 
 export interface GarageActions {
   buy(car: BodyId): void;
@@ -38,8 +41,8 @@ export interface WallNav {
   back: boolean;
 }
 
-export type WallPage = 'wall' | 'cars' | 'paint' | 'tune' | 'prep' | 'dailies';
-const PAGE_TITLES: Record<WallPage, string> = { wall: 'TOTALS', cars: 'CARS', paint: 'PAINT', tune: 'TUNE', prep: 'PREP', dailies: 'DAILIES' };
+export type WallPage = 'wall' | 'board' | 'cars' | 'paint' | 'tune' | 'prep' | 'dailies';
+const PAGE_TITLES: Record<WallPage, string> = { wall: 'TOTALS', board: 'BOARD', cars: 'CARS', paint: 'PAINT', tune: 'TUNE', prep: 'PREP', dailies: 'DAILIES' };
 
 /** The seven car paints of the palette (docs/STYLE.md): the respray is free. */
 export const GARAGE_PAINTS: readonly number[] = [
@@ -74,6 +77,10 @@ export class GarageUi {
   private readonly paintFor: HTMLElement;
   private readonly tuneFor: HTMLElement;
   private readonly carsCount: HTMLElement;
+  /** The BOARD page (M6): your place, a chip per poster, the next rival's poster. */
+  private readonly boardYou: HTMLElement;
+  private readonly boardChips: HTMLElement[] = [];
+  private readonly boardNext: HTMLElement;
   private readonly dailiesBody: HTMLElement;
   private page: WallPage = 'wall';
   private level: 'pages' | 'items' = 'pages';
@@ -90,7 +97,7 @@ export class GarageUi {
   private dailySerial = -1;
   private keys = { left: 'A', right: 'D', confirm: 'W', back: 'S' };
 
-  constructor(parent: HTMLElement, private readonly sim: SimWorld, private readonly actions: GarageActions, pages: readonly WallPage[] = ['wall', 'cars', 'paint', 'tune', 'prep', 'dailies']) {
+  constructor(parent: HTMLElement, private readonly sim: SimWorld, private readonly actions: GarageActions, pages: readonly WallPage[] = ['wall', 'board', 'cars', 'paint', 'tune', 'prep', 'dailies']) {
     this.order = [...pages];
     this.root = parent;
     const tabBar = el('div', 'wall__tabs');
@@ -116,6 +123,21 @@ export class GarageUi {
     this.offerRow.append(this.offerDouble, this.offerBank);
     wallPage.appendChild(this.offerRow);
     this.items.set('wall', []);
+
+    // BOARD (M6 slice 1): the wanted board, the player's place on it and the next rival's poster
+    const boardPage = this.newPage('board');
+    this.boardYou = el('div', 'wall__for');
+    const strip = el('div', 'wall__board');
+    for (let i = 0; i < RIVALS.length; i++) {
+      const chip = el('div', 'wall__chip');
+      chip.append(el('span', 'wall__chip-swatch'), el('span', 'wall__chip-num', i === CHIEF ? '★' : `#${posterNumber(i)}`));
+      (chip.firstElementChild as HTMLElement).style.background = `#${((RIVALS[i] as RivalDef).paints[0] as number).toString(16).padStart(6, '0')}`;
+      strip.appendChild(chip);
+      this.boardChips.push(chip);
+    }
+    this.boardNext = el('div', 'wall__dailies wall__poster');
+    boardPage.append(this.boardYou, strip, this.boardNext);
+    this.items.set('board', []);
 
     // CARS (M6 slice 0): the catalogue's five always, then every other car once it is owned or driven in
     const cars = this.newPage('cars');
@@ -357,7 +379,43 @@ export class GarageUi {
       video.classList.toggle('is-bought', bought);
     }
     this.fillDailies(sim);
+    this.fillBoard(sim);
     this.show();
+  }
+
+  /** The BOARD page: your place, the posters beaten and the next, the next rival's requirements and prize. */
+  private fillBoard(sim: SimWorld): void {
+    const board = sim.board;
+    const next = board.next();
+    this.boardYou.textContent = next < 0 ? 'YOU ARE #1 · THE BOARD IS YOURS'
+      : board.rank > 10 ? 'YOU ARE NOT ON THE WANTED BOARD YET' : `YOU ARE #${board.rank} ON THE WANTED BOARD`;
+    for (let i = 0; i < this.boardChips.length; i++) {
+      const chip = this.boardChips[i] as HTMLElement;
+      chip.classList.toggle('is-beaten', board.isBeaten(i));
+      chip.classList.toggle('is-next', i === next);
+    }
+    const rows: HTMLElement[] = [];
+    if (next < 0) {
+      rows.push(el('div', 'wall__streak', 'EVERY RIVAL BEATEN · A REMATCH PAYS A QUARTER'));
+    } else {
+      const r = RIVALS[next] as RivalDef;
+      const n = posterNumber(next);
+      const where = r.turf === 'highway' ? 'THE HIGHWAY' : DISTRICTS.find((d) => d.id === r.turf)?.name ?? '';
+      const head = el('div', 'wall__daily');
+      head.append(el('span', 'wall__daily-text', n > 0 ? `NEXT: #${n} ${r.name}` : `LAST: ${r.name}`), el('span', 'wall__daily-progress', where),
+        el('span', 'wall__daily-reward', `${money(r.purse)} + THE ${BODY_WORDS[r.body]}`));
+      rows.push(head, el('div', 'wall__streak wall__medals', r.line));
+      for (const q of r.reqs) {
+        const have = board.have(q);
+        const done = have >= q.count;
+        const row = el('div', done ? 'wall__daily is-done' : 'wall__daily');
+        row.append(el('span', 'wall__daily-text', reqText(q)), el('span', 'wall__daily-progress', done ? 'DONE'
+          : q.kind === 'bestRun' ? `BEST ${money(have)}` : `${money(Math.min(have, q.count))}/${money(q.count)}`), el('span', 'wall__daily-reward', ''));
+        rows.push(row);
+      }
+      rows.push(el('div', 'wall__streak', board.ready(next) ? 'READY · THE CYAN RING IS ON THE MAP' : 'DO BOTH AND THE RING APPEARS'));
+    }
+    this.boardNext.replaceChildren(...rows);
   }
 
   /** The DAILIES page: the day's three with their progress, the streak. */

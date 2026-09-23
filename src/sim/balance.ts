@@ -158,6 +158,23 @@ export const BALANCE = {
    * breaks the first hour's something-new-every-3-to-10-minutes; the sports car stays the second hour's goal.
    */
   prices: { compact: 10000, heavy: 20000, sports: 60000, police: 120000 },
+  /**
+   * The wanted board (M6, DESIGN.md §14.3): a rematch pays `rematchShare` of the purse (the car is won once); a
+   * race duel's rival runs at `pace` × the street race's pace, rubber-banded between `band`, both by rival index
+   * (#10 first: the band's low end rises so the later rivals ease off less); the duel's clock is the path at
+   * `limitSpeed` m/s. A rival waits parked at a kerbside bay (the corners' rings are all taken): its car stands
+   * there while the player is within `carRange` m, and pulling up beside it, inside `ringRadius` m under
+   * `pullUp` m/s, starts the duel (driving past does not).
+   */
+  board: {
+    ringRadius: 7,
+    pullUp: 4,
+    carRange: 220,
+    rematchShare: 0.25,
+    pace: [0.88, 0.9, 0.92, 0.95, 0.97, 0.99, 1.01, 1.03, 1.06, 1.1],
+    band: [[0.7, 1.15], [0.72, 1.16], [0.74, 1.18], [0.76, 1.19], [0.78, 1.2], [0.8, 1.22], [0.83, 1.24], [0.86, 1.26], [0.89, 1.28], [0.92, 1.3]] as ReadonlyArray<readonly [number, number]>,
+    limitSpeed: 9,
+  },
   /** Bring it home, pay to keep it (DESIGN.md §13.7): a car driven through a door, not owned yet, is kept for this share of its price (the police car for `police`). */
   keep: { share: 0.3, police: 0.6 },
   /**

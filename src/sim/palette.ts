@@ -28,6 +28,8 @@ export const PALETTE = {
   carMagenta: 0xf45bff,
   carWhite: 0xf7f3ea,
   carBlack: 0x1c1b22,
+  /** The wanted board's gold (M6): the Mayor's Nephew's limo, the Chief's trim, the frame round #1. */
+  carGold: 0xe2b33c,
 
   // blacks and greys (trim, rubber, metal)
   ink: 0x0c0c10,

@@ -46,6 +46,9 @@ export class Sfx {
     // a cache found (M5.5): the cap's bell already rang; every tenth adds the streak's two notes
     else if (e.kind === 'cache') { if (e.value > 0) { this.note(ctx, master, 880, 0, 0.12, 0.06, 'triangle'); this.note(ctx, master, 1174.66, 0.1, 0.3, 0.06, 'triangle'); } }
     else if (e.kind === 'streak') { this.note(ctx, master, 880, 0, 0.12, 0.06, 'triangle'); this.note(ctx, master, 1174.66, 0.1, 0.3, 0.06, 'triangle'); }
+    // the wanted board (M6): a rival calls you out (three notes up, a question); a rival beaten (the chord, then an octave)
+    else if (e.kind === 'rivalReady') { [392, 523.25, 698.46].forEach((f, i) => this.note(ctx, master, f, i * 0.12, i === 2 ? 0.4 : 0.12, 0.08, 'square')); }
+    else if (e.kind === 'rivalBeaten') { [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => this.note(ctx, master, f, i * 0.08, i === 4 ? 0.7 : 0.14, 0.08, 'square')); }
   };
 
   constructor(private readonly engine: EngineAudio) {}

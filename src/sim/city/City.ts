@@ -9,7 +9,8 @@ import { mulberry32 } from '../random';
 import { IDENTITY_QUAT as IDENTITY_ROT, quatFromYaw, type StaticDesc } from '../scene';
 import { Architecture, CITY_COLORS } from './architecture';
 import { placeBillboards, type BillboardDesc } from './collectibles';
-import { cameraSites, dropOffAt, hideoutStatics, nearDoor } from './cover';
+import { DROP_OFF_LOTS, cameraSites, dropOffAt, dropOffFor, hideoutStatics, nearDoor } from './cover';
+import { COVER, coverStatics, insideCover, placeCovers, type CoverAvoid, type CoverDesc } from './covers';
 import { cameraStatics, placeCameras, type CameraDesc } from './cameras';
 import { jumpStatics, placeJumps, type JumpDesc } from './jumps';
 import { layoutCoins, placeCoins, type CoinDesc, type CoinPoint } from './coins';
@@ -75,10 +76,29 @@ export class City {
   readonly jumps: readonly JumpDesc[];
   /** The island's coin layout from the seed (every line but the gate lines); each chunk takes the ones inside it. */
   readonly coinLayout: readonly CoinPoint[];
+  /** The four covered streets (M5.5 slice 7); their boxes go into the chunks that hold them. */
+  readonly covers: readonly CoverDesc[];
+  private readonly coverBoxes: readonly StaticDesc[];
   constructor(readonly world: RAPIER.World, readonly seed = 42) {
     this.cameras = placeCameras(cameraSites(this.graph), POLICE.cameras.count);
     this.jumps = placeJumps(seed, BALANCE.jumps.count);
     this.coinLayout = layoutCoins(this.jumps);
+    // a covered street near each district's door (the Gardens': its landmark), clear of doors, ramps, cameras and plazas
+    const doors = DROP_OFF_LOTS.map((lot) => dropOffFor(lot));
+    const anchors: Record<string, { x: number; z: number }> = {};
+    for (const d of DISTRICTS) {
+      const door = doors.find((o) => districtAt(o.x, o.z).id === d.id)?.door;
+      const site = LANDMARKS.find((l) => l.district === d.id);
+      anchors[d.id] = door ?? site ?? { x: 0, z: 0 };
+    }
+    const avoid: CoverAvoid[] = [
+      ...doors.map((o) => ({ x: o.door.x, z: o.door.z, r: COVER.clear })),
+      ...this.jumps.map((j) => ({ x: j.x, z: j.z, r: COVER.clear })),
+      ...this.cameras.map((c) => ({ x: c.poleX, z: c.poleZ, r: COVER.clear })),
+      ...LANDMARKS.map((l) => ({ x: l.x, z: l.z, r: COVER.clear })),
+    ];
+    this.covers = placeCovers(this.graph, anchors, avoid);
+    this.coverBoxes = this.covers.flatMap((c) => coverStatics(c));
     // The one unbroken collision plane eliminates suspension seams at roads and chunk borders.
     world.createCollider(RAPIER.ColliderDesc.cuboid(CITY_HALF, 0.5, CITY_HALF)
       .setTranslation(0, -0.5, 0).setFriction(1).setCollisionGroups(GROUPS_TERRAIN));
@@ -229,19 +249,19 @@ export class City {
         if (ox === 40) box(x + sx * (vx + 4.5 + setback / 2), 0.17, pz, setback / 2, 0.01, 1.5, PALETTE.kerb, 'decor', 'top');
         if (oz === 40) box(px, 0.17, z + sz * (vz + 4.5 + setback / 2), 1.5, 0.01, setback / 2, PALETTE.kerb, 'decor', 'top');
         if (d.id === 'gardens') {
-          if (ox === 40) {
+          if (ox === 40 && !insideCover(this.covers, x + sx * (vx + 7), pz + sz * 5, 4)) {
             architecture.tree(x + sx * (vx + 7), pz + sz * 5);
             box(x + sx * (vx + 5.5), 0.65, pz - sz * 6, 0.7, 0.5, 4, c.hedge);
           }
         }
       }
       if (d.id !== 'foundry') for (const along of [57, 106]) {
-        if (roadClearance(x + sx * (vx + 2.7), z + sz * along) > 3 && !nearDoor(x + sx * (vx + 2.7), z + sz * along, 4)) architecture.tree(x + sx * (vx + 2.7), z + sz * along, d.id === 'marina');
-        if (roadClearance(x + sx * along, z + sz * (vz + 2.7)) > 3 && !nearDoor(x + sx * along, z + sz * (vz + 2.7), 4)) architecture.tree(x + sx * along, z + sz * (vz + 2.7), d.id === 'marina');
+        if (roadClearance(x + sx * (vx + 2.7), z + sz * along) > 3 && !nearDoor(x + sx * (vx + 2.7), z + sz * along, 4) && !insideCover(this.covers, x + sx * (vx + 2.7), z + sz * along, 4)) architecture.tree(x + sx * (vx + 2.7), z + sz * along, d.id === 'marina');
+        if (roadClearance(x + sx * along, z + sz * (vz + 2.7)) > 3 && !nearDoor(x + sx * along, z + sz * (vz + 2.7), 4) && !insideCover(this.covers, x + sx * along, z + sz * (vz + 2.7), 4)) architecture.tree(x + sx * along, z + sz * (vz + 2.7), d.id === 'marina');
       }
       // Street lamps and planted verges are outside the driving corridor.
       for (const offset of [36, 80]) {
-        if (roadClearance(x + sx * (vx + 2), z + sz * offset) < 1.5 || nearDoor(x + sx * (vx + 2), z + sz * offset, 4)) continue;
+        if (roadClearance(x + sx * (vx + 2), z + sz * offset) < 1.5 || nearDoor(x + sx * (vx + 2), z + sz * offset, 4) || insideCover(this.covers, x + sx * (vx + 2), z + sz * offset, 4)) continue;
         box(x + sx * (vx + 2), 4, z + sz * offset, 0.18, 4, 0.18, 0x686678);
         box(x + sx * (vx + 1), 8, z + sz * offset, 1.4, 0.28, 0.45, PALETTE.laneMark);
       }
@@ -311,6 +331,8 @@ export class City {
       box(x, quay ? 0.55 : 2, Math.sign(cz) * CITY_HALF, BLOCK / 2, quay ? 0.55 : 2, 1, PALETTE.kerb, 'boundary');
       if (quay) box(x, 1.16, Math.sign(cz) * CITY_HALF, BLOCK / 2, 0.07, 1.15, CITY_COLORS.trim, 'boundary');
     }
+    // the covered streets' boxes, each in the chunk holding its centre
+    for (const st of this.coverBoxes) if (chunkCoord(st.position.x) === cx && chunkCoord(st.position.z) === cz) statics.push(st);
     // Last: the billboards need every static in place to find clear ground.
     const billboards = placeBillboards(cx, cz, statics, roadClearance);
     const coins = placeCoins(cx, cz, this.coinLayout, billboards, this.graph);

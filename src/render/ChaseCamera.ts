@@ -112,6 +112,9 @@ export const DEFAULT_CAMERA: CameraTuning = {
 export type CameraMode = 'chase' | 'far';
 
 const DEG = Math.PI / 180;
+/** The occlusion rule's gap kept to the static that blocks, and the shortest boom it pulls to, m. */
+const BOOM_MARGIN = 0.4;
+const BOOM_MIN = 1.6;
 
 function wrapAngle(a: number): number {
   while (a > Math.PI) a -= Math.PI * 2;
@@ -131,6 +134,14 @@ export class ChaseCamera {
   /** Metres added behind and above for a long or tall body (the bus), set on a swap. */
   private extraDistance = 0;
   private extraHeight = 0;
+  /**
+   * The occlusion rule (M5.5 slice 7): the share of the way from the car to the camera that is clear of
+   * solid statics (the sim's `clearFraction`); null shows the camera where it is, as the tests' cameras do.
+   */
+  occluder: ((ax: number, ay: number, az: number, bx: number, by: number, bz: number) => number) | null = null;
+  /** How much of the boom is out: pulled in at once by a static between, let out again at the ground height's pace. */
+  private boom = 1;
+  private readonly shown = new THREE.Vector3();
   private readonly pos = new THREE.Vector3();
   private readonly target = new THREE.Vector3();
   private readonly look = new THREE.Vector3();
@@ -320,7 +331,18 @@ export class ChaseCamera {
     const sx = Math.sin(this.shakeT * 1.3) * shake;
     const sy = Math.cos(this.shakeT * 1.7) * shake * 0.7;
 
-    this.camera.position.set(this.pos.x + sx, this.pos.y + sy, this.pos.z);
+    // the occlusion rule: a wall, a roof or a building between the car and the camera pulls the camera in
+    // along the boom at once; it lets out again at the height's ground pace when the way is clear
+    this.shown.copy(this.pos);
+    if (this.occluder) {
+      const ox = car.position.x, oy = car.position.y + t.lookHeight, oz = car.position.z;
+      const len = Math.hypot(this.pos.x - ox, this.pos.y - oy, this.pos.z - oz);
+      const clear = this.occluder(ox, oy, oz, this.pos.x, this.pos.y, this.pos.z);
+      const want = clear >= 1 || len < 1e-3 ? 1 : Math.max(Math.min(1, BOOM_MIN / len), (clear * len - BOOM_MARGIN) / len);
+      this.boom = snap || want < this.boom ? want : this.boom + (want - this.boom) * (1 - Math.exp(-dt * t.heightRateGround));
+      if (this.boom < 0.999) this.shown.set(ox + (this.pos.x - ox) * this.boom, oy + (this.pos.y - oy) * this.boom, oz + (this.pos.z - oz) * this.boom);
+    }
+    this.camera.position.set(this.shown.x + sx, this.shown.y + sy, this.shown.z);
     const ahead = (t.lookAhead + speed * t.lookAheadPerSpeed) * (tm.airborne ? 0.5 : 1);
     // left of the view direction is (cos yaw, 0, -sin yaw)
     this.look.set(

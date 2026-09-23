@@ -7,6 +7,10 @@
  * every step (controls, pose, telemetry) and the ghost of the best lap.
  */
 import RAPIER from '@dimforge/rapier3d-compat';
+import { GROUP_DEFAULT, interactionGroups } from './collision';
+
+/** A query that meets the solid statics only (buildings, walls, roofs), not kerbs, ramps or the ground. */
+const SOLID_ONLY = interactionGroups(0xffff, GROUP_DEFAULT);
 import { City } from './city/City';
 import { coverSites, type CoverSites } from './city/cover';
 import { Roadblocks } from './police/Roadblocks';
@@ -157,6 +161,8 @@ export class SimWorld {
   private readonly scratchRot = { x: 0, y: 0, z: 0, w: 1 };
   /** The player's footprint and motion this step, filled before the life systems run. */
   readonly probe: PlayerProbe = { x: 0, y: 0.5, z: 0, yaw: 0, vx: 0, vz: 0, speed: 0, halfWidth: 0, halfLength: 0 };
+  /** The camera's sight query's ray (clearFraction), reused. */
+  private readonly sightRay = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: 1, z: 0 });
   /** Pose stream of the best lap (x, y, z, qx, qy, qz, qw per tick), for the ghost. */
   bestLapPoses: Float32Array | null = null;
 
@@ -389,6 +395,22 @@ export class SimWorld {
       }
     }
     return best;
+  }
+
+  /**
+   * The share of the way from one point to another that is clear of solid statics (buildings, walls, a
+   * cover's roof): 1 when nothing is between, else the fraction to the first hit. The chase camera pulls in
+   * by it (M5.5 slice 7). A read of the world, no allocation.
+   */
+  clearFraction(ax: number, ay: number, az: number, bx: number, by: number, bz: number): number {
+    const dx = bx - ax, dy = by - ay, dz = bz - az;
+    const length = Math.hypot(dx, dy, dz);
+    if (length < 1e-6) return 1;
+    const ray = this.sightRay;
+    ray.origin.x = ax; ray.origin.y = ay; ray.origin.z = az;
+    ray.dir.x = dx / length; ray.dir.y = dy / length; ray.dir.z = dz / length;
+    const hit = this.world.castRay(ray, length, true, RAPIER.QueryFilterFlags.ONLY_FIXED | RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, SOLID_ONLY);
+    return hit ? hit.timeOfImpact / length : 1;
   }
 
   /** Change the player's class in place (the cold open's van; the swap does its own). */

@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M5.5 slice 7: covered streets and the camera occlusion rule
+
+Done: one covered street per district over the middle of a grid street near its door (the Gardens': near the
+Glasshouse), 64 m long, over the carriageway and both pavements, clear of doors, ramps, cameras and plazas: an
+arcade under a two-storey frontage bridge in Crown Heights, a steel gantry with a crane bridge in the Works, a
+plane-tree canopy with hedges in the Gardens, a brick warehouse with a gable roof on the Quay. Solid roof and walls,
+open ends: the police see in only along the street. No street tree or lamp under them. The camera's occlusion rule:
+a solid static between the car and the camera pulls it in along the boom at once, then lets it out at the ground
+height's pace (one ray a frame through the sim's new clearFraction query). Pins 7.1–7.4.
+
 ## 2026-09-23 — M5.5 slice 20: pedestrians with bodies
 
 Done: four silhouettes of boxes, 150–200 triangles each (was one 72-triangle figure): a man in a long coat and

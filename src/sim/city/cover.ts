@@ -10,6 +10,7 @@
  * `along` is metres inward from the garage centre, `across` metres to the
  * right of that axis. The door line is `along = -GARAGE.depth / 2`.
  */
+import { BALANCE } from '../balance';
 import { PALETTE } from '../palette';
 import { mulberry32 } from '../random';
 import { POLICE } from '../police/tuning';
@@ -124,9 +125,6 @@ export interface CoverSites {
   daily: DailyCover;
 }
 
-/** The share of each list manned on a day. */
-export const DAILY_SHARE = { chokepoints: 0.6, parked: 0.6, cameras: 0.8 };
-
 function identity(n: number): Int16Array {
   const a = new Int16Array(n);
   for (let i = 0; i < n; i++) a[i] = i;
@@ -148,9 +146,10 @@ export function setDailyOrder(cover: CoverSites, seed: number): void {
     const n = Math.ceil(order.length * share);
     for (let i = 0; i < n; i++) active[order[i] as number] = 1;
   };
-  shuffle(d.order.chokepoints, d.chokepoints, DAILY_SHARE.chokepoints);
-  shuffle(d.order.parked, d.parked, DAILY_SHARE.parked);
-  shuffle(d.order.cameras, d.cameras, DAILY_SHARE.cameras);
+  const share = BALANCE.dailies.police;
+  shuffle(d.order.chokepoints, d.chokepoints, share.chokepoints);
+  shuffle(d.order.parked, d.parked, share.parked);
+  shuffle(d.order.cameras, d.cameras, share.cameras);
 }
 
 /** The drop-off built on this lot, or null. Called by the generator for every lot. */

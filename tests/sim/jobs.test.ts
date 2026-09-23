@@ -282,4 +282,23 @@ describe('jobs (M5 slice 1)', () => {
       expect([t.x, t.z]).toEqual([d.targetX, d.targetZ]);
     } finally { sim.dispose(); }
   });
+
+  it('1.10 every marker has its coin ring: seven coins on the side facing the junction and a cap in front of the beacon', async () => {
+    const sim = await placedWorld();
+    try {
+      // laid on the jobs' first step
+      sim.step();
+      const extra = sim.coins!.extra;
+      for (const d of sim.jobs.defs) {
+        const ring = extra.filter((c) => Math.hypot(c.x - d.x, c.z - d.z) <= BALANCE.jobs.markerRadius + 0.01);
+        expect(ring.length).toBe(8);
+        expect(ring.filter((c) => c.value === BALANCE.coin.cap).length).toBe(1);
+        // the half facing the junction: every coin is at most a right angle off the marker's facing
+        for (const c of ring) {
+          const along = (c.x - d.x) * Math.sin(d.yaw) + (c.z - d.z) * Math.cos(d.yaw);
+          expect(along).toBeGreaterThan(-1e-6);
+        }
+      }
+    } finally { sim.dispose(); }
+  });
 });

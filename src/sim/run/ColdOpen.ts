@@ -13,7 +13,8 @@
  * unit close). The swap, boost, smash and takedown give up on their own so a
  * player who ignores one is never stuck. The door ends the script; `skip()`
  * ends it at once. Busted and the arrest are off while it runs. Once ended it
- * never starts again in this world (`seen`; the app keeps the session flag).
+ * never starts again in this world (`seen`), and the save counts it shown from
+ * its start, so it plays once per profile.
  * Never writes controls, never blocks input.
  */
 import { BALANCE } from '../balance';

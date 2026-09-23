@@ -43,6 +43,18 @@ Then `npm run perf` three times on the build: 56.9 / 55.7 / 56.6 fps, frame
 max 100 / 133 / 83 ms (the M5 gate's 200 / 1,017, M4's 917 / 517), step p95
 6.4–7.1 ms (`perf/m5.1-fix-*.json`).
 
+### 2-5. Closed at Marcin's call
+
+- Coin rings round the job markers: seven coins on the junction-facing half
+  of each ring and a cap, laid on the jobs' first step (jobs 1.10).
+- Review fixes: the daily police share moved to `BALANCE.dailies.police`;
+  coins mark the save dirty; the cold open's comment and record 33 match the
+  save's `seen`.
+- Eleven tests over ~10 s moved unchanged into `*.long.test.ts` (8 files,
+  green with LONG=1). The quick suite still reads ~66 s on this 4-core
+  laptop; Marcin: not worth more time.
+- Next: the jobs' placement off the time to control.
+
 ## 2026-09-23 — M5, the launch minimum
 
 Marcin: carry out the whole M5 plan. Working autonomously per

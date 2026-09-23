@@ -94,8 +94,14 @@ export const BALANCE = {
   prep: { lawyer: 5000, lawyerKeep: 0.75, fence: 8000, fenceBonus: 0.5 },
   /** The door's rewarded offer: above `doorThreshold` in the bag the video doubles it (`doorMultiplier`); the idle arrow turns to the doors above it too. */
   offer: { doorThreshold: 8000, doorMultiplier: 2 },
-  /** Daily challenge rewards by template weight, and the streak's cash for day 1..7 (day 7 on repeats). */
-  dailies: { rewards: [3000, 5000, 10000], streak: [500, 1000, 1500, 2000, 3000, 4000, 5000] },
+  /**
+   * Daily challenge rewards by template weight, and the streak's cash for day 1..7 (day 7 on repeats); `police` is
+   * the share of each fixed site list the date mans (roadblock chokepoints, parked-patrol junctions, cameras).
+   */
+  dailies: {
+    rewards: [3000, 5000, 10000], streak: [500, 1000, 1500, 2000, 3000, 4000, 5000],
+    police: { chokepoints: 0.6, parked: 0.6, cameras: 0.8 },
+  },
   /** The save: one key, written at most once per `debounceSeconds`; everything filled must stay under `maxBytes`. */
   save: { key: 'save', debounceSeconds: 1, maxBytes: 32768 },
   /**

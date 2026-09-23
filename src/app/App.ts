@@ -133,7 +133,8 @@ export class App {
   /** Bound once: the save's dirty marks come from the event ring. */
   private readonly onSaveEvent = (e: SimEvent): void => {
     switch (e.kind) {
-      case 'banked': case 'busted': case 'purchase': case 'dailyDone': case 'streak': case 'billboard': case 'escape':
+      // coins are the player's for good: the throttle keeps it to one write a second while they come in
+      case 'banked': case 'busted': case 'purchase': case 'dailyDone': case 'streak': case 'billboard': case 'escape': case 'coin':
         this.store.markDirty();
         break;
       default:

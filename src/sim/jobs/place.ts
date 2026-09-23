@@ -196,6 +196,24 @@ export function fenceTargets(city: City): JobTarget[] {
   return out;
 }
 
+/**
+ * The coins round a marker (DESIGN.md §3.2: rings round the job markers): seven on the half of the ring that
+ * faces the junction, the side the approach is checked clear, and a cap two metres in front of the beacon.
+ * Driving in from the road sweeps them.
+ */
+export function markerRingCoins(defs: readonly JobDef[]): Array<{ x: number; z: number; value: number }> {
+  const out: Array<{ x: number; z: number; value: number }> = [];
+  const r = BALANCE.jobs.markerRadius;
+  for (const d of defs) {
+    for (let k = -3; k <= 3; k++) {
+      const a = d.yaw + k * Math.PI / 6;
+      out.push({ x: d.x + Math.sin(a) * r, z: d.z + Math.cos(a) * r, value: BALANCE.coin.value });
+    }
+    out.push({ x: d.x + Math.sin(d.yaw) * 2, z: d.z + Math.cos(d.yaw) * 2, value: BALANCE.coin.cap });
+  }
+  return out;
+}
+
 /** Deterministic per seed: `BALANCE.jobs.counts` of each kind, ids from 1 (0 is the cold open's). */
 export function placeJobs(city: City, seed: number, lanes: LaneTables): JobDef[] {
   const cfg = BALANCE.jobs;

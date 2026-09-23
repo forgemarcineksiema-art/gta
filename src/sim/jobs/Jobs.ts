@@ -26,6 +26,7 @@ import type { SimWorld } from '../SimWorld';
 import { AgentState, type PlayerProbe } from '../traffic/Traffic';
 import { CAR_IDS } from '../vehicle/presets';
 import type { JobDef } from './catalog';
+import { markerRingCoins } from './place';
 
 export type { JobDef, JobKind } from './catalog';
 
@@ -58,6 +59,8 @@ export class Jobs {
   private cursor: number;
   /** An `escape` event was read this step. */
   private escaped = false;
+  /** The markers' coin rings are laid on the first step (once; the world's constructor leaves the extra coins to its callers). */
+  private ringsLaid = false;
 
   constructor(private readonly sim: SimWorld, defs: JobDef[]) {
     this.defs = defs;
@@ -99,6 +102,11 @@ export class Jobs {
   }
 
   step(probe: PlayerProbe, dt: number): void {
+    if (!this.ringsLaid) {
+      this.ringsLaid = true;
+      // a ring of coins round every placed marker (DESIGN.md §3.2); not the cold open's, whose line leads there
+      this.sim.coins?.addExtra(markerRingCoins(this.defs.filter((d) => d.id !== 0)));
+    }
     this.escaped = false;
     this.cursor = this.sim.events.readFrom(this.cursor, this.onEvent);
     const r = BALANCE.jobs.markerRadius;

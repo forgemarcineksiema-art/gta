@@ -9,7 +9,7 @@ import { TRAFFIC } from '../../src/sim/traffic/tuning';
 import { POLICE } from '../../src/sim/police/tuning';
 import { AgentState, type Traffic } from '../../src/sim/traffic/Traffic';
 import type { SimWorld } from '../../src/sim';
-import { createWorld } from './helpers';
+import { createWorld, run, runUntil } from './helpers';
 
 /** Signed angle between the player's nose and the bearing to a point, degrees. */
 function viewAngle(sim: SimWorld, x: number, z: number): number {
@@ -94,4 +94,40 @@ describe('police patrols (long)', () => {
       } finally { sim.dispose(); }
     }
   }, 180_000);
+});
+
+// Moved unchanged from `police.test.ts` in M5.1: over ~10 s of wall time under the parallel suite.
+describe('police patrols (long)', () => {
+  it('detects a patrol in the open, and heat 0 leaves the same car driving its lane', async () => {
+    for (const heat of [0, 20]) {
+      const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false, heat });
+      const traffic = sim.traffic as Traffic;
+      try {
+        // Stand on the highway, where a spawned patrol has a clear line to the player.
+        sim.spawnAt('highway');
+        run(sim, 4);
+        expect(sim.heat.level).toBe(heat === 0 ? 0 : 1);
+        const police = sim.police!;
+        if (heat === 0) {
+          run(sim, 12);
+          expect(police.count).toBe(0);
+          expect(sim.pursuit.state).toBe('idle');
+          continue;
+        }
+        // the pair is on duty and sees the player within the window...
+        const found = runUntil(sim, 12, (s) => s.pursuit.state === 'active' && s.police!.count === (POLICE.budget[1] as number));
+        expect(found).toBeGreaterThan(0);
+        expect(sim.pursuit.visible).toBe(true);
+        // ...closing on the player rather than idling at its spawn,
+        const live = Array.from(police.units).filter((agent) => agent >= 0);
+        const nearest = Math.min(...live.map((agent) =>
+          Math.hypot((traffic.x[agent] as number) - sim.probe.x, (traffic.z[agent] as number) - sim.probe.z)));
+        console.log(`[police] nearest unit ${nearest.toFixed(0)} m when the pursuit went active on a stationary target`);
+        expect(nearest).toBeLessThan(POLICE.sightRange);
+        for (const agent of live) expect(traffic.state[agent]).not.toBe(AgentState.Free);
+        // ...and a player who just sits there is boxed and busted (the arrest, slice 3c)
+        expect(runUntil(sim, 20, (s) => s.run.state === 'busted')).toBeGreaterThan(0);
+      } finally { sim.dispose(); }
+    }
+  }, 120_000);
 });

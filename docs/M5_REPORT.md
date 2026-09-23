@@ -149,8 +149,7 @@ All live-editable in the dev panel (backtick) unless noted.
   `tierPrices`, `tiers` (the multipliers), `prep`, `offer` (the door's
   threshold), `dailies` (rewards, the streak's cash), `save`.
 - `src/sim/dailies/Dailies.ts`: `DAILY_TEMPLATES` (code, not the panel).
-- `src/sim/city/cover.ts`: `DAILY_SHARE` (the manned share of each site
-  list; code).
+- The daily police share is `BALANCE.dailies.police` (in the panel since M5.1; it applies at the next date).
 
 ## Known issues
 

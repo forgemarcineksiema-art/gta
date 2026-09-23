@@ -626,13 +626,13 @@ export class Coins {
   }
 
   /** Lays a line of coins at these points (beyond the pool's room they are dropped); returns how many were laid. */
-  addExtra(points: ReadonlyArray<Pt>): number {
+  addExtra(points: ReadonlyArray<Pt & { value?: number }>): number {
     let n = 0;
     for (const p of points) {
       if (this.extra.length >= EXTRA_COINS_MAX) break;
       const id = EXTRA_COIN_BASE + this.extra.length;
       this.picked[id] = 0;
-      this.extra.push({ id, x: p.x, y: COIN_HEIGHT, z: p.z, lane: -3, value: BALANCE.coin.value, phase: this.extra.length });
+      this.extra.push({ id, x: p.x, y: COIN_HEIGHT, z: p.z, lane: -3, value: p.value ?? BALANCE.coin.value, phase: this.extra.length });
       n++;
     }
     if (n > 0) this.extraSerial++;

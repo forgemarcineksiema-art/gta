@@ -413,15 +413,16 @@ body {
   text-shadow: 2px 3px 0 #000;
 }
 
-/* the skill chain (M5.5 slice 14): the multiplier, the points and the last trick over a draining bar, bottom centre */
+/* the skill chain (M5.5 slice 14): the multiplier, the points and the last trick over a draining bar, top left
+   across from the bag it pays into (bottom centre sat on the car's bumper, the right side on the popups) */
 .hud__skill {
   position: absolute;
-  left: 50%;
-  bottom: calc(100px + var(--safe-bottom));
-  transform: translateX(-50%) skewX(-8deg);
+  left: calc(24px + var(--safe-left));
+  top: calc(70px + var(--safe-top));
+  transform: skewX(-10deg);
   display: none;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 4px;
   pointer-events: none;
 }
@@ -450,7 +451,7 @@ body {
   color: var(--ui-ink-dim);
 }
 .hud__skill-track {
-  width: 160px;
+  width: 140px;
   height: 4px;
   background: rgba(0, 0, 0, 0.45);
 }
@@ -843,28 +844,22 @@ kbd.key {
   gap: 3px;
 }
 .run__busted.is-visible { display: flex; }
-.run__busted-label {
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.25em;
-  color: var(--ui-danger);
-  text-shadow: 2px 2px 0 #000;
-}
-/* the ticket book (M5.5 slice 18): a citation pad, its three lines written as the bar fills */
+/* the ticket book (M5.5 slice 18): a citation pad headed BUSTED, its three lines written as the bar fills; low
+   enough to stay under the swap prompt */
 .run__ticket {
-  width: clamp(170px, 22vw, 230px);
-  padding: 0 10px 7px;
+  width: clamp(160px, 20vw, 210px);
+  padding: 0 10px 5px;
   background: #f2efe6;
   border: 2px solid #1c1b22;
   box-shadow: 3px 3px 0 #000;
   transform: skewX(12deg) rotate(-3deg);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 .run__ticket-head {
   margin: 0 -10px;
-  padding: 2px 0;
+  padding: 1px 0;
   background: var(--ui-danger);
   color: #f7f3ea;
   font-size: 11px;
@@ -873,7 +868,7 @@ kbd.key {
   text-align: center;
 }
 .run__ticket-line {
-  height: 6px;
+  height: 5px;
   border-bottom: 1px solid rgba(28, 27, 34, 0.35);
 }
 .run__ticket-ink {
@@ -1443,14 +1438,17 @@ kbd.key {
 
 /* the full-screen map (M5.5 slice 15): held on a key over the drive, the key to its glyphs on the right */
 .bigmap {
-  position: absolute;
+  position: fixed;
   inset: 0;
+  /* a sibling of the HUD, the job line and the run's layer, over all of them: the map is the screen while held */
+  z-index: 40;
+  font-family: var(--font-display);
   display: none;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: rgba(12, 8, 24, 0.6);
+  background: rgba(12, 8, 24, 0.84);
   pointer-events: none;
 }
 .bigmap.is-visible { display: flex; }

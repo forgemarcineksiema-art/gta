@@ -437,6 +437,8 @@ export class App {
     });
     // the save's flag is written as it starts, so a reload never repeats it (the M4 session flag's rule)
     if (sim.coldOpen.active) void store.flush(sim);
+    // `police=off`: the dispatcher sends nobody, the beat included (a job's flow measured clean: tests, playtests)
+    if (params.get('police') === 'off' && sim.police) sim.police.dispatching = false;
     // `job=<id>` or `job=delivery|order|escape`: into that marker's ring at boot (tests and playtests)
     const jobParam = params.get('job');
     if (jobParam !== null && sim.city) {

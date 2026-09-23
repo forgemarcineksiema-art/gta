@@ -225,7 +225,8 @@ test('1.9e a delivery from its ring by the bot: paid into the bag inside the lim
 test('2.8e an order: the bot finds the wanted car, the swap takes it, the clock starts', async ({ page }) => {
   test.setTimeout(240_000);
   const errors = watch(page);
-  await page.goto('/?job=order&bot=job&quality=low&fresh=1');
+  // the order's flow, clean: the beat (M5.5) would chase the speeding bot and box it in a queue before the hunt ends
+  await page.goto('/?job=order&bot=job&quality=low&fresh=1&police=off');
   await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 60_000 });
   await page.waitForFunction(() => (window.__game?.sim.jobs.wantedAgent ?? -1) >= 0, null, { timeout: 15_000 });
   // the bot closes on it; within reach the test takes it (the swap is the player's key, not the bot's)

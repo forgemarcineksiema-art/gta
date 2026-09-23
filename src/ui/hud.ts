@@ -232,8 +232,8 @@ export class Hud {
 
     this.hints = el('div', 'hud__hints');
     this.root.appendChild(this.hints);
-    // over the rest of the HUD while held
-    this.bigMap = this.minimap ? new BigMap(this.root, sim, this.minimap.paths) : null;
+    // over every layer of the UI while held (the job line, the cards and the run's layer are siblings of the HUD)
+    this.bigMap = this.minimap ? new BigMap(parent, sim, this.minimap.paths) : null;
 
     this.toast = el('div', 'hud__toast');
     this.root.appendChild(this.toast);

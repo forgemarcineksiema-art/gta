@@ -65,9 +65,10 @@ for (const quality of ['low', 'high']) {
     console.log(`[city ${quality}] ${JSON.stringify(peak)}`);
     mkdirSync('perf', { recursive: true });
     writeFileSync(`perf/city-${quality}.json`, JSON.stringify(peak, null, 2));
-    // 226 = 60 street edges x 2 directions + 24 perimeter edges x 4 (two real
-    // highway lanes per direction, M4 slice 0) + 5 authored roads x 2.
-    expect(peak.lanes).toBe(226); expect(peak.resets).toBe(0);
+    // 210 = 60 street edges x 2 directions + 20 perimeter edges x 4 (two real
+    // highway lanes per direction, M4 slice 0; the four overpasses of M5.5 slice 8
+    // span two blocks each, so 24 edges became 20) + 5 authored roads x 2.
+    expect(peak.lanes).toBe(210); expect(peak.resets).toBe(0);
     expect(peak.draws).toBeLessThanOrEqual(quality === 'low' ? 150 : 300);
     expect(peak.triangles).toBeLessThanOrEqual(quality === 'low' ? 250000 : 600000);
     expect(peak.heap).toBeLessThan(250);

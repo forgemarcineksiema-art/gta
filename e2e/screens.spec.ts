@@ -4,7 +4,8 @@
  * CrazyGames requires legibility at (docs/CRAZYGAMES.md), at DPR 1, plus the
  * wrecked overlay at 1280x720; and the run (M4): the bag and the busted bar
  * filling, the busted card, and the wall behind the hideout's shut door; M5:
- * a delivery's line and card, and the garage's CARS and DAILIES pages on the wall.
+ * a delivery's line and card, and the garage's CARS and DAILIES pages on the wall; M5.5: the goal line, a chain
+ * step's card, the skill chain and the full-screen map.
  * Output: screens/<state>-<w>x<h>.png. Look at them.
  */
 import { expect, test } from '@playwright/test';
@@ -146,6 +147,45 @@ for (const [w, h] of SIZES) {
     await page.locator('.wall__tab', { hasText: 'DAILIES' }).click();
     await page.waitForSelector('.wall__page--dailies.is-current .wall__daily', { timeout: 10_000 });
     await page.screenshot({ path: `screens/dailies-${w}x${h}.png` });
+  });
+}
+
+for (const [w, h] of SIZES) {
+  test(`M5.5 states at ${w}x${h}`, async ({ page }) => {
+    mkdirSync('screens', { recursive: true });
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto('/?manual=1&quality=low&spawn=crown&ad=off&fresh=1&date=2026-09-23');
+    await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 30_000 });
+    // the goal line with no job running: the chain's first step and the way to it
+    await page.evaluate(() => window.advanceTime?.(600));
+    await page.waitForSelector('.jobs.is-visible', { timeout: 10_000 });
+    await page.screenshot({ path: `screens/goal-${w}x${h}.png` });
+    // a step of the chain ticked: its card
+    await page.evaluate(() => {
+      const run = window.__game!.sim.run;
+      run.chain |= 1;
+      run.chainLast = 0;
+      run.chainSerial++;
+      window.advanceTime?.(200);
+    });
+    await page.waitForSelector('.jobs__card.is-visible', { timeout: 10_000 });
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `screens/chain-${w}x${h}.png` });
+    // the skill chain: seven near misses, the multiplier up
+    await page.evaluate(() => {
+      const sim = window.__game!.sim;
+      for (let k = 0; k < 7; k++) sim.events.push('nearMiss', 0, sim.probe.x, 0, sim.probe.z, -1);
+      window.advanceTime?.(100);
+    });
+    await page.waitForSelector('.hud__skill.is-visible', { timeout: 10_000 });
+    await page.screenshot({ path: `screens/skill-${w}x${h}.png` });
+    // the full-screen map, held
+    await page.keyboard.down('Tab');
+    await page.evaluate(() => window.advanceTime?.(200));
+    await page.waitForSelector('.bigmap.is-visible', { timeout: 10_000 });
+    await page.evaluate(() => window.advanceTime?.(200));
+    await page.screenshot({ path: `screens/map-${w}x${h}.png` });
+    await page.keyboard.up('Tab');
   });
 }
 

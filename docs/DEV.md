@@ -44,6 +44,7 @@ do not change with the calendar.
 | `/?spawn=crown` | city districts: `crown`, `foundry`, `gardens`, `marina`; perimeter road: `highway` |
 | `/?spawn=loop` | start of the authored loop: Crown diagonals, north highway, Works chicane, Quay sweep, Garden parkway |
 | `/?heat=3` | start the run at heat level 1-5 (the police answer at that level once they see you) |
+| `/?police=off` | the dispatcher sends no unit, the beat included: a job's flow measured clean (the order e2e) |
 | `/?quality=low` | lock `low` or `high` for reproducible visual/performance comparisons |
 | `/?seed=123` | regenerate building lots from a seed (road topology stays fixed) |
 | `/?dev=1` | debug HUD + live tuning panel (also the backtick key); the panel's Life section holds the traffic, pedestrian, economy, damage and swap numbers |

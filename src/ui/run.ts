@@ -68,7 +68,7 @@ export class RunHud {
     // the busted bar is the officer's ticket book (M5.5 slice 18): three lines written as it fills
     this.bar = el('div', 'run__busted');
     const pad = el('div', 'run__ticket');
-    pad.append(el('div', 'run__ticket-head', 'CITATION'));
+    pad.append(el('div', 'run__ticket-head', 'BUSTED'));
     this.barLines = [0, 1, 2].map(() => {
       const line = el('div', 'run__ticket-line');
       const ink = el('div', 'run__ticket-ink');
@@ -76,7 +76,7 @@ export class RunHud {
       pad.appendChild(line);
       return ink;
     });
-    this.bar.append(el('div', 'run__busted-label', 'BUSTED'), pad);
+    this.bar.append(pad);
     this.card = el('div', 'run__card');
     this.cardLines = el('div', 'run__lines');
     this.card.append(el('div', 'run__title run__title--danger', 'BUSTED'), this.cardLines, this.prompt());

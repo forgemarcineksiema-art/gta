@@ -245,6 +245,7 @@ export class App {
       debug: this.input.label('debug'),
       swap: this.input.label('swap'),
       map: this.input.label('map'),
+      horn: this.input.label('horn'),
     });
     this.hintsUntil = performance.now() + 12000;
     this.hud.setSound(this.input.label('mute'), this.audio.isUserMuted);
@@ -654,6 +655,7 @@ export class App {
           c.boost = st.value.boost;
           if (st.pressed.reset) c.reset = true;
           if (st.pressed.swap) c.swap = true;
+          if (st.pressed.horn) c.horn = true;
         }
         // the car idles behind a shut door and waits out the card
         if (this.sim.run.state === 'door' || this.sim.run.state === 'busted') clearControls(c);

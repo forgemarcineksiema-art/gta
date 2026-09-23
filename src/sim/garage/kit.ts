@@ -27,6 +27,8 @@ export interface KitItem {
   won: number;
   /** Its colour (a neon's, a flame's, a smoke's; a topper's main one for the page's swatch). */
   colour: number;
+  /** A second colour: the tail's half of the twins' two-tone neon. */
+  colour2?: number;
 }
 
 function sold(id: string, slot: KitSlot, name: string, price: number, colour: number): KitItem {
@@ -64,7 +66,7 @@ export const KIT: readonly KitItem[] = [
   sold('neonGold', 'neon', 'GOLD NEON', 4000, PALETTE.coin),
   sold('neonWhite', 'neon', 'WHITE NEON', 2500, PALETTE.carWhite),
   sold('neonViolet', 'neon', 'VIOLET NEON', 3500, 0x8b5cf6),
-  won('twoTone', 'neon', 'TWO-TONE NEON', 3, CITY_COLORS.mint),
+  { ...won('twoTone', 'neon', 'TWO-TONE NEON', 3, CITY_COLORS.mint), colour2: CITY_COLORS.peach },
   won('pinkNeon', 'neon', 'PINK NEON', 6, PALETTE.carMagenta),
   // horns (slice 7): five of our own, Bernie's air horn won
   sold('clown', 'horn', 'CLOWN HORN', 1000, PALETTE.carRed),

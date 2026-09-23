@@ -27,6 +27,7 @@ const BINDINGS: Record<string, Action> = {
   Enter: 'skip',
   KeyN: 'skip',
   Tab: 'map',
+  KeyH: 'horn',
 };
 
 /** Primary key shown in overlays, per action. */
@@ -45,6 +46,7 @@ const PRIMARY: Partial<Record<Action, string>> = {
   mute: 'KeyM',
   skip: 'KeyN',
   map: 'Tab',
+  horn: 'KeyH',
 };
 
 const FALLBACK_LABEL: Record<string, string> = {

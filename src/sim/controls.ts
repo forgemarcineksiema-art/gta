@@ -18,10 +18,12 @@ export interface VehicleControls {
   reset: boolean;
   /** Edge-triggered: take the car alongside. Consumed by the sim on the step it is seen. */
   swap: boolean;
+  /** Edge-triggered (M6): the horn, once a press. Consumed by the sim on the step it is seen. */
+  horn: boolean;
 }
 
 export function createControls(): VehicleControls {
-  return { throttle: 0, brake: 0, steer: 0, handbrake: 0, boost: 0, reset: false, swap: false };
+  return { throttle: 0, brake: 0, steer: 0, handbrake: 0, boost: 0, reset: false, swap: false, horn: false };
 }
 
 export function clearControls(c: VehicleControls): void {
@@ -32,4 +34,5 @@ export function clearControls(c: VehicleControls): void {
   c.boost = 0;
   c.reset = false;
   c.swap = false;
+  c.horn = false;
 }

@@ -13,8 +13,8 @@ import { CAR_PROFILES } from './carProfiles';
 import { BODY_PROFILES } from './bodyProfiles';
 import { Sparks } from './Sparks';
 import { SpeedLines } from './SpeedLines';
-import { buildCarMesh, type CarMesh } from './carMesh';
-import { topperGeometry } from './kitMesh';
+import { buildCarMesh, restHeight, type CarMesh } from './carMesh';
+import { buildFlame, buildNeon, setNeonColours, topperGeometry } from './kitMesh';
 import { CityView, QUALITY, type QualityTier } from './CityView';
 import { SHADOW_HALF, SUN_OFFSET, stableShadowTarget } from './shadows';
 import { gableGeometry, prismGeometry } from './geometry';
@@ -128,6 +128,13 @@ export class Renderer {
   private topperId = '';
   private readonly topperMeshes = new Map<string, THREE.Mesh>();
   private readonly topperMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  /** The rest of the kit on the car (M6 slice 7): the neon under it, a flame at each exhaust, the tyre smoke's rate. */
+  private readonly neon = buildNeon();
+  private readonly flames: THREE.Mesh[] = [buildFlame(), buildFlame()];
+  private neonId = -2;
+  private flameId = -2;
+  private tyreAcc = 0;
+  private tyreSide = 0;
   /** Each shown body's roof height above its origin, for the topper and the camera's fit. */
   private readonly roofY: Partial<Record<BodyId, number>>;
   private smokeAcc = 0;
@@ -249,6 +256,7 @@ export class Renderer {
     for (const id of CAR_IDS) this.roofY[id] = roofOf(this.cars[id]);
     this.car.root.add(this.topper);
     this.topper.position.set(0, (this.roofY[sim.carId] ?? 1.2) - 0.02, -0.2);
+    this.fitKit(sim.carId);
     this.policeView = new PoliceView(this.scene, sim, this.cars.police);
     this.heliView = sim.police ? new HeliView(this.scene, sim) : null;
     // the best-lap ghost: the same car, translucent, no shadow, wheels carried by the body
@@ -404,6 +412,73 @@ export class Renderer {
     return mesh;
   }
 
+  /**
+   * The neon, the boost's flames and the tyre smoke (M6 slice 7), on whichever car the player drives: the neon
+   * sized to the body's footprint on the ground under it, the flames at the tail while the boost burns, the smoke
+   * off the rear tyres in a drift. Colours from the kit; the flame and the smoke have their own when none is worn.
+   */
+  private syncKit(): void {
+    const kit = this.sim.kit;
+    const neon = kit.worn('neon'), flame = kit.worn('flame');
+    if (neon !== this.neonId) {
+      this.neonId = neon;
+      const item = neon >= 0 ? KIT[neon] : undefined;
+      this.neon.visible = item !== undefined;
+      if (item) setNeonColours(this.neon, item.colour, item.colour2 ?? item.colour);
+    }
+    if (flame !== this.flameId) {
+      this.flameId = flame;
+      const colour = flame >= 0 ? (KIT[flame]?.colour ?? PALETTE.carOrange) : PALETTE.carOrange;
+      for (const f of this.flames) (f.material as THREE.MeshBasicMaterial).color.setHex(colour);
+    }
+    const tm = this.sim.vehicle.telemetry;
+    const burning = tm.boosting && !this.sim.life.state.wrecked;
+    for (let k = 0; k < this.flames.length; k++) {
+      const f = this.flames[k] as THREE.Mesh;
+      if (f.visible !== burning) f.visible = burning;
+      if (burning) f.scale.set(1, 1, 0.75 + 0.35 * Math.abs(Math.sin(this.sim.time * 37 + k * 1.7)));
+    }
+  }
+
+  /** Seats the neon and the flames on a newly shown car: its footprint, its ground, its tail. */
+  private fitKit(body: BodyId): void {
+    const spec = bodySpec(body), t = bodyTuning(body), profile = BODY_PROFILES[body];
+    const ground = -restHeight(t);
+    this.car.root.add(this.neon);
+    this.neon.position.set(0, ground + 0.035, 0);
+    this.neon.scale.set(spec.halfWidth * 2 + 0.5, 1, spec.halfLength * 2 + 0.4);
+    const tail = profile.sections[profile.sections.length - 1];
+    const tz = tail ? tail.z : -spec.halfLength, ty = (tail ? tail.floor : 0.35) + ground + 0.06;
+    for (let k = 0; k < this.flames.length; k++) {
+      const f = this.flames[k] as THREE.Mesh;
+      this.car.root.add(f);
+      f.position.set(k === 0 ? 0.36 : -0.36, ty, tz - 0.05);
+    }
+  }
+
+  /** A drift's tyre smoke off the rear wheels, in the kit's colour (a pale grey when none is worn). */
+  private emitTyreSmoke(dt: number): void {
+    const tm = this.sim.vehicle.telemetry;
+    if (!tm.drifting || tm.groundedWheels < 2 || this.sim.probe.speed < 6) { this.tyreAcc = 0; return; }
+    const worn = this.sim.kit.worn('smoke');
+    const colour = worn >= 0 ? (KIT[worn]?.colour ?? -1) : -1;
+    const car = this.car.root;
+    this.tmpFwd.set(0, 0, 1).applyQuaternion(car.quaternion);
+    this.tyreAcc += 28 * dt;
+    while (this.tyreAcc >= 1) {
+      this.tyreAcc -= 1;
+      // the rear wheels are the two behind the car's middle; one then the other
+      this.tyreSide = 1 - this.tyreSide;
+      let seen = 0;
+      for (const w of this.car.wheels) {
+        const behind = (w.position.x - car.position.x) * this.tmpFwd.x + (w.position.z - car.position.z) * this.tmpFwd.z < 0;
+        if (!behind) continue;
+        if (seen++ !== this.tyreSide) continue;
+        this.smoke.emit('tyre', w.position.x, w.position.y - 0.1, w.position.z, this.carVel.x, this.carVel.z, 1, colour);
+      }
+    }
+  }
+
   /** The topper worn now on the roof: built the first time it is worn, one child of the holder at a time. */
   private syncTopper(): void {
     const worn = this.sim.kit.worn('topper');
@@ -437,6 +512,7 @@ export class Renderer {
       for (const w of this.car.wheels) w.visible = true;
       this.car.setDamage(0);
       this.bodyId = body;
+      this.fitKit(body);
       this.shownPaint = -1;
       // the topper is the player's: it moves to the new car's roof
       this.car.root.add(this.topper);
@@ -462,6 +538,7 @@ export class Renderer {
     }
     this.syncCar();
     this.syncTopper();
+    this.syncKit();
     this.applyTransforms(alpha);
     this.trafficView?.update(this.sim.transforms, alpha);
     this.pedView?.update(this.sim.transforms, alpha);
@@ -508,6 +585,7 @@ export class Renderer {
     this.syncFocus();
     this.car.setDamage(this.sim.life.state.stage);
     this.emitSmoke(dt);
+    this.emitTyreSmoke(dt);
     if (this.billboards && this.sim.collectibles) this.billboards.update(this.sim.collectibles);
     this.debris.update(dt);
     this.smoke.update(dt);

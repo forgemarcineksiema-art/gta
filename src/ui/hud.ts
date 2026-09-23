@@ -35,6 +35,7 @@ export interface KeyHints {
   debug: string;
   swap: string;
   map: string;
+  horn: string;
 }
 
 export class Hud {
@@ -277,6 +278,7 @@ export class Hud {
       row([k.reset], 'reset'),
       row([k.camera], 'camera'),
       row([k.map], 'map (hold)'),
+      row([k.horn], 'horn'),
       row([k.pause], 'pause'),
       row([k.debug], 'tuning'),
     );

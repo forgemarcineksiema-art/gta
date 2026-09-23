@@ -368,6 +368,12 @@ export class SimWorld {
     if (this.traffic) this.stash.step(this.probe);
     this.donuts?.step(this.probe);
     this.fares.step(this.probe, FIXED_DT);
+    if (this.controls.horn) {
+      // the horn (M6 slice 7): the cars ahead move aside, the worn horn sounds
+      this.controls.horn = false;
+      const heeded = this.traffic ? this.traffic.honked(this.probe) : 0;
+      this.events.push('horn', heeded, this.probe.x, this.probe.y, this.probe.z, this.kit.worn('horn'));
+    }
     this.jobs.step(this.probe, FIXED_DT);
     // after the jobs (a fare's def and a race's place are still there), before the run banks anything
     this.career.step();

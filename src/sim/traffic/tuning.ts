@@ -41,6 +41,11 @@ export interface TrafficTuning {
    * density), apart from the moving traffic's count; swap candidates like any stopped car.
    */
   parked: { share: number; near: number; far: number; max: number };
+  /**
+   * The player's horn (M6 slice 7): a civilian ahead in the player's lane (within `cone` m across, heading the
+   * same way) within `reach` m moves `shift` m toward its kerb for `seconds`, once per `cooldown` s per car.
+   */
+  horn: { reach: number; cone: number; shift: number; seconds: number; cooldown: number };
   highwayGap: number;
   /** Chance a highway car takes the same lane out of a junction instead of choosing among every exit. */
   highwayKeepLane: number;
@@ -172,6 +177,7 @@ export const TRAFFIC: TrafficTuning = {
   junctionClear: 4,
   signals: { green: 14, amber: 3, allRed: 1, offset: 6 },
   parked: { share: 0.4, near: 80, far: 220, max: 10 },
+  horn: { reach: 25, cone: 2.2, shift: 0.8, seconds: 2, cooldown: 4 },
   highwayGap: 25,
   highwayKeepLane: 0.85,
   disturbedImpact: 1.5,

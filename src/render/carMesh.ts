@@ -334,11 +334,16 @@ function wheelGeometry(t: VehicleTuning, style: string): THREE.BufferGeometry {
   return result;
 }
 
+/** The chassis origin's height above the ground with the car at rest: the mesh's y = 0 is there, the ground at -this. */
+export function restHeight(t: VehicleTuning): number {
+  const staticCompression = (t.mass * (9.81 + t.extraGravity)) / 4 / t.suspensionStiffness;
+  return t.wheelRadius + t.suspensionRestLength - staticCompression - t.suspensionAttachY;
+}
+
 export function buildCarMesh(t: VehicleTuning, profile: CarProfile = MUSCLE, color: number = profile.paint): CarMesh {
   const root = new THREE.Group();
   root.name = `car-${profile.name}`;
-  const staticCompression = (t.mass * (9.81 + t.extraGravity)) / 4 / t.suspensionStiffness;
-  const y0 = t.wheelRadius + t.suspensionRestLength - staticCompression - t.suspensionAttachY;
+  const y0 = restHeight(t);
   const S = profile.sections;
   const nose = S[0] as Section, tail = S[S.length - 1] as Section;
   const paint = color, paintDark = shade(color, 0.72), paintLight = shade(color, 1.13);

@@ -197,6 +197,9 @@ export class Traffic {
   /** Seconds left of a flinch, a pull-over, an angry driver's temper. */
   readonly flinchLeft: Float32Array;
   readonly pullLeft: Float32Array;
+  /** The player's horn (M6 slice 7): seconds left moving aside, and until the car heeds it again. */
+  readonly hornLeft: Float32Array;
+  private readonly hornCool: Float32Array;
   readonly angryLeft: Float32Array;
   /** Going round this dead car (-1 none), metres of the pass left. */
   readonly passAgent: Int16Array;
@@ -405,6 +408,8 @@ export class Traffic {
     this.shift = new Float32Array(n);
     this.flinchLeft = new Float32Array(n);
     this.pullLeft = new Float32Array(n);
+    this.hornLeft = new Float32Array(n);
+    this.hornCool = new Float32Array(n);
     this.angryLeft = new Float32Array(n);
     this.passAgent = new Int16Array(n).fill(-1);
     this.standoff = new Float32Array(n);
@@ -756,6 +761,30 @@ export class Traffic {
     this.speed[i] = 0;
     this.gapT[i] = 0.5;
     return i;
+  }
+
+  /**
+   * The player's horn (M6 slice 7): each driving civilian ahead in the player's lane within reach, heading the same
+   * way, moves toward its kerb for a moment (the big ones only hold their line). Returns how many heeded it.
+   */
+  honked(player: PlayerProbe): number {
+    const h = this.tuning.horn;
+    const fx = Math.sin(player.yaw), fz = Math.cos(player.yaw);
+    let n = 0;
+    for (let i = 0; i < this.capacity; i++) {
+      const st = this.state[i];
+      if ((st !== AgentState.Kinematic && st !== AgentState.Physical) || this.police[i] !== 0 || this.racer[i] !== 0) continue;
+      if ((this.hornCool[i] as number) > 0) continue;
+      const dx = (this.x[i] as number) - player.x, dz = (this.z[i] as number) - player.z;
+      const along = dx * fx + dz * fz, across = dx * -fz + dz * fx;
+      if (along <= 0 || along > h.reach || Math.abs(across) > h.cone) continue;
+      const yaw = this.yaw[i] as number;
+      if (Math.sin(yaw) * fx + Math.cos(yaw) * fz < 0.5) continue;
+      this.hornLeft[i] = h.seconds;
+      this.hornCool[i] = h.cooldown;
+      n++;
+    }
+    return n;
   }
 
   /** A driving civilian becomes a rival's racer where it is (M6 slice 3: a twin swapped into it). */
@@ -2237,6 +2266,8 @@ export class Traffic {
     this.shift[i] = 0;
     this.flinchLeft[i] = 0;
     this.pullLeft[i] = 0;
+    this.hornLeft[i] = 0;
+    this.hornCool[i] = 0;
     this.standoff[i] = 0;
     this.angryLeft[i] = 0;
     this.passAgent[i] = -1;
@@ -2307,6 +2338,8 @@ export class Traffic {
     }
     this.flinchLeft[i] = Math.max(0, (this.flinchLeft[i] as number) - dt);
     this.pullLeft[i] = Math.max(0, (this.pullLeft[i] as number) - dt);
+    this.hornLeft[i] = Math.max(0, (this.hornLeft[i] as number) - dt);
+    this.hornCool[i] = Math.max(0, (this.hornCool[i] as number) - dt);
     this.angryLeft[i] = Math.max(0, (this.angryLeft[i] as number) - dt);
     this.laneCool[i] = Math.max(0, (this.laneCool[i] as number) - dt);
     const yaw = this.yaw[i] as number;
@@ -2403,6 +2436,7 @@ export class Traffic {
     let target = 0;
     if ((this.passAgent[i] as number) >= 0) target = -2 * (this.lanes.offset[this.lane[i] as number] as number);
     else if ((this.flinchLeft[i]) > 0) target = t.flinch.offset;
+    else if (this.hornLeft[i] > 0 && !spec.big) target = t.horn.shift;
     else if ((this.pullLeft[i]) > 0 && !spec.big) target = t.pullOver.offset;
     else if (this.bad[i] === 1) target = t.temper.badDrift * Math.sin(this.clock * 0.9 + i * 1.7);
     this.ease(i, target, dt);

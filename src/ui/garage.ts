@@ -47,7 +47,7 @@ export type WallPage = 'wall' | 'board' | 'cars' | 'paint' | 'tune' | 'prep' | '
 const PAGE_TITLES: Record<WallPage, string> = { wall: 'TOTALS', board: 'BOARD', cars: 'CARS', paint: 'STYLE', tune: 'TUNE', prep: 'PREP', dailies: 'DAILIES' };
 
 /** The driver's kit's slots on the STYLE page (M6), in order, and each row's heading. */
-export const STYLE_SLOTS: readonly KitSlot[] = ['topper'];
+export const STYLE_SLOTS: readonly KitSlot[] = ['topper', 'neon', 'horn', 'flame', 'smoke'];
 const SLOT_WORDS: Record<KitSlot, string> = { topper: 'ON THE ROOF · GOES INTO EVERY CAR YOU TAKE', neon: 'NEON', horn: 'HORN · H', flame: 'BOOST FLAME', smoke: 'TYRE SMOKE' };
 
 /** The seven car paints of the palette (docs/STYLE.md): the respray is free. */

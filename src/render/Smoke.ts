@@ -15,7 +15,7 @@ const HIDDEN_Y = -100;
 /** Seconds a puff takes to fade in at the source. */
 const FADE_IN = 0.12;
 
-export type Puff = 'smoke' | 'dark' | 'fire';
+export type Puff = 'smoke' | 'dark' | 'fire' | 'tyre';
 
 const VERT = `
 uniform float uScale;
@@ -105,7 +105,7 @@ export class Smoke {
    * from a moving car is spread through more air per second, so it is fainter
    * and mixes away sooner.
    */
-  emit(kind: Puff, x: number, y: number, z: number, vx = 0, vz = 0, density = 1): void {
+  emit(kind: Puff, x: number, y: number, z: number, vx = 0, vz = 0, density = 1, colour = -1): void {
     const i = this.next;
     this.next = (this.next + 1) % POOL;
     const r = (): number => this.rnd();
@@ -123,6 +123,19 @@ export class Smoke {
       this.peak[i] = 0.9 * density;
       this.colors[i * 3] = 1.0; this.colors[i * 3 + 1] = 0.55 + r() * 0.35; this.colors[i * 3 + 2] = 0.1;
       this.kind[i] = 2;
+    } else if (kind === 'tyre') {
+      // a drift's tyre smoke (M6 slice 7): low, wide, quick to spread, in the kit's colour or a pale grey
+      this.vy[i] = 0.35 + r() * 0.3;
+      this.life[i] = (0.9 + r() * 0.5) * mix;
+      this.sizes[i] = 0.5;
+      this.grow[i] = 1.3;
+      this.peak[i] = 0.5 * density;
+      const c = colour >= 0 ? colour : 0xdcdce4;
+      const shade = 0.9 + r() * 0.15;
+      this.colors[i * 3] = ((c >> 16) & 255) / 255 * shade;
+      this.colors[i * 3 + 1] = ((c >> 8) & 255) / 255 * shade;
+      this.colors[i * 3 + 2] = (c & 255) / 255 * shade;
+      this.kind[i] = 0;
     } else {
       const dark = kind === 'dark';
       this.vy[i] = 0.9 + r() * 0.6;

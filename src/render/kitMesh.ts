@@ -145,3 +145,63 @@ export function topperGeometry(id: string): THREE.BufferGeometry {
 
 /** The topper ids drawn here (tests: every topper in the kit has one). */
 export const TOPPER_IDS: readonly string[] = Object.keys(TOPPERS);
+
+/**
+ * The neon under the car (M6 slice 7): a flat quad in the car's footprint that glows from its middle out to soft
+ * edges, additive, front and back colours (the twins' two-tone: mint at the nose, peach at the tail). One draw, no
+ * texture: the falloff is the quad's own coordinates.
+ */
+export function buildNeon(): THREE.Mesh {
+  const geometry = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+  geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(geometry.getAttribute('position').count * 3), 3));
+  const material = new THREE.ShaderMaterial({
+    vertexColors: true,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    uniforms: { uOpacity: { value: 0.75 } },
+    vertexShader: `
+      varying vec2 vUv;
+      varying vec3 vColor;
+      void main() {
+        vUv = uv;
+        vColor = color;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: `
+      uniform float uOpacity;
+      varying vec2 vUv;
+      varying vec3 vColor;
+      void main() {
+        vec2 d = abs(vUv - 0.5) * 2.0;
+        float edge = max(d.x * d.x, d.y);
+        gl_FragColor = vec4(vColor, uOpacity * (1.0 - smoothstep(0.35, 1.0, edge)));
+      }`,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = 'neon';
+  mesh.renderOrder = 1;
+  mesh.visible = false;
+  return mesh;
+}
+
+/** The neon's colours: the nose's and the tail's (one colour twice for a plain neon). */
+export function setNeonColours(neon: THREE.Mesh, front: number, back: number): void {
+  const pos = neon.geometry.getAttribute('position'), col = neon.geometry.getAttribute('color') as THREE.BufferAttribute;
+  const f = new THREE.Color(front), b = new THREE.Color(back);
+  for (let i = 0; i < pos.count; i++) {
+    const c = pos.getZ(i) > 0 ? f : b;
+    col.setXYZ(i, c.r, c.g, c.b);
+  }
+  col.needsUpdate = true;
+}
+
+/** The boost's flame at an exhaust (M6 slice 7): a cone pointing back, additive, in the flame's colour; the renderer flickers it. */
+export function buildFlame(): THREE.Mesh {
+  const geometry = new THREE.ConeGeometry(0.1, 0.55, 8, 1, true).rotateX(-Math.PI / 2).translate(0, 0, -0.275);
+  const material = new THREE.MeshBasicMaterial({ color: PALETTE.carOrange, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = 'flame';
+  mesh.visible = false;
+  return mesh;
+}

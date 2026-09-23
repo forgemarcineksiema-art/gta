@@ -7,12 +7,16 @@ import type { EngineAudio } from './EngineAudio';
 import type { SimEvent, SimWorld } from '../sim';
 import { BALANCE } from '../sim/balance';
 import { BODIES } from '../sim/traffic/bodies';
+import { KIT } from '../sim/garage/kit';
+import { CAR_IDS } from '../sim/vehicle/presets';
 
 export class Sfx {
   private seq = 0;
   private ctx: BaseAudioContext | null = null;
   private master: AudioNode | null = null;
   private traffic: SimWorld['traffic'] = null;
+  /** The player's class index (the horn's pitch when none is worn). */
+  private playerKind = 0;
   private readonly drop = (): void => undefined;
   private readonly play = (e: SimEvent): void => {
     const ctx = this.ctx;
@@ -46,6 +50,8 @@ export class Sfx {
     // a cache found (M5.5): the cap's bell already rang; every tenth adds the streak's two notes
     else if (e.kind === 'cache') { if (e.value > 0) { this.note(ctx, master, 880, 0, 0.12, 0.06, 'triangle'); this.note(ctx, master, 1174.66, 0.1, 0.3, 0.06, 'triangle'); } }
     else if (e.kind === 'streak') { this.note(ctx, master, 880, 0, 0.12, 0.06, 'triangle'); this.note(ctx, master, 1174.66, 0.1, 0.3, 0.06, 'triangle'); }
+    // the player's horn (M6 slice 7): the kit's worn one, or the class's own
+    else if (e.kind === 'horn') this.playerHorn(ctx, master, e.target);
     // the wanted board (M6): a rival calls you out (three notes up, a question); a rival beaten (the chord, then an octave)
     else if (e.kind === 'rivalReady') { [392, 523.25, 698.46].forEach((f, i) => this.note(ctx, master, f, i * 0.12, i === 2 ? 0.4 : 0.12, 0.08, 'square')); }
     else if (e.kind === 'rivalBeaten') { [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => this.note(ctx, master, f, i * 0.08, i === 4 ? 0.7 : 0.14, 0.08, 'square')); }
@@ -62,6 +68,7 @@ export class Sfx {
     this.ctx = master.context;
     this.master = master;
     this.traffic = sim.traffic;
+    this.playerKind = Math.max(0, CAR_IDS.indexOf(sim.carId));
     this.seq = sim.events.readFrom(this.seq, this.play);
   }
 
@@ -95,6 +102,61 @@ export class Sfx {
     noise.connect(filter).connect(gain).connect(master);
     noise.start(t);
     noise.stop(t + 0.26);
+  }
+
+  /**
+   * The player's horn (M6 slice 7) by the kit's item: the clown's squeeze, a goose, a doorbell, a two-tone, a kazoo,
+   * the air horn; none worn is the class's own honk. Our own sounds, synthesized like the rest.
+   */
+  private playerHorn(ctx: BaseAudioContext, master: AudioNode, item: number): void {
+    const id = item >= 0 ? (KIT[item]?.id ?? '') : '';
+    switch (id) {
+      case 'clown':
+        this.bend(ctx, master, 'triangle', [[620, 0], [780, 0.08], [520, 0.2]], 0.24, 0.1);
+        this.bend(ctx, master, 'triangle', [[700, 0.28], [900, 0.36], [600, 0.46]], 0.5, 0.1);
+        break;
+      case 'goose':
+        for (const d of [0, 0.22]) this.bend(ctx, master, 'sawtooth', [[520, d], [420, d + 0.14]], d + 0.16, 0.07);
+        break;
+      case 'doorbell':
+        this.note(ctx, master, 1318.5, 0, 0.5, 0.08, 'sine');
+        this.note(ctx, master, 1046.5, 0.32, 0.8, 0.08, 'sine');
+        break;
+      case 'twoToneHorn':
+        this.note(ctx, master, 392, 0, 0.26, 0.07, 'square');
+        this.note(ctx, master, 523.25, 0.24, 0.3, 0.07, 'square');
+        break;
+      case 'kazoo':
+        this.bend(ctx, master, 'sawtooth', [[440, 0], [466, 0.1], [440, 0.2], [494, 0.3], [440, 0.42]], 0.46, 0.05);
+        break;
+      case 'airHorn':
+        this.honk(ctx, master, 0, true);
+        this.note(ctx, master, 110, 0, 0.7, 0.07, 'sawtooth');
+        break;
+      default:
+        this.honk(ctx, master, this.playerKind);
+    }
+  }
+
+  /** One oscillator through a list of (frequency, time) points, held to `end`. */
+  private bend(ctx: BaseAudioContext, master: AudioNode, type: OscillatorType, points: ReadonlyArray<readonly [number, number]>, end: number, peak: number): void {
+    const t = ctx.currentTime, first = points[0];
+    if (!first) return;
+    const osc = ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.setValueAtTime(first[0], t + first[1]);
+    for (let k = 1; k < points.length; k++) {
+      const p = points[k] as readonly [number, number];
+      osc.frequency.linearRampToValueAtTime(p[0], t + p[1]);
+    }
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t + first[1]);
+    gain.gain.exponentialRampToValueAtTime(peak, t + first[1] + 0.02);
+    gain.gain.setValueAtTime(peak, t + end - 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + end);
+    osc.connect(gain).connect(master);
+    osc.start(t + first[1]);
+    osc.stop(t + end + 0.02);
   }
 
   /** A car's horn by class; a truck's or a bus's is the low air horn, held longer. */

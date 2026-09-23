@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M6 slice 7: neon, horns, the boost's flame, tyre smoke
+
+Done: the horn is a verb on H (hint strip, `horn` edge in the controls): a civilian ahead in the player's lane within 25
+m moves 0.8 m toward its kerb for 2 s, once per 4 s (`Traffic.honked`), units and racers never; the 'horn' event plays
+the worn one (a clown's, a goose, a doorbell, a two-tone, a kazoo, Bernie's air horn; the class's honk when none).
+The game had no tyre smoke and no boost flame: now a drift smokes off the rear tyres and the boost burns at the tail, in
+the worn colours (a pale grey and orange when none); neon is a soft additive quad in the body's footprint (the twins'
+mint to peach). All ride on whatever car the player drives; STYLE shows all five rows. Pins M6 7.1–7.3 and the H key.
+Verify green (369 tests).
+
 ## 2026-09-23 — M6 slice 6: the driver's kit and the STYLE page
 
 Done: `garage/kit.ts`, the catalogue of 43 items in five slots (toppers now; neon, horns, flames, smoke drawn in slice

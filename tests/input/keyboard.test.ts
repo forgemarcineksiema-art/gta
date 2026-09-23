@@ -116,4 +116,14 @@ describe('keyboard input', () => {
     expect(input.state.value.map).toBe(0);
     expect(win.defaults).toContain('Tab');
   });
+
+  it('M6 7.2 H is the horn, by its code, once a press', () => {
+    const { input, win } = setup();
+    win.fire('keydown', 'KeyH');
+    input.update();
+    expect(input.state.pressed.horn).toBe(true);
+    win.fire('keydown', 'KeyH', true);
+    input.update();
+    expect(input.state.pressed.horn).toBe(false);
+  });
 });

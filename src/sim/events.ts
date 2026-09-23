@@ -35,7 +35,9 @@ export type EventKind =
   // place on the board); target = the rival's index in RIVALS
   | 'rivalReady' | 'rivalBeaten'
   // a twin swapped cars (M6 slice 3): target = the new car's body index over its paint (the radio names it)
-  | 'twinSwap';
+  | 'twinSwap'
+  // the player's horn (M6 slice 7): value = the cars that pulled aside, target = the kit's horn worn (-1 the class's own)
+  | 'horn';
 
 export interface SimEvent {
   kind: EventKind;

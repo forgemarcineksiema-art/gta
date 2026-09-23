@@ -78,7 +78,7 @@ npm run city         # M2 startup, whole-road-graph scene budgets, controls and 
 npm run life         # M3: a bot run with traffic and pedestrians on, events flowing, budgets held
 npm run heat         # M4: the bot into the hideout, the door as a game-made break, heat 1/3/5
 npm run game         # M5: the garage by keys, the offers on every ad path, the cold open once, the save, a delivery and an order by the bot
-npm run balance      # M5: the busted rates by the bot policies, the EV table, the first hour, three assertions (~40 s, Node)
+npm run balance      # M5: the busted rates by the bot policies (seeds 42 / 7 / 123), the EV table, the first hour, three assertions (~160 s, Node)
 ```
 
 The whole-map check is accelerated fixed-step driving with sampled rendering;

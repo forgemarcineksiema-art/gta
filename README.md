@@ -21,11 +21,11 @@ npm start            # builds the production bundle and serves it at http://loca
 ```
 
 That is the build CrazyGames would serve, from `dist/`, with no URL parameters.
-Press `P`: the pause screen's corner shows the build stamp, `0.5.0+<commit>`
+Press `P`: the pause screen's corner shows the build stamp, `0.5.5+<commit>`
 (`-dirty` when uncommitted changes went into it), so it is always clear which
-build is on screen. The version is the milestone: 0.5.x is M5.
+build is on screen. The version is the milestone: 0.5.5 is M5.5.
 
-Controls: `W A S D` / arrows drive, `Space` handbrake (drift), `Shift` boost, `E` swap into the car beside you, `R` reset (or respawn when wrecked), `C` camera, `P` pause, `M` mute. Any key skips the takedown slow motion and closes the busted card. Behind the garage door `A`/`D` move between the wall's pages, `W` opens one or drives out, `S` backs out; everything is clickable too.
+Controls: `W A S D` / arrows drive, `Space` handbrake (drift), `Shift` boost, `E` swap into the car beside you, `R` reset (or respawn when wrecked), `C` camera, hold `Tab` for the map of the island, `P` pause, `M` mute. Any key skips the takedown slow motion and closes the busted card. Behind the garage door `A`/`D` move between the wall's pages, `W` opens one or drives out, `S` backs out; everything is clickable too.
 
 The first visit is the cold open: a beat-up van at heat 1, a muscle car to swap into, a coin line round the hideout's block through a billboard, a delivery marker and the hideout door; captions teach each verb, `N` skips. The save (bank, coins, cars, paint, upgrades, billboards, dailies, the streak) is kept in the browser; `?fresh=1` starts a new profile.
 
@@ -33,7 +33,9 @@ The run: crimes fill the bag (yellow, top right, with the multiplier the police 
 
 Coins are never a carpet: a job lays its coins along your route (runs at the turns and on the straights, the big one on the target; take them all and the job tips 10 %), thirty caches a day sit on side streets (gold dots on the radar, CACHES n/30, a bonus at every tenth), and the rest lie only at billboards and ramps.
 
-Jobs: sixteen rings on the corners of the grid, drive into one. Orange is a getaway delivery (a clock to a drop-off, faster pays more), magenta a steal-to-order (find the named car, swap into it, bring it to a fence unscratched), blue a pursuit escape (the police on you at once at a set heat, a bounty for losing them). The orange arrow over the car points at the job's target, and between jobs, dimmed, at the nearest ring or, with a full bag, the nearest door. Behind the door the wall is the garage: cars, paint, three upgrades a car, the lawyer and the fence for the next run, and the day's three challenges. Cars and upgrades are bought with the bank and the coins together.
+The line at the top always names one thing to do (TAKE A JOB · 320 m, LOSE THEM, BANK IT, BUY THE COMPACT · n TO GO) and the arrow points at it; the first quarter hour is a six-step chain with a card for each step.
+
+Jobs: twenty-eight rings on the corners of the grid, drive into one. Orange is a getaway delivery (a clock to a drop-off, faster pays more), magenta a steal-to-order (find the named car, swap into it, bring it to a fence unscratched), blue a pursuit escape (the police on you at once at a set heat, a bounty for losing them), gold a time trial on a coin line (medals), lime a street race against three rivals, red a takedown rage and white a mayhem zone (a quota inside a ring in 60 s). In a taxi, walkers hail fares; one in four is a crook who pays double while the heat climbs. Near misses, drifts, flights and the oncoming lane build a skill chain into the bag; the twenty ramps and the fifty billboards are hunts with a prize, and one car in the city is hidden. The orange arrow over the car points at the job's target, and between jobs, dimmed, at the nearest ring or, with a full bag, the nearest door. Behind the door the wall is the garage: cars, paint, three upgrades a car, the lawyer and the fence for the next run, and the day's three challenges. Cars and upgrades are bought with the bank and the coins together.
 
 ## Develop
 

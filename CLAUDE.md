@@ -9,7 +9,7 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 
 ## Session start
 
-1. Read this file, `docs/PROGRESS.md` and the current milestone contract (M5.5: `docs/M5.5_PLAN.md`; then `docs/M6_PLAN.md`; the design in `docs/DESIGN.md`, §13 first); check `git log --oneline -15`.
+1. Read this file, `docs/PROGRESS.md` and the current milestone contract (M5.5 at its gate, `docs/M5.5_REPORT.md`; then `docs/M6_PLAN.md`, only on Marcin's word; the design in `docs/DESIGN.md`, §13 first); check `git log --oneline -15`.
 2. Run `npm run verify` (the quick set) before touching anything and at the commit that ends a slice. `npm run verify:gate` (the long bot-driven pins included) only at a milestone gate. Nothing else per slice: see **Pace** below, and read it before every slice.
 3. Work autonomously inside the milestone. Decide, act, note assumptions in `docs/PROGRESS.md`. Stop only at a gate, before destructive/irreversible operations, to change a fixed decision from the brief, or when blocked on something only Marcin can provide.
 4. Commit small and often; never leave significant work uncommitted. Commit messages end with a `Co-Authored-By:` line naming the model that did the work (e.g. `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`).
@@ -20,7 +20,7 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 |---|---|
 | `docs/BRIEF.md` | The project brief. Read-only. |
 | `docs/PROGRESS.md` | Session log: done, decided and why, next, open problems. Holds the current milestone and the design talks; older entries are archived under `docs/history/` at each gate. |
-| `docs/history/` | Past gate reports, reviews and archived session logs (`PROGRESS_M0-M3.md`, `PROGRESS_M4.md`). |
+| `docs/history/` | Past gate reports, reviews and archived session logs (`PROGRESS_M0-M3.md`, `PROGRESS_M4.md`, `PROGRESS_M5.md`). |
 | `docs/DESIGN.md` | Design decisions on top of the brief: the run, progression, the city as a level, platform KPIs, the M4 slice order. Each section is marked decided (Marcin) or set here (mine). |
 | `docs/M5.5_PLAN.md` | The current milestone contract: the whole game before the platform (the playtest's fixes, the air, the jobs, the toys, life's models). Slices in order, done criteria, pins. M6 starts only on his word after its gate. |
 | `docs/M4_PLAN.md`, `docs/M5_PLAN.md` | The finished contracts (kept for their numbers and as-built notes). M4's §5 holds the contract for post-launch update 1. |

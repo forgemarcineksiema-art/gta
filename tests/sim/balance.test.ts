@@ -2,11 +2,16 @@
  * The balance script (docs/M5_PLAN.md slice 7, D12; DESIGN.md §2.7, §3.3):
  * `npm run balance`, outside `verify` (it steps the sim for minutes).
  *
- * 1. The capture probe: the road bot under the police, headless, seed 42,
- *    traffic on, 180 s at each level 1–5 with the novice and the skilled
- *    policies of `app/botPolicy.ts`; busted a minute per level (after a card
- *    the run drives on and the heat is put back after 10 s, as M4 measured).
- *    The same novice at heat 0 gives the bag and the coins a minute.
+ * 1. The capture probe: the road bot under the police, headless, traffic on,
+ *    180 s at each level 1–5 with the novice and the skilled policies of
+ *    `app/botPolicy.ts`, averaged over the M4 reference seeds 42 / 7 / 123
+ *    (M5.5 gate: one seed's 180 s counts busts in steps of 0.33 a minute, and a
+ *    single bust more or less moved the optimum two levels); busted a minute
+ *    per level (after a card the run drives on and the heat is put back after
+ *    10 s, as M4 measured, once the car is `AWAY` m from where the card fell:
+ *    a bot wedged in a queue at the lights was busted there every 13 s, eight
+ *    cards for one trap). The same novice at heat 0, same seeds, gives the
+ *    bag and the coins a minute.
  * 2. The EV model of §2.7 with those rates: one job per level, two minutes
  *    each, the placed jobs' mean payout; capture as a Poisson rate per level;
  *    busted keeps the fine; the door pays the level's multiplier; coins are
@@ -30,6 +35,10 @@ import { createWorld, run, runUntil } from './helpers';
 
 const SECONDS = 180;
 const LEVELS = [1, 2, 3, 4, 5];
+/** The M4 gate's reference seeds (BALANCE.measured). */
+const SEEDS = [42, 7, 123];
+/** After a card the heat comes back only this far (m) from where it fell: one trap is one capture, not a loop. */
+const AWAY = 50;
 /** Minutes of a run spent at each level, and the drive to the door (DESIGN.md §2.7). */
 const STAGE_MINUTES = 2;
 const DOOR_MINUTES = 1;
@@ -38,10 +47,10 @@ const HOUR = 60;
 interface Capture { busted: number; perMinute: number }
 
 /** Busted a minute at a level: the bot drives on after each card, the heat is put back after 10 s. */
-async function capture(policy: PolicyName, level: number): Promise<Capture> {
+async function capture(policy: PolicyName, level: number, seed: number): Promise<Capture> {
   const threshold = BALANCE.heatThresholds[level - 1] as number;
-  const sim = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 0, record: false, heat: threshold });
-  let busted = 0, rearm = -1;
+  const sim = await createWorld({ map: 'city', seed, traffic: 1, peds: 0, record: false, heat: threshold });
+  let busted = 0, rearm = -1, fellX = 0, fellZ = 0;
   try {
     const bot = new BotPolicy(policy, new TrackBot(sim.carId, CITY_BOT_TUNING));
     run(sim, SECONDS, (_t, c, s) => {
@@ -49,13 +58,20 @@ async function capture(policy: PolicyName, level: number): Promise<Capture> {
         busted++;
         s.run.closeCard();
         rearm = 10;
+        fellX = s.probe.x;
+        fellZ = s.probe.z;
       } else if (s.run.state === 'door') {
         s.run.openDoor();
         rearm = 10;
+        fellX = s.probe.x;
+        fellZ = s.probe.z;
       }
       if (rearm > 0) {
-        rearm -= 1 / 60;
-        if (rearm <= 0) s.heat.set(threshold);
+        rearm = Math.max(1e-6, rearm - 1 / 60);
+        if (rearm <= 1e-6 && Math.hypot(s.probe.x - fellX, s.probe.z - fellZ) >= AWAY) {
+          rearm = -1;
+          s.heat.set(threshold);
+        }
       }
       // the probe is a level, not a run: the chase's drip and the seen crimes (M5.5) are put back
       else if (s.heat.level !== level) s.heat.set(threshold);
@@ -66,8 +82,8 @@ async function capture(policy: PolicyName, level: number): Promise<Capture> {
 }
 
 /** The bag and the coins a minute from heat 0, the novice. */
-async function earnings(): Promise<{ bag: number; coins: number; jobMean: number }> {
-  const sim: SimWorld = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 0, record: false });
+async function earnings(seed: number): Promise<{ bag: number; coins: number; jobMean: number }> {
+  const sim: SimWorld = await createWorld({ map: 'city', seed, traffic: 1, peds: 0, record: false });
   try {
     const bot = new BotPolicy('novice', new TrackBot(sim.carId, CITY_BOT_TUNING));
     let bag = 0;
@@ -152,21 +168,26 @@ describe('the balance script', () => {
     const rates: Record<PolicyName, number[]> = { novice: [0], skilled: [0] };
     const rows: string[] = [];
     for (const level of LEVELS) {
+      const each: Record<PolicyName, number[]> = { novice: [], skilled: [] };
       for (const policy of ['novice', 'skilled'] as const) {
-        const c = await capture(policy, level);
-        rates[policy][level] = c.perMinute;
+        for (const seed of SEEDS) each[policy].push((await capture(policy, level, seed)).perMinute);
+        rates[policy][level] = each[policy].reduce((a, b) => a + b, 0) / SEEDS.length;
       }
-      rows.push(`  level ${level}: novice ${(rates.novice[level] as number).toFixed(2)} / min, skilled ${(rates.skilled[level] as number).toFixed(2)} / min`);
+      const seeds = (p: PolicyName): string => each[p].map((v) => v.toFixed(2)).join(' / ');
+      rows.push(`  level ${level}: novice ${(rates.novice[level] as number).toFixed(2)} / min (${seeds('novice')}), skilled ${(rates.skilled[level] as number).toFixed(2)} / min (${seeds('skilled')})`);
     }
-    const earn = await earnings();
+    const earns: Array<{ bag: number; coins: number; jobMean: number }> = [];
+    for (const seed of SEEDS) earns.push(await earnings(seed));
+    const mean = (f: (e: { bag: number; coins: number; jobMean: number }) => number): number => earns.reduce((n, e) => n + f(e), 0) / earns.length;
+    const earn = { bag: mean((e) => e.bag), coins: mean((e) => e.coins), jobMean: mean((e) => e.jobMean) };
     const out: string[] = [];
     for (const policy of ['novice', 'skilled'] as const) {
       const t = await timeToLevel(policy);
       const fmt = (v: number): string => (v < 0 ? 'not inside the cap' : `${v.toFixed(0)} s`);
       out.push(`time to level from heat 0, ${policy}: level 2 ${fmt(t.t2)}, level 3 ${fmt(t.t3)}`);
     }
-    out.push(`busted a minute (seed 42, traffic on, ${SECONDS} s a level, M4 measured novice ${BALANCE.measured.bustedPerMinute.slice(1).join(' / ')}, skilled ${BALANCE.measured.bustedPerMinuteSkilled.slice(1).join(' / ')}):`, ...rows);
-    out.push(`bag ${earn.bag.toFixed(0)} a minute, coins ${earn.coins.toFixed(0)} a minute from heat 0 (M4: ${BALANCE.measured.bagPerMinute}, ${BALANCE.measured.coinsPerMinute} coins); the placed jobs' mean payout ${earn.jobMean.toFixed(0)}`);
+    out.push(`busted a minute (seeds ${SEEDS.join(' / ')}, traffic on, ${SECONDS} s a level, M4 measured novice ${BALANCE.measured.bustedPerMinute.slice(1).join(' / ')}, skilled ${BALANCE.measured.bustedPerMinuteSkilled.slice(1).join(' / ')}):`, ...rows);
+    out.push(`bag ${earn.bag.toFixed(0)} a minute (${earns.map((e) => e.bag.toFixed(0)).join(' / ')}), coins ${earn.coins.toFixed(0)} a minute from heat 0 (M4: ${BALANCE.measured.bagPerMinute}, ${BALANCE.measured.coinsPerMinute} coins); the placed jobs' mean payout ${earn.jobMean.toFixed(0)}`);
 
     const table: Record<PolicyName, Ev[]> = { novice: [], skilled: [] };
     for (const policy of ['novice', 'skilled'] as const) {

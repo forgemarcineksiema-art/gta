@@ -224,6 +224,8 @@ export class Traffic {
   private readonly laneIndex: Int16Array;
   private readonly halfW: Float32Array;
   private readonly halfL: Float32Array;
+  /** The longest body's half length: no two cars' spacing exceeds this plus their own (the pair scans' cheap reject). */
+  private readonly maxHalfL: number;
   private readonly colliderAgent = new Map<number, number>();
   private readonly pose: LanePose = { x: 0, z: 0, yaw: 0 };
   private readonly proj: PathProjection = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0, switched: false };
@@ -365,10 +367,13 @@ export class Traffic {
     this.lastPlayerContactTick.fill(-100000);
     this.halfW = new Float32Array(BODIES.length);
     this.halfL = new Float32Array(BODIES.length);
+    let maxHalfL = 0;
     for (let b = 0; b < BODIES.length; b++) {
       this.halfW[b] = (BODIES[b] as (typeof BODIES)[number]).halfWidth;
       this.halfL[b] = (BODIES[b] as (typeof BODIES)[number]).halfLength;
+      maxHalfL = Math.max(maxHalfL, this.halfL[b] as number);
     }
+    this.maxHalfL = maxHalfL;
     for (let i = 0; i < n; i++) this.slot[i] = transforms.allocate();
     this.agentBody = new Int16Array(n);
     this.reattachLeft = new Float32Array(n);
@@ -1258,12 +1263,14 @@ export class Traffic {
     let gap = Infinity;
     this.aheadAgent[i] = -1;
     for (let j = 0; j < this.capacity; j++) {
-      if (j === i || this.state[j] === AgentState.Free || this.passable(i, j)) continue;
+      if (j === i || this.state[j] === AgentState.Free) continue;
       const dx = (this.x[j] as number) - x;
       const dz = (this.z[j] as number) - z;
       const along = dx * fx + dz * fz;
       if (along < 2 || along > 14) continue;
       if (Math.abs(dx * rx + dz * rz) > half) continue;
+      // a car standing in its kerbside bay is off every lane's corridor (M5.5 slice 17): not a car ahead
+      if ((this.parkedCiv[j] === 1 && this.state[j] === AgentState.Parked) || this.passable(i, j)) continue;
       const spare = along - this.spacing(i, j);
       if (spare < gap) { gap = spare; this.aheadAgent[i] = j; }
     }
@@ -2069,10 +2076,12 @@ export class Traffic {
       let moved = false;
       for (let i = 0; i < this.capacity; i++) {
         if (this.state[i] !== AgentState.Kinematic) continue;
+        const reach = Math.max(CAR_GAP, (this.halfL[this.body[i] as number] as number) + this.maxHalfL);
         for (let j = 0; j < this.capacity; j++) {
           if (j === i || this.state[j] === AgentState.Free) continue;
           const dx = (this.x[j] as number) - (this.x[i] as number);
           const dz = (this.z[j] as number) - (this.z[i] as number);
+          if (dx >= reach || dx <= -reach || dz >= reach || dz <= -reach) continue;
           const dist = Math.hypot(dx, dz);
           const gap = this.spacing(i, j);
           if (dist >= gap || Math.abs((this.y[i] as number) - (this.y[j] as number)) > 3) continue;

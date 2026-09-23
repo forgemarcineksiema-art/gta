@@ -103,7 +103,7 @@ Launch model (requirements/intro): **Basic Launch** = live without SDK, no monet
 |---|---|---|---|---|
 | Q1 | Onboarding inside gameplay, skippable, visual over text, core mechanics only; show keyboard overlay/mouse gestures. | requirements/quality | done (M4–M5) | The cold open is the onboarding: in gameplay, a verb at a time with keycaps, skippable (N), once per profile (the save's `seen`, written as it starts). |
 | Q2 | Buttons clearly labeled, not sized or delayed to push ads or other behaviour. | requirements/quality | todo | |
-| Q3 | Clear reachable goals, easy to learn, consistent controls, responsive input, balanced pacing, no repetitive chores. | requirements/quality | todo | |
+| Q3 | Clear reachable goals, easy to learn, consistent controls, responsive input, balanced pacing, no repetitive chores. | requirements/quality | partly (M5.5) | Goals: the goal line always names one thing to do and the arrow points at it (TAKE A JOB · 320 m, LOSE THEM, BANK IT, BUY THE COMPACT · n TO GO); the first quarter hour is a six-step chain with a card per step and the next step on the wall. Pacing: the balance script's first hour is red at the gate (the first car at minute 3.9 in the model, one gap of 2.4 minutes; BACKLOG); Marcin's playtest judges it. |
 | Q4 | Consistent resolution and audio levels, no compression artifacts, coherent art style, name/imagery match the genre. | requirements/quality | todo | |
 | Q5 | Game must be maintainable/updatable; core genre features must not change after submission; name must not be confusable with other games or use IP you do not own. | requirements/quality | todo | |
 

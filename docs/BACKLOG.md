@@ -1,8 +1,11 @@
 # Backlog
 
-Ideas outside the current milestone, non-blocking bugs, refactors. One line of context each. Nothing here is scheduled.
+Ideas outside the current milestone, non-blocking bugs, refactors. One line of context each. A milestone's plan takes what it schedules from here; what shipped is removed (M5.5 shipped updates 1 and 2, the life models and the polish items, 2026-09-23).
 
 ## Performance / size
+
+- The quick `verify` runs about 95 s of tests (M5.5 gate; CLAUDE.md asks under a minute): the jobs, the traffic and the police pins grew with the slices. Next: move the pins over ~5 s each into the long set, as M5.1 did.
+- M5.5 against M5.1 under 4× CPU: fps 51–53 against 56–57 at an equal frame p95 (33.4 ms), the traffic step's mean 1.9 → 3.0 ms (the signals, the parked cars, the drivers), time to control 3.8–4.3 s against 3.3–3.4 (budget 6 s). The traffic's per-record scans are the first lever.
 
 - Rapier `-compat` inlines the WASM as base64 (~2.7 MB vs ~2.0 MB raw). If startup bytes ever approach the 8 MB target, switch to the bundler build with `vite-plugin-wasm` and keep `-compat` only for Vitest. (M0)
 - `RigidBody.translation()/rotation()` calls allocate per body per step in the JS bindings; fine for tens of bodies, revisit if traffic ever uses many rigid bodies (M3 plans kinematic traffic). (M0)
@@ -29,14 +32,13 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 - Paint is flat colour with one wear tone; no re-painted patches, no per-block
   wear variation. Cheap to add as a second `paint` underlay once the flicker
   capture shows it does not shimmer. (M2.2)
-- (Superseded 2026-09-23 by DESIGN.md §13.5: the trails are deleted; coins lie only at goals and along a job's route.)
 - The spill's twelve coins appear on the lane in one step; a scatter from the
   wreck to their spots over half a second (the fly pool run backwards) would
   make the burst read as one. Render only. (2026-09-23)
-- The minimap has no lot, park or water data to draw: `City.generate` emits
-  render descriptors only. A small `cityFootprints()` export (park rects, block
-  outlines, the promenade and piers) would let a full-screen map show blocks
-  the way the radar shows roads. (M2)
+- The big map (M5.5 slice 15) draws roads, district tints and landmarks but no
+  lots, parks or water: `City.generate` emits render descriptors only. A small
+  `cityFootprints()` export (park rects, block outlines, the promenade and
+  piers) would let it show blocks the way the radar shows roads. (M2)
 
 ## Rendering
 
@@ -60,43 +62,33 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 ## Life (M3)
 
-- Abandoned player cars (a swap leaves one) are never towed and traffic queues behind them for good. Scheduled: M5.5 slice 3's gawk (traffic goes around a stopped car through the oncoming lane when clear). (M4 → M5.5)
-- Parked civilian cars in the kerbside bays of the avenue and the quay as stopped agents (more swap candidates); the rest of the M3 stretch (stunt ramps, speed cameras) is M4 slice 6. (M3)
-- Traffic-only silhouettes: scheduled, M5.5 slice 19 (eight civilian bodies, DESIGN.md §13.11). (M3 → M5.5)
-- Junction reservations are first come first served with a forced override after 9 s (about one a minute in a busy run); traffic lights or a round-robin would look more deliberate at the big crossings. (M3)
+- Traffic lights run the nine downtown crossings (M5.5 slice 17); the other junctions keep first come first served with the forced override after 9 s (about one a minute in a busy run), where a round-robin would look more deliberate. (M3)
 - A driving traffic body has no terrain contact (kerbs and the pavement apron pass under it) and a disturbed car beyond 70 m snaps back onto its lane when its body is returned; nobody has seen either in play, but a slow blend back would be cleaner than a snap. (M3)
-- The takedown camera only focuses; a short cut to a side view with the wreck in the foreground would sell it more. The whip on swap has no cut either, by design. (M3)
-- Pedestrian variety: scheduled, M5.5 slice 20 (four silhouettes with a walk cycle, DESIGN.md §13.11). (M3 → M5.5)
 - The interior billboards are footway gates approached diagonally off the road; the frontage row leaves no run-out behind a roadside panel. Park lots and plazas could take roadside panels with a run-out once the lot generator exposes its open ground. (M3)
 
 ## UI
 
 - Keycap labels resolve through `navigator.keyboard.getLayoutMap()` only on Chromium; other browsers show `W/A/S/D` positions, which is what the brief asks for anyway. (M0)
-- Full-screen city map (update 2 in `docs/DESIGN.md` §11): the radar painter
-  already draws any centre, scale and rotation, so a north-up whole-island view
-  with job markers is a second instance behind a hold key, not a new renderer. (M2)
 - North-up option for the radar once settings exist; some players prefer a map
-  that never turns. `advance()` with a fixed target heading is the whole change. (unscheduled)
+  that never turns. `advance()` with a fixed target heading is the whole change.
+  (with a settings page; the big map is north-up already)
 
 ## Run structure and heat (M4 candidates beyond the slice plan; docs/DESIGN.md)
 
-- The officer's ticket book as the busted bar: a pedestrian walking up from the nearest unit while the bar fills (M4 slice 8 polish, skipped for the gate).
-- The donut-shop withdrawal: units path to a marker building and park when the pursuit ends (M4 slice 8 polish, skipped).
+- The balance model's novice (M5.5 gate): the road bot waits in queues at the downtown lights with units behind it and is busted even at level 1 (once in three minutes at every seed), so the model's novice run is 2.4 minutes and the first hour's assertions (b) and (c) are red (the first car at minute 3.9, one gap 2.4 minutes) while the income a minute is on DESIGN §3.3's target. A novice proxy that drives round a queue without ramming (the careful bot's overtake while chased turned it into a rammer: bag 4,079 a minute) would measure a player; until then Marcin's first hour judges `BALANCE.prices.compact` and tier 1 (over 13.6k keeps every gap over three minutes at these runs).
+- The police catch the novice bot less at level 4 than at levels 2 and 3 at all three seeds (0.22 against 0.78 and 0.44 a minute): heat 4–5 thin the traffic to 60 %, so fewer queues trap it. A player's level 4 decides whether the heavies and the helicopter need more bite.
+- The garage keeps classes: a pickup or a taxi driven home offers the class it rides on (the van, the compact), not its body (M5.5 slice 19). Bodies as garage entries need a price each and the wall's cards.
+- The SELL / KEEP choice at a fence for an order's car (M5.5 slice 6 shipped KEEP at a door only).
+- A unit's junction curves are the traffic's; tighter ones would read as police driving (M5.5 slice 4, cosmetic).
+- Race #23 at seed 42: the test bot resets in a loop at the city spawn by the signalled centre, so its measurement fails there; the bot's limit, not the race's (M5.5 gate).
+
 - The bot policies stop in front of a roadblock's cars and get boxed; a bot that aims for the sawhorse (or around) would make the level-3 busted rate a player's. (M4 slice 6)
 - Pier-end jumps (DESIGN.md §6.1 names them): the quay has no clear 60 m run-out off a pier; the twenty ramps are on the park strip. (M4 slice 6)
-- Update 1, "the air" (decided 2026-09-22, `docs/DESIGN.md` §5): covered streets with the camera occlusion rule, the highway overpasses, the helicopter with its spotlight. Left M4 so the game reaches Basic Launch with heat 4–5 on the ground; the contracts are §5 of `docs/M4_PLAN.md`. (update 1)
-- Pursuit breakers: smashable props that drop a static onto the road behind the player (scaffold, water tower, petrol canopy); police crash or reroute; doubles as cover. Billboard machinery plus a dropped static and a police reroute. (M4 stretch)
 - Multi-storey car park as a helicopter cover set piece: ramps, per-floor colliders, and a chase camera at 2.4 m plus look height inside 3 m ceilings; the camera alone is a week. (v1.1)
-- The comic arrest: the busted bar drawn as an officer walking up with a ticket book; one pedestrian pose. (M4 polish)
-- Heat-scaled sirens and the radio as dispatch lines: scheduled, M5.5 slice 4 (DESIGN.md §13.9). The helicopter's rotor as a low-pass on everything when it is overhead stays with update 1. (M4 audio → M5.5)
 
 ## Activities and progression (M5; docs/DESIGN.md §3–4, §7–8)
 
-- Launch scope (decided 2026-09-22, `docs/DESIGN.md` §11): M5 ships the cold open, save, the garage, three jobs (getaway delivery, steal-to-order, pursuit escape), dailies and the streak (`docs/M5_PLAN.md`). Update 2, "the jobs": the time trial with medals, street races with rivals, takedown rage and mayhem, fares with hot passengers, the stunt and collectible hunts, the skill chain, the full map. (update 2)
-- Order-free checkpoint races (Midnight Club) and road rules (a best time and best damage per street, Burnout Paradise): the same rival and recorder tech as the two race types that ship first. (update 2 or later)
-- Hidden cars: a stashed car somewhere in the city that a swap unlocks (the ice-cream truck; needs its own profile). (update 2)
-- A giant ball in a plaza, one dynamic sphere to push around; a free-roam toy that costs nothing. (unscheduled)
-- Body crumple by vertex displacement on the low-poly car mesh, render only; thumbnail value. (polish, unscheduled)
+- Order-free checkpoint races (Midnight Club) and road rules (a best time and best damage per street, Burnout Paradise): the rivals and the medals of M5.5's races and trials carry them. (post-launch)
 - Derby in a park lot: eight cars from the body pool, last one rolling, takedowns for cash. (v1.1)
 - Crash mode: after a wreck, bounce it along the street with boost taps for cash; the player keeps control so the 2 s rule holds. (v1.1)
 - Cop mode: "the suspect is a red muscle car", catch and stop it; the descriptor and pursuit systems from the other side. The first post-launch update; the Interceptor unlock is its trailer. (post-launch)
@@ -104,10 +96,6 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 ## City v2 (after the M4 run loop works; docs/DESIGN.md §5–6)
 
-- Highway overpasses at the four avenue crossings: a third dimension in the road graph (lane height, kinematic traffic at height, the bot route, road meshes, markings, the minimap, the city pins). Moved from M4 to update 1 on 2026-09-22; the contract is §5 of `docs/M4_PLAN.md`. (update 1)
 - A lit hideout sign visible from the highway (the garages have an orange band over the door and a radar glyph); drop-off approaches with a second, longer way in. (M4/M5)
-- The garage interior reads empty, not dark (Marcin, 2026-09-23). Scheduled:
-  M5.5 slice 5 dresses it (DESIGN.md §13.6). (M4 → M5.5)
 - The music bed (M5 slice 8): one CC0 loop fetched after `gameplayStart()` through the master gain at -14 dB; needs Marcin's yes on the exact file, source and licence before anything is downloaded (docs/ASSETS.md).
-- The naive hunter (`order.long.test.ts`) loses the wanted car where its re-plan routes through a U-turn: a hunter aiming at the car's next junction would make the order e2e and the measurement faster.
-- The wall panel is 660 px wide at every size: scheduled, M5.5 slice 5 (`clamp(640px, 48vw, 960px)`, DESIGN.md §13.6).
+- The naive hunter (`order.long.test.ts`) loses the wanted car where its re-plan routes through a U-turn (M5.5 gate: orders #10 and #16 not reached in 240 s, 4 of 6): a hunter aiming at the car's next junction would make the order e2e and the measurement faster.

@@ -439,6 +439,66 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   wide roof bar; the Chief is the interceptor's body in `ink` with a
   `carOrange` band and a single red lens.
 
+## The city's people and things, the new HUD (M5.5)
+
+- **Traffic bodies** (slice 19): eight civilian shells (sedan, hatchback,
+  estate, SUV, pickup, taxi, box truck, 12 m bus) in the player cars'
+  profile format, 386–460 triangles, one instanced draw with a paint mask:
+  glass `ink`, lights and a truck's box keep their colour, the rest takes
+  the record's paint. The taxi is `coin` yellow with a roof sign; buses
+  wear the district's colour. The player's shells never spawn as traffic.
+- **Pedestrians** (slice 20): four silhouettes of boxes, 150–200 triangles
+  (the long coat and scarf, the jacket and skirt with a bag, the hi-vis
+  worker in a hard hat, the stooped old man with a stick), dressed by
+  district from each district's six clothes colours in `palette.ts`; the
+  walk, the dive, the push-up and the fist (the old man's stick) are one
+  vertex-shader swing by limb. The officer (slice 18) is a fifth look:
+  blue shirt, navy cap, badge, the ticket book in hand.
+- **The ice-cream truck** (slice 16): a shortened box truck, `mint` cab,
+  white box, a serving hatch under a pink awning, a wafer cone with a scoop
+  and a cherry on the roof. **The giant ball**: a 4.4 m beach ball, six
+  flat gores (`carRed`, `coin`, `carBlue`, white, `carLime`, `carOrange`)
+  and white caps. **The crumple**: each damage stage dents the shell where the
+  hit landed; a wreck caves it and squashes the roof.
+- **The donut shop** (slice 18): a pink kiosk with a dark serving window,
+  a light counter and a pink-and-white striped awning; over it on a `steel`
+  pole a giant donut on its edge, `wafer` dough, pink icing on the upper
+  half with a few yellow and blue sprinkles.
+- **Pursuit breakers** (slice 18): scaffold towers of `steel` tubes and
+  braces, `sand` plank decks every 2.2 m and a `carLime` safety mesh on the
+  street face, standing on mid-block pavements; down, they lie across the
+  lane as a barrier.
+- **Traffic lights** (slice 17): a `steel` pole at each corner of the nine
+  downtown crossings, an `ink` head, three lamps of which one is lit.
+  **Parked cars** are traffic bodies at the kerbside bays.
+- **Covered streets and overpasses** (slices 7–8): each district's cover
+  in its own material (an arcade under a frontage bridge, a steel gantry, a
+  plane-tree canopy, a brick warehouse); the overpass is a `concrete` deck
+  on a girder, ramps between retaining walls, parapets and lane lines.
+- **The helicopter** (slice 9): a police-white body with a spinning rotor,
+  a blinking bar, an additive searchlight cone and a spot on the ground.
+- **The goal line** (slice 2): the job line's place at the top centre, a
+  12 px dot in the colour of the ring the arrow points at, the goal in
+  capitals (LOSE THEM in danger red); the chain's cards in the job card's
+  frame with an accent border. **The ticker** (slice 4): one italic
+  uppercase line at the top centre, the level in danger red before the
+  text; captions over the ticker over the goal line over the hints, one at
+  a time. **The ring** (slice 4): under the stars, draining as the
+  cooldown runs; the stars pulse slower.
+- **Fares** (slice 13): a hailing walker raises the right arm under a
+  yellow beacon; a hot passenger is a crook with a suitcase.
+- **The skill chain** (slice 14): top left under the bag's corner, the
+  multiplier in the accent (the second accent at ×5), the points in
+  tabular figures, the last trick's word, over a draining bar.
+- **The big map** (slice 15): the whole screen while Tab is held, the
+  island on a dark violet veil at 84 %, north up; roads, district tints and
+  names, landmarks, garages, jobs, caches, cameras, cover, units, the
+  helicopter, the search disc, the rivals and the car's arrow, with a key
+  on the right drawing each glyph as the radar does.
+- **The ticket pad** (slice 18): the busted bar is a cream citation pad,
+  a danger-red BUSTED head, three ruled lines that fill with navy ink,
+  tilted 3° and skewed like the rest of the HUD, under the swap prompt.
+
 ## Camera and motion
 
 - Chase camera behind and above, FOV 60 → up to 80 with speed and boost, pulls back and drops with speed, follows the velocity direction so drifts show the car sideways. Very small shake at high speed. Steering input itself never swivels the view; actual yaw contributes only 0.04 s of heading lead and at most 0.65 m of lateral look offset. Heading follow is capped at 110°/s; speed/boost FOV changes ease at 2.5/s. See `src/render/ChaseCamera.ts`.

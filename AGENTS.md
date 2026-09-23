@@ -9,15 +9,17 @@ For any coding agent working in this repository (Cursor, Codex, Claude Code):
 2. `docs/BRIEF.md` is the project brief and is read-only.
 3. `docs/PROGRESS.md` is the session log; read the newest entry and the last
    15 commits before starting, and add your own entry before stopping.
-4. Every remaining milestone has a written contract (M4: `docs/M4_PLAN.md`;
-   M5: `docs/M5_PLAN.md`; M6: `docs/M6_PLAN.md`; the design behind them in
-   `docs/DESIGN.md`; M3's was `docs/M3_PLAN.md`). A contract fixes scope,
+4. Every remaining milestone has a written contract (now `docs/M5.5_PLAN.md`,
+   the whole game before the platform; then `docs/M6_PLAN.md`; the design
+   behind them in `docs/DESIGN.md`; the finished ones `docs/M3_PLAN.md`,
+   `M4_PLAN.md`, `M5_PLAN.md`). A contract fixes scope,
    decisions, numbers, tests and the gate; work through its slices in order
    and stop only where it says to stop.
 5. `npm run verify` must be green before your first edit and at every commit
    that ends a slice; `npm run verify:gate` (the long pins in
-   `*.long.test.ts`) at a gate and at the commit of a slice that added one.
-   Never loosen a test or a budget to get there.
+   `*.long.test.ts`) at a gate. Nothing else per slice: no perf runs, e2e
+   suites, screens, browser checks, bot measurements or research between
+   slices (`CLAUDE.md`, Pace). Never loosen a test or a budget to get green.
 6. `npm start` (port 4173, the production build) is the one way to play the
    game; `npm run dev` (5173) is for editing. Other agents or Marcin may have
    either running in this folder: never kill processes you did not start, and

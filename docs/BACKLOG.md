@@ -62,11 +62,11 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 - Abandoned player cars (a swap leaves one) are never towed and traffic queues behind them for good. Scheduled: M5.5 slice 3's gawk (traffic goes around a stopped car through the oncoming lane when clear). (M4 → M5.5)
 - Parked civilian cars in the kerbside bays of the avenue and the quay as stopped agents (more swap candidates); the rest of the M3 stretch (stunt ramps, speed cameras) is M4 slice 6. (M3)
-- Traffic-only silhouettes: the taxi and the bus are scheduled in M5.5 slice 3 (DESIGN.md §13.8, the bus as the stretch item); a van beyond those stays here. (M3 → M5.5)
+- Traffic-only silhouettes: scheduled, M5.5 slice 19 (eight civilian bodies, DESIGN.md §13.11). (M3 → M5.5)
 - Junction reservations are first come first served with a forced override after 9 s (about one a minute in a busy run); traffic lights or a round-robin would look more deliberate at the big crossings. (M3)
 - A driving traffic body has no terrain contact (kerbs and the pavement apron pass under it) and a disturbed car beyond 70 m snaps back onto its lane when its body is returned; nobody has seen either in play, but a slow blend back would be cleaner than a snap. (M3)
 - The takedown camera only focuses; a short cut to a side view with the wreck in the foreground would sell it more. The whip on swap has no cut either, by design. (M3)
-- Pedestrian variety: one walker mesh in a handful of tints; a second silhouette and a walk-cycle pose would help once perf budgets are known on the low tier. (M3)
+- Pedestrian variety: scheduled, M5.5 slice 20 (four silhouettes with a walk cycle, DESIGN.md §13.11). (M3 → M5.5)
 - The interior billboards are footway gates approached diagonally off the road; the frontage row leaves no run-out behind a roadside panel. Park lots and plazas could take roadside panels with a run-out once the lot generator exposes its open ground. (M3)
 
 ## UI

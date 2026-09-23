@@ -10,7 +10,7 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 ## Session start
 
 1. Read this file, `docs/PROGRESS.md` and the current milestone contract (M5.5: `docs/M5.5_PLAN.md`; then `docs/M6_PLAN.md`; the design in `docs/DESIGN.md`, §13 first); check `git log --oneline -15`.
-2. Run `npm run verify` (the quick set) before touching anything. `npm run verify:gate` (the long bot-driven pins included) must be green at every milestone gate and at the commit of a slice that added a long pin.
+2. Run `npm run verify` (the quick set) before touching anything and at the commit that ends a slice. `npm run verify:gate` (the long bot-driven pins included) only at a milestone gate. Nothing else per slice: see **Pace** below, and read it before every slice.
 3. Work autonomously inside the milestone. Decide, act, note assumptions in `docs/PROGRESS.md`. Stop only at a gate, before destructive/irreversible operations, to change a fixed decision from the brief, or when blocked on something only Marcin can provide.
 4. Commit small and often; never leave significant work uncommitted. Commit messages end with `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
 
@@ -22,7 +22,7 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 | `docs/PROGRESS.md` | Session log: done, decided and why, next, open problems. Holds the current milestone and the design talks; older entries are archived under `docs/history/` at each gate. |
 | `docs/history/` | Past gate reports, reviews and archived session logs (`PROGRESS_M0-M3.md`, `PROGRESS_M4.md`). |
 | `docs/DESIGN.md` | Design decisions on top of the brief: the run, progression, the city as a level, platform KPIs, the M4 slice order. Each section is marked decided (Marcin) or set here (mine). |
-| `docs/M5.5_PLAN.md` | The current milestone contract: the polish pass Marcin's M5 playtest forced (heat, coins, the goal line, traffic, police, the garage). Slices in order, done criteria, pins, the measurement each slice must record. M6 starts only on his word after its gate. |
+| `docs/M5.5_PLAN.md` | The current milestone contract: the whole game before the platform (the playtest's fixes, the air, the jobs, the toys, life's models). Slices in order, done criteria, pins. M6 starts only on his word after its gate. |
 | `docs/M4_PLAN.md`, `docs/M5_PLAN.md` | The finished contracts (kept for their numbers and as-built notes). M4's §5 holds the contract for post-launch update 1. |
 | `docs/M6_PLAN.md` | The platform contract (SDK adapter, touch, mobile tier, submission), after M5.5. |
 | `docs/ARCHITECTURE.md` | Structure, dependency justifications, decision records. |
@@ -65,6 +65,7 @@ Startup bytes before gameplay-start: target 8 MB, fail at 12 MB (uncompressed). 
 
 ## Working method
 
+- **Pace (Marcin, 2026-09-23, after three sessions that lost hours to it).** A slice is: the code, its Vitest pins, `npm run verify` green, one commit, a PROGRESS entry of at most eight lines. **Not per slice, ever:** `npm run perf`, any e2e suite (`heat`, `game`, `life`, `city`, `screens`), `npm run balance`, browser checks, bot measurements, research agents, design or plan rewrites, backlog grooming, memory notes. Those happen once, at the gate, or when Marcin asks for one by name. A "measurement" a plan names for a slice is taken at the gate unless it is already a Vitest pin inside the quick verify. Any check outside this list that would take over a minute: skip it and say so in the commit. He reads the game, not the logs; hours spent proving a slice are hours he watches nothing move.
 - Vertical slices; build what the milestone asks, completely. Ideas outside it go to `docs/BACKLOG.md`.
 - Never loosen a test or a budget to get green; say it is wrong instead.
 - Keep tests to the brief's list and to what a milestone calls for. Scratch scripts are not committed.

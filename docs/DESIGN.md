@@ -1115,6 +1115,23 @@ after (the balance script), the share of chase time a unit spends within
 60 m of the player at level 2 for the skilled bot (target 60 % or more),
 the cut-offs, rams and PITs a minute, and the step p95 at levels 3 and 5.
 
+### 13.11 Life's models: the city's cars and people — set here, 2026-09-23 (Marcin: "what about the car and pedestrian models")
+
+The M3 shortcut stands in the frame every second: the traffic is the
+player's three bodies in other paints (record 29) and the pedestrians are
+one walker in a handful of tints. Marcin: not shippable, and he should not
+have had to say it. The rule from here: **the city's cars and people are a
+designed set, not a paint job.** Eight civilian silhouettes (sedan,
+hatchback, estate, SUV, pickup, taxi, box truck, bus) built the way the
+player's cars are (parametric profiles, flat shading, the palette; STYLE
+§Vehicles), each with its own footprint in the traffic record so the
+planner, the swap and the chase treat a bus as a bus; four pedestrian
+silhouettes with a walk cycle in the instanced shader, tints by district,
+the dive and the fist on all of them. Spawn weights make the districts
+read: buses on the avenues, trucks in the Works, taxis round the tower.
+Slices 19 and 20 of `docs/M5.5_PLAN.md`; the taxi's and the bus's
+behaviour (§13.8) rides on these bodies.
+
 ### 13.10 What this section changes elsewhere
 
 - §3.2 and §3.5 (the coin layer): superseded by §13.5; the look and the

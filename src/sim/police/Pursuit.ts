@@ -32,6 +32,8 @@ export class Pursuit {
   blown = false;
   /** Seconds until the dispatcher notices the stolen police car (the slice-5 measurement's fallback, DESIGN.md §12). */
   coverLeft = 0;
+  /** Seconds the radio still gives the police the player's position (a forced chase, M5's escape job). */
+  radioLeft = 0;
   private level = 0;
 
   constructor(private readonly events: EventLog, private readonly tuning: PoliceTuning = POLICE) {}
@@ -43,6 +45,10 @@ export class Pursuit {
 
   step(dt: number, level: number, seen: boolean, x: number, z: number): void {
     this.level = level;
+    if (this.radioLeft > 0) {
+      this.radioLeft -= dt;
+      seen = true;
+    }
     if (this.disguised) {
       this.coverLeft -= dt;
       if (this.coverLeft <= 0) this.markBlown(x, z);
@@ -100,10 +106,15 @@ export class Pursuit {
     this.events.push('escape', this.level, this.lastX, 0, this.lastZ, 1);
   }
 
-  /** Straight into a chase (M5's pursuit escape job, tests): active and seen this step. */
-  force(): void {
+  /**
+   * Straight into a chase (M5's pursuit escape job, tests): active and seen
+   * this step, and for `radioSeconds` more the police know where the player
+   * is, so the units close in before the escape timer can start.
+   */
+  force(radioSeconds = 0): void {
     this.state = 'active';
     this.visible = true;
+    this.radioLeft = radioSeconds;
   }
 
   /** A crime from the police car with a unit watching. */
@@ -117,5 +128,6 @@ export class Pursuit {
     this.state = 'idle';
     this.visible = false;
     this.cooldown = 0;
+    this.radioLeft = 0;
   }
 }

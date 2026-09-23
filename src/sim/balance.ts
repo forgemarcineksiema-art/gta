@@ -57,7 +57,8 @@ export const BALANCE = {
    * `minPath` m away by path. An order pays by class less `stagePenalty` per damage stage, `limitSeconds` from
    * the swap; the traffic guarantees the car `ensureMin`–`ensureMax` m away, re-checked every `ensureSeconds`,
    * cruising at `cruise` of its lanes' limits so a hunter can close on it, and its ring shows within `ringRange`
-   * m. An escape pays `bounty` × level on the escape.
+   * m. An escape pays `bounty` × level on the escape; for its first `radioSeconds` the police know where the
+   * player is, so the units close in before the escape timer can start.
    */
   jobs: {
     markerRadius: 4, beaconHeight: 3, timeBonus: 0.5, holdSeconds: 2, cardSeconds: 1.5, markerMinGap: 60,
@@ -67,7 +68,7 @@ export const BALANCE = {
       payout: { compact: 4000, heavy: 5000, muscle: 6000, sports: 8000 }, stagePenalty: 0.1, limitSeconds: 240, heat: 4,
       ensureMin: 300, ensureMax: 600, ensureSeconds: 5, ringRange: 150, cruise: 0.5,
     },
-    escape: { bounty: 1500, levels: [2, 2, 3, 4] },
+    escape: { bounty: 1500, levels: [2, 2, 3, 4], radioSeconds: 8 },
   },
   /** The garage's catalogue (docs/M5_PLAN.md D13): cash only; the muscle car is owned from the start. */
   prices: { compact: 10000, heavy: 30000, sports: 60000, police: 120000 },

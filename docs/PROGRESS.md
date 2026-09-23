@@ -150,6 +150,32 @@ Decided (set here):
 - The fence lives in `place.ts`, not `cover.ts`: finding a clear lot needs
   the chunk's statics, and `cover.ts` is a pure function of constants.
 
+### Slice 3 — pursuit escape
+
+- The four escape markers (levels 2, 2, 3, 4) raise the heat to the level's
+  threshold (never lower) and `Pursuit.force(radioSeconds)` puts the police
+  on the player at once; the `escape` event pays `bounty × level` through
+  `jobDone` (on top of the run's own `escapePerLevel`); busted and the door
+  end it silently. `Pursuit.radioLeft`: for the first 8 s
+  (`jobs.escape.radioSeconds`) the police know where the player is.
+- Tests: `escape.test.ts` 3.1–3.5; `escape.long.test.ts` 3.6.
+
+Measured, the skilled bot from each marker, seeds 42 / 7 / 123, traffic on,
+up to 3 min: 6 of 12 escapes. Level 2: 5 of 6 (31–54 s, two by a swap);
+level 3: 1 of 3 (11 s by a swap; busted at 37 and 42 s); level 4: 0 of 3
+(busted at 43–62 s). Without the radio window a level-3 marker paid its
+bounty in 16 s with no chase: the units spawn out of view, the pursuit went
+straight to `lost` and the cooldown won it.
+
+Decided (set here):
+- The radio window (8 s): "the police have you" has to be true for long
+  enough that the units reach the player before the cooldown can start,
+  or the escape job is a free bounty.
+- The quick suite's time is `traffic.test.ts` (M3, 68 s under the parallel
+  load; the next longest is 27 s): the suite runs as long as its slowest
+  file. Moving its bot drives into a long file is M3 housekeeping, in
+  BACKLOG, not done here.
+
 ## 2026-09-23 — The coin layer as lines
 
 Marcin: the coins are placed hopelessly and thoughtlessly; their look, how a

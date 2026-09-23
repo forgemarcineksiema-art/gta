@@ -259,7 +259,7 @@ export class Jobs {
       this.remaining = NaN;
       const threshold = BALANCE.heatThresholds[d.level - 1] ?? 0;
       this.sim.heat.add(Math.max(0, threshold - this.sim.heat.points));
-      this.sim.pursuit.force();
+      this.sim.pursuit.force(BALANCE.jobs.escape.radioSeconds);
       return;
     }
     this.remaining = d.limitSeconds;

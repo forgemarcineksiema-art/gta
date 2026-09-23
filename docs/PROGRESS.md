@@ -2,6 +2,18 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M5.5 slice 11: street races
+
+Done: four street races (lime markers), placed like the trials after them (the other jobs unchanged), to a finish
+1.2–2 km on by path, any route, no coins. Starting one puts three rivals (two sports cars, a muscle car in race
+paints) on a standing grid 16–48 m ahead; they race in the police's driving mode (junction boxes run, ×1.5
+acceleration, round slower cars, a 0.5 s gap), taking at each junction the exit with the shortest way on to the
+finish, at 1.85× the lane's limit, rubber-banded 0.72–1.25 by how far they are ahead of or behind the player. The
+player's place over the line pays 6,000 / 2,500 / 1,000 into the bag; fourth pays nothing and fails, as does the
+clock (the path at 10 m/s). The HUD shows the place live; the rivals are lime on the radar; home, they drive on as
+traffic. Jobs re-baked (24 defs). Pins 11.1–11.3. The police come by heat as ever. At the gate: the bot beats a
+rival at seed 42 once in three.
+
 ## 2026-09-23 — M5.5 slice 10: the time trial on a coin line
 
 Done: four time trials (gold markers), placed after the sixteen jobs (those unchanged) from a free corner in each

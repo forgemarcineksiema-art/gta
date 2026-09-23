@@ -101,6 +101,8 @@ export class Traffic {
   readonly bodySpawns = new Uint32Array(BODIES.length);
   /** Pursuit membership, independent of car class; retained on a police wreck until free or swap. */
   readonly police: Uint8Array;
+  /** A street race's rival (M5.5 slice 11): drives in the police's driving mode while its race plan holds. */
+  readonly racer: Uint8Array;
   readonly paint: Uint32Array;
   readonly slot: Int16Array;
   readonly lane: Int16Array;
@@ -263,6 +265,7 @@ export class Traffic {
     this.kind = new Uint8Array(n);
     this.body = new Uint8Array(n);
     this.police = new Uint8Array(n);
+    this.racer = new Uint8Array(n);
     this.paint = new Uint32Array(n);
     this.slot = new Int16Array(n);
     this.lane = new Int16Array(n);
@@ -574,7 +577,7 @@ export class Traffic {
     if (agent >= 0) return agent;
     let farthest = 0;
     for (let i = 0; i < this.capacity; i++) {
-      if (this.police[i] !== 0 || i === this.wanted || (this.state[i] !== AgentState.Kinematic && this.state[i] !== AgentState.Physical)) continue;
+      if (this.police[i] !== 0 || this.racer[i] === 1 || i === this.wanted || (this.state[i] !== AgentState.Kinematic && this.state[i] !== AgentState.Physical)) continue;
       const x = this.x[i] as number, z = this.z[i] as number;
       const r = Math.hypot(this.halfWidthOf(i), this.halfLengthOf(i));
       if (!this.outOfView(x, z, r, player, near, cosHalf)) continue;
@@ -643,6 +646,50 @@ export class Traffic {
     this.freeSteer[agent] = 0;
   }
 
+  /** A street race's rival on a lane (M5.5 slice 11): a civilian record in the race's paint, the race's plan to follow. */
+  spawnRacer(lane: number, s: number, body: BodyId, paint: number): number {
+    const i = this.findFree();
+    if (i < 0) return -1;
+    this.place(i, lane, s, BODY_INDEX[body], 0, AgentState.Kinematic, paint);
+    this.racer[i] = 1;
+    this.bad[i] = 0;
+    // a standing start, and a racer's short gap to the car ahead
+    this.speed[i] = 0;
+    this.gapT[i] = 0.5;
+    return i;
+  }
+
+  isRacer(agent: number): boolean {
+    return this.racer[agent] === 1 && this.state[agent] !== AgentState.Free;
+  }
+
+  /** A rival's route and speed for this step: the exit toward the finish, the rubber-banded pace. */
+  setRacePlan(agent: number, next: number, speed: number): void {
+    if (this.racer[agent] !== 1 || this.state[agent] === AgentState.Free) return;
+    const lane = this.lane[agent] as number;
+    this.plannerLane[agent] = lane;
+    this.plannerNext[agent] = lane >= 0 && this.lanes.outs(lane).includes(next) ? next : -1;
+    const planned = this.plannerNext[agent];
+    if (planned >= 0 && this.next[agent] !== planned && (this.s[agent] as number) < (this.lanes.length[lane] as number)) {
+      this.next[agent] = planned;
+      this.turn[agent] = this.lanes.straightThrough(lane, planned) ? 0 : 1;
+    }
+    this.plannerSpeed[agent] = Math.max(0.1, speed);
+  }
+
+  /** The race is over for a rival: it drives on as traffic. */
+  endRace(agent: number): void {
+    this.racer[agent] = 0;
+    this.plannerLane[agent] = -1;
+    this.plannerNext[agent] = -1;
+    this.plannerSpeed[agent] = 0;
+  }
+
+  /** The driving mode (DESIGN.md §13.9): a unit on a chase or a rival in a race runs the junction box, pulls away ×1.5 and goes round slower cars. */
+  private fast(i: number): boolean {
+    return (this.police[i] === 1 || this.racer[i] === 1) && (this.plannerSpeed[i] as number) > 0;
+  }
+
   /** The speed a unit's plan asks for (0 without a plan). Tests. */
   planSpeed(agent: number): number {
     return this.plannerSpeed[agent] as number;
@@ -708,6 +755,7 @@ export class Traffic {
 
   private placeAtPoint(i: number, x: number, z: number, yaw: number, body: number, state: AgentState, paint: number): void {
     this.state[i] = state;
+    this.racer[i] = 0;
     this.lights[i] = 0;
     this.police[i] = 0;
     this.clearPolicePlan(i);
@@ -926,7 +974,7 @@ export class Traffic {
   private moveKinematic(i: number, desired: number, dt: number): void {
     const t = this.tuning;
     const speed = this.speed[i] as number;
-    const unit = this.police[i] === 1 && (this.plannerSpeed[i] as number) > 0 ? POLICE_ACCEL : 1;
+    const unit = this.fast(i) ? POLICE_ACCEL : 1;
     const brake = ((this.flinchLeft[i] as number) > 0 ? t.flinch.brake : t.brake) * unit;
     this.speed[i] = speed < desired ? Math.min(desired, speed + t.accel * unit * dt) : Math.max(0, Math.max(desired, speed - brake * dt));
     const lane = this.lane[i] as number;
@@ -1088,7 +1136,7 @@ export class Traffic {
   /** What a car does not wait behind: the dead car it is going round; for a unit on a chase, a car pulling over for it. */
   private passable(i: number, other: number): boolean {
     if (other === this.passAgent[i]) return true;
-    return this.police[i] === 1 && (this.plannerSpeed[i] as number) > 0 && this.police[other] === 0
+    return this.fast(i) && this.police[other] === 0
       && (this.pullLeft[other] as number) > 0 && (this.shift[other] as number) >= 1;
   }
 
@@ -1142,8 +1190,8 @@ export class Traffic {
   private mayEnter(i: number, player: PlayerProbe): boolean {
     const t = this.tuning;
     if (this.forced[i] === 1) return true;
-    // the police driving mode (DESIGN.md §13.9): a unit on a chase runs the box; the traffic yields to it
-    if (this.police[i] === 1 && (this.plannerSpeed[i] as number) > 0) return true;
+    // the police driving mode (DESIGN.md §13.9): a unit on a chase runs the box, and so does a racing rival
+    if (this.fast(i)) return true;
     if ((this.wait[i] as number) >= (this.bad[i] === 1 ? t.temper.badClaimAfter : t.junctionWait)) {
       this.forced[i] = 1;
       return true;
@@ -1666,6 +1714,7 @@ export class Traffic {
 
   private place(i: number, lane: number, s: number, body: number, offset: number, state: AgentState, paint: number): void {
     this.state[i] = state;
+    this.racer[i] = 0;
     this.drawDriver(i);
     this.lights[i] = 0;
     this.police[i] = 0;
@@ -1706,6 +1755,7 @@ export class Traffic {
     this.releaseHolds(i);
     this.state[i] = AgentState.Free;
     this.police[i] = 0;
+    this.racer[i] = 0;
     this.lights[i] = 0;
     this.clearPolicePlan(i);
     this.next[i] = -1;
@@ -1740,7 +1790,8 @@ export class Traffic {
   private despawn(player: PlayerProbe): void {
     const r2 = this.tuning.despawn * this.tuning.despawn;
     for (let i = 0; i < this.capacity; i++) {
-      if (this.state[i] === AgentState.Free || this.police[i] === 1 || i === this.wanted) continue;
+      // a race's rivals race on however far behind the player is
+      if (this.state[i] === AgentState.Free || this.police[i] === 1 || this.racer[i] === 1 || i === this.wanted) continue;
       const dx = (this.x[i] as number) - player.x;
       const dz = (this.z[i] as number) - player.z;
       if (dx * dx + dz * dz > r2) this.free(i);
@@ -2004,7 +2055,7 @@ export class Traffic {
     const s = this.s[i] as number;
     if (this.police[i] === 1 || (this.plannerSpeed[i] as number) > 0) {
       let target = 0;
-      if (this.police[i] === 1 && (this.plannerSpeed[i] as number) > 0) {
+      if (this.fast(i)) {
         // the police driving mode (DESIGN.md §13.9): round a slower car on the oncoming side (or the other lane
         // of the highway), round a car pulling over for it
         const pass = this.passAgent[i] as number;

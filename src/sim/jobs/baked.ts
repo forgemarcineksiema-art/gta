@@ -26,5 +26,9 @@ export const BAKED_JOBS: Readonly<Record<number, readonly JobDef[]>> = {
     { id: 18, kind: 'trial', x: -468, z: 207, yaw: 0.7853981633974483, targetX: 334.32249705129857, targetZ: -336.4491819726335, level: 0, descriptor: -1, payout: 8000, limitSeconds: 91, heat: 0 },
     { id: 19, kind: 'trial', x: 243, z: 243, yaw: -2.356194490192345, targetX: -687, targetZ: 562.5, level: 0, descriptor: -1, payout: 8000, limitSeconds: 90, heat: 0 },
     { id: 20, kind: 'trial', x: 468, z: -650, yaw: -2.5175696006130366, targetX: 112.5, targetZ: 454.5, level: 0, descriptor: -1, payout: 8000, limitSeconds: 91, heat: 0 },
+    { id: 21, kind: 'race', x: 243, z: -468, yaw: -0.7853981633974483, targetX: 229.5, targetZ: 562.5, level: 0, descriptor: -1, payout: 6000, limitSeconds: 160, heat: 0 },
+    { id: 22, kind: 'race', x: -207, z: 243, yaw: -2.356194490192345, targetX: 337.5, targetZ: -687, level: 0, descriptor: -1, payout: 6000, limitSeconds: 160, heat: 0 },
+    { id: 23, kind: 'race', x: 650, z: -243, yaw: 0.9467732738181398, targetX: -562.5, targetZ: 4.5, level: 0, descriptor: -1, payout: 6000, limitSeconds: 161, heat: 0 },
+    { id: 24, kind: 'race', x: -650, z: 432, yaw: -0.9467732738181398, targetX: 679, targetZ: 562.5, level: 0, descriptor: -1, payout: 6000, limitSeconds: 163, heat: 0 },
   ],
 };

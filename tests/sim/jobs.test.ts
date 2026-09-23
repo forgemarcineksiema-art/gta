@@ -171,16 +171,17 @@ function firstDelivery(sim: SimWorld): JobDef {
 }
 
 describe('jobs (M5 slice 1)', () => {
-  it('1.1 placement: 20 defs (6/6/4/4), deterministic, off the carriageway, 60 m apart, deliveries at least 400 m by path', async () => {
+  it('1.1 placement: 24 defs (6/6/4/4/4), deterministic, off the carriageway, 60 m apart, deliveries at least 400 m by path', async () => {
     const sim = await placedWorld();
     try {
       const defs = sim.jobs.defs;
-      // the four time trials (M5.5 slice 10) join the sixteen
-      expect(defs.length).toBe(20);
+      // the four time trials (M5.5 slice 10) and the four street races (slice 11) join the sixteen
+      expect(defs.length).toBe(24);
       expect(defs.filter((d) => d.kind === 'delivery').length).toBe(6);
       expect(defs.filter((d) => d.kind === 'order').length).toBe(6);
       expect(defs.filter((d) => d.kind === 'escape').length).toBe(4);
       expect(defs.filter((d) => d.kind === 'trial').length).toBe(4);
+      expect(defs.filter((d) => d.kind === 'race').length).toBe(4);
       const placed = placeJobs(sim.city!, 42, sim.traffic!.lanes);
       if (process.env.npm_lifecycle_event === 'bake:jobs') writeBaked(42, placed);
       // the boot reads the baked table: `npm run bake:jobs` rewrites it when the generator moves

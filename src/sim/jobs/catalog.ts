@@ -10,7 +10,7 @@ import { PLAYER_PAINT } from '../traffic/Traffic';
 import { CAR_IDS, type CarId } from '../vehicle/presets';
 import { BODIES, BODY_IDS, type BodyId } from '../traffic/bodies';
 
-export type JobKind = 'delivery' | 'order' | 'escape' | 'trial';
+export type JobKind = 'delivery' | 'order' | 'escape' | 'trial' | 'race';
 
 export interface JobDef {
   id: number;
@@ -91,3 +91,5 @@ export function trialMedal(limitSeconds: number, elapsed: number): number {
 }
 
 export const MEDAL_WORDS = ['', 'BRONZE', 'SILVER', 'GOLD'] as const;
+
+export const PLACE_WORDS = ['', '1ST', '2ND', '3RD', '4TH'] as const;

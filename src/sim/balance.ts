@@ -87,7 +87,7 @@ export const BALANCE = {
   jobs: {
     // nearDoor: the placement's first picks are a ring within this of every door (the first goal after a door, DESIGN §13.4)
     markerRadius: 4, beaconHeight: 3, timeBonus: 0.5, holdSeconds: 2, cardSeconds: 1.5, markerMinGap: 60, nearDoor: 250,
-    counts: { delivery: 6, order: 6, escape: 4, trial: 4 },
+    counts: { delivery: 6, order: 6, escape: 4, trial: 4, race: 4 },
     // payoutPerKm 9,000 (balance script, 2026-09-23; the plan's 4,000 paid every placed delivery the 5,000 floor on
     // their 0.55–1.27 km paths): now 5,000–11,400, DESIGN.md §3.3's 5–12k
     delivery: { payoutPerKm: 9000, payoutMin: 5000, payoutMax: 12000, limitFactor: 1.3, limitMin: 45, heat: 10, minPath: 400 },
@@ -102,6 +102,14 @@ export const BALANCE = {
      * bag (DESIGN.md §3.3); slower than bronze fails it; the finish reaches `finishRadius` m across the road.
      */
     trial: { speeds: [16.5, 20, 24], pay: [3000, 5000, 8000], minPath: 1100, maxPath: 1900, finishRadius: 12 },
+    /**
+     * Street races (M5.5 slice 11): one per district in turn to a finish 1.2–2 km on by lane path, any route; three
+     * rivals `gridAhead` m apart ahead of the player at `pace` × the lane's limit, rubber-banded between `band`
+     * (a rival `bandRange` m nearer the finish than the player eases to the low end, one as far behind pushes to the
+     * high end); the player's place pays `pay` (fourth pays nothing and fails it); the clock allows the path at
+     * `limitSpeed` m/s.
+     */
+    race: { pace: 1.85, band: [0.72, 1.25], bandRange: 250, gridAhead: 16, finishRadius: 12, pay: [6000, 2500, 1000], minPath: 1200, maxPath: 2000, limitSpeed: 10 },
   },
   /**
    * The garage's catalogue (docs/M5_PLAN.md D13): cash only; the muscle car is owned from the start. The van at

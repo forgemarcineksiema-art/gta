@@ -10,11 +10,11 @@
  * top centre. DOM writes only on change; reads sim state only.
  */
 import {
-  BALANCE, CAR_WORDS, CHAIN_STEPS, MEDAL_WORDS, STEP, chainStep, goalFor, newGoal, paintName, trialTimes, unpackDescriptor,
+  BALANCE, CAR_WORDS, CHAIN_STEPS, MEDAL_WORDS, PLACE_WORDS, STEP, chainStep, goalFor, newGoal, paintName, trialTimes, unpackDescriptor,
   type GoalKind, type JobDef, type SimWorld,
 } from '../sim';
 
-const KIND_TITLE: Record<JobDef['kind'], string> = { delivery: 'DELIVERY', order: 'STEAL TO ORDER', escape: 'ESCAPE', trial: 'TIME TRIAL' };
+const KIND_TITLE: Record<JobDef['kind'], string> = { delivery: 'DELIVERY', order: 'STEAL TO ORDER', escape: 'ESCAPE', trial: 'TIME TRIAL', race: 'STREET RACE' };
 
 export class JobsHud {
   readonly root: HTMLElement;
@@ -36,6 +36,8 @@ export class JobsHud {
   private serial = -1;
   private lastSeconds = -2;
   private lastDist = -2;
+  /** The running race's place last shown. */
+  private racePlace = 0;
   private lastRoute = -1;
   private visible = false;
   private yielding = false;
@@ -165,6 +167,14 @@ export class JobsHud {
       if (this.cardMode === 'job') this.fillJobCard(sim, d);
     }
     if (jobs.state === 'done' || jobs.state === 'failed') return;
+    // a race's place, live: the line's words when it changes
+    if (d.kind === 'race' && jobs.state === 'active') {
+      const place = jobs.race.place(sim.probe);
+      if (place !== this.racePlace) {
+        this.racePlace = place;
+        this.fillJobLine(sim, d);
+      }
+    }
     // the clock and the distance: compare numbers first, a string per frame is garbage
     const seconds = Number.isFinite(jobs.remaining) ? Math.ceil(jobs.remaining) : -1;
     if (seconds !== this.lastSeconds) {
@@ -240,13 +250,14 @@ export class JobsHud {
   private fillJobLine(sim: SimWorld, d: JobDef): void {
     const jobs = sim.jobs;
     let kind: string;
-    let state = d.kind === 'order' ? 'is-order' : d.kind === 'escape' ? 'is-escape' : d.kind === 'trial' ? 'is-trial' : '';
+    let state = d.kind === 'order' ? 'is-order' : d.kind === 'escape' ? 'is-escape' : d.kind === 'trial' ? 'is-trial' : d.kind === 'race' ? 'is-race' : '';
     if (jobs.state === 'done') {
-      const what = d.kind === 'order' ? 'SOLD' : d.kind === 'escape' ? 'BOUNTY' : d.kind === 'trial' ? MEDAL_WORDS[jobs.lastMedal] : 'DELIVERED';
+      const what = d.kind === 'order' ? 'SOLD' : d.kind === 'escape' ? 'BOUNTY' : d.kind === 'trial' ? MEDAL_WORDS[jobs.lastMedal]
+        : d.kind === 'race' ? `${PLACE_WORDS[jobs.lastPlace] ?? ''} PLACE` : 'DELIVERED';
       kind = `${what} +${money(jobs.lastPaid)}${jobs.lastTip ? ' · CLEAN LINE' : ''}`;
       state = 'is-done';
     } else if (jobs.state === 'failed') {
-      kind = d.kind === 'trial' ? 'TOO SLOW · NO MEDAL' : 'TOO LATE';
+      kind = d.kind === 'trial' ? 'TOO SLOW · NO MEDAL' : d.kind === 'race' && jobs.lastPlace > 3 ? 'LAST · NO PRIZE' : 'TOO LATE';
       state = 'is-failed';
     } else if (d.kind === 'order') {
       const w = unpackDescriptor(d.descriptor);
@@ -255,6 +266,8 @@ export class JobsHud {
       kind = `ESCAPE ${'★'.repeat(d.level)}`;
     } else if (d.kind === 'trial') {
       kind = 'TIME TRIAL · FOLLOW THE COINS';
+    } else if (d.kind === 'race') {
+      kind = `RACE · ${PLACE_WORDS[this.racePlace] ?? ''}`;
     } else {
       kind = 'DELIVERY';
     }
@@ -282,6 +295,10 @@ export class JobsHud {
     } else if (d.kind === 'escape') {
       this.cardSub.textContent = 'THE POLICE HAVE YOU';
       this.cardLimit.textContent = 'LOSE THEM';
+    } else if (d.kind === 'race') {
+      const pay = BALANCE.jobs.race.pay;
+      this.cardSub.textContent = 'FIRST TO THE FINISH · ANY ROUTE';
+      this.cardLimit.textContent = `1ST ${money(pay[0] ?? 0)} · 2ND ${money(pay[1] ?? 0)} · 3RD ${money(pay[2] ?? 0)}`;
     } else if (d.kind === 'trial') {
       const [g, s, b] = trialTimes(d.limitSeconds);
       const best = sim.jobs.medals.get(d.id) ?? 0;

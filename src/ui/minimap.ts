@@ -14,7 +14,8 @@ export type MarkerKind = 'tower' | 'tank' | 'glasshouse' | 'hotel' | 'garage' | 
 export interface MinimapMarker { x: number; z: number; kind: MarkerKind; color: string; yaw?: number; local?: boolean }
 
 /** The job rings by kind (the marker's own colours, docs/STYLE.md). */
-const JOB_COLORS = { delivery: hex(PALETTE.carOrange), order: hex(PALETTE.carMagenta), escape: hex(PALETTE.policeBlue), trial: hex(PALETTE.coin) } as const;
+const RIVAL = hex(PALETTE.carLime);
+const JOB_COLORS = { delivery: hex(PALETTE.carOrange), order: hex(PALETTE.carMagenta), escape: hex(PALETTE.policeBlue), trial: hex(PALETTE.coin), race: hex(PALETTE.carLime) } as const;
 
 const FONT = "'Segoe UI', 'Helvetica Neue', Arial, system-ui, sans-serif";
 const INK = '#f7f3ea';
@@ -369,6 +370,21 @@ export class Minimap {
         c.arc(this.tmp.x, this.tmp.y, 3.5, 0, Math.PI * 2);
         c.fill();
         c.stroke();
+      }
+      // a street race's rivals (M5.5 slice 11): lime dots
+      const rivals = sim.jobs.race.running ? sim.jobs.race.rivals : null;
+      if (rivals) {
+        c.fillStyle = RIVAL;
+        for (let k = 0; k < rivals.length; k++) {
+          const agent = rivals[k] as number;
+          if (agent < 0) continue;
+          project(this.tmp, traffic.x[agent] as number, traffic.z[agent] as number, x, z, h, s, px, py);
+          if ((this.tmp.x - ccx) ** 2 + (this.tmp.y - ccy) ** 2 > rimR * rimR) continue;
+          c.beginPath();
+          c.arc(this.tmp.x, this.tmp.y, 3.5, 0, Math.PI * 2);
+          c.fill();
+          c.stroke();
+        }
       }
       // the helicopter (M5.5 slice 9): a square with a cross for its rotor, clamped to the rim when away
       const heli = police.heli;

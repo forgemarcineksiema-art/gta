@@ -20,6 +20,9 @@
  *   line to a finish across the road; crossing it pays by the medal the time
  *   wins (gold, silver, bronze), the best medal per trial is kept; slower than
  *   bronze fails it.
+ * - race (M5.5 slice 11): three rivals start just ahead, everybody to one finish
+ *   by any route (no coins); the player's place over the line pays (1st, 2nd,
+ *   3rd), fourth fails it, and so does the clock.
  *
  * Money goes into the bag through the `jobDone` event (`Run` reads it). While
  * the cold open runs only its own marker is live. No allocation per step.
@@ -33,6 +36,7 @@ import type { Lane } from '../city/roads';
 import { AgentState, type PlayerProbe } from '../traffic/Traffic';
 import { CAR_IDS } from '../vehicle/presets';
 import { trialMedal, type JobDef } from './catalog';
+import { Race } from './Race';
 import { markerRingCoins, pointTarget } from './place';
 import { goalFor, newGoal } from '../run/goal';
 
@@ -59,6 +63,9 @@ export class Jobs {
   /** The last trial's medal (3 gold .. 1 bronze), and the best per trial def id (saved). */
   lastMedal = 0;
   readonly medals = new Map<number, number>();
+  /** The running street race's rivals (M5.5 slice 11), and the player's place in the last one. */
+  readonly race: Race;
+  lastPlace = 0;
   /** Ensures run so far for this hunt that repainted a car, and that spawned one (the slice-2 measurement). */
   repaints = 0;
   spawns = 0;
@@ -78,6 +85,7 @@ export class Jobs {
 
   constructor(private readonly sim: SimWorld, defs: JobDef[]) {
     this.defs = defs;
+    this.race = new Race(sim);
     for (const d of defs) this.nextId = Math.max(this.nextId, d.id + 1);
     this.cursor = sim.events.sequence;
   }
@@ -155,6 +163,7 @@ export class Jobs {
       this.hunt(d, probe, dt);
       return;
     }
+    if (d.kind === 'race') this.race.step(probe);
     if (d.kind === 'escape') {
       // the chase was lost (by the cooldown or a swap nobody saw): the bounty
       if (!this.escaped) return;
@@ -163,10 +172,20 @@ export class Jobs {
       this.sim.events.push('jobDone', d.payout, probe.x, 0, probe.z, d.id);
       return;
     }
-    const reach = d.kind === 'trial' ? BALANCE.jobs.trial.finishRadius : r;
+    const reach = d.kind === 'trial' ? BALANCE.jobs.trial.finishRadius : d.kind === 'race' ? BALANCE.jobs.race.finishRadius : r;
     if ((d.targetX - probe.x) ** 2 + (d.targetZ - probe.z) ** 2 <= reach * reach && this.canArrive(d)) {
       let paid: number;
-      if (d.kind === 'trial') {
+      if (d.kind === 'race') {
+        // over the line: the place the rivals already home leave, and its pay; fourth pays nothing
+        const place = this.race.finished + 1;
+        this.lastPlace = place;
+        paid = BALANCE.jobs.race.pay[place - 1] ?? 0;
+        if (paid <= 0) {
+          this.finish('failed', probe);
+          this.sim.events.push('jobFailed', 0, probe.x, 0, probe.z, d.id);
+          return;
+        }
+      } else if (d.kind === 'trial') {
         // the medal the time wins, and the best one kept
         const medal = Math.max(1, trialMedal(d.limitSeconds, d.limitSeconds - Math.max(0, this.remaining)));
         this.lastMedal = medal;
@@ -245,6 +264,7 @@ export class Jobs {
   abandon(): void {
     if (this.state === 'idle') return;
     this.release();
+    this.race.stop();
     this.sim.coins?.clearExtra('route');
     this.state = 'idle';
     this.active = -1;
@@ -295,6 +315,12 @@ export class Jobs {
     }
     this.remaining = d.limitSeconds;
     this.sim.heat.add(d.heat);
+    if (d.kind === 'race') {
+      // any route: no coin line, the rivals on the grid ahead
+      this.lastPlace = 0;
+      this.race.start(d.targetX, d.targetZ, this.sim.probe);
+      return;
+    }
     // the coins along the way (DESIGN.md §13.5); the cold open lays its own line
     if (d.id !== this.sim.coldOpen.job) this.layRoute(d.x, d.z, d.targetX, d.targetZ);
   }
@@ -377,6 +403,7 @@ export class Jobs {
 
   private finish(state: 'done' | 'failed', probe: PlayerProbe): void {
     this.release();
+    this.race.stop();
     this.sim.coins?.clearExtra('route');
     const d = this.defOf(this.active);
     if (d && (d.x - probe.x) ** 2 + (d.z - probe.z) ** 2 <= BALANCE.jobs.markerRadius ** 2) this.rearm = d.id;

@@ -128,6 +128,9 @@ export class ChaseCamera {
   private focusLeft = 0;
   private focusAmount = 0;
   private readonly focusPoint = new THREE.Vector3();
+  /** Metres added behind and above for a long or tall body (the bus), set on a swap. */
+  private extraDistance = 0;
+  private extraHeight = 0;
   private readonly pos = new THREE.Vector3();
   private readonly target = new THREE.Vector3();
   private readonly look = new THREE.Vector3();
@@ -170,6 +173,12 @@ export class ChaseCamera {
   /** An external jolt (a billboard through the windscreen): adds bounded shake energy. */
   kick(amount: number): void {
     this.shakeEnergy = Math.min(0.7, this.shakeEnergy + amount);
+  }
+
+  /** A longer or taller body than the classes (the bus): the camera sits this much further back and higher. */
+  fit(distance: number, height: number): void {
+    this.extraDistance = distance;
+    this.extraHeight = height;
   }
 
   whip(seconds: number): void {
@@ -290,8 +299,8 @@ export class ChaseCamera {
     const hRate = 1 - Math.exp(-dt * (tm.airborne ? t.heightRateAir : t.heightRateGround));
     this.carY += (car.position.y - this.carY) * (snap ? 1 : hRate);
 
-    const dist = (t.distance + speed * t.distancePerSpeed + (tm.drifting ? t.driftDistanceBonus : 0)) * modeMul;
-    const height = Math.max(1.4, t.height - speed * t.heightDropPerSpeed - (tm.drifting ? t.driftHeightDrop : 0) + t.reverseHeight * this.reverseU) * modeMul;
+    const dist = (t.distance + this.extraDistance + speed * t.distancePerSpeed + (tm.drifting ? t.driftDistanceBonus : 0)) * modeMul;
+    const height = Math.max(1.4, t.height + this.extraHeight - speed * t.heightDropPerSpeed - (tm.drifting ? t.driftHeightDrop : 0) + t.reverseHeight * this.reverseU) * modeMul;
     this.target.set(car.position.x - this.dir.x * dist, this.carY + height, car.position.z - this.dir.z * dist);
 
     if (snap || !this.initialised) {

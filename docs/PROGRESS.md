@@ -2,6 +2,18 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M5.5 slice 19: traffic's own bodies (taken before 7–18: Marcin asked for the city's models outright)
+
+Done: eight civilian bodies (sedan, hatchback, estate, SUV, pickup, taxi, box truck, 12 m bus) on the player's
+profile format, drawn instanced with a paint mask (glass, lights and a truck's box keep their colour), 386–460
+triangles a body (was 244–268); each record has its body's footprint, collider and mass; queues are spaced by the
+bodies; buses only on avenue lanes, straight on at junctions, never change lane; taxis round the tower, hop lanes;
+trucks and pickups in the Works; the player's shells never spawn ambient; trucks and buses honk low. A swap takes
+the body: the bus and truck are the heavy stretched (every force × mass), the rest their class on its axles, the
+paint kept, the radio names it (SUSPECT IN A YELLOW TAXI), the camera backs off for the bus. Fix: a unit set on an
+exit before its route came takes the route's. Not done: the garage keeps classes (a pickup driven home offers the
+van). Pins 19.1–19.6.
+
 ## 2026-09-23 — M5.5 slice 6: bring it home, pay to keep it
 
 Done: a car driven through a door whose class the garage does not own is HOT on the CARS page (`HOT · KEEP IT n`,

@@ -1,5 +1,6 @@
 /** Every traffic and pedestrian number. Live-editable from the dev panel. */
 import type { CarId } from '../vehicle/presets';
+import type { BodyWeights } from './bodies';
 
 export interface TrafficTuning {
   agents: number;
@@ -61,8 +62,11 @@ export interface TrafficTuning {
   yawGain: number;
   yawRateMax: number;
   subLaneOffsets: { highway: readonly number[]; street: readonly number[] };
-  /** Spawn shares of the ambient classes; they must sum to 1. `sports` and `police` are never ambient traffic. */
-  kindWeights: { compact: number; muscle: number; heavy: number };
+  /**
+   * The civilian bodies' spawn shares and the place's factors (docs/DESIGN.md §13.11): buses only on the
+   * avenues, trucks and pickups in the Works, taxis round the tower. The player's shells never spawn ambient.
+   */
+  bodies: BodyWeights;
   /** Each driver's share of the lane's limit, drawn at spawn (docs/DESIGN.md §13.8); the weights sum to 1. */
   pace: { values: readonly number[]; weights: readonly number[] };
   /** The class's share on top: a van a little slower, a sports car a little faster. */
@@ -164,7 +168,16 @@ export const TRAFFIC: TrafficTuning = {
   yawRateMax: 1.5,
   // The highway's two lanes per direction are real graph lanes now, so nothing sits off its lane.
   subLaneOffsets: { highway: [0], street: [0] },
-  kindWeights: { compact: 0.5, muscle: 0.3, heavy: 0.2 },
+  bodies: {
+    base: { sedan: 0.24, hatch: 0.22, estate: 0.1, suv: 0.14, pickup: 0.1, taxi: 0.06, truck: 0.06, bus: 0.12 },
+    places: {
+      crown: { taxi: 4 },
+      foundry: { truck: 3, pickup: 2 },
+      gardens: { estate: 1.6, suv: 1.5 },
+      marina: { hatch: 1.5, sedan: 1.2 },
+      highway: { truck: 2, taxi: 0.5 },
+    },
+  },
   pace: { values: [0.85, 1.0, 1.1, 1.18], weights: [0.15, 0.55, 0.22, 0.08] },
   classPace: { compact: 1, muscle: 1, heavy: 0.9, sports: 1.1, police: 1 },
   temper: { gapTime: [0.9, 1.6], badShare: 0.125, badGap: 0.6, badDrift: 0.5, badClaimAfter: 3 },

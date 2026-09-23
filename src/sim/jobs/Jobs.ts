@@ -347,7 +347,7 @@ export class Jobs {
   private canArrive(d: JobDef): boolean {
     if (d.kind !== 'order') return true;
     const kind = CAR_IDS[(d.descriptor >>> 24) & 0xff];
-    return this.sim.carId === kind && this.sim.life.state.stage < 4 && !this.sim.life.state.wrecked;
+    return this.sim.carBody === kind && this.sim.life.state.stage < 4 && !this.sim.life.state.wrecked;
   }
 
   /** The wanted car goes back to being traffic. */

@@ -2,7 +2,7 @@
  * In-game HUD: plain DOM over the canvas. Speedometer, boost bar, drift readout,
  * a debug block, a pause overlay and the keycap hint strip. Reads sim state only.
  */
-import { AgentState, BALANCE, CAR_WORDS, POLICE, paintName, unpackDescriptor } from '../sim';
+import { AgentState, BALANCE, BODY_WORDS, POLICE, paintName, unpackDescriptor } from '../sim';
 import type { SimEvent, SimWorld } from '../sim';
 import { Minimap } from './minimap';
 import { HeatHud } from './heat';
@@ -318,7 +318,7 @@ export class Hud {
       else if (value === 2) line = 'UNIT DOWN · SEND ANOTHER';
       else if (value === 3) {
         const d = unpackDescriptor(target);
-        line = `SUSPECT IN A ${paintName(d.paint)} ${CAR_WORDS[d.kind]}`;
+        line = `SUSPECT IN A ${paintName(d.paint)} ${BODY_WORDS[d.body]}`;
       }
       if (!line) return;
       this.dispatchQuiet = 0;

@@ -38,6 +38,7 @@ import { PEDS, TRAFFIC } from './traffic/tuning';
 import { SimPhase, type PhaseMark } from './profile';
 import { TransformBuffer } from './transforms';
 import { CAR_PRESETS, type CarId } from './vehicle/presets';
+import type { BodyId } from './traffic/bodies';
 import { cloneTuning, type VehicleTuning } from './vehicle/tuning';
 import { Vehicle } from './vehicle/Vehicle';
 import * as M from './math';
@@ -142,6 +143,9 @@ export class SimWorld {
   readonly vehicle: Vehicle;
   /** The player's class; car-swap changes it. */
   carId: CarId;
+  /** The body the player drives (a class's own shell, or a civilian body taken by a swap; M5.5 slice 19) and its paint. */
+  carBody: BodyId = 'muscle';
+  carPaint = 0;
   readonly controls: VehicleControls = createControls();
   readonly layout: PlaygroundLayout;
   readonly track: TrackDef;
@@ -218,8 +222,11 @@ export class SimWorld {
     this.heat = new Heat(this.events, this.traffic);
     this.heat.set(opts.heat ?? 0);
     this.pursuit = new Pursuit(this.events);
+    this.carBody = this.carId;
+    this.carPaint = this.garage.paintOf(this.carId);
     this.pursuit.descriptor.kind = this.carId;
-    this.pursuit.descriptor.paint = this.garage.paintOf(this.carId);
+    this.pursuit.descriptor.body = this.carId;
+    this.pursuit.descriptor.paint = this.carPaint;
     this.cover = this.city ? coverSites(this.city) : null;
     this.police = this.traffic ? new Police(this) : null;
     // a crime in a unit's sight pays double and makes the player wanted (DESIGN.md §13.3)
@@ -387,8 +394,11 @@ export class SimWorld {
   /** Change the player's class in place (the cold open's van; the swap does its own). */
   setCar(kind: CarId): void {
     this.carId = kind;
+    this.carBody = kind;
+    this.carPaint = this.garage.paintOf(kind);
     this.pursuit.descriptor.kind = kind;
-    this.pursuit.descriptor.paint = this.garage.paintOf(kind);
+    this.pursuit.descriptor.body = kind;
+    this.pursuit.descriptor.paint = this.carPaint;
     this.vehicle.tuning = cloneTuning(CAR_PRESETS[kind]);
     this.vehicle.applyTuning();
   }

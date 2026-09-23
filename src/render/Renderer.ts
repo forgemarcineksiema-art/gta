@@ -4,9 +4,10 @@
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { CAR_IDS, CAR_PRESETS, GARAGE, PALETTE, SWAP, type CarId, type DynamicDesc, type GhostPose, type ShapeDesc, type SimWorld, type StaticDesc } from '../sim';
+import { CAR_IDS, CAR_PRESETS, GARAGE, PALETTE, SWAP, bodySpec, bodyTuning, isShell, type BodyId, type CarId, type DynamicDesc, type GhostPose, type ShapeDesc, type SimWorld, type StaticDesc } from '../sim';
 import { ChaseCamera } from './ChaseCamera';
 import { CAR_PROFILES } from './carProfiles';
+import { BODY_PROFILES } from './bodyProfiles';
 import { Sparks } from './Sparks';
 import { SpeedLines } from './SpeedLines';
 import { buildCarMesh, buildTopper, type CarMesh } from './carMesh';
@@ -96,10 +97,15 @@ export class Renderer {
   readonly stats: RenderStats = { drawCalls: 0, triangles: 0, dpr: 1, width: 0, height: 0, glRenderer: '' };
   private readonly sim: SimWorld;
   private readonly dynamics: DynamicView[] = [];
-  /** One mesh per class; `car` is the visible one and follows `sim.carId` (car-swap). */
+  /** One mesh per class; `car` is the visible one and follows `sim.carBody` (car-swap). */
   private readonly cars: Record<CarId, CarMesh>;
+  /** The city's bodies the player has taken (or is next to): built on first need, kept (M5.5 slice 19). */
+  private readonly bodyCars = new Map<BodyId, CarMesh>();
   private car: CarMesh;
   private carId: CarId;
+  private bodyId: BodyId;
+  /** The paint last put on a taken body's mesh. */
+  private shownPaint = -1;
   private readonly ghost: CarMesh;
   private readonly ghostPose: GhostPose = { x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1 };
   private readonly sun: THREE.DirectionalLight;
@@ -112,8 +118,8 @@ export class Renderer {
   private garageSerial = -1;
   /** The streak's topper, on the roof of the car the player drives. */
   private readonly topper = buildTopper();
-  /** Each class's roof height above its body origin, for the topper. */
-  private readonly roofY: Record<CarId, number>;
+  /** Each shown body's roof height above its origin, for the topper and the camera's fit. */
+  private readonly roofY: Partial<Record<BodyId, number>>;
   private smokeAcc = 0;
   private fireAcc = 0;
   private readonly wreckSmokeAcc: Float32Array;
@@ -213,16 +219,12 @@ export class Renderer {
     }
     this.cars = cars as Record<CarId, CarMesh>;
     this.carId = sim.carId;
+    this.bodyId = sim.carId;
     this.car = this.cars[sim.carId];
-    const roofY: Partial<Record<CarId, number>> = {};
-    for (const id of CAR_IDS) {
-      const body = this.cars[id].root.getObjectByName('body-and-trim') as THREE.Mesh | undefined;
-      body?.geometry.computeBoundingBox();
-      roofY[id] = body?.geometry.boundingBox?.max.y ?? 1.2;
-    }
-    this.roofY = roofY as Record<CarId, number>;
+    this.roofY = {};
+    for (const id of CAR_IDS) this.roofY[id] = roofOf(this.cars[id]);
     this.car.root.add(this.topper);
-    this.topper.position.set(0, this.roofY[sim.carId] - 0.02, -0.2);
+    this.topper.position.set(0, (this.roofY[sim.carId] ?? 1.2) - 0.02, -0.2);
     this.policeView = new PoliceView(this.scene, sim, this.cars.police);
     // the best-lap ghost: the same car, translucent, no shadow, wheels carried by the body
     this.ghost = buildCarMesh(sim.vehicle.tuning, profile, PALETTE.carBlue);
@@ -355,21 +357,55 @@ export class Renderer {
     return this.carId;
   }
 
+  /** The body's shown mesh: a class's own, or a city body's, built hidden the first time it is needed. */
+  private meshFor(body: BodyId): CarMesh {
+    if (isShell(body)) return this.cars[body];
+    let mesh = this.bodyCars.get(body);
+    if (!mesh) {
+      // built in a colour no fixed part uses, so a respray finds the paint alone (a white truck keeps a white box)
+      mesh = buildCarMesh(bodyTuning(body), BODY_PROFILES[body], SENTINEL_PAINT);
+      mesh.root.visible = false;
+      this.scene.add(mesh.root);
+      for (const w of mesh.wheels) {
+        w.visible = false;
+        this.scene.add(w);
+      }
+      this.roofY[body] = roofOf(mesh);
+      this.bodyCars.set(body, mesh);
+    }
+    return mesh;
+  }
+
   private syncCar(): void {
-    const id = this.sim.carId;
-    if (id === this.carId) return;
-    const old = this.car;
-    old.root.visible = false;
-    for (const w of old.wheels) w.visible = false;
-    this.car = this.cars[id];
-    this.car.root.visible = true;
-    for (const w of this.car.wheels) w.visible = true;
-    this.car.setDamage(0);
-    this.carId = id;
-    // the topper is the player's: it moves to the new car's roof
-    this.car.root.add(this.topper);
-    this.topper.position.set(0, this.roofY[id] - 0.02, -0.2);
-    this.chase.whip(SWAP.whipSeconds);
+    const sim = this.sim;
+    const body = sim.carBody;
+    // a car next to the player may be taken: its body's mesh is ready before the swap, not built on it
+    const candidate = sim.life.state.swapCandidate;
+    if (candidate >= 0 && sim.traffic) this.meshFor(sim.traffic.bodyOf(candidate));
+    if (body !== this.bodyId) {
+      const old = this.car;
+      old.root.visible = false;
+      for (const w of old.wheels) w.visible = false;
+      this.car = this.meshFor(body);
+      this.car.root.visible = true;
+      for (const w of this.car.wheels) w.visible = true;
+      this.car.setDamage(0);
+      this.bodyId = body;
+      this.shownPaint = -1;
+      // the topper is the player's: it moves to the new car's roof
+      this.car.root.add(this.topper);
+      const roof = this.roofY[body] ?? 1.2;
+      this.topper.position.set(0, roof - 0.02, -0.2);
+      this.chase.whip(SWAP.whipSeconds);
+      // a bus needs the camera further back and higher to see past it
+      const spec = bodySpec(body);
+      this.chase.fit(Math.max(0, spec.halfLength - 2.7) * 1.1, Math.max(0, roof - 2.3) * 0.9);
+    }
+    this.carId = sim.carId;
+    if (!isShell(body) && sim.carPaint !== this.shownPaint) {
+      this.car.setPaint(sim.carPaint);
+      this.shownPaint = sim.carPaint;
+    }
   }
 
   render(alpha: number, dt: number): void {
@@ -437,7 +473,7 @@ export class Renderer {
   /** Sim events with a visible consequence: parts fly off, a wreck bursts. */
   private handleEvent(e: SimEvent): void {
     const car = this.car.root;
-    const paint = this.sim.garage.paintOf(this.sim.carId);
+    const paint = this.sim.carPaint;
     if (e.kind === 'damage') {
       this.tmpFwd.set(0, 0, 1).applyQuaternion(car.quaternion);
       const front = e.value === 1;
@@ -624,4 +660,13 @@ function buildSkyDome(): THREE.Mesh {
   mesh.frustumCulled = false;
   mesh.renderOrder = -10;
   return mesh;
+}
+
+/** A colour no fixed part of a body uses: a taken body's mesh is built in it and resprayed at once. */
+const SENTINEL_PAINT = 0x808182;
+
+function roofOf(mesh: CarMesh): number {
+  const body = mesh.root.getObjectByName('body-and-trim') as THREE.Mesh | undefined;
+  body?.geometry.computeBoundingBox();
+  return body?.geometry.boundingBox?.max.y ?? 1.2;
 }

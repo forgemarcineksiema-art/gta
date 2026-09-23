@@ -306,7 +306,7 @@ export class Police {
     pursuit.step(dt, level, visible, player.x, player.z);
     if (before === 'idle' && pursuit.state !== 'idle') {
       const d = pursuit.descriptor;
-      this.sim.events.push('dispatch', DISPATCH.suspect, player.x, 0, player.z, packSuspect(d.kind, d.paint));
+      this.sim.events.push('dispatch', DISPATCH.suspect, player.x, 0, player.z, packSuspect(d.body, d.paint));
     }
     if (before === 'lost' && pursuit.state === 'idle') {
       this.withdrawing.fill(1);

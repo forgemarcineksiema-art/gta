@@ -69,6 +69,22 @@ export interface CarProfile {
   /** Visual wheel offset along the axle: negative pushes the wheels outward past the sills. */
   wheelInset: number;
   paint: number;
+  /** The hubs' style ('heavy', 'compact'); the profile's name otherwise. */
+  wheelStyle?: string;
+  /** Boxes on the body (a taxi's sign, roof rails, a bed's rails, a truck's box stripe), in the profile's frame. */
+  parts?: BodyPart[];
+  /** Segment indices whose top is dark (a pickup's open bed). */
+  darkTops?: number[];
+  /** Segments [from, to) that keep their own colour instead of the paint (a box truck's box), the tail with them when they reach it. */
+  fixed?: { from: number; to: number; color: number };
+}
+
+/** A box fitted to a body: size and centre in metres (heights above the ground), a colour or one of the paint's tones; `mirror` adds the one at -x. */
+export interface BodyPart {
+  size: readonly [number, number, number];
+  at: readonly [number, number, number];
+  color: number | 'paint' | 'dark' | 'light';
+  mirror?: boolean;
 }
 
 /** A long-bonnet coupe: the first car. Heights above ground, length 4.5 m, width ~1.9 m at the belt. */
@@ -345,6 +361,10 @@ export function buildCarMesh(t: VehicleTuning, profile: CarProfile = MUSCLE, col
     return z > nose.z ? nose : tail;
   };
   const sideWidth = (s: Section, y: number) => s.hwFloor + (s.hwBelt - s.hwFloor) * Math.min(1, (y - s.floor) / (s.belt - s.floor));
+  // a fixed segment (a truck's box) keeps its own colour in the three tones the paint would take
+  const fixed = profile.fixed;
+  const fixedTones = fixed ? [fixed.color, shade(fixed.color, 0.72), shade(fixed.color, 1.13)] as const : null;
+  const toneSet = (i: number): readonly [number, number, number] => fixed && fixedTones && i >= fixed.from && i < fixed.to ? fixedTones : [paint, paintDark, paintLight];
   const arcRadius = t.wheelRadius + (van ? 0.105 : 0.085);
   // The same polygon drives both the cutout and the bevel, preventing cracks between them.
   const arcs = [t.wheelBase / 2, -t.wheelBase / 2].map(z => Array.from({ length: 13 }, (_, i) => {
@@ -362,6 +382,7 @@ export function buildCarMesh(t: VehicleTuning, profile: CarProfile = MUSCLE, col
 
   for (let i = 0; i < S.length - 1; i++) {
     const a = S[i] as Section, b = S[i + 1] as Section;
+    const [tone, toneDark, toneLight] = toneSet(i);
     const ref = P(0, (a.floor + a.roof + b.floor + b.roof) / 4, (a.z + b.z) / 2);
     const aMap = { a0: a.z, a1: b.z };
     // Narrow undertray leaves the wheel wells open from below as well as the sides.
@@ -373,10 +394,10 @@ export function buildCarMesh(t: VehicleTuning, profile: CarProfile = MUSCLE, col
         const ya = bottom(sa), yb = bottom(sb);
         const lower = makePanel(P(side * sideWidth(sa, ya), ya, sa.z), P(side * sideWidth(sb, yb), yb, sb.z), P(side * sb.hwBelt, sb.belt, sb.z), P(side * sa.hwBelt, sa.belt, sa.z), ref,
           { a0: sa.z, a1: sb.z, lo0: ya, lo1: yb, hi0: sa.belt, hi1: sb.belt });
-        bb.fill(lower, paint);
-        bb.decal(lower, rect(sa.z, sb.z, 0, Math.max(sa.floor, sb.floor) + (van ? 0.19 : 0.09)), van ? PALETTE.charcoal : paintDark);
-        bb.decal(lower, rect(sa.z, sb.z, a.belt - 0.10, a.belt - 0.075), paintLight);
-        for (const dz of profile.doorSeams) bb.decal(lower, rect(dz + 0.009, dz - 0.009, 0.43, 2), paintDark);
+        bb.fill(lower, tone);
+        bb.decal(lower, rect(sa.z, sb.z, 0, Math.max(sa.floor, sb.floor) + (van ? 0.19 : 0.09)), van ? PALETTE.charcoal : toneDark);
+        bb.decal(lower, rect(sa.z, sb.z, a.belt - 0.10, a.belt - 0.075), toneLight);
+        for (const dz of profile.doorSeams) bb.decal(lower, rect(dz + 0.009, dz - 0.009, 0.43, 2), toneDark);
         bb.decal(lower, rect(profile.handleZ + 0.10, profile.handleZ - 0.10, a.belt - 0.13, a.belt - 0.09), PALETTE.charcoal);
         if (van) bb.decal(lower, rect(sa.z, sb.z, 0.85, 0.94), PALETTE.charcoal);
         if (muscle && i < 3) bb.decal(lower, rect(0.88, 0.70, 0.7, 0.74), PALETTE.chrome);
@@ -387,11 +408,11 @@ export function buildCarMesh(t: VehicleTuning, profile: CarProfile = MUSCLE, col
         windowPanel(upper, i === profile.aPillar ? 0.14 : 0.06);
         for (const z of profile.pillars) bb.decal(upper, rect(z - 0.035, z + 0.035, 0, 3), PALETTE.charcoal, 0.012);
       } else if (i === profile.cPillar) {
-        bb.fill(upper, paint);
+        bb.fill(upper, tone);
         longitudinalPatch(upper, [[0.13, 0.16], [0.72, 0.16], [0.6, 0.72], [0.13, 0.84]], PALETTE.charcoal);
         longitudinalPatch(upper, [[0.18, 0.24], [0.63, 0.24], [0.54, 0.65], [0.18, 0.73]], glassLight, 0.006);
       } else {
-        bb.fill(upper, paint);
+        bb.fill(upper, tone);
         if (van && i === 4) {
           // Cargo panel surround, sliding-door split and rail: no passenger quarter glass.
           bb.patch(upper, rect(0.07, 0.94, 0.10, 0.88), paintDark);
@@ -408,7 +429,7 @@ export function buildCarMesh(t: VehicleTuning, profile: CarProfile = MUSCLE, col
       windowPanel(top, 0.08);
       if (i === profile.aPillar) for (const side of [-1, 1]) bb.patch(top, rect(0.12, 0.135, side === 1 ? 0.16 : 0.57, side === 1 ? 0.43 : 0.84), PALETTE.charcoal, 0.014);
     } else {
-      bb.fill(top, compact && i === 3 ? PALETTE.charcoal : paint);
+      bb.fill(top, (compact && i === 3) || profile.darkTops?.includes(i) ? PALETTE.charcoal : tone);
       if (muscle) for (const side of [-1, 1]) bb.decal(top, rect(a.z, b.z, side * 0.12, side * 0.30), PALETTE.charcoal);
       if (van && i >= 3) for (const x of [-0.63, -0.31, 0.31, 0.63]) bb.decal(top, rect(a.z, b.z, x - 0.018, x + 0.018), paintLight);
     }
@@ -429,7 +450,8 @@ export function buildCarMesh(t: VehicleTuning, profile: CarProfile = MUSCLE, col
       { a0: s.floor, a1: s.belt, lo0: -s.hwFloor, lo1: -s.hwBelt, hi0: s.hwFloor, hi1: s.hwBelt });
     const hi = makePanel(P(-s.hwBelt, s.belt, s.z), P(-s.hwRoof, s.roof, s.z), P(s.hwRoof, s.roof, s.z), P(s.hwBelt, s.belt, s.z), ref,
       { a0: s.belt, a1: s.roof, lo0: -s.hwBelt, lo1: -s.hwRoof, hi0: s.hwBelt, hi1: s.hwRoof });
-    bb.fill(lo, front ? paint : paintDark); bb.fill(hi, paint);
+    const [tone, toneDark] = toneSet(front ? 0 : S.length - 2);
+    bb.fill(lo, front ? tone : toneDark); bb.fill(hi, tone);
     bb.decal(lo, rectYX(s.floor, s.floor + profile.bumperHeight, -2, 2), PALETTE.charcoal);
     return [lo, hi] as const;
   };
@@ -520,13 +542,17 @@ export function buildCarMesh(t: VehicleTuning, profile: CarProfile = MUSCLE, col
     box(0.36, 0.035, 0.012, 0xba2338, 0, s.roof + 0.015, s.z - 0.175);
     tailLightRanges.push([lightStart, 36]);
   }
+  for (const p of profile.parts ?? []) {
+    const c = p.color === 'paint' ? paint : p.color === 'dark' ? paintDark : p.color === 'light' ? paintLight : p.color;
+    for (const side of p.mirror ? [1, -1] : [1]) box(p.size[0], p.size[1], p.size[2], c, side * p.at[0], p.at[1], p.at[2]);
+  }
   const bodyGeometry = bb.build();
   const geometry = mergeGeometries([bodyGeometry, ...extras], false);
   bodyGeometry.dispose(); for (const g of extras) g.dispose();
   const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
   const body = new THREE.Mesh(geometry, material); body.name = 'body-and-trim'; body.castShadow = true;
   root.add(body);
-  const wheels: THREE.Object3D[] = [], wheelGeom = wheelGeometry(t, profile.name);
+  const wheels: THREE.Object3D[] = [], wheelGeom = wheelGeometry(t, profile.wheelStyle ?? profile.name);
   for (let i = 0; i < 4; i++) {
     const g = new THREE.Group(); g.name = `wheel-${i}`;
     const mesh = new THREE.Mesh(wheelGeom, material); mesh.castShadow = true;

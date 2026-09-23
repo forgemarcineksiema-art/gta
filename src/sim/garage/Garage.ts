@@ -173,10 +173,13 @@ export class Garage {
     v.tuning = this.tuningFor(this.car);
     v.applyTuning();
     sim.carId = this.car;
+    sim.carBody = this.car;
+    sim.carPaint = this.paintOf(this.car);
     sim.life.heal();
     // a fresh car: the descriptor is this one, and a police car starts as a clean disguise on the dispatcher's clock
     const pursuit = sim.pursuit;
     pursuit.descriptor.kind = this.car;
+    pursuit.descriptor.body = this.car;
     pursuit.descriptor.paint = this.paintOf(this.car);
     pursuit.blown = false;
     pursuit.coverLeft = POLICE.disguise.seconds;

@@ -3,8 +3,7 @@
  * later slices; this one pays boost for a near miss and for the oncoming lane.
  */
 import { BILLBOARD_BOTTOM, BILLBOARD_HEIGHT } from '../city/collectibles';
-import { CAR_IDS, CAR_PRESETS } from '../vehicle/presets';
-import { cloneTuning } from '../vehicle/tuning';
+import { bodyTuning, isShell } from '../traffic/bodies';
 import type { VehicleControls } from '../controls';
 import { DAMAGE, ECONOMY, SWAP } from '../economy';
 import * as M from '../math';
@@ -56,7 +55,7 @@ export class Life {
   private oncomingEvent = 0;
   private readonly proj = { x: 0, y: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };
   private readonly rot = { x: 0, y: 0, z: 0, w: 1 };
-  private readonly handover: SwapHandover = { x: 0, y: 0, z: 0, yaw: 0, vx: 0, vz: 0, kind: 'muscle' };
+  private readonly handover: SwapHandover = { x: 0, y: 0, z: 0, yaw: 0, vx: 0, vz: 0, kind: 'muscle', body: 'muscle', paint: 0 };
   private readonly oldPose = { x: 0, y: 0, z: 0, yaw: 0 };
 
   /** `damageEnabled` false keeps the playground a handling lab: hits are classified and reported, nothing dents or wrecks. */
@@ -298,13 +297,15 @@ export class Life {
     this.oldPose.y = p.y;
     this.oldPose.z = p.z;
     this.oldPose.yaw = oldYaw;
-    const oldKind = this.sim.carId;
     // an order's wanted car taken: its clock starts before the record becomes the car left behind
     this.sim.jobs.onSwap(agent);
-    traffic.takeOver(agent, oldKind, this.sim.garage.paintOf(oldKind), this.oldPose, this.state.wrecked, this.handover);
+    traffic.takeOver(agent, this.sim.carBody, this.sim.carPaint, this.oldPose, this.state.wrecked, this.handover);
     const h = this.handover;
     this.sim.carId = h.kind;
-    v.tuning = cloneTuning(CAR_PRESETS[h.kind]);
+    this.sim.carBody = h.body;
+    // a civilian body keeps the paint it had (the yellow taxi stays yellow); a class's own shell takes the garage's
+    this.sim.carPaint = isShell(h.body) ? this.sim.garage.paintOf(h.kind) : h.paint;
+    v.tuning = bodyTuning(h.body);
     v.applyTuning();
     this.proj.x = h.x;
     this.proj.y = p.y;
@@ -322,7 +323,7 @@ export class Life {
     this.state.swapCandidate = -1;
     // identity (docs/DESIGN.md §2.5): a swap no unit saw loses them, and they box the car you left
     const police = this.sim.police;
-    if (this.sim.pursuit.onSwap(police?.crimeSeen() ?? false, h.kind, this.sim.garage.paintOf(h.kind))) police?.box(this.oldPose.x, this.oldPose.z, oldYaw);
+    if (this.sim.pursuit.onSwap(police?.crimeSeen() ?? false, h.kind, this.sim.carPaint, h.body)) police?.box(this.oldPose.x, this.oldPose.z, oldYaw);
   }
 
   /** Set the damage directly (the cold open's beat-up van); the stage follows, silently, and a wreck is never set this way. */
@@ -392,9 +393,7 @@ export class Life {
       if (ahead) this.wasAhead[i] = 1;
       else if (dist > 12) this.wasAhead[i] = 0; // passed wide: nothing to score later from behind
       if (dist > 12 || recentHit || (this.cool[i] as number) > 0 || this.wasAhead[i] !== 1 || ahead) continue;
-      const id = CAR_IDS[traffic.kind[i] as number];
-      if (!id) continue;
-      const agentHw = CAR_PRESETS[id].chassisHalfExtents.x;
+      const agentHw = traffic.halfWidthOf(i);
       const clearance = dist - this.sim.vehicle.tuning.chassisHalfExtents.x - agentHw;
       if (clearance > ECONOMY.nearMissGap) {
         if (!ahead) this.wasAhead[i] = 0;

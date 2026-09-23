@@ -7,6 +7,7 @@
 import { CITY_COLORS, PALETTE } from '../palette';
 import { PLAYER_PAINT } from '../traffic/Traffic';
 import { CAR_IDS, type CarId } from '../vehicle/presets';
+import { BODIES, BODY_IDS, type BodyId } from '../traffic/bodies';
 
 export type JobKind = 'delivery' | 'order' | 'escape';
 
@@ -39,7 +40,7 @@ export const ORDER_KINDS: readonly CarId[] = ['compact', 'heavy', 'muscle', 'spo
 export const PAINT_NAMES: ReadonlyArray<readonly [number, string]> = [
   [PALETTE.carLime, 'LIME'], [PALETTE.carBlue, 'CYAN'], [PALETTE.carOrange, 'ORANGE'], [PALETTE.carMagenta, 'MAGENTA'],
   [PALETTE.carWhite, 'WHITE'], [PALETTE.carBlack, 'BLACK'], [CITY_COLORS.mint, 'MINT'], [CITY_COLORS.peach, 'PEACH'],
-  [PALETTE.carRed, 'RED'],
+  [PALETTE.carRed, 'RED'], [PALETTE.coin, 'YELLOW'],
 ];
 
 /** Six paints an order may ask for in a class: traffic's, never the player's own for the class. */
@@ -57,8 +58,10 @@ export function packDescriptor(kind: CarId, paint: number): number {
   return (CAR_IDS.indexOf(kind) << 24) | (paint & 0xffffff);
 }
 
-export function unpackDescriptor(d: number): { kind: CarId; paint: number } {
-  return { kind: CAR_IDS[(d >>> 24) & 0xff] ?? 'muscle', paint: d & 0xffffff };
+/** An order's or a suspect's car: the body index over the paint (a class's index is its own shell's). */
+export function unpackDescriptor(d: number): { kind: CarId; body: BodyId; paint: number } {
+  const body = BODY_IDS[(d >>> 24) & 0xff] ?? 'muscle';
+  return { kind: (BODIES[BODY_IDS.indexOf(body)] as (typeof BODIES)[number]).car, body, paint: d & 0xffffff };
 }
 
 export function paintName(paint: number): string {
@@ -68,3 +71,7 @@ export function paintName(paint: number): string {
 
 /** What the card calls a class. */
 export const CAR_WORDS: Record<CarId, string> = { muscle: 'MUSCLE CAR', compact: 'COMPACT', heavy: 'VAN', sports: 'SPORTS CAR', police: 'POLICE CAR' };
+/** What the radio calls a body. */
+export const BODY_WORDS: Record<BodyId, string> = {
+  ...CAR_WORDS, sedan: 'SEDAN', hatch: 'HATCHBACK', estate: 'ESTATE', suv: 'SUV', pickup: 'PICKUP', taxi: 'TAXI', truck: 'BOX TRUCK', bus: 'BUS',
+};

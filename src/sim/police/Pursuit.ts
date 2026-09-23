@@ -1,20 +1,22 @@
 import type { EventLog } from '../events';
-import { CAR_IDS, type CarId } from '../vehicle/presets';
+import type { CarId } from '../vehicle/presets';
+import { BODY_INDEX, type BodyId } from '../traffic/bodies';
 import { POLICE, type PoliceTuning } from './tuning';
 
 /** The radio's lines (the `dispatch` event's value; docs/DESIGN.md §13.9). */
 export const DISPATCH = { roadblock: 1, unitDown: 2, suspect: 3 } as const;
 
-/** The descriptor as one number for an event's target: the class's index over the paint. */
-export function packSuspect(kind: CarId, paint: number): number {
-  return (CAR_IDS.indexOf(kind) << 24) | (paint & 0xffffff);
+/** The descriptor as one number for an event's target: the body's index over the paint (a class's index is its own shell's). */
+export function packSuspect(body: BodyId, paint: number): number {
+  return (BODY_INDEX[body] << 24) | (paint & 0xffffff);
 }
 
 export type PursuitState = 'idle' | 'detected' | 'active' | 'lost';
 
-/** What the police are looking for: the class and paint of the player's car (docs/DESIGN.md §2.5). */
+/** What the police are looking for: the class, the body and the paint of the player's car (docs/DESIGN.md §2.5). */
 export interface Descriptor {
   kind: CarId;
+  body: BodyId;
   paint: number;
 }
 
@@ -35,7 +37,7 @@ export class Pursuit {
   swapEscapes = 0;
   lastX = 0;
   lastZ = 0;
-  readonly descriptor: Descriptor = { kind: 'muscle', paint: 0 };
+  readonly descriptor: Descriptor = { kind: 'muscle', body: 'muscle', paint: 0 };
   /** A crime was seen from the police car the player drives: the disguise no longer holds. */
   blown = false;
   /** Seconds until the dispatcher notices the stolen police car (the slice-5 measurement's fallback, DESIGN.md §12). */
@@ -106,13 +108,14 @@ export class Pursuit {
    * carries no blown cover. Returns true when the swap lost the police: a
    * chase was on and no unit saw it happen.
    */
-  onSwap(seenNow: boolean, kind: CarId, paint: number): boolean {
+  onSwap(seenNow: boolean, kind: CarId, paint: number, body: BodyId = kind): boolean {
     this.descriptor.kind = kind;
+    this.descriptor.body = body;
     this.descriptor.paint = paint;
     this.blown = false;
     this.coverLeft = this.tuning.disguise.seconds;
     // seen: the radio names the new car (the identity rule, taught by the police themselves)
-    if (seenNow && this.state !== 'idle') this.events.push('dispatch', DISPATCH.suspect, 0, 0, 0, packSuspect(kind, paint));
+    if (seenNow && this.state !== 'idle') this.events.push('dispatch', DISPATCH.suspect, 0, 0, 0, packSuspect(body, paint));
     if (seenNow || this.state === 'idle') return false;
     this.lose();
     return true;

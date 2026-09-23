@@ -6,6 +6,7 @@
 import type { EngineAudio } from './EngineAudio';
 import type { SimEvent, SimWorld } from '../sim';
 import { BALANCE } from '../sim/balance';
+import { BODIES } from '../sim/traffic/bodies';
 
 export class Sfx {
   private seq = 0;
@@ -18,7 +19,7 @@ export class Sfx {
     const master = this.master;
     if (!ctx || !master) return;
     if (e.kind === 'nearMiss' || e.kind === 'nearMissOncoming') this.sweep(ctx, master);
-    else if (e.kind === 'honk') this.honk(ctx, master, e.target >= 0 ? (this.traffic?.kind[e.target] ?? 0) : 0);
+    else if (e.kind === 'honk') this.honk(ctx, master, e.target >= 0 ? (this.traffic?.kind[e.target] ?? 0) : 0, e.target >= 0 && (BODIES[this.traffic?.body[e.target] ?? 0]?.stretch ?? false));
     else if (e.kind === 'nearMissPed') this.yelp(ctx, master);
     else if (e.kind === 'damage') this.crunch(ctx, master, e.value);
     else if (e.kind === 'wrecked') this.boom(ctx, master);
@@ -92,9 +93,11 @@ export class Sfx {
     noise.stop(t + 0.26);
   }
 
-  private honk(ctx: BaseAudioContext, master: AudioNode, kind: number): void {
+  /** A car's horn by class; a truck's or a bus's is the low air horn, held longer. */
+  private honk(ctx: BaseAudioContext, master: AudioNode, kind: number, air = false): void {
     const t = ctx.currentTime;
-    const base = 220 + kind * 40;
+    const base = air ? 140 : 220 + kind * 40;
+    const hold = air ? 0.55 : 0.3;
     const osc = ctx.createOscillator();
     osc.type = 'square';
     osc.frequency.setValueAtTime(base, t);
@@ -102,10 +105,10 @@ export class Sfx {
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.0001, t);
     gain.gain.exponentialRampToValueAtTime(0.08, t + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + hold);
     osc.connect(gain).connect(master);
     osc.start(t);
-    osc.stop(t + 0.32);
+    osc.stop(t + hold + 0.02);
   }
 
   private yelp(ctx: BaseAudioContext, master: AudioNode): void {

@@ -22,7 +22,7 @@ import { POLICE } from '../police/tuning';
 import type { Quat } from '../scene';
 import type { SimWorld } from '../SimWorld';
 import type { PlayerProbe } from '../traffic/Traffic';
-import type { CarId } from '../vehicle/presets';
+import type { BodyId } from '../traffic/bodies';
 import { STEP } from './goal';
 
 export type RunState = 'running' | 'closing' | 'door' | 'busted';
@@ -74,8 +74,8 @@ export class Run {
   firstDoor = true;
   /** The drop-off being closed or shut, index into `dropOffs`; -1 otherwise. */
   dropOff = -1;
-  /** The car driven through the door when the garage does not own its class yet (DESIGN.md §13.7), and its paint: the wall offers to keep it. Null otherwise. */
-  hot: CarId | null = null;
+  /** The car driven through the door when the garage does not own it yet (DESIGN.md §13.7, §14.6: any body), and its paint: the wall offers to keep it. Null otherwise. */
+  hot: BodyId | null = null;
   hotPaint = 0;
   /** For the wall and the card. */
   lastBag = 0;
@@ -305,8 +305,8 @@ export class Run {
 
   private bankAt(site: DropOff): void {
     const prep = this.sim.garage.prep;
-    // the car you drove in: yours to keep for a share of its price, if the garage has none of its class yet
-    const car = this.sim.carId;
+    // the car you drove in: yours to keep for a share of its price, if the garage does not own it yet
+    const car = this.sim.carBody;
     this.hot = this.sim.garage.owned.has(car) ? null : car;
     this.hotPaint = this.sim.pursuit.descriptor.paint;
     this.lastFence = prep.fence;

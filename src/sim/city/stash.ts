@@ -2,8 +2,8 @@
  * Hidden cars (M5.5 slice 16; DESIGN.md §8, Forza Horizon's barn finds): the
  * ice-cream truck stands on the Palm Gardens stretch of the edge park, off
  * every road, its jingle playing to whoever drives near. A swap into it finds
- * it for good: the garage keeps it (a card on the wall, driven out like any
- * car, no upgrades: it is a toy) and the stash stands empty. The parked
+ * it for good: the garage owns it (a card on the wall, driven out like any
+ * car on its class's tiers since M6) and the stash stands empty. The parked
  * record is placed when the player comes within `range` m and freed by the
  * traffic's own despawn; the city's toys (the giant ball in the Works yard)
  * live here too. No allocation per step.
@@ -55,7 +55,8 @@ export class Stash {
     if (sim.carBody === id && !this.found.has(id)) {
       this.found.add(id);
       this.serial++;
-      sim.garage.serial++;
+      // found for good: a car in the garage from now on (M6 slice 0), in its own paint
+      sim.garage.own(id);
       sim.events.push('hiddenCar', 0, probe.x, 0, probe.z, HIDDEN_CARS.indexOf(id));
     }
     // the record went (the traffic's despawn) or became another car (the swap left the player's old one there)

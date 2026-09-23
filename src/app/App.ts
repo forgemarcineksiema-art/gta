@@ -195,10 +195,6 @@ export class App {
         if (this.adShowing || !sim.garage.select(car)) return;
         sim.garage.applyToVehicle();
       },
-      selectHidden: (id) => {
-        if (this.adShowing || !sim.garage.selectHidden(id)) return;
-        sim.garage.applyToVehicle();
-      },
       respray: (car, paint) => {
         if (this.adShowing) return;
         sim.garage.respray(car, paint);

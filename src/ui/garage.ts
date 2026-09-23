@@ -14,17 +14,17 @@
  * Reports intents through `GarageActions` and never writes the sim; reads it
  * to draw. Rebuilds only when the garage, the bank or the totals change.
  */
-import { BALANCE, BODY_WORDS, CAR_IDS, CAR_WORDS, HIDDEN_CARS, MEDAL_WORDS, PALETTE, STATS, bodySpec, type CarId, type HiddenCar, type PrepItem, type SimWorld, type Stat } from '../sim';
+import { BALANCE, BODY_IDS, BODY_WORDS, MEDAL_WORDS, PALETTE, STATS, isShell, type BodyId, type PrepItem, type SimWorld, type Stat } from '../sim';
 
 export interface GarageActions {
-  buy(car: CarId): void;
-  /** Keep the car driven in (DESIGN.md §13.7). */
-  keep(car: CarId): void;
-  select(car: CarId): void;
-  /** A hidden car found in the city (M5.5 slice 16) as the drive-out. */
-  selectHidden(id: HiddenCar): void;
-  respray(car: CarId, paint: number): void;
-  upgrade(car: CarId, stat: Stat): void;
+  buy(car: BodyId): void;
+  /** Keep the car driven in (DESIGN.md §13.7, any body since M6). */
+  keep(car: BodyId): void;
+  /** Any owned car as the drive-out: the catalogue's, a kept one, a hidden car found. */
+  select(car: BodyId): void;
+  respray(car: BodyId, paint: number): void;
+  /** The tiers of the car's class. */
+  upgrade(car: BodyId, stat: Stat): void;
   buyPrep(item: PrepItem): void;
   offer(kind: 'lawyer' | 'fence' | 'double'): void;
   driveOut(): void;
@@ -73,6 +73,7 @@ export class GarageUi {
   private readonly hint: HTMLElement;
   private readonly paintFor: HTMLElement;
   private readonly tuneFor: HTMLElement;
+  private readonly carsCount: HTMLElement;
   private readonly dailiesBody: HTMLElement;
   private page: WallPage = 'wall';
   private level: 'pages' | 'items' = 'pages';
@@ -84,7 +85,7 @@ export class GarageUi {
   private rewarded = true;
   private isOpen = false;
   private garageSerial = -1;
-  private hot: CarId | null = null;
+  private hot: BodyId | null = null;
   private bank = -1;
   private dailySerial = -1;
   private keys = { left: 'A', right: 'D', confirm: 'W', back: 'S' };
@@ -116,29 +117,24 @@ export class GarageUi {
     wallPage.appendChild(this.offerRow);
     this.items.set('wall', []);
 
-    // CARS: the five bodies
+    // CARS (M6 slice 0): the catalogue's five always, then every other car once it is owned or driven in
     const cars = this.newPage('cars');
+    this.carsCount = el('div', 'wall__for');
     const grid = el('div', 'wall__cars');
     const carItems: Item[] = [];
-    for (const id of CAR_IDS) {
-      const b = button('wall__card', '');
-      b.dataset['car'] = id;
-      b.append(el('span', 'wall__card-swatch'), el('span', 'wall__card-name', CAR_WORDS[id]), el('span', 'wall__card-status'));
-      grid.appendChild(b);
-      carItems.push(this.item('cars', b, () => this.carAction(id)));
-    }
-    // the hidden cars (M5.5 slice 16): a card each, shown once found in the city
-    for (const id of HIDDEN_CARS) {
-      const b = button('wall__card wall__card--hidden', '');
+    for (const id of BODY_IDS) {
+      const b = button(isShell(id) ? 'wall__card' : 'wall__card wall__card--body', '');
       b.dataset['car'] = id;
       b.append(el('span', 'wall__card-swatch'), el('span', 'wall__card-name', BODY_WORDS[id]), el('span', 'wall__card-status'));
       grid.appendChild(b);
-      const it = this.item('cars', b, () => this.actions.selectHidden(id));
-      it.hidden = true;
-      b.hidden = true;
+      const it = this.item('cars', b, () => this.carAction(id));
+      if (!isShell(id)) {
+        it.hidden = true;
+        b.hidden = true;
+      }
       carItems.push(it);
     }
-    cars.appendChild(grid);
+    cars.append(this.carsCount, grid);
     this.items.set('cars', carItems);
 
     // PAINT: seven swatches for the garage car
@@ -304,47 +300,45 @@ export class GarageUi {
     this.bank = funds;
     this.dailySerial = sim.dailies.serial;
     this.bankValue.textContent = money(funds);
-    // CARS
+    // CARS: how many of the city's cars are yours, then a card per car
+    this.carsCount.textContent = `CARS ${g.owned.size}/${BODY_IDS.length} · DRIVE ANY CAR HOME TO KEEP IT`;
     const cars = this.items.get('cars') ?? [];
-    for (let k = 0; k < CAR_IDS.length; k++) {
-      const id = CAR_IDS[k] as CarId;
-      const b = (cars[k] as Item).el;
+    for (let k = 0; k < BODY_IDS.length; k++) {
+      const id = BODY_IDS[k] as BodyId;
+      const it = cars[k] as Item;
+      const b = it.el;
+      const owned = g.owned.has(id);
+      // the car you drove in: its card offers to keep it for a share of its price
+      const hot = sim.run.hot === id && !owned;
+      if (!isShell(id)) {
+        it.hidden = !owned && !hot;
+        b.hidden = it.hidden;
+      }
       const status = b.querySelector('.wall__card-status') as HTMLElement;
-      (b.querySelector('.wall__card-swatch') as HTMLElement).style.background = `#${g.paintOf(id).toString(16).padStart(6, '0')}`;
+      const paint = hot ? sim.run.hotPaint : g.paintOf(id);
+      (b.querySelector('.wall__card-swatch') as HTMLElement).style.background = `#${paint.toString(16).padStart(6, '0')}`;
       const can = g.canBuy(id);
-      // the car you drove in: the class's card offers to keep it for a share of its price
-      const hot = sim.run.hot === id && !g.owned.has(id);
-      b.classList.toggle('is-selected', g.car === id && g.hidden === null);
-      b.classList.toggle('is-owned', g.owned.has(id));
-      b.classList.toggle('is-locked', can === 'locked');
-      b.classList.toggle('is-hot', hot && can !== 'locked');
+      const locked = isShell(id) && can === 'locked';
+      b.classList.toggle('is-selected', g.car === id);
+      b.classList.toggle('is-owned', owned);
+      b.classList.toggle('is-locked', locked);
+      b.classList.toggle('is-hot', hot && !locked);
       b.classList.toggle('is-short', hot ? funds < g.keepPrice(id) : can === 'cash');
-      status.textContent = g.car === id && g.hidden === null ? 'SELECTED' : g.owned.has(id) ? 'OWNED' : can === 'locked' ? 'ESCAPE HEAT 5 FIRST'
+      status.textContent = g.car === id ? 'SELECTED' : owned ? 'OWNED' : locked ? 'ESCAPE HEAT 5 FIRST'
         : hot ? `HOT · KEEP IT ${money(g.keepPrice(id))}` : money(g.price(id));
     }
-    // the hidden cars found
-    for (let k = 0; k < HIDDEN_CARS.length; k++) {
-      const id = HIDDEN_CARS[k] as HiddenCar;
-      const it = cars[CAR_IDS.length + k] as Item;
-      const found = sim.stash.found.has(id);
-      it.hidden = !found;
-      it.el.hidden = !found;
-      (it.el.querySelector('.wall__card-swatch') as HTMLElement).style.background = `#${(bodySpec(id).paints[0] as number).toString(16).padStart(6, '0')}`;
-      it.el.classList.toggle('is-selected', g.hidden === id);
-      it.el.classList.add('is-owned');
-      (it.el.querySelector('.wall__card-status') as HTMLElement).textContent = g.hidden === id ? 'SELECTED' : 'FOUND';
-    }
     // PAINT
-    this.paintFor.textContent = `PAINT: ${CAR_WORDS[g.car]} · FREE`;
+    this.paintFor.textContent = `PAINT: ${BODY_WORDS[g.car]} · FREE`;
     const paint = this.items.get('paint') ?? [];
     for (let k = 0; k < GARAGE_PAINTS.length; k++) (paint[k] as Item).el.classList.toggle('is-selected', g.paintOf(g.car) === GARAGE_PAINTS[k]);
-    // TUNE
-    this.tuneFor.textContent = `TUNING: ${CAR_WORDS[g.car]}`;
+    // TUNE: the tiers belong to the car's class, so every car of the class drives with them
+    this.tuneFor.textContent = `TUNING: ${BODY_WORDS[g.car]}`;
     const tune = this.items.get('tune') ?? [];
+    const tiers = g.tiers[g.classOf(g.car)];
     for (let k = 0; k < STATS.length; k++) {
       const stat = STATS[k] as Stat;
       const b = (tune[k] as Item).el;
-      const tier = g.tiers[g.car][k] as number;
+      const tier = tiers[k] as number;
       (b.querySelector('.wall__dots') as HTMLElement).textContent = '●'.repeat(tier) + '○'.repeat(3 - tier);
       const price = g.tierPrice(g.car, stat);
       (b.querySelector('.wall__row-price') as HTMLElement).textContent = Number.isFinite(price) ? money(price) : 'MAX';
@@ -438,9 +432,13 @@ export class GarageUi {
     const list = this.visibleItems();
     this.focus = 0;
     if (this.page === 'cars') {
-      let k = CAR_IDS.findIndex((id) => g.canBuy(id) === 'ok');
-      if (k < 0) k = CAR_IDS.findIndex((id) => !g.owned.has(id) && g.canBuy(id) !== 'locked');
-      if (k < 0) k = CAR_IDS.indexOf(g.car);
+      // the car just driven in, else the next to buy, else the one selected
+      const ids = list.map((it) => it.el.dataset['car'] as BodyId);
+      const hot = this.sim.run.hot;
+      let k = hot !== null && !g.owned.has(hot) ? ids.indexOf(hot) : -1;
+      if (k < 0) k = ids.findIndex((id) => g.canBuy(id) === 'ok');
+      if (k < 0) k = ids.findIndex((id) => isShell(id) && !g.owned.has(id) && g.canBuy(id) !== 'locked');
+      if (k < 0) k = ids.indexOf(g.car);
       this.focus = Math.max(0, k);
     } else if (this.page === 'paint') {
       this.focus = Math.max(0, GARAGE_PAINTS.indexOf(g.paintOf(g.car)));
@@ -448,7 +446,7 @@ export class GarageUi {
     this.focus = Math.min(this.focus, Math.max(0, list.length - 1));
   }
 
-  private carAction(id: CarId): void {
+  private carAction(id: BodyId): void {
     const g = this.sim.garage;
     if (g.owned.has(id)) this.actions.select(id);
     else if (this.sim.run.hot === id) this.actions.keep(id);
@@ -475,6 +473,9 @@ export class GarageUi {
     }
     const list = this.visibleItems();
     for (const items of this.items.values()) for (const it of items) it.el.classList.toggle('is-focus', this.level === 'items' && list[this.focus] === it && !this.offerOpen);
+    // the cars' row scrolls: the focused card is brought into view
+    const focused = this.level === 'items' && this.page === 'cars' ? list[this.focus]?.el : undefined;
+    if (focused && typeof focused.scrollIntoView === 'function') focused.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     this.offerRow.classList.toggle('is-open', this.offerOpen);
     this.offerDouble.classList.toggle('is-focus', this.offerOpen && this.offerFocus === 0);
     this.offerBank.classList.toggle('is-focus', this.offerOpen && this.offerFocus === 1);

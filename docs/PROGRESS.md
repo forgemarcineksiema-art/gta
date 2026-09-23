@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M6 slice 0: the garage keeps bodies
+
+Marcin: "Lecisz z M6". Done: the garage owns bodies (`Garage.car/owned/paint` by `BodyId`), upgrades stay per class (a
+muscle tier drives the taxi too; tier 0 still the preset bitwise); a car the garage does not own driven through a door is
+HOT, kept at 30 % of `BALANCE.bodyPrices` (a taxi 4,200); a hidden car found is owned. CARS: the catalogue's five and
+every car kept or found in one scrolling row, `CARS n/14`. Save v3: v2's hidden cars join the owned, the one driven out
+becomes the car; the kits, the board and the career reserved. Decided: no SELL / KEEP prompt at a fence (no wall there;
+the order pays at the fence, the car can still be kept at a door). Pins M6 0.1, save 0.1b and M6 0.2, 16.2 on bodies; the
+store's newer-version pin reads `SAVE_VERSION + 1`. Verify green (342 tests).
+
 ## 2026-09-23 — design talk: a new M6, the platform becomes M7
 
 Marcin asked for an idea for a milestone before the platform, the platform becoming M7. Decided (set here, DESIGN

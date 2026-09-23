@@ -1196,11 +1196,14 @@ kbd.key {
 }
 .wall__cars {
   display: grid;
-  /* one row: the five classes, and a hidden car's card once found */
+  /* one row that scrolls (M6): the catalogue's five, then every car kept, found or won; the keys bring the focus into view */
   grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-columns: minmax(96px, 1fr);
   gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.wall__cars::-webkit-scrollbar { display: none; }
 .wall__card {
   display: flex;
   flex-direction: column;

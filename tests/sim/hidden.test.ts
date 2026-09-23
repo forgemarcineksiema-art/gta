@@ -48,6 +48,7 @@ describe('hidden cars', () => {
       expect(sim.carBody).toBe('icecream');
       expect(sim.carId).toBe('heavy');
       expect(sim.stash.found.has('icecream')).toBe(true);
+      expect(sim.garage.owned.has('icecream')).toBe(true);
       expect(count(sim, 'hiddenCar', seq)).toBe(1);
       expect(sim.pursuit.descriptor.body).toBe('icecream');
       // found for good: away and back, the stash stays empty
@@ -61,31 +62,32 @@ describe('hidden cars', () => {
     } finally { sim.dispose(); }
   }, 60_000);
 
-  it('16.2 once found the garage drives it out, a class clears it, and the save carries both', async () => {
+  it('16.2 once found the garage owns it and drives it out, a class clears it, and the save carries both (M6: an owned body)', async () => {
     const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
     try {
       const g = sim.garage;
-      expect(g.selectHidden('icecream')).toBe(false);
-      sim.stash.found.add('icecream');
-      expect(g.selectHidden('icecream')).toBe(true);
+      expect(g.select('icecream')).toBe(false);
+      g.own('icecream');
+      expect(g.select('icecream')).toBe(true);
       g.applyToVehicle();
       expect(sim.carBody).toBe('icecream');
       expect(sim.carId).toBe('heavy');
       expect(sim.vehicle.tuning.mass).toBe(2800);
       const doc = defaultSave();
       collect(sim, doc);
-      expect(doc.hidden).toBe('icecream');
-      expect(doc.drive).toBe('icecream');
-      sim.stash.found.clear();
-      g.hidden = null;
+      expect(doc.owned).toContain('icecream');
+      expect(doc.car).toBe('icecream');
+      g.owned.delete('icecream');
+      g.car = 'muscle';
       apply(sim, doc);
+      expect(g.owned.has('icecream')).toBe(true);
+      // owned is found: its stash stays empty
       expect(sim.stash.found.has('icecream')).toBe(true);
       expect(sim.carBody).toBe('icecream');
       // a class on the wall clears it
       expect(g.select('muscle')).toBe(true);
       g.applyToVehicle();
       expect(sim.carBody).toBe('muscle');
-      expect(g.hidden).toBeNull();
     } finally { sim.dispose(); }
   }, 60_000);
 });

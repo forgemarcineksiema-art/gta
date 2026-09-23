@@ -1,15 +1,19 @@
 /**
  * The save format (docs/M5_PLAN.md slice 0): the round trip and its stable
  * string, parsing that never throws, the v0 migration, the size guard with
- * everything filled, and collect / apply against a world.
+ * everything filled, and collect / apply against a world. Version 3 (M6 slice
+ * 0): the garage keeps bodies, the M6 fields are reserved.
  */
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../src/sim/balance';
 import { CAR_IDS, CAR_PRESETS, PALETTE } from '../../src/sim';
-import { DEFAULT_SAVE, apply, collect, defaultSave, encodeBits, migrate, parse, serialize, type SaveV1 } from '../../src/sim/save/format';
+import { DEFAULT_SAVE, SAVE_VERSION, apply, collect, defaultSave, encodeBits, migrate, parse, serialize, type SaveV1 } from '../../src/sim/save/format';
 import { createWorld } from './helpers';
 
-/** Every field off its default: five cars, tiers, paints, prep, a streak, billboards. */
+/**
+ * Every field the world holds off its default: seven cars, tiers, paints, prep, a streak, billboards. The M6
+ * fields no system reads yet stay at their defaults here (a world cannot hold them); 0.1b fills them.
+ */
 function filled(smashedIds: number[]): SaveV1 {
   const smashed = new Uint8Array(49 * 4);
   for (const id of smashedIds) smashed[id] = 1;
@@ -18,13 +22,13 @@ function filled(smashedIds: number[]): SaveV1 {
   const ramps = new Uint8Array(20);
   for (const k of [1, 7, 19]) ramps[k] = 1;
   return {
-    v: 2,
+    v: 3,
     seen: true,
     bank: 123456,
     coins: 7890,
     car: 'sports',
-    owned: ['muscle', 'compact', 'heavy', 'sports', 'police'],
-    paint: { muscle: PALETTE.carLime, compact: PALETTE.carBlack, sports: PALETTE.carMagenta },
+    owned: ['muscle', 'compact', 'heavy', 'sports', 'police', 'taxi', 'icecream'],
+    paint: { muscle: PALETTE.carLime, compact: PALETTE.carBlack, sports: PALETTE.carMagenta, taxi: PALETTE.coin },
     tiers: { muscle: [3, 3, 3], compact: [1, 0, 2], heavy: [0, 3, 0], sports: [2, 2, 2], police: [1, 1, 1] },
     prep: { lawyer: true, fence: true },
     policeUnlocked: true,
@@ -39,9 +43,10 @@ function filled(smashedIds: number[]): SaveV1 {
     borrowHints: 2,
     medals: '3102',
     jumps: encodeBits(ramps),
-    hidden: 'icecream',
-    // the class drives out (0.5 pins the sports car); 16.2 pins a hidden car as the drive-out
-    drive: '',
+    carKit: {},
+    kit: { owned: '', on: [-1, -1, -1, -1, -1] },
+    board: { beaten: 0 },
+    career: { races: 0, zones: 0, fares: 0, hotFares: 0, orders: 0, takedowns: 0, caches: 0, escapes: [0, 0, 0, 0, 0] },
   };
 }
 
@@ -53,6 +58,23 @@ describe('save format', () => {
     expect(serialize(parse(text))).toBe(text);
     expect(serialize(save)).toBe(text);
     expect(parse(serialize(defaultSave()))).toEqual(DEFAULT_SAVE);
+  });
+
+  it('0.1b the M6 fields (a car kit, the driver\'s kit, the board, the career) round-trip and fall back one by one', () => {
+    const save = filled([1, 2, 3]);
+    save.carKit = { muscle: [1, 2, 0, 1], taxi: [4, 0, 2, 2] };
+    save.kit = { owned: encodeBits(new Uint8Array([1, 0, 1, 1, 0, 0, 0, 1])), on: [0, 3, -1, 2, -1] };
+    save.board = { beaten: 0b111 };
+    save.career = { races: 3, zones: 1, fares: 4, hotFares: 1, orders: 2, takedowns: 17, caches: 41, escapes: [2, 3, 1, 0, 0] };
+    const text = serialize(save);
+    expect(parse(text)).toEqual(save);
+    expect(serialize(parse(text))).toBe(text);
+    const bad = parse(JSON.stringify({ ...JSON.parse(text), carKit: { muscle: [99, -3, 'x', 2], tank: [1, 1, 1, 1] }, kit: { owned: '***', on: [7, 999, -5] }, board: { beaten: -1 }, career: { races: -4, escapes: 'many' } }));
+    expect(bad.carKit).toEqual({ muscle: [15, 0, 0, 2] });
+    expect(bad.kit).toEqual({ owned: '', on: [7, -1, -1, -1, -1] });
+    expect(bad.board).toEqual({ beaten: 0 });
+    expect(bad.career).toEqual({ races: 0, zones: 0, fares: 0, hotFares: 0, orders: 0, takedowns: 0, caches: 0, escapes: [0, 0, 0, 0, 0] });
+    expect(bad.bank).toBe(123456);
   });
 
   it('0.2 null, broken JSON, a non-object and a newer version give the defaults without throwing', () => {
@@ -69,7 +91,7 @@ describe('save format', () => {
   it('0.3 a v0 shape (no v) migrates to the current version with the muscle car owned', () => {
     const v0 = { bank: 5000, coins: 120, seen: true, owned: ['compact'], car: 'compact' };
     const save = migrate(v0);
-    expect(save.v).toBe(2);
+    expect(save.v).toBe(SAVE_VERSION);
     expect(save.owned).toEqual(['muscle', 'compact']);
     expect(save.car).toBe('compact');
     expect(save.bank).toBe(5000);
@@ -117,10 +139,10 @@ describe('save format', () => {
     } finally { sim.dispose(); }
   });
 
-  it('0.11 an M5 document (v1) migrates to v2 with no caches found, the chain at 0 and the hint counter at 0; a v2 field out of range falls back alone', () => {
+  it('0.11 an M5 document (v1) migrates to the current version with no caches found, the chain at 0 and the hint counter at 0; a v2 field out of range falls back alone', () => {
     const v1 = { v: 1, bank: 777, coins: 12, seen: true, owned: ['muscle', 'compact'], car: 'compact', smashed: '' };
     const save = migrate(v1);
-    expect(save.v).toBe(2);
+    expect(save.v).toBe(SAVE_VERSION);
     expect(save.bank).toBe(777);
     expect(save.caches).toEqual({ date: '', found: '' });
     expect(save.chain).toBe(0);
@@ -130,5 +152,31 @@ describe('save format', () => {
     expect(bad.chain).toBe(0);
     expect(bad.borrowHints).toBe(0);
     expect(bad.bank).toBe(123456);
+  });
+
+  it('M6 0.2 an M5.5 document (v2) migrates to v3: the hidden cars found are owned, the one driven out is the car, nothing else is lost', () => {
+    const v2 = {
+      v: 2, seen: true, bank: 4321, coins: 55, car: 'compact', owned: ['muscle', 'compact', 'sports'],
+      paint: { compact: PALETTE.carBlack }, tiers: { compact: [1, 2, 0] }, streak: { count: 7, last: '2026-09-22', topper: true },
+      chain: 63, medals: '32', hidden: 'icecream', drive: 'icecream',
+    };
+    const save = migrate(v2);
+    expect(save.v).toBe(3);
+    expect(save.owned).toEqual(['muscle', 'compact', 'sports', 'icecream']);
+    expect(save.car).toBe('icecream');
+    expect(save.paint).toEqual({ compact: PALETTE.carBlack });
+    expect(save.tiers).toEqual({ compact: [1, 2, 0] });
+    expect(save.streak.topper).toBe(true);
+    expect(save.chain).toBe(63);
+    expect(save.medals).toBe('32');
+    expect(save.bank).toBe(4321);
+    expect('hidden' in save).toBe(false);
+    // a class driven out stays the car; a found car not driven out is owned all the same
+    const b = migrate({ ...v2, drive: '' });
+    expect(b.car).toBe('compact');
+    expect(b.owned).toContain('icecream');
+    // the reserved fields start empty
+    expect(save.board).toEqual({ beaten: 0 });
+    expect(save.kit.on).toEqual([-1, -1, -1, -1, -1]);
   });
 });

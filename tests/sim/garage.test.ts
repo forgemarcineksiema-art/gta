@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../src/sim/balance';
-import { CAR_PRESETS, PALETTE, type SimWorld } from '../../src/sim';
+import { CAR_PRESETS, PALETTE, bodyTuning, type SimWorld } from '../../src/sim';
 import type { Traffic } from '../../src/sim/traffic/Traffic';
 import { createWorld, fullThrottle, kmh, run, runUntil } from './helpers';
 
@@ -193,6 +193,54 @@ describe('garage', () => {
       // the door opens: nothing is hot any more
       sim.run.openDoor();
       expect(sim.run.hot).toBe(null);
+    } finally { sim.dispose(); }
+  }, 60_000);
+
+  it('M6 0.1 the garage keeps bodies: a taxi driven home is kept at 30 % of its own price and drives out as the taxi on its class with the class\'s tiers', async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
+    (sim.police as NonNullable<SimWorld['police']>).dispatching = false;
+    try {
+      const g = sim.garage;
+      const site = sim.run.dropOffs[0]!;
+      // in a yellow taxi taken from traffic (the swap's state, set by hand), stopped inside the hideout
+      sim.carBody = 'taxi';
+      sim.carId = 'muscle';
+      sim.carPaint = PALETTE.coin;
+      sim.pursuit.descriptor.body = 'taxi';
+      sim.pursuit.descriptor.kind = 'muscle';
+      sim.pursuit.descriptor.paint = PALETTE.coin;
+      sim.vehicle.tuning = bodyTuning('taxi');
+      sim.vehicle.applyTuning();
+      sim.city?.sync(site.x, site.z, true);
+      sim.vehicle.teleport({ x: site.x, y: 0.9, z: site.z }, site.yaw);
+      expect(runUntil(sim, 6, (s) => s.run.state === 'door')).toBeGreaterThan(0);
+      expect(sim.run.hot).toBe('taxi');
+      expect(sim.run.hotPaint).toBe(PALETTE.coin);
+      expect(g.canBuy('taxi')).toBe('locked');
+      const price = Math.round(BALANCE.bodyPrices.taxi * BALANCE.keep.share);
+      expect(g.keepPrice('taxi')).toBe(price);
+      sim.run.bank = price;
+      expect(g.keep('taxi', sim.run.hotPaint)).toBe('ok');
+      expect(g.owned.has('taxi')).toBe(true);
+      expect(g.car).toBe('taxi');
+      expect(g.paintOf('taxi')).toBe(PALETTE.coin);
+      // the muscle class's tier 2 power drives the taxi too (the taxi rides on the muscle class)
+      g.tiers.muscle[0] = 2;
+      g.applyToVehicle();
+      expect(sim.carBody).toBe('taxi');
+      expect(sim.carId).toBe('muscle');
+      expect(sim.carPaint).toBe(PALETTE.coin);
+      expect(sim.pursuit.descriptor.body).toBe('taxi');
+      const base = bodyTuning('taxi');
+      expect(sim.vehicle.tuning.chassisHalfExtents.z).toBe(base.chassisHalfExtents.z);
+      expect(sim.vehicle.tuning.torqueMax).toBe(base.torqueMax * (BALANCE.tiers.power[2] as number));
+      // a shell at tier 0 is still its preset bitwise
+      g.tiers.muscle[0] = 0;
+      expect(g.tuningFor('muscle')).toEqual(CAR_PRESETS.muscle);
+      // the class's card clears it
+      expect(g.select('muscle')).toBe(true);
+      g.applyToVehicle();
+      expect(sim.carBody).toBe('muscle');
     } finally { sim.dispose(); }
   }, 60_000);
 });

@@ -159,4 +159,40 @@ describe('garage', () => {
       expect(g.prep.fence).toBe(false);
     } finally { sim.dispose(); }
   });
+
+  it('6.1 bring it home, pay to keep it: the car driven in is on the wall as hot, kept for 30 % in its own paint, the police car at 60 % and only after its escape', async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
+    (sim.police as NonNullable<SimWorld['police']>).dispatching = false;
+    try {
+      const g = sim.garage;
+      const site = sim.run.dropOffs[0]!;
+      // in a sports car nobody bought, stopped inside the hideout: the door shuts behind it
+      sim.setCar('sports');
+      sim.pursuit.descriptor.paint = PALETTE.carMagenta;
+      sim.city?.sync(site.x, site.z, true);
+      sim.vehicle.teleport({ x: site.x, y: 0.9, z: site.z }, site.yaw);
+      expect(runUntil(sim, 6, (s) => s.run.state === 'door')).toBeGreaterThan(0);
+      expect(sim.run.hot).toBe('sports');
+      expect(sim.run.hotPaint).toBe(PALETTE.carMagenta);
+      const price = Math.round(BALANCE.prices.sports * BALANCE.keep.share);
+      expect(g.keepPrice('sports')).toBe(price);
+      sim.run.bank = price - 1;
+      expect(g.keep('sports', sim.run.hotPaint)).toBe('cash');
+      expect(g.owned.has('sports')).toBe(false);
+      sim.run.bank = price + 500;
+      expect(g.keep('sports', sim.run.hotPaint)).toBe('ok');
+      expect(g.owned.has('sports')).toBe(true);
+      expect(g.car).toBe('sports');
+      expect(g.paintOf('sports')).toBe(PALETTE.carMagenta);
+      expect(sim.run.bank).toBe(500);
+      expect(g.keep('sports', sim.run.hotPaint)).toBe('owned');
+      // the police car: locked until one escape from heat 5, then 60 %
+      expect(g.keep('police', PALETTE.policeWhite)).toBe('locked');
+      g.policeUnlocked = true;
+      expect(g.keepPrice('police')).toBe(Math.round(BALANCE.prices.police * BALANCE.keep.police));
+      // the door opens: nothing is hot any more
+      sim.run.openDoor();
+      expect(sim.run.hot).toBe(null);
+    } finally { sim.dispose(); }
+  }, 60_000);
 });

@@ -175,6 +175,15 @@ export class App {
         sim.garage.applyToVehicle();
         if (first) this.platform.happyTime();
       },
+      keep: (car) => {
+        if (this.adShowing) return;
+        const first = sim.garage.owned.size === 1;
+        if (sim.garage.keep(car, sim.run.hotPaint) !== 'ok') return;
+        sim.run.hot = null;
+        sim.garage.applyToVehicle();
+        this.store.markDirty();
+        if (first) this.platform.happyTime();
+      },
       select: (car) => {
         if (this.adShowing || !sim.garage.select(car)) return;
         sim.garage.applyToVehicle();

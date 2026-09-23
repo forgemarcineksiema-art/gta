@@ -103,6 +103,8 @@ export const BALANCE = {
    * breaks the first hour's something-new-every-3-to-10-minutes; the sports car stays the second hour's goal.
    */
   prices: { compact: 10000, heavy: 20000, sports: 60000, police: 120000 },
+  /** Bring it home, pay to keep it (DESIGN.md §13.7): a car driven through a door, not owned yet, is kept for this share of its price (the police car for `police`). */
+  keep: { share: 0.3, police: 0.6 },
   /**
    * Each upgrade tier's price, tier 1 to 3, the same for every stat and car: 12,000 / 16,000 / 22,000 (balance
    * script, M5.5 slice 1; M5's 8,000 / 14,000 / 22,000 fell tier 1 to the first car's door once the beat's

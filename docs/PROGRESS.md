@@ -2,6 +2,14 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M5.5 slice 6: bring it home, pay to keep it
+
+Done: a car driven through a door whose class the garage does not own is HOT on the CARS page (`HOT · KEEP IT n`,
+cyan): kept for 30 % of its price (the police car 60 %, still locked behind its escape), owned from then on in the
+paint it came in and selected for the drive-out; the purchase ticks the chain's car step. Declining costs nothing.
+Not done: the SELL / KEEP choice at a fence (an order's car driven to a door instead can be kept). Pin garage 6.1;
+verify 288 green.
+
 ## 2026-09-23 — M5.5 slice 5: the garage dressed, the wall sized
 
 Done: the garage's things along its walls (a pegboard with tools over a workbench and its lamp, four tyres by the

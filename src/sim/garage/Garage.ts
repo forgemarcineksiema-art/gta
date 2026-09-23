@@ -68,6 +68,31 @@ export class Garage {
     return 'ok';
   }
 
+  /** What keeping a car driven in costs (DESIGN.md §13.7): a share of its price, more for the police car. */
+  keepPrice(car: CarId): number {
+    const k = BALANCE.keep;
+    return Math.round(this.price(car) * (car === 'police' ? k.police : k.share));
+  }
+
+  /**
+   * Bring it home, pay to keep it: the car driven through the door is owned from now on in the paint it came
+   * in, and it is the one the next drive-out uses. 'owned', 'locked' (the police car before its escape) or
+   * 'cash' leave everything as it was; 'ok' pushes 'purchase' like a buy.
+   */
+  keep(car: CarId, paint: number): BuyResult {
+    if (this.owned.has(car)) return 'owned';
+    if (car === 'police' && !this.policeUnlocked) return 'locked';
+    const price = this.keepPrice(car);
+    if (this.sim.run.funds < price) return 'cash';
+    this.sim.run.spend(price);
+    this.owned.add(car);
+    this.paint.set(car, paint);
+    this.car = car;
+    this.serial++;
+    this.sim.events.push('purchase', price, 0, 0, 0, CAR_IDS.indexOf(car));
+    return 'ok';
+  }
+
   /** Owned cars only: the one the next drive-out uses. */
   select(car: CarId): boolean {
     if (!this.owned.has(car)) return false;

@@ -18,6 +18,8 @@ import { BALANCE, CAR_IDS, CAR_WORDS, PALETTE, STATS, type CarId, type PrepItem,
 
 export interface GarageActions {
   buy(car: CarId): void;
+  /** Keep the car driven in (DESIGN.md §13.7). */
+  keep(car: CarId): void;
   select(car: CarId): void;
   respray(car: CarId, paint: number): void;
   upgrade(car: CarId, stat: Stat): void;
@@ -80,6 +82,7 @@ export class GarageUi {
   private rewarded = true;
   private isOpen = false;
   private garageSerial = -1;
+  private hot: CarId | null = null;
   private bank = -1;
   private dailySerial = -1;
   private keys = { left: 'A', right: 'D', confirm: 'W', back: 'S' };
@@ -282,7 +285,8 @@ export class GarageUi {
     if (!this.isOpen) return;
     const g = sim.garage;
     const funds = sim.run.funds;
-    if (g.serial === this.garageSerial && funds === this.bank && sim.dailies.serial === this.dailySerial) return;
+    if (g.serial === this.garageSerial && funds === this.bank && sim.dailies.serial === this.dailySerial && sim.run.hot === this.hot) return;
+    this.hot = sim.run.hot;
     this.garageSerial = g.serial;
     this.bank = funds;
     this.dailySerial = sim.dailies.serial;
@@ -295,11 +299,15 @@ export class GarageUi {
       const status = b.querySelector('.wall__card-status') as HTMLElement;
       (b.querySelector('.wall__card-swatch') as HTMLElement).style.background = `#${g.paintOf(id).toString(16).padStart(6, '0')}`;
       const can = g.canBuy(id);
+      // the car you drove in: the class's card offers to keep it for a share of its price
+      const hot = sim.run.hot === id && !g.owned.has(id);
       b.classList.toggle('is-selected', g.car === id);
       b.classList.toggle('is-owned', g.owned.has(id));
       b.classList.toggle('is-locked', can === 'locked');
-      b.classList.toggle('is-short', can === 'cash');
-      status.textContent = g.car === id ? 'SELECTED' : g.owned.has(id) ? 'OWNED' : can === 'locked' ? 'ESCAPE HEAT 5 FIRST' : money(g.price(id));
+      b.classList.toggle('is-hot', hot && can !== 'locked');
+      b.classList.toggle('is-short', hot ? funds < g.keepPrice(id) : can === 'cash');
+      status.textContent = g.car === id ? 'SELECTED' : g.owned.has(id) ? 'OWNED' : can === 'locked' ? 'ESCAPE HEAT 5 FIRST'
+        : hot ? `HOT · KEEP IT ${money(g.keepPrice(id))}` : money(g.price(id));
     }
     // PAINT
     this.paintFor.textContent = `PAINT: ${CAR_WORDS[g.car]} · FREE`;
@@ -402,6 +410,7 @@ export class GarageUi {
   private carAction(id: CarId): void {
     const g = this.sim.garage;
     if (g.owned.has(id)) this.actions.select(id);
+    else if (this.sim.run.hot === id) this.actions.keep(id);
     else this.actions.buy(id);
   }
 

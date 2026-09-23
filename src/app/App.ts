@@ -234,6 +234,7 @@ export class App {
       camera: this.input.label('camera'),
       debug: this.input.label('debug'),
       swap: this.input.label('swap'),
+      map: this.input.label('map'),
     });
     this.hintsUntil = performance.now() + 12000;
     this.hud.setSound(this.input.label('mute'), this.audio.isUserMuted);
@@ -592,7 +593,7 @@ export class App {
 
     // takedown slow motion: the fixed-step loop gets scaled time (the sim never sees wall time); any key skips it
     if (this.sim.life.state.slowMo > 0 && !this.bot) {
-      for (const action of ACTIONS) if (st.pressed[action]) { this.sim.life.skipSlowMo(); break; }
+      for (const action of ACTIONS) if (st.pressed[action] && action !== 'map') { this.sim.life.skipSlowMo(); break; }
     }
     // behind the shut door the wall has the keys; on the busted card any driving key drives on
     const run = this.sim.run;
@@ -684,6 +685,8 @@ export class App {
     // the cold open's captions sit where the hints do and teach the same keys
     // the hints are for driving: behind a shut door or under the card the wall and the card have the keys
     // the ticker (a heat level's news) takes the top centre for its two seconds: the job line and the hints make room
+    // the full-screen map while its key is held, over the drive (never over the wall or the card)
+    this.hud.setMapVisible(st.value.map > 0.5 && playing && !this.bot);
     this.hud.setHintsVisible(now < this.hintsUntil && !this.bot && !this.sim.coldOpen.active && !this.jobsHud.showing && !this.hud.tickerShowing && playing);
     this.runHud.update(this.sim, frameDt);
     this.coldOpenHud.update(this.sim);

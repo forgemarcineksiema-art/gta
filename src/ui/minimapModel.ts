@@ -158,3 +158,15 @@ export function clampToRim(out: Vec2, px: number, py: number, sx: number, sy: nu
   out.y = py + dy * t;
   return true;
 }
+
+/** The full-screen map (M5.5 slice 15): pixels a metre when the island (`half` m each way) and `margin` m of water fill a `size` px square. */
+export function bigMapScale(size: number, half: number, margin = 25): number {
+  return size / 2 / (half + margin);
+}
+
+/** A world point on the full-screen map: north (+Z) up, west (+X) to the left, the island's centre in the middle. */
+export function bigMapProject(out: Vec2, x: number, z: number, size: number, scale: number): Vec2 {
+  out.x = size / 2 - x * scale;
+  out.y = size / 2 - z * scale;
+  return out;
+}

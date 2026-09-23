@@ -5,7 +5,8 @@
  */
 import { describe, expect, test } from 'vitest';
 import { buildRoadGraph } from '../../src/sim/city/roads';
-import { MINIMAP, advance, buildRoadLayers, clampToRim, project, wrapAngle, type MinimapState, type Vec2 } from '../../src/ui/minimapModel';
+import { MINIMAP, advance, bigMapProject, bigMapScale, buildRoadLayers, clampToRim, project, wrapAngle, type MinimapState, type Vec2 } from '../../src/ui/minimapModel';
+import { CITY_HALF } from '../../src/sim/city/roads';
 
 describe('minimap model', () => {
   test('road layers: every undirected grid road once, junction to junction, authored roads at real width', () => {
@@ -72,5 +73,24 @@ describe('minimap model', () => {
     expect(rx * mx + ry * my).toBeGreaterThan(0);
     expect(clampToRim(out, 50, 61, 60, 55, 50, 50, 40)).toBe(false);
     expect(out).toEqual({ x: 60, y: 55 });
+  });
+
+  test('the full-screen map: north up, west to the left, the whole island inside the square', () => {
+    const size = 600, s = bigMapScale(size, CITY_HALF);
+    const out: Vec2 = { x: 0, y: 0 };
+    bigMapProject(out, 0, 0, size, s);
+    expect(out).toEqual({ x: 300, y: 300 });
+    // north (+Z) is up, west (+X) is left, as on the radar's compass
+    bigMapProject(out, 0, 100, size, s);
+    expect(out.y).toBeLessThan(300);
+    bigMapProject(out, 100, 0, size, s);
+    expect(out.x).toBeLessThan(300);
+    for (const [x, z] of [[CITY_HALF, CITY_HALF], [-CITY_HALF, -CITY_HALF], [CITY_HALF, -CITY_HALF]] as const) {
+      bigMapProject(out, x, z, size, s);
+      expect(out.x).toBeGreaterThan(0);
+      expect(out.x).toBeLessThan(size);
+      expect(out.y).toBeGreaterThan(0);
+      expect(out.y).toBeLessThan(size);
+    }
   });
 });

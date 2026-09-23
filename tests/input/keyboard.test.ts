@@ -103,4 +103,17 @@ describe('keyboard input', () => {
     input.update();
     expect(input.state.pressed.swap).toBe(true);
   });
+
+  it('holds the full-screen map on Tab and keeps Tab from hopping the focus', () => {
+    const { input, win } = setup();
+    win.fire('keydown', 'Tab');
+    input.update();
+    expect(input.state.value.map).toBe(1);
+    input.update();
+    expect(input.state.value.map).toBe(1);
+    win.fire('keyup', 'Tab');
+    input.update();
+    expect(input.state.value.map).toBe(0);
+    expect(win.defaults).toContain('Tab');
+  });
 });

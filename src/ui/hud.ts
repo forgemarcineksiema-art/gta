@@ -4,6 +4,7 @@
  */
 import { AgentState, BALANCE, BODY_WORDS, POLICE, TRICK_WORDS, paintName, unpackDescriptor } from '../sim';
 import type { SimEvent, SimWorld } from '../sim';
+import { BigMap } from './bigmap';
 import { Minimap } from './minimap';
 import { HeatHud } from './heat';
 
@@ -33,10 +34,13 @@ export interface KeyHints {
   camera: string;
   debug: string;
   swap: string;
+  map: string;
 }
 
 export class Hud {
   private readonly minimap: Minimap | null;
+  /** The full-screen map (M5.5 slice 15), held on a key; the radar's paths. */
+  private readonly bigMap: BigMap | null;
   private readonly heat: HeatHud;
   readonly root: HTMLElement;
   private readonly speed: HTMLElement;
@@ -224,6 +228,8 @@ export class Hud {
 
     this.hints = el('div', 'hud__hints');
     this.root.appendChild(this.hints);
+    // over the rest of the HUD while held
+    this.bigMap = this.minimap ? new BigMap(this.root, sim, this.minimap.paths) : null;
 
     this.toast = el('div', 'hud__toast');
     this.root.appendChild(this.toast);
@@ -266,6 +272,7 @@ export class Hud {
       row([k.boost], 'boost'),
       row([k.reset], 'reset'),
       row([k.camera], 'camera'),
+      row([k.map], 'map (hold)'),
       row([k.pause], 'pause'),
       row([k.debug], 'tuning'),
     );
@@ -273,8 +280,14 @@ export class Hud {
     if (sub) sub.textContent = `press ${k.pause} to continue`;
     this.swapKey = k.swap;
     this.resetKey = k.reset;
+    this.bigMap?.setKey(k.map);
     this.swapKeycap.textContent = this.swapKey;
     this.wreckedSub.textContent = `${this.swapKey} take a car  ·  ${this.resetKey} respawn`;
+  }
+
+  /** The full-screen map while its key is held (the app decides when it may show). */
+  setMapVisible(v: boolean): void {
+    this.bigMap?.setVisible(v);
   }
 
   /** The mute key's label and whether the player muted the sound (the pause screen shows both). */
@@ -401,6 +414,7 @@ export class Hud {
     // Every DOM write here costs style, layout and paint on the main thread. The
     // radar paints its own canvas at its own cadence, off the layout path.
     this.frameIndex++;
+    this.bigMap?.update(sim, now);
     this.minimap?.update(sim, dt, now);
     this.heat.update(sim, dt);
     const tm = sim.vehicle.telemetry;

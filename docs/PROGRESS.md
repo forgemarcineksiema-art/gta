@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M5.5 slice 15: the full-screen map
+
+Done: holding Tab (its focus hop prevented; the hint strip names it) lays a map over the drive: north up and west
+left like the radar's compass, the whole island with roads, district tints and names, the landmarks, the three
+garages, the jobs on offer (or the running job's target and a zone's edge), the day's caches, the ten speed cameras,
+the cover (the four covered streets and the overpasses' decks), the police units (lit in a chase), the helicopter,
+the search disc and a race's rivals, and the car's arrow; a key on the right draws each glyph. Repaints at 15 Hz
+while held, nothing hidden; never over the wall, the card or the slow motion's skip. The radar's paths and glyphs
+are shared (`buildMapPaths`, `drawGlyph`). Pins: Tab in the keyboard suite, the projection in the minimap suite.
+
 ## 2026-09-23 — M5.5 slice 14: the hunts and the skill chain
 
 Done: the skill chain (DESIGN §7). Near misses (100), oncoming near misses (200), each second in the oncoming lane

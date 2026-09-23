@@ -9,37 +9,37 @@ import { BALANCE, CITY_HALF, DISTRICTS, PALETTE, districtAt, type SimWorld } fro
 import { LANDMARKS } from '../sim/city/City';
 import { MINIMAP, advance, buildRoadLayers, clampToRim, project, yawFromQuat, type MinimapState, type Vec2 } from './minimapModel';
 
-export type MarkerKind = 'tower' | 'tank' | 'glasshouse' | 'hotel' | 'garage' | 'job' | 'cache';
+export type MarkerKind = 'tower' | 'tank' | 'glasshouse' | 'hotel' | 'garage' | 'job' | 'cache' | 'camera';
 /** A point of interest on the map. `local` markers show only inside the circle (the job rings: sixteen chevrons on the rim would be noise). */
 export interface MinimapMarker { x: number; z: number; kind: MarkerKind; color: string; yaw?: number; local?: boolean }
 
 /** The job rings by kind (the marker's own colours, docs/STYLE.md). */
-const RIVAL = hex(PALETTE.carLime);
-const JOB_COLORS = { delivery: hex(PALETTE.carOrange), order: hex(PALETTE.carMagenta), escape: hex(PALETTE.policeBlue), trial: hex(PALETTE.coin), race: hex(PALETTE.carLime), rage: hex(PALETTE.carRed), mayhem: hex(PALETTE.carWhite), fare: hex(PALETTE.coin) } as const;
+export const RIVAL = hex(PALETTE.carLime);
+export const JOB_COLORS = { delivery: hex(PALETTE.carOrange), order: hex(PALETTE.carMagenta), escape: hex(PALETTE.policeBlue), trial: hex(PALETTE.coin), race: hex(PALETTE.carLime), rage: hex(PALETTE.carRed), mayhem: hex(PALETTE.carWhite), fare: hex(PALETTE.coin) } as const;
 
-const FONT = "'Segoe UI', 'Helvetica Neue', Arial, system-ui, sans-serif";
-const INK = '#f7f3ea';
-const DARK = 'rgba(22, 14, 40, 0.92)';
-const ACCENT = '#ffd23f';
-const CACHE_COLOR = hex(PALETTE.coin);
+export const FONT = "'Segoe UI', 'Helvetica Neue', Arial, system-ui, sans-serif";
+export const INK = '#f7f3ea';
+export const DARK = 'rgba(22, 14, 40, 0.92)';
+export const ACCENT = '#ffd23f';
+export const CACHE_COLOR = hex(PALETTE.coin);
 /** The police on the radar (DESIGN.md §13.9): lit blue in a chase, grey on the beat; the search disc. */
-const UNIT_LIT = '#3b82ff';
-const UNIT_BEAT = '#9d9da8';
-const SEARCH_FILL = 'rgba(59, 130, 246, 0.22)';
-const SEARCH_EDGE = 'rgba(59, 130, 246, 0.7)';
-const LOOP = '#ffe9a8';
-const GRID = 'rgba(247, 243, 234, 0.85)';
+export const UNIT_LIT = '#3b82ff';
+export const UNIT_BEAT = '#9d9da8';
+export const SEARCH_FILL = 'rgba(59, 130, 246, 0.22)';
+export const SEARCH_EDGE = 'rgba(59, 130, 246, 0.7)';
+export const LOOP = '#ffe9a8';
+export const GRID = 'rgba(247, 243, 234, 0.85)';
 const RIM = 'rgba(255, 210, 63, 0.45)';
 const PANEL = 0x160e28;
-const WATER = rgba(mix(PALETTE.water, PANEL, 0.3), 0.96);
+export const WATER = rgba(mix(PALETTE.water, PANEL, 0.3), 0.96);
 const ISLAND = rgba(PANEL, 0.9);
 const TINT_ALPHA = 0.22;
-const GLYPH_KINDS: readonly MarkerKind[] = ['tower', 'tank', 'glasshouse', 'hotel'];
+export const GLYPH_KINDS: readonly MarkerKind[] = ['tower', 'tank', 'glasshouse', 'hotel'];
 
-function hex(c: number): string {
+export function hex(c: number): string {
   return `#${c.toString(16).padStart(6, '0')}`;
 }
-function rgba(c: number, a: number): string {
+export function rgba(c: number, a: number): string {
   return `rgba(${(c >> 16) & 255}, ${(c >> 8) & 255}, ${c & 255}, ${a})`;
 }
 /** `t` of colour `a` over colour `b`, per channel. */
@@ -57,6 +57,170 @@ function el(tag: string, className: string): HTMLElement {
   return e;
 }
 
+/**
+ * The island in world-space paths (metres), built once: the grid streets merged into whole lines across the
+ * island (10 subpaths instead of 60 segments), the perimeter highway as one closed rectangle, the authored roads
+ * on their centrelines, the island and the district tints. The radar and the full-screen map stroke the same ones.
+ */
+export interface MapPaths {
+  gridLines: Array<{ path: Path2D; axis: 'x' | 'z'; at: number }>;
+  highwayPath: Path2D;
+  highwayRing: number;
+  specialPaths: Array<{ path: Path2D; width: number; minX: number; maxX: number; minZ: number; maxZ: number }>;
+  islandPath: Path2D;
+  districtFills: Array<{ path: Path2D; fill: string }>;
+  gridWidth: number;
+  highwayWidth: number;
+}
+
+export function buildMapPaths(sim: SimWorld): MapPaths {
+  const layers = sim.city ? buildRoadLayers(sim.city.graph) : null;
+  const out: MapPaths = {
+    gridLines: [], highwayPath: new Path2D(), highwayRing: 0, specialPaths: [], islandPath: new Path2D(), districtFills: [],
+    gridWidth: layers?.gridWidth ?? 24, highwayWidth: layers?.highwayWidth ?? 38,
+  };
+  if (layers) {
+    const lines = new Map<string, { axis: 'x' | 'z'; at: number; min: number; max: number }>();
+    for (const s of layers.grid) {
+      const axis = s.x0 === s.x1 ? 'x' : 'z';
+      const at = axis === 'x' ? s.x0 : s.z0;
+      const a = axis === 'x' ? s.z0 : s.x0, b = axis === 'x' ? s.z1 : s.x1;
+      const key = `${axis}${at}`;
+      const line = lines.get(key) ?? { axis, at, min: Infinity, max: -Infinity };
+      line.min = Math.min(line.min, a, b);
+      line.max = Math.max(line.max, a, b);
+      lines.set(key, line);
+    }
+    for (const line of lines.values()) {
+      const path = new Path2D();
+      if (line.axis === 'x') { path.moveTo(line.at, line.min); path.lineTo(line.at, line.max); }
+      else { path.moveTo(line.min, line.at); path.lineTo(line.max, line.at); }
+      out.gridLines.push({ path, axis: line.axis, at: line.at });
+    }
+    for (const s of layers.highway) out.highwayRing = Math.max(out.highwayRing, Math.abs(s.x0), Math.abs(s.x1), Math.abs(s.z0), Math.abs(s.z1));
+    if (out.highwayRing > 0) out.highwayPath.rect(-out.highwayRing, -out.highwayRing, out.highwayRing * 2, out.highwayRing * 2);
+    for (const road of layers.special) {
+      const path = new Path2D();
+      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      road.points.forEach((p, i) => {
+        if (i === 0) path.moveTo(p.x, p.z); else path.lineTo(p.x, p.z);
+        minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
+      });
+      out.specialPaths.push({ path, width: road.width, minX, maxX, minZ, maxZ });
+    }
+  }
+  out.islandPath.rect(-CITY_HALF, -CITY_HALF, CITY_HALF * 2, CITY_HALF * 2);
+  for (const [i, d] of DISTRICTS.entries()) {
+    const path = new Path2D();
+    path.rect(i % 2 ? 0 : -CITY_HALF, i >= 2 ? 0 : -CITY_HALF, CITY_HALF, CITY_HALF);
+    out.districtFills.push({ path, fill: rgba(d.color, TINT_ALPHA) });
+  }
+  return out;
+}
+
+/** The island under the roads: water, the island panel, the district tints (in world space). */
+export function fillIsland(c: CanvasRenderingContext2D, paths: MapPaths): void {
+  c.fillStyle = ISLAND;
+  c.fill(paths.islandPath);
+  for (const d of paths.districtFills) { c.fillStyle = d.fill; c.fill(d.path); }
+}
+
+/** Four distinct shapes so the landmarks read without colour: the tower, the water tank, the glasshouse, the hotel slab; and the jobs, caches, garages and cameras. */
+export function drawGlyph(c: CanvasRenderingContext2D, kind: MarkerKind, x: number, y: number, g: number, color: string): void {
+  c.beginPath();
+  switch (kind) {
+    case 'tower':
+      c.moveTo(x, y - g * 1.3);
+      c.lineTo(x + g * 0.8, y + g * 0.9);
+      c.lineTo(x - g * 0.8, y + g * 0.9);
+      c.closePath();
+      break;
+    case 'tank':
+      c.rect(x - g * 0.16, y, g * 0.32, g * 1.1);
+      c.moveTo(x + g * 0.72, y - g * 0.3);
+      c.arc(x, y - g * 0.3, g * 0.72, 0, Math.PI * 2);
+      break;
+    case 'glasshouse':
+      c.moveTo(x, y - g);
+      c.lineTo(x + g, y);
+      c.lineTo(x, y + g);
+      c.lineTo(x - g, y);
+      c.closePath();
+      break;
+    case 'hotel':
+      c.rect(x - g * 0.9, y - g * 0.55, g * 1.8, g * 1.1);
+      break;
+    case 'job':
+      // a ring, the marker's own shape on the road
+      c.arc(x, y, g * 0.85, 0, Math.PI * 2);
+      c.moveTo(x + g * 0.4, y);
+      c.arc(x, y, g * 0.4, 0, Math.PI * 2, true);
+      break;
+    case 'cache':
+      // a gold dot: a coin on the map
+      c.arc(x, y, g * 0.45, 0, Math.PI * 2);
+      break;
+    case 'camera':
+      // a speed camera: a box with its lens
+      c.rect(x - g * 0.8, y - g * 0.5, g * 1.6, g);
+      c.moveTo(x + g * 0.3, y);
+      c.arc(x, y, g * 0.3, 0, Math.PI * 2, true);
+      break;
+    case 'garage':
+      // a garage front: a pitched outline with the door as the dark band across its foot
+      c.moveTo(x - g * 0.9, y + g * 0.8);
+      c.lineTo(x - g * 0.9, y - g * 0.3);
+      c.lineTo(x, y - g);
+      c.lineTo(x + g * 0.9, y - g * 0.3);
+      c.lineTo(x + g * 0.9, y + g * 0.8);
+      c.closePath();
+      break;
+  }
+  c.lineJoin = 'round';
+  c.lineWidth = 2;
+  c.strokeStyle = DARK;
+  c.stroke();
+  c.fillStyle = color;
+  c.fill();
+  if (kind === 'garage') {
+    c.fillStyle = DARK;
+    c.fillRect(x - g * 0.55, y + g * 0.05, g * 1.1, g * 0.75);
+  }
+}
+
+/** The player's arrow at a screen point, turned `angle` from screen up. */
+export function drawArrow(c: CanvasRenderingContext2D, x: number, y: number, angle: number, a: number): void {
+  c.save();
+  c.translate(x, y);
+  c.rotate(angle);
+  c.beginPath();
+  c.moveTo(0, -a);
+  c.lineTo(a * 0.66, a * 0.66);
+  c.lineTo(0, a * 0.38);
+  c.lineTo(-a * 0.66, a * 0.66);
+  c.closePath();
+  c.lineJoin = 'round';
+  c.lineWidth = 2.5;
+  c.strokeStyle = DARK;
+  c.stroke();
+  c.fillStyle = ACCENT;
+  c.fill();
+  c.restore();
+}
+
+/** The helicopter: a square with a cross for its rotor. */
+export function drawHeli(c: CanvasRenderingContext2D, x: number, y: number): void {
+  c.fillStyle = UNIT_LIT;
+  c.strokeStyle = DARK;
+  c.lineWidth = 1.5;
+  c.fillRect(x - 4.5, y - 4.5, 9, 9);
+  c.strokeRect(x - 4.5, y - 4.5, 9, 9);
+  c.beginPath();
+  c.moveTo(x - 8, y); c.lineTo(x + 8, y);
+  c.moveTo(x, y - 8); c.lineTo(x, y + 8);
+  c.stroke();
+}
+
 export class Minimap {
   private readonly wrap: HTMLElement;
   private readonly canvas: HTMLCanvasElement;
@@ -64,19 +228,8 @@ export class Minimap {
   private readonly label: HTMLElement;
   private readonly landmark: HTMLElement;
   private readonly observer: ResizeObserver | null = null;
-  /**
-   * World-space paths built once; one transform per repaint draws the visible
-   * ones. Grid streets merge into whole lines across the island (10 subpaths
-   * instead of 60 segments), the perimeter highway is one closed rectangle.
-   */
-  private readonly gridLines: Array<{ path: Path2D; axis: 'x' | 'z'; at: number }> = [];
-  private readonly highwayPath = new Path2D();
-  private highwayRing = 0;
-  private readonly specialPaths: Array<{ path: Path2D; width: number; minX: number; maxX: number; minZ: number; maxZ: number }> = [];
-  private readonly islandPath = new Path2D();
-  private readonly districtFills: Array<{ path: Path2D; fill: string }> = [];
-  private readonly gridWidth: number;
-  private readonly highwayWidth: number;
+  /** World-space paths built once; one transform per repaint draws the visible ones. The full-screen map shares them. */
+  readonly paths: MapPaths;
   private markers: readonly MinimapMarker[];
   /** The landmarks and drop-offs; idle job markers are appended when the jobs change. */
   private base: readonly MinimapMarker[];
@@ -120,45 +273,7 @@ export class Minimap {
     if (!ctx) throw new Error('2d context');
     this.ctx = ctx;
 
-    const layers = sim.city ? buildRoadLayers(sim.city.graph) : null;
-    this.gridWidth = layers?.gridWidth ?? 24;
-    this.highwayWidth = layers?.highwayWidth ?? 38;
-    if (layers) {
-      const lines = new Map<string, { axis: 'x' | 'z'; at: number; min: number; max: number }>();
-      for (const s of layers.grid) {
-        const axis = s.x0 === s.x1 ? 'x' : 'z';
-        const at = axis === 'x' ? s.x0 : s.z0;
-        const a = axis === 'x' ? s.z0 : s.x0, b = axis === 'x' ? s.z1 : s.x1;
-        const key = `${axis}${at}`;
-        const line = lines.get(key) ?? { axis, at, min: Infinity, max: -Infinity };
-        line.min = Math.min(line.min, a, b);
-        line.max = Math.max(line.max, a, b);
-        lines.set(key, line);
-      }
-      for (const line of lines.values()) {
-        const path = new Path2D();
-        if (line.axis === 'x') { path.moveTo(line.at, line.min); path.lineTo(line.at, line.max); }
-        else { path.moveTo(line.min, line.at); path.lineTo(line.max, line.at); }
-        this.gridLines.push({ path, axis: line.axis, at: line.at });
-      }
-      for (const s of layers.highway) this.highwayRing = Math.max(this.highwayRing, Math.abs(s.x0), Math.abs(s.x1), Math.abs(s.z0), Math.abs(s.z1));
-      if (this.highwayRing > 0) this.highwayPath.rect(-this.highwayRing, -this.highwayRing, this.highwayRing * 2, this.highwayRing * 2);
-      for (const road of layers.special) {
-        const path = new Path2D();
-        let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-        road.points.forEach((p, i) => {
-          if (i === 0) path.moveTo(p.x, p.z); else path.lineTo(p.x, p.z);
-          minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
-        });
-        this.specialPaths.push({ path, width: road.width, minX, maxX, minZ, maxZ });
-      }
-    }
-    this.islandPath.rect(-CITY_HALF, -CITY_HALF, CITY_HALF * 2, CITY_HALF * 2);
-    for (const [i, d] of DISTRICTS.entries()) {
-      const path = new Path2D();
-      path.rect(i % 2 ? 0 : -CITY_HALF, i >= 2 ? 0 : -CITY_HALF, CITY_HALF, CITY_HALF);
-      this.districtFills.push({ path, fill: rgba(d.color, TINT_ALPHA) });
-    }
+    this.paths = buildMapPaths(sim);
     // the landmarks, then the three drop-offs: where a run can end is always on the rim
     this.base = [
       ...LANDMARKS.map((l, i): MinimapMarker => ({ x: l.x, z: l.z, kind: GLYPH_KINDS[i] ?? 'tower', color: hex(DISTRICTS[i]?.accent ?? 0xffffff) })),
@@ -304,19 +419,18 @@ export class Minimap {
     c.rotate(h);
     c.scale(-s, -s);
     c.translate(-x, -z);
-    c.fillStyle = ISLAND;
-    c.fill(this.islandPath);
-    for (const d of this.districtFills) { c.fillStyle = d.fill; c.fill(d.path); }
+    fillIsland(c, this.paths);
+    const paths = this.paths;
     const minW = MINIMAP.minRoadPx / s;
     const casing = (MINIMAP.casingPx * 2) / s;
-    const gridW = Math.max(this.gridWidth, minW);
-    const highW = Math.max(this.highwayWidth, minW);
+    const gridW = Math.max(paths.gridWidth, minW);
+    const highW = Math.max(paths.highwayWidth, minW);
     // Only paths within reach of the visible disc are stroked (casing pass, then fills).
     const reach = this.state.radiusM + casing;
-    const highwayVisible = this.highwayRing > 0 && Math.max(Math.abs(x), Math.abs(z)) >= this.highwayRing - reach - highW / 2;
+    const highwayVisible = paths.highwayRing > 0 && Math.max(Math.abs(x), Math.abs(z)) >= paths.highwayRing - reach - highW / 2;
     c.strokeStyle = DARK;
     this.strokeGrid(x, z, reach + gridW / 2, gridW + casing);
-    if (highwayVisible) { c.lineWidth = highW + casing; c.stroke(this.highwayPath); }
+    if (highwayVisible) { c.lineWidth = highW + casing; c.stroke(paths.highwayPath); }
     this.strokeSpecials(x, z, reach, casing, minW);
     c.strokeStyle = GRID;
     this.strokeGrid(x, z, reach + gridW / 2, gridW);
@@ -327,7 +441,7 @@ export class Minimap {
       c.lineJoin = 'miter';
       c.strokeStyle = ACCENT;
       c.lineWidth = highW;
-      c.stroke(this.highwayPath);
+      c.stroke(paths.highwayPath);
     }
     // a zone job's edge (M5.5 slice 12)
     const zoneJob = this.sim?.jobs.running;
@@ -358,7 +472,7 @@ export class Minimap {
       project(this.tmp, m.x, m.z, x, z, h, s, px, py);
       if (m.local && (this.tmp.x - ccx) ** 2 + (this.tmp.y - ccy) ** 2 > rimR * rimR) continue;
       const clamped = clampToRim(this.tmp, px, py, this.tmp.x, this.tmp.y, ccx, ccy, rimR);
-      this.glyph(m.kind, this.tmp.x, this.tmp.y, clamped ? MINIMAP.glyphPx * 0.75 : MINIMAP.glyphPx, m.color);
+      drawGlyph(c, m.kind, this.tmp.x, this.tmp.y, clamped ? MINIMAP.glyphPx * 0.75 : MINIMAP.glyphPx, m.color);
       if (clamped) this.chevron(this.tmp.x, this.tmp.y, Math.atan2(this.tmp.x - px, py - this.tmp.y), m.color);
     }
 
@@ -400,33 +514,11 @@ export class Minimap {
       if (heli.active) {
         project(this.tmp, heli.x, heli.z, x, z, h, s, px, py);
         clampToRim(this.tmp, px, py, this.tmp.x, this.tmp.y, ccx, ccy, rimR - 6);
-        c.fillStyle = UNIT_LIT;
-        c.fillRect(this.tmp.x - 4.5, this.tmp.y - 4.5, 9, 9);
-        c.strokeRect(this.tmp.x - 4.5, this.tmp.y - 4.5, 9, 9);
-        c.beginPath();
-        c.moveTo(this.tmp.x - 8, this.tmp.y); c.lineTo(this.tmp.x + 8, this.tmp.y);
-        c.moveTo(this.tmp.x, this.tmp.y - 8); c.lineTo(this.tmp.x, this.tmp.y + 8);
-        c.stroke();
+        drawHeli(c, this.tmp.x, this.tmp.y);
       }
     }
 
-    const a = MINIMAP.arrowPx;
-    c.save();
-    c.translate(px, py);
-    c.rotate(-(yaw - h));
-    c.beginPath();
-    c.moveTo(0, -a);
-    c.lineTo(a * 0.66, a * 0.66);
-    c.lineTo(0, a * 0.38);
-    c.lineTo(-a * 0.66, a * 0.66);
-    c.closePath();
-    c.lineJoin = 'round';
-    c.lineWidth = 2.5;
-    c.strokeStyle = DARK;
-    c.stroke();
-    c.fillStyle = ACCENT;
-    c.fill();
-    c.restore();
+    drawArrow(c, px, py, -(yaw - h), MINIMAP.arrowPx);
 
     // Compass: a world direction with yaw phi sits at screen angle h - phi, so N, E, S, W are at h + k * 90 deg.
     c.font = `800 11px ${FONT}`;
@@ -465,7 +557,7 @@ export class Minimap {
     c.lineCap = 'butt';
     c.lineJoin = 'miter';
     c.lineWidth = width;
-    for (const line of this.gridLines) {
+    for (const line of this.paths.gridLines) {
       if (Math.abs((line.axis === 'x' ? x : z) - line.at) <= reach) c.stroke(line.path);
     }
   }
@@ -475,70 +567,12 @@ export class Minimap {
     const c = this.ctx;
     c.lineCap = 'round';
     c.lineJoin = 'round';
-    for (const p of this.specialPaths) {
+    for (const p of this.paths.specialPaths) {
       const w = Math.max(p.width, minW);
       const margin = reach + w;
       if (x + margin < p.minX || x - margin > p.maxX || z + margin < p.minZ || z - margin > p.maxZ) continue;
       c.lineWidth = w + extra;
       c.stroke(p.path);
-    }
-  }
-
-  /** Four distinct shapes so the landmarks read without colour: the tower, the water tank, the glasshouse, the hotel slab. */
-  private glyph(kind: MarkerKind, x: number, y: number, g: number, color: string): void {
-    const c = this.ctx;
-    c.beginPath();
-    switch (kind) {
-      case 'tower':
-        c.moveTo(x, y - g * 1.3);
-        c.lineTo(x + g * 0.8, y + g * 0.9);
-        c.lineTo(x - g * 0.8, y + g * 0.9);
-        c.closePath();
-        break;
-      case 'tank':
-        c.rect(x - g * 0.16, y, g * 0.32, g * 1.1);
-        c.moveTo(x + g * 0.72, y - g * 0.3);
-        c.arc(x, y - g * 0.3, g * 0.72, 0, Math.PI * 2);
-        break;
-      case 'glasshouse':
-        c.moveTo(x, y - g);
-        c.lineTo(x + g, y);
-        c.lineTo(x, y + g);
-        c.lineTo(x - g, y);
-        c.closePath();
-        break;
-      case 'hotel':
-        c.rect(x - g * 0.9, y - g * 0.55, g * 1.8, g * 1.1);
-        break;
-      case 'job':
-        // a ring, the marker's own shape on the road
-        c.arc(x, y, g * 0.85, 0, Math.PI * 2);
-        c.moveTo(x + g * 0.4, y);
-        c.arc(x, y, g * 0.4, 0, Math.PI * 2, true);
-        break;
-      case 'cache':
-        // a gold dot: a coin on the map
-        c.arc(x, y, g * 0.45, 0, Math.PI * 2);
-        break;
-      case 'garage':
-        // a garage front: a pitched outline with the door as the dark band across its foot
-        c.moveTo(x - g * 0.9, y + g * 0.8);
-        c.lineTo(x - g * 0.9, y - g * 0.3);
-        c.lineTo(x, y - g);
-        c.lineTo(x + g * 0.9, y - g * 0.3);
-        c.lineTo(x + g * 0.9, y + g * 0.8);
-        c.closePath();
-        break;
-    }
-    c.lineJoin = 'round';
-    c.lineWidth = 2;
-    c.strokeStyle = DARK;
-    c.stroke();
-    c.fillStyle = color;
-    c.fill();
-    if (kind === 'garage') {
-      c.fillStyle = DARK;
-      c.fillRect(x - g * 0.55, y + g * 0.05, g * 1.1, g * 0.75);
     }
   }
 

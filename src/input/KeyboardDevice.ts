@@ -26,6 +26,7 @@ const BINDINGS: Record<string, Action> = {
   KeyM: 'mute',
   Enter: 'skip',
   KeyN: 'skip',
+  Tab: 'map',
 };
 
 /** Primary key shown in overlays, per action. */
@@ -43,6 +44,7 @@ const PRIMARY: Partial<Record<Action, string>> = {
   swap: 'KeyE',
   mute: 'KeyM',
   skip: 'KeyN',
+  map: 'Tab',
 };
 
 const FALLBACK_LABEL: Record<string, string> = {
@@ -51,14 +53,15 @@ const FALLBACK_LABEL: Record<string, string> = {
   ShiftRight: 'SHIFT',
   Backquote: '`',
   Enter: 'ENTER',
+  Tab: 'TAB',
   ArrowUp: '↑',
   ArrowDown: '↓',
   ArrowLeft: '←',
   ArrowRight: '→',
 };
 
-/** Keys whose default browser behaviour (scrolling) must be suppressed while playing. */
-const PREVENT_DEFAULT = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+/** Keys whose default browser behaviour (scrolling, and Tab's focus hop) must be suppressed while playing. */
+const PREVENT_DEFAULT = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab']);
 
 interface KeyboardLayoutMapLike {
   get(code: string): string | undefined;

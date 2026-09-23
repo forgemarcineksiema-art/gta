@@ -1418,3 +1418,68 @@ kbd.key {
   .wall__row-name, .wall__row-price { font-size: 16px; }
   .wall__footer { margin-top: 4px; }
 }
+
+/* the full-screen map (M5.5 slice 15): held on a key over the drive, the key to its glyphs on the right */
+.bigmap {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(12, 8, 24, 0.6);
+  pointer-events: none;
+}
+.bigmap.is-visible { display: flex; }
+.bigmap__head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.bigmap__title {
+  font-size: 22px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.16em;
+  color: var(--ui-accent);
+  text-shadow: 2px 2px 0 #000;
+}
+.bigmap__hint {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--ui-ink-dim);
+}
+.bigmap__body {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.bigmap__canvas {
+  width: min(calc(100vh - 84px), calc(100vw - 280px));
+  aspect-ratio: 1;
+  border: 2px solid var(--ui-panel-line);
+  border-radius: 6px;
+}
+.bigmap__legend {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.bigmap__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bigmap__swatch {
+  width: 18px;
+  height: 18px;
+}
+.bigmap__word {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--ui-ink);
+  text-shadow: 1px 1px 0 #000;
+}

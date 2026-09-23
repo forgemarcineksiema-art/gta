@@ -65,6 +65,8 @@ export class Run {
   /** The BORROW prompt's appearances so far: its second line teaches the disguise the first `chain.hintTimes`. */
   borrowHints = 0;
   private borrowPrev = false;
+  /** Seconds of active pursuit toward the next bounty (DESIGN.md §13.9). */
+  private chaseClock = 0;
   /** Seconds since a police car was last alongside: a candidate that flickers for a step is the same appearance. */
   private borrowGone = Infinity;
   /** True until the first door has been opened again: that door ends the cold open and gets no ad (M5 D10). */
@@ -137,7 +139,17 @@ export class Run {
     this.borrowGone = borrow ? 0 : this.borrowGone + dt;
     this.borrowPrev = borrow;
     this.playSeconds += dt;
-    if (this.sim.pursuit.state === 'active') this.maxHeat = Math.max(this.maxHeat, this.sim.heat.level);
+    if (this.sim.pursuit.state === 'active') {
+      this.maxHeat = Math.max(this.maxHeat, this.sim.heat.level);
+      // a chase pays while it lasts: 100 × the level every 10 s, into the bag
+      this.chaseClock += dt;
+      if (this.chaseClock >= 10 - 1e-9) {
+        this.chaseClock -= 10;
+        const pay = BALANCE.bag.pursuitPer10s * this.sim.heat.level;
+        this.bag += pay;
+        this.sim.events.push('chase', pay, probe.x, 0, probe.z, -1);
+      }
+    }
     if (this.stepBusted(probe, dt)) return;
     this.stepDoor(probe, dt);
   }
@@ -361,6 +373,7 @@ export class Run {
   private startRun(): void {
     this.runs++;
     this.maxHeat = 0;
+    this.chaseClock = 0;
     this.counts.takedowns = 0;
     this.counts.escapes = 0;
     this.counts.billboards = 0;

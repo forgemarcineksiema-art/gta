@@ -93,6 +93,7 @@ export class Roadblocks {
   raise(site: Chokepoint): void {
     if (this.active === 1) this.release();
     this.place(site, this.sim.probe);
+    if (this.active === 1) this.sim.events.push('dispatch', 1, site.x, 0, site.z, -1);
   }
 
   /** Take the block down now (the run ended). */

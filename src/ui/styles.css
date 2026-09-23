@@ -118,6 +118,21 @@ body {
   animation: heat-pulse 1s ease-in-out infinite;
 }
 @keyframes heat-pulse { 50% { opacity: 0.45; } }
+/* the search (M5.5): the stars pulse slower as the cooldown runs down, a ring under them drains */
+.hud__heat.is-lost .hud__heat-star.is-filled { animation: heat-pulse var(--heat-pulse, 0.6s) ease-in-out infinite; }
+.hud__heat-escape {
+  display: none;
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: -7px;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.hud__heat-escape.is-on { display: block; }
+.hud__heat-escape-fill { height: 100%; background: var(--ui-accent-2); transform-origin: left center; }
 /* a star that just filled scales up once; every discrete gain pops a red +n under the row (M5.5) */
 .hud__heat-star.is-pop { animation: heat-pop 0.3s ease-out; }
 @keyframes heat-pop { 50% { transform: scale(1.35); } }

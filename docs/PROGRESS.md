@@ -2,6 +2,19 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M5.5 slice 4: the police as a different animal
+
+Done: pressure instead of a flat speed (within 60 m the player's speed + 4, within 25 m the class's for the ram or
+the PIT, the catch-up only out of the player's view); the police driving mode (a unit on a chase runs the junction
+box, brakes and pulls away ×1.5, goes round a slower car on the oncoming side or the highway's other lane, swings
+out round a car pulling over); the refill cadence by level (8/10/8/7/6/5 s, the Chief ×2); every third arrival
+from level 2 pulls out of a side street 60–100 m ahead, in view; the radar draws the units (lit in a chase, grey on
+the beat) and the search disc growing 60→150 m; the stars pulse slower and a ring drains as the cooldown runs; the
+radio in the ticker (ROADBLOCK AHEAD, UNIT DOWN, SUSPECT IN A <paint> <car> at a chase's start and after a seen
+swap; one line per 6 s); the siren yelps from level 2, the low voice from 3; 100 × level into the bag every 10 s
+of chase. Not done: tighter junction curves for units (cosmetic). Pins pressure 4.1–4.7; the Chief's cadence pin
+reads the table. Verify 286 green.
+
 ## 2026-09-23 — M5.5 slice 3: traffic with character
 
 Done: a driver per record (pace 0.85/1.0/1.1/1.18 of the limit × the class, a 0.9–1.6 s time gap, one in eight bad:

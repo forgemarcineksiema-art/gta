@@ -1,6 +1,14 @@
 import type { EventLog } from '../events';
-import type { CarId } from '../vehicle/presets';
+import { CAR_IDS, type CarId } from '../vehicle/presets';
 import { POLICE, type PoliceTuning } from './tuning';
+
+/** The radio's lines (the `dispatch` event's value; docs/DESIGN.md §13.9). */
+export const DISPATCH = { roadblock: 1, unitDown: 2, suspect: 3 } as const;
+
+/** The descriptor as one number for an event's target: the class's index over the paint. */
+export function packSuspect(kind: CarId, paint: number): number {
+  return (CAR_IDS.indexOf(kind) << 24) | (paint & 0xffffff);
+}
 
 export type PursuitState = 'idle' | 'detected' | 'active' | 'lost';
 
@@ -37,6 +45,19 @@ export class Pursuit {
   private level = 0;
 
   constructor(private readonly events: EventLog, private readonly tuning: PoliceTuning = POLICE) {}
+
+  /** 0..1 of the cooldown run down while the police search (the HUD's ring, the radar's disc); 0 otherwise. */
+  get escapeProgress(): number {
+    if (this.state !== 'lost') return 0;
+    const total = this.tuning.escapeSeconds[this.level] ?? 15;
+    return total > 0 ? Math.max(0, Math.min(1, 1 - this.cooldown / total)) : 1;
+  }
+
+  /** The radar's search disc round the last fix (m): it grows as the search goes on. */
+  get searchRadius(): number {
+    const s = this.tuning.search;
+    return s.discMin + (s.discMax - s.discMin) * this.escapeProgress;
+  }
 
   /** In a police car nobody has seen misbehave: no unit detects the player. */
   get disguised(): boolean {
@@ -90,6 +111,8 @@ export class Pursuit {
     this.descriptor.paint = paint;
     this.blown = false;
     this.coverLeft = this.tuning.disguise.seconds;
+    // seen: the radio names the new car (the identity rule, taught by the police themselves)
+    if (seenNow && this.state !== 'idle') this.events.push('dispatch', DISPATCH.suspect, 0, 0, 0, packSuspect(kind, paint));
     if (seenNow || this.state === 'idle') return false;
     this.lose();
     return true;

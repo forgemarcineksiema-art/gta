@@ -21,6 +21,11 @@ const INK = '#f7f3ea';
 const DARK = 'rgba(22, 14, 40, 0.92)';
 const ACCENT = '#ffd23f';
 const CACHE_COLOR = hex(PALETTE.coin);
+/** The police on the radar (DESIGN.md §13.9): lit blue in a chase, grey on the beat; the search disc. */
+const UNIT_LIT = '#3b82ff';
+const UNIT_BEAT = '#9d9da8';
+const SEARCH_FILL = 'rgba(59, 130, 246, 0.22)';
+const SEARCH_EDGE = 'rgba(59, 130, 246, 0.7)';
 const LOOP = '#ffe9a8';
 const GRID = 'rgba(247, 243, 234, 0.85)';
 const RIM = 'rgba(255, 210, 63, 0.45)';
@@ -76,6 +81,7 @@ export class Minimap {
   private base: readonly MinimapMarker[];
   private jobSerial = -1;
   private cacheSerial = -1;
+  private sim: SimWorld | null = null;
   /** The running job's target on the rim: the drop-off, the fence or the wanted car. Moved in place. */
   private readonly jobTarget: MinimapMarker = { x: 0, z: 0, kind: 'job', color: JOB_COLORS.delivery };
   private readonly jobPoint = { x: 0, z: 0 };
@@ -182,6 +188,9 @@ export class Minimap {
 
   /** Call every frame; paints at most every `repaintMs` and only when something moved. */
   update(sim: SimWorld, dt: number, now: number): void {
+    this.sim = sim;
+    // units move on their own: while any is on the map the radar repaints at its own cadence
+    if (sim.police && sim.police.count > 0) this.dirty = true;
     if (this.measure) {
       this.measure = false;
       this.resize(this.canvas.clientWidth);
@@ -319,6 +328,17 @@ export class Minimap {
       c.lineWidth = highW;
       c.stroke(this.highwayPath);
     }
+    // the search: where they last saw you, growing as they look (get away from it)
+    const pursuit = this.sim?.pursuit;
+    if (pursuit && pursuit.state === 'lost') {
+      c.beginPath();
+      c.arc(pursuit.lastX, pursuit.lastZ, pursuit.searchRadius, 0, Math.PI * 2);
+      c.fillStyle = SEARCH_FILL;
+      c.fill();
+      c.lineWidth = 2 / s;
+      c.strokeStyle = SEARCH_EDGE;
+      c.stroke();
+    }
     c.restore();
 
     // Screen space from here: glyphs stay upright.
@@ -330,6 +350,26 @@ export class Minimap {
       const clamped = clampToRim(this.tmp, px, py, this.tmp.x, this.tmp.y, ccx, ccy, rimR);
       this.glyph(m.kind, this.tmp.x, this.tmp.y, clamped ? MINIMAP.glyphPx * 0.75 : MINIMAP.glyphPx, m.color);
       if (clamped) this.chevron(this.tmp.x, this.tmp.y, Math.atan2(this.tmp.x - px, py - this.tmp.y), m.color);
+    }
+
+    // the police: every unit inside the circle, lit in a chase
+    const sim = this.sim;
+    const police = sim?.police, traffic = sim?.traffic;
+    if (sim && police && traffic) {
+      const lit = sim.pursuit.state !== 'idle';
+      c.fillStyle = lit ? UNIT_LIT : UNIT_BEAT;
+      c.strokeStyle = DARK;
+      c.lineWidth = 1.5;
+      for (let u = 0; u < police.units.length; u++) {
+        const agent = police.units[u] as number;
+        if (agent < 0) continue;
+        project(this.tmp, traffic.x[agent] as number, traffic.z[agent] as number, x, z, h, s, px, py);
+        if ((this.tmp.x - ccx) ** 2 + (this.tmp.y - ccy) ** 2 > rimR * rimR) continue;
+        c.beginPath();
+        c.arc(this.tmp.x, this.tmp.y, 3.5, 0, Math.PI * 2);
+        c.fill();
+        c.stroke();
+      }
     }
 
     const a = MINIMAP.arrowPx;

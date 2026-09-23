@@ -37,6 +37,8 @@ export const BALANCE = {
     escapePerLevel: 500,
     jump: 400,
     jumpPerSecond: 200,
+    /** Every 10 s the pursuit is active, this × the heat level into the bag (NFS's bounty, DESIGN.md §13.9). */
+    pursuitPer10s: 100,
   },
   /** The door's multiplier by the highest level at which the pursuit went active (index = level; 0 and 1 both x1). */
   multiplier: [1, 1, 1.25, 1.6, 2.2, 3],

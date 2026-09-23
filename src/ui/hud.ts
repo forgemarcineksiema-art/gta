@@ -2,7 +2,7 @@
  * In-game HUD: plain DOM over the canvas. Speedometer, boost bar, drift readout,
  * a debug block, a pause overlay and the keycap hint strip. Reads sim state only.
  */
-import { AgentState, BALANCE, POLICE } from '../sim';
+import { AgentState, BALANCE, CAR_WORDS, POLICE, paintName, unpackDescriptor } from '../sim';
 import type { SimEvent, SimWorld } from '../sim';
 import { Minimap } from './minimap';
 import { HeatHud } from './heat';
@@ -58,6 +58,8 @@ export class Hud {
   private readonly tickerLevel: HTMLElement;
   private readonly tickerText: HTMLElement;
   private tickerLeft = 0;
+  /** Seconds since the radio last spoke: a line at most every `DISPATCH_EVERY`. */
+  private dispatchQuiet = Infinity;
   private readonly lap: HTMLElement;
   private readonly lapCurrent: HTMLElement;
   private readonly lapLast: HTMLElement;
@@ -308,6 +310,21 @@ export class Hud {
       if (news) this.showTicker(`LEVEL ${value}`, news);
       return;
     }
+    if (kind === 'dispatch') {
+      // the radio (DESIGN.md §13.9): one line, never over a level's news, at most every few seconds
+      if (this.dispatchQuiet < DISPATCH_EVERY || this.tickerLeft > 0) return;
+      let line = '';
+      if (value === 1) line = 'ROADBLOCK AHEAD';
+      else if (value === 2) line = 'UNIT DOWN · SEND ANOTHER';
+      else if (value === 3) {
+        const d = unpackDescriptor(target);
+        line = `SUSPECT IN A ${paintName(d.paint)} ${CAR_WORDS[d.kind]}`;
+      }
+      if (!line) return;
+      this.dispatchQuiet = 0;
+      this.showTicker('DISPATCH', line);
+      return;
+    }
     if (kind === 'camera') {
       // the flash, then the photo's caption: the speed it caught
       this.flash.classList.add('is-on');
@@ -319,6 +336,7 @@ export class Hud {
       : kind === 'nearMissOncoming' ? 'ONCOMING!'
         : kind === 'nearMissPed' ? 'DODGED'
           : kind === 'swap' ? 'FRESH WHEELS'
+            : kind === 'chase' ? `CHASE +${value.toLocaleString('en-US')}`
             : kind === 'takedown' ? 'TAKEDOWN!'
               : kind === 'takedownTraffic' ? 'TAKEDOWN! INTO TRAFFIC!'
                 : kind === 'billboard' ? 'BILLBOARD!'
@@ -436,6 +454,7 @@ export class Hud {
       this.tickerLeft -= dt;
       if (this.tickerLeft <= 0) this.ticker.classList.remove('is-on');
     }
+    this.dispatchQuiet += dt;
 
     const lap = sim.lap;
     this.setLapVisible(lap.lapStartTick >= 0 || lap.best >= 0);
@@ -459,6 +478,9 @@ export class Hud {
     }
   }
 }
+
+/** Seconds between two of the radio's lines. */
+const DISPATCH_EVERY = 6;
 
 /** The ticker's line per heat level: what the city sends from now on. */
 const HEAT_NEWS: Record<number, string> = {

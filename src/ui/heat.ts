@@ -10,6 +10,10 @@ export class HeatHud {
   readonly root: HTMLElement;
   private readonly stars: SVGSVGElement[] = [];
   private readonly gain: HTMLElement;
+  /** Under the stars while the police search: drains as the cooldown runs (DESIGN.md §13.9). */
+  private readonly escape: HTMLElement;
+  private readonly escapeFill: HTMLElement;
+  private escapeStep = -1;
   private level = -1;
   private state = '';
   private gainSerial: number;
@@ -36,6 +40,12 @@ export class HeatHud {
     this.gain = document.createElement('div');
     this.gain.className = 'hud__heat-gain';
     this.root.appendChild(this.gain);
+    this.escape = document.createElement('div');
+    this.escape.className = 'hud__heat-escape';
+    this.escapeFill = document.createElement('div');
+    this.escapeFill.className = 'hud__heat-escape-fill';
+    this.escape.appendChild(this.escapeFill);
+    this.root.appendChild(this.escape);
     this.gainSerial = sim.heat.gainSerial;
     parent.appendChild(this.root);
     this.update(sim, 0);
@@ -65,6 +75,16 @@ export class HeatHud {
         this.popped = -1;
       }
     }
+    // the search: the ring drains and the stars pulse slower as the cooldown runs down (twenty steps, not a write a frame)
+    const step = sim.pursuit.state === 'lost' ? Math.round(sim.pursuit.escapeProgress * 20) : -1;
+    if (step !== this.escapeStep) {
+      this.escapeStep = step;
+      this.escape.classList.toggle('is-on', step >= 0);
+      if (step >= 0) {
+        this.escapeFill.style.transform = `scaleX(${(1 - step / 20).toFixed(2)})`;
+        this.root.style.setProperty('--heat-pulse', `${(0.6 + step * 0.07).toFixed(2)}s`);
+      }
+    }
     const level = heat.level, state = sim.pursuit.state;
     if (level === this.level && state === this.state) return;
     if (level !== this.level) {
@@ -77,6 +97,7 @@ export class HeatHud {
       }
     }
     this.root.classList.toggle('is-active', state === 'active');
+    this.root.classList.toggle('is-lost', state === 'lost');
     this.root.setAttribute('aria-label', `Heat ${level} of 5. Pursuit ${state}.`);
     this.level = level;
     this.state = state;

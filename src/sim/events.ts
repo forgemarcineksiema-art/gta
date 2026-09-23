@@ -20,7 +20,9 @@ export type EventKind =
   // the ratchet crossed a threshold (M5.5): value = the new level; the ticker and the siren sting
   | 'heatLevel'
   // a cache found (M5.5): value = the bonus into the bank (0 but every tenth), target = found today
-  | 'cache';
+  | 'cache'
+  // the radio (M5.5): value = DISPATCH code, target = a packed descriptor for SUSPECT; the chase's bounty: value = the pay
+  | 'dispatch' | 'chase';
 
 export interface SimEvent {
   kind: EventKind;

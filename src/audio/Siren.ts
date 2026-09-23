@@ -19,6 +19,9 @@ export class Siren {
   private ctx: BaseAudioContext | null = null;
   private main: GainNode | null = null;
   private low: GainNode | null = null;
+  /** The main voice's sweep: a slow wail at level 1, the faster yelp from level 2 (DESIGN.md §13.9). */
+  private mainLfo: OscillatorNode | null = null;
+  private lfoRate = 0;
   private horn: GainNode | null = null;
   private hornLeft = 0;
 
@@ -44,7 +47,14 @@ export class Siren {
     const near = on ? Math.max(0, 1 - nearest / REACH) : 0;
     const t = ctx.currentTime;
     (this.main as GainNode).gain.setTargetAtTime(near * near * LEVEL, t, 0.15);
-    (this.low as GainNode).gain.setTargetAtTime(on && (police?.heavies ?? 0) > 0 ? near * near * LEVEL * 0.7 : 0, t, 0.2);
+    // the siren by heat: the yelp from level 2, the low voice from level 3 (and with the heavies)
+    const level = sim.heat.level;
+    const rate = level >= 2 ? 1.6 : 0.45;
+    if (rate !== this.lfoRate && this.mainLfo) {
+      this.lfoRate = rate;
+      this.mainLfo.frequency.setTargetAtTime(rate, t, 0.3);
+    }
+    (this.low as GainNode).gain.setTargetAtTime(on && (level >= 3 || (police?.heavies ?? 0) > 0) ? near * near * LEVEL * 0.7 : 0, t, 0.2);
     this.hornLeft -= dt;
     if (chief < HORN_RANGE && this.hornLeft <= 0) {
       this.hornLeft = HORN_EVERY;
@@ -61,6 +71,7 @@ export class Siren {
   private build(out: GainNode): void {
     const ctx = out.context;
     this.ctx = ctx;
+    let lastLfo: OscillatorNode | null = null;
     const voice = (base: number, depth: number, rate: number): GainNode => {
       const osc = ctx.createOscillator();
       osc.type = 'sawtooth';
@@ -71,6 +82,7 @@ export class Siren {
       const sweep = ctx.createGain();
       sweep.gain.value = depth;
       lfo.connect(sweep).connect(osc.frequency);
+      lastLfo = lfo;
       const filter = ctx.createBiquadFilter();
       filter.type = 'lowpass';
       filter.frequency.value = 2200;
@@ -82,6 +94,8 @@ export class Siren {
       return gain;
     };
     this.main = voice(980, 330, 0.45);
+    this.mainLfo = lastLfo;
+    this.lfoRate = 0.45;
     this.low = voice(490, 160, 0.45);
     const horn = ctx.createGain();
     horn.gain.value = 0;

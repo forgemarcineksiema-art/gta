@@ -40,6 +40,19 @@ import { AgentState, type PlayerProbe, type Traffic } from '../traffic/Traffic';
 import type { LanePose, LaneProjection } from '../traffic/lanes';
 import { CAR_PRESETS } from '../vehicle/presets';
 import { POLICE, type PoliceTuning } from './tuning';
+import { DISPATCH, packSuspect } from './Pursuit';
+
+/**
+ * A chasing unit's speed (docs/DESIGN.md §13.9): within `pressure.attack` its class's (the ram, the PIT); within
+ * `pressure.within` the player's speed and a little more, up to the class's; beyond it the catch-up only where the
+ * player cannot see the unit, else the class's speed.
+ */
+export function pressureSpeed(t: PoliceTuning, gap: number, inView: boolean, playerSpeed: number, classSpeed: number): number {
+  // close enough to ram or PIT: it closes at its class's speed (the M4 attack)
+  if (gap <= t.pressure.attack) return classSpeed;
+  if (gap <= t.pressure.within) return Math.min(classSpeed, Math.max(t.pressure.min, playerSpeed + t.pressure.over));
+  return inView ? classSpeed : Math.max(classSpeed, t.catchUpSpeed);
+}
 
 /** Distance fields over the road graph: toward the player's near future, and toward where the player is heading. */
 const CHASE = 0;
@@ -131,6 +144,9 @@ export class Police {
   private playerLimit = Infinity;
   /** Speeding offences seen so far (the pins). */
   speedings = 0;
+  /** Units dispatched so far, and those that pulled out in the player's view (the arrival rule). */
+  arrivals = 0;
+  arrivalsInView = 0;
   /**
    * A contact's impulse is read two steps after the contact, when both cars have already slowed: these
    * decaying maxima (×0.8 a step) keep the speeds the cars had going in, for the fault rule.
@@ -197,18 +213,21 @@ export class Police {
       const state = traffic.state[agent];
       if (traffic.police[agent] !== 1 || state === AgentState.Free || state === AgentState.Wrecked || state === AgentState.Abandoned) {
         traffic.clearPolicePlan(agent);
+        const refill = t.refillSeconds[this.sim.heat.level] ?? t.reinforceSeconds;
         if (agent === this.chief) {
           this.chief = -1;
-          this.chiefWait = t.reinforceSeconds * t.chief.reinforceFactor;
+          this.chiefWait = refill * t.chief.reinforceFactor;
         }
+        // the radio: a unit written off in a chase
+        if (state === AgentState.Wrecked && this.sim.heat.level > 0) this.sim.events.push('dispatch', DISPATCH.unitDown, traffic.x[agent] as number, 0, traffic.z[agent] as number, -1);
         this.units[u] = -1;
         this.seen[u] = 0;
         this.los[u] = 0;
         this.leaving[u] = 0;
         this.rammed[u] = 0;
         this.slotOf[u] = -1;
-        // A wrecked patrol is replaced, but the street gets a breather first.
-        this.spawnLeft = Math.max(this.spawnLeft, t.reinforceSeconds);
+        // A wrecked patrol is replaced, but the street gets a breather first: shorter as the heat grows.
+        this.spawnLeft = Math.max(this.spawnLeft, refill);
         continue;
       }
       this.count++;
@@ -285,6 +304,10 @@ export class Police {
     }
     const before = pursuit.state;
     pursuit.step(dt, level, visible, player.x, player.z);
+    if (before === 'idle' && pursuit.state !== 'idle') {
+      const d = pursuit.descriptor;
+      this.sim.events.push('dispatch', DISPATCH.suspect, player.x, 0, player.z, packSuspect(d.kind, d.paint));
+    }
     if (before === 'lost' && pursuit.state === 'idle') {
       this.withdrawing.fill(1);
       this.seen.fill(0);
@@ -369,10 +392,13 @@ export class Police {
       const pit = traffic.kindOf(agent) === 'sports';
       const isChief = agent === this.chief;
       const next = this.isCutter(u, agent, level) && gap > t.cutoff.breakRange ? this.routeExit(agent, AHEAD) : this.routeExit(agent, CHASE);
-      // Close in, a unit drives its class speed; a street back it runs flat out to arrive at all.
-      const speed = isChief ? t.chief.speed : gap > t.catchUpRange ? t.catchUpSpeed : pit ? t.interceptorSpeed : t.chaseSpeed;
+      // pressure (DESIGN.md §13.9): close, the player's speed and a little more; far, the catch-up only out of view
+      const classSpeed = isChief ? t.chief.speed : pit ? t.interceptorSpeed : t.chaseSpeed;
+      const inView = !traffic.outOfView(traffic.x[agent] as number, traffic.z[agent] as number, this.radius, player, t.viewNear, cosHalf);
       const range = isChief ? t.chief.pitRange : pit ? t.pitRange : t.ramRange;
       const ram = this.seen[u] === 1 && traffic.state[agent] === AgentState.Physical && gap <= range;
+      // a ram closes at its own rate on the class's speed
+      const speed = ram ? classSpeed : isChief && gap > t.pressure.within ? t.chief.speed : pressureSpeed(t, gap, inView, player.speed, classSpeed);
       if (!ram) {
         traffic.setPolicePlan(agent, next, speed);
         continue;
@@ -833,7 +859,7 @@ export class Police {
     }
   }
 
-  /** Fill the roster up to the level's budget, out of view, one retry window at a time. */
+  /** Fill the roster up to the level's budget, out of view, one retry window at a time; now and then one pulls out ahead, in view. */
   private dispatch(player: PlayerProbe, cosHalf: number, level: number): void {
     const t = this.tuning;
     if (!this.dispatching || this.count >= this.budget || this.spawnLeft > 0) return;
@@ -842,8 +868,13 @@ export class Police {
       if ((this.units[u] as number) >= 0) continue;
       const kind = this.wantedKind(level);
       if (kind === null) break;
-      const agent = this.spawn(player, cosHalf, kind);
+      const a = t.arriveInView;
+      const ambush = kind !== 'chief' && level >= a.fromLevel && this.arrivals % a.every === a.every - 1;
+      let agent = ambush ? this.spawnAhead(player, cosHalf, kind) : -1;
+      if (agent >= 0) this.arrivalsInView++;
+      else agent = this.spawn(player, cosHalf, kind);
       if (agent < 0) break;
+      this.arrivals++;
       if (kind === 'chief') this.chief = agent;
       this.units[u] = agent;
       this.seen[u] = 0;
@@ -1027,6 +1058,44 @@ export class Police {
     return kind === 'chief'
       ? this.traffic.spawnPoliceAt(bestLane, bestS, 'sports', player, t.viewNear, cosHalf, t.spawnClearance, PALETTE.ink)
       : this.traffic.spawnPoliceAt(bestLane, bestS, kind, player, t.viewNear, cosHalf, t.spawnClearance);
+  }
+
+  /**
+   * The roadside ambush (DESIGN.md §13.9): a unit pulling out of a side street `arriveInView.ahead` m in front
+   * of the player, on a lane that crosses the player's heading and drives toward the player's road, in view.
+   * Returns its agent or -1.
+   */
+  spawnAhead(player: PlayerProbe, cosHalf: number, kind: 'sports' | 'heavy' | 'police'): number {
+    const t = this.tuning;
+    const lanes = this.traffic.lanes;
+    const [near, far] = t.arriveInView.ahead;
+    const fx = Math.sin(player.yaw), fz = Math.cos(player.yaw);
+    const rx = -fz, rz = fx;
+    let best = Infinity, bestLane = -1, bestS = 0;
+    for (let lane = 0; lane < lanes.laneCount; lane++) {
+      const len = lanes.length[lane] as number;
+      if (Math.hypot((lanes.midX[lane] as number) - player.x, (lanes.midZ[lane] as number) - player.z) > far + len / 2) continue;
+      for (let s = t.spawnEndInset; s <= len - t.spawnEndInset; s += t.spawnSample) {
+        lanes.positionAt(lane, s, 0, this.pose);
+        const dx = this.pose.x - player.x, dz = this.pose.z - player.z;
+        const ahead = dx * fx + dz * fz;
+        if (ahead < near || ahead > far) continue;
+        const across = dx * rx + dz * rz;
+        if (Math.abs(across) > 45) continue;
+        // a side street crossing the player's heading, driving toward the player's road
+        const lx = Math.sin(this.pose.yaw), lz = Math.cos(this.pose.yaw);
+        if (Math.abs(lx * fx + lz * fz) > 0.5) continue;
+        if (across * (lx * rx + lz * rz) >= 0) continue;
+        if (!this.traffic.canSpawnAt(lane, s, t.spawnClearance)) continue;
+        const score = Math.abs(ahead - (near + far) / 2) + Math.abs(across);
+        if (score >= best) continue;
+        best = score;
+        bestLane = lane;
+        bestS = s;
+      }
+    }
+    if (bestLane < 0) return -1;
+    return this.traffic.spawnPoliceAt(bestLane, bestS, kind, player, t.viewNear, cosHalf, t.spawnClearance, -1, true);
   }
 
   /** Reverse Dijkstra on the authored road graph toward the lane under a point, into one of the two fields. */

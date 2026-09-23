@@ -78,6 +78,11 @@ const HOLDERS = 4;
 const WOBBLE_RAD = 5 * Math.PI / 180;
 /** Look-ahead of the velocity controller along the path, m. */
 const CARROT = 8;
+/** A unit on a chase brakes and pulls away this much harder than traffic (POLICE.mode.accelFactor; traffic may not import police). */
+const POLICE_ACCEL = 1.5;
+/** A unit on a chase goes round a car this much slower (m/s) within this reach (m) (POLICE.mode). */
+const POLICE_SLOWER_BY = 3;
+const POLICE_LOOK = 25;
 /** Driving cars ignore the ground; a disturbed or wrecked car is switched onto GROUPS_SOLID so it can tumble and rest. */
 const GROUPS_TRAFFIC = interactionGroups(GROUP_DEFAULT, 0xffff & ~GROUP_TERRAIN);
 const ZERO = { x: 0, y: 0, z: 0 };
@@ -520,12 +525,12 @@ export class Traffic {
     return -1;
   }
 
-  /** Only an unseen, undisturbed civilian may give up a full agent slot. */
-  spawnPoliceAt(lane: number, s: number, kind: 'police' | 'sports' | 'heavy', player: PlayerProbe, near: number, cosHalf: number, clearance: number, paint = -1): number {
+  /** Only an unseen, undisturbed civilian may give up a full agent slot. `inView`: the roadside ambush, placed where the player sees it. */
+  spawnPoliceAt(lane: number, s: number, kind: 'police' | 'sports' | 'heavy', player: PlayerProbe, near: number, cosHalf: number, clearance: number, paint = -1, inView = false): number {
     if (!this.canSpawnAt(lane, s, clearance)) return -1;
     const index = KIND_INDEX[kind];
     const radius = Math.hypot(this.halfW[index] as number, this.halfL[index] as number);
-    if (!this.outOfView(this.pose.x, this.pose.z, radius, player, near, cosHalf)) return -1;
+    if (!inView && !this.outOfView(this.pose.x, this.pose.z, radius, player, near, cosHalf)) return -1;
     const agent = this.claim(player, near, cosHalf);
     if (agent < 0) return -1;
     // a heavy in the pursuit is a police van: white like the saloons, with the livery on top
@@ -601,6 +606,11 @@ export class Traffic {
     this.ramSpeed[agent] = 0;
     this.ramAccel[agent] = 0;
     this.freeSteer[agent] = 0;
+  }
+
+  /** The speed a unit's plan asks for (0 without a plan). Tests. */
+  planSpeed(agent: number): number {
+    return this.plannerSpeed[agent] as number;
   }
 
   clearPolicePlan(agent: number): void {
@@ -873,8 +883,9 @@ export class Traffic {
   private moveKinematic(i: number, desired: number, dt: number): void {
     const t = this.tuning;
     const speed = this.speed[i] as number;
-    const brake = (this.flinchLeft[i] as number) > 0 ? t.flinch.brake : t.brake;
-    this.speed[i] = speed < desired ? Math.min(desired, speed + t.accel * dt) : Math.max(0, Math.max(desired, speed - brake * dt));
+    const unit = this.police[i] === 1 && (this.plannerSpeed[i] as number) > 0 ? POLICE_ACCEL : 1;
+    const brake = ((this.flinchLeft[i] as number) > 0 ? t.flinch.brake : t.brake) * unit;
+    this.speed[i] = speed < desired ? Math.min(desired, speed + t.accel * unit * dt) : Math.max(0, Math.max(desired, speed - brake * dt));
     const lane = this.lane[i] as number;
     const len = this.lanes.length[lane] as number;
     const nxt = this.next[i] as number;
@@ -1025,7 +1036,8 @@ export class Traffic {
   /** What a car does not wait behind: the dead car it is going round; for a unit on a chase, a car pulling over for it. */
   private passable(i: number, other: number): boolean {
     if (other === this.passAgent[i]) return true;
-    return this.police[i] === 1 && (this.plannerSpeed[i] as number) > 0 && this.police[other] === 0 && (this.pullLeft[other] as number) > 0;
+    return this.police[i] === 1 && (this.plannerSpeed[i] as number) > 0 && this.police[other] === 0
+      && (this.pullLeft[other] as number) > 0 && (this.shift[other] as number) >= 1;
   }
 
   /** An agent's speed along a heading, never below 0 (a car crossing is not going our way); 0 for none. */
@@ -1078,6 +1090,8 @@ export class Traffic {
   private mayEnter(i: number, player: PlayerProbe): boolean {
     const t = this.tuning;
     if (this.forced[i] === 1) return true;
+    // the police driving mode (DESIGN.md §13.9): a unit on a chase runs the box; the traffic yields to it
+    if (this.police[i] === 1 && (this.plannerSpeed[i] as number) > 0) return true;
     if ((this.wait[i] as number) >= (this.bad[i] === 1 ? t.temper.badClaimAfter : t.junctionWait)) {
       this.forced[i] = 1;
       return true;
@@ -1901,8 +1915,35 @@ export class Traffic {
     const len = this.lanes.length[lane] as number;
     const s = this.s[i] as number;
     if (this.police[i] === 1 || (this.plannerSpeed[i] as number) > 0) {
-      const out = this.police[i] === 1 && (this.plannerSpeed[i] as number) > 0 && this.pullingAhead(i, lane, s);
-      this.ease(i, out ? -t.pullOver.offset : 0, dt);
+      let target = 0;
+      if (this.police[i] === 1 && (this.plannerSpeed[i] as number) > 0) {
+        // the police driving mode (DESIGN.md §13.9): round a slower car on the oncoming side (or the other lane
+        // of the highway), round a car pulling over for it
+        const pass = this.passAgent[i] as number;
+        if (pass >= 0) {
+          this.passLeft[i] = (this.passLeft[i] as number) - (this.speed[i] as number) * dt;
+          if ((this.passLeft[i]) <= 0 || this.state[pass] === AgentState.Free) this.passAgent[i] = -1;
+        } else {
+          const lead = this.leaderAgent[i] as number;
+          if (lead >= 0 && this.police[lead] === 0 && this.lane[lead] === lane) {
+            const gapL = (this.s[lead] as number) - s;
+            if (gapL > 0 && gapL < POLICE_LOOK && (this.plannerSpeed[i] as number) - (this.speed[lead] as number) > POLICE_SLOWER_BY) {
+              const par = this.parallel[lane] as number;
+              const rev = this.reverse[lane] as number;
+              if (par >= 0) {
+                const sp = s * (this.lanes.length[par] as number) / len;
+                if ((this.next[i] as number) < 0 && this.laneClear(par, sp, (this.speed[i] as number) * 0.8 + 8)) this.changeLane(i, par, sp);
+              } else if (rev >= 0 && this.oncomingClear(rev, (this.lanes.length[rev] as number) - s, 60)) {
+                this.passAgent[i] = lead;
+                this.passLeft[i] = gapL + 15;
+              }
+            }
+          }
+        }
+        if ((this.passAgent[i] as number) >= 0) target = -2 * (this.lanes.offset[this.lane[i] as number] as number);
+        else if (this.pullingAhead(i, lane, s)) target = -t.pullOver.offset;
+      }
+      this.ease(i, target, dt);
       return;
     }
     this.flinchLeft[i] = Math.max(0, (this.flinchLeft[i] as number) - dt);

@@ -123,7 +123,7 @@ describe('heavies and the Chief', () => {
     } finally { sim.dispose(); }
   }, 120_000);
 
-  it('7.4 the Chief stays through the chase, and after a wreck another comes 16 s later, not sooner', async () => {
+  it('7.4 the Chief stays through the chase, and after a wreck another comes on level 5 cadence times two, not sooner', async () => {
     const sim = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 0, record: false, heat: 100, spawn: 'highway' });
     const traffic = sim.traffic as Traffic;
     const police = sim.police!;
@@ -140,7 +140,8 @@ describe('heavies and the Chief', () => {
       traffic.wreck(police.chief);
       run(sim, 1 / 60);
       expect(police.chief).toBe(-1);
-      const wait = POLICE.reinforceSeconds * POLICE.chief.reinforceFactor;
+      // M5.5: the refill cadence is the level's (POLICE.refillSeconds), the Chief's that times its factor
+      const wait = (POLICE.refillSeconds[5] as number) * POLICE.chief.reinforceFactor;
       const back = runUntil(sim, wait + 3, (s) => s.police!.chief >= 0, (_t, _c, s) => {
         if (s.run.state === 'busted') s.run.closeCard();
         if (s.heat.level < 5) s.heat.add(100);

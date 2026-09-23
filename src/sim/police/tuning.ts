@@ -89,8 +89,20 @@ export interface PoliceTuning {
    * the rest stand by `standby` m behind. `accel` caps the body's velocity change; `keep` m of hysteresis on a slot.
    */
   arrest: { playerSpeed: number; releaseSpeed: number; range: number; rear: number; front: number; side: number; standby: number; decel: number; arrive: number; accel: number; keep: number; clear: number; detourSpeed: number };
-  /** Sight lost: units drive to the last fix and fan out once within `reach` m of it. */
-  search: { reach: number };
+  /** Sight lost: units drive to the last fix and fan out once within `reach` m of it; the radar's disc there grows from `discMin` to `discMax` m over the cooldown. */
+  search: { reach: number; discMin: number; discMax: number };
+  /**
+   * Pressure (docs/DESIGN.md §13.9): within `within` m a chasing unit drives at the player's speed plus `over`
+   * (never under `min`), up to its class's speed; within `attack` m it closes at its class's speed for the ram
+   * or the PIT; the catch-up only where the player cannot see the unit.
+   */
+  pressure: { within: number; attack: number; over: number; min: number };
+  /** Seconds before a lost unit is replaced, by heat level 0..5: the cadence tightens as the chase grows. */
+  refillSeconds: number[];
+  /** From `fromLevel` one arrival in `every` pulls out of a side street `ahead` m in front of the player, in view. */
+  arriveInView: { fromLevel: number; every: number; ahead: readonly [number, number] };
+  /** The police driving mode: brakes and pulls away at `accelFactor` of traffic's; goes round a car `slowerBy` m/s slower within `look` m. */
+  mode: { accelFactor: number; slowerBy: number; look: number };
   /** From `fromLevel` every second saloon routes to the player's position `seconds` ahead, until within `breakRange` m. */
   cutoff: { fromLevel: number; seconds: number; breakRange: number };
   /** A police car the player hits at this dv while nobody chases notices (and heat rises); once per `assaultCooldown` s per car. */
@@ -150,7 +162,11 @@ export const POLICE: PoliceTuning = {
   chief: { level: 5, speed: 45, pitAcceleration: 30, pitRange: 14, reinforceFactor: 2 },
   // clear: a unit passes the player's car no closer than this (m), at detourSpeed (m/s)
   arrest: { playerSpeed: 6, releaseSpeed: 9, range: 60, rear: 5.6, front: 5.6, side: 3.2, standby: 12, decel: 6, arrive: 1.2, accel: 12, keep: 5, clear: 4, detourSpeed: 5 },
-  search: { reach: 30 },
+  search: { reach: 30, discMin: 60, discMax: 150 },
+  pressure: { within: 60, attack: 25, over: 4, min: 12 },
+  refillSeconds: [8, 10, 8, 7, 6, 5],
+  arriveInView: { fromLevel: 2, every: 3, ahead: [60, 100] },
+  mode: { accelFactor: 1.5, slowerBy: 3, look: 25 },
   cutoff: { fromLevel: 2, seconds: 4, breakRange: 40 },
   assaultDv: 1.5,
   assaultCooldown: 3,

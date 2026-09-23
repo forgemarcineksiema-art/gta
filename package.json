@@ -1,7 +1,7 @@
 {
   "name": "gta",
   "private": true,
-  "version": "0.5.5",
+  "version": "0.6.0",
   "type": "module",
   "description": "Open-world arcade driving game for CrazyGames",
   "scripts": {

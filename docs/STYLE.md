@@ -499,6 +499,31 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   a danger-red BUSTED head, three ruled lines that fill with navy ink,
   tilted 3° and skewed like the rest of the HUD, under the swap prompt.
 
+## The wanted board and the kit (M6)
+
+- **The rivals' cars** (slices 4–5), built as the city's set is, under 3,000 triangles: Granny's lavender wagon (a
+  chrome blower through the bonnet, side pipes, three terracotta pots with pink blooms on the rack), Pete's red hatch
+  under a pizza slice sign (crust up, point down, pepperoni), Tina's orange wrecker (winch, crane, hook, amber bar,
+  tow bar), the twins' mint and peach coupes (twin stripes in the dark tone, a wing), Frank's white saloon under a
+  five-colour disco bar with a magenta band and a drawn yellow star, Bernie's magenta party bus (a chrome-railed roof
+  deck, speaker stacks, a disco ball, lime and yellow stripes), Niko's long low blue lowrider (chrome bumpers, pink
+  pinstripes, the spare on the tail; it hops at a standstill), the Nephew's 6.8 m gold limo (three windows a side,
+  chrome trim, red and white flags), Pip's lime one-door bubble, the Ghost's black phantom (skirts, a slim wing, the
+  headlamps dark), the Chief's white cruiser in gold trim with a gold star a side, his light bar and a push bar.
+- **The posters** (slice 5): ten on the hideout's back wall either side of the player's own and the Chief's above it;
+  a white card, a band (red waiting, cyan the next, grey beaten), the rival's car as a swatch of their paint, a gold bar
+  under a beaten one. The duel's ring, the line and the card are the cyan (`carBlue`) no other job wears.
+- **The driver's kit** (slices 6–7): toppers of a few boxes (the cone, a rubber duck, a shark fin, a crown, a traffic
+  light, a donut, a dish, a mattress, a trophy, a flamingo, the rivals' seven), under 300 triangles, seated on the roof
+  of whatever the player drives; neon as a soft additive glow in the body's footprint, no light; the boost's flame as
+  two short additive cones at the tail; a drift's tyre smoke low off the rear tyres; each in its item's colour (the
+  flame orange and the smoke a pale grey when none is worn).
+- **The car's kit** (slice 8): chrome stars, a deep dish with a wide chrome lip, gold wires, white discs; a lip, a wing
+  or the giant red wing on the boot (not on the big ones); slammed 6 cm or lifted 10 cm, the body over its wheels.
+- **The hidden cars** (slice 9): a red 1930s roadster (open cockpit, a tall grille, wire wheels, running boards), a
+  white street sweeper (orange hopper, black brushes under the nose, an amber bar), a yellow hot-dog van (the sausage
+  in its bun on the roof, a mustard zigzag, a red and white awning).
+
 ## Camera and motion
 
 - Chase camera behind and above, FOV 60 → up to 80 with speed and boost, pulls back and drops with speed, follows the velocity direction so drifts show the car sideways. Very small shake at high speed. Steering input itself never swivels the view; actual yaw contributes only 0.04 s of heading lead and at most 0.65 m of lateral look offset. Heading follow is capped at 110°/s; speed/boost FOV changes ease at 2.5/s. See `src/render/ChaseCamera.ts`.

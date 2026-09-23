@@ -102,7 +102,8 @@ async function earnings(seed: number): Promise<{ bag: number; coins: number; job
       if (s.run.state === 'door') { s.run.openDoor(); last = 0; }
       bot.drive(s, c, 1 / 60);
     });
-    const jobs = sim.jobs.defs.filter((d) => d.kind !== 'escape');
+    // the repeatable jobs: a duel (M6) pays its purse once, one rival at a time behind the board's requirements
+    const jobs = sim.jobs.defs.filter((d) => d.kind !== 'escape' && d.kind !== 'duel');
     const jobMean = jobs.reduce((n, d) => n + d.payout, 0) / jobs.length;
     return { bag: bag / (SECONDS / 60), coins: sim.run.coins / (SECONDS / 60), jobMean };
   } finally { sim.dispose(); }

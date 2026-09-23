@@ -29,7 +29,7 @@ fix Marcin asks for after a gate. Dev-server builds carry the same stamp.
 ## Test URLs
 
 All parameters work on both ports. Test parameters (`bot`, `spawn`, `heat`,
-`car`, `map`, `manual`, `job`) turn the cold open off and, without `date`,
+`car`, `map`, `manual`, `job`, `board`) turn the cold open off and, without `date`,
 the dailies and the day's police layout (every site manned), so the suites
 do not change with the calendar.
 
@@ -45,6 +45,9 @@ do not change with the calendar.
 | `/?spawn=loop` | start of the authored loop: Crown diagonals, north highway, Works chicane, Quay sweep, Garden parkway |
 | `/?heat=3` | start the run at heat level 1-5 (the police answer at that level once they see you) |
 | `/?police=off` | the dispatcher sends no unit, the beat included: a job's flow measured clean (the order e2e) |
+| `/?board=8` | the wanted board (M6) as if every rival under #8 was beaten (their cars owned) and #8's requirements met, the chain done; `board=0` puts the Chief next; turns the cold open off |
+| `/?board=10&job=duel` | pulled up at the next rival's bay: their duel starts at boot |
+| `/?kit=all` | every item of the driver's and the car's kit had, to try them on the STYLE page |
 | `/?quality=low` | lock `low` or `high` for reproducible visual/performance comparisons |
 | `/?seed=123` | regenerate building lots from a seed (road topology stays fixed) |
 | `/?dev=1` | debug HUD + live tuning panel (also the backtick key); the panel's Life section holds the traffic, pedestrian, economy, damage and swap numbers |

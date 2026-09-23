@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../src/sim/balance';
-import { CAR_IDS, CAR_PRESETS, PALETTE } from '../../src/sim';
+import { BODY_IDS, CAR_IDS, CAR_PRESETS, KIT, PALETTE } from '../../src/sim';
 import { DEFAULT_SAVE, SAVE_VERSION, apply, collect, defaultSave, encodeBits, migrate, parse, serialize, type SaveV1 } from '../../src/sim/save/format';
 import { createWorld } from './helpers';
 
@@ -178,5 +178,23 @@ describe('save format', () => {
     // the reserved fields start empty
     expect(save.board).toEqual({ beaten: 0 });
     expect(save.kit.on).toEqual([-1, -1, -1, -1, -1]);
+  });
+
+  it('M6 G.2 everything M6 can hold (every car owned, painted and fitted, the whole kit, the board beaten, a long career) round-trips under the size guard', () => {
+    const save = filled([1, 2, 3]);
+    save.owned = [...BODY_IDS];
+    save.paint = {};
+    save.carKit = {};
+    for (const id of BODY_IDS) {
+      save.paint[id] = PALETTE.carMagenta;
+      save.carKit[id] = [3, 0, 2, 1];
+    }
+    save.kit = { owned: encodeBits(new Uint8Array(KIT.length).fill(1)), on: [16, 20, 25, 30, 35] };
+    save.board = { beaten: 0b111_1111_1111 };
+    save.career = { races: 9999, zones: 9999, fares: 9999, hotFares: 9999, orders: 9999, takedowns: 99999, caches: 9999, escapes: [999, 999, 999, 999, 999] };
+    const text = serialize(save);
+    expect(parse(text)).toEqual(save);
+    expect(text.length).toBeLessThan(BALANCE.save.maxBytes);
+    console.info(`the save with everything of M6 filled: ${text.length} bytes of ${BALANCE.save.maxBytes}`);
   });
 });

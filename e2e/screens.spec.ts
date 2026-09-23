@@ -167,6 +167,7 @@ for (const [w, h] of SIZES) {
     await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 30_000 });
     await page.evaluate(() => window.advanceTime?.(400));
     await page.waitForSelector('.jobs__card.is-visible', { timeout: 10_000 });
+    await page.waitForTimeout(300);
     await page.screenshot({ path: `screens/duel-${w}x${h}.png` });
     await page.evaluate(() => window.advanceTime?.(2000));
     await page.screenshot({ path: `screens/duel-line-${w}x${h}.png` });

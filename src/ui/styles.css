@@ -1208,8 +1208,16 @@ kbd.key {
   scrollbar-width: none;
 }
 .wall__cars::-webkit-scrollbar { display: none; }
-/* the STYLE page's kit rows (M6): the cars' row's cards, a little lower */
-.wall__kit .wall__card { min-height: 78px; }
+/* the STYLE page's kit rows (M6): the cars' row's cards, lower and smaller */
+.wall__kit .wall__card { min-height: 62px; padding: 6px 4px 7px; gap: 3px; }
+.wall__kit .wall__card-swatch { width: 36px; height: 12px; }
+.wall__kit .wall__card-name { font-size: 12px; }
+.wall__kit .wall__card-status { font-size: 13px; }
+/* the STYLE page is taller than the wall at every size (nine rows): it scrolls under the tabs, each row keeps its
+   height, and the keys bring the focus into view (M6 gate) */
+.wall__page--paint.is-current { overflow-y: auto; scrollbar-width: none; }
+.wall__page--paint::-webkit-scrollbar { display: none; }
+.wall__page--paint > * { flex-shrink: 0; }
 .wall__card {
   display: flex;
   flex-direction: column;
@@ -1447,10 +1455,11 @@ kbd.key {
 /* short screens (800×450 and the like): the same wall, tighter */
 /* the wall grows with a big screen (M5.5, DESIGN.md §13.6): 660 px at the small sizes, 790 at 1536×864, 920 at 1080p */
 @media (min-width: 1400px) and (min-height: 820px) {
-  .run__wall { transform: translate(-50%, -50%) scale(1.2); }
+  /* scaled, it still fits the screen's height (the STYLE page fills it, M6 gate) */
+  .run__wall { transform: translate(-50%, -50%) scale(1.2); max-height: calc((100vh - 24px) / 1.2); }
 }
 @media (min-width: 1700px) and (min-height: 1000px) {
-  .run__wall { transform: translate(-50%, -50%) scale(1.4); }
+  .run__wall { transform: translate(-50%, -50%) scale(1.4); max-height: calc((100vh - 24px) / 1.4); }
 }
 @media (max-height: 560px) {
   .run__wall { padding: 8px 16px 10px; }

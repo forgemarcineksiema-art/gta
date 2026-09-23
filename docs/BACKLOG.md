@@ -42,6 +42,8 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 ## Rendering
 
+- The heap went 48 → 58 MB at the M6 gate (budget 250), not profiled. The likely part: the traffic builds an instanced mesh per body at load, all 28 (M6 added 14 bodies, most never spawned); building one the first time its body spawns would tell and save.
+
 - Startup at 20 Mbit + CPU ×4 is 2.7 s to control in a typical run (download
   0.9, physics 0.2, sim 0.4, renderer 0.65, first frame 0.6); a slow run of the
   same build reached 4.6 s with every phase 1.5–2× longer (machine state, not
@@ -75,6 +77,7 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 ## Run structure and heat (M4 candidates beyond the slice plan; docs/DESIGN.md)
 
+- The balance model at the M6 gate: (a) is red too, the skilled optimum at L2 under the novice's L3; both bots' bank a run is flat across the levels (novice 5.3–5.6k, skilled 3.9–5.7k), so the argmax moves with the traffic's moment (the skilled bot's captures at L3 and L5 at seed 7 went 0 → 1.00 and 0 → 0.67 a minute when M6 reserved the rivals' and the hidden cars' bays). Whether the heat multiplier pays enough for the capture risk is a design question for Marcin's first hour, not a bot's.
 - The balance model's novice (M5.5 gate): the road bot waits in queues at the downtown lights with units behind it and is busted even at level 1 (once in three minutes at every seed), so the model's novice run is 2.4 minutes and the first hour's assertions (b) and (c) are red (the first car at minute 3.9, one gap 2.4 minutes) while the income a minute is on DESIGN §3.3's target. A novice proxy that drives round a queue without ramming (the careful bot's overtake while chased turned it into a rammer: bag 4,079 a minute) would measure a player; until then Marcin's first hour judges `BALANCE.prices.compact` and tier 1 (over 13.6k keeps every gap over three minutes at these runs).
 - The police catch the novice bot less at level 4 than at levels 2 and 3 at all three seeds (0.22 against 0.78 and 0.44 a minute): heat 4–5 thin the traffic to 60 %, so fewer queues trap it. A player's level 4 decides whether the heavies and the helicopter need more bite.
 - A unit's junction curves are the traffic's; tighter ones would read as police driving (M5.5 slice 4, cosmetic).
@@ -83,6 +86,14 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 - The bot policies stop in front of a roadblock's cars and get boxed; a bot that aims for the sawhorse (or around) would make the level-3 busted rate a player's. (M4 slice 6)
 - Pier-end jumps (DESIGN.md §6.1 names them): the quay has no clear 60 m run-out off a pier; the twenty ramps are on the park strip. (M4 slice 6)
 - Multi-storey car park as a helicopter cover set piece: ramps, per-floor colliders, and a chase camera at 2.4 m plus look height inside 3 m ceilings; the camera alone is a week. (v1.1)
+
+## The wanted board and the kit (M6)
+
+- A rival cruising their turf before their duel is ready, a teaser seen in traffic (the plan left it to the playtest).
+- The day's pick as the rewarded offer (free for a video, the half price as the equal alternative): M7 slice 4 (`docs/M7_PLAN.md`).
+- The sweeper's brushes spin and the lowrider's hop reaches the traffic's other lowriders only when the rival waits: render polish.
+- SELL / KEEP at a fence was dropped in M6 slice 0 (a fence has no wall; the order pays there and the car can still be kept at a door).
+- The standoff (M5.5 gate) with a car near the player: nose to nose, it pulls toward its own kerb even when the player stands on that side (seen at the M6 gate, the player mid U-turn in a junction), and a car that is not moving cannot steer aside; it should go round on the side away from the player.
 
 ## Activities and progression (M5; docs/DESIGN.md §3–4, §7–8)
 

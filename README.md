@@ -7,9 +7,10 @@ takedowns and fifty smashable billboards. M4 (`docs/M4_REPORT.md`) is the
 police and the run. M5 (at its gate, `docs/M5_REPORT.md`) is the launch
 minimum: the save, three jobs with the arrow, the garage on the wall, the
 dailies and the streak, the balance script. M5.5 (`docs/M5.5_REPORT.md`)
-is the whole game before the platform. M6 is the wanted board, ten rivals
-and their cars (`docs/M6_PLAN.md`); M7 is the platform and the submission
-(`docs/M7_PLAN.md`); all designed in `docs/DESIGN.md`. Older
+is the whole game before the platform. M6 (at its gate, `docs/M6_REPORT.md`)
+is the wanted board: ten rivals and the Chief, their cars, the kit; M7 is
+the platform and the submission (`docs/M7_PLAN.md`); all designed in
+`docs/DESIGN.md`. Older
 acceptance reports: `docs/M2_REPORT.md`, `docs/M3_REPORT.md` and
 `docs/history/`.
 
@@ -23,11 +24,11 @@ npm start            # builds the production bundle and serves it at http://loca
 ```
 
 That is the build CrazyGames would serve, from `dist/`, with no URL parameters.
-Press `P`: the pause screen's corner shows the build stamp, `0.5.5+<commit>`
+Press `P`: the pause screen's corner shows the build stamp, `0.6.0+<commit>`
 (`-dirty` when uncommitted changes went into it), so it is always clear which
-build is on screen. The version is the milestone: 0.5.5 is M5.5.
+build is on screen. The version is the milestone: 0.6.0 is M6.
 
-Controls: `W A S D` / arrows drive, `Space` handbrake (drift), `Shift` boost, `E` swap into the car beside you, `R` reset (or respawn when wrecked), `C` camera, hold `Tab` for the map of the island, `P` pause, `M` mute. Any key skips the takedown slow motion and closes the busted card. Behind the garage door `A`/`D` move between the wall's pages, `W` opens one or drives out, `S` backs out; everything is clickable too.
+Controls: `W A S D` / arrows drive, `Space` handbrake (drift), `Shift` boost, `E` swap into the car beside you, `H` horn (the car ahead moves aside), `R` reset (or respawn when wrecked), `C` camera, hold `Tab` for the map of the island, `P` pause, `M` mute. Any key skips the takedown slow motion and closes the busted card. Behind the garage door `A`/`D` move between the wall's pages, `W` opens one or drives out, `S` backs out; everything is clickable too.
 
 The first visit is the cold open: a beat-up van at heat 1, a muscle car to swap into, a coin line round the hideout's block through a billboard, a delivery marker and the hideout door; captions teach each verb, `N` skips. The save (bank, coins, cars, paint, upgrades, billboards, dailies, the streak) is kept in the browser; `?fresh=1` starts a new profile.
 

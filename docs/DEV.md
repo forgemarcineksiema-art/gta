@@ -29,12 +29,18 @@ fix Marcin asks for after a gate. Dev-server builds carry the same stamp.
 ## Test URLs
 
 All parameters work on both ports. Test parameters (`bot`, `spawn`, `heat`,
-`car`, `map`, `manual`) turn the cold open off.
+`car`, `map`, `manual`, `job`) turn the cold open off and, without `date`,
+the dailies and the day's police layout (every site manned), so the suites
+do not change with the calendar.
 
 | URL | What |
 |---|---|
-| `/` | seeded 1.575 km square city; automatic rendering quality; the cold open once per tab |
+| `/` | seeded 1.575 km square city; automatic rendering quality; the cold open once per profile (the save's `seen`) |
+| `/?fresh=1` | a new profile: the save's key is cleared before boot (the cold open follows) |
 | `/?coldopen=1` | force the cold open; `?coldopen=0` skips it |
+| `/?date=2026-09-23` | the local date the dailies, the streak and the day's police are drawn for |
+| `/?job=delivery` | start in that job's ring: a def id or the first of a kind (`delivery`, `order`, `escape`) |
+| `/?job=order&bot=job` | the road bot on the job: into a delivery's drop-off, after an order's wanted car (the swap is yours) |
 | `/?spawn=crown` | city districts: `crown`, `foundry`, `gardens`, `marina`; perimeter road: `highway` |
 | `/?spawn=loop` | start of the authored loop: Crown diagonals, north highway, Works chicane, Quay sweep, Garden parkway |
 | `/?heat=3` | start the run at heat level 1-5 (the police answer at that level once they see you) |
@@ -56,7 +62,7 @@ All parameters work on both ports. Test parameters (`bot`, `spawn`, `heat`,
 
 ## QA hooks
 
-- `window.__game`: the `GameHandle` (`started`, `paused`, `sim`, `platformCalls`, `errors`, `version`, `renderer`, `roadBot`, `audio`, `adShowing`).
+- `window.__game`: the `GameHandle` (`started`, `paused`, `sim`, `platformCalls`, `errors`, `version`, `renderer`, `roadBot`, `audio`, `adShowing`, `save`).
 - `window.render_game_to_text()`: JSON with the map, car, district, residency, damage, heat, pursuit, run, cold open, job, traffic counts, pedestrians, billboards and the recent events.
 - `window.advanceTime(ms)` with `?manual=1`; `window.__perf` / `window.__perfDone` with `bot` + `duration`.
 
@@ -70,6 +76,8 @@ npm run screens      # HUD/pause screenshots at every required size -> screens/
 npm run city         # M2 startup, whole-road-graph scene budgets, controls and quality
 npm run life         # M3: a bot run with traffic and pedestrians on, events flowing, budgets held
 npm run heat         # M4: the bot into the hideout, the door as a game-made break, heat 1/3/5
+npm run game         # M5: the garage by keys, the offers on every ad path, the cold open once, the save, a delivery and an order by the bot
+npm run balance      # M5: the busted rates by the bot policies, the EV table, the first hour, three assertions (~40 s, Node)
 ```
 
 The whole-map check is accelerated fixed-step driving with sampled rendering;

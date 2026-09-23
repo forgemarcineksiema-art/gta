@@ -117,3 +117,8 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 - A lit hideout sign visible from the highway (the garages have an orange band over the door and a radar glyph); drop-off approaches with a second, longer way in. (M4/M5)
 - The garage interior reads dark: the roof's underside gets only the hemisphere's ground colour; a lighter ceiling or a brighter strip light if Marcin finds it gloomy. (M4)
 - `tests/sim/traffic.test.ts` is the quick suite's long pole (68 s under the parallel load, 2026-09-23; the next file is 27 s): its traffic-pool drives over 10 s belong in `traffic.long.test.ts` per CLAUDE.md, which would bring `npm run verify` back under a minute of tests.
+- The music bed (M5 slice 8): one CC0 loop fetched after `gameplayStart()` through the master gain at -14 dB; needs Marcin's yes on the exact file, source and licence before anything is downloaded (docs/ASSETS.md).
+- Coin rings round the job markers (DESIGN.md §3.2 says they join in M5): not built; the markers are rings already and the lines end on caps.
+- The naive hunter (`order.long.test.ts`) loses the wanted car where its re-plan routes through a U-turn: a hunter aiming at the car's next junction would make the order e2e and the measurement faster.
+- The wall panel is 660 px wide at every size: at 1920x1080 it could grow with the viewport (legible already at DPR 1).
+- Job placement generates the chunks it checks at boot (70-130 ms in Node): caching the sixteen defs per seed would take it off the time to control.

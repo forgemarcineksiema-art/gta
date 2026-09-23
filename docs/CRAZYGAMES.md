@@ -43,7 +43,7 @@ Launch model (requirements/intro): **Basic Launch** = live without SDK, no monet
 | G7 | No in-game fullscreen button; CrazyGames provides fullscreen itself. | requirements/gameplay | done | No fullscreen button in the UI. |
 | G8 | No cross-promotion/external links except: privacy/terms, community links on menus, store links (desktop only), CrazyGames backlinks, same-series game links. App Store links are never allowed in-game. | requirements/gameplay | done | No external links in the game. |
 | G9 | PEGI 12 compliant (audience aged 13+). | requirements/gameplay | todo | |
-| G10 | Full Launch: player lands directly in gameplay or at most one click away from playing. | requirements/gameplay | todo | Auto-start into the tutorial. |
+| G10 | Full Launch: player lands directly in gameplay or at most one click away from playing. | requirements/gameplay | done (M5) | A plain load starts in the cold open (first visit) or on the street in the garage car (every later one): no menu; the garage is a place behind the door. |
 
 ## 3. Ads
 
@@ -53,14 +53,14 @@ Launch model (requirements/intro): **Basic Launch** = live without SDK, no monet
 | A2 | Do not implement own cooldown timers: the SDK enforces max 1 midgame ad every 3 minutes and takes game start into account; early requests return `adCooldown`. | requirements/ads, resources/midgame-ads-pacing | info | Just request at every natural break. |
 | A3 | On `adStarted`: pause the game, mute audio, block all UI (disable buttons or show a blocking spinner) until `adFinished` or `adError`. Mute only when the ad actually starts, not on request. | requirements/ads, sdk/video-ads | done (adapter side, M4 slice 8) | `App` blocks input from the request (`InputManager.blocked`) and holds the break open (`adShowing`); `adStarted` mutes the one master gain (`EngineAudio.setMuted`, which the engine, `Sfx` and the siren share); `adFinished`/`adError` unmute and unblock. e2e 8.1 reads the gain and presses a key during the ad. |
 | A4 | On `adError` (any code incl. `unfilled`, `adblock`, `adsDisabledBasicLaunch`, `adCooldown`, `other`) the game must continue normally. | requirements/ads, sdk/video-ads | done (adapter side, M4 slice 8) | The error event unblocks at once and the next key drives on; no reward exists at these points. e2e 8.2 (`?ad=error&adError=adCooldown`), 8.3 (`?ad=off`: no request). |
-| A5 | Rewarded ads are occasional optional bonuses, not a core loop; do not offer too often (show a timer or hide the button). | requirements/ads | todo | Planned (docs/DESIGN.md §3.4, §9): rewarded offers only in the garage (lawyer, fence) and at the hideout door (double the bag), each with a cash price as the equal alternative; hidden when ads are unavailable. |
-| A6 | Rewarded ad button must not appear on an active gameplay screen and must not be misleading; show a video icon; skip/close must be equally prominent and never hidden or delayed. | requirements/ads | todo | |
-| A7 | Reward only on `adFinished`; never reward on `adError`. | requirements/ads | todo | |
-| A8 | Do not chain ads (more than one rewarded ad for a single reward). | requirements/ads | todo | |
-| A9 | Do not offer an out-of-lives/revive rewarded ad every time the player loses a life; revive max once per session. | requirements/ads, resources/monetizing-driving | todo | |
-| A10 | Do not combine a midgame ad between levels with a rewarded "keep playing" ad for the same level. | requirements/ads | todo | |
+| A5 | Rewarded ads are occasional optional bonuses, not a core loop; do not offer too often (show a timer or hide the button). | requirements/ads | done (M5) | Rewarded offers only at the door (DOUBLE THE BAG, above an 8,000 bag, at most once a door) and on the wall's PREP page (the lawyer, the fence), each beside a cash button of the same size; never on a driving screen. |
+| A6 | Rewarded ad button must not appear on an active gameplay screen and must not be misleading; show a video icon; skip/close must be equally prominent and never hidden or delayed. | requirements/ads | done (M5) | Every rewarded button carries the video icon (a cyan frame with a play triangle); the decline (BANK IT) is the same size, beside it, and focused by default; `e2e/game.spec.ts` 4.7–4.9. |
+| A7 | Reward only on `adFinished`; never reward on `adError`. | requirements/ads | done (M5) | `App.rewarded` pays only when `requestAd` resolves `finished`; an error pays nothing and leaves the cash path (e2e 4.8). |
+| A8 | Do not chain ads (more than one rewarded ad for a single reward). | requirements/ads | done (M5) | One video per reward: the double offer is answered either way after its one request (no second ask); a prep item already bought never requests (e2e 4.9 counts one request for the door). |
+| A9 | Do not offer an out-of-lives/revive rewarded ad every time the player loses a life; revive max once per session. | requirements/ads, resources/monetizing-driving | n/a | No lives and no revive: busted keeps half the bag by design, and the lawyer is a cash item with a video alternative, not a revive. |
+| A10 | Do not combine a midgame ad between levels with a rewarded "keep playing" ad for the same level. | requirements/ads | done (M5) | At most one ad a door: the rewarded offer when it shows, else the midgame request; never both (`App.openWall`). |
 | A11 | Banners only on useful screens open >= 5 seconds on average, never during active gameplay, max 2 per screen, must not block UI at any size. | requirements/ads | todo | Garage/menu only if we use banners. |
-| A12 | Adblock users must be able to play normally; never block them. Features may be restricted with a notice, but rewarded buttons must not stay clickable with no effect (use `hasAdblock()` to hide/disable). | requirements/ads | todo | |
+| A12 | Adblock users must be able to play normally; never block them. Features may be restricted with a notice, but rewarded buttons must not stay clickable with no effect (use `hasAdblock()` to hide/disable). | requirements/ads | done (M5) | `adsAvailable('rewarded')` false hides every video button (never disabled); the adblock case reports unavailable in `LocalPlatform` (`?adblock=1`), and the M6 adapter must do the same from `hasAdblock()`; the game plays fully on the cash paths (e2e 4.7). |
 | A13 | During Basic Launch ads are disabled and no revenue is shared; `requestAd` returns `adsDisabledBasicLaunch`. | requirements/ads, resources/basic-launch-metrics | info | |
 
 ## 4. Account / User
@@ -80,11 +80,11 @@ Launch model (requirements/intro): **Basic Launch** = live without SDK, no monet
 
 | # | Requirement | Source | Status | Notes |
 |---|---|---|---|---|
-| D1 | Use the Data module (`getItem`/`setItem`/`removeItem`/`clear`) for progress; it is the preferred save method and syncs across devices for logged-in users. | requirements/account-integration, sdk/data | todo | |
-| D2 | Total game data as a JSON string must stay <= 1 MB (1048576 bytes); exceeding it raises error code `dataLimitExcedeed` (sic) and the data is no longer backed up. | sdk/data | todo | Keep saves compact; warnings appear in console near the limit. |
+| D1 | Use the Data module (`getItem`/`setItem`/`removeItem`/`clear`) for progress; it is the preferred save method and syncs across devices for logged-in users. | requirements/account-integration, sdk/data | done (adapter side, M5) | One key (`save`), one versioned JSON document through `Platform.saveData/loadData` (`src/app/save.ts`); the format is `src/sim/save/format.ts` (pins in `tests/sim/save.test.ts`). `LocalPlatform` keeps it in `localStorage`; `CrazyGamesPlatform` (M6) maps the same three calls onto the Data module. |
+| D2 | Total game data as a JSON string must stay <= 1 MB (1048576 bytes); exceeding it raises error code `dataLimitExcedeed` (sic) and the data is no longer backed up. | sdk/data | done (M5) | Everything filled serializes to 1.1 kB; a 15-minute bot session saves 359 bytes; `BALANCE.save.maxBytes` (32 kB) warns in the console; save test 0.4 pins the filled size. |
 | D3 | Saving is debounced 1 s (up to 30 s in exceptional cases); do not rely on immediate persistence. | sdk/data | info | |
 | D4 | Guest data lives in `localStorage`; on login the SDK migrates guest data to the account automatically. | sdk/data | info | |
-| D5 | Data is preloaded at `init()`; read only after `await init()` resolves. | sdk/data | todo | |
+| D5 | Data is preloaded at `init()`; read only after `await init()` resolves. | sdk/data | done (adapter side, M5) | `App.boot` awaits `platform.init()` before `SaveStore.load()`, and the world is built from the loaded save; nothing reads the data before init resolves. |
 | D6 | Games with in-game purchases must not rely on Automatic Progress Save (APS). | requirements/account-integration | n/a | |
 
 ## 6. Game covers
@@ -101,7 +101,7 @@ Launch model (requirements/intro): **Basic Launch** = live without SDK, no monet
 
 | # | Requirement | Source | Status | Notes |
 |---|---|---|---|---|
-| Q1 | Onboarding inside gameplay, skippable, visual over text, core mechanics only; show keyboard overlay/mouse gestures. | requirements/quality | todo | |
+| Q1 | Onboarding inside gameplay, skippable, visual over text, core mechanics only; show keyboard overlay/mouse gestures. | requirements/quality | done (M4–M5) | The cold open is the onboarding: in gameplay, a verb at a time with keycaps, skippable (N), once per profile (the save's `seen`, written as it starts). |
 | Q2 | Buttons clearly labeled, not sized or delayed to push ads or other behaviour. | requirements/quality | todo | |
 | Q3 | Clear reachable goals, easy to learn, consistent controls, responsive input, balanced pacing, no repetitive chores. | requirements/quality | todo | |
 | Q4 | Consistent resolution and audio levels, no compression artifacts, coherent art style, name/imagery match the genre. | requirements/quality | todo | |
@@ -130,8 +130,8 @@ Launch model (requirements/intro): **Basic Launch** = live without SDK, no monet
 
 | # | Requirement | Source | Status | Notes |
 |---|---|---|---|---|
-| M1 | Never show an ad while a race is active; request midgame ads on the post-race summary after results are visible. | resources/monetizing-driving | todo | |
-| M2 | Rewarded ad ideas: post-race 2x/3x multiplier, fuel/energy refill, cosmetic unlocks, test drive of premium vehicle, level skip, once-per-session revive with buff. | resources/monetizing-driving | todo | Pick 2-3. |
+| M1 | Never show an ad while a race is active; request midgame ads on the post-race summary after results are visible. | resources/monetizing-driving | done (M5) | No ad while driving; the door's ad is requested once the totals are up (the midgame) or offered on the wall (the rewarded). |
+| M2 | Rewarded ad ideas: post-race 2x/3x multiplier, fuel/energy refill, cosmetic unlocks, test drive of premium vehicle, level skip, once-per-session revive with buff. | resources/monetizing-driving | done (M5) | Picked: the post-run double (DOUBLE THE BAG at the door) and the prep items (the lawyer, the fence) as rewarded alternatives to cash. |
 | M3 | Banner spot: the garage/tuning screen. | resources/monetizing-driving | todo | |
 | M4 | Benchmarks: driving games average 8.7 min play time, 5.7% D1 retention, top titles 7 ad impressions per play. | resources/monetizing-driving | info | |
 
@@ -140,7 +140,7 @@ Launch model (requirements/intro): **Basic Launch** = live without SDK, no monet
 | # | Requirement | Source | Status | Notes |
 |---|---|---|---|---|
 | P1 | SDK throttles to at most one midgame ad every 3 minutes with extra safeguards around game start and rewarded ads. | resources/midgame-ads-pacing | info | |
-| P2 | Delay the first midgame ad until the tutorial is done, or 3-5 minutes played, or level 3-4 reached. | resources/midgame-ads-pacing | todo | |
+| P2 | Delay the first midgame ad until the tutorial is done, or 3-5 minutes played, or level 3-4 reached. | resources/midgame-ads-pacing | done (M4–M5) | No midgame ad at the session's first door (the cold open's end on a first visit); the SDK paces the rest. |
 | P3 | Request at every natural break (between levels/rounds, after milestones); prefer rewarded before big rewards; no custom cooldowns. | resources/midgame-ads-pacing | todo | |
 | P4 | Midgame ads are typically 40-60% of revenue in casual games. | resources/midgame-ads-pacing | info | |
 

@@ -67,6 +67,27 @@ garage's ad calls through `Platform.requestAd` with the input block and the
 mute, `adsAvailable` hiding the video buttons, the seen flag, the ten-size
 screens spec with seven states, `npm run game`. Slice 0 checks each.
 
+As built in M5 (docs/M5_REPORT.md; read before slice 0):
+
+- The save's key is `save` (`BALANCE.save.key`), one document of 0.4–1.1 kB,
+  written at the door, the busted card, the drive-out, `pagehide`, a hidden
+  tab and the cold open's start; a stored document of a newer version is
+  never written over (`SaveStore.unknownRaw`). The Data module maps onto the
+  same three calls.
+- Rewarded ads: the door's DOUBLE THE BAG (above an 8,000 bag, once a door)
+  and the wall's PREP page (the lawyer, the fence); midgame at the door when
+  there is no offer and at the busted card; none at the session's first door.
+  `adsAvailable('rewarded')` hides every video button: the SDK adapter must
+  return false there when `hasAdblock()` is true (CRAZYGAMES.md A12).
+- The wall is `ui/garage.ts`: every item is already a DOM button with the
+  key's handler and the panel takes pointer events, so touch gets the
+  garage by tapping; the driving controls are the touch work.
+- The screens spec shoots ten states (hud, pause, life, bar, busted, door,
+  job, garage, dailies, cold) at the ten sizes; `npm run game` has nine cases.
+- The app reads the local date for the dailies (`?date=` overrides); test
+  sessions without it draw no dailies and man every police site.
+- `?job=<id|kind>` and `?bot=job` exist for tests; `?fresh=1` clears the save.
+
 ### 1.3 Out of scope
 
 Accounts (scenario 1, no accounts, D5), banners, in-game purchases,

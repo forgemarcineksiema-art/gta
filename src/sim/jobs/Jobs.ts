@@ -400,7 +400,8 @@ export class Jobs {
     if (!coins || !city) return;
     coins.clearExtra('route');
     const target = pointTarget(city, targetX, targetZ);
-    const start = city.nearestLane(x, z);
+    // the marker stands on the ground: its lane is the street's, never an overpass above it
+    const start = city.nearestLane(x, z, 0);
     const s0 = alongLane(city.graph.lanes[start] as Lane, x, z).s;
     const chain = start === target.lane && target.s >= s0 ? [start] : laneChain(city.graph, start, target.lane);
     if (chain.length === 0) return;

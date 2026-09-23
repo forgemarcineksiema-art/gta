@@ -413,7 +413,8 @@ export class Police {
       const classSpeed = isChief ? t.chief.speed : pit ? t.interceptorSpeed : t.chaseSpeed;
       const inView = !traffic.outOfView(traffic.x[agent] as number, traffic.z[agent] as number, this.radius, player, t.viewNear, cosHalf);
       const range = isChief ? t.chief.pitRange : pit ? t.pitRange : t.ramRange;
-      const ram = this.seen[u] === 1 && traffic.state[agent] === AgentState.Physical && gap <= range;
+      // the cold open's chase is a lesson (M5.5 gate): the units follow, they never ram in the first minute
+      const ram = !this.sim.coldOpen.active && this.seen[u] === 1 && traffic.state[agent] === AgentState.Physical && gap <= range;
       // a ram closes at its own rate on the class's speed
       const speed = ram ? classSpeed : isChief && gap > t.pressure.within ? t.chief.speed : pressureSpeed(t, gap, inView, player.speed, classSpeed);
       if (!ram) {
@@ -800,7 +801,9 @@ export class Police {
     const ux = traffic.x[agent] as number, uz = traffic.z[agent] as number;
     const d = Math.hypot(sx - ux, sz - uz);
     // v² = 2 a d: a stopped player is reached at walking pace, never at chase speed
-    const arrive = d < a.arrive ? 0 : Math.min(t.chaseSpeed, Math.sqrt(2 * a.decel * (d - a.arrive)));
+    let arrive = d < a.arrive ? 0 : Math.min(t.chaseSpeed, Math.sqrt(2 * a.decel * (d - a.arrive)));
+    // beside the stopped car, whatever slot it is going to: a walking pace, never a rush past the door
+    if (Math.hypot(player.x - ux, player.z - uz) < a.near) arrive = Math.min(arrive, a.nearSpeed);
     // a slot on the far side of the player is reached round the car, not through it
     let tx = sx, tz = sz;
     const vx = sx - ux, vz = sz - uz;

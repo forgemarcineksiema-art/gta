@@ -6,6 +6,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { FIXED_DT, SimWorld, initPhysics } from '../../src/sim';
 import { CITY_BOT_TUNING, TrackBot } from '../../src/app/trackBot';
+import { highwayHeightAt } from '../../src/sim/city/roads';
 
 beforeAll(initPhysics);
 
@@ -19,7 +20,16 @@ describe('M2 city (long)', () => {
         bot.drive(sim, sim.controls, FIXED_DT); sim.step();
         // this pins the road graph, not a chase: the speed cameras (M4 slice 6) on the tour would raise the heat
         if (sim.heat.points > 0) sim.heat.reset();
-        if (i > 120) { const y = sim.transforms.currPos[sim.vehicle.slot * 3 + 1] as number; maxY = Math.max(maxY, y); minY = Math.min(minY, y); }
+        if (i > 120) {
+          // above the road under the car: the highway climbs 7.5 m over its four crossings (M5.5 slice 8), and a
+          // street runs under each deck: the road is the ramp's surface or the ground, whichever the car is nearer
+          const p = sim.transforms.currPos, k = sim.vehicle.slot * 3;
+          const cx = p[k] as number, cy = p[k + 1] as number, cz = p[k + 2] as number;
+          const ramp = highwayHeightAt(cx, cz, 2);
+          const y = cy - (Math.abs(cy - ramp) < Math.abs(cy) ? ramp : 0);
+          maxY = Math.max(maxY, y);
+          minY = Math.min(minY, y);
+        }
         maxImpact = Math.max(maxImpact, sim.vehicle.telemetry.impact);
         if (i % 600 === 0) {
           expect(sim.hasNaN()).toBe(false);

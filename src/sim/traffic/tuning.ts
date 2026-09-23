@@ -103,6 +103,11 @@ export interface TrafficTuning {
   pullOver: { behind: number; offset: number; speed: number; hold: number };
   /** Stopped `wait` s behind a dead car (a wreck, an abandoned car), a car goes round it on the oncoming side when that is clear `clearAhead` m. */
   gawk: { wait: number; clearAhead: number };
+  /**
+   * The standoff (M5.5 gate): a civilian held up nose to nose by the player, who is not moving on (under
+   * `playerSpeed` m/s), for `wait` s pulls to its kerb as for a siren and creeps by: neither would ever give way.
+   */
+  standoff: { wait: number; playerSpeed: number };
   /** Metres a second a car's place across its lane moves toward where it wants to be. */
   shiftRate: number;
   /** Traffic by heat level 0..5: the streets thin as the chase grows. */
@@ -207,8 +212,11 @@ export const TRAFFIC: TrafficTuning = {
   overtake: { slowerBy: 2, clear: 1.2, look: 40, endClear: 40, cooldown: 4 },
   flinch: { seconds: 2.5, offset: 1.2, brake: 8, hold: 1.5 },
   angry: { share: 0.1, seconds: 8, pace: 1.3, honkEvery: 2 },
-  pullOver: { behind: 60, offset: 1.5, speed: 4, hold: 3 },
+  // offset 3 (M5.5 gate): at 1.5 a car pulling over for a chase still filled the suspect's lane and held it to 4 m/s;
+  // 3 m clears a car's width beside it and stops 0.2 m short of the kerbside bays
+  pullOver: { behind: 60, offset: 3, speed: 4, hold: 3 },
   gawk: { wait: 2, clearAhead: 40 },
+  standoff: { wait: 1, playerSpeed: 3 },
   shiftRate: 2.5,
   densityByLevel: [1, 1, 1, 0.9, 0.6, 0.6],
   cloneDistance: 150,

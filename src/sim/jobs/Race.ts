@@ -50,8 +50,8 @@ export class Race {
     this.stop();
     this.finishX = finishX;
     this.finishZ = finishZ;
-    this.field(city.nearestLane(finishX, finishZ));
-    const lane = city.nearestLane(probe.x, probe.z);
+    this.field(city.nearestLane(finishX, finishZ, 0));
+    const lane = city.nearestLane(probe.x, probe.z, probe.y - 0.5);
     const s0 = alongLane(city.graph.lanes[lane] as Lane, probe.x, probe.z).s;
     const len = traffic.lanes.length[lane] as number;
     const r = BALANCE.jobs.race;

@@ -88,9 +88,12 @@ describe('traffic pool (long)', () => {
             traffic.lanes.positionAt(lane, (traffic.s[i] as number) + 8, traffic.laneOffset[i] as number, pose, traffic.next[i]);
             let err = Math.atan2(pose.x - (traffic.x[i] as number), pose.z - (traffic.z[i] as number)) - (traffic.yaw[i] as number);
             err = Math.abs(Math.atan2(Math.sin(err), Math.cos(err)));
-            // settled cars only: a car spun by a shove turns back on the spot, which is physics recovering, not steering
+            // settled cars only: a car spun by a shove turns back on the spot, which is physics recovering, not steering;
+            // and the lane follower's cars only: a unit on a chase plan (M5.5 slice 4, the police driving mode) goes
+            // round slower cars and takes the U-turn its route asks for, away from the lane's carrot by design
             const settled = step - (physicalSince[i] as number) > 60 && step - (contactAt[i] as number) > 60;
-            if (dist > 8 && settled && (traffic.speed[i] as number) > 3) maxHeadingError = Math.max(maxHeadingError, err);
+            const chasing = traffic.police[i] === 1 && traffic.planSpeed(i) > 0;
+            if (dist > 8 && settled && !chasing && (traffic.speed[i] as number) > 3) maxHeadingError = Math.max(maxHeadingError, err);
             if ((prevLane[i] as number) >= 0 && prevLane[i] !== lane) laneChanges++;
             // progress: a lent car with nothing in front of it and no reservation to wait for keeps moving along its path
             const s = traffic.s[i] as number;

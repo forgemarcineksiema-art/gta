@@ -209,7 +209,8 @@ export const BALANCE = {
    * line, and when each caption cues and times out (s, m, m/s).
    */
   coldOpen: {
-    heat: 20, damage: 0.6, startSpeed: 12,
+    // heatCap (M5.5 gate): the first minute teaches the escape at level 2; the M5.5 heat rules climbed it to 4-5 there
+    heat: 20, heatCap: 59, damage: 0.6, startSpeed: 12,
     candidateAhead: 40, candidateOffset: 3.2, candidateHold: 15, candidateGain: 0.5, candidateSpread: 6,
     markerAt: 600, payout: 5000, limitSeconds: 150, coinPitch: 4.5,
     gateRamp: 45, gatePlateau: 12,

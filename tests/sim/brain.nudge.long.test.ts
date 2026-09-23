@@ -36,6 +36,9 @@ describe('the police brain (long)', () => {
         const agent = traffic.spawnAt(lane, 50, kind === 'police' ? 'police' : 'compact');
         expect(agent).toBeGreaterThanOrEqual(0);
         if (kind === 'police') traffic.police[agent] = 1;
+        // the M3 driver: the lane's limit, no weave (M5.5 slice 3 draws a pace and a temper at spawn)
+        traffic.pace[agent] = 1;
+        traffic.bad[agent] = 0;
         // close from 30 m back at 4 m/s over the car's 14 m/s, let go at the touch
         let touched = false, maxDv = 0;
         run(sim, 10, (_t, _c, s) => {

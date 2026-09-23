@@ -25,6 +25,12 @@ export interface TrackBotTuning {
   vMax: number;
   /** Use boost above this speed when the road ahead is straight (0 = never). */
   boostAbove: number;
+  /**
+   * A careful driver (M5.5 gate): it brakes for a slower car over its stopping distance, waits in a queue instead
+   * of taking it for a stuck car, and overtakes through an empty oncoming lane. Off by default, so the bot-driven
+   * pins keep their baseline (the skilled bot's escapes need its speed); the delivery pin turns it on.
+   */
+  careful: boolean;
 }
 
 export const DEFAULT_TRACK_BOT: TrackBotTuning = {
@@ -38,6 +44,7 @@ export const DEFAULT_TRACK_BOT: TrackBotTuning = {
   planAhead: 90,
   vMax: 58,
   boostAbove: 0,
+  careful: false,
 };
 
 /**
@@ -70,6 +77,10 @@ export class TrackBot {
   private path: TrackSample[] | null = null;
   private loop = true;
   private stuckTime = 0;
+  /** Overtaking (M5.5 gate): the lateral offset from the path (+ left), its target, and the car being passed. */
+  private offset = 0;
+  private pass = 0;
+  private passing = -1;
   readonly visitedLanes = new Set<number>();
   tourComplete = false;
   resets = 0;
@@ -83,6 +94,9 @@ export class TrackBot {
     this.path = samples.length > 1 ? samples : null;
     this.loop = loop || !this.path;
     this.idx = 0;
+    this.offset = 0;
+    this.pass = 0;
+    this.passing = -1;
   }
 
   /** Metres left on an open path of its own; Infinity on the map's loop. */
@@ -134,7 +148,7 @@ export class TrackBot {
       this.tourComplete = this.visitedLanes.size === sim.city.graph.lanes.length;
     }
 
-    // pursuit target: the sample `look` metres ahead along the track
+    // pursuit target: the sample `look` metres ahead along the track, shifted across by an overtake's offset
     const look = Math.max(t.lookMin, Math.min(t.lookMax, t.lookBase + speed * t.lookPerSpeed));
     const target = S[this.at(best + Math.round(look / 3), m)] as TrackSample;
     const q = sim.transforms.currRot;
@@ -144,7 +158,9 @@ export class TrackBot {
     const qz = q[qi + 2] as number;
     const qw = q[qi + 3] as number;
     const yaw = Math.atan2(2 * (qx * qz + qw * qy), 1 - 2 * (qx * qx + qy * qy));
-    const desired = Math.atan2(target.x - px, target.z - pz);
+    this.offset += Math.max(-3 * dt, Math.min(3 * dt, this.pass - this.offset));
+    const tx = target.x + Math.cos(target.yaw) * this.offset, tz = target.z - Math.sin(target.yaw) * this.offset;
+    const desired = Math.atan2(tx - px, tz - pz);
     let d = desired - yaw;
     while (d > Math.PI) d -= Math.PI * 2;
     while (d < -Math.PI) d += Math.PI * 2;
@@ -166,14 +182,23 @@ export class TrackBot {
     controls.brake = speed > allowed + 1.5 ? 1 : 0;
     controls.handbrake = 0;
     controls.boost = t.boostAbove > 0 && speed > t.boostAbove && allowed >= t.vMax ? 1 : 0;
+    if (sim.traffic && t.careful) this.overtake(sim, S, best, px, pz, yaw, speed, allowed);
     if (sim.traffic && this.trafficAhead(sim, px, pz, yaw, speed)) {
       controls.throttle = 0;
       controls.brake = 1;
       controls.boost = 0;
     }
+    // queued: a car within a few metres ahead waits (a junction, the lights): hold behind it, never push it,
+    // and it is not a stuck car (a brake held at a standstill would reverse, so the car only coasts)
+    const queued = t.careful && sim.traffic !== null && this.queuedBehind(sim, px, pz, yaw);
+    if (queued) {
+      controls.throttle = 0;
+      controls.brake = speed > 0.5 ? 1 : 0;
+      controls.boost = 0;
+    }
 
     // stuck: no progress while trying to drive; boxed in by the police is an arrest, not a stuck car
-    if (speed < 0.8 && controls.throttle > 0 && (sim.police?.unitsWithin(px, pz, BOXED_RANGE) ?? 0) === 0) {
+    if (speed < 0.8 && controls.throttle > 0 && !queued && (sim.police?.unitsWithin(px, pz, BOXED_RANGE) ?? 0) === 0) {
       this.stuckTime += dt;
       if (this.stuckTime > 2.5) {
         sim.spawnAt(sim.city ? 'city' : 'track');
@@ -186,18 +211,98 @@ export class TrackBot {
     }
   }
 
-  /** Brake for a slower car within 18 m ahead on the bot's heading. Never swaps. */
-  private trafficAhead(sim: SimWorld, px: number, pz: number, yaw: number, speed: number): boolean {
+  /** A car within 8 m ahead in the bot's corridor, nearly stopped: the bot is in a queue behind it. */
+  private queuedBehind(sim: SimWorld, px: number, pz: number, yaw: number): boolean {
     const traffic = sim.traffic;
     if (!traffic) return false;
     const fx = Math.sin(yaw);
     const fz = Math.cos(yaw);
     for (let i = 0; i < traffic.capacity; i++) {
-      if (traffic.state[i] === AgentState.Free) continue;
+      // a queue is driving cars waiting their turn; a wreck, a parked car or an abandoned one never moves on
+      const st = traffic.state[i];
+      if (st !== AgentState.Kinematic && st !== AgentState.Physical) continue;
       const dx = (traffic.x[i] as number) - px;
       const dz = (traffic.z[i] as number) - pz;
       const along = dx * fx + dz * fz;
-      if (along < 1 || along > 18) continue;
+      if (along < 1 || along > 8) continue;
+      if (Math.abs(dx * -fz + dz * fx) > 2.2) continue;
+      if ((traffic.speed[i] as number) < 1.5) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Overtaking (M5.5 gate: the slice-3 drivers keep their own pace and a bot that never passes sat behind the
+   * slowest for a whole street): on a straight, with a moving car ahead going 3 m/s or more under what the bot
+   * may do and the oncoming lane empty 15 m back to 50 m ahead, it moves 3.8 m to its left and back once the
+   * car is 6 m behind. An oncoming car in the lane ahead calls it off.
+   */
+  private overtake(sim: SimWorld, S: TrackSample[], best: number, px: number, pz: number, yaw: number, speed: number, allowed: number): void {
+    const traffic = sim.traffic;
+    if (!traffic) return;
+    const fx = Math.sin(yaw), fz = Math.cos(yaw);
+    const lx = fz, lz = -fx;
+    const oncomingFree = (): boolean => {
+      for (let i = 0; i < traffic.capacity; i++) {
+        if (traffic.state[i] === AgentState.Free || i === this.passing) continue;
+        const dx = (traffic.x[i] as number) - px, dz = (traffic.z[i] as number) - pz;
+        const along = dx * fx + dz * fz, left = dx * lx + dz * lz;
+        if (along > -15 && along < 50 && left > 1.6 && left < 6.5) return false;
+      }
+      return true;
+    };
+    if (this.passing >= 0) {
+      const i = this.passing;
+      const gone = traffic.state[i] === AgentState.Free;
+      const behind = gone || ((traffic.x[i] as number) - px) * fx + ((traffic.z[i] as number) - pz) * fz < -6;
+      if (behind || !oncomingFree()) {
+        this.pass = 0;
+        this.passing = -1;
+      }
+      return;
+    }
+    if (Math.abs(this.offset) > 0.2) return;
+    // a straight ahead: no bend over the next 60 m, and not within 60 m of the path's end
+    for (let k = 0; k < 20; k++) {
+      const i = best + k;
+      if (!this.loop && i >= S.length) return;
+      if (Math.abs((S[this.at(i, S.length)] as TrackSample).curvature) > 0.01) return;
+    }
+    let slow = -1, slowAlong = Infinity;
+    for (let i = 0; i < traffic.capacity; i++) {
+      const st = traffic.state[i];
+      if (st !== AgentState.Kinematic && st !== AgentState.Physical) continue;
+      const dx = (traffic.x[i] as number) - px, dz = (traffic.z[i] as number) - pz;
+      const along = dx * fx + dz * fz;
+      if (along < 3 || along > 30 || Math.abs(dx * -fz + dz * fx) > 2.2) continue;
+      if ((traffic.speed[i] as number) > Math.min(allowed, speed + 2) - 3) continue;
+      if (along < slowAlong) { slowAlong = along; slow = i; }
+    }
+    if (slow < 0 || !oncomingFree()) return;
+    this.passing = slow;
+    this.pass = 3.8;
+  }
+
+  /**
+   * Brake for a slower car ahead on the bot's heading: within 18 m, or its braking distance and a car length at
+   * speed (at 30 m/s 18 m was a ram into a car waiting at a junction). Never swaps; the car it is passing, it passes.
+   */
+  private trafficAhead(sim: SimWorld, px: number, pz: number, yaw: number, speed: number): boolean {
+    const traffic = sim.traffic;
+    if (!traffic) return false;
+    const fx = Math.sin(yaw);
+    const fz = Math.cos(yaw);
+    const reach = this.tuning.careful ? Math.max(18, (speed * speed) / (2 * this.tuning.brakeAccel) + 8) : 18;
+    // the corridor follows an overtake across
+    const ox = Math.cos(yaw) * this.offset, oz = -Math.sin(yaw) * this.offset;
+    px += ox;
+    pz += oz;
+    for (let i = 0; i < traffic.capacity; i++) {
+      if (traffic.state[i] === AgentState.Free || i === this.passing) continue;
+      const dx = (traffic.x[i] as number) - px;
+      const dz = (traffic.z[i] as number) - pz;
+      const along = dx * fx + dz * fz;
+      if (along < 1 || along > reach) continue;
       const side = dx * -fz + dz * fx;
       if (Math.abs(side) > 2.6) continue;
       if ((traffic.speed[i] as number) < speed - 1) return true;

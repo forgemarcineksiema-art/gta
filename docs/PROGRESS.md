@@ -2,6 +2,22 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M5.5 gate: the long pins
+
+The long pins had not run since slice 0; ten were red. Fixed in the game (each a real defect the pins found):
+billboards past the overpass ramps (four verge panels' run-outs met the ramps' walls; more slots, ids unchanged);
+the arrest (a unit passing the stopped player to the front slot at 9.1 m/s: within 10 m it now moves at 7 m/s at
+most); the pull-over (1.5 m left a car in the suspect's lane at 4 m/s for as long as the chase lasted: 3 m); the
+standoff (nose to nose with a player who is not moving on, a civilian pulls over after 1 s); the cold open (heat
+capped at level 2, no rams, its route's bays kept empty: the M5.5 heat rules took the first minute to level 4-5);
+lanes by height (a ring beside an overpass routed its coins and the bot onto the deck above: `nearestLane` takes the
+road's height for the route coins, the oncoming check, a race's start and the bot). The delivery pin drives a
+careful test bot (it brakes over its stopping distance, waits in a queue instead of resetting, overtakes: slice 3's
+drivers keep their own pace); the other bot pins keep the M5 bot. Re-pinned, with the reason: police.long's roster at level 5 is the budget less the
+helicopter's place up to the budget (a patrol that joins in), its civilian floor from the density by level (§13.8)
+and the police's holdings; traffic.pool.long's heading limit (60°) skips a unit on a chase plan (slice 4's mode);
+city.long measures height above the road under the car (slice 8); brain.nudge.long's car drives at the limit.
+
 ## 2026-09-23 — M5.5 slice 18: police extras
 
 Done: the ticket book. While the busted bar fills an officer (a new pedestrian look: blue shirt, navy cap, badge, the

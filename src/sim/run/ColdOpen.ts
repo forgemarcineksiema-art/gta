@@ -119,6 +119,11 @@ export class ColdOpen {
     sim.life.setDamage(c.damage);
     sim.vehicle.setVelocity(Math.sin(spawn.yaw) * c.startSpeed, 0, Math.cos(spawn.yaw) * c.startSpeed);
     traffic.clearAround(spawn.position.x, spawn.position.z, 30);
+    // the route crosses kerbside bays where it cuts across a street: those hold no parked car (M5.5 slice 17)
+    for (let k = 0; k < route.samples.length; k += 2) {
+      const p = route.samples[k] as TrackSample;
+      traffic.reserveBays(p.x, p.z, 5);
+    }
     if (sim.heat.points < c.heat) sim.heat.add(c.heat - sim.heat.points);
 
     // the candidate: a muscle car ahead beside the lane, held until it is alongside and taken

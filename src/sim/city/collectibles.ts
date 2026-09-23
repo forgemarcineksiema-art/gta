@@ -86,7 +86,8 @@ function candidateSlots(cx: number, cz: number, out: Slot[]): number {
     const ox = dz !== 0 ? Math.sign(cx) : 0;
     const oz = dx !== 0 ? Math.sign(cz) : 0;
     const yaw = Math.atan2(-ox, -oz); // the panel faces inward, toward the carriageway
-    for (const along of [62, 66, 58, 108]) {
+    // past 134 m: the overpasses' ramps (M5.5 slice 8) wall off the first four slots of the four segments they lift
+    for (const along of [62, 66, 58, 108, 150, 160, 170]) {
       out.push({ x: ox !== 0 ? ox * VERGE : x0 + dx * along, z: oz !== 0 ? oz * VERGE : z0 + dz * along, yaw, width: ROADSIDE_WIDTH });
     }
     return 1;

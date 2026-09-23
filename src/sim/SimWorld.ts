@@ -6,6 +6,7 @@
  * Also owns the instrumentation: a lap timer on the test track, a recorder of
  * every step (controls, pose, telemetry) and the ghost of the best lap.
  */
+import { BALANCE } from './balance';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { GROUP_DEFAULT, interactionGroups } from './collision';
 
@@ -345,6 +346,8 @@ export class SimWorld {
     if (this.traffic) this.cameras?.step(this.probe, FIXED_DT, this.events);
     this.roadblocks?.step(this.probe, FIXED_DT, this.events);
     this.jumps?.step(this.probe, this.vehicle.telemetry.groundedWheels === 0, FIXED_DT, this.events);
+    // the cold open's escape is a lesson at level 2: its crimes never lift the heat past it
+    this.heat.cap = this.coldOpen.active ? BALANCE.coldOpen.heatCap : 100;
     this.heat.step();
     this.heat.tick(FIXED_DT, this.pursuit.state === 'active');
     // before the run: a delivery into a garage pays the bag before the door can drop the job

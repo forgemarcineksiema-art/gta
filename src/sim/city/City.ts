@@ -752,7 +752,11 @@ export class City {
   }
 
   /** The lane whose polyline is closest to a point, through the lane bounds; -1 with no lanes. */
-  nearestLane(x: number, z: number): number {
+  /**
+   * The lane nearest a point; with the road height under it given (M5.5 gate), a lane over or under counts its
+   * height gap, so a car on the street under an overpass is not on the highway above it.
+   */
+  nearestLane(x: number, z: number, y?: number): number {
     let best = Infinity;
     let found = -1;
     const hit = { x: 0, z: 0, yaw: 0 };
@@ -760,7 +764,7 @@ export class City {
       const b = this.laneBounds[i] as { minX: number; maxX: number; minZ: number; maxZ: number };
       const dx = Math.max(b.minX - x, 0, x - b.maxX), dz = Math.max(b.minZ - z, 0, z - b.maxZ);
       if (dx * dx + dz * dz >= best) continue;
-      const dist = projectOnLane(this.graph.lanes[i] as Lane, x, z, hit);
+      const dist = projectOnLane(this.graph.lanes[i] as Lane, x, z, hit, y);
       if (dist < best) { best = dist; found = i; }
     }
     return found;

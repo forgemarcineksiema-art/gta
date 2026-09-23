@@ -8,11 +8,14 @@
 import type { DropOff, Lane, SimWorld, TrackSample } from '../sim';
 import { alongLane, chainPoints, crawlInto, garageEntry, junctionCurve, laneAt, laneChain, laneSpan, resample, type Pt } from '../sim/city/route';
 
-export function routeToDropOff(sim: SimWorld, site: DropOff): TrackSample[] {
+export function routeToDropOff(sim: SimWorld, site: DropOff, from?: { x: number; z: number }): TrackSample[] {
   const city = sim.city;
   if (!city || site.approachLane < 0) return [];
   const p = sim.vehicle.body.translation();
-  const chain = laneChain(city.graph, city.nearestLane(p.x, p.z), site.approachLane);
+  // the road under the car (the chassis rides about half a metre over it): never the deck above a street;
+  // from a job's marker, its own lane, the one its route coins start on (a corner marker is as near two lanes)
+  const start = from ? city.nearestLane(from.x, from.z, 0) : city.nearestLane(p.x, p.z, p.y - 0.5);
+  const chain = laneChain(city.graph, start, site.approachLane);
   if (chain.length === 0) return [];
   const raw: Pt[] = [];
   chainPoints(city.graph, chain, raw);
@@ -37,7 +40,7 @@ export function routeToAgent(sim: SimWorld, agent: number): TrackSample[] {
   const city = sim.city, traffic = sim.traffic;
   if (!city || !traffic) return [];
   const p = sim.probe;
-  const from = city.nearestLane(p.x, p.z);
+  const from = city.nearestLane(p.x, p.z, p.y - 0.5);
   const to = traffic.lane[agent] as number;
   if (to < 0) return [];
   const chain = from === to ? [from] : laneChain(city.graph, from, to);
@@ -65,8 +68,8 @@ export function routeToPoint(sim: SimWorld, x: number, z: number): TrackSample[]
   const city = sim.city;
   if (!city) return [];
   const p = sim.vehicle.body.translation();
-  const to = city.nearestLane(x, z);
-  const chain = laneChain(city.graph, city.nearestLane(p.x, p.z), to);
+  const to = city.nearestLane(x, z, 0);
+  const chain = laneChain(city.graph, city.nearestLane(p.x, p.z, p.y - 0.5), to);
   if (chain.length === 0) return [];
   const raw: Pt[] = [];
   chainPoints(city.graph, chain, raw);

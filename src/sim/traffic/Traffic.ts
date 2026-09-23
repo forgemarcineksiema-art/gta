@@ -185,6 +185,8 @@ export class Traffic {
   readonly angryLeft: Float32Array;
   /** Going round this dead car (-1 none), metres of the pass left. */
   readonly passAgent: Int16Array;
+  /** Seconds a civilian has been held up by a player who is not moving on (the standoff, M5.5 gate). */
+  private readonly standoff: Float32Array;
   /** Per lane: the other lane of the same carriageway (the highway), the lane the other way (a street); -1 none. */
   readonly parallel: Int16Array;
   readonly reverse: Int16Array;
@@ -382,6 +384,7 @@ export class Traffic {
     this.pullLeft = new Float32Array(n);
     this.angryLeft = new Float32Array(n);
     this.passAgent = new Int16Array(n).fill(-1);
+    this.standoff = new Float32Array(n);
     this.passLeft = new Float32Array(n);
     this.stuck = new Float32Array(n);
     this.laneCool = new Float32Array(n);
@@ -2172,6 +2175,7 @@ export class Traffic {
     this.shift[i] = 0;
     this.flinchLeft[i] = 0;
     this.pullLeft[i] = 0;
+    this.standoff[i] = 0;
     this.angryLeft[i] = 0;
     this.passAgent[i] = -1;
     this.passLeft[i] = 0;
@@ -2268,6 +2272,16 @@ export class Traffic {
     if (this.litBehind(i, lane, s)) {
       if ((this.pullLeft[i]) <= 0) this.pullOvers++;
       this.pullLeft[i] = t.pullOver.hold;
+    }
+
+    // the standoff: held up nose to nose by a player who is not moving on, it pulls to its kerb the same way and
+    // creeps by (a player stopped ahead the same way gets a queue behind them, as ever)
+    if (this.police[i] === 0 && this.blocker[i] === 2 && speed < 0.5 && player.speed < t.standoff.playerSpeed
+      && Math.cos(player.yaw - yaw) < -0.5) {
+      this.standoff[i] = (this.standoff[i] as number) + dt;
+      if ((this.standoff[i]) >= t.standoff.wait) this.pullLeft[i] = t.pullOver.hold;
+    } else if ((this.pullLeft[i]) <= 0) {
+      this.standoff[i] = 0;
     }
 
     // the angry driver: bumped by the player, one in ten goes after them

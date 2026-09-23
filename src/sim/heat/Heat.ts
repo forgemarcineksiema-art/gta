@@ -26,6 +26,8 @@ export class Heat {
   playerSpeed: () => number = () => Infinity;
   private lastLevel = 0;
   private readonly hitCooldown: Float32Array;
+  /** The ceiling the points may reach: 100, but under the cold open's cap while it runs (the world sets it each step). */
+  cap = 100;
 
   constructor(private readonly events: EventLog, private readonly traffic: Traffic | null) {
     this.hitCooldown = new Float32Array(traffic ? traffic.capacity : 0);
@@ -48,7 +50,7 @@ export class Heat {
     if (!(points > 0) || !Number.isFinite(points)) return;
     let gain = seen ? points * BALANCE.heat.seenFactor : points;
     if (seen) gain = Math.max(gain, (BALANCE.heatThresholds[0] ?? 0) - this.value);
-    this.value = Math.min(100, this.value + gain);
+    this.value = Math.max(this.value, Math.min(this.cap, this.value + gain));
     this.lastGain = gain;
     this.gainSerial++;
   }
@@ -57,7 +59,7 @@ export class Heat {
   wanted(points: number): void {
     const gain = Math.max(points, (BALANCE.heatThresholds[0] ?? 0) - this.value);
     if (!(gain > 0)) return;
-    this.value = Math.min(100, this.value + gain);
+    this.value = Math.max(this.value, Math.min(this.cap, this.value + gain));
     this.lastGain = gain;
     this.gainSerial++;
   }
@@ -86,7 +88,7 @@ export class Heat {
    */
   tick(dt: number, chasing: boolean): void {
     const heat = BALANCE.heat;
-    if (chasing && heat.chasePerSecond > 0) this.value = Math.min(100, this.value + heat.chasePerSecond * dt);
+    if (chasing && heat.chasePerSecond > 0) this.value = Math.max(this.value, Math.min(this.cap, this.value + heat.chasePerSecond * dt));
     const cool = this.hitCooldown;
     for (let i = 0; i < cool.length; i++) {
       const c = cool[i] as number;

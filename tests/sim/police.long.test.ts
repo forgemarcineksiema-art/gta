@@ -86,13 +86,20 @@ describe('police patrols (long)', () => {
         // the Chief (level 5, slice 7) drives the sports body but is not one of the level's interceptors
         for (const agent of police.units) if (agent >= 0 && agent !== police.chief && traffic.kindOf(agent) === 'sports') interceptors++;
         console.log(`[police] level ${level}: ${police.count} units, ${interceptors} interceptors, ${maxPoliceBodies} police bodies, ${minAlive} cars alive at the worst moment`);
-        expect(police.count).toBe(POLICE.budget[level] as number);
+        // the helicopter keeps one of the budget's places from its level on (M5.5 slice 9); a parked patrol or a
+        // roadblock's car that joins the chase (M4 slice 6, `enlist`) may take that place back
+        expect(police.count).toBeGreaterThanOrEqual((POLICE.budget[level] as number) - (level >= POLICE.heli.fromLevel ? 1 : 0));
+        expect(police.count).toBeLessThanOrEqual(POLICE.budget[level] as number);
         expect(interceptors).toBe(POLICE.interceptors[level] as number);
         // The pursuit borrows from the traffic; it never owns the pool and never empties the street.
         expect(maxPoliceBodies).toBeLessThanOrEqual(TRAFFIC.policeBodies);
         expect(minAlive).toBeGreaterThan(20);
-        // at level 5 the pursuit holds up to 14 of the 48 records (8 units, 4 parked patrols, 2 roadblock cars)
-        expect(minCivilians).toBeGreaterThanOrEqual(level === 5 ? 28 : 36);
+        // at level 5 the police hold up to the roster's budget (a patrol that joins in takes the helicopter's place
+        // back), the parked patrols, the roadblock's two cars and the donut shop's two (M5.5 slice 18); the streets
+        // thin as the chase grows (M5.5, DESIGN.md §13.8: `densityByLevel`), and the rest are civilians
+        const moving = Math.floor(TRAFFIC.agents * (TRAFFIC.densityByLevel[level] as number));
+        const held = (POLICE.budget[5] as number) + POLICE.parked.count + 2 + 2;
+        expect(minCivilians).toBeGreaterThanOrEqual(level === 5 ? moving - held : 36);
       } finally { sim.dispose(); }
     }
   }, 180_000);

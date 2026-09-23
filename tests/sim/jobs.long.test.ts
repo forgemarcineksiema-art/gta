@@ -28,8 +28,10 @@ describe('jobs (long)', () => {
         sim.step();
         expect(sim.jobs.active).toBe(d.id);
         const site = sim.run.dropOffs.find((s) => Math.hypot(s.door.x - d.targetX, s.door.z - d.targetZ) < 6)!;
-        const bot = new TrackBot(sim.carId, CITY_BOT_TUNING);
-        bot.setPath(routeToDropOff(sim, site));
+        // a careful driver who overtakes (M5.5 gate): the slice-3 drivers keep their own pace, and the limits are a player's
+        const bot = new TrackBot(sim.carId, { ...CITY_BOT_TUNING, careful: true });
+        // from the marker's own lane: the one the route coins start on (M5.5 gate; a corner marker is as near two lanes)
+        bot.setPath(routeToDropOff(sim, site, d));
         // the route's coins (M5.5 1.4): laid on the chain's lanes, taken by a bot that follows the lanes
         let laid = 0, taken = 0;
         const t = runUntil(sim, d.limitSeconds + 5, (s) => {

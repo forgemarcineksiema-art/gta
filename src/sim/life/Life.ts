@@ -425,7 +425,8 @@ export class Life {
       const x = pos.x;
       const z = pos.z;
       // the nearest lane through the city's lane bounds, then one projection for its heading
-      const lane = this.sim.city ? this.sim.city.nearestLane(x, z) : -1;
+      // the road under the car: under an overpass the highway above is not the car's lane
+      const lane = this.sim.city ? this.sim.city.nearestLane(x, z, pos.y - 0.5) : -1;
       let best = Infinity;
       let yaw = 0;
       if (lane >= 0) {

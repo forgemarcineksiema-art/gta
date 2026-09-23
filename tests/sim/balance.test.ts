@@ -25,12 +25,18 @@
  *    higher than the novice's; (b) the compact is affordable between minute
  *    5 and 7; (c) no gap between purchases in the first hour is over 10
  *    minutes or under 3.
+ * 5. The kit (M6 slice 10, DESIGN.md §14.4): at a door with no rung
+ *    affordable, four minutes after the last thing seen bought, the cheapest
+ *    kit item not had goes (a twelve-year-old's buy); (d) something to see
+ *    bought, a car or a kit item, at least every 8 minutes of the first hour.
+ *    And the minute each of the wanted board's cash gates is reached: a
+ *    40,000 run (Neon Niko) and three cars owned (Fake Frank).
  */
 import { describe, expect, it } from 'vitest';
 import { BotPolicy, type PolicyName } from '../../src/app/botPolicy';
 import { CITY_BOT_TUNING, TrackBot } from '../../src/app/trackBot';
 import { BALANCE } from '../../src/sim/balance';
-import type { SimWorld } from '../../src/sim';
+import { KIT, type SimWorld } from '../../src/sim';
 import { createWorld, run, runUntil } from './helpers';
 
 const SECONDS = 180;
@@ -208,6 +214,11 @@ describe('the balance script', () => {
     let funds = coldOpen.bank + earn.coins * coldOpen.minutes;
     const bought: Array<[string, number]> = [];
     let rung = 0;
+    // the kit for sale, the cheapest first (M6), and what was bought that shows: the cars and the kit
+    const kitShop = KIT.filter((k) => k.price > 0).sort((a, b) => a.price - b.price);
+    let kitNext = 0, lastSeen = coldOpen.minutes, cars = 1;
+    const seen: number[] = [];
+    const CARS = new Set(['compact', 'heavy', 'sports']);
     // a tick at a time: coins as they come, a run's bank at its door, the purchases at the doors
     const step = 1 / 60, doorTicks = Math.round(runMinutes / step);
     for (let tick = 1, start = Math.round(coldOpen.minutes / step); start + tick <= HOUR / step && rung < LADDER.length; tick++) {
@@ -215,21 +226,38 @@ describe('the balance script', () => {
       if (tick % doorTicks !== 0) continue;
       funds += perRun - earn.coins * runMinutes;
       const minute = (start + tick) * step;
+      let rungBought = false;
       while (rung < LADDER.length && funds >= (LADDER[rung] as [string, number])[1]) {
         const [name, price] = LADDER[rung] as [string, number];
         funds -= price;
         bought.push([name, minute]);
         rung++;
+        rungBought = true;
+        if (CARS.has(name)) { cars++; seen.push(minute); lastSeen = minute; }
+      }
+      const kit = kitShop[kitNext];
+      if (!rungBought && kit && minute - lastSeen >= 4 && funds >= kit.price) {
+        funds -= kit.price;
+        kitNext++;
+        bought.push([`kit: ${kit.name.toLowerCase()}`, minute]);
+        seen.push(minute);
+        lastSeen = minute;
       }
     }
     out.push(`the novice's first hour at L${nov.level} (runs of ${runMinutes.toFixed(1)} min banking ${(perRun / 1000).toFixed(1)}k with the coins; the cold open ${(coldOpen.bank / 1000).toFixed(1)}k in ${coldOpen.minutes} min):`);
     let prev = 0;
     const gaps: number[] = [];
     for (const [name, minute] of bought) {
-      out.push(`  minute ${minute.toFixed(1).padStart(5)}  ${name}${prev > 0 ? `  (+${(minute - prev).toFixed(1)})` : ''}`);
+      out.push(`  minute ${minute.toFixed(1).padStart(5)}  ${name}${prev > 0 && !name.startsWith('kit') ? `  (+${(minute - prev).toFixed(1)})` : ''}`);
+      if (name.startsWith('kit')) continue;
       if (prev > 0) gaps.push(minute - prev);
       prev = minute;
     }
+    // the wanted board's cash gates (M6): a 40,000 run and three cars
+    const third = bought.filter(([n]) => CARS.has(n))[1];
+    out.push(`the board's cash gates: a 40,000 run ${perRun >= 40000 ? 'at every door' : `not at L${nov.level} (${(perRun / 1000).toFixed(1)}k a run)`}; three cars at ${third ? `minute ${third[1].toFixed(1)}` : 'not in the first hour'} (${cars} owned)`);
+    const seenGaps = seen.map((m, k) => m - (k === 0 ? coldOpen.minutes : seen[k - 1] as number));
+    out.push(`something to see bought (a car or a kit item) every ${seenGaps.map((g) => g.toFixed(1)).join(' / ')} min`);
     console.info(out.join('\n'));
 
     // (a) the optimum rises with skill
@@ -242,5 +270,8 @@ describe('the balance script', () => {
     // (c) something new every three to ten minutes
     expect(Math.max(...gaps)).toBeLessThanOrEqual(10);
     expect(Math.min(...gaps)).toBeGreaterThanOrEqual(3);
+    // (d) something to see bought at least every 8 minutes (M6)
+    expect(seenGaps.length).toBeGreaterThan(0);
+    expect(Math.max(...seenGaps)).toBeLessThanOrEqual(8);
   }, 1_800_000);
 });

@@ -63,17 +63,27 @@ export const BALANCE = {
   jobs: {
     markerRadius: 4, beaconHeight: 3, timeBonus: 0.5, holdSeconds: 2, cardSeconds: 1.5, markerMinGap: 60,
     counts: { delivery: 6, order: 6, escape: 4 },
-    delivery: { payoutPerKm: 4000, payoutMin: 5000, payoutMax: 12000, limitFactor: 1.3, limitMin: 45, heat: 6, minPath: 400 },
+    // payoutPerKm 9,000 (balance script, 2026-09-23; the plan's 4,000 paid every placed delivery the 5,000 floor on
+    // their 0.55–1.27 km paths): now 5,000–11,400, DESIGN.md §3.3's 5–12k
+    delivery: { payoutPerKm: 9000, payoutMin: 5000, payoutMax: 12000, limitFactor: 1.3, limitMin: 45, heat: 6, minPath: 400 },
     order: {
       payout: { compact: 4000, heavy: 5000, muscle: 6000, sports: 8000 }, stagePenalty: 0.1, limitSeconds: 240, heat: 4,
       ensureMin: 300, ensureMax: 600, ensureSeconds: 5, ringRange: 150, cruise: 0.5,
     },
     escape: { bounty: 1500, levels: [2, 2, 3, 4], radioSeconds: 8 },
   },
-  /** The garage's catalogue (docs/M5_PLAN.md D13): cash only; the muscle car is owned from the start. */
-  prices: { compact: 10000, heavy: 30000, sports: 60000, police: 120000 },
-  /** Each upgrade tier's price, tier 1 to 3, the same for every stat and car. */
-  tierPrices: [2000, 5000, 12000],
+  /**
+   * The garage's catalogue (docs/M5_PLAN.md D13): cash only; the muscle car is owned from the start. The van at
+   * 20,000, not 30,000 (balance script, 2026-09-23): at a novice's 2.5k a minute 30,000 is a 12-minute save and
+   * breaks the first hour's something-new-every-3-to-10-minutes; the sports car stays the second hour's goal.
+   */
+  prices: { compact: 10000, heavy: 20000, sports: 60000, police: 120000 },
+  /**
+   * Each upgrade tier's price, tier 1 to 3, the same for every stat and car: 8,000 / 14,000 / 22,000 (balance
+   * script, 2026-09-23; the plan's 2,000 / 5,000 / 12,000 fell two to a door, under the three-minute floor):
+   * the tiers are the first hour's cadence between the cars.
+   */
+  tierPrices: [8000, 14000, 22000],
   /** Multipliers on the preset per tier 0..3 (D8): power × torqueMax, grip × muFront and muRear, boost × boostDrain. */
   tiers: {
     power: [1, 1.06, 1.12, 1.2],

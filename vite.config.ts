@@ -44,7 +44,12 @@ export default defineConfig({
   test: {
     include: ['tests/**/*.test.ts'],
     // Long bot-driven pins (*.long.test.ts) run in `npm run verify:gate` / `npm run test:long` (LONG=1), not in the quick verify.
-    exclude: [...configDefaults.exclude, ...(process.env.LONG === '1' ? [] : ['tests/**/*.long.test.ts'])],
+    // The balance script steps the sim for minutes: only `npm run balance` (BALANCE=1, or that npm script by name) runs it.
+    exclude: [
+      ...configDefaults.exclude,
+      ...(process.env.LONG === '1' ? [] : ['tests/**/*.long.test.ts']),
+      ...(process.env.BALANCE === '1' || process.env.npm_lifecycle_event === 'balance' ? [] : ['tests/sim/balance.test.ts']),
+    ],
     environment: 'node',
     testTimeout: 60000,
   },

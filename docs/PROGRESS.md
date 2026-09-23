@@ -280,6 +280,55 @@ Decided (set here):
   site unless `date` is given, so the perf runs and the M4 suites stay
   deterministic across calendar days.
 
+### Slice 7 — the balance script
+
+`npm run balance` (`tests/sim/balance.test.ts`, excluded from every other
+run by `vite.config.ts` unless `BALANCE=1` or that npm script): 38 s.
+
+The table (2026-09-23, on 386da51 plus the numbers below; seed 42, traffic
+on, 180 s a level; busted runs drive on and the heat is put back after 10 s):
+
+| Level | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|
+| busted a minute, novice | 0.00 | 0.67 | 0.67 | 1.67 | 1.67 |
+| busted a minute, skilled | 0.00 | 0.00 | 0.00 | 0.67 | 1.00 |
+| expected bank a run, novice | 8.4k | 9.0k | 8.2k | 6.7k | 6.6k |
+| expected bank a run, skilled | 8.4k | 19.8k | 36.7k | 27.6k | 18.4k |
+
+From heat 0 the novice earns 520 a minute in the bag and 460 in coins (M4:
+406 and 36 coins worth 426–564); the placed jobs pay 5,942 on average. The
+best cash-out is level 2 for the novice and level 3 for the skilled bot.
+
+The novice's first hour at level 2 (runs of 3.5 min banking 9.0k with the
+coins, the cold open 7.8k in 1.5 min; purchases at a door): the compact at
+minute 5.0, tier 1 power 8.6, the van 15.6, tier 1 grip 19.2, tier 2 power
+22.7, tier 1 boost 26.2, tier 2 grip 33.3, tier 3 power 40.4, tier 2 boost
+47.4, tier 3 grip 54.5; gaps 3.5–7.1 min, 5.5 min to the hour's end. The
+three assertions hold.
+
+Changed in `balance.ts`, each with its reason there:
+- `jobs.delivery.payoutPerKm` 4,000 → 9,000: every placed delivery (0.55–
+  1.27 km of lane path) paid the 5,000 floor; now 5,000–11,400, DESIGN.md
+  §3.3's range.
+- `tierPrices` 2,000 / 5,000 / 12,000 → 8,000 / 14,000 / 22,000: two tiers
+  fell to one door, under the three-minute floor; the tiers now carry the
+  first hour's cadence between the cars.
+- `prices.heavy` 30,000 → 20,000: a 12-minute save at a novice's 2.5k a
+  minute, over the ten-minute ceiling.
+
+Decided (set here):
+- The first-hour model buys at doors (the garage is on the wall) and orders
+  the ladder compact, a tier, the van, the tiers, the sports car last: at
+  any price above the van's the sports car is a longer save than the
+  cadence allows, so it is the second hour's goal (the plan listed it
+  sixth). The hour's tail with nothing new counts as a gap.
+- The run length is the model's (two minutes a level and one to the door,
+  shortened by the expected busts), not `measured.runSeconds`: the M4 bot
+  never ends a run, so 600 s is a floor of a measurement artefact.
+- The bot's busted rates differ from M4's five-minute counts (level 3
+  novice 0.67 here, 1.0 there): 180 s at one seed is a short sample; the
+  assertions are about the ordering, which both samples agree on.
+
 ## 2026-09-23 — The coin layer as lines
 
 Marcin: the coins are placed hopelessly and thoughtlessly; their look, how a

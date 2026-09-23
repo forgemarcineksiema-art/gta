@@ -134,7 +134,7 @@ export class ColdOpen {
       // four metres inside the door: any car through the opening passes within the ring
       targetX: hideout.door.x + fx * BALANCE.jobs.markerRadius, targetZ: hideout.door.z + fz * BALANCE.jobs.markerRadius,
       payout: c.payout, limitSeconds: c.limitSeconds, heat: 0,
-    });
+    }, 0);
     this.cursor = sim.events.sequence;
     this.advance();
   }

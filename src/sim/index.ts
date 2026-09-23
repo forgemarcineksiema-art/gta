@@ -19,6 +19,8 @@ export { Jumps, placeJumps, type JumpDesc } from './city/jumps';
 export { Run, type RunState, type RunCounts } from './run/Run';
 export { ColdOpen, COLD_OPEN_VERBS, coldOpenRoute, type ColdOpenVerb, type ColdOpenRoute } from './run/ColdOpen';
 export { Jobs, type JobDef, type JobKind, type JobState } from './jobs/Jobs';
+export { ORDER_KINDS, CAR_WORDS, orderPaints, packDescriptor, unpackDescriptor, paintName } from './jobs/catalog';
+export { placeJobs, lanePathTo, dropOffTarget, fenceTargets, palmFence, type JobTarget } from './jobs/place';
 export { Garage, STATS, type Stat, type BuyResult, type PrepItem } from './garage/Garage';
 export { Dailies } from './dailies/Dailies';
 export { SAVE_VERSION, DEFAULT_SAVE, defaultSave, serialize, parse, migrate, collect, apply, versionOf, type SaveV1 } from './save/format';

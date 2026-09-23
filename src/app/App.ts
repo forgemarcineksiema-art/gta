@@ -16,6 +16,7 @@ import { DebugPanel } from '../ui/debugPanel';
 import { Hud } from '../ui/hud';
 import { RunHud } from '../ui/run';
 import { ColdOpenHud } from '../ui/coldOpen';
+import { JobsHud } from '../ui/jobs';
 import { routeToDropOff } from './doorRoute';
 import { BotDriver } from './bot';
 import { BotPolicy } from './botPolicy';
@@ -94,6 +95,7 @@ export class App {
   private readonly hud: Hud;
   private readonly runHud: RunHud;
   private readonly coldOpenHud: ColdOpenHud;
+  private readonly jobsHud: JobsHud;
   private readonly audio: EngineAudio;
   private readonly sfx: Sfx;
   private readonly siren: Siren;
@@ -150,6 +152,7 @@ export class App {
     this.runHud = new RunHud(uiRoot, sim);
     this.runHud.setKeys({ any: this.input.label('throttle') });
     this.coldOpenHud = new ColdOpenHud(uiRoot);
+    this.jobsHud = new JobsHud(uiRoot);
     this.coldOpenHud.setKeys({
       throttle: this.input.label('throttle'),
       steerLeft: this.input.label('steerLeft'),
@@ -527,9 +530,10 @@ export class App {
     this.frameMsSmooth += (frameMs - this.frameMsSmooth) * 0.05;
     const stats = this.renderer.stats;
     // the cold open's captions sit where the hints do and teach the same keys
-    this.hud.setHintsVisible(now < this.hintsUntil && !this.bot && !this.sim.coldOpen.active);
+    this.hud.setHintsVisible(now < this.hintsUntil && !this.bot && !this.sim.coldOpen.active && !this.jobsHud.showing);
     this.runHud.update(this.sim, frameDt);
     this.coldOpenHud.update(this.sim);
+    this.jobsHud.update(this.sim, frameDt);
     this.hud.update(
       this.sim,
       frameDt,

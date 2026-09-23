@@ -151,3 +151,8 @@ export function yawOf(q: Quat): number {
 }
 
 export const DEG = Math.PI / 180;
+
+/** Heading from one ground point to another (0 = +Z, positive toward +X): the arrow's bearing. */
+export function bearing(x0: number, z0: number, x1: number, z1: number): number {
+  return Math.atan2(x1 - x0, z1 - z0);
+}

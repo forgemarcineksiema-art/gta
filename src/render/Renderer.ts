@@ -23,6 +23,7 @@ import { Smoke } from './Smoke';
 import { HideoutView } from './HideoutView';
 import { Coins } from './Coins';
 import { MarkerView } from './MarkerView';
+import { Arrow } from './Arrow';
 import { RoadblockView } from './RoadblockView';
 import { RampView } from './RampView';
 import { AgentState } from '../sim/traffic/Traffic';
@@ -54,6 +55,7 @@ export class Renderer {
   readonly hideoutView: HideoutView | null;
   readonly coinsView: Coins | null;
   readonly markerView: MarkerView;
+  readonly arrow: Arrow;
   readonly roadblockView: RoadblockView | null;
   readonly rampView: RampView | null;
   quality: QualityTier = 'low';
@@ -155,7 +157,8 @@ export class Renderer {
     this.trafficView = sim.traffic && (sim.trafficDensity > 0 || sim.police) ? new TrafficView(this.scene, sim.traffic, sim.trafficDensity > 0) : null;
     this.pedView = sim.peds && sim.pedsDensity > 0 ? new PedView(this.scene, sim.peds) : null;
     this.hideoutView = sim.run.dropOffs.length > 0 ? new HideoutView(this.scene, sim) : null;
-    this.markerView = new MarkerView(this.scene);
+    this.markerView = new MarkerView(this.scene, sim, this.camera);
+    this.arrow = new Arrow(this.scene, this.camera);
     this.roadblockView = sim.roadblocks ? new RoadblockView(this.scene) : null;
     this.rampView = sim.jumps ? new RampView(this.scene, sim) : null;
     if (sim.city) this.scene.add(buildSkyline(sim.city));
@@ -345,7 +348,8 @@ export class Renderer {
     this.chase.update(this.car.root, this.carVel, tm, dt, snap);
     this.hideoutView?.update(this.sim);
     this.coinsView?.update(this.sim, dt, this.car.root.position);
-    this.markerView.update(this.sim, dt);
+    this.markerView.update(this.sim, alpha);
+    this.arrow.update(this.sim, carPos.x, carPos.y, carPos.z);
     this.roadblockView?.update(this.sim);
     this.car.update(tm);
     // ghost of the best lap

@@ -2,12 +2,17 @@
  * The jobs skeleton (docs/M4_PLAN.md slice 4): a delivery ring starts the
  * job and adds its heat once, arrival pays the payout with the time bonus
  * into the bag, the clock fails it, a second ring does nothing while one
- * runs, and abandon is silent.
+ * runs, and abandon is silent. M5 slice 1: the generator's placement, the
+ * delivery on a placed def, the arrow's bearing and its idle target (the bot
+ * drives one, 1.7, in jobs.long.test.ts).
  */
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../src/sim/balance';
 import type { EventKind } from '../../src/sim/events';
-import type { SimWorld } from '../../src/sim';
+import type { JobDef, SimWorld } from '../../src/sim';
+import { lanePathTo, placeJobs, pointTarget } from '../../src/sim/jobs/place';
+import { bearing } from '../../src/sim/math';
+import { BLOCK, HIGHWAY_HALF, ROAD_HALF, distanceToPolyline } from '../../src/sim/city/roads';
 import type { Traffic } from '../../src/sim/traffic/Traffic';
 import { TRAFFIC } from '../../src/sim/traffic/tuning';
 import { createWorld, run, runUntil } from './helpers';
@@ -111,4 +116,170 @@ describe('jobs', () => {
       expect(sim.events.sequence).toBe(before);
     } finally { sim.dispose(); }
   }, 120_000);
+});
+
+// ---- M5 slice 1: placement, the delivery, the arrow and its idle target ----
+
+/** Metres from a point to the nearest carriageway edge: the grid streets, the highway and the authored roads. */
+function roadClearance(sim: SimWorld, x: number, z: number): number {
+  let best = Infinity;
+  for (let g = -3; g <= 3; g++) {
+    const half = Math.abs(g) === 3 ? HIGHWAY_HALF : ROAD_HALF;
+    best = Math.min(best, Math.abs(x - g * BLOCK) - half, Math.abs(z - g * BLOCK) - half);
+  }
+  for (const road of sim.city!.graph.special) best = Math.min(best, distanceToPolyline(road.centre, x, z) - road.halfWidth);
+  return best;
+}
+
+/** Teleports the car onto a point, loads the chunks there, and steps once. */
+function drop(sim: SimWorld, x: number, z: number, yaw = 0): void {
+  sim.city?.sync(x, z, true);
+  sim.vehicle.teleport({ x, y: 0.8, z }, yaw);
+  sim.vehicle.setVelocity(0, 0, 0);
+  sim.step();
+}
+
+async function placedWorld(): Promise<SimWorld> {
+  return createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
+}
+
+function firstDelivery(sim: SimWorld): JobDef {
+  return sim.jobs.defs.find((d) => d.kind === 'delivery')!;
+}
+
+describe('jobs (M5 slice 1)', () => {
+  it('1.1 placement: 16 defs (6/6/4), deterministic, off the carriageway, 60 m apart, deliveries at least 400 m by path', async () => {
+    const sim = await placedWorld();
+    try {
+      const defs = sim.jobs.defs;
+      expect(defs.length).toBe(16);
+      expect(defs.filter((d) => d.kind === 'delivery').length).toBe(6);
+      expect(defs.filter((d) => d.kind === 'order').length).toBe(6);
+      expect(defs.filter((d) => d.kind === 'escape').length).toBe(4);
+      expect(JSON.stringify(placeJobs(sim.city!, 42, sim.traffic!.lanes))).toBe(JSON.stringify(defs));
+      for (const d of defs) {
+        expect(roadClearance(sim, d.x, d.z)).toBeGreaterThanOrEqual(BALANCE.jobs.markerRadius + 1);
+        for (const e of defs) if (e !== d) expect(Math.hypot(d.x - e.x, d.z - e.z)).toBeGreaterThanOrEqual(BALANCE.jobs.markerMinGap);
+      }
+      for (const d of defs.filter((k) => k.kind === 'delivery')) {
+        const path = lanePathTo(sim.city!, sim.traffic!.lanes, d.x, d.z, pointTarget(sim.city!, d.targetX, d.targetZ));
+        expect(path.length).toBeGreaterThanOrEqual(BALANCE.jobs.delivery.minPath);
+        expect(d.limitSeconds).toBeGreaterThanOrEqual(BALANCE.jobs.delivery.limitMin);
+        expect(d.payout).toBeGreaterThanOrEqual(BALANCE.jobs.delivery.payoutMin);
+        expect(d.payout).toBeLessThanOrEqual(BALANCE.jobs.delivery.payoutMax);
+      }
+      expect(defs.filter((d) => d.kind === 'escape').map((d) => d.level)).toEqual(BALANCE.jobs.escape.levels);
+    } finally { sim.dispose(); }
+  });
+
+  it('1.2 driving into a delivery ring starts it: active, one jobStart, heat +6 once, the clock at the limit', async () => {
+    const sim = await placedWorld();
+    try {
+      const d = firstDelivery(sim);
+      const seq = sim.events.sequence;
+      drop(sim, d.x, d.z);
+      expect(sim.jobs.state).toBe('active');
+      expect(sim.jobs.active).toBe(d.id);
+      expect(Math.abs(sim.jobs.remaining - d.limitSeconds)).toBeLessThanOrEqual(1 / 60 + 1e-9);
+      run(sim, 1);
+      expect(count(sim, seq, 'jobStart')).toBe(1);
+      expect(sim.heat.points).toBe(BALANCE.jobs.delivery.heat);
+    } finally { sim.dispose(); }
+  });
+
+  it('1.3 the arrow: the target is the drop-off and the bearing to it is right within 2 degrees', async () => {
+    const sim = await placedWorld();
+    try {
+      const d = firstDelivery(sim);
+      drop(sim, d.x, d.z);
+      const t = { x: 0, z: 0, idle: true };
+      expect(sim.jobs.target(t)).toBe(true);
+      expect(t.x).toBe(d.targetX);
+      expect(t.z).toBe(d.targetZ);
+      expect(sim.jobs.arrowTarget(t)).toBe(true);
+      expect(t.idle).toBe(false);
+      const p = sim.probe;
+      const expected = Math.atan2(d.targetX - p.x, d.targetZ - p.z);
+      const got = bearing(p.x, p.z, t.x, t.z);
+      const diff = Math.abs(Math.atan2(Math.sin(got - expected), Math.cos(got - expected))) * 180 / Math.PI;
+      expect(diff).toBeLessThan(2);
+    } finally { sim.dispose(); }
+  });
+
+  it('1.4 arriving with 30 s left of 90 pays payout x (1 + 0.5 x 30/90) into the bag; idle after the hold', async () => {
+    const sim = await placedWorld();
+    try {
+      const d = firstDelivery(sim);
+      d.limitSeconds = 90;
+      const seq = sim.events.sequence;
+      drop(sim, d.x, d.z);
+      expect(runUntil(sim, 90, (s) => s.jobs.remaining <= 30 + 1e-9)).toBeGreaterThan(0);
+      const remaining = sim.jobs.remaining;
+      const bag = sim.run.bag;
+      drop(sim, d.targetX, d.targetZ, 0);
+      const expected = d.payout * (1 + BALANCE.jobs.timeBonus * remaining / 90);
+      expect(Math.abs(sim.run.bag - bag - expected)).toBeLessThanOrEqual(1);
+      expect(count(sim, seq, 'jobDone')).toBe(1);
+      expect(sim.jobs.state).toBe('done');
+      run(sim, BALANCE.jobs.holdSeconds + 0.1);
+      expect(sim.jobs.state).toBe('idle');
+    } finally { sim.dispose(); }
+  });
+
+  it('1.5 the clock fails it: jobFailed, the bag unchanged, the heat kept', async () => {
+    const sim = await placedWorld();
+    try {
+      const d = firstDelivery(sim);
+      d.limitSeconds = 5;
+      const seq = sim.events.sequence;
+      drop(sim, d.x, d.z);
+      const bag = sim.run.bag;
+      expect(runUntil(sim, 6, (s) => s.jobs.state === 'failed')).toBeGreaterThan(0);
+      expect(count(sim, seq, 'jobFailed')).toBe(1);
+      expect(sim.run.bag).toBe(bag);
+      expect(sim.heat.points).toBe(BALANCE.jobs.delivery.heat);
+    } finally { sim.dispose(); }
+  });
+
+  it('1.6 another marker does nothing while one runs; abandon goes idle with no event', async () => {
+    const sim = await placedWorld();
+    try {
+      const [a, b] = sim.jobs.defs.filter((d) => d.kind === 'delivery') as [JobDef, JobDef];
+      drop(sim, a.x, a.z);
+      expect(sim.jobs.active).toBe(a.id);
+      const seq = sim.events.sequence;
+      drop(sim, b.x, b.z);
+      run(sim, 0.5);
+      expect(sim.jobs.active).toBe(a.id);
+      expect(count(sim, seq, 'jobStart')).toBe(0);
+      const before = sim.events.sequence;
+      sim.jobs.abandon();
+      expect(sim.jobs.state).toBe('idle');
+      expect(sim.jobs.active).toBe(-1);
+      expect(sim.events.sequence).toBe(before);
+    } finally { sim.dispose(); }
+  });
+
+  it('1.8 idle: the nearest marker; above the door threshold the nearest door; during a job its target', async () => {
+    const sim = await placedWorld();
+    try {
+      const p = sim.probe;
+      run(sim, 0.1);
+      const t = { x: 0, z: 0, idle: false };
+      expect(sim.jobs.arrowTarget(t)).toBe(true);
+      expect(t.idle).toBe(true);
+      const nearest = [...sim.jobs.defs].sort((u, v) => Math.hypot(u.x - p.x, u.z - p.z) - Math.hypot(v.x - p.x, v.z - p.z))[0]!;
+      expect([t.x, t.z]).toEqual([nearest.x, nearest.z]);
+      sim.run.bag = BALANCE.offer.doorThreshold + 1;
+      expect(sim.jobs.idleTarget(t)).toBe(true);
+      const door = [...sim.run.dropOffs].sort((u, v) => Math.hypot(u.door.x - p.x, u.door.z - p.z) - Math.hypot(v.door.x - p.x, v.door.z - p.z))[0]!.door;
+      expect([t.x, t.z]).toEqual([door.x, door.z]);
+      const d = firstDelivery(sim);
+      drop(sim, d.x, d.z);
+      expect(sim.jobs.idleTarget(t)).toBe(false);
+      expect(sim.jobs.arrowTarget(t)).toBe(true);
+      expect(t.idle).toBe(false);
+      expect([t.x, t.z]).toEqual([d.targetX, d.targetZ]);
+    } finally { sim.dispose(); }
+  });
 });

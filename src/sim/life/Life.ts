@@ -299,6 +299,8 @@ export class Life {
     this.oldPose.z = p.z;
     this.oldPose.yaw = oldYaw;
     const oldKind = this.sim.carId;
+    // an order's wanted car taken: its clock starts before the record becomes the car left behind
+    this.sim.jobs.onSwap(agent);
     traffic.takeOver(agent, oldKind, this.sim.garage.paintOf(oldKind), this.oldPose, this.state.wrecked, this.handover);
     const h = this.handover;
     this.sim.carId = h.kind;

@@ -32,6 +32,14 @@ export class Sfx {
     else if (e.kind === 'camera') this.shutter(ctx, master);
     else if (e.kind === 'jump') { this.crunch(ctx, master, 1); this.ding(ctx, master); }
     else if (e.kind === 'roadblock') { this.splinter(ctx, master); this.crunch(ctx, master, 1); }
+    // jobs and the wall (M5): a two-note sting up, a chord, a low buzz; a ping when the wanted car turns up
+    else if (e.kind === 'jobStart') { this.note(ctx, master, 523.25, 0, 0.12, 0.09, 'square'); this.note(ctx, master, 783.99, 0.11, 0.2, 0.09, 'square'); }
+    else if (e.kind === 'jobDone') { for (const f of [523.25, 659.25, 783.99, 1046.5]) this.note(ctx, master, f, 0, 0.6, 0.06, 'triangle'); }
+    else if (e.kind === 'jobFailed') { this.note(ctx, master, 110, 0, 0.45, 0.1, 'sawtooth'); this.note(ctx, master, 103.8, 0.05, 0.45, 0.08, 'sawtooth'); }
+    else if (e.kind === 'orderFound') this.note(ctx, master, 1318.5, 0, 0.18, 0.06, 'sine');
+    else if (e.kind === 'purchase') { this.note(ctx, master, 1567.98, 0, 0.08, 0.07, 'square'); this.note(ctx, master, 2093, 0.07, 0.35, 0.07, 'triangle'); this.coin(ctx, master, 50); }
+    else if (e.kind === 'dailyDone') { [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.note(ctx, master, f, i * 0.09, i === 3 ? 0.55 : 0.12, 0.08, 'square')); }
+    else if (e.kind === 'streak') { this.note(ctx, master, 880, 0, 0.12, 0.06, 'triangle'); this.note(ctx, master, 1174.66, 0.1, 0.3, 0.06, 'triangle'); }
   };
 
   constructor(private readonly engine: EngineAudio) {}
@@ -46,6 +54,21 @@ export class Sfx {
     this.master = master;
     this.traffic = sim.traffic;
     this.seq = sim.events.readFrom(this.seq, this.play);
+  }
+
+  /** One enveloped oscillator note `delay` s from now. */
+  private note(ctx: BaseAudioContext, master: AudioNode, freq: number, delay: number, dur: number, peak: number, type: OscillatorType): void {
+    const t = ctx.currentTime + delay;
+    const osc = ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(peak, t + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(gain).connect(master);
+    osc.start(t);
+    osc.stop(t + dur + 0.02);
   }
 
   private sweep(ctx: BaseAudioContext, master: AudioNode): void {

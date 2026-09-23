@@ -10,8 +10,11 @@ import { LANDMARKS } from '../sim/city/City';
 import { MINIMAP, advance, buildRoadLayers, clampToRim, project, yawFromQuat, type MinimapState, type Vec2 } from './minimapModel';
 
 export type MarkerKind = 'tower' | 'tank' | 'glasshouse' | 'hotel' | 'garage' | 'job';
-/** A point of interest on the map. M3 traffic and police, M5 activities add kinds. */
-export interface MinimapMarker { x: number; z: number; kind: MarkerKind; color: string; yaw?: number }
+/** A point of interest on the map. `local` markers show only inside the circle (the job rings: sixteen chevrons on the rim would be noise). */
+export interface MinimapMarker { x: number; z: number; kind: MarkerKind; color: string; yaw?: number; local?: boolean }
+
+/** The job rings by kind (the marker's own colours, docs/STYLE.md). */
+const JOB_COLORS = { delivery: hex(PALETTE.carOrange), order: hex(PALETTE.carMagenta), escape: hex(PALETTE.policeBlue) } as const;
 
 const FONT = "'Segoe UI', 'Helvetica Neue', Arial, system-ui, sans-serif";
 const INK = '#f7f3ea';
@@ -71,6 +74,10 @@ export class Minimap {
   /** The landmarks and drop-offs; idle job markers are appended when the jobs change. */
   private base: readonly MinimapMarker[];
   private jobSerial = -1;
+  /** The running job's target on the rim: the drop-off, the fence or the wanted car. Moved in place. */
+  private readonly jobTarget: MinimapMarker = { x: 0, z: 0, kind: 'job', color: JOB_COLORS.delivery };
+  private readonly jobPoint = { x: 0, z: 0 };
+  private jobTargetShown = false;
   private readonly state: MinimapState = { heading: 0, radiusM: MINIMAP.radiusMinM };
   private readonly tmp: Vec2 = { x: 0, y: 0 };
   /** CSS size of the (square) canvas and the backing-store ratio. */
@@ -188,13 +195,33 @@ export class Minimap {
     this.lastX = x;
     this.lastZ = z;
     advance(this.state, dt, yaw, tm.vx, tm.vz, tm.speed, snap);
-    if (sim.jobs.serial !== this.jobSerial) {
-      // job markers only while no job runs: a running job's target is a garage, already on the rim
-      this.jobSerial = sim.jobs.serial;
-      const jobs = sim.jobs.state === 'idle' ? sim.jobs.defs : [];
-      this.markers = jobs.length === 0 ? this.base
-        : [...this.base, ...jobs.map((d): MinimapMarker => ({ x: d.x, z: d.z, kind: 'job', color: hex(PALETTE.carOrange) }))];
+    const jobs = sim.jobs;
+    if (jobs.serial !== this.jobSerial) {
+      // the live rings while no job runs (inside the circle only); the running job's target clamps to the rim
+      this.jobSerial = jobs.serial;
+      const running = jobs.running;
+      if (running) {
+        this.jobTarget.color = JOB_COLORS[running.kind];
+        this.markers = [...this.base, this.jobTarget];
+      } else {
+        const live = jobs.state === 'idle' ? jobs.defs.filter((d) => jobs.live(d)) : [];
+        this.markers = live.length === 0 ? this.base
+          : [...this.base, ...live.map((d): MinimapMarker => ({ x: d.x, z: d.z, kind: 'job', color: JOB_COLORS[d.kind], local: true }))];
+      }
+      this.jobTargetShown = false;
       this.dirty = true;
+    }
+    if (jobs.running) {
+      const shown = jobs.target(this.jobPoint);
+      if (shown && (this.jobPoint.x !== this.jobTarget.x || this.jobPoint.z !== this.jobTarget.z)) {
+        this.jobTarget.x = this.jobPoint.x;
+        this.jobTarget.z = this.jobPoint.z;
+        this.dirty = true;
+      }
+      if (shown !== this.jobTargetShown) {
+        this.jobTargetShown = shown;
+        this.dirty = true;
+      }
     }
 
     const d = districtAt(x, z);
@@ -285,7 +312,9 @@ export class Minimap {
     // Screen space from here: glyphs stay upright.
     const rimR = R - MINIMAP.rimInset;
     for (const m of this.markers) {
+      if (m === this.jobTarget && !this.jobTargetShown) continue;
       project(this.tmp, m.x, m.z, x, z, h, s, px, py);
+      if (m.local && (this.tmp.x - ccx) ** 2 + (this.tmp.y - ccy) ** 2 > rimR * rimR) continue;
       const clamped = clampToRim(this.tmp, px, py, this.tmp.x, this.tmp.y, ccx, ccy, rimR);
       this.glyph(m.kind, this.tmp.x, this.tmp.y, clamped ? MINIMAP.glyphPx * 0.75 : MINIMAP.glyphPx, m.color);
       if (clamped) this.chevron(this.tmp.x, this.tmp.y, Math.atan2(this.tmp.x - px, py - this.tmp.y), m.color);

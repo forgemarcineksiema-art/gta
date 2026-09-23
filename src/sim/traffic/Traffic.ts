@@ -26,6 +26,7 @@ import { CITY_COLORS, PALETTE } from '../palette';
 import { mulberry32 } from '../random';
 import type { Quat } from '../scene';
 import type { TransformBuffer } from '../transforms';
+import { BALANCE } from '../balance';
 import { CAR_PRESETS, type CarId } from '../vehicle/presets';
 import { LaneTables, type LanePose, type PathProjection } from './lanes';
 import { TRAFFIC, type TrafficTuning } from './tuning';
@@ -129,6 +130,8 @@ export class Traffic {
   /** Wrecks towed away since the run began. */
   towedAway = 0;
   guardHops = 0;
+  /** An order's wanted car (docs/M5_PLAN.md D7): never despawned or claimed while it is wanted; -1 none. */
+  wanted = -1;
 
   private readonly transforms: TransformBuffer;
   private readonly target: number;
@@ -402,6 +405,62 @@ export class Traffic {
     return along < boundary;
   }
 
+  /** Records in use. */
+  get aliveCount(): number {
+    return this.alive();
+  }
+
+  paintOf(agent: number): number {
+    return this.paint[agent] as number;
+  }
+
+  /**
+   * Guarantees a car of this class and paint `ensureMin`–`ensureMax` m from the
+   * player and out of view (docs/M5_PLAN.md D7): an unseen driving civilian of
+   * the class in that band is repainted (the nearest, for the shorter hunt),
+   * else one is spawned on a lane there through the police spawner's
+   * out-of-view search. Returns the agent or -1 (the caller retries).
+   */
+  ensure(kind: CarId, paint: number, player: PlayerProbe, near: number, cosHalf: number): number {
+    const o = BALANCE.jobs.order;
+    const min2 = o.ensureMin * o.ensureMin, max2 = o.ensureMax * o.ensureMax;
+    const index = KIND_INDEX[kind];
+    const radius = Math.hypot(this.halfW[index] as number, this.halfL[index] as number);
+    let best = -1, bestD = Infinity;
+    for (let i = 0; i < this.capacity; i++) {
+      if (this.police[i] !== 0 || this.state[i] !== AgentState.Kinematic || this.kind[i] !== index || (this.lane[i] as number) < 0) continue;
+      if ((this.plannerLane[i] as number) >= 0) continue;
+      const x = this.x[i] as number, z = this.z[i] as number;
+      const d = (x - player.x) ** 2 + (z - player.z) ** 2;
+      if (d < min2 || d > max2 || d >= bestD) continue;
+      if (!this.outOfView(x, z, radius, player, near, cosHalf)) continue;
+      best = i;
+      bestD = d;
+    }
+    if (best >= 0) {
+      if (this.paint[best] !== paint) {
+        this.paint[best] = paint;
+        this.paintSerial++;
+      }
+      return best;
+    }
+    const lanes = this.lanes;
+    for (let attempt = 0; attempt < 96; attempt++) {
+      const lane = (this.rng() * lanes.laneCount) | 0;
+      const s = this.rng() * (lanes.length[lane] as number);
+      lanes.positionAt(lane, s, 0, this.pose);
+      const d = (this.pose.x - player.x) ** 2 + (this.pose.z - player.z) ** 2;
+      if (d < min2 || d > max2) continue;
+      if (!this.outOfView(this.pose.x, this.pose.z, radius, player, near, cosHalf)) continue;
+      if (this.nearWorld(this.pose.x, this.pose.z, this.tuning.gapMin + 4)) continue;
+      const agent = this.claim(player, near, cosHalf);
+      if (agent < 0) return -1;
+      this.place(agent, lane, s, index, 0, AgentState.Kinematic, paint);
+      return agent;
+    }
+    return -1;
+  }
+
   /** Only an unseen, undisturbed civilian may give up a full agent slot. */
   spawnPoliceAt(lane: number, s: number, kind: 'police' | 'sports' | 'heavy', player: PlayerProbe, near: number, cosHalf: number, clearance: number, paint = -1): number {
     if (!this.canSpawnAt(lane, s, clearance)) return -1;
@@ -422,7 +481,7 @@ export class Traffic {
     if (agent >= 0) return agent;
     let farthest = 0;
     for (let i = 0; i < this.capacity; i++) {
-      if (this.police[i] !== 0 || (this.state[i] !== AgentState.Kinematic && this.state[i] !== AgentState.Physical)) continue;
+      if (this.police[i] !== 0 || i === this.wanted || (this.state[i] !== AgentState.Kinematic && this.state[i] !== AgentState.Physical)) continue;
       const x = this.x[i] as number, z = this.z[i] as number;
       const r = Math.hypot(this.halfWidthOf(i), this.halfLengthOf(i));
       if (!this.outOfView(x, z, r, player, near, cosHalf)) continue;
@@ -1472,7 +1531,7 @@ export class Traffic {
   private despawn(player: PlayerProbe): void {
     const r2 = this.tuning.despawn * this.tuning.despawn;
     for (let i = 0; i < this.capacity; i++) {
-      if (this.state[i] === AgentState.Free || this.police[i] === 1) continue;
+      if (this.state[i] === AgentState.Free || this.police[i] === 1 || i === this.wanted) continue;
       const dx = (this.x[i] as number) - player.x;
       const dz = (this.z[i] as number) - player.z;
       if (dx * dx + dz * dz > r2) this.free(i);

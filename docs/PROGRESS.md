@@ -55,6 +55,56 @@ Decided (set here):
 - The player's paint for a class is the garage's (`Garage.paintOf`): the
   swap leaves the old car in it and the descriptor takes it.
 
+### Slice 1 — jobs framework, the arrow, getaway delivery
+
+- `sim/jobs/catalog.ts` (kinds, the def, the descriptor packed as class
+  index << 24 | paint, the order paints per class, the card's words),
+  `sim/jobs/place.ts` (the generator's sixteen: corner aprons of the grid
+  junctions `ROAD_HALF + 6` m out on both arms, the approach from the kerb
+  corner clear of anything a car would hit by the billboard placer's
+  `tallFootprint`, off every carriageway, 20 m from the doors, 25 m from the
+  ramps, 15 m from the camera poles; the four escapes one per side of the
+  island where a street meets the highway; the twelve others by
+  farthest-point sampling from a seeded start; a delivery to the nearest
+  drop-off at least 400 m by lane path; limit and payout from that path at
+  the lanes' limits). A candidate's chunk is generated only when it is
+  about to be picked.
+- `Jobs` extended in place (same names): `hunting`, `idleTarget`,
+  `arrowTarget`, a marker re-arms only once the car has left it, and only
+  the cold open's own marker is live while it runs (its def is id 0).
+- `render/Arrow.ts`: a 12-triangle chevron 1.2 m long, 2.5 m above the
+  roof, full `carOrange` on a job and 40 % between jobs. `render/MarkerView.ts`
+  instanced: rings and beacons in the kind's colour, the running job's
+  target ringed. `ui/jobs.ts`: the line at the top centre and the 1.5 s card;
+  the key hints give way to it. The radar's job rings are local (no rim
+  chevrons for sixteen of them); the running target clamps to the rim.
+  Sfx: the two-note start, the done chord, the failed buzz.
+- Tests: `jobs.test.ts` 1.1–1.6 and 1.8; `jobs.long.test.ts` 1.7.
+
+Measured (seed 42, traffic on): the road bot from each delivery ring into
+its drop-off, time of limit and pay of payout: #9 scrapyard 45.2 of 75 s,
+5,993 of 5,000; #10 hotel 46.1 of 71, 5,876; #11 scrapyard 84.7 of 120,
+5,735; #12 scrapyard 32.0 of 51, 5,933; #14 scrapyard 59.0 of 74, 5,506;
+#15 hideout 44.5 of 82, 6,145. Placement: 16 defs in 71–130 ms in Node
+for seeds 42 / 7 / 123 (chunk generation is most of it). Smoke: 104 draws
+(+4: the arrow, rings, beacons), 244k triangles (+1k), 60 fps. Tests 248
+in 66 s (the quick set was 59 s before M5: over the minute already).
+
+Decided (set here):
+- Escape markers stand where a street meets the highway, one per side of
+  the island: the chokepoints are highway lane points, which a ring off the
+  carriageway cannot sit on, and these corners are the on-ramps.
+- Every delivery pays the 5,000 floor at seed 42: the nearest drop-off 400 m
+  away is 0.5–1.2 km by path, and `payoutPerKm` 4,000 reaches 5,000 only at
+  1.25 km. Left for the balance script (slice 7) to tune, not guessed here.
+- The arrow lies in a plane tipped 45° toward the camera and turns inside it
+  to the bearing: a horizontal chevron is edge-on to a chase camera below
+  it. `Arrow` takes the camera as an optional second constructor argument.
+- In the cold open the arrow shows only while its delivery runs; the job
+  line and card stay hidden (the captions lead).
+- An order arrives only in the ordered class and not as a wreck; a swap away
+  from the stolen car leaves the job waiting for it.
+
 ## 2026-09-23 — The coin layer as lines
 
 Marcin: the coins are placed hopelessly and thoughtlessly; their look, how a

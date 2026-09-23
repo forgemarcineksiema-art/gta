@@ -2,6 +2,74 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — Marcin's M5 playtest: polish before the platform
+
+Marcin played the gate build and answered the watch list. Busted is fair;
+the pursuit is mediocre because the police drive like traffic and traffic
+drives evenly at one speed, blind to its surroundings. He never got above
+heat 1 and did not know how. The door works. After the intro he had no idea
+what to do or what the game is about. The disguise and steal-to-order were
+invisible. The coins, for the second time: too many, everywhere, on every
+lane, from the first second, uncollectable; they must be a treat and lie
+along the job's route. The garage is empty, not dark; the wall is small at
+1080p; the "slow turn" arrest worry is nothing; abandoned cars need
+thought. And: "M6 Platforma dopiero gdy gra będzie dopracowana", no Basic
+Launch with a game that is not good.
+
+### Done
+
+- `main` pushed (13 commits since the M4 gate were local).
+- Research (four briefs, 2026-09-23): police pursuit design in GTA V / IV,
+  NFS Most Wanted 2005, NFS Heat, Hot Pursuit, Driver SF, Watch Dogs,
+  Mafia, Saints Row; civilian traffic in GTA V (driving-style flags,
+  per-driver ability and aggressiveness, per-class handling, population by
+  zone and hour, pull-over for sirens), Burnout, Forza, Driver SF, Watch
+  Dogs 2; collectible placement in Subway Surfers, Sonic, Mario Kart,
+  Nintendo's course dojo, Forza's boards, Burnout's smashes, a 2018 study
+  and the GDC 2019 exploration talk; loop legibility in GTA, Forza,
+  Burnout, Crazy Taxi, Hit & Run, the accessibility guideline and the
+  CrazyGames quality page. Sources in `docs/M5.5_PLAN.md` §8.
+- `docs/DESIGN.md` §13: his findings, the decision (M5.5 before M6), and
+  the design for each: heat that moves (patrols at heat 0, seen crimes
+  double and start the chase, reckless driving counts, the numbers, the
+  `+n` pop and the ticker), the goal line and the six-step chain, coins as
+  breadcrumbs (static only at goals, thirty caches a day, the route line
+  during a job, the tip), the garage dressed and the wall sized, "bring it
+  home, pay to keep it", traffic with character (pace and temper, overtakes,
+  the flinch, the pull-over, the gawk, the taxi and the bus), the police as
+  a different animal (the driving mode, pressure instead of a flat speed,
+  the refill cadence, arrivals in view, the search disc and the escape
+  ring, dispatch lines, sirens by heat). §11 and §12 revised.
+- `docs/M5.5_PLAN.md`: the contract (slices 0–7, numbers, pins,
+  measurements, the gate). `CLAUDE.md` and `docs/BACKLOG.md` point at it.
+- Docs closed after M5.1 (aea0137): the stale known issues and the backlog's
+  resolved lines.
+
+### Decided
+
+- By Marcin: M6 and Basic Launch wait for a game he would launch; the
+  polish milestone runs on his playtests, as many passes as it takes.
+- Set here (DESIGN §13, he overrides): everything above; the order of the
+  slices (heat, coins, the goal line, traffic, police, the garage; the
+  ownership slice on his word).
+
+### Why he stayed at heat 1 (from the code)
+
+`POLICE.budget[0]` is 0: no police car exists at heat 0, so nothing can
+see a crime; heat comes only from takedowns, billboards, cameras,
+roadblocks and jobs (2–10 points against a 20-point level), never from
+rams, wrecks or speeding. The intro starts at 20 and level 2 is three
+deliveries away.
+
+### Next
+
+- Marcin's signal, then M5.5 slice 0.
+
+### Open problems
+
+- Nothing new beyond DESIGN §13; the M5 known issues that remain open are
+  the naive hunter (4 of 6), no bot escape from level 4, and the music bed.
+
 ## 2026-09-23 — M5.1
 
 Marcin: "lecisz z M5.1", with no playtest notes yet. The plan names M5.1 as

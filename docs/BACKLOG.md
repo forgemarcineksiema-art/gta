@@ -29,10 +29,7 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 - Paint is flat colour with one wear tone; no re-painted patches, no per-block
   wear variation. Cheap to add as a second `paint` underlay once the flicker
   capture shows it does not shimmer. (M2.2)
-- The coin trails wander at random (DESIGN.md §3.5); in M5 a trail could be
-  aimed, its walk preferring the lanes toward an unvisited billboard, ramp or
-  the day's job markers, so "follow the coins" tours the content. Same
-  machinery, one scoring term in the walk. (2026-09-23)
+- (Superseded 2026-09-23 by DESIGN.md §13.5: the trails are deleted; coins lie only at goals and along a job's route.)
 - The spill's twelve coins appear on the lane in one step; a scatter from the
   wreck to their spots over half a second (the fly pool run backwards) would
   make the burst read as one. Render only. (2026-09-23)
@@ -63,9 +60,9 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 ## Life (M3)
 
-- Abandoned player cars (a swap leaves one) are never towed and traffic queues behind them for good; the wreck tow-away could take them too once out of view. Police units pull out past the one they boxed (slice 5). (M4)
+- Abandoned player cars (a swap leaves one) are never towed and traffic queues behind them for good. Scheduled: M5.5 slice 3's gawk (traffic goes around a stopped car through the oncoming lane when clear). (M4 → M5.5)
 - Parked civilian cars in the kerbside bays of the avenue and the quay as stopped agents (more swap candidates); the rest of the M3 stretch (stunt ramps, speed cameras) is M4 slice 6. (M3)
-- Traffic-only silhouettes (a van, a taxi, a bus): agents use the three player classes with paint for variety, so every swap yields a real car; new silhouettes need a preset each and a swap rule. (M3)
+- Traffic-only silhouettes: the taxi and the bus are scheduled in M5.5 slice 3 (DESIGN.md §13.8, the bus as the stretch item); a van beyond those stays here. (M3 → M5.5)
 - Junction reservations are first come first served with a forced override after 9 s (about one a minute in a busy run); traffic lights or a round-robin would look more deliberate at the big crossings. (M3)
 - A driving traffic body has no terrain contact (kerbs and the pavement apron pass under it) and a disturbed car beyond 70 m snaps back onto its lane when its body is returned; nobody has seen either in play, but a slow blend back would be cleaner than a snap. (M3)
 - The takedown camera only focuses; a short cut to a side view with the wreck in the foreground would sell it more. The whip on swap has no cut either, by design. (M3)
@@ -91,7 +88,7 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 - Pursuit breakers: smashable props that drop a static onto the road behind the player (scaffold, water tower, petrol canopy); police crash or reroute; doubles as cover. Billboard machinery plus a dropped static and a police reroute. (M4 stretch)
 - Multi-storey car park as a helicopter cover set piece: ramps, per-floor colliders, and a chase camera at 2.4 m plus look height inside 3 m ceilings; the camera alone is a week. (v1.1)
 - The comic arrest: the busted bar drawn as an officer walking up with a ticket book; one pedestrian pose. (M4 polish)
-- Heat-scaled sirens and a radio chatter layer under the engine, both synthesized; the helicopter's rotor as a low-pass on everything when it is overhead. (M4 audio)
+- Heat-scaled sirens and the radio as dispatch lines: scheduled, M5.5 slice 4 (DESIGN.md §13.9). The helicopter's rotor as a low-pass on everything when it is overhead stays with update 1. (M4 audio → M5.5)
 
 ## Activities and progression (M5; docs/DESIGN.md §3–4, §7–8)
 
@@ -109,7 +106,8 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 - Highway overpasses at the four avenue crossings: a third dimension in the road graph (lane height, kinematic traffic at height, the bot route, road meshes, markings, the minimap, the city pins). Moved from M4 to update 1 on 2026-09-22; the contract is §5 of `docs/M4_PLAN.md`. (update 1)
 - A lit hideout sign visible from the highway (the garages have an orange band over the door and a radar glyph); drop-off approaches with a second, longer way in. (M4/M5)
-- The garage interior reads dark: the roof's underside gets only the hemisphere's ground colour; a lighter ceiling or a brighter strip light if Marcin finds it gloomy. (M4)
+- The garage interior reads empty, not dark (Marcin, 2026-09-23). Scheduled:
+  M5.5 slice 5 dresses it (DESIGN.md §13.6). (M4 → M5.5)
 - The music bed (M5 slice 8): one CC0 loop fetched after `gameplayStart()` through the master gain at -14 dB; needs Marcin's yes on the exact file, source and licence before anything is downloaded (docs/ASSETS.md).
 - The naive hunter (`order.long.test.ts`) loses the wanted car where its re-plan routes through a U-turn: a hunter aiming at the car's next junction would make the order e2e and the measurement faster.
-- The wall panel is 660 px wide at every size: at 1920x1080 it could grow with the viewport (legible already at DPR 1).
+- The wall panel is 660 px wide at every size: scheduled, M5.5 slice 5 (`clamp(640px, 48vw, 960px)`, DESIGN.md §13.6).

@@ -277,7 +277,8 @@ locked district. Revised around the audience.
 
 - **Coins on the road** (Marcin's idea, 2026-09-22; an addition, not a
   replacement for anything). Instanced, one draw call, laid as lines that
-  say something (§3.5, 2026-09-23): runs and weaves along the lanes, links
+  say something (§3.5, 2026-09-23; since his second verdict the same day
+  only at goals and along a job's route, §13.5): runs and weaves along the lanes, links
   through turns, arcs over jumps, gate lines through billboards; rings round
   job markers join in M5. They mark the suggested line of a time trial and
   the cold-open route, so they are navigation as well as reward. Always kept, never at risk. Built
@@ -327,7 +328,7 @@ this run, 8k); both are also rewarded-ad offers with these cash prices as the
 equal alternative. Save: versioned JSON through the platform's data module,
 under 1 MB, `Collectibles.smashed` included.
 
-### 3.5 The coin layer as lines — set here, 2026-09-23 (Marcin's playtest)
+### 3.5 The coin layer as lines — set here, 2026-09-23 (Marcin's playtest); the layout superseded by §13.5 the same day
 
 Marcin after the M4 gate: the coins are placed "hopelessly and thoughtlessly",
 and their look and the moment of picking one up could be much better. What
@@ -633,7 +634,10 @@ The contracts with done criteria, pins and measurements per slice are
 after the first Basic Launch numbers.
 
 Revised 2026-09-22 (decided by Marcin): the game goes to Basic Launch after
-M4 and a minimum M5, and the rest ships as updates. The platform measures
+M4 and a minimum M5, and the rest ships as updates. Revised again
+2026-09-23 (decided by Marcin, §13.1): the minimum was never the bar; the
+platform milestone starts only when the game plays well, so M5.5 (below)
+sits between M5 and M6 and runs on his playtests. The platform measures
 the three KPIs live from the first day and re-features updated games; no
 design table replaces that data, and the biggest milestone (M5) should not sit
 between the run loop and the first numbers. This deviates from the brief's v1
@@ -660,7 +664,14 @@ both.
   streak (revised 2026-09-22: no longer conditional; the brief lists them in
   v1 and they are the one D1 lever; if anything slips it is the day-7
   topper).
-- **M6 Platform** as in the brief, then Basic Launch.
+- **M5.5 The city lives** (decided 2026-09-23, §13; the contract is
+  `docs/M5.5_PLAN.md`): heat that moves with patrols at heat 0, coins as
+  breadcrumbs, the goal line and the first quarter hour's chain, traffic
+  with character, the police as a different animal, the garage dressed
+  and the wall sized; optionally "bring it home, pay to keep it". As many
+  passes as his playtests ask for.
+- **M6 Platform** as in the brief, then Basic Launch; only on his word
+  that the game is good.
 - **Update 1, the air**: covered streets and the camera occlusion rule, the
   overpasses, the helicopter with the spotlight (§5).
 - **Update 2, the jobs**: the time trial on a coin line, street races with
@@ -704,11 +715,401 @@ both.
   cruiser. Watch whether 30 s still reads as the joke.
 - The arrest (§2.10): does ~11 s from a stop to busted at heat 2 read as
   fair; does the box read (units parking round the car) before the bar
-  does; is a slow junction turn at heat 1 a trap. The knobs are
-  `POLICE.arrest` and `POLICE.busted`.
+  does. The knobs are `POLICE.arrest` and `POLICE.busted`. (The "slow
+  junction turn as a trap" worry is dropped, 2026-09-23: Marcin: a driver
+  who crashes on a corner drives off, the police are not there yet; and
+  busted itself reads as fair.)
+- From the M5 playtest (2026-09-23, §13.10): does the goal line read
+  without the sentence on the wall; does the search disc read as "get
+  away from here"; does the pull-over make levels 1–2 too easy; are 730
+  coins still too many; do the patrols at heat 0 read as a threat or as
+  decoration.
 - The spill (§2.2): does the scramble read as a chance or as a punishment,
   and does a novice recover any of it. If the bot's recovery share is under a
   third, the coins live longer or land closer to the respawn.
+
+## 13. The M5 playtest and the polish before the platform — 2026-09-23
+
+Marcin played the M5 gate build (0.5.0 with M5.1) and the verdict reorders
+the roadmap. This section records what he found, the decision it forced,
+and the design that answers each finding. Status: **decided** where he said
+so, **set here** for the answers (he overrides by saying so). The contract
+is `docs/M5.5_PLAN.md`.
+
+### 13.1 The decision — decided
+
+**M6 (the platform, the submission) starts only when the game plays well.**
+Basic Launch is not a beta: the platform reads the three KPIs from the first
+day and a game that is not good gets its verdict in a week; updates during
+Basic Launch continue, they do not rescue a bad first week. So a polish
+milestone sits between M5 and M6, worked from his playtest notes, as many
+passes as it takes, each pass a playable build he judges. §11's launch
+timing ("Basic Launch after M4 and a minimum M5") is revised by this: the
+minimum was never the bar, the bar is a game he would launch.
+
+### 13.2 What the playtest found
+
+In the order he gave it:
+
+1. Busted is fair, but the pursuit as a whole is mediocre: the police drive
+   like every other car, and every car drives evenly, at one speed, blind to
+   its surroundings. He suspects the whole traffic, not only the police.
+2. He never got above heat 1 and does not know how.
+3. The door works and reads well.
+4. After the intro he had no idea what to do or what the game is about.
+5. The disguise (BORROW, the 30 s) and steal-to-order were invisible: he did
+   not know they exist, and asked whether "hunting" is how you get a car.
+6. The coins, the second time: far too many, everywhere, on two or three
+   lanes at once, all present from the first second, laid so they cannot be
+   collected; wherever you drive you hit some, so they mean nothing. They
+   should be a treat, a small goal; during a job they should lie along the
+   player's route so they can be collected.
+7. The garage reads empty, not dark. The wall is small at 1920×1080.
+8. A crash on a corner is not an arrest trap: the driver drives off, the
+   police are not there yet. Dropped from the watch list.
+9. Abandoned cars: the player should not lose cars for good; recovery or
+   repair rather than loss; think it through.
+
+Points 1, 2, 4 and 6 are bigger than everything in `docs/BACKLOG.md`, which
+is why the backlog did not predict them: it lists what the bots and the
+numbers could see. This section is the answer, one subsection each.
+
+### 13.3 Heat that moves — set here
+
+Why he stayed at level 1, from the code as shipped: heat points come only
+from takedowns (4 traffic, 10 police), billboards (2), cameras (5),
+roadblocks (6), a rammed patrol (4) and the jobs (a delivery 6, an order 4),
+against thresholds of 20 / 40 / 60 / 80 / 100. The intro starts at 20
+(level 1); level 2 is twenty points away, three deliveries and a billboard.
+Worse, `POLICE.budget[0]` is 0: **at heat 0 there is no police car on the
+island**, so a fresh run has nobody to see anything, and a player who
+drives dirty (rams traffic, wrecks a civilian by shoving, speeds past
+nothing) earns no heat at all. GTA's rule is the opposite: patrol cars are
+ambient traffic, the wanted level comes from a crime a cop *sees*, and it
+comes at once. Need for Speed's rule is that the chase itself is the heat:
+the longer they hold you, the more they send. Both apply here:
+
+- **Cops on the beat at heat 0.** Two units cruise at every level, level 0
+  included (`budget[0] = 2`), lights off, on ordinary lane driving with the
+  patrol-recycle rule keeping them near the player. They are the city's
+  eyes and the first thing a new player sees flashing in the mirror.
+- **A crime a unit sees counts double and starts the chase.** `Heat` reads
+  `Police.crimeSeen()` for each crime event: seen, the points are ×2 and
+  `Pursuit` goes to `detected` that step (a cop who saw it comes after you);
+  unseen, the ratchet rises as before and the next sighting answers at the
+  new level. The disguise rule is unchanged: a crime seen from the police
+  car blows the cover.
+- **Reckless driving is a crime.** A `hit` on a civilian above the disturb
+  threshold: `heat.hit` 2 (2 s cooldown per car); the chase itself:
+  `heat.chasePerSecond` 0.1 while the pursuit is active (a minute of chase is
+  a third of a level, NFS's escalation); speeding within a patrol's sight
+  by 30 km/h over the limit: `heat.speedingSeen` 3 (5 s cooldown).
+- **The numbers move:** delivery 10, order 8, billboard 3, camera 6, traffic
+  takedown 5, police takedown 12, roadblock 8, police hit 6. Target: the
+  novice bot from heat 0 reaches level 2 inside 5 minutes of one job and
+  dirty driving, level 3 by 9; the balance script measures it (the busted
+  table already runs per level; a "time to level" row joins it).
+- **Legible:** every gain pops a small red `+n` under the stars for 0.6 s
+  and the star that fills scales up once; a level-up plays the two-note
+  siren sting and one ticker line at the top for 2 s (`LEVEL 2 ·
+  INTERCEPTORS ON THE ROAD`, `LEVEL 3 · ROADBLOCKS UP`, the news ticker of
+  §8, comic, no voice). §2.1's "no text" HUD keeps its stars; the number is
+  the one teacher a twelve-year-old needs, and it is tiny.
+
+### 13.4 The run made legible: the goal line and the first quarter hour — set here
+
+The intro teaches the verbs and never the sentence. After the door the
+player has sixteen rings, an arrow and no reason. Every open-world game that
+onboards well keeps **one line that says what to do next** and one marker
+that says where (GTA's mission text, Forza's next event, Crazy Taxi's arrow
+and clock); the run needs the same, in the run's own words.
+
+- **The goal line** lives where the job line sits (top centre) and is the
+  job line when a job runs. Otherwise: `TAKE A JOB · 320 m` with the
+  nearest ring's colour dot (the arrow points at it, as today); with a bag
+  above the door threshold: `BANK IT · 540 m` (the arrow at the nearest
+  door); under pursuit: `LOSE THEM` with the escape ring (§13.9). One line,
+  one marker, always: the rule every game in the research keeps (GTA's
+  objective line and one yellow blip, Forza's auto-routed next event,
+  Crazy Taxi's arrow and clock, Burnout's compass), and the accessibility
+  guideline behind it: the player always knows the goal they are working
+  toward. The first goal is under forty seconds away (The Witcher 3's
+  rule): the placement guarantees a ring within 250 m of every door.
+- **The first quarter hour is a chain**, six steps counted on the wall's
+  TOTALS page and in the save (`save.chain`, a byte): 1 TAKE A JOB, 2 BANK
+  THE BAG, 3 BUY YOUR FIRST CAR (the compact, 10,000), 4 LOSE THE COPS AT
+  LEVEL 2, 5 STEAL A CAR TO ORDER, 6 BANK 20,000 IN ONE RUN. The goal line
+  shows the chain's step when it is more specific than the default (`BUY THE
+  COMPACT · 1,800 TO GO` once the cash is within one run of it). Each done
+  step shows a card (the job card's style) and pays nothing: the reward is
+  the next step. After step 6 the line falls back to the defaults for good.
+- **The sentence** sits on the wall under BANKED until step 4 is done:
+  `CRIMES FILL THE BAG · THE POLICE MULTIPLY IT · THE DOOR BANKS IT`. It is
+  the whole game in eleven words and the one line of text this design
+  allows itself.
+- **The two hidden verbs get their moment.** The first magenta ring's card
+  stays up until the wanted car is found and reads `IT'S IN TRAFFIC · SWAP
+  INTO IT` with the swap keycap; the BORROW prompt carries a second line the
+  first three times it shows, `COPS WON'T KNOW YOU · 30 s`; COVER BLOWN
+  stays. Neither is a tutorial screen; both are the prompt saying one thing
+  more, once.
+
+### 13.5 Coins as breadcrumbs, never a carpet — set here, after Marcin's verdict
+
+The M4 gate rant was about placement and §3.5 answered it with figures; the
+figures still covered the island (2,300 coins, one figure per road, ten
+random trails), so from the driver's seat it was the same carpet in a
+better font. The verdict is the rule now: **a coin is attached to a goal or
+it does not exist.** The genre agrees (research 2026-09-23, sources in
+`docs/M5.5_PLAN.md` §8): Subway Surfers' coins exist only where the run
+goes, in streaks of 4–6 that trace one jump; Sonic's rings run along the
+intended route and "guide the player"; Mario Kart caps coins at ten and lays
+them to "highlight the curve of the track"; Nintendo's own course dojo warns
+that too many coins "lose their power, inflation"; Burnout Paradise and
+Forza Horizon have no coins at all and count finite, mapped collectibles
+(570 smashes, 150–200 boards) instead; a 2018 study found coins on the
+natural path get collected more and finish more levels than designer-scattered
+or off-path ones; and the GDC 2019 talk on rewarding exploration names the
+first failure mode of collectibles: "tedious, too many".
+
+- **No coin lies on a road for being a road.** The trails, the fillers and
+  the sweeps are gone. The main carriageways carry nothing between jobs.
+- **Static coins only where a goal is**: the gate line through a billboard
+  (4 coins and the cap, from 8), the arc over a ramp (3 and the cap), the
+  ring's approach (M5.1's seven and the cap, unchanged), and **thirty
+  caches a day**: a run of 8 ending on a cap worth 100, on side streets and
+  the parkway's bends, drawn by the date seed from a fixed list of about
+  120 candidate spots (the generator's, like the police sites), counted on
+  the HUD as `CACHES n/30` under the billboards: a finite, visible goal that
+  is new every day and reads as one on the radar (a gold dot); the tenth,
+  twentieth and thirtieth pay a bonus into the bank (500 / 1,000 / 2,000,
+  Burnout's "every tenth" rule). About 730 coins resident island-wide, from
+  2,300, every one at something.
+- **Route coins during a job**: when a job's target is known (a delivery
+  from the ring; an order once the car is taken; the intro's delivery), the
+  lane path to the target is laid with coins **in the path's own lanes
+  only**, and only where a decision is: a run of 5 into and out of every
+  turn (the navigation), a run of 6 on every straight longer than 80 m, the
+  cap at the target; about 40–70 coins a job at 4.5 m (0.2 s at 80 km/h,
+  the rhythm rule). Taking every coin of a route pays a `+10 %` tip on the
+  job (the "clean line"), and the job line counts them (`DELIVERY 1:15 ·
+  370 m · 12/48`). Laid through the run-time pool (the intro's mechanism;
+  512 coins cover any route) and cleared when the job ends, picked ones
+  stay picked. A hunt lays none (the target moves); an escape lays none
+  (the goal is not a place).
+- **Between jobs the arrow is enough.** No breadcrumbs to the nearest ring:
+  that would be the carpet again, on the player's road this time.
+- **Values**: a coin 20 (from 10), a cap 100 (from 50), a cache's cap 250;
+  the counter's pop and the bell are unchanged. The balance script re-runs
+  with the new income (a job's route about 1,000–1,400 in coins plus the
+  tip; the caches up to 3,700 a day) and the first hour is re-timed.
+- **The look and the catch stay** (§3.5): he did not fault them this time.
+
+### 13.6 The garage dressed, the wall sized — set here
+
+- The garage is a room with nothing in it; STYLE.md asked for no clutter,
+  which reads as unfinished. Along the walls, never on the floor the car
+  needs: a pegboard with tools, a tyre stack, a workbench with a lamp, an
+  oil drum, a coiled hose, and the wanted poster as a plane on the back
+  wall (the HUD's poster, drawn once in geometry). Flat boxes in the
+  palette, one merged mesh per garage, no shadows inside.
+- The wall panel: `width: clamp(640px, 48vw, 960px)` and a root type size
+  from the viewport height, `clamp(14px, 1.6vh, 20px)`, so at 1920×1080
+  the panel is 922 px wide with 17 px lines and a 62 px title, and at
+  800×450 it is what it is today. Answering his question: about 900 px at
+  1080p, half the screen, and the type grows with it.
+
+### 13.7 Cars are never lost: bring it home, pay to keep it — set here
+
+What exists: the garage owns *classes*; drive-out gives a fresh car of the
+class in the garage's paint; the car a swap leaves behind is a traffic
+record and gone. Nothing is ever lost because nothing in the street is the
+player's: the garage car is an archetype. That is the right rule for a
+getaway driver who never keeps a car (§1), and it stays: leaving a car in
+the street costs nothing, damage is healed at drive-out for free, the
+respray is free. What it lacks is the other half of the brief's fantasy,
+"any car you see can be yours", made literal:
+
+- **Any car driven through a door is on the wall.** The CARS page shows it
+  as HOT with one button: `KEEP IT · 3,000` (30 % of its price; the police
+  car 60 % and still locked behind one heat-5 escape). Paying launders it
+  (new plates, a free respray) and the class is owned from then on, in that
+  paint. Declining costs nothing; the next run starts in the garage's car.
+  Buying at full price stays for a player who never brings one home.
+- The steal-to-order fence pays cash for a car; keeping it is the
+  alternative, and the wall says so on an order's car (`SELL · 6,000` /
+  `KEEP · 3,000`).
+- Scheduled as the last slice of M5.5 (his call whether it ships there);
+  the descriptor at the door, one page on the wall, one field in the save.
+
+### 13.8 Traffic with character — set here
+
+Why it reads as "równiutko, systemowo", from the code: `Traffic.plan` gives
+every car its lane's limit as the desired speed, one number per road type
+(street 50 km/h, avenue 58, highway 79), so every car on a road drives the
+same speed to the decimal; there are no lane changes (the highway's two
+lanes per direction are used only at junction exits); the only reactions
+are braking for a car ahead, a wobble on contact and a honk after nine
+seconds at a junction; nothing reacts to a siren; nothing differs between
+one driver and the next. Traffic like that is a conveyor, and police built
+on it (§13.9) are a faster conveyor.
+
+What the big games do (research 2026-09-23, sources in `docs/M5.5_PLAN.md`
+§8): GTA V gives every driver a bitmask of driving-style flags (stop for
+vehicles, steer around obstructions, change lanes around obstructions, go
+the wrong way only when the own lane is full) and two scalars, ability and
+aggressiveness; every vehicle class has its own brake distances and corner
+speeds; sports cars "go faster", big vehicles take wider turns and keep
+more space, buses avoid junction turns; the population is set per zone and
+hour with clone caps; drivers pull over for a siren; a bumped driver may
+get angry. Burnout keeps traffic as a hazard with steady lanes and a mix
+of compacts, vans, trucks and buses; Forza pays near misses at speed, and
+its players' three hated patterns are spawning in view, braking for no
+reason and swerving into oncoming. Driver: San Francisco places traffic to
+form lines to weave through. The cheap rules they share: speed = road ×
+personality × class; lane changes only with a reason; brake and swerve
+when the player comes at you; pull over for sirens; bigger vehicles behave
+bigger; density by place and by heat.
+
+The design, all of it on the existing records (no new system):
+
+- **A driver per record.** Two bytes seeded at spawn: `pace` (slow 0.85,
+  normal 1.0, brisk 1.1, fast 1.18 of the limit, weighted 15 / 55 / 22 /
+  8 %) and `temper` (the gap time 0.9–1.6 s, the honk readiness, and the
+  one driver in eight who is bad: a 0.6 s gap, a ±0.5 m drift in the lane,
+  a junction claim jumped after 3 s). Class factors on top: sports 1.1,
+  heavy 0.9, the taxi 1.1, the bus 0.8. The highway then carries 67 to
+  93 km/h in one direction instead of 79 everywhere, and the player has
+  someone to overtake and someone to be overtaken by.
+- **Overtakes with a reason.** On roads with two lanes per direction (the
+  highway; the avenues where the second lane exists) a car whose leader is
+  2 m/s slower changes lane when the target lane is clear one gap time
+  ahead and behind, indicates for a second (the lights byte), and returns
+  when clear. Streets keep their one lane; nobody drives the wrong way to
+  overtake (Forza's hated swerve).
+- **The flinch.** A car with the player closing head-on in its lane inside
+  2.5 s brakes hard, pulls 1.2 m to its kerb side and honks; a car passed
+  within a metre at over 10 m/s closing honks and wobbles (exists); a car
+  cut in front of brakes (exists) and flashes. One bumped driver in ten
+  tailgates the player for 8 s, never rams, then gives up: GTA IV's angry
+  driver, comic and cheap (a temporary plan target).
+- **Pull over for the siren.** A civilian with a lit unit within 60 m
+  behind it on its road pulls 1.5 m to the kerb and slows to 4 m/s until
+  the unit has passed, plus 3 s; the bus and the heavy only slow. The road
+  parts for the chase, the chase reads from the traffic itself, and the
+  police get through where the player had to weave. From level 4 the
+  density thins to 60 % (GTA's five-star streets are nearly empty).
+- **The gawk.** A car reaching a wreck or a stopped car in its lane stops
+  2 s behind it, then goes around through the oncoming lane when it is
+  clear (the one wrong-way move, GTA's "only when the own lane is full").
+  This also closes the M3 issue of traffic queueing behind an abandoned
+  car for good.
+- **Two silhouettes that behave differently**: the **taxi** (the compact
+  body in the coin yellow with an ink roof sign; pace fast, a lane-hopper;
+  a swap gives a compact) and the **bus** (the heavy preset stretched 1.6×
+  in length, pace 0.8, never changes lane, a moving wall for the chase; a
+  swap gives the bus, which is the slapstick the brief asks for). The bus
+  is the stretch item of its slice: if the profile or the perf bites, the
+  taxi ships alone.
+- **Population rules**: no same class-and-paint pair within 150 m (GTA's
+  clone cap); density by district (the quay and the parkway lighter, the
+  avenue and the highway denser) and by heat.
+
+Measured at the slice: the speed spread on a highway lane (coefficient of
+variation ≥ 10 %), lane changes a minute on the highway, pull-overs per
+chase, the novice bot's near misses a minute before and after, and the
+traffic step's p95 (this is where the cost is).
+
+### 13.9 The police as a different animal — set here
+
+What exists is a good chase brain on traffic's legs: prediction, the
+cut-off from level 2, the ram, the PIT, the heavy's shove, the box, the
+search fan-out, roadblocks, spikes, parked patrols, the Chief. But a unit
+drives with traffic's lane follower: it waits at junction reservations,
+stays behind a civilian in its lane, runs 108 km/h flat whatever the player
+does (the catch-up 173 km/h beyond 55 m, in view or not), and the HUD
+shows the chase's state as five pulsing stars and nothing else. That is
+why busted is fair and the chase is mediocre: the tactics are right, the
+driving and the reading are not.
+
+What the genre does (research 2026-09-23): every good pursuit system keeps
+explicit SEEN and SEARCH states with a last-known position the units drive
+to and a search zone the player can see (GTA V's vision cones on the radar,
+GTA IV's circle frozen at the last-seen point, Driver: San Francisco's
+flashing circle, Watch Dogs' two circles, Mafia III's blue disc); escape is
+time outside every sensor, reset on re-sighting, and its progress is shown
+(GTA's star flash slows, NFS's EVADE bar drains, then a cooldown with
+hiding spots); dispatch holds a minimum count per level and refills on a
+cadence that shrinks with heat (NFS Most Wanted 3:00 to 1:00); tactics are
+a vocabulary picked from relative position and speed (pursue at a distance,
+rear-quarter ram, low-speed PIT, box, rolling roadblock, static roadblock
+on the predicted route, spikes, the helicopter as a sensor); the radio
+announces the tactic before it lands (NFS's 10-codes; GTA's "suspect last
+seen in a red muscle car"); cops ignore lanes and lights and target the
+player while traffic yields; catch-up is allowed only out of sight and
+capped in view (NFS Heat's visible rubber band is what its players call
+cheating); and a chase escalates by time in pursuit and by units wrecked.
+
+The design, each item on the existing planner:
+
+- **The police driving mode.** A unit in a chase or a search runs the
+  junction box without a reservation (civilians yield by the pull-over
+  rule), swings out around a slower civilian through the oncoming lane
+  when it is clear (the wrong-way move, reserved for units and the gawk),
+  cuts junction curves with handles at 0.25 of the gap (traffic's 0.42),
+  and brakes and accelerates at 1.5× the class. Lights and siren on, as
+  now. A unit off duty drives like traffic again.
+- **Pressure, not a flat speed.** Within 60 m a chasing unit's desired
+  speed is the player's plus 4 m/s (never under 12 m/s), capped by its
+  class; beyond 60 m the catch-up applies only out of the player's view
+  cone, and a unit far off in view runs its class speed. The cops are
+  always in the mirror and never visibly cheating.
+- **Refill on a cadence by level**: `reinforceSeconds` becomes a table,
+  12 / 10 / 8 / 6 / 5 s for levels 1–5 (NFS's cadence compressed to a
+  run's length), and a wrecked unit's replacement is announced (below).
+- **Arrivals you can see.** From level 2 one reinforcement in three spawns
+  in view: at a side street 60–100 m ahead, pulling out with its lights on
+  (GTA's roadside ambush). The rest arrive out of view as now.
+- **The visible search.** The radar draws units: lit blue blips in a chase,
+  grey dots on patrol; in `lost` it draws the search zone, a translucent
+  blue disc at the last fix growing from 60 to 150 m over the cooldown
+  (GTA IV, Driver SF): "get away from where they saw you" made visible.
+  The stars' pulse slows as the cooldown runs down (GTA V) and a thin ring
+  under the stars drains with it (NFS's EVADE), so "did I lose them" is
+  answered on the HUD and not by guessing.
+- **The radio as one line.** The ticker of §13.3 also calls tactics before
+  they land, NFS's 10-codes in plain comic English, one line, 2 s, at most
+  one every 6 s: `DISPATCH · ROADBLOCK AHEAD ON THE AVENUE`, `DISPATCH ·
+  SPIKES OUT`, `DISPATCH · SUSPECT IN A LIME COMPACT` (the identity rule
+  taught by the radio: they remember the car), `DISPATCH · UNIT DOWN, SEND
+  ANOTHER`, `DISPATCH · WE LOST HIM`.
+- **Sirens by heat.** The siren adds a tone per level (one at 1, the
+  two-tone at 2, a third texture at 3 and up); the rotor's low-pass waits
+  for the helicopter (update 1).
+- **A chase pays and escalates.** `heat.chasePerSecond` (§13.3) and a
+  bounty in the bag per 10 s in pursuit, 100 × level (NFS's per-10-s
+  bounty), beside the police takedown's 1,500 that exists: a long chase is
+  worth something and gets worse.
+- **Traffic in the chase**: the pull-over and the thinning of §13.8; the
+  bus never yields (a bus across a junction is a wall for both sides).
+
+Measured at the slice: the busted rates per level by both bots before and
+after (the balance script), the share of chase time a unit spends within
+60 m of the player at level 2 for the skilled bot (target 60 % or more),
+the cut-offs, rams and PITs a minute, and the step p95 at levels 3 and 5.
+
+### 13.10 What this section changes elsewhere
+
+- §3.2 and §3.5 (the coin layer): superseded by §13.5; the look and the
+  catch stand, the layout does not.
+- §11: the launch timing (§13.1) and the milestone list (M5.5 before M6).
+- §12: the arrest's "slow junction turn" item is dropped at Marcin's word;
+  new watch items: does the goal line read without the sentence, does the
+  search disc read as "get away from here", does the pull-over make level
+  1–2 too easy, are 730 coins still too many.
+- `docs/BACKLOG.md`: the abandoned-car tow (closed by the gawk), the
+  ticker, the heat-scaled sirens and the radio chatter (scheduled here);
+  the garage's "dark" note corrected to "empty".
 
 ## References
 

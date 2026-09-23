@@ -23,7 +23,7 @@ import { Pursuit } from './police/Pursuit';
 import { ColdOpen } from './run/ColdOpen';
 import { Run } from './run/Run';
 import { Jobs } from './jobs/Jobs';
-import { placeJobs } from './jobs/place';
+import { jobsFor } from './jobs/place';
 import { Garage } from './garage/Garage';
 import { Dailies } from './dailies/Dailies';
 import { apply as applySave, type SaveV1 } from './save/format';
@@ -223,7 +223,7 @@ export class SimWorld {
     this.cameras = this.cover ? new Cameras(this.cover.cameraSites, this.cover.daily.cameras) : null;
     this.jumps = this.city ? new Jumps(this, this.city.jumps) : null;
     // the generator's sixteen markers (docs/M5_PLAN.md D4); the cold open adds its own as id 0
-    this.jobs = new Jobs(this, this.city && this.traffic ? placeJobs(this.city, opts.seed ?? 42, this.traffic.lanes) : []);
+    this.jobs = new Jobs(this, this.city && this.traffic ? jobsFor(this.city, opts.seed ?? 42, this.traffic.lanes) : []);
     this.run = new Run(this);
     this.coldOpen = new ColdOpen(this);
     this.dailies = new Dailies(this);

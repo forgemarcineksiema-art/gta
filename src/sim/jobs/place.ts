@@ -26,6 +26,7 @@ import { alongLane, laneChain } from '../city/route';
 import { BLOCK, HIGHWAY_HALF, ROAD_HALF, distanceToPolyline, type Lane } from '../city/roads';
 import { mulberry32 } from '../random';
 import type { LaneTables } from '../traffic/lanes';
+import { BAKED_JOBS } from './baked';
 import { ORDER_KINDS, orderPaints, packDescriptor, type JobDef, type JobKind } from './catalog';
 
 /** Metres past the carriageway edge a corner marker stands, along both arms. */
@@ -215,6 +216,15 @@ export function markerRingCoins(defs: readonly JobDef[]): Array<{ x: number; z: 
 }
 
 /** Deterministic per seed: `BALANCE.jobs.counts` of each kind, ids from 1 (0 is the cold open's). */
+/**
+ * The seed's jobs: the baked table for the shipping seed, so the boot does not generate the chunks the
+ * placement checks (M5.1; jobs 1.1 fails when it drifts from `placeJobs`), else placed here.
+ */
+export function jobsFor(city: City, seed: number, lanes: LaneTables): JobDef[] {
+  const baked = BAKED_JOBS[seed];
+  return baked ? baked.map((d) => ({ ...d })) : placeJobs(city, seed, lanes);
+}
+
 export function placeJobs(city: City, seed: number, lanes: LaneTables): JobDef[] {
   const cfg = BALANCE.jobs;
   const rng = mulberry32(seed ^ 0x0b5);

@@ -119,4 +119,3 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 - Coin rings round the job markers (DESIGN.md §3.2 says they join in M5): not built; the markers are rings already and the lines end on caps.
 - The naive hunter (`order.long.test.ts`) loses the wanted car where its re-plan routes through a U-turn: a hunter aiming at the car's next junction would make the order e2e and the measurement faster.
 - The wall panel is 660 px wide at every size: at 1920x1080 it could grow with the viewport (legible already at DPR 1).
-- Job placement generates the chunks it checks at boot (70-130 ms in Node): caching the sixteen defs per seed would take it off the time to control.

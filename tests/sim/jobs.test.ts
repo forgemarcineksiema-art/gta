@@ -6,6 +6,7 @@
  * delivery on a placed def, the arrow's bearing and its idle target (the bot
  * drives one, 1.7, in jobs.long.test.ts).
  */
+import { writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../src/sim/balance';
 import type { EventKind } from '../../src/sim/events';
@@ -28,6 +29,26 @@ function street(sim: SimWorld, s: number): { x: number; z: number; yaw: number }
     return pose;
   }
   throw new Error('no straight street lane');
+}
+
+/** Writes `src/sim/jobs/baked.ts` with the seed's placement (`npm run bake:jobs`). */
+function writeBaked(seed: number, defs: readonly JobDef[]): void {
+  const row = (d: JobDef): string => '    { ' + Object.entries(d).map(([k, v]) => `${k}: ${typeof v === 'string' ? `'${v}'` : String(v)}`).join(', ') + ' },';
+  const text = [
+    '/**',
+    ' * The jobs\' placement for the shipping seed, baked so the boot does not generate the chunks `placeJobs`',
+    ' * checks (M5.1). Written by `npm run bake:jobs`; jobs 1.1 fails when it drifts from the generator.',
+    ' */',
+    "import type { JobDef } from './catalog';",
+    '',
+    'export const BAKED_JOBS: Readonly<Record<number, readonly JobDef[]>> = {',
+    `  ${seed}: [`,
+    ...defs.map(row),
+    '  ],',
+    '};',
+    '',
+  ].join('\n');
+  writeFileSync(new URL('../../src/sim/jobs/baked.ts', import.meta.url), text);
 }
 
 function count(sim: SimWorld, from: number, kind: EventKind): number {
@@ -156,7 +177,10 @@ describe('jobs (M5 slice 1)', () => {
       expect(defs.filter((d) => d.kind === 'delivery').length).toBe(6);
       expect(defs.filter((d) => d.kind === 'order').length).toBe(6);
       expect(defs.filter((d) => d.kind === 'escape').length).toBe(4);
-      expect(JSON.stringify(placeJobs(sim.city!, 42, sim.traffic!.lanes))).toBe(JSON.stringify(defs));
+      const placed = placeJobs(sim.city!, 42, sim.traffic!.lanes);
+      if (process.env.npm_lifecycle_event === 'bake:jobs') writeBaked(42, placed);
+      // the boot reads the baked table: `npm run bake:jobs` rewrites it when the generator moves
+      else expect(JSON.stringify(placed)).toBe(JSON.stringify(defs));
       for (const d of defs) {
         expect(roadClearance(sim, d.x, d.z)).toBeGreaterThanOrEqual(BALANCE.jobs.markerRadius + 1);
         for (const e of defs) if (e !== d) expect(Math.hypot(d.x - e.x, d.z - e.z)).toBeGreaterThanOrEqual(BALANCE.jobs.markerMinGap);

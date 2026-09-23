@@ -53,7 +53,11 @@ max 100 / 133 / 83 ms (the M5 gate's 200 / 1,017, M4's 917 / 517), step p95
 - Eleven tests over ~10 s moved unchanged into `*.long.test.ts` (8 files,
   green with LONG=1). The quick suite still reads ~66 s on this 4-core
   laptop; Marcin: not worth more time.
-- Next: the jobs' placement off the time to control.
+- The jobs' placement off the time to control: seed 42's sixteen defs are
+  baked (`sim/jobs/baked.ts`, `npm run bake:jobs`; jobs 1.1 fails when the
+  generator drifts), other seeds still place at boot. Time to control at
+  20 Mbit and 4x CPU 3.70 s -> 3.30 / 3.30 / 3.43 s, the sim phase 1.32 s ->
+  0.88-0.95 s. M5.1 closed.
 
 ## 2026-09-23 — M5, the launch minimum
 

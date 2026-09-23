@@ -70,6 +70,8 @@ export const PED_COLORS = {
   skin: 0xd7ae9c, skinDark: 0x9c6b52, hair: 0x2a211d, hairAuburn: 0x6b3f2a, hairGrey: 0xb9b4ad,
   trousers: 0x35353e, denim: 0x3a4f6e, skirt: 0x2d2d36, shoes: 0x1c1b22, boots: 0x4a3a2a,
   scarf: 0xd4cbbd, bag: 0x8c5a3a, stick: 0x5a3a28, hardHat: 0xffd23f, sleeve: 0x6d6d78, stripe: 0xe4e4ea,
+  // the officer (M5.5 slice 18): a blue shirt, navy trousers and cap, a badge, the ticket book
+  uniform: 0x3f6fb6, navy: 0x1f2a44, badge: 0xe6bb63, ticket: 0xf2efe6,
 } as const;
 
 export const CITY_COLORS = {

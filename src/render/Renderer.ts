@@ -7,6 +7,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CAR_IDS, CAR_PRESETS, GARAGE, PALETTE, SWAP, bodySpec, bodyTuning, isShell, type BodyId, type CarId, type DynamicDesc, type GhostPose, type ShapeDesc, type SimWorld, type StaticDesc } from '../sim';
 import { ChaseCamera, sideCutEye } from './ChaseCamera';
 import { SignalView } from './SignalView';
+import { BreakerView } from './BreakerView';
+import { buildDonutShop } from './DonutShop';
 import { CAR_PROFILES } from './carProfiles';
 import { BODY_PROFILES } from './bodyProfiles';
 import { Sparks } from './Sparks';
@@ -134,6 +136,8 @@ export class Renderer {
   private readonly cutEye = { x: 0, y: 0, z: 0 };
   /** The traffic lights' lamps (M5.5 slice 17). */
   private readonly signalView: SignalView | null;
+  /** The pursuit breakers (M5.5 slice 18). */
+  private readonly breakerView: BreakerView | null;
   /** The last damage's contact in the car's frame: where the wreck caves in. */
   private readonly lastDent = new THREE.Vector3(0, 0.5, 2);
   private readonly lastCarPos = new THREE.Vector3(Infinity, Infinity, Infinity);
@@ -210,6 +214,8 @@ export class Renderer {
     this.arrow = new Arrow(this.scene, this.camera);
     this.roadblockView = sim.roadblocks ? new RoadblockView(this.scene) : null;
     this.signalView = sim.city && sim.traffic ? new SignalView(this.scene, sim) : null;
+    this.breakerView = sim.breakers ? new BreakerView(this.scene, sim.breakers.descs.length) : null;
+    if (sim.donuts) this.scene.add(buildDonutShop());
     this.rampView = sim.jumps ? new RampView(this.scene, sim) : null;
     if (sim.city) this.scene.add(buildSkyline(sim.city));
     if (sim.statics.length) this.buildStatics(sim.statics);
@@ -454,6 +460,7 @@ export class Renderer {
     this.arrow.update(this.sim, carPos.x, carPos.y, carPos.z);
     this.roadblockView?.update(this.sim);
     this.signalView?.update(this.sim);
+    this.breakerView?.update(this.sim);
     this.car.update(tm);
     // ghost of the best lap
     if (this.sim.ghostPose(this.ghostPose)) {
@@ -508,6 +515,11 @@ export class Renderer {
       const tint = e.target >= 0 && this.sim.traffic ? (this.sim.traffic.paint[e.target] as number) : PALETTE.charcoal;
       this.debris.burst(e.x, e.y + 0.6, e.z, 0, 3, 0, e.kind === 'takedownTraffic' ? 10 : 6, 0.4, tint, 4);
       for (let k = 0; k < 16; k++) this.smoke.emit(k % 2 ? 'fire' : 'dark', e.x, e.y + 0.8, e.z);
+    } else if (e.kind === 'breaker') {
+      // the tower comes down: boards and poles over the street, dust, a jolt
+      this.debris.burst(e.x, e.y, e.z, this.carVel.x * 0.3, 3, this.carVel.z * 0.3, 16, 0.5, PALETTE.sand, 5);
+      this.debris.burst(e.x, e.y * 0.6, e.z, 0, 2, 0, 8, 0.3, PALETTE.steel, 4);
+      this.chase.kick(0.3);
     } else if (e.kind === 'billboard') {
       // planks in the panel's paint fly on with the car, and the camera takes a jolt
       const tint = this.billboards?.descOf(e.target)?.paint ?? PALETTE.charcoal;

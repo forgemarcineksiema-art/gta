@@ -94,7 +94,7 @@ export class PedView {
       const a = this.anims[look] as THREE.InstancedBufferAttribute;
       const k = n * 3;
       const arr = a.array as Float32Array;
-      if (pose === PedPose.Walk) {
+      if (pose === PedPose.Walk || pose === PedPose.Approach) {
         arr[k] = (peds.gait[i] as number) * PHASE_PER_METRE;
         arr[k + 1] = Math.min(1.2, (peds.speed[i] as number) / 1.35);
         arr[k + 2] = 0;
@@ -111,6 +111,11 @@ export class PedView {
         arr[k] = 0;
         arr[k + 1] = 1;
         arr[k + 2] = 4;
+      } else if (pose === PedPose.Ticket) {
+        // writing the ticket (M5.5 slice 18)
+        arr[k] = clock * 9 + i;
+        arr[k + 1] = 1;
+        arr[k + 2] = 5;
       } else {
         arr[k] = clock * FIST_RATE + i;
         arr[k + 1] = 1;

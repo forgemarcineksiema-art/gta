@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { PED_TINTS } from '../../src/sim/palette';
-import { PED_LOOKS, PedLook, PedPose, type Pedestrians } from '../../src/sim/traffic/Pedestrians';
+import { CROWD_LOOKS, PedLook, PedPose, type Pedestrians } from '../../src/sim/traffic/Pedestrians';
 import { PEDS } from '../../src/sim/traffic/tuning';
 import { createWorld, run } from './helpers';
 
@@ -21,7 +21,7 @@ describe('pedestrians with bodies', () => {
     try {
       const peds = sim.peds as Pedestrians;
       for (const [district, [x, z]] of Object.entries(POINTS)) {
-        const looks = new Array<number>(PED_LOOKS).fill(0);
+        const looks = new Array<number>(CROWD_LOOKS).fill(0);
         const n = 400;
         for (let k = 0; k < n; k++) {
           const i = peds.spawnAt(x, z, 0, PedPose.Fist);
@@ -32,7 +32,7 @@ describe('pedestrians with bodies', () => {
         }
         const shares = PEDS.looks[district] as readonly number[];
         const total = shares.reduce((a, b) => a + b, 0);
-        for (let l = 0; l < PED_LOOKS; l++) expect(Math.abs((looks[l] as number) / n - (shares[l] as number) / total), `${district} look ${l}`).toBeLessThan(0.07);
+        for (let l = 0; l < CROWD_LOOKS; l++) expect(Math.abs((looks[l] as number) / n - (shares[l] as number) / total), `${district} look ${l}`).toBeLessThan(0.07);
       }
       // the Works are the workers', the Gardens the old men's
       expect(PEDS.looks.foundry![PedLook.Worker]).toBeGreaterThan(0.5);

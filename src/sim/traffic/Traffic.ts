@@ -669,6 +669,20 @@ export class Traffic {
     this.free(agent);
   }
 
+  /** A parked police car goes back to the pool (the donut shop's, M5.5 slice 18). */
+  releaseParkedPolice(agent: number): void {
+    if (this.police[agent] !== 1 || this.state[agent] !== AgentState.Parked) return;
+    this.free(agent);
+  }
+
+  /** The kerbside bays within `r` m of a point hold no civilian (the donut shop's are the cruisers'). */
+  reserveBays(x: number, z: number, r: number): void {
+    for (let b = 0; b < this.bays.length; b++) {
+      const bay = this.bays[b] as ParkingBay;
+      if (Math.hypot(bay.x - x, bay.z - z) <= r) this.bayUsed[b] = 0;
+    }
+  }
+
   /** Bounded planner inputs: a connected exit, speed, and an optional physical ram target. */
   setPolicePlan(agent: number, next: number, speed: number, ramX = 0, ramZ = 0, ramSpeed = 0, ramAccel = 0, free = false): void {
     if (this.police[agent] !== 1) return;

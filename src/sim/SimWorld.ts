@@ -17,6 +17,7 @@ import { Roadblocks } from './police/Roadblocks';
 import { Cameras } from './city/cameras';
 import { Jumps } from './city/jumps';
 import { Stash, cityToys } from './city/stash';
+import { Breakers } from './city/breakers';
 import { createControls, type VehicleControls } from './controls';
 import { EventLog } from './events';
 import { Collectibles } from './city/collectibles';
@@ -29,6 +30,8 @@ import { Pursuit } from './police/Pursuit';
 import { ColdOpen } from './run/ColdOpen';
 import { Run } from './run/Run';
 import { Skill } from './run/Skill';
+import { TicketOfficer } from './police/Ticket';
+import { DonutShop } from './police/Donuts';
 import { Jobs } from './jobs/Jobs';
 import { Fares } from './jobs/Fares';
 import { jobsFor } from './jobs/place';
@@ -138,6 +141,12 @@ export class SimWorld {
   readonly skill: Skill;
   /** Hidden cars (M5.5 slice 16): the stashed truck, and which the player has found. */
   readonly stash: Stash;
+  /** The busted rule's officer walking up with the ticket book (M5.5 slice 18). */
+  readonly ticket: TicketOfficer;
+  /** The pursuit breakers (M5.5 slice 18): the city's scaffold towers; null off the city. */
+  readonly breakers: Breakers | null;
+  /** The donut shop's cruisers (M5.5 slice 18); null off the city. */
+  readonly donuts: DonutShop | null;
   /** The first run's script; inactive until `start()`. */
   readonly coldOpen: ColdOpen;
   /** The catalogue, paint, upgrades and prep: the wall's pages (M5 slice 4). */
@@ -257,6 +266,9 @@ export class SimWorld {
     this.fares = new Fares(this, this.events);
     this.skill = new Skill(this);
     this.stash = new Stash(this);
+    this.ticket = new TicketOfficer(this);
+    this.breakers = this.city && this.traffic ? new Breakers(this) : null;
+    this.donuts = this.city && this.traffic ? new DonutShop(this) : null;
     this.run = new Run(this);
     this.coldOpen = new ColdOpen(this);
     this.dailies = new Dailies(this);
@@ -336,11 +348,14 @@ export class SimWorld {
     this.heat.step();
     this.heat.tick(FIXED_DT, this.pursuit.state === 'active');
     // before the run: a delivery into a garage pays the bag before the door can drop the job
+    this.breakers?.step(this.probe, FIXED_DT);
     this.skill.step(FIXED_DT);
     if (this.traffic) this.stash.step(this.probe);
+    this.donuts?.step(this.probe);
     this.fares.step(this.probe, FIXED_DT);
     this.jobs.step(this.probe, FIXED_DT);
     this.run.step(this.probe, FIXED_DT);
+    this.ticket.step(FIXED_DT);
     this.dailies.step();
     this.coldOpen.postStep(FIXED_DT);
     for (const t of this.tracked) {

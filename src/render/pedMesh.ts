@@ -164,6 +164,23 @@ export function buildPed(look: PedLook): THREE.BufferGeometry {
       arms(b, 1.5, 0.3, 0.56, 0.13, C.sleeve);
       break;
     }
+    case PedLook.Officer: {
+      // the officer (M5.5 slice 18): navy trousers and cap with a peak, a blue shirt, a belt, a badge, the ticket book in the left hand
+      legs(b, 0.92, 0.1, 0.14, C.navy, C.shoes);
+      b.on(LIMB.body)
+        .box([0, 0.97, 0], [0.42, 0.1, 0.27], C.navy)
+        .box([0, 1.24, 0], [0.44, 0.46, 0.27], C.uniform)
+        .box([0.12, 1.36, 0.14], [0.06, 0.07, 0.02], C.badge)
+        .box([0, 1.53, 0], [0.1, 0.06, 0.1], C.skin)
+        .box([0, 1.66, 0.01], [0.2, 0.22, 0.21], C.skin)
+        .box([0, 1.8, -0.005], [0.23, 0.07, 0.24], C.navy)
+        .box([0, 1.77, 0.12], [0.2, 0.02, 0.1], C.navy)
+        .box([0, 1.8, 0.115], [0.06, 0.04, 0.02], C.badge);
+      arms(b, 1.45, 0.28, 0.54, 0.12, C.uniform);
+      b.on(LIMB.armL, [0.28, 1.45, 0])
+        .box([0.28, 0.83, 0.07], [0.12, 0.16, 0.03], C.ticket);
+      break;
+    }
     case PedLook.Old: {
       // an old man, stooped, a cardigan in the tint, a flat cap, grey hair, a stick in his right hand
       legs(b, 0.84, 0.1, 0.13, C.sleeve, C.shoes);
@@ -186,7 +203,7 @@ export function buildPed(look: PedLook): THREE.BufferGeometry {
 
 /**
  * The crowd's material: flat, vertex colours, the tint where the mask says so, and the limbs posed per
- * instance by `anim` (x the phase, y the amount, z the pose: 0 walk, 1 dive, 2 getting up, 3 the fist, 4 hailing a taxi).
+ * instance by `anim` (x the phase, y the amount, z the pose: 0 walk, 1 dive, 2 getting up, 3 the fist, 4 hailing a taxi, 5 writing a ticket).
  */
 export function pedMaterial(): THREE.MeshLambertMaterial {
   const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
@@ -208,7 +225,9 @@ float limbAngle() {
   if ( anim.z < 2.5 ) return -arm * 0.9 * anim.y;
   if ( anim.z < 3.5 ) return side < 0.0 ? -arm * ( 2.6 + 0.25 * sin( anim.x ) ) : arm * 0.15;
   // hailing: the right arm straight up and still
-  return side < 0.0 ? -arm * 2.9 : 0.0;
+  if ( anim.z < 4.5 ) return side < 0.0 ? -arm * 2.9 : 0.0;
+  // writing the ticket: the book held up in the left hand, the right hand at it, a scribble in the wrist
+  return side > 0.0 ? -arm * 1.25 : -arm * ( 1.1 + 0.06 * sin( anim.x ) );
 }`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
 float limbA = limb > 0.5 ? limbAngle() : 0.0;

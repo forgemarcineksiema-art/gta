@@ -2,6 +2,17 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M5.5 slice 18: police extras
+
+Done: the ticket book. While the busted bar fills an officer (a new pedestrian look: blue shirt, navy cap, badge, the
+book in hand) walks from the nearest cruiser to the driver's door, paced to arrive as it fills, writes through the
+card, and walks back once it closes; the bar is drawn as a citation pad whose three lines fill. Pursuit breakers:
+eight scaffold towers on mid-block pavements, two a district, on the big map; driven through at speed one topples
+across its lane behind the car, crushes what stands there (a cruiser is the player's takedown), stands 25 s as a
+barrier (each cruiser written off on it pays) and is back next run. The donut shop: a pink kiosk under a giant donut
+in the Works; two cruisers in its bays whenever the player is near (borrowable), units that stand down head its way.
+The news: after each level's line the ticker names the suspect and the district, and an escape. Pins 18.1–18.4.
+
 ## 2026-09-23 — M5.5 slice 17: life extras
 
 Done: traffic lights at the nine downtown crossings (no highway or authored road at them): 14 s green, 3 s amber,

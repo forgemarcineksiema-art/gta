@@ -25,7 +25,8 @@ export class RunHud {
   private coinPop = false;
   private capFlash = false;
   private readonly bar: HTMLElement;
-  private readonly barFill: HTMLElement;
+  /** The ticket book's three lines of ink. */
+  private readonly barLines: HTMLElement[];
   private readonly card: HTMLElement;
   private readonly cardLines: HTMLElement;
   /** The panel behind the shut door: the garage's tabs and pages are added to it by `GarageUi`. */
@@ -64,11 +65,18 @@ export class RunHud {
     this.coinRow = el('div', 'run__coins');
     this.coinValue = el('span', 'run__coins-value', '0');
     this.coinRow.append(el('span', 'run__coin-glyph'), this.coinValue);
+    // the busted bar is the officer's ticket book (M5.5 slice 18): three lines written as it fills
     this.bar = el('div', 'run__busted');
-    const track = el('div', 'run__busted-track');
-    this.barFill = el('div', 'run__busted-fill');
-    track.appendChild(this.barFill);
-    this.bar.append(el('div', 'run__busted-label', 'BUSTED'), track);
+    const pad = el('div', 'run__ticket');
+    pad.append(el('div', 'run__ticket-head', 'CITATION'));
+    this.barLines = [0, 1, 2].map(() => {
+      const line = el('div', 'run__ticket-line');
+      const ink = el('div', 'run__ticket-ink');
+      line.appendChild(ink);
+      pad.appendChild(line);
+      return ink;
+    });
+    this.bar.append(el('div', 'run__busted-label', 'BUSTED'), pad);
     this.card = el('div', 'run__card');
     this.cardLines = el('div', 'run__lines');
     this.card.append(el('div', 'run__title run__title--danger', 'BUSTED'), this.cardLines, this.prompt());
@@ -150,7 +158,13 @@ export class RunHud {
     }
     if (barVisible) {
       const bar = Math.round(run.bustedProgress * 200);
-      if (bar !== this.lastBar) { this.barFill.style.transform = `scaleX(${bar / 200})`; this.lastBar = bar; }
+      if (bar !== this.lastBar) {
+        this.lastBar = bar;
+        for (let k = 0; k < this.barLines.length; k++) {
+          const f = Math.max(0, Math.min(1, (bar / 200) * this.barLines.length - k));
+          (this.barLines[k] as HTMLElement).style.transform = `scaleX(${f})`;
+        }
+      }
     }
     if (run.state === 'door' && run.lastSerial !== this.lastSerial) {
       // the double offer paid after the door shut: the totals again

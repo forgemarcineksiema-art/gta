@@ -26,6 +26,7 @@ export class Sfx {
     else if (e.kind === 'respawn' || e.kind === 'swap') this.whoosh(ctx, master);
     else if (e.kind === 'takedown' || e.kind === 'takedownTraffic') { this.crunch(ctx, master, 4); this.boom(ctx, master); }
     else if (e.kind === 'billboard') { this.splinter(ctx, master); this.ding(ctx, master); }
+    else if (e.kind === 'breaker') this.splinter(ctx, master);
     else if (e.kind === 'door') this.thud(ctx, master);
     else if (e.kind === 'coin') this.coin(ctx, master, e.value);
     else if (e.kind === 'spill') this.cascade(ctx, master);

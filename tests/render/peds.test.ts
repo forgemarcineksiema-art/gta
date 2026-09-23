@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { LIMB, buildPed } from '../../src/render/pedMesh';
-import { PED_LOOKS } from '../../src/sim';
+import { PED_LOOKS, CROWD_LOOKS } from '../../src/sim';
 
 describe('the crowd, drawn', () => {
   it('20.1 four silhouettes: under 600 triangles, on the ground, 1.5–1.95 m tall, four limbs on their joints, tinted clothes', () => {
@@ -30,7 +30,8 @@ describe('the crowd, drawn', () => {
         if (l !== LIMB.body) expect(pivot.getY(i)).toBeGreaterThanOrEqual(pos.getY(i) - 0.2);
       }
       for (const l of [LIMB.body, LIMB.legL, LIMB.legR, LIMB.armL, LIMB.armR]) expect(seen.has(l), `look ${look} limb ${l}`).toBe(true);
-      expect(tinted).toBeGreaterThan(0);
+      // the crowd's clothes take the district's tint; the officer's uniform (M5.5 slice 18) is fixed
+      if (look < CROWD_LOOKS) expect(tinted).toBeGreaterThan(0);
       expect(tinted).toBeLessThan(mask.count);
       g.dispose();
     }

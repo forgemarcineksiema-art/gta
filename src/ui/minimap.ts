@@ -9,7 +9,7 @@ import { BALANCE, CITY_HALF, DISTRICTS, PALETTE, districtAt, type SimWorld } fro
 import { LANDMARKS } from '../sim/city/City';
 import { MINIMAP, advance, buildRoadLayers, clampToRim, project, yawFromQuat, type MinimapState, type Vec2 } from './minimapModel';
 
-export type MarkerKind = 'tower' | 'tank' | 'glasshouse' | 'hotel' | 'garage' | 'job' | 'cache' | 'camera';
+export type MarkerKind = 'tower' | 'tank' | 'glasshouse' | 'hotel' | 'garage' | 'job' | 'cache' | 'camera' | 'breaker';
 /** A point of interest on the map. `local` markers show only inside the circle (the job rings: sixteen chevrons on the rim would be noise). */
 export interface MinimapMarker { x: number; z: number; kind: MarkerKind; color: string; yaw?: number; local?: boolean }
 
@@ -165,6 +165,10 @@ export function drawGlyph(c: CanvasRenderingContext2D, kind: MarkerKind, x: numb
       c.rect(x - g * 0.8, y - g * 0.5, g * 1.6, g);
       c.moveTo(x + g * 0.3, y);
       c.arc(x, y, g * 0.3, 0, Math.PI * 2, true);
+      break;
+    case 'breaker':
+      // a pursuit breaker: a scaffold tower, tall and narrow
+      c.rect(x - g * 0.4, y - g * 1.1, g * 0.8, g * 2.2);
       break;
     case 'garage':
       // a garage front: a pitched outline with the door as the dark band across its foot

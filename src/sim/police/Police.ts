@@ -42,6 +42,7 @@ import { CAR_PRESETS } from '../vehicle/presets';
 import { POLICE, type PoliceTuning } from './tuning';
 import { DISPATCH, packSuspect } from './Pursuit';
 import { Helicopter } from './Helicopter';
+import { DONUT_SHOP } from './Donuts';
 
 /**
  * A chasing unit's speed (docs/DESIGN.md §13.9): within `pressure.attack` its class's (the ram, the PIT); within
@@ -58,6 +59,8 @@ export function pressureSpeed(t: PoliceTuning, gap: number, inView: boolean, pla
 /** Distance fields over the road graph: toward the player's near future, and toward where the player is heading. */
 const CHASE = 0;
 const AHEAD = 1;
+/** Toward the donut shop (M5.5 slice 18): where the units that stand down head. */
+const DONUT = 2;
 /** Arrest slots: behind, ahead, left, right of the player; units beyond four stand by behind. */
 const SLOTS = 4;
 /** After a box: the leave point is this far past the empty car along the unit's lane (m), reached within this (m) or given up after this (s). */
@@ -124,9 +127,9 @@ export class Police {
   private readonly spin = { x: 0, y: 0, z: 0 };
   private readonly pose: LanePose = { x: 0, z: 0, yaw: 0 };
   private readonly projection: LaneProjection = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };
-  private readonly fields: [Float64Array, Float64Array];
-  private readonly targetLane = new Int16Array(2);
-  private readonly targetS = new Float64Array(2);
+  private readonly fields: [Float64Array, Float64Array, Float64Array];
+  private readonly targetLane = new Int16Array(3);
+  private readonly targetS = new Float64Array(3);
   private readonly visited: Uint8Array;
   private readonly incoming: Int16Array;
   private readonly previousIncoming: Int16Array;
@@ -183,7 +186,7 @@ export class Police {
     this.slotOf.fill(-1);
     this.assaultCooldown = new Float32Array(this.traffic.capacity);
     this.copSpeedMax = new Float32Array(this.traffic.capacity);
-    this.fields = [new Float64Array(this.graph.nodes.length), new Float64Array(this.graph.nodes.length)];
+    this.fields = [new Float64Array(this.graph.nodes.length), new Float64Array(this.graph.nodes.length), new Float64Array(this.graph.nodes.length)];
     this.targetLane.fill(-1);
     this.visited = new Uint8Array(this.graph.nodes.length);
     this.incoming = new Int16Array(this.graph.nodes.length);
@@ -202,6 +205,8 @@ export class Police {
     }
     const extents = CAR_PRESETS.police.chassisHalfExtents;
     this.radius = Math.hypot(extents.x, extents.z);
+    // the donut shop's field, once: the units that stand down head there
+    this.route(DONUT, DONUT_SHOP.laneX, DONUT_SHOP.laneZ, DONUT_SHOP.laneYaw);
   }
 
   /** Runs before Traffic.step; never steps traffic or physics itself. */
@@ -367,7 +372,7 @@ export class Police {
         }
         // Idle means ordinary lane driving, not omniscient navigation to the player.
         if (this.withdrawing[u] === 1) {
-          traffic.setPolicePlan(agent, this.awayExit(agent, player), 0);
+          traffic.setPolicePlan(agent, this.withdrawExit(agent, player), 0);
           continue;
         }
         // Off duty across town: that car goes back to the depot and another comes on
@@ -867,8 +872,21 @@ export class Police {
         this.count--;
         continue;
       }
-      traffic.setPolicePlan(agent, this.awayExit(agent, player), 0);
+      traffic.setPolicePlan(agent, this.withdrawExit(agent, player), 0);
     }
+  }
+
+  /**
+   * A unit standing down heads for the donut shop (M5.5 slice 18), unless that way leads back toward the player:
+   * then away, as ever.
+   */
+  private withdrawExit(agent: number, player: PlayerProbe): number {
+    const toShop = this.routeExit(agent, DONUT);
+    const lane = this.traffic.lane[agent] as number;
+    if (toShop < 0 || lane < 0) return this.awayExit(agent, player);
+    const here = this.graph.lanes[lane] as Lane, next = this.graph.lanes[toShop] as Lane;
+    const now = Math.hypot(here.x1 - player.x, here.z1 - player.z), then = Math.hypot(next.x1 - player.x, next.z1 - player.z);
+    return then < now - 20 ? this.awayExit(agent, player) : toShop;
   }
 
   /** Fill the roster up to the level's budget, out of view, one retry window at a time; now and then one pulls out ahead, in view. */

@@ -28,7 +28,9 @@ export type EventKind =
   // the hunts (M5.5 slice 14): value = the set's reward into the bank (0 but for the last), target = 0 jumps, 1 billboards
   | 'hunt'
   // a hidden car found (M5.5 slice 16): target = its index in HIDDEN_CARS
-  | 'hiddenCar';
+  | 'hiddenCar'
+  // a pursuit breaker brought down (M5.5 slice 18): value and target = its id
+  | 'breaker';
 
 export interface SimEvent {
   kind: EventKind;

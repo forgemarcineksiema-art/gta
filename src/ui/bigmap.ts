@@ -8,7 +8,7 @@
  * repaints at most every `REPAINT_MS` while shown and costs nothing hidden.
  * Reads sim state only; the radar's paths and glyphs are shared.
  */
-import { BALANCE, CITY_HALF, DISTRICTS, PALETTE, type JobKind, type SimWorld } from '../sim';
+import { BALANCE, BreakerState, CITY_HALF, DISTRICTS, PALETTE, type BreakerDesc, type JobKind, type SimWorld } from '../sim';
 import { LANDMARKS } from '../sim/city/City';
 import { COVER } from '../sim/city/covers';
 import { BLOCK, HIGHWAY_HALF, OVERPASS, OVERPASS_NODES } from '../sim/city/roads';
@@ -24,6 +24,8 @@ const GLYPH = 7;
 /** The cover on the map: where the helicopter cannot see (DESIGN.md §13.10). */
 const COVER_COLOR = 'rgba(126, 196, 214, 0.9)';
 const CAMERA_COLOR = INK;
+/** A scaffold tower that brings down on the chasers (M5.5 slice 18). */
+const BREAKER_COLOR = hex(PALETTE.carOrange);
 /** The placed jobs' kinds, in the legend's order (fares have no marker: a hailer waves the taxi down). */
 const LEGEND_JOBS: ReadonlyArray<[JobKind, string]> = [
   ['delivery', 'DELIVERY'], ['order', 'STEAL TO ORDER'], ['escape', 'ESCAPE'], ['trial', 'TIME TRIAL'],
@@ -152,6 +154,7 @@ export class BigMap {
     item('GARAGE', (c) => drawGlyph(c, 'garage', 9, 9, GLYPH, hex(PALETTE.carOrange)));
     item('CACHE', (c) => drawGlyph(c, 'cache', 9, 9, GLYPH * 1.4, CACHE_COLOR));
     item('SPEED CAMERA', (c) => drawGlyph(c, 'camera', 9, 9, GLYPH, CAMERA_COLOR));
+    item('PURSUIT BREAKER', (c) => drawGlyph(c, 'breaker', 9, 9, GLYPH * 0.8, BREAKER_COLOR));
     item('COVER', (c) => { c.fillStyle = COVER_COLOR; c.strokeStyle = DARK; c.lineWidth = 1.5; c.fillRect(3, 5, 12, 8); c.strokeRect(3, 5, 12, 8); });
     item('POLICE', (c) => { this.unitDot(c, 9, 9, UNIT_LIT); });
     item('HELICOPTER', (c) => drawHeli(c, 9, 9));
@@ -259,6 +262,13 @@ export class BigMap {
     LANDMARKS.forEach((l, i) => this.glyphAt(GLYPH_KINDS[i] ?? 'tower', l.x, l.z, s, GLYPH, hex(DISTRICTS[i]?.accent ?? 0xffffff)));
     for (const d of sim.run.dropOffs) this.glyphAt('garage', d.door.x, d.door.z, s, GLYPH * 1.2, hex(PALETTE.carOrange));
     for (const cam of sim.cameras?.descs ?? []) this.glyphAt('camera', cam.x, cam.z, s, GLYPH * 0.8, CAMERA_COLOR);
+    // the pursuit breakers still standing (M5.5 slice 18)
+    const breakers = sim.breakers;
+    if (breakers) for (let k = 0; k < breakers.descs.length; k++) {
+      if (breakers.state[k] !== BreakerState.Standing) continue;
+      const d = breakers.descs[k] as BreakerDesc;
+      this.glyphAt('breaker', d.x, d.z, s, GLYPH * 0.8, BREAKER_COLOR);
+    }
     const caches = sim.caches;
     if (caches) {
       for (let k = 0; k < caches.today.length; k++) {

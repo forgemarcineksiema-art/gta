@@ -12,7 +12,7 @@ import { districtAt, type City } from '../city/City';
 import type { RoadGraph } from '../city/roads';
 import type { EventLog } from '../events';
 import * as M from '../math';
-import { CITY_COLORS, PED_TINTS } from '../palette';
+import { CITY_COLORS, PED_COLORS, PED_TINTS } from '../palette';
 import { mulberry32 } from '../random';
 import type { Quat } from '../scene';
 import type { TransformBuffer } from '../transforms';
@@ -20,10 +20,12 @@ import { AgentState, type PlayerProbe, type Traffic } from './Traffic';
 import type { LanePose, LaneProjection } from './lanes';
 import { PEDS, type PedTuning } from './tuning';
 
-export enum PedPose { Walk = 0, Dive = 1, GetUp = 2, Fist = 3, Hail = 4 }
+export enum PedPose { Walk = 0, Dive = 1, GetUp = 2, Fist = 3, Hail = 4, Approach = 5, Ticket = 6 }
 /** The four silhouettes (M5.5 slice 20; render/pedMesh.ts draws them). Appended, never renumbered. */
-export enum PedLook { Coat = 0, Bag = 1, Worker = 2, Old = 3 }
-export const PED_LOOKS = 4;
+export enum PedLook { Coat = 0, Bag = 1, Worker = 2, Old = 3, Officer = 4 }
+/** The crowd's four silhouettes; the officer (M5.5 slice 18) walks up only for the busted rule. */
+export const CROWD_LOOKS = 4;
+export const PED_LOOKS = 5;
 /** A place with no palette of its own dresses in the chalk of the city's facades. */
 const ANY_TINTS: readonly number[] = [CITY_COLORS.chalk];
 /** Metres of walking per full stride (two steps): the gait's phase runs 2π over it. */
@@ -48,6 +50,9 @@ export class Pedestrians {
   readonly dir: Int8Array;
   readonly s: Float32Array;
   readonly speed: Float32Array;
+  /** An approaching pedestrian's target (the officer, M5.5 slice 18). */
+  readonly tx: Float32Array;
+  readonly tz: Float32Array;
   readonly x: Float32Array;
   readonly z: Float32Array;
   readonly yaw: Float32Array;
@@ -102,6 +107,8 @@ export class Pedestrians {
     this.dir = new Int8Array(n).fill(1);
     this.s = new Float32Array(n);
     this.speed = new Float32Array(n);
+    this.tx = new Float32Array(n);
+    this.tz = new Float32Array(n);
     this.x = new Float32Array(n);
     this.z = new Float32Array(n);
     this.yaw = new Float32Array(n);
@@ -217,8 +224,70 @@ export class Pedestrians {
 
   /** In the taxi: gone from the pavement. */
   pickUp(i: number): void {
+    this.remove(i);
+  }
+
+  /** Gone (a fare in the taxi, the officer back in the car). */
+  remove(i: number): void {
     this.active[i] = 0;
     this.writeOne(i, true);
+  }
+
+  /**
+   * The busted rule's officer (M5.5 slice 18): out of a unit at (x, z), walking toward (tx, tz) at `speed` m/s,
+   * in the officer's look; the crowd's dice are left alone.
+   */
+  spawnOfficer(x: number, z: number, tx: number, tz: number, speed: number): number {
+    const i = this.findFree();
+    if (i < 0) return -1;
+    this.active[i] = 1;
+    this.lane[i] = -1;
+    this.dir[i] = 1;
+    this.s[i] = 0;
+    this.x[i] = x;
+    this.z[i] = z;
+    this.yaw[i] = Math.atan2(tx - x, tz - z);
+    this.scored[i] = 0;
+    this.look[i] = PedLook.Officer;
+    this.tint[i] = PED_COLORS.uniform;
+    this.gait[i] = 0;
+    this.tintSerial++;
+    this.pose[i] = PedPose.Approach;
+    this.poseFor[i] = 0;
+    this.approach(i, tx, tz, speed);
+    this.writeOne(i, true);
+    return i;
+  }
+
+  /** Walk straight on toward (tx, tz) at `speed` m/s, the walk cycle running. */
+  approach(i: number, tx: number, tz: number, speed: number): void {
+    this.tx[i] = tx;
+    this.tz[i] = tz;
+    this.speed[i] = speed;
+    if (this.pose[i] !== PedPose.Approach) {
+      this.pose[i] = PedPose.Approach;
+      this.poseFor[i] = 0;
+    }
+  }
+
+  /** At the car's window, writing the ticket, facing `yaw`. */
+  ticket(i: number, yaw: number): void {
+    this.pose[i] = PedPose.Ticket;
+    this.poseFor[i] = 0;
+    this.speed[i] = 0;
+    this.yaw[i] = yaw;
+  }
+
+  private approachStep(i: number, dt: number): void {
+    const dx = (this.tx[i] as number) - (this.x[i] as number), dz = (this.tz[i] as number) - (this.z[i] as number);
+    const d = Math.hypot(dx, dz);
+    this.poseFor[i] = (this.poseFor[i] as number) + dt;
+    if (d < 0.05) return;
+    const step = Math.min(d, (this.speed[i] as number) * dt);
+    this.x[i] = (this.x[i] as number) + dx / d * step;
+    this.z[i] = (this.z[i] as number) + dz / d * step;
+    this.yaw[i] = Math.atan2(dx, dz);
+    this.gait[i] = ((this.gait[i] as number) + step) % (STRIDE * 1000);
   }
 
   /** A silhouette and clothes for where the pedestrian stands: the district's shares and palette. */
@@ -226,7 +295,7 @@ export class Pedestrians {
     const district = districtAt(this.x[i] as number, this.z[i] as number).id;
     const shares = this.tuning.looks[district] ?? [0.25, 0.25, 0.25, 0.25];
     let u = this.rng() * (shares[0] + shares[1] + shares[2] + shares[3]), look = 0;
-    while (look < PED_LOOKS - 1 && u >= (shares[look] as number)) { u -= shares[look] as number; look++; }
+    while (look < CROWD_LOOKS - 1 && u >= (shares[look] as number)) { u -= shares[look] as number; look++; }
     this.look[i] = look;
     const tints = PED_TINTS[district] ?? ANY_TINTS;
     this.tint[i] = tints[(this.rng() * tints.length) | 0] as number;
@@ -260,7 +329,8 @@ export class Pedestrians {
       if (pose === PedPose.Walk) this.walk(i, dt);
       else if (pose === PedPose.Dive) this.dive(i, dt);
       else if (pose === PedPose.GetUp) this.getUp(i, dt);
-      else if (pose === PedPose.Hail) this.poseFor[i] = (this.poseFor[i] as number) + dt;
+      else if (pose === PedPose.Hail || pose === PedPose.Ticket) this.poseFor[i] = (this.poseFor[i] as number) + dt;
+      else if (pose === PedPose.Approach) this.approachStep(i, dt);
       else this.fist(i, dt);
     }
     for (let i = 0; i < this.capacity; i++) {
@@ -306,7 +376,8 @@ export class Pedestrians {
     let pitch = 0;
     let roll = 0;
     // highest with the legs together, lowest at the full stride
-    if (pose === PedPose.Walk) y = (1 - Math.abs(Math.sin((this.gait[i] as number) * (Math.PI * 2 / STRIDE)))) * 0.04;
+    if (pose === PedPose.Walk || pose === PedPose.Approach) y = (1 - Math.abs(Math.sin((this.gait[i] as number) * (Math.PI * 2 / STRIDE)))) * 0.04;
+    else if (pose === PedPose.Hail || pose === PedPose.Ticket) y = 0;
     else if (pose === PedPose.Dive) pitch = Math.min(1, (this.poseFor[i] as number) / 0.25) * 70 * M.DEG;
     else if (pose === PedPose.GetUp) pitch = Math.max(0, 1 - (this.poseFor[i] as number) / this.tuning.getUpTime) * 70 * M.DEG;
     else { roll = Math.sin(this.time * 25) * 8 * M.DEG; y = Math.abs(Math.sin(this.time * 12.5)) * 0.1; }
@@ -501,9 +572,11 @@ export class Pedestrians {
     const rz = fx;
     const reachAlong = halfLength + t.guaranteeDistance;
     const reachSide = halfWidth + t.guaranteeDistance;
-    void vx; void vz;
+    // the officer at a stopped car's window (M5.5 slice 18) stays put; a car moving off still clears them
+    const crawling = Math.hypot(vx, vz) < 3;
     for (let i = 0; i < this.capacity; i++) {
       if (!this.active[i]) continue;
+      if (crawling && (this.pose[i] === PedPose.Approach || this.pose[i] === PedPose.Ticket)) continue;
       const dx = (this.x[i] as number) - cx;
       const dz = (this.z[i] as number) - cz;
       const along = dx * fx + dz * fz;

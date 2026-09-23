@@ -2,7 +2,7 @@
  * In-game HUD: plain DOM over the canvas. Speedometer, boost bar, drift readout,
  * a debug block, a pause overlay and the keycap hint strip. Reads sim state only.
  */
-import { AgentState, BALANCE, BODY_WORDS, POLICE, TRICK_WORDS, paintName, unpackDescriptor } from '../sim';
+import { AgentState, BALANCE, BODY_WORDS, POLICE, TRICK_WORDS, districtAt, paintName, unpackDescriptor } from '../sim';
 import type { SimEvent, SimWorld } from '../sim';
 import { BigMap } from './bigmap';
 import { Minimap } from './minimap';
@@ -62,6 +62,10 @@ export class Hud {
   private readonly tickerLevel: HTMLElement;
   private readonly tickerText: HTMLElement;
   private tickerLeft = 0;
+  /** The news line owed (M5.5 slice 18): a heat level, -1 for an escape, 0 for none; queued behind the level's line. */
+  private newsFor = 0;
+  private queuedLead = '';
+  private queuedText = '';
   /** Seconds since the radio last spoke: a line at most every `DISPATCH_EVERY`. */
   private dispatchQuiet = Infinity;
   private readonly lap: HTMLElement;
@@ -354,8 +358,11 @@ export class Hud {
       // the level's news, one line (DESIGN.md §13.3): what the city sends now
       const news = HEAT_NEWS[value] ?? '';
       if (news) this.showTicker(`LEVEL ${value}`, news);
+      // then the evening news about the suspect (M5.5 slice 18): written in the frame's update, which has the sim
+      this.newsFor = value;
       return;
     }
+    if (kind === 'escape') this.newsFor = -1;
     if (kind === 'dispatch') {
       // the radio (DESIGN.md §13.9): one line, never over a level's news, at most every few seconds
       if (this.dispatchQuiet < DISPATCH_EVERY || this.tickerLeft > 0) return;
@@ -394,6 +401,7 @@ export class Hud {
       : kind === 'skill' ? `SKILL CHAIN +${value.toLocaleString('en-US')}`
       : kind === 'skillLost' ? 'CHAIN LOST'
       : kind === 'hiddenCar' ? 'HIDDEN CAR FOUND · IN THE GARAGE NOW'
+      : kind === 'breaker' ? 'PURSUIT BREAKER!'
       : kind === 'hunt' ? (target === 0
         ? (value > 0 ? `ALL ${this.huntTotal} JUMPS +${value.toLocaleString('en-US')}` : `NEW JUMP ${this.huntFound}/${this.huntTotal}`)
         : `ALL BILLBOARDS +${value.toLocaleString('en-US')}`)
@@ -534,9 +542,26 @@ export class Hud {
       this.toastTimer -= dt;
       if (this.toastTimer <= 0) this.toast.classList.remove('is-visible');
     }
+    if (this.newsFor !== 0) {
+      // the suspect as the news has them: the descriptor and where they are
+      const d = sim.pursuit.descriptor;
+      const what = `A ${paintName(d.paint)} ${BODY_WORDS[d.body]}`;
+      const where = districtAt(sim.probe.x, sim.probe.z).name;
+      const line = newsLine(this.newsFor, what, where);
+      if (this.newsFor < 0 && this.tickerLeft <= 0) this.showTicker('NEWS', line, 3);
+      else { this.queuedLead = 'NEWS'; this.queuedText = line; }
+      this.newsFor = 0;
+    }
     if (this.tickerLeft > 0) {
       this.tickerLeft -= dt;
-      if (this.tickerLeft <= 0) this.ticker.classList.remove('is-on');
+      if (this.tickerLeft <= 0) {
+        if (this.queuedText) {
+          this.showTicker(this.queuedLead, this.queuedText, 3);
+          this.queuedText = '';
+        } else {
+          this.ticker.classList.remove('is-on');
+        }
+      }
     }
     this.dispatchQuiet += dt;
 
@@ -567,6 +592,18 @@ export class Hud {
 const DISPATCH_EVERY = 6;
 
 /** The ticker's line per heat level: what the city sends from now on. */
+/** The news about the suspect at each level (M5.5 slice 18; DESIGN.md §8's ticker), and after an escape (-1). */
+function newsLine(level: number, what: string, where: string): string {
+  switch (level) {
+    case 1: return `${what} SPOTTED SPEEDING IN ${where}`;
+    case 2: return `${what} TERRORIZING ${where}`;
+    case 3: return `ROADBLOCKS GO UP ACROSS ${where} · ${what} STILL AT LARGE`;
+    case 4: return `${where} IN LOCKDOWN AS ${what} RUNS RIOT`;
+    case 5: return `CITY-WIDE MANHUNT FOR ${what}`;
+    default: return `${what} GIVES POLICE THE SLIP IN ${where} · UNITS HEAD FOR DONUTS`;
+  }
+}
+
 const HEAT_NEWS: Record<number, string> = {
   1: 'PATROLS ON YOUR TAIL',
   2: 'INTERCEPTORS ON THE ROAD',

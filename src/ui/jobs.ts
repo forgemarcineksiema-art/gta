@@ -291,10 +291,11 @@ export class JobsHud {
       kind = jobs.lastRematch ? `REMATCH WON +${money(jobs.lastPaid)}` : `BEATEN +${money(jobs.lastPaid)} · THE ${BODY_WORDS[rival.body]} IS YOURS`;
       state = 'is-done';
     } else if (jobs.state === 'failed' && rival) {
-      kind = jobs.lastPlace === 2 ? `${rival.name} WIN${rival.name.startsWith('THE TWINS') ? '' : 'S'} · TRY AGAIN` : 'TOO LATE · TRY AGAIN';
+      kind = jobs.lastPlace !== 2 ? 'TOO LATE · TRY AGAIN' : rival.format === 'hunt' ? `${rival.name} GOT HOME · TRY AGAIN`
+        : `${rival.name} WIN${rival.name.startsWith('THE TWINS') ? '' : 'S'} · TRY AGAIN`;
       state = 'is-failed';
     } else if (rival) {
-      kind = rival.format === 'chief' ? 'LOSE THE CHIEF' : `${rival.name} · ${PLACE_WORDS[this.racePlace] ?? ''}`;
+      kind = rival.format === 'chief' ? 'LOSE THE CHIEF' : rival.format === 'hunt' ? `WRECK ${rival.name}` : `${rival.name} · ${PLACE_WORDS[this.racePlace] ?? ''}`;
     } else if (jobs.state === 'done') {
       const what = d.kind === 'order' ? 'SOLD' : d.kind === 'escape' ? 'BOUNTY' : d.kind === 'trial' ? MEDAL_WORDS[jobs.lastMedal]
         : d.kind === 'race' ? `${PLACE_WORDS[jobs.lastPlace] ?? ''} PLACE` : d.kind === 'rage' ? 'RAGE DONE' : d.kind === 'mayhem' ? 'MAYHEM DONE' : d.kind === 'fare' ? 'FARE PAID' : 'DELIVERED';
@@ -345,7 +346,7 @@ export class JobsHud {
       const board = sim.board;
       this.cardTitle.textContent = n > 0 ? `#${n} ${r.name}` : r.name;
       this.cardSub.textContent = r.line;
-      this.cardLimit.textContent = r.format === 'chief' ? 'LOSE HIM AT ★★★★★' : 'FIRST TO THE FINISH · ANY ROUTE';
+      this.cardLimit.textContent = r.format === 'chief' ? 'LOSE HIM AT ★★★★★' : r.format === 'hunt' ? `WRECK THE ${BODY_WORDS[r.body]} BEFORE IT GETS HOME` : 'FIRST TO THE FINISH · ANY ROUTE';
       this.cardPay.textContent = board.isBeaten(d.level) ? `REMATCH · ${money(board.purse(d.level))}` : `${money(board.purse(d.level))} + THE ${BODY_WORDS[r.body]}`;
     } else if (d.kind === 'order') {
       const w = unpackDescriptor(d.descriptor);

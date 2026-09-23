@@ -174,6 +174,12 @@ export const BALANCE = {
     pace: [0.88, 0.9, 0.92, 0.95, 0.97, 0.99, 1.01, 1.03, 1.06, 1.1],
     band: [[0.7, 1.15], [0.72, 1.16], [0.74, 1.18], [0.76, 1.19], [0.78, 1.2], [0.8, 1.22], [0.83, 1.24], [0.86, 1.26], [0.89, 1.28], [0.92, 1.3]] as ReadonlyArray<readonly [number, number]>,
     limitSpeed: 9,
+    /**
+     * A hunt (M6 slice 2): the rival starts `lead` m ahead and drives home at `pace` × their race pace for
+     * `seconds` at most, their car's armour by rival index (× `heavy` for Tow Truck Tina's twist); wrecked, their
+     * bag bursts as `burst` in coins on the lane ahead of the wreck (the spill's pool).
+     */
+    hunt: { seconds: 180, lead: 40, pace: 0.85, armour: [1.5, 1.6, 1.7, 1.8, 2, 2.2, 2.4, 2.6, 2.8, 3] as readonly number[], heavy: 2, burst: 1500 },
   },
   /** Bring it home, pay to keep it (DESIGN.md §13.7): a car driven through a door, not owned yet, is kept for this share of its price (the police car for `police`). */
   keep: { share: 0.3, police: 0.6 },

@@ -82,6 +82,12 @@ export class Police {
   /** The Chief's agent at level 5, -1 otherwise; after a wreck another comes `chiefWait` seconds later. */
   chief = -1;
   chiefWait = 0;
+
+  /** The wanted board's finale (M6 slice 2): the next arrival is the Chief himself, now. */
+  summonChief(): void {
+    this.chiefWait = 0;
+    this.spawnLeft = 0;
+  }
   /** Parked patrols: the agent at each place (-1 none) and its index into `parkedJunctions`. */
   readonly parked: Int16Array;
   readonly parkedAt: Int16Array;

@@ -10,7 +10,8 @@ import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../src/sim/balance';
 import { CHAIN_ALL, CHIEF, RIVALS, goalFor, newGoal, type JobDef, type SimWorld } from '../../src/sim';
 import { apply, collect, defaultSave } from '../../src/sim/save/format';
-import { AgentState, type Traffic } from '../../src/sim/traffic/Traffic';
+import { AgentState, impactDamage, type Traffic } from '../../src/sim/traffic/Traffic';
+import { TRAFFIC } from '../../src/sim/traffic/tuning';
 import { BODY_INDEX } from '../../src/sim/traffic/bodies';
 import { createWorld, run } from './helpers';
 
@@ -243,4 +244,95 @@ describe('the wanted board', () => {
       expect(c.caches).toBe(1);
     } finally { sim.dispose(); }
   }, 60_000);
+
+  it("M6 2.1 a hunted rival's armour: a hit that wrecks a civilian dents Tow Truck Tina's wrecker, and its damage grows by a share", () => {
+    const t = TRAFFIC;
+    const armour = (BALANCE.board.hunt.armour[2] as number) * BALANCE.board.hunt.heavy;
+    expect(armour).toBeGreaterThan(2);
+    const dv = t.wreckImpact;
+    // a civilian: wrecked by the impact alone
+    expect(dv >= t.wreckImpact * 1).toBe(true);
+    // the rival: under the armoured wreck line, and the damage only a share of the civilian's
+    expect(dv >= t.wreckImpact * armour).toBe(false);
+    const civ = impactDamage(0, dv, 1, t), riv = impactDamage(0, dv, armour, t);
+    expect(civ).toBeLessThan(1);
+    expect(riv).toBeCloseTo(civ / armour, 9);
+    expect(riv).toBeLessThan(civ);
+    expect(impactDamage(0.2, t.damageThreshold * 0.5, armour, t)).toBe(0.2);
+  });
+
+  it('M6 2.2 a hunt: Tina pulls out 40 m ahead in her armoured wrecker, the arrow is on her; wrecked she pays and her bag bursts; home first she wins', async () => {
+    for (const end of ['wreck', 'home'] as const) {
+      const sim = await world();
+      try {
+        sim.police!.dispatching = false;
+        sim.run.chain = CHAIN_ALL;
+        sim.board.beaten = 0b11;
+        sim.board.force = true;
+        expect(sim.board.next()).toBe(2);
+        const d = ring(sim, 2);
+        pullUp(sim, d);
+        run(sim, 0.3);
+        expect(sim.jobs.state).toBe('active');
+        const traffic = sim.traffic as Traffic;
+        const a = sim.jobs.race.rivals[0] as number;
+        expect(traffic.bodyOf(a)).toBe('wrecker');
+        expect(traffic.armour[a]).toBeCloseTo((BALANCE.board.hunt.armour[2] as number) * BALANCE.board.hunt.heavy, 5);
+        expect(sim.jobs.remaining).toBeGreaterThan(BALANCE.board.hunt.seconds - 1);
+        const ahead = Math.hypot((traffic.x[a] as number) - sim.probe.x, (traffic.z[a] as number) - sim.probe.z);
+        expect(ahead).toBeGreaterThan(BALANCE.board.hunt.lead - 12);
+        const out = { x: 0, z: 0 };
+        expect(sim.jobs.target(out)).toBe(true);
+        expect(Math.hypot(out.x - (traffic.x[a] as number), out.z - (traffic.z[a] as number))).toBeLessThan(0.01);
+        const bag = sim.run.bag;
+        if (end === 'wreck') {
+          traffic.wreck(a);
+          run(sim, 2 / 60);
+          expect(sim.jobs.state).toBe('done');
+          expect(sim.run.bag - bag).toBe(RIVALS[2]!.purse);
+          expect(sim.board.isBeaten(2)).toBe(true);
+          expect(sim.garage.owned.has('wrecker')).toBe(true);
+          let burst = 0;
+          const coins = sim.coins!;
+          for (let k = 0; k < coins.spillTtl.length; k++) if ((coins.spillTtl[k] as number) > 0) burst += coins.spillValue[k] as number;
+          expect(burst).toBe(BALANCE.board.hunt.burst);
+        } else {
+          sim.jobs.race.finished = 1;
+          run(sim, 2 / 60);
+          expect(sim.jobs.state).toBe('failed');
+          expect(sim.jobs.lastPlace).toBe(2);
+          expect(sim.board.isBeaten(2)).toBe(false);
+          expect(sim.run.bag).toBe(bag);
+        }
+      } finally { sim.dispose(); }
+    }
+  }, 90_000);
+
+  it('M6 2.3 the Chief: his bay by the donut shop after the ten; the duel is an escape at five stars with him on the roster within a second; lost, he pays his car', async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 0.5, peds: 0, record: false });
+    try {
+      sim.run.chain = CHAIN_ALL;
+      sim.board.beaten = (1 << CHIEF) - 1;
+      expect(sim.board.next()).toBe(CHIEF);
+      expect(sim.board.ready(CHIEF)).toBe(true);
+      const d = ring(sim, CHIEF);
+      pullUp(sim, d);
+      run(sim, 0.2);
+      expect(sim.jobs.state).toBe('active');
+      expect(sim.jobs.active).toBe(d.id);
+      expect(sim.heat.level).toBe(5);
+      expect(sim.pursuit.state).not.toBe('idle');
+      const out = { x: 0, z: 0 };
+      expect(sim.jobs.target(out)).toBe(false);
+      run(sim, 1);
+      expect(sim.police!.chief).toBeGreaterThanOrEqual(0);
+      // lost him: the escape
+      sim.pursuit.lose();
+      run(sim, 2 / 60);
+      expect(sim.jobs.state).toBe('done');
+      expect(sim.board.isBeaten(CHIEF)).toBe(true);
+      expect(sim.garage.owned.has('chiefcar')).toBe(true);
+      expect(sim.board.next()).toBe(-1);
+    } finally { sim.dispose(); }
+  }, 90_000);
 });

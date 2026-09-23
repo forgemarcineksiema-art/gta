@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M6 slice 2: the hunt and the Chief
+
+Done: a hunt's rival pulls out 40 m ahead and drives home at 0.85 of their race pace with armour by rank (1.5 → 3; Tina
+×2), `Traffic.armour` per record in the police's damage rule (`impactDamage`, one pure function now); the arrow is on
+their car; wrecked (by anyone) they pay the purse, their car is won and their bag bursts as 1,500 in the spill's coins;
+home first, or 3 minutes, loses. The Chief waits at the bay by the donut shop after the ten: his duel is the escape at
+five stars with `Police.summonChief()` putting him on the roster within the second; lost, his cruiser is won. Pins M6
+2.1–2.3. Verify green (351 tests).
+
 ## 2026-09-23 — M6 slice 1: the wanted board and the race
 
 Done: `sim/board` (the ten rivals and the Chief, `Career`'s lifetime counts from the events, `Board`: the next rival,

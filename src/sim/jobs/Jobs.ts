@@ -296,6 +296,14 @@ export class Jobs {
       return true;
     }
     if (d.kind === 'escape' || (d.kind === 'duel' && RIVALS[d.level]?.format === 'chief')) return false;
+    if (d.kind === 'duel' && RIVALS[d.level]?.format === 'hunt') {
+      // a hunt's target is the rival's car
+      const traffic = this.sim.traffic, a = this.race.rivals[0] as number;
+      if (!traffic || a < 0 || traffic.state[a] === AgentState.Free) return false;
+      out.x = traffic.x[a] as number;
+      out.z = traffic.z[a] as number;
+      return true;
+    }
     out.x = d.targetX;
     out.z = d.targetZ;
     return true;
@@ -420,21 +428,44 @@ export class Jobs {
     const threshold = rival.heat > 0 ? (BALANCE.heatThresholds[rival.heat - 1] ?? 0) : 0;
     this.sim.heat.add(Math.max(0, threshold - this.sim.heat.points));
     if (rival.format === 'chief') {
+      // his is an escape at five stars with him on the roster from the first second
       this.remaining = NaN;
       this.sim.pursuit.force(BALANCE.jobs.escape.radioSeconds);
+      this.sim.police?.summonChief();
+      return;
+    }
+    const b = BALANCE.board, h = b.hunt;
+    const cars: Array<readonly [BodyId, number]> = rival.paints.map((paint) => [rival.body, paint] as const);
+    const pace = b.pace[d.level] ?? 1, band = b.band[d.level] ?? [0.8, 1.2];
+    if (rival.format === 'hunt') {
+      // the rival drives home with a bag: wreck their car first
+      this.remaining = h.seconds;
+      const armour = (h.armour[d.level] ?? 2) * (rival.twist === 'heavy' ? h.heavy : 1);
+      this.race.start(d.targetX, d.targetZ, this.sim.probe, { cars, pace: pace * h.pace, band, lead: h.lead, armour });
       return;
     }
     this.remaining = d.limitSeconds;
-    const b = BALANCE.board;
-    const cars: Array<readonly [BodyId, number]> = rival.paints.map((paint) => [rival.body, paint] as const);
-    this.race.start(d.targetX, d.targetZ, this.sim.probe, { cars, pace: b.pace[d.level] ?? 1, band: b.band[d.level] ?? [0.8, 1.2] });
+    this.race.start(d.targetX, d.targetZ, this.sim.probe, { cars, pace, band });
   }
 
-  /** The duel's step: a rival over the line first loses it at once; the player over it wins; the clock fails it. */
+  /**
+   * The duel's step: a rival over the line (or home) first loses it at once; the player over the line wins a race,
+   * the rival's car wrecked wins a hunt (their bag bursts on the road); the Chief's is won by losing him; the clock
+   * fails any of them.
+   */
   private duelStep(d: JobDef, probe: PlayerProbe, dt: number): void {
     const rival = RIVALS[d.level] as RivalDef;
     if (rival.format === 'chief') {
       if (this.escaped) this.winDuel(d, probe);
+      return;
+    }
+    const traffic = this.sim.traffic;
+    const hunted = rival.format === 'hunt' ? (this.race.rivals[0] as number) : -1;
+    if (hunted >= 0 && traffic && traffic.state[hunted] === AgentState.Wrecked) {
+      const x = traffic.x[hunted] as number, z = traffic.z[hunted] as number;
+      this.sim.coins?.spill(x, z, traffic.yaw[hunted] as number, BALANCE.board.hunt.burst, this.sim.events);
+      this.lastPlace = 1;
+      this.winDuel(d, probe);
       return;
     }
     this.race.step(probe);
@@ -445,7 +476,7 @@ export class Jobs {
       return;
     }
     const reach = BALANCE.jobs.race.finishRadius;
-    if ((d.targetX - probe.x) ** 2 + (d.targetZ - probe.z) ** 2 <= reach * reach) {
+    if (rival.format === 'race' && (d.targetX - probe.x) ** 2 + (d.targetZ - probe.z) ** 2 <= reach * reach) {
       this.lastPlace = 1;
       this.winDuel(d, probe);
       return;

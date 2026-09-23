@@ -55,6 +55,15 @@ export interface PlayerProbe {
 }
 
 const KINDS: CarId[] = ['muscle', 'compact', 'heavy', 'sports', 'police'];
+
+/**
+ * A contact's damage on a car (0..1): what a hit of `dv` m/s adds past the threshold, divided by the car's
+ * armour (1 a civilian, `policeArmour` a unit, a hunted rival's own factor). The wreck is `dv` at `wreckImpact`
+ * × armour or the damage at 1.
+ */
+export function impactDamage(damage: number, dv: number, armour: number, t: { damageThreshold: number; damagePerDv: number }): number {
+  return dv > t.damageThreshold ? Math.min(1, damage + (dv - t.damageThreshold) * t.damagePerDv / armour) : damage;
+}
 const KIND_INDEX: Record<CarId, number> = { muscle: 0, compact: 1, heavy: 2, sports: 3, police: 4 };
 /** The player's paint per class (docs/STYLE.md): what an abandoned player car keeps. */
 export const PLAYER_PAINT: Record<CarId, number> = {
@@ -127,6 +136,8 @@ export class Traffic {
   readonly racer: Uint8Array;
   /** A wanted board's rival's car (M6): never a swap candidate, during its duel and after, until the record is freed. */
   readonly rival: Uint8Array;
+  /** A hunted rival's armour (M6 slice 2): the police's rule with its own factor; 1 for every other car. */
+  readonly armour: Float32Array;
   readonly paint: Uint32Array;
   readonly slot: Int16Array;
   readonly lane: Int16Array;
@@ -300,6 +311,7 @@ export class Traffic {
     this.police = new Uint8Array(n);
     this.racer = new Uint8Array(n);
     this.rival = new Uint8Array(n);
+    this.armour = new Float32Array(n).fill(1);
     this.paint = new Uint32Array(n);
     this.slot = new Int16Array(n);
     this.lane = new Int16Array(n);
@@ -860,6 +872,7 @@ export class Traffic {
     this.parkBay[i] = -1;
     this.racer[i] = 0;
     this.rival[i] = 0;
+    this.armour[i] = 1;
     this.lights[i] = 0;
     this.police[i] = 0;
     this.clearPolicePlan(i);
@@ -1739,10 +1752,10 @@ export class Traffic {
     const st = this.state[i];
     if (st === AgentState.Wrecked || st === AgentState.Abandoned || st === AgentState.Parked) return;
     const t = this.tuning;
-    // a police car takes a harder hit to shake and a much harder one to kill
-    const armour = this.police[i] === 1 ? t.policeArmour : 1;
-    if (dv > t.damageThreshold) this.damage[i] = Math.min(1, (this.damage[i] as number) + (dv - t.damageThreshold) * t.damagePerDv / armour);
-    if (dv >= t.wreckImpact * armour || (this.damage[i] as number) >= 1) {
+    // a police car takes a harder hit to shake and a much harder one to kill; a hunted rival's car by its own factor
+    const armour = this.police[i] === 1 ? t.policeArmour : (this.armour[i] as number);
+    this.damage[i] = impactDamage(this.damage[i] as number, dv, armour, t);
+    if (dv >= t.wreckImpact * armour || this.damage[i] >= 1) {
       this.wreck(i);
       this.justWrecked[i] = 1;
       return;
@@ -1900,6 +1913,7 @@ export class Traffic {
     this.parkBay[i] = -1;
     this.racer[i] = 0;
     this.rival[i] = 0;
+    this.armour[i] = 1;
     this.drawDriver(i);
     this.lights[i] = 0;
     this.police[i] = 0;
@@ -1944,6 +1958,7 @@ export class Traffic {
     this.police[i] = 0;
     this.racer[i] = 0;
     this.rival[i] = 0;
+    this.armour[i] = 1;
     this.lights[i] = 0;
     this.clearPolicePlan(i);
     this.next[i] = -1;

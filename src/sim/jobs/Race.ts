@@ -20,11 +20,16 @@ import { PALETTE } from '../palette';
 /** The street race's field: the rivals' cars and paints. */
 const FIELD: ReadonlyArray<readonly [BodyId, number]> = [['sports', PALETTE.carLime], ['muscle', PALETTE.carMagenta], ['sports', PALETTE.carBlue]];
 
-/** A wanted board's duel (M6): its rivals (one, the twins two), their pace on the lane's limit and their band. */
+/**
+ * A wanted board's duel (M6): its rivals (one, the twins two), their pace on the lane's limit and their band; a
+ * hunt's rival starts `lead` m ahead and carries `armour`.
+ */
 export interface RaceField {
   cars: ReadonlyArray<readonly [BodyId, number]>;
   pace: number;
   band: readonly [number, number];
+  lead?: number;
+  armour?: number;
 }
 
 export class Race {
@@ -73,10 +78,12 @@ export class Race {
     this.pace = r.pace * (duel ? duel.pace : 1);
     this.bandLow = duel ? duel.band[0] : (r.band[0] as number);
     this.bandHigh = duel ? duel.band[1] : (r.band[1] as number);
+    const lead = duel?.lead ?? r.gridAhead;
     for (let k = 0; k < this.count; k++) {
       const [body, paint] = cars[k] as readonly [BodyId, number];
-      const s = Math.min(len - 2, s0 + r.gridAhead * (k + 1));
+      const s = Math.min(len - 2, s0 + lead + r.gridAhead * k);
       const agent = traffic.spawnRacer(lane, s, body, paint, duel !== undefined);
+      if (agent >= 0 && duel?.armour !== undefined) traffic.armour[agent] = duel.armour;
       this.rivals[k] = agent;
       this.placeOf[k] = 0;
     }

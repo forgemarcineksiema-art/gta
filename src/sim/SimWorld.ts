@@ -16,6 +16,7 @@ import { createControls, type VehicleControls } from './controls';
 import { EventLog } from './events';
 import { Collectibles } from './city/collectibles';
 import { Coins } from './city/coins';
+import { Caches } from './city/caches';
 import { Life } from './life/Life';
 import { Heat } from './heat/Heat';
 import { Police } from './police/Police';
@@ -133,6 +134,8 @@ export class SimWorld {
   readonly collectibles: Collectibles | null;
   /** Coins on the road and the spill pool; null on the playground. */
   readonly coins: Coins | null;
+  /** The day's thirty caches (DESIGN.md §13.5); null on the playground. */
+  readonly caches: Caches | null;
   readonly statics: StaticDesc[];
   readonly dynamics: DynamicDesc[] = [];
   readonly spawns: SpawnPoint[];
@@ -230,6 +233,7 @@ export class SimWorld {
     this.run = new Run(this);
     this.coldOpen = new ColdOpen(this);
     this.dailies = new Dailies(this);
+    this.caches = this.coins ? new Caches(this) : null;
     this.city?.sync(spawn.position.x, spawn.position.z, true);
     if (opts.save) {
       applySave(this, opts.save);
@@ -296,6 +300,7 @@ export class SimWorld {
     this.peds?.writeTransforms();
     this.life.postStep(FIXED_DT);
     if (this.traffic) this.coins?.step(this.probe, FIXED_DT, this.events);
+    if (this.traffic) this.caches?.step();
     if (this.traffic) this.cameras?.step(this.probe, FIXED_DT, this.events);
     this.roadblocks?.step(this.probe, FIXED_DT, this.events);
     this.jumps?.step(this.probe, this.vehicle.telemetry.groundedWheels === 0, FIXED_DT, this.events);

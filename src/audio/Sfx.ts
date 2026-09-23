@@ -41,6 +41,8 @@ export class Sfx {
     else if (e.kind === 'dailyDone') { [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.note(ctx, master, f, i * 0.09, i === 3 ? 0.55 : 0.12, 0.08, 'square')); }
     // the ratchet crossed a level (M5.5): a short two-tone wail, the siren's shape in a sting
     else if (e.kind === 'heatLevel') { this.note(ctx, master, 440, 0, 0.16, 0.07, 'sawtooth'); this.note(ctx, master, 587.33, 0.15, 0.3, 0.07, 'sawtooth'); }
+    // a cache found (M5.5): the cap's bell already rang; every tenth adds the streak's two notes
+    else if (e.kind === 'cache') { if (e.value > 0) { this.note(ctx, master, 880, 0, 0.12, 0.06, 'triangle'); this.note(ctx, master, 1174.66, 0.1, 0.3, 0.06, 'triangle'); } }
     else if (e.kind === 'streak') { this.note(ctx, master, 880, 0, 0.12, 0.06, 'triangle'); this.note(ctx, master, 1174.66, 0.1, 0.3, 0.06, 'triangle'); }
   };
 

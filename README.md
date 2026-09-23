@@ -31,6 +31,8 @@ The first visit is the cold open: a beat-up van at heat 1, a muscle car to swap 
 
 The run: crimes fill the bag (yellow, top right, with the multiplier the police have seen you at). Two patrols are always on the beat: a crime they see (a billboard, a wrecked car, a ram, speeding past them) makes you wanted at once and the stars pop with what it cost; a crime nobody saw raises the stars quietly. Pull into one of the three garages (orange on the radar) and stop: the door takes 3 s to shut and banks the bag times the multiplier; back out to cancel. Two police cars boxing you in while you are wanted fill the BUSTED bar: half the bag is kept, no multiplier.
 
+Coins are never a carpet: a job lays its coins along your route (runs at the turns and on the straights, the big one on the target; take them all and the job tips 10 %), thirty caches a day sit on side streets (gold dots on the radar, CACHES n/30, a bonus at every tenth), and the rest lie only at billboards and ramps.
+
 Jobs: sixteen rings on the corners of the grid, drive into one. Orange is a getaway delivery (a clock to a drop-off, faster pays more), magenta a steal-to-order (find the named car, swap into it, bring it to a fence unscratched), blue a pursuit escape (the police on you at once at a set heat, a bounty for losing them). The orange arrow over the car points at the job's target, and between jobs, dimmed, at the nearest ring or, with a full bag, the nearest door. Behind the door the wall is the garage: cars, paint, three upgrades a car, the lawyer and the fence for the next run, and the day's three challenges. Cars and upgrades are bought with the bank and the coins together.
 
 ## Develop

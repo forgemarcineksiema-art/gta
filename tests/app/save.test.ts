@@ -72,7 +72,7 @@ describe('save store', () => {
 
   it('0.9 a newer save is kept: nothing is written over it', async () => {
     const platform = new FakePlatform('');
-    const newer = JSON.stringify({ v: 2, bank: 999999, hovercraft: true });
+    const newer = JSON.stringify({ v: 3, bank: 999999, hovercraft: true });
     platform.store.set(BALANCE.save.key, newer);
     const store = new SaveStore(platform, BALANCE.save.key, clock().now);
     const save = await store.load();

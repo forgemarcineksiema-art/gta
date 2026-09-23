@@ -670,14 +670,15 @@ both.
   with character, the police as a different animal, the garage dressed
   and the wall sized; optionally "bring it home, pay to keep it". As many
   passes as his playtests ask for.
-- **M6 Platform** as in the brief, then Basic Launch; only on his word
-  that the game is good.
-- **Update 1, the air**: covered streets and the camera occlusion rule, the
-  overpasses, the helicopter with the spotlight (§5).
-- **Update 2, the jobs**: the time trial on a coin line, street races with
-  rivals, takedown rage and mayhem, fares with hot passengers, the stunt and
-  collectible hunts, the skill chain, the full map (§4, §7).
-- Later: cop mode, ghosts, the rest of §8, by the KPIs.
+- **Everything that was "update 1", "update 2" or "polish" is M5.5 too**
+  (decided by Marcin, 2026-09-23): the air (cover, the overpasses, the
+  helicopter, §5), the jobs (the time trial, street races, takedown rage,
+  mayhem, fares, the hunts, the skill chain, the full map, §4, §7), the
+  hidden cars and the toys (§8), the life and police extras of the backlog.
+  `docs/M5.5_PLAN.md` §4 slices 7–18.
+- **M6 Platform** as in the brief, then Basic Launch; only when all of it is
+  in and on his word that the game is good.
+- Later, by the KPIs: cop mode, ghosts, multiplayer (§8).
 
 ## 12. Playtest watch list
 
@@ -913,6 +914,13 @@ first failure mode of collectibles: "tedious, too many".
   with the new income (a job's route about 1,000–1,400 in coins plus the
   tip; the caches up to 3,700 a day) and the first hour is re-timed.
 - **The look and the catch stay** (§3.5): he did not fault them this time.
+- As built (slice 1, 2026-09-23): the static island holds only the gate
+  lines and the arcs (about 330 coins at seed 42); the rings, the caches and
+  the route are run-time pools with their own id ranges; the caches' spots
+  are the side streets' lane middles (about 60 candidates after the 150 m
+  spacing, so about half of tomorrow's thirty are new); the intro's line
+  runs at the same rhythm with the cap on its marker; arriving takes the cap
+  on a job's target, so the tip never hinges on the last metre.
 
 ### 13.6 The garage dressed, the wall sized — set here
 

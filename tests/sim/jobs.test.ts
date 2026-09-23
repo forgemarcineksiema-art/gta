@@ -13,7 +13,7 @@ import type { EventKind } from '../../src/sim/events';
 import type { JobDef, SimWorld } from '../../src/sim';
 import { lanePathTo, placeJobs, pointTarget } from '../../src/sim/jobs/place';
 import { bearing } from '../../src/sim/math';
-import { BLOCK, HIGHWAY_HALF, ROAD_HALF, distanceToPolyline } from '../../src/sim/city/roads';
+import { BLOCK, HIGHWAY_HALF, ROAD_HALF, distanceToPolyline, projectOnLane } from '../../src/sim/city/roads';
 import type { Traffic } from '../../src/sim/traffic/Traffic';
 import { TRAFFIC } from '../../src/sim/traffic/tuning';
 import { createWorld, run, runUntil } from './helpers';
@@ -327,4 +327,65 @@ describe('jobs (M5 slice 1)', () => {
       }
     } finally { sim.dispose(); }
   });
+});
+
+describe('jobs (M5.5 slice 1)', () => {
+  it('1.3 a delivery lays its route\'s coins on the chain\'s lanes with the cap on the target, clears them at the end, and the clean line pays the tip', async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
+    sim.police!.dispatching = false;
+    try {
+      const d = sim.jobs.defs.find((j) => j.kind === 'delivery')!;
+      const coins = sim.coins!;
+      const city = sim.city!;
+      sim.city?.sync(d.x, d.z, true);
+      sim.vehicle.teleport({ x: d.x, y: 0.8, z: d.z }, d.yaw);
+      sim.vehicle.setVelocity(0, 0, 0);
+      sim.step();
+      expect(sim.jobs.state).toBe('active');
+      const total = coins.routeTotal;
+      expect(total).toBeGreaterThanOrEqual(20);
+      expect(total).toBeLessThanOrEqual(120);
+      const route = coins.extra.filter((c) => c.lane === -5);
+      expect(route.length).toBe(total);
+      const hit = { x: 0, z: 0, yaw: 0 };
+      for (const c of route) {
+        if (c.value === BALANCE.coin.cap) continue;
+        const lane = city.graph.lanes[city.nearestLane(c.x, c.z)]!;
+        expect(Math.sqrt(projectOnLane(lane, c.x, c.z, hit))).toBeLessThan(2.5);
+        expect(c.value).toBe(BALANCE.coin.value);
+      }
+      const cap = route[route.length - 1]!;
+      expect(cap.value).toBe(BALANCE.coin.cap);
+      expect(Math.hypot(cap.x - d.targetX, cap.z - d.targetZ)).toBeLessThan(0.01);
+      // every coin but the cap taken, then arrival: the cap is taken by arriving, the tip is paid
+      for (const c of route) if (c.id !== cap.id) coins.take(c.id, sim.events);
+      expect(coins.routePicked).toBe(total - 1);
+      const remaining = sim.jobs.remaining;
+      const bag = sim.run.bag;
+      sim.vehicle.teleport({ x: d.targetX, y: 0.8, z: d.targetZ }, d.yaw);
+      sim.step();
+      expect(sim.jobs.state).toBe('done');
+      expect(sim.jobs.lastTip).toBe(true);
+      const base = Math.round(d.payout * (1 + BALANCE.jobs.timeBonus * (remaining - 1 / 60) / d.limitSeconds));
+      expect(Math.abs(sim.run.bag - bag - (base + Math.round(d.payout * BALANCE.coin.route.tip)))).toBeLessThanOrEqual(Math.round(d.payout * BALANCE.jobs.timeBonus / d.limitSeconds / 60) + 1);
+      expect(coins.routeTotal).toBe(0);
+      expect(coins.extra.filter((c) => c.lane === -5).length).toBe(0);
+      // the same delivery with a coin missed: no tip
+      run(sim, BALANCE.jobs.holdSeconds + 0.2);
+      sim.vehicle.teleport({ x: d.x + Math.sin(d.yaw) * 30, y: 0.8, z: d.z + Math.cos(d.yaw) * 30 }, d.yaw);
+      run(sim, 0.2);
+      sim.vehicle.teleport({ x: d.x, y: 0.8, z: d.z }, d.yaw);
+      sim.step();
+      expect(sim.jobs.state).toBe('active');
+      const again = coins.extra.filter((c) => c.lane === -5);
+      expect(again.length).toBe(total);
+      for (const c of again.slice(0, again.length - 2)) coins.take(c.id, sim.events);
+      const bag2 = sim.run.bag;
+      sim.vehicle.teleport({ x: d.targetX, y: 0.8, z: d.targetZ }, d.yaw);
+      sim.step();
+      expect(sim.jobs.state).toBe('done');
+      expect(sim.jobs.lastTip).toBe(false);
+      expect(sim.run.bag - bag2).toBeLessThan(d.payout * (1 + BALANCE.jobs.timeBonus) + 1);
+    } finally { sim.dispose(); }
+  }, 60_000);
 });

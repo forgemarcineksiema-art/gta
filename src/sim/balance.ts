@@ -45,14 +45,20 @@ export const BALANCE = {
   /** Pulling into a drop-off under `enterSpeed` (m/s) starts the door; it takes `closeSeconds` to shut, busted live. */
   door: { closeSeconds: 3, enterSpeed: 8 },
   /**
-   * Coins on the road (docs/DESIGN.md §3.5): a coin, the cap a line ends on, the pitch along a line (m) and a
-   * line's length; the layout's `trails` random walks of `trailLength` lanes, the share of the roads left that
-   * get a `filler`, the share of figures that `weave` onto the next lane; the pickup `reach` past the bumpers,
-   * the doors and about the bonnet (m); the launch a ramp's `arc` is laid for (m/s, m/s² with the car's gravity).
+   * Coins (docs/DESIGN.md §13.5): a coin is attached to a goal or it does not exist. `value` a coin, `cap` the
+   * bigger coin a line ends on, `cacheCap` a cache's; `pitch` along a line (m). Static coins: `gateCoins` before
+   * the cap on a billboard, `arcCoins` in the air over a ramp. A job's `route`: a run of `turn` coins into and
+   * out of every turn, a run of `straight` every `straightEvery` m of straight, the cap on the target; every
+   * coin of a route taken pays `tip` of the payout. The day's `cache`: `perDay` runs of `run` coins and a cap,
+   * drawn by the date seed from `candidates` spots at least `minGap` m apart; the tenth, twentieth and thirtieth
+   * pay `bonus` into the bank. The pickup `reach` past the bumpers, the doors and about the bonnet (m); the
+   * launch a ramp's `arc` is laid for (m/s, m/s² with the car's gravity).
    */
   coin: {
-    value: 10, cap: 50, pitch: 4.5, runMin: 8, runMax: 12,
-    trails: 10, trailLength: 8, filler: 0.55, weave: 0.45,
+    value: 20, cap: 100, cacheCap: 250, pitch: 4.5,
+    gateCoins: 4, arcCoins: 3,
+    route: { turn: 5, straight: 6, straightEvery: 80, tip: 0.1 },
+    cache: { perDay: 30, run: 8, minGap: 150, candidates: 120, bonus: [500, 1000, 2000] },
     reach: { side: 1.2, ahead: 1.0, up: 1.5 },
     arc: { speed: 27, gravity: 13.3 },
   },
@@ -95,11 +101,11 @@ export const BALANCE = {
    */
   prices: { compact: 10000, heavy: 20000, sports: 60000, police: 120000 },
   /**
-   * Each upgrade tier's price, tier 1 to 3, the same for every stat and car: 8,000 / 14,000 / 22,000 (balance
-   * script, 2026-09-23; the plan's 2,000 / 5,000 / 12,000 fell two to a door, under the three-minute floor):
-   * the tiers are the first hour's cadence between the cars.
+   * Each upgrade tier's price, tier 1 to 3, the same for every stat and car: 12,000 / 16,000 / 22,000 (balance
+   * script, M5.5 slice 1; M5's 8,000 / 14,000 / 22,000 fell tier 1 to the first car's door once the beat's
+   * police income arrived): the tiers are the first hour's cadence between the cars.
    */
-  tierPrices: [8000, 14000, 22000],
+  tierPrices: [12000, 16000, 22000],
   /** Multipliers on the preset per tier 0..3 (D8): power × torqueMax, grip × muFront and muRear, boost × boostDrain. */
   tiers: {
     power: [1, 1.06, 1.12, 1.2],

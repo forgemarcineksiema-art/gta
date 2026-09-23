@@ -2,6 +2,32 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M5.5 slice 1: coins as breadcrumbs
+
+Done: the static island is the gate lines (4 + the cap) and the arcs (3 in
+the air + the cap) only, 330 coins at every seed; the rings, the day's
+thirty caches (`caches.ts`, the date seed over ~60 side-street spots 150 m
+apart) and a job's route (`routeLine`: runs into and out of every turn,
+every 80 m of straight, the cap on the target taken by arriving; every coin
+taken pays a 10 % tip, the job line counts `12/48`) are run-time pools with
+their own id ranges; the intro's line runs at the same rhythm with the cap
+on its marker; CACHES n/30 on the HUD, gold dots on the radar, a bonus into
+the bank at every tenth; values 20 / 100 / 250; the save is v2 (the day's
+finds, and slice 2's `chain` and `borrowHints` reserved).
+
+Measured: the novice bot between jobs picks 4 coins a minute (was 32–40);
+the road bot takes ≥ 70 % of every delivery's route (jobs.long 1.7);
+`npm run balance` green again with the tiers at 12,000 / 16,000 / 22,000
+(the beat's police income put the compact and tier 1 on one door): the
+compact at minute 5.0, then every 3.5–7.1 min. Pins changed with the
+design: coins 3.8 (the layout), 3.9 (a laid run), the intro's 4.3 (runs, not
+a carpet), the save's v1 shape. verify:gate 294 green, heat 10/10, game 9/9.
+
+Marcin, on the way: two slices in an hour and a half is too slow, and the
+plan must hold everything discussed before the platform: no M6 until the
+whole game is in. §4 of `docs/M5.5_PLAN.md` now lists the rest; from here
+a slice is code and pins, the measurements and the suites run at the gate.
+
 ## 2026-09-23 — M5.5 slice 0: heat that moves
 
 Marcin: "Lecisz". Working autonomously per `docs/M5.5_PLAN.md`, slice 0

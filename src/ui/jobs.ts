@@ -17,6 +17,9 @@ export class JobsHud {
   private readonly lineKind: HTMLElement;
   private readonly lineTime: HTMLElement;
   private readonly lineDist: HTMLElement;
+  /** The route's coins taken of laid (M5.5): `12/48`. */
+  private readonly lineCoins: HTMLElement;
+  private lastRoute = -1;
   private readonly card: HTMLElement;
   private readonly cardTitle: HTMLElement;
   private readonly cardSub: HTMLElement;
@@ -39,7 +42,8 @@ export class JobsHud {
     this.lineKind = el('span', 'jobs__kind');
     this.lineTime = el('span', 'jobs__time');
     this.lineDist = el('span', 'jobs__dist');
-    this.line.append(this.lineKind, this.lineTime, this.lineDist);
+    this.lineCoins = el('span', 'jobs__coins');
+    this.line.append(this.lineKind, this.lineTime, this.lineDist, this.lineCoins);
     this.card = el('div', 'jobs__card');
     this.cardTitle = el('div', 'jobs__card-title');
     this.cardSub = el('div', 'jobs__card-sub');
@@ -96,6 +100,12 @@ export class JobsHud {
       this.lastDist = dist;
       this.lineDist.textContent = dist >= 0 ? `${dist.toLocaleString('en-US')} m` : '';
     }
+    const coins = sim.coins;
+    const route = coins && coins.routeTotal > 0 ? coins.routePicked * 1024 + coins.routeTotal : -1;
+    if (route !== this.lastRoute) {
+      this.lastRoute = route;
+      this.lineCoins.textContent = coins && route >= 0 ? `${coins.routePicked}/${coins.routeTotal}` : '';
+    }
   }
 
   /** The line's words and the card for this state of this job. */
@@ -104,7 +114,7 @@ export class JobsHud {
     let kind: string;
     let state = d.kind === 'order' ? 'is-order' : d.kind === 'escape' ? 'is-escape' : '';
     if (jobs.state === 'done') {
-      kind = `${d.kind === 'order' ? 'SOLD' : d.kind === 'escape' ? 'BOUNTY' : 'DELIVERED'} +${money(jobs.lastPaid)}`;
+      kind = `${d.kind === 'order' ? 'SOLD' : d.kind === 'escape' ? 'BOUNTY' : 'DELIVERED'} +${money(jobs.lastPaid)}${jobs.lastTip ? ' · CLEAN LINE' : ''}`;
       state = 'is-done';
     } else if (jobs.state === 'failed') {
       kind = 'TOO LATE';
@@ -129,6 +139,8 @@ export class JobsHud {
     if (jobs.state === 'done' || jobs.state === 'failed') {
       this.lineTime.textContent = '';
       this.lineDist.textContent = '';
+      this.lineCoins.textContent = '';
+      this.lastRoute = -1;
       return;
     }
     // the card: what was taken on

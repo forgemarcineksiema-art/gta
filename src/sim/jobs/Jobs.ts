@@ -23,10 +23,13 @@
 import { BALANCE } from '../balance';
 import type { SimEvent } from '../events';
 import type { SimWorld } from '../SimWorld';
+import { routeLine, type CoinPoint } from '../city/coins';
+import { alongLane, laneChain } from '../city/route';
+import type { Lane } from '../city/roads';
 import { AgentState, type PlayerProbe } from '../traffic/Traffic';
 import { CAR_IDS } from '../vehicle/presets';
 import type { JobDef } from './catalog';
-import { markerRingCoins } from './place';
+import { markerRingCoins, pointTarget } from './place';
 
 export type { JobDef, JobKind } from './catalog';
 
@@ -45,8 +48,9 @@ export class Jobs {
   serial = 0;
   /** Seconds since the running job started (the card shows for the first `cardSeconds`). */
   elapsed = 0;
-  /** The last job's pay into the bag (the HUD's result line). */
+  /** The last job's pay into the bag (the HUD's result line), and whether every coin of its route was taken (the tip). */
   lastPaid = 0;
+  lastTip = false;
   /** Ensures run so far for this hunt that repainted a car, and that spawned one (the slice-2 measurement). */
   repaints = 0;
   spawns = 0;
@@ -61,6 +65,7 @@ export class Jobs {
   private escaped = false;
   /** The markers' coin rings are laid on the first step (once; the world's constructor leaves the extra coins to its callers). */
   private ringsLaid = false;
+  private readonly routePoints: CoinPoint[] = [];
 
   constructor(private readonly sim: SimWorld, defs: JobDef[]) {
     this.defs = defs;
@@ -150,9 +155,18 @@ export class Jobs {
       return;
     }
     if ((d.targetX - probe.x) ** 2 + (d.targetZ - probe.z) ** 2 <= r * r && this.canArrive(d)) {
-      const paid = d.kind === 'order'
+      let paid = d.kind === 'order'
         ? Math.round(d.payout * Math.max(0, 1 - BALANCE.jobs.order.stagePenalty * this.sim.life.state.stage))
         : Math.round(d.payout * (1 + BALANCE.jobs.timeBonus * Math.max(0, this.remaining) / d.limitSeconds));
+      // arriving takes the cap on the target; every coin of the route taken is the clean line, and pays the tip
+      const coins = this.sim.coins;
+      if (coins && coins.routeTotal > 0) {
+        coins.take(coins.extraId('route', coins.routeTotal - 1), this.sim.events);
+        this.lastTip = coins.routePicked >= coins.routeTotal;
+        if (this.lastTip) paid += Math.round(d.payout * BALANCE.coin.route.tip);
+      } else {
+        this.lastTip = false;
+      }
       this.lastPaid = paid;
       this.finish('done', probe);
       this.sim.events.push('jobDone', paid, d.targetX, 0, d.targetZ, d.id);
@@ -225,6 +239,7 @@ export class Jobs {
   abandon(): void {
     if (this.state === 'idle') return;
     this.release();
+    this.sim.coins?.clearExtra('route');
     this.state = 'idle';
     this.active = -1;
     this.remaining = 0;
@@ -243,6 +258,8 @@ export class Jobs {
     this.wantedAgent = -1;
     if (this.sim.traffic) this.sim.traffic.wanted = -1;
     this.sim.heat.add(d.heat);
+    // the car is taken: the coins from here to the fence
+    this.layRoute(this.sim.probe.x, this.sim.probe.z, d.targetX, d.targetZ);
     this.serial++;
   }
 
@@ -272,6 +289,28 @@ export class Jobs {
     }
     this.remaining = d.limitSeconds;
     this.sim.heat.add(d.heat);
+    // the coins along the way (DESIGN.md §13.5); the cold open lays its own line
+    if (d.id !== this.sim.coldOpen.job) this.layRoute(d.x, d.z, d.targetX, d.targetZ);
+  }
+
+  /**
+   * The route's coins: the lane chain from a point to the target, laid whole
+   * into the coins' route pool (D3), the cap on the target.
+   */
+  private layRoute(x: number, z: number, targetX: number, targetZ: number): void {
+    const coins = this.sim.coins;
+    const city = this.sim.city;
+    if (!coins || !city) return;
+    coins.clearExtra('route');
+    const target = pointTarget(city, targetX, targetZ);
+    const start = city.nearestLane(x, z);
+    const s0 = alongLane(city.graph.lanes[start] as Lane, x, z).s;
+    const chain = start === target.lane && target.s >= s0 ? [start] : laneChain(city.graph, start, target.lane);
+    if (chain.length === 0) return;
+    this.routePoints.length = 0;
+    routeLine(city.graph, chain, s0, target.s, { x: targetX, z: targetZ }, this.routePoints);
+    coins.addExtra(this.routePoints, 'route');
+    this.routePoints.length = 0;
   }
 
   /** The wanted car: kept while it is the class and paint and still a driving civilian, else found again. */
@@ -332,6 +371,7 @@ export class Jobs {
 
   private finish(state: 'done' | 'failed', probe: PlayerProbe): void {
     this.release();
+    this.sim.coins?.clearExtra('route');
     const d = this.defOf(this.active);
     if (d && (d.x - probe.x) ** 2 + (d.z - probe.z) ** 2 <= BALANCE.jobs.markerRadius ** 2) this.rearm = d.id;
     this.state = state;

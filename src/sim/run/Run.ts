@@ -53,6 +53,9 @@ export class Run {
   bestRun = 0;
   /** Seconds driven (running or closing) over every session: the save carries it. */
   playSeconds = 0;
+  /** The first quarter hour's chain, steps done, and the BORROW hint shown so far (M5.5 slice 2; the save carries them from slice 1). */
+  chain = 0;
+  borrowHints = 0;
   /** True until the first door has been opened again: that door ends the cold open and gets no ad (M5 D10). */
   firstDoor = true;
   /** The drop-off being closed or shut, index into `dropOffs`; -1 otherwise. */
@@ -382,6 +385,10 @@ export class Run {
       case 'jobDone':
         // value: the payout with its time bonus, already rounded
         this.bag += e.value;
+        break;
+      case 'cache':
+        // every tenth cache of the day pays its bonus straight into the bank (never at risk)
+        this.bank += e.value;
         break;
       case 'coin':
         // a spilled coin (target -2) was the bag's and goes back into it; a road coin is the player's for good

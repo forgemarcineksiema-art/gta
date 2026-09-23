@@ -134,6 +134,7 @@ export class Dailies {
    */
   setDate(local: string): void {
     if (!Number.isFinite(dayNumber(local))) return;
+    this.sim.caches?.setDate(local);
     if (local === this.date) {
       // a save from today: the police layout is today's too
       if (this.sim.cover && this.sim.cover.daily.seed !== fnv1a(local)) setDailyOrder(this.sim.cover, fnv1a(local));

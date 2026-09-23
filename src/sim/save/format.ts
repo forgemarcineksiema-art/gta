@@ -13,7 +13,7 @@
 import type { SimWorld } from '../SimWorld';
 import { CAR_IDS, type CarId } from '../vehicle/presets';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export type Tiers = [number, number, number];
 
@@ -32,8 +32,15 @@ export interface SaveStreak {
   topper: boolean;
 }
 
-export interface SaveV1 {
-  v: 1;
+export interface SaveCaches {
+  /** The local date the day's thirty were drawn for, `YYYY-MM-DD`; '' before the first. */
+  date: string;
+  /** Found today, as bits, base64; '' when none. */
+  found: string;
+}
+
+export interface SaveDoc {
+  v: 2;
   /** The cold open was shown (started, completed or skipped): never again for this profile. */
   seen: boolean;
   bank: number;
@@ -59,11 +66,19 @@ export interface SaveV1 {
   /** Runs ended, and seconds driven: KPI rehearsal and the balance script. */
   runs: number;
   playSeconds: number;
+  /** The day's caches (M5.5 slice 1). */
+  caches: SaveCaches;
+  /** The first quarter hour's chain, steps done (M5.5 slice 2); the BORROW hint shown so far. */
+  chain: number;
+  borrowHints: number;
 }
 
-function defaults(): SaveV1 {
+/** The current document's type under the name the app and the tests used since M5. */
+export type SaveV1 = SaveDoc;
+
+function defaults(): SaveDoc {
   return {
-    v: 1,
+    v: 2,
     seen: false,
     bank: 0,
     coins: 0,
@@ -79,6 +94,9 @@ function defaults(): SaveV1 {
     streak: { count: 0, last: '', topper: false },
     runs: 0,
     playSeconds: 0,
+    caches: { date: '', found: '' },
+    chain: 0,
+    borrowHints: 0,
   };
 }
 
@@ -90,15 +108,15 @@ function deepFreeze<T>(o: T): Readonly<T> {
   return o;
 }
 
-export const DEFAULT_SAVE: Readonly<SaveV1> = deepFreeze(defaults());
+export const DEFAULT_SAVE: Readonly<SaveDoc> = deepFreeze(defaults());
 
 /** A fresh, mutable copy of the defaults. */
-export function defaultSave(): SaveV1 {
+export function defaultSave(): SaveDoc {
   return defaults();
 }
 
 /** The document as JSON with a fixed key order (records in `CAR_IDS` order), so equal saves are equal strings. */
-export function serialize(save: SaveV1): string {
+export function serialize(save: SaveDoc): string {
   const paint: Partial<Record<CarId, number>> = {};
   const tiers: Partial<Record<CarId, Tiers>> = {};
   for (const id of CAR_IDS) {
@@ -125,6 +143,9 @@ export function serialize(save: SaveV1): string {
     streak: { count: s.count, last: s.last, topper: s.topper },
     runs: save.runs,
     playSeconds: save.playSeconds,
+    caches: { date: save.caches.date, found: save.caches.found },
+    chain: save.chain,
+    borrowHints: save.borrowHints,
   });
 }
 
@@ -142,7 +163,7 @@ export function versionOf(text: string | null): number | null {
 }
 
 /** Never throws: null, garbage, a non-object or a newer version give the defaults; anything else migrates. */
-export function parse(text: string | null): SaveV1 {
+export function parse(text: string | null): SaveDoc {
   if (text === null) return defaults();
   let raw: unknown;
   try {
@@ -157,10 +178,12 @@ export function parse(text: string | null): SaveV1 {
 /** Version n → n + 1. Version 0 is "no save": an object without `v` (a hand-made or pre-release document). */
 const MIGRATIONS: Record<number, (raw: Record<string, unknown>) => Record<string, unknown>> = {
   0: (raw) => ({ ...raw, v: 1 }),
+  // M5.5: the day's caches, the chain and the BORROW hint counter; an M5 save starts them empty
+  1: (raw) => ({ ...raw, v: 2, caches: { date: '', found: '' }, chain: 0, borrowHints: 0 }),
 };
 
 /** Walks the table from the document's version to `SAVE_VERSION`, then keeps every valid field. Unknown or newer versions give the defaults. */
-export function migrate(raw: unknown): SaveV1 {
+export function migrate(raw: unknown): SaveDoc {
   if (!isRecord(raw)) return defaults();
   let doc = raw;
   let v = typeof doc['v'] === 'number' ? doc['v'] : 0;
@@ -174,7 +197,7 @@ export function migrate(raw: unknown): SaveV1 {
   return sanitize(doc);
 }
 
-function sanitize(raw: Record<string, unknown>): SaveV1 {
+function sanitize(raw: Record<string, unknown>): SaveDoc {
   const out = defaults();
   out.seen = bool(raw['seen'], false);
   out.bank = amount(raw['bank']);
@@ -207,6 +230,13 @@ function sanitize(raw: Record<string, unknown>): SaveV1 {
   out.streak = { count: Math.floor(amount(s['count'])), last: dateString(s['last']), topper: bool(s['topper'], false) };
   out.runs = Math.floor(amount(raw['runs']));
   out.playSeconds = amount(raw['playSeconds']);
+  const c = isRecord(raw['caches']) ? raw['caches'] : {};
+  const found = c['found'];
+  out.caches = { date: dateString(c['date']), found: typeof found === 'string' && /^[A-Za-z0-9+/]*={0,2}$/.test(found) && found.length <= 12 ? found : '' };
+  const chain = raw['chain'];
+  out.chain = typeof chain === 'number' && Number.isInteger(chain) && chain >= 0 && chain <= 6 ? chain : 0;
+  const hints = raw['borrowHints'];
+  out.borrowHints = typeof hints === 'number' && Number.isInteger(hints) && hints >= 0 && hints <= 9 ? hints : 0;
   return out;
 }
 
@@ -215,9 +245,9 @@ function sanitize(raw: Record<string, unknown>): SaveV1 {
  * `into`'s arrays and records; allocates only a car's tier triple the first
  * time it is upgraded.
  */
-export function collect(sim: SimWorld, into: SaveV1): void {
+export function collect(sim: SimWorld, into: SaveDoc): void {
   const run = sim.run, garage = sim.garage, dailies = sim.dailies;
-  into.v = 1;
+  into.v = 2;
   // shown once per profile: a cold open that has started counts, so a reload mid-way never repeats it
   into.seen = sim.coldOpen.seen || sim.coldOpen.active;
   into.bank = run.bank;
@@ -255,10 +285,16 @@ export function collect(sim: SimWorld, into: SaveV1): void {
   into.streak.count = dailies.streak.count;
   into.streak.last = dailies.streak.last;
   into.streak.topper = dailies.streak.topper;
+  if (sim.caches) {
+    into.caches.date = sim.caches.date;
+    into.caches.found = sim.caches.count > 0 ? encodeBits(sim.caches.found) : '';
+  }
+  into.chain = run.chain;
+  into.borrowHints = run.borrowHints;
 }
 
 /** A document into a freshly built world, once, before the first step: the garage car is driven out at once. */
-export function apply(sim: SimWorld, save: SaveV1): void {
+export function apply(sim: SimWorld, save: SaveDoc): void {
   const run = sim.run, garage = sim.garage, dailies = sim.dailies;
   sim.coldOpen.seen = save.seen;
   run.bank = save.bank;
@@ -266,6 +302,8 @@ export function apply(sim: SimWorld, save: SaveV1): void {
   run.bestRun = save.bestRun;
   run.runs = save.runs;
   run.playSeconds = save.playSeconds;
+  run.chain = save.chain;
+  run.borrowHints = save.borrowHints;
   garage.owned.clear();
   garage.owned.add('muscle');
   for (const id of save.owned) garage.owned.add(id);
@@ -299,6 +337,11 @@ export function apply(sim: SimWorld, save: SaveV1): void {
   dailies.streak.count = save.streak.count;
   dailies.streak.last = save.streak.last;
   dailies.streak.topper = save.streak.topper;
+  if (sim.caches) {
+    const found = new Uint8Array(sim.caches.total);
+    decodeBits(save.caches.found, found);
+    sim.caches.restore(save.caches.date, found);
+  }
 }
 
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';

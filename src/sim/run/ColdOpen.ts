@@ -384,8 +384,12 @@ function gateOn(sim: SimWorld, lane: Lane): BillboardDesc | null {
   return best;
 }
 
-/** Coins along the route every `coinPitch` m, from 4 m ahead of the spawn to the door, where no coin already lies within 3 m. */
-function routeCoins(sim: SimWorld, route: ColdOpenRoute, hideout: DropOff): Pt[] {
+/**
+ * The intro's route line as breadcrumbs (DESIGN.md §13.5): a run of `route.straight` coins every
+ * `route.straightEvery` m of the route from 4 m ahead of the spawn to the door, at `coinPitch`, where no coin
+ * already lies within 3 m; the cap on the marker. Runs, not a carpet: the line leads, the road stays clear.
+ */
+function routeCoins(sim: SimWorld, route: ColdOpenRoute, hideout: DropOff): Array<Pt & { value?: number }> {
   const city = sim.city;
   if (!city) return [];
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
@@ -401,8 +405,9 @@ function routeCoins(sim: SimWorld, route: ColdOpenRoute, hideout: DropOff): Pt[]
   }
   // the gate's own line lies in its chunk's list (placeCoins)
   if (route.gate) existing.push(...(gateLine(city.graph, route.gate) ?? []));
-  const out: Pt[] = [];
+  const out: Array<Pt & { value?: number }> = [];
   const pitch = BALANCE.coldOpen.coinPitch;
+  const r = BALANCE.coin.route;
   const fx = Math.sin(hideout.yaw), fz = Math.cos(hideout.yaw);
   for (let s = 4; ; s += pitch) {
     const i = Math.round(s / 3);
@@ -411,8 +416,14 @@ function routeCoins(sim: SimWorld, route: ColdOpenRoute, hideout: DropOff): Pt[]
     // stop at the door: the garage is the goal, not a coin run
     const along = (q.x - hideout.x) * fx + (q.z - hideout.z) * fz;
     if (q.s > route.entryS && along > -GARAGE.depth / 2 - 2) break;
+    // a run every `straightEvery` m: the coins inside the run's window along the route
+    const inRun = ((s - 4) % r.straightEvery) < r.straight * pitch;
+    if (!inRun) continue;
     if (existing.some((e) => (e.x - q.x) ** 2 + (e.z - q.z) ** 2 < 9)) continue;
+    if ((q.x - route.markerX) ** 2 + (q.z - route.markerZ) ** 2 < 9) continue;
     out.push({ x: q.x, z: q.z });
   }
+  // the cap on the marker: the pickup is the line's first goal (the intro's marker has no ring of its own)
+  out.push({ x: route.markerX, z: route.markerZ, value: BALANCE.coin.cap });
   return out;
 }

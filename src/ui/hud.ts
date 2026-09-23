@@ -80,6 +80,10 @@ export class Hud {
   private readonly collect: HTMLElement;
   private readonly collectValue: HTMLElement;
   private lastCollectText = '';
+  /** The day's caches under the billboards (M5.5). */
+  private readonly caches: HTMLElement;
+  private readonly cachesValue: HTMLElement;
+  private cachesSerial = -1;
   private readonly damageFill: HTMLElement;
   private readonly wrecked: HTMLElement;
   private readonly wreckedSub: HTMLElement;
@@ -138,6 +142,10 @@ export class Hud {
     this.collectValue = el('span', 'hud__collect-value', '0/50');
     this.collect.append(el('span', 'hud__collect-label', 'BILLBOARDS'), this.collectValue);
     speedo.append(this.collect);
+    this.caches = el('div', 'hud__collect hud__collect--caches');
+    this.cachesValue = el('span', 'hud__collect-value', '0/30');
+    this.caches.append(el('span', 'hud__collect-label', 'CACHES'), this.cachesValue);
+    speedo.append(this.caches);
     this.oncoming = el('div', 'hud__oncoming', 'ONCOMING');
     speedo.prepend(this.oncoming);
     this.root.appendChild(speedo);
@@ -312,7 +320,8 @@ export class Hud {
                 : kind === 'billboard' ? 'BILLBOARD!'
                   : kind === 'escape' ? 'COPS LOST YOU'
                     : kind === 'blown' ? 'COVER BLOWN'
-                      : kind === 'dailyDone' ? `DAILY DONE +${value.toLocaleString('en-US')}`
+                      : kind === 'cache' ? (value > 0 ? `CACHE ${target}/30 +${value.toLocaleString('en-US')}` : `CACHE ${target}/30`)
+      : kind === 'dailyDone' ? `DAILY DONE +${value.toLocaleString('en-US')}`
                         : kind === 'streak' ? `DAY ${target} STREAK +${value.toLocaleString('en-US')}`
                           : '';
     if (!text) return;
@@ -322,7 +331,7 @@ export class Hud {
     if (!popup) return;
     popup.textContent = text;
     popup.classList.toggle('is-gain', value > 0);
-    popup.classList.toggle('is-big', kind === 'takedown' || kind === 'takedownTraffic' || kind === 'jump' || kind === 'dailyDone');
+    popup.classList.toggle('is-big', kind === 'takedown' || kind === 'takedownTraffic' || kind === 'jump' || kind === 'dailyDone' || (kind === 'cache' && value > 0));
     popup.classList.add('is-on');
     this.popupLeft[i] = 1.2;
   }
@@ -354,6 +363,13 @@ export class Hud {
     if (this.boostFlash > 0) this.boostFlash -= dt;
     this.boostWrap.classList.toggle('is-gain', this.boostFlash > 0);
     this.oncoming.classList.toggle('is-on', sim.life.state.oncoming);
+    const caches = sim.caches;
+    if (caches && caches.serial !== this.cachesSerial) {
+      this.cachesSerial = caches.serial;
+      this.cachesValue.textContent = `${caches.count}/${caches.total}`;
+      this.caches.classList.toggle('is-visible', caches.today.length > 0);
+      this.caches.classList.toggle('is-done', caches.count >= caches.total);
+    }
     const life = sim.life.state;
     const damageText = `scaleX(${life.damage.toFixed(3)})`;
     if (damageText !== this.lastDamageText) { this.damageFill.style.transform = damageText; this.lastDamageText = damageText; }

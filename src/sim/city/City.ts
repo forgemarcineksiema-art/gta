@@ -78,7 +78,7 @@ export class City {
   constructor(readonly world: RAPIER.World, readonly seed = 42) {
     this.cameras = placeCameras(cameraSites(this.graph), POLICE.cameras.count);
     this.jumps = placeJumps(seed, BALANCE.jumps.count);
-    this.coinLayout = layoutCoins(this.graph, this.jumps, seed);
+    this.coinLayout = layoutCoins(this.jumps);
     // The one unbroken collision plane eliminates suspension seams at roads and chunk borders.
     world.createCollider(RAPIER.ColliderDesc.cuboid(CITY_HALF, 0.5, CITY_HALF)
       .setTranslation(0, -0.5, 0).setFriction(1).setCollisionGroups(GROUPS_TERRAIN));

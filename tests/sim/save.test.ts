@@ -13,8 +13,10 @@ import { createWorld } from './helpers';
 function filled(smashedIds: number[]): SaveV1 {
   const smashed = new Uint8Array(49 * 4);
   for (const id of smashedIds) smashed[id] = 1;
+  const found = new Uint8Array(30);
+  for (const k of [0, 3, 29]) found[k] = 1;
   return {
-    v: 1,
+    v: 2,
     seen: true,
     bank: 123456,
     coins: 7890,
@@ -30,6 +32,9 @@ function filled(smashedIds: number[]): SaveV1 {
     streak: { count: 42, last: '2026-09-23', topper: true },
     runs: 318,
     playSeconds: 98765.5,
+    caches: { date: '2026-09-23', found: encodeBits(found) },
+    chain: 4,
+    borrowHints: 2,
   };
 }
 
@@ -54,10 +59,10 @@ describe('save format', () => {
     expect(DEFAULT_SAVE.owned).toEqual(['muscle']);
   });
 
-  it('0.3 a v0 shape (no v) migrates to v1 with the muscle car owned', () => {
+  it('0.3 a v0 shape (no v) migrates to the current version with the muscle car owned', () => {
     const v0 = { bank: 5000, coins: 120, seen: true, owned: ['compact'], car: 'compact' };
     const save = migrate(v0);
-    expect(save.v).toBe(1);
+    expect(save.v).toBe(2);
     expect(save.owned).toEqual(['muscle', 'compact']);
     expect(save.car).toBe('compact');
     expect(save.bank).toBe(5000);
@@ -103,5 +108,20 @@ describe('save format', () => {
       expect(serialize(out)).toBe(serialize(save));
       for (const id of CAR_IDS) expect(sim.garage.owned.has(id)).toBe(true);
     } finally { sim.dispose(); }
+  });
+
+  it('0.11 an M5 document (v1) migrates to v2 with no caches found, the chain at 0 and the hint counter at 0; a v2 field out of range falls back alone', () => {
+    const v1 = { v: 1, bank: 777, coins: 12, seen: true, owned: ['muscle', 'compact'], car: 'compact', smashed: '' };
+    const save = migrate(v1);
+    expect(save.v).toBe(2);
+    expect(save.bank).toBe(777);
+    expect(save.caches).toEqual({ date: '', found: '' });
+    expect(save.chain).toBe(0);
+    expect(save.borrowHints).toBe(0);
+    const bad = parse(JSON.stringify({ ...filled([]), caches: { date: 'yesterday', found: '***' }, chain: 99, borrowHints: -1 }));
+    expect(bad.caches).toEqual({ date: '', found: '' });
+    expect(bad.chain).toBe(0);
+    expect(bad.borrowHints).toBe(0);
+    expect(bad.bank).toBe(123456);
   });
 });

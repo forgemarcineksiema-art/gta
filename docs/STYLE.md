@@ -212,7 +212,9 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 - Swap prompt (M3): a keycap and SWAP in accent cyan at 18 px, centred above
   the speedo, only while a car is within reach; never a button.
 - Billboard counter (M3): BILLBOARDS n/50 under the damage bar, 16 px heavy
-  italic, accent yellow when complete.
+  italic, accent yellow when complete. Under it the day's caches (M5.5): CACHES n/30 in the same
+  type, accent yellow at thirty; each cache is a gold dot inside the radar's
+  circle until found.
 - Minimap: a radar, not an atlas. A circle in the bottom-left corner
   (`--minimap-size`, 150–240 px) that turns with the direction of travel, the car
   22 % below the centre so more road shows ahead, zoom from a 210 m radius at rest
@@ -392,7 +394,9 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 - The job line: top centre where the key hints sit (they give way), 20 px
   heavy italic uppercase skewed −10° in the popup type: the job, its clock
   in accent yellow (danger red from 10 s), the distance in ink at 16 px
-  (`DELIVERY 1:15 · 370 m`, `FIND A LIME COMPACT · 420 m`, `ESCAPE ★★★`).
+  (`DELIVERY 1:15 · 370 m`, `FIND A LIME COMPACT · 420 m`, `ESCAPE ★★★`),
+  and, while a route is laid, its coins taken of laid in accent yellow
+  (`· 12/48`); the result line adds `· CLEAN LINE` when all were taken.
   The kind's words take its colour (an order magenta, an escape cyan). The
   result replaces it for 2 s at 24 px: DELIVERED / SOLD / BOUNTY +n in
   accent yellow, TOO LATE in danger red.

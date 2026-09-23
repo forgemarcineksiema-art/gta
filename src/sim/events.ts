@@ -18,7 +18,9 @@ export type EventKind =
   // identity (slice 5): a crime seen from the police car the player drives
   | 'blown'
   // the ratchet crossed a threshold (M5.5): value = the new level; the ticker and the siren sting
-  | 'heatLevel';
+  | 'heatLevel'
+  // a cache found (M5.5): value = the bonus into the bank (0 but every tenth), target = found today
+  | 'cache';
 
 export interface SimEvent {
   kind: EventKind;

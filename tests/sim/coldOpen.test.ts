@@ -71,7 +71,7 @@ describe('cold open', () => {
     } finally { sim.dispose(); }
   }, 60_000);
 
-  it('4.3 the coin line runs from the spawn to the marker: a coin within 6 m of every 30 m of the route', async () => {
+  it('4.3 the coin line runs from the spawn to the marker as breadcrumbs (M5.5): a run within 6 m of every 100 m of the route, the cap on the marker', async () => {
     const sim = await coldWorld();
     try {
       const route = sim.coldOpen.route!;
@@ -80,11 +80,13 @@ describe('cold open', () => {
       for (const s of route.samples) if (s.s % 225 < 3) coins.push(...sim.city!.generate(Math.round(s.x / 225), Math.round(s.z / 225)).coins);
       expect(sim.coins!.extra.length).toBeGreaterThan(50);
       let gaps = 0;
-      for (const s of route.samples) {
-        if (s.s % 30 >= 3 || s.s > route.markerS) continue;
-        if (!coins.some((c) => (c.x - s.x) ** 2 + (c.z - s.z) ** 2 <= 36)) gaps++;
+      for (let from = 0; from < route.markerS; from += 100) {
+        const window = route.samples.filter((s) => s.s >= from && s.s < from + 100 && s.s < route.markerS);
+        if (window.length === 0) continue;
+        if (!window.some((s) => coins.some((c) => (c.x - s.x) ** 2 + (c.z - s.z) ** 2 <= 36))) gaps++;
       }
       expect(gaps).toBe(0);
+      expect(sim.coins!.extra.some((c) => c.value === BALANCE.coin.cap && Math.hypot(c.x - route.markerX, c.z - route.markerZ) < 1)).toBe(true);
     } finally { sim.dispose(); }
   }, 60_000);
 

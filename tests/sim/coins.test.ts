@@ -9,24 +9,12 @@
  */
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../src/sim/balance';
-import { EXTRA_COIN_BASE, type CoinDesc } from '../../src/sim/city/coins';
+import { EXTRA_COIN_BASE } from '../../src/sim/city/coins';
 import { GARAGE } from '../../src/sim/city/cover';
-import type { CityChunk } from '../../src/sim/city/City';
-import { projectOnLane } from '../../src/sim/city/roads';
 import type { SimWorld } from '../../src/sim';
 import type { Traffic } from '../../src/sim/traffic/Traffic';
 import { TRAFFIC } from '../../src/sim/traffic/tuning';
 import { createWorld, run } from './helpers';
-
-function allChunks(sim: SimWorld): CityChunk[] {
-  const out: CityChunk[] = [];
-  for (let cz = -3; cz <= 3; cz++) for (let cx = -3; cx <= 3; cx++) out.push(sim.city!.generate(cx, cz));
-  return out;
-}
-
-function allCoins(sim: SimWorld): CoinDesc[] {
-  return allChunks(sim).flatMap((chunk) => chunk.coins);
-}
 
 /** A straight street lane and its pose at `s`. */
 function street(sim: SimWorld, s: number): { lane: number; x: number; z: number; yaw: number } {
@@ -56,24 +44,25 @@ describe('coins', () => {
   it('3.9 a run driven at 60 km/h is picked once, coin by coin, its cap worth five, and a second pass picks nothing', async () => {
     const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
     try {
-      const { lane, x, z, yaw } = street(sim, 0);
+      const { x, z, yaw } = street(sim, 0);
       const fx = Math.sin(yaw), fz = Math.cos(yaw);
-      const hit = { x: 0, z: 0, yaw: 0 };
-      const laneDesc = sim.city!.graph.lanes[lane]!;
-      // this lane's coins on its centre in order, and its first run (consecutive coins one pitch apart)
-      const mine = allCoins(sim).filter((c) => c.lane === lane && Math.sqrt(projectOnLane(laneDesc, c.x, c.z, hit)) < 0.5)
-        .map((c) => ({ c, s: (c.x - x) * fx + (c.z - z) * fz })).sort((p, q) => p.s - q.s);
-      expect(mine.length).toBeGreaterThan(0);
-      const runCoins = [mine[0]!];
-      for (let k = 1; k < mine.length && mine[k]!.s - mine[k - 1]!.s < BALANCE.coin.pitch + 0.01; k++) runCoins.push(mine[k]!);
-      expect(runCoins.length).toBeGreaterThanOrEqual(BALANCE.coin.runMin);
-      const worth = runCoins.reduce((sum, { c }) => sum + c.value, 0);
-      expect(runCoins[runCoins.length - 1]!.c.value).toBe(BALANCE.coin.cap);
-      const startS = runCoins[0]!.s - 15, endS = runCoins[runCoins.length - 1]!.s + 10;
+      // no road carries a line of its own (M5.5): a route's run of six and its cap, laid on this street's centre
+      const c = BALANCE.coin;
+      const points = [];
+      for (let k = 0; k < c.route.straight; k++) points.push({ x: x + fx * (60 + k * c.pitch), z: z + fz * (60 + k * c.pitch) });
+      points.push({ x: x + fx * (60 + c.route.straight * c.pitch), z: z + fz * (60 + c.route.straight * c.pitch), value: c.cap });
+      expect(sim.coins!.addExtra(points, 'route')).toBe(points.length);
+      const runCoins = sim.coins!.extra.filter((e) => e.lane === -5);
+      expect(runCoins.length).toBe(points.length);
+      expect(runCoins[runCoins.length - 1]!.value).toBe(c.cap);
+      expect(c.cap).toBe(5 * c.value);
+      const worth = runCoins.reduce((sum, e) => sum + e.value, 0);
+      const startS = 45, endS = 60 + c.route.straight * c.pitch + 10;
       const before = sim.coins!.pickedCount;
       driveStraight(sim, { x, z, yaw }, 0, startS, endS);
       expect(sim.coins!.pickedCount - before).toBe(runCoins.length);
-      for (const { c } of runCoins) expect(sim.coins!.picked[c.id]).toBe(1);
+      for (const e of runCoins) expect(sim.coins!.picked[e.id]).toBe(1);
+      expect(sim.coins!.routePicked).toBe(runCoins.length);
       expect(sim.run.coins).toBe(worth);
       expect(sim.run.bag).toBe(0);
       driveStraight(sim, { x, z, yaw }, 0, startS, endS);

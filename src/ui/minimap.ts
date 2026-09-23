@@ -9,7 +9,7 @@ import { CITY_HALF, DISTRICTS, PALETTE, districtAt, type SimWorld } from '../sim
 import { LANDMARKS } from '../sim/city/City';
 import { MINIMAP, advance, buildRoadLayers, clampToRim, project, yawFromQuat, type MinimapState, type Vec2 } from './minimapModel';
 
-export type MarkerKind = 'tower' | 'tank' | 'glasshouse' | 'hotel' | 'garage' | 'job';
+export type MarkerKind = 'tower' | 'tank' | 'glasshouse' | 'hotel' | 'garage' | 'job' | 'cache';
 /** A point of interest on the map. `local` markers show only inside the circle (the job rings: sixteen chevrons on the rim would be noise). */
 export interface MinimapMarker { x: number; z: number; kind: MarkerKind; color: string; yaw?: number; local?: boolean }
 
@@ -20,6 +20,7 @@ const FONT = "'Segoe UI', 'Helvetica Neue', Arial, system-ui, sans-serif";
 const INK = '#f7f3ea';
 const DARK = 'rgba(22, 14, 40, 0.92)';
 const ACCENT = '#ffd23f';
+const CACHE_COLOR = hex(PALETTE.coin);
 const LOOP = '#ffe9a8';
 const GRID = 'rgba(247, 243, 234, 0.85)';
 const RIM = 'rgba(255, 210, 63, 0.45)';
@@ -74,6 +75,7 @@ export class Minimap {
   /** The landmarks and drop-offs; idle job markers are appended when the jobs change. */
   private base: readonly MinimapMarker[];
   private jobSerial = -1;
+  private cacheSerial = -1;
   /** The running job's target on the rim: the drop-off, the fence or the wanted car. Moved in place. */
   private readonly jobTarget: MinimapMarker = { x: 0, z: 0, kind: 'job', color: JOB_COLORS.delivery };
   private readonly jobPoint = { x: 0, z: 0 };
@@ -196,17 +198,27 @@ export class Minimap {
     this.lastZ = z;
     advance(this.state, dt, yaw, tm.vx, tm.vz, tm.speed, snap);
     const jobs = sim.jobs;
-    if (jobs.serial !== this.jobSerial) {
-      // the live rings while no job runs (inside the circle only); the running job's target clamps to the rim
+    const caches = sim.caches;
+    const cacheSerial = caches ? caches.serial : 0;
+    if (jobs.serial !== this.jobSerial || cacheSerial !== this.cacheSerial) {
+      // the live rings while no job runs (inside the circle only); the running job's target clamps to the rim;
+      // the day's caches still to find as gold dots inside the circle (M5.5)
       this.jobSerial = jobs.serial;
+      this.cacheSerial = cacheSerial;
       const running = jobs.running;
+      const dots: MinimapMarker[] = [];
+      if (caches) {
+        for (let k = 0; k < caches.today.length; k++) {
+          if (caches.found[k] === 1) continue;
+          const spot = caches.spots[caches.today[k] as number];
+          if (spot) dots.push({ x: spot.x, z: spot.z, kind: 'cache', color: CACHE_COLOR, local: true });
+        }
+      }
       if (running) {
-        this.jobTarget.color = JOB_COLORS[running.kind];
-        this.markers = [...this.base, this.jobTarget];
+        this.markers = [...this.base, ...dots, this.jobTarget];
       } else {
         const live = jobs.state === 'idle' ? jobs.defs.filter((d) => jobs.live(d)) : [];
-        this.markers = live.length === 0 ? this.base
-          : [...this.base, ...live.map((d): MinimapMarker => ({ x: d.x, z: d.z, kind: 'job', color: JOB_COLORS[d.kind], local: true }))];
+        this.markers = [...this.base, ...dots, ...live.map((d): MinimapMarker => ({ x: d.x, z: d.z, kind: 'job', color: JOB_COLORS[d.kind], local: true }))];
       }
       this.jobTargetShown = false;
       this.dirty = true;
@@ -425,6 +437,10 @@ export class Minimap {
         c.arc(x, y, g * 0.85, 0, Math.PI * 2);
         c.moveTo(x + g * 0.4, y);
         c.arc(x, y, g * 0.4, 0, Math.PI * 2, true);
+        break;
+      case 'cache':
+        // a gold dot: a coin on the map
+        c.arc(x, y, g * 0.45, 0, Math.PI * 2);
         break;
       case 'garage':
         // a garage front: a pitched outline with the door as the dark band across its foot

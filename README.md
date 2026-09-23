@@ -6,8 +6,10 @@ M3 put life in the city: traffic, pedestrians, damage and wrecks, car-swap,
 takedowns and fifty smashable billboards. M4 (`docs/M4_REPORT.md`) is the
 police and the run. M5 (at its gate, `docs/M5_REPORT.md`) is the launch
 minimum: the save, three jobs with the arrow, the garage on the wall, the
-dailies and the streak, the balance script. M6 is the platform and the
-submission: `docs/M6_PLAN.md`; all designed in `docs/DESIGN.md`. Older
+dailies and the streak, the balance script. M5.5 (`docs/M5.5_REPORT.md`)
+is the whole game before the platform. M6 is the wanted board, ten rivals
+and their cars (`docs/M6_PLAN.md`); M7 is the platform and the submission
+(`docs/M7_PLAN.md`); all designed in `docs/DESIGN.md`. Older
 acceptance reports: `docs/M2_REPORT.md`, `docs/M3_REPORT.md` and
 `docs/history/`.
 

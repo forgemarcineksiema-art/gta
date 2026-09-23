@@ -77,8 +77,6 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 - The balance model's novice (M5.5 gate): the road bot waits in queues at the downtown lights with units behind it and is busted even at level 1 (once in three minutes at every seed), so the model's novice run is 2.4 minutes and the first hour's assertions (b) and (c) are red (the first car at minute 3.9, one gap 2.4 minutes) while the income a minute is on DESIGN §3.3's target. A novice proxy that drives round a queue without ramming (the careful bot's overtake while chased turned it into a rammer: bag 4,079 a minute) would measure a player; until then Marcin's first hour judges `BALANCE.prices.compact` and tier 1 (over 13.6k keeps every gap over three minutes at these runs).
 - The police catch the novice bot less at level 4 than at levels 2 and 3 at all three seeds (0.22 against 0.78 and 0.44 a minute): heat 4–5 thin the traffic to 60 %, so fewer queues trap it. A player's level 4 decides whether the heavies and the helicopter need more bite.
-- The garage keeps classes: a pickup or a taxi driven home offers the class it rides on (the van, the compact), not its body (M5.5 slice 19). Bodies as garage entries need a price each and the wall's cards.
-- The SELL / KEEP choice at a fence for an order's car (M5.5 slice 6 shipped KEEP at a door only).
 - A unit's junction curves are the traffic's; tighter ones would read as police driving (M5.5 slice 4, cosmetic).
 - Race #23 at seed 42: the test bot resets in a loop at the city spawn by the signalled centre, so its measurement fails there; the bot's limit, not the race's (M5.5 gate).
 

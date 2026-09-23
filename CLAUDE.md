@@ -9,7 +9,7 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 
 ## Session start
 
-1. Read this file, `docs/PROGRESS.md` and the current milestone contract (M5.5 at its gate, `docs/M5.5_REPORT.md`; then `docs/M6_PLAN.md`, only on Marcin's word; the design in `docs/DESIGN.md`, §13 first); check `git log --oneline -15`.
+1. Read this file, `docs/PROGRESS.md` and the current milestone contract (M5.5 at its gate, `docs/M5.5_REPORT.md`; then `docs/M6_PLAN.md`, the wanted board, only on Marcin's word; the design in `docs/DESIGN.md`, §14 first); check `git log --oneline -15`.
 2. Run `npm run verify` (the quick set) before touching anything and at the commit that ends a slice. `npm run verify:gate` (the long bot-driven pins included) only at a milestone gate. Nothing else per slice: see **Pace** below, and read it before every slice.
 3. Work autonomously inside the milestone. Decide, act, note assumptions in `docs/PROGRESS.md`. Stop only at a gate, before destructive/irreversible operations, to change a fixed decision from the brief, or when blocked on something only Marcin can provide.
 4. Commit small and often; never leave significant work uncommitted. Commit messages end with a `Co-Authored-By:` line naming the model that did the work (e.g. `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`).
@@ -24,7 +24,8 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 | `docs/DESIGN.md` | Design decisions on top of the brief: the run, progression, the city as a level, platform KPIs, the M4 slice order. Each section is marked decided (Marcin) or set here (mine). |
 | `docs/M5.5_PLAN.md` | The current milestone contract: the whole game before the platform (the playtest's fixes, the air, the jobs, the toys, life's models). Slices in order, done criteria, pins. M6 starts only on his word after its gate. |
 | `docs/M4_PLAN.md`, `docs/M5_PLAN.md` | The finished contracts (kept for their numbers and as-built notes). M4's §5 holds the contract for post-launch update 1. |
-| `docs/M6_PLAN.md` | The platform contract (SDK adapter, touch, mobile tier, submission), after M5.5. |
+| `docs/M6_PLAN.md` | The next contract, after M5.5 on Marcin's word: the wanted board (ten rivals and the Chief, their races and hunts, their cars), the garage keeping bodies, the driver's kit and the car's kit, three hidden cars. |
+| `docs/M7_PLAN.md` | The platform contract (SDK adapter, touch, mobile tier, submission), the brief's M6, after M6. |
 | `docs/ARCHITECTURE.md` | Structure, dependency justifications, decision records. |
 | `docs/DEV.md` | Servers and ports, the build stamp, test URLs, QA hooks, the suites, scratch folders. `npm start` (4173) is the one way to play; `npm run dev` (5173) is for editing. |
 | `docs/BACKLOG.md` | Out-of-milestone ideas and non-blocking bugs, one line of context each. |
@@ -35,7 +36,7 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 | `src/sim/` | Headless game state + physics (Rapier). **No Three.js, no DOM** (enforced by `tsconfig.sim.json` and lint). |
 | `src/render/`, `src/audio/`, `src/ui/` | Read sim state, never write it. |
 | `src/input/` | Devices → abstract actions. `KeyboardEvent.code` only. |
-| `src/platform/` | `Platform` interface; `LocalPlatform` now, `CrazyGamesPlatform` in M6. Game code never touches `window.CrazyGames`. |
+| `src/platform/` | `Platform` interface; `LocalPlatform` now, `CrazyGamesPlatform` in M7. Game code never touches `window.CrazyGames`. |
 | `src/app/` | Glue: fixed-step loop, bot, perf probe, `App`. |
 | `src/sim/vehicle/tuning.ts` | Every handling number (`VehicleTuning`). Live-editable via `?dev=1` / backtick key. |
 | `tests/sim/` | Vitest, Node, headless sim tests. The handling pins live here. `*.long.test.ts` are the long bot-driven pins, run with `LONG=1` (`npm run verify:gate`, `npm run test:long`). |

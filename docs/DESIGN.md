@@ -608,8 +608,8 @@ onto the front page.
   on a navigation button, mute on `adStarted`, no reward on `adError`.
 - **Discovery** is the title, the cover and the tags: car, police chase, open
   world, driving, 3D. The description leads with the fantasy in one line.
-- **Mobile** is M6: touch, the mobile tier, under 20 MB (3.5 MB today) for
-  the mobile homepage.
+- **Mobile** is M7 (the brief's M6): touch, the mobile tier, under 20 MB
+  (3.8 MB today) for the mobile homepage.
 
 ## 10. Engineering constraints
 
@@ -630,7 +630,8 @@ onto the front page.
 
 The contracts with done criteria, pins and measurements per slice are
 `docs/M4_PLAN.md` (its §5 holds update 1), `docs/M5_PLAN.md` and
-`docs/M6_PLAN.md`; this section is the summary. Update 2 gets its contract
+`docs/M6_PLAN.md` (the board) and `docs/M7_PLAN.md` (the platform); this
+section is the summary. Update 2 gets its contract
 after the first Basic Launch numbers.
 
 Revised 2026-09-22 (decided by Marcin): the game goes to Basic Launch after
@@ -676,8 +677,13 @@ both.
   mayhem, fares, the hunts, the skill chain, the full map, §4, §7), the
   hidden cars and the toys (§8), the life and police extras of the backlog.
   `docs/M5.5_PLAN.md` §4 slices 7–18.
-- **M6 Platform** as in the brief, then Basic Launch; only when all of it is
-  in and on his word that the game is good.
+- **M6 The board** (decided by Marcin 2026-09-23 that a milestone sits
+  here; what it is, §14, set here; the contract is `docs/M6_PLAN.md`): the
+  wanted board of ten rivals and the Chief, their duels and their cars, the
+  garage keeping bodies, the driver's kit and the car's kit, three more
+  hidden cars. On his word after the M5.5 playtest.
+- **M7 Platform**, the brief's M6 (`docs/M7_PLAN.md`), then Basic Launch;
+  only when all of it is in and on his word that the game is good.
 - Later, by the KPIs: cop mode, ghosts, multiplayer (§8).
 
 ## 12. Playtest watch list
@@ -739,7 +745,8 @@ is `docs/M5.5_PLAN.md`.
 
 ### 13.1 The decision — decided
 
-**M6 (the platform, the submission) starts only when the game plays well.**
+**M6 (the platform, the submission; M7 since 2026-09-23, §14) starts only
+when the game plays well.**
 Basic Launch is not a beta: the platform reads the three KPIs from the first
 day and a game that is not good gets its verdict in a week; updates during
 Basic Launch continue, they do not rescue a bad first week. So a polish
@@ -1144,6 +1151,182 @@ behaviour (§13.8) rides on these bodies.
 - `docs/BACKLOG.md`: the abandoned-car tow (closed by the gawk), the
   ticker, the heat-scaled sirens and the radio chatter (scheduled here);
   the garage's "dark" note corrected to "empty".
+
+## 14. M6 "The board": rivals, their cars, your style — set here, 2026-09-23
+
+Marcin, after the M5.5 gate: a new M6 before the platform, the platform
+becoming M7 (decided). What M6 is, is my idea (set here; he overrides).
+The contract is `docs/M6_PLAN.md`; the platform's is `docs/M7_PLAN.md`.
+
+### 14.1 What is missing after M5.5
+
+The first quarter hour has a spine (the chain, §13.4) and the city is full
+of things to do. After the chain's sixth step there is no goal longer than
+one run and nobody to beat: jobs, money and dailies, Forza's checklist
+without Forza's championships. Nothing in the game has a face, and the
+Saints Row pillar of the brief (absurd humour, ridiculous customization) is
+the thinnest of the four: "visual customization ranging from paint and
+wheels to silly roof toppers" is today the paint and the day-7 cone, and
+the brief's eight vehicles are six to own. The KPIs say where it bites:
+play time needs a clear next goal at all times past minute fifteen, and
+day-1 retention needs a reason to come back that has a name (a rival
+nearly beaten, a car nearly won).
+
+### 14.2 The idea: the wanted board
+
+The genre's proven answer is Need for Speed Most Wanted's (2005) blacklist:
+named rivals beaten one at a time, each win taking the rival's car. In our
+fiction it is the police's own board: the ten drivers the city wants most,
+ten wanted posters on the hideout's back wall where the one poster hangs
+today. The player starts off the board. Beating a rival in a duel takes
+their place, their car and their signature item, and the player's poster
+climbs. At #1 the Chief comes in person (§14.5).
+
+- **Every rival asks for something first**: two requirements printed on
+  the poster, each a thing the game already has (win a street race, gold on
+  a trial, escape at ★★★, a hot fare, bank 40,000 in one run). The ten
+  posters walk the player through every activity in the city in order: the
+  chain's rule (§13.4) stretched over the first four or five hours. The
+  counters are lifetime, so nothing done before the board opens is wasted.
+- **The goal line follows the board** once the chain is done: `CHALLENGE
+  GRANNY GEARS · 640 m` with the arrow on her ring when she is ready, else
+  her first open requirement, `#9 NEEDS: WIN A STREET RACE`, with the arrow
+  on the nearest race. There is always a named next thing.
+- **One rival at a time**: only the next rival's ring is live; the beaten
+  stay on the map as rematches for a quarter of the purse (a car is won
+  once). Losing costs nothing but the heat; the ring stays.
+- **Rewards**: the purse goes into the bag like every job's pay (the run's
+  rule, §2.2); the car and the item are the player's at once and never at
+  risk (a twelve-year-old who wins a car and loses it to busted quits).
+- In the game it is the `WANTED BOARD`, never "most wanted" (brief §2: no
+  borrowed names). No number is attached to the player: the board is
+  posters and names, so §3.2's "no reputation" stands and nothing is locked
+  by it.
+
+### 14.3 The ten
+
+Two duel formats on what exists, and a twist per rival that is one of the
+game's own verbs turned on the player, so the board teaches them too:
+
+- **Race**: the rival and the player to one finish by any route (M5.5's
+  race with the rival's pace and rubber band by rank).
+- **Hunt**: the rival carries a bag to their door; wreck their car (its
+  armour grows with rank) before it gets there. A wrecked rival's bag bursts
+  as coins on the road (the spill, run the other way). Their arrival, or
+  three minutes, loses it.
+
+| # | Rival | Turf | Their car | Duel | Twist | Their item | Purse |
+|---|---|---|---|---|---|---|---|
+| 10 | Granny Gears | Palm Gardens | the Wagon: a hot-rodded estate, a blower through the bonnet, flower pots on the roof rack | race along the parkway to the Glasshouse | none, heat 0: the duel taught | flower-pot topper | 4,000 |
+| 9 | Pepperoni Pete | Coral Quay | the Pizza Hatch: a hatchback under a giant slice | race to a customer's door | drives like the bad driver: weaves, takes the oncoming lane | pizza topper | 6,000 |
+| 8 | Tow Truck Tina | Sunset Works | the Wrecker: a pickup with a crane, a hook and an amber bar | hunt to the scrapyard | heavy: twice the armour, a shove like the heavy van's | amber beacon | 8,000 |
+| 7 | The Twins | Coral Quay | the Twin: one sports coupé, two of them, mint and peach | race against both | they never drive the same car twice: a twin who falls 150 m behind swaps into a car ahead of you out of your view, and the radio names it | two-tone neon | 10,000 |
+| 6 | Fake Frank | Sunset Works | the Fake Cruiser: a police saloon under a disco light bar | hunt to the donut shop | the disguise: the units ignore him, and ramming him is hitting a police car | disco light bar | 12,000 |
+| 5 | Big Bernie | Crown Heights | the Party Bus: the bus with a roof deck and speakers | race down the avenues | a bus at race pace that never yields: traffic bounces off it | air horn | 15,000 |
+| 4 | Neon Niko | Coral Quay | the Lowrider: a long low coupé on hydraulics | race along the promenade, heat 3 | the pursuit breakers: every scaffold tower he passes with you behind falls on you | pink neon | 18,000 |
+| 3 | The Mayor's Nephew | Crown Heights | the Gold Limo: stretched, gold, flags on the wings | hunt to the Crown Tower | a police escort: two units beside the limo ram you from the start | the flags | 22,000 |
+| 2 | Professor Pip | Palm Gardens | the Bubble: a one-door microcar, absurdly fast | race, heat 4 | the helicopter over you from the start: the cover is the way | propeller cap | 30,000 |
+| 1 | The Ghost | the highway | the Phantom: a matte black sports car with its lights off | race round the whole loop, heat 4 | no blip on the radar and no lights: seen only in view | ghost smoke | 50,000 |
+
+Requirements, lifetime counts, two a poster: #10 the chain's six steps; #9
+win a street race, bronze on a trial; #8 escape at ★★★, 10 takedowns; #7
+win a rage or mayhem zone, deliver 3 fares; #6 deliver 3 cars to order, own
+3 cars; #5 silver on 2 trials, 10 stunt jumps; #4 bank 40,000 in one run,
+25 billboards; #3 escape at ★★★★, a hot fare; #2 win 3 street races, 40
+caches (the day's thirty cannot make it: the second day is the D1 lever,
+said on the poster); #1 escape at ★★★★★, gold on a trial. The intended pace:
+#10 at about minute 20, a rival every 15–25 minutes after it, #2 on day
+two. The pace and the band of the race rivals and the hunted cars' armour
+rise with rank (`BALANCE.board`); the numbers are the balance script's and
+Marcin's hours'.
+
+### 14.4 Your style: the driver's kit travels, the car's kit stays home
+
+The identity (§1: the getaway driver who never keeps a car) and
+customization meet in one rule. **The driver's kit is the player's and
+goes into every car they swap into**: the topper on the roof, the neon under
+the sills, the horn, the boost flame, the tyre smoke. Take a bus with a
+rubber duck on your roof and the bus wears the duck; the day-7 cone already
+works this way. **The car's kit belongs to a car in the garage**: the paint
+(exists), the wheels, the spoiler, the stance. It is what you drive out in.
+
+- **Toppers**: the streak's cone; for sale a rubber duck, a shark fin, a
+  crown, a traffic light, a giant donut (the police's weakness), a satellite
+  dish, a mattress, a trophy and a flamingo; won only, six rivals' (the
+  flower pots, the pizza, the amber beacon, the disco light bar, the flags,
+  the propeller cap) and the Chief's gold star. Each a few boxes in the
+  palette, under 300 triangles, seated on the body's roof.
+- **Neon**: six colours, and the rivals' two-tone and pink; an additive
+  quad under the car in its footprint, no light.
+- **Horns**: five of our own synthesized like the engine (a clown's, a
+  goose, a doorbell, a two-tone, a kazoo) and Bernie's air horn won. **The
+  horn is a verb** (H): the car ahead in your lane within 25 m pulls toward
+  its kerb for 2 s (the pull-over's move at half), so honking through
+  traffic works; a horn with nothing to do is a button pressed once.
+- **Boost flame and tyre smoke**: five colours each; the Ghost's smoke won.
+- **The car's kit**: five wheel styles in five colours, three spoilers (a
+  lip, a wing, the silly one), three stances (low, stock, high: the body's
+  height over the wheels, drawn only).
+- Prices 500–12,000, so the first hour has something to see bought between
+  the upgrade tiers (eight of its ten purchases today are stat tiers, which
+  nobody sees).
+- **The day's pick**: one kit item a day by the date seed at half price on
+  the STYLE page; in M7 the same item free for a rewarded ad, the half
+  price as the equal alternative. That is the brief's "daily cosmetic
+  crate" (§7) without the randomness: PEGI 12 and the brief rule out
+  gambling, and a crate you cannot see into is one.
+- **Cosmetics never change handling, heat or the police's descriptor.** A
+  kit that costs something in the chase is a kit nobody wears; the
+  descriptor stays class and paint (§2.5).
+
+### 14.5 The Chief
+
+Beating #1 puts the Chief in his ring at the donut shop, the ticker's
+`THE CHIEF WANTS HIS BOARD BACK`. The duel is the escape at ★★★★★ with the
+Chief on the roster from the first second; losing him (the cooldown, as in
+any escape) wins his own car, the Chief's Cruiser (the police body with gold
+trim and a gold star on the roof), 100,000 into the bag and a gold frame
+round the player's poster at #1. The police car's own unlock (one heat-5
+escape) stands.
+
+### 14.6 The collection
+
+The garage keeps **bodies**, not classes (closing BACKLOG's "the garage
+keeps classes"): every body is a car on the CARS page, counted (`CARS
+9/28`): the five of the catalogue; the eight civilian bodies, only by
+bringing one home (KEEP IT at 30 % of its own price); four hidden cars (the
+ice-cream truck and, mine, one more in each district without one: a vintage
+roadster under a tarp in a Crown Heights back lot, a street sweeper with
+spinning brushes in a Works yard, a hot-dog van on the Coral Quay
+promenade); the ten rivals' cars and the Chief's. Upgrades stay per class:
+a power tier on the muscle class drives the Wagon and the taxi faster too,
+which keeps the save and the balance small and every handling pin standing
+(tier 0 is the preset bitwise). The SELL / KEEP choice at a fence (§13.7)
+comes with it.
+
+### 14.7 What it moves and what it costs
+
+- **Play time**: a named next goal for four to five hours; rematches;
+  something visible to buy every few minutes.
+- **Day-1**: a rival nearly beaten, a car nearly won, #2's forty caches,
+  the day's pick.
+- **Conversion**: the first minute does not change; M7's cover brief gets a
+  cast (a party bus, a granny's wagon, a duck on a roof).
+- **Cost**: fourteen bodies (M5.5 built eight in one slice), two duel
+  formats on the race and the takedown, eight twists on systems that exist,
+  two wall pages, about forty kit items of a few boxes each, the save's
+  version 3. Twelve slices.
+
+### 14.8 What this section changes elsewhere
+
+- §11: M6 is the board; the platform (the brief's M6) is M7 (decided by
+  Marcin, 2026-09-23).
+- §3.3's car list (Hatch, Van, Coupe, Muscle Pro, GT) is superseded by the
+  bodies of §14.6.
+- `docs/BACKLOG.md`: the garage keeps classes and SELL / KEEP at a fence
+  are scheduled (M6 slice 0).
+- The brief's v1 items it closes: visual customization (paint, wheels,
+  toppers) and the eight vehicles (twenty-eight).
 
 ## References
 

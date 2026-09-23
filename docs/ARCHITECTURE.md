@@ -24,7 +24,7 @@ tests/render/         Vitest camera pins (three.js math in Node, no WebGL)
 tests/ui/             Vitest minimap model pins (road layers, projection, easing, rim clamp)
 e2e/                  Playwright: smoke, perf, screens, city (M2 tour), life (M3 traffic run)
 tools/                verify.mjs, budget.mjs
-docs/                 BRIEF, PROGRESS, DESIGN, M4_PLAN / M5_PLAN / M6_PLAN, ARCHITECTURE, BACKLOG, CRAZYGAMES, STYLE, TITLES, ASSETS
+docs/                 BRIEF, PROGRESS, DESIGN, M4_PLAN … M7_PLAN, ARCHITECTURE, BACKLOG, CRAZYGAMES, STYLE, TITLES, ASSETS
 ```
 
 ## City (M2)
@@ -293,7 +293,7 @@ Pinned by `tests/sim/handling.test.ts` (29 tests; `cars.test.ts` repeats the cla
 
 ## Platform adapter
 
-`Platform` (`src/platform/Platform.ts`): init/info, loading + gameplay brackets, `happyTime`, `adsAvailable`, `requestAd` (typed `AdResult`, never rejects), `onAdEvent` (mute hook), `hasAdblock`, save/load/clear. `LocalPlatform` simulates ads with a DOM overlay and can force every SDK error code from the URL (`?ad=error&adError=adblock`, `?ad=off`, `?adblock=1`). `CrazyGamesPlatform` arrives in M6.
+`Platform` (`src/platform/Platform.ts`): init/info, loading + gameplay brackets, `happyTime`, `adsAvailable`, `requestAd` (typed `AdResult`, never rejects), `onAdEvent` (mute hook), `hasAdblock`, save/load/clear. `LocalPlatform` simulates ads with a DOM overlay and can force every SDK error code from the URL (`?ad=error&adError=adblock`, `?ad=off`, `?adblock=1`). `CrazyGamesPlatform` arrives in M7 (the platform milestone).
 
 ## Verification
 
@@ -323,7 +323,7 @@ Pinned by `tests/sim/handling.test.ts` (29 tests; `cars.test.ts` repeats the cla
 19. **Pedestrians have no colliders** (M3). Points on footway paths with a dodge controller and a last-resort hop make "never hit" true by construction; PEGI 12 slapstick, zero Rapier cost.
 20. **Billboards are pass-through triggers with a visible smash** (M3). A solid panel is a wall at highway speed. Placed last in chunk generation with a fixed quota so the island has exactly fifty; drawn as their own instanced mesh so one can vanish without a chunk rebuild. Interior ones are gates across the footways, because the frontage row leaves no run-out behind a roadside panel; the highway verges get roadside panels.
 21. **Slow motion is a time scale on the fixed-step loop** (M3). Deterministic, no special stepping, input keeps flowing, any pressed action ends it.
-22. **Traffic density is the same on both quality tiers** (M3). The M2 rule that quality never changes gameplay (City section: simulation, road topology and collisions are tier independent) wins until M6 needs a mobile lever; the pool size is one tuning number.
+22. **Traffic density is the same on both quality tiers** (M3). The M2 rule that quality never changes gameplay (City section: simulation, road topology and collisions are tier independent) wins until M7 (the platform) needs a mobile lever; the pool size is one tuning number.
 23. **Wrecks are towed by age plus an instantaneous sight test** (M4). A wreck older than `wreckTow` (60 s) is freed the first step it is outside a 55° half-cone on the player's heading and beyond 40 m. A hidden-for timer reads better but never fires for a player circling one junction, which is the scrapyard case the rule exists for.
 24. **The sim step is timed by phase through a hook, never by the sim** (M4). `SimWorld.mark` is called at the end of each `SimPhase`; `src/app/simProfile.ts` owns the clock, because `src/sim` has no lib.dom and no Node types. Installed for measured runs only.
 25. **Keyboard taps are latched until read** (M4). A key down and up between two frames was never seen; `KeyboardDevice.tapped` reports it once. Input read while blocked is dropped, not replayed after an ad.

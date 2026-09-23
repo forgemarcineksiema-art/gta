@@ -5,7 +5,7 @@ export type * from './Platform';
 export { LocalPlatform } from './LocalPlatform';
 
 /**
- * Picks the platform adapter. `CrazyGamesPlatform` arrives in M6; until then
+ * Picks the platform adapter. `CrazyGamesPlatform` arrives in M7; until then
  * everything runs on `LocalPlatform`, which also serves tests and local dev.
  */
 export function createPlatform(): Platform {

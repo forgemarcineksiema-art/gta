@@ -28,9 +28,11 @@ describe('heavies and the Chief', () => {
       const traffic = sim.traffic as Traffic;
       const police = sim.police!;
       try {
-        expect(runUntil(sim, 10, (s) => s.police!.count === POLICE.budget[level])).toBeGreaterThan(0);
+        // the ground roster: the level's budget less the helicopter's place (M5.5 slice 9)
+        const ground = (POLICE.budget[level] as number) - (level >= POLICE.heli.fromLevel ? 1 : 0);
+        expect(runUntil(sim, 10, (s) => s.police!.count === ground)).toBeGreaterThan(0);
         const live = Array.from(police.units).filter((a) => a >= 0);
-        expect(live.length).toBe(POLICE.budget[level]);
+        expect(live.length).toBe(ground);
         expect(live.filter((a) => traffic.kindOf(a) === 'heavy').length).toBe(heavies);
         expect(live.filter((a) => traffic.kindOf(a) === 'sports' && a !== police.chief).length).toBe(interceptors);
         if (level === 5) {
@@ -86,10 +88,11 @@ describe('heavies and the Chief', () => {
     const traffic = sim.traffic as Traffic;
     const lanes = traffic.lanes;
     try {
-      // the north side eastbound: a straight of 1,350 m, driven twice
+      // the north side eastbound from its corner: since the overpasses (M5.5 slice 8) its flat run ends 540 m on
+      // at the ramp, so the minute is four passes of 14 s instead of two of 30
       const lane = highwayLane(sim, (l) => Math.abs(l.z0 + 671) < 1 && l.x1 > l.x0 && l.x0 < -600);
       let pits = 0;
-      for (let pass = 0; pass < 2; pass++) {
+      for (let pass = 0; pass < 4; pass++) {
         const pose = { x: 0, z: 0, yaw: 0 };
         lanes.positionAt(lane, 60, 0, pose);
         sim.city!.sync(pose.x, pose.z, true);
@@ -102,7 +105,7 @@ describe('heavies and the Chief', () => {
         sim.police!.enlist(chief);
         sim.police!.chief = chief;
         let contactAt = -10, landedAt = -10;
-        run(sim, 30, (_t, _c, s) => {
+        run(sim, 14, (_t, _c, s) => {
           s.pursuit.force();
           s.vehicle.setVelocity(fx * v, s.vehicle.telemetry.vy, fz * v);
           if ((traffic.playerDv[chief] as number) > POLICE.ramContactDv) contactAt = s.time;

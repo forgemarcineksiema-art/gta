@@ -107,10 +107,12 @@ describe('pursuit escape', () => {
     try {
       const d = escapes(sim).find((e) => e.level === 4)!;
       drop(sim, d.x, d.z, d.yaw);
-      const t = runUntil(sim, 3, (s) => s.police!.count >= (POLICE.budget[4] as number));
+      // the ground roster: the level's budget less the helicopter's place (M5.5 slice 9)
+      const ground = (POLICE.budget[4] as number) - 1;
+      const t = runUntil(sim, 3, (s) => s.police!.count >= ground);
       expect(sim.heat.level).toBe(4);
       expect(t).toBeGreaterThan(0);
-      expect(sim.police!.count).toBe(POLICE.budget[4]);
+      expect(sim.police!.count).toBe(ground);
     } finally { sim.dispose(); }
   });
 });

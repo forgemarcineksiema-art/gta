@@ -370,6 +370,19 @@ export class Minimap {
         c.fill();
         c.stroke();
       }
+      // the helicopter (M5.5 slice 9): a square with a cross for its rotor, clamped to the rim when away
+      const heli = police.heli;
+      if (heli.active) {
+        project(this.tmp, heli.x, heli.z, x, z, h, s, px, py);
+        clampToRim(this.tmp, px, py, this.tmp.x, this.tmp.y, ccx, ccy, rimR - 6);
+        c.fillStyle = UNIT_LIT;
+        c.fillRect(this.tmp.x - 4.5, this.tmp.y - 4.5, 9, 9);
+        c.strokeRect(this.tmp.x - 4.5, this.tmp.y - 4.5, 9, 9);
+        c.beginPath();
+        c.moveTo(this.tmp.x - 8, this.tmp.y); c.lineTo(this.tmp.x + 8, this.tmp.y);
+        c.moveTo(this.tmp.x, this.tmp.y - 8); c.lineTo(this.tmp.x, this.tmp.y + 8);
+        c.stroke();
+      }
     }
 
     const a = MINIMAP.arrowPx;

@@ -18,6 +18,7 @@ import { buildSkyline } from './skyline';
 import { TrafficView } from './TrafficView';
 import { PedView } from './PedView';
 import { PoliceView } from './PoliceView';
+import { HeliView } from './HeliView';
 import { Billboards } from './Billboards';
 import { Debris } from './Debris';
 import { Smoke } from './Smoke';
@@ -77,6 +78,7 @@ export class Renderer {
   readonly trafficView: TrafficView | null;
   readonly pedView: PedView | null;
   readonly policeView: PoliceView;
+  private readonly heliView: HeliView | null;
   readonly hideoutView: HideoutView | null;
   readonly coinsView: Coins | null;
   readonly markerView: MarkerView;
@@ -228,6 +230,7 @@ export class Renderer {
     this.car.root.add(this.topper);
     this.topper.position.set(0, (this.roofY[sim.carId] ?? 1.2) - 0.02, -0.2);
     this.policeView = new PoliceView(this.scene, sim, this.cars.police);
+    this.heliView = sim.police ? new HeliView(this.scene, sim) : null;
     // the best-lap ghost: the same car, translucent, no shadow, wheels carried by the body
     this.ghost = buildCarMesh(sim.vehicle.tuning, profile, PALETTE.carBlue);
     this.ghost.root.traverse((o) => {
@@ -423,6 +426,7 @@ export class Renderer {
     this.trafficView?.update(this.sim.transforms, alpha);
     this.pedView?.update(this.sim.transforms, alpha);
     this.policeView.update(alpha);
+    this.heliView?.update(dt);
     const tm = this.sim.vehicle.telemetry;
     const carPos = this.car.root.position;
     // A fixed step can clear the sim's respawn flag before the next render frame.

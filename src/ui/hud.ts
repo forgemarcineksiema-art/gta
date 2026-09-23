@@ -316,6 +316,7 @@ export class Hud {
       let line = '';
       if (value === 1) line = 'ROADBLOCK AHEAD';
       else if (value === 2) line = 'UNIT DOWN · SEND ANOTHER';
+      else if (value === 4) line = 'AIR UNIT ON SCENE';
       else if (value === 3) {
         const d = unpackDescriptor(target);
         line = `SUSPECT IN A ${paintName(d.paint)} ${BODY_WORDS[d.body]}`;

@@ -41,6 +41,7 @@ import type { LanePose, LaneProjection } from '../traffic/lanes';
 import { CAR_PRESETS } from '../vehicle/presets';
 import { POLICE, type PoliceTuning } from './tuning';
 import { DISPATCH, packSuspect } from './Pursuit';
+import { Helicopter } from './Helicopter';
 
 /**
  * A chasing unit's speed (docs/DESIGN.md §13.9): within `pressure.attack` its class's (the ram, the PIT); within
@@ -117,6 +118,8 @@ export class Police {
   private readonly slotZ = new Float64Array(SLOTS);
   private readonly slotOpen = new Uint8Array(SLOTS);
   private readonly ray = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 });
+  /** The air unit from level 4 (M5.5 slice 9): its light is sight; it counts in the budget while on duty. */
+  readonly heli: Helicopter;
   private readonly pos = { x: 0, y: 0, z: 0 };
   private readonly spin = { x: 0, y: 0, z: 0 };
   private readonly pose: LanePose = { x: 0, z: 0, yaw: 0 };
@@ -155,6 +158,7 @@ export class Police {
   private playerSpeedMax = 0;
 
   constructor(sim: SimWorld) {
+    this.heli = new Helicopter(sim.world, sim.events);
     if (!sim.traffic || !sim.city) throw new Error('Police requires city traffic');
     this.sim = sim;
     this.traffic = sim.traffic;
@@ -247,6 +251,8 @@ export class Police {
     const parkedSaw = this.stepParked(player, level, dt, cosHalf);
     // the beat is part of the traffic: a world without civilians (the tours, the sandboxes) has none
     this.budget = Math.min(this.units.length, level === 0 && this.sim.trafficDensity <= 0 ? 0 : (t.budget[level] ?? 0));
+    // the helicopter's place is kept from its level on, up or not, so its arrival never sends a car home
+    if (level >= t.heli.fromLevel) this.budget = Math.max(0, this.budget - 1);
     this.spawnLeft -= dt;
     if (level === 0) {
       // the beat: the roster beyond `budget[0]` goes off duty out of view, the rest drive their lanes with
@@ -261,6 +267,7 @@ export class Police {
       this.withdrawing.fill(0);
       this.slotOf.fill(-1);
       pursuit.step(dt, level, false, player.x, player.z);
+      this.heli.step(dt, level, false, false, player, pursuit.lastX, pursuit.lastZ);
       this.standDown(player, cosHalf);
       this.dispatch(player, cosHalf, level);
       this.recycle(player, cosHalf);
@@ -285,6 +292,8 @@ export class Police {
       if (this.unitsWithin(this.boxX, this.boxZ, t.box.range) >= Math.min(t.busted.units, this.count)) this.boxLeft -= dt;
       if (this.boxLeft > 0 && this.boxAge < t.box.maxSeconds) {
         pursuit.step(dt, level, false, player.x, player.z);
+        // fooled too: the chase is over, the air unit goes home
+        this.heli.step(dt, level, false, false, player, pursuit.lastX, pursuit.lastZ);
         this.stepBox(dt);
         return;
       }
@@ -298,6 +307,9 @@ export class Police {
       this.startLeaving();
       visible = false;
     }
+    // the air unit's light is sight too; the radio gives it the position while anybody has the car
+    const known = pursuit.state === 'detected' || pursuit.state === 'active';
+    if (this.heli.step(dt, level, pursuit.state !== 'idle', known, player, pursuit.lastX, pursuit.lastZ)) visible = true;
     if (visible) {
       this.lastVx = player.vx;
       this.lastVz = player.vz;

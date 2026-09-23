@@ -2,6 +2,17 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M5.5 slice 9: the helicopter
+
+Done: from heat level 4, while a pursuit is on, a police helicopter flies in from the island's edge (the radio: AIR
+UNIT ON SCENE) and hangs over the car at 40 m with its searchlight: the light is its sight, so in the open it holds
+the chase with no car near (it flies at 50 m/s and leads the car), and only a covered street's roof, an overpass's
+deck or a building hides the car. Lost, it spirals the light out from the last fix; hidden under a roof the level's
+cooldown runs out into an escape. It keeps its place in the budget from level 4 (the table now 2/2/4/5/7/9, the
+ground rosters unchanged). Drawn with a spinning rotor, a blinking bar, an additive cone and spot; on the radar; the
+rotor thumps by distance and muffles the whole mix overhead. Pins 9.1–9.3; roster and PIT pins re-pinned (the PIT
+drive in four flat passes before the ramp). Not measured here: the busted rates at 4 and 5 (the gate).
+
 ## 2026-09-23 — M5.5 slice 8: overpasses
 
 Done: the highway climbs over its four crossings with the central streets (x = 0 and z = 0 at the ring): a 7.5 m

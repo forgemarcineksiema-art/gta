@@ -13,6 +13,9 @@ const GESTURES = ['keydown', 'pointerdown', 'touchstart', 'touchend', 'click'] a
 export class EngineAudio {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  /** The whole mix's low-pass, open unless something muffles it (the helicopter overhead). */
+  private muffler: BiquadFilterNode | null = null;
+  private muffled = 0;
   private engineGain: GainNode | null = null;
   private windGain: GainNode | null = null;
   private skidGain: GainNode | null = null;
@@ -42,6 +45,14 @@ export class EngineAudio {
     return this.ctx !== null && this.ctx.state === 'running';
   }
 
+  /** Muffle the whole mix, 0 (open) to 1 (a thick low-pass): the helicopter hanging overhead. */
+  muffle(amount: number): void {
+    const a = Math.max(0, Math.min(1, amount));
+    if (!this.muffler || !this.ctx || Math.abs(a - this.muffled) < 0.02) return;
+    this.muffled = a;
+    this.muffler.frequency.setTargetAtTime(20000 * Math.pow(600 / 20000, a), this.ctx.currentTime, 0.15);
+  }
+
   /** Master gain. Effects connect here so the ad-mute hook silences them too. */
   get output(): GainNode | null {
     return this.master;
@@ -64,7 +75,10 @@ export class EngineAudio {
     this.ctx = ctx;
     this.master = ctx.createGain();
     this.master.gain.value = this.effectiveVolume();
-    this.master.connect(ctx.destination);
+    this.muffler = ctx.createBiquadFilter();
+    this.muffler.type = 'lowpass';
+    this.muffler.frequency.value = 20000;
+    this.master.connect(this.muffler).connect(ctx.destination);
 
     // engine: saw + square an octave down + sub sine, through a lowpass driven by load
     this.engineFilter = ctx.createBiquadFilter();

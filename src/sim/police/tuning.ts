@@ -1,7 +1,7 @@
 import type { CarId } from '../vehicle/presets';
 /** Unit rosters, sight and ramming. Heat picks the row; everything else is per unit. */
 export interface PoliceTuning {
-  /** Units at once by heat level (index 0 = heat 0: the patrols on the beat, no chase). */
+  /** Units at once by heat level (index 0 = heat 0: the patrols on the beat, no chase), the helicopter's place included from its level. */
   budget: number[];
   /** How many of that roster are interceptors, by level. */
   interceptors: number[];
@@ -92,6 +92,14 @@ export interface PoliceTuning {
   /** Sight lost: units drive to the last fix and fan out once within `reach` m of it; the radar's disc there grows from `discMin` to `discMax` m over the cooldown. */
   search: { reach: number; discMin: number; discMax: number };
   /**
+   * The helicopter (M5.5 slice 9): on duty from `fromLevel` while a pursuit is on, in from `arriveFrom` m
+   * beyond the player toward the island's edge, at `altitude` m, up to `speed` m/s (`searchSpeed` round a lost
+   * fix) and `accel` m/s², leading
+   * the car by `lead` s; its light turns at `lightRate` /s, reaches `reach` m from under it and sees a car
+   * within `spot` m of its centre; lost, it circles the last fix at `circle` m, `sweepRate` rad/s.
+   */
+  heli: { fromLevel: number; arriveFrom: number; altitude: number; speed: number; searchSpeed: number; accel: number; lead: number; lightRate: number; reach: number; spot: number; circle: number; sweepRate: number };
+  /**
    * Pressure (docs/DESIGN.md §13.9): within `within` m a chasing unit drives at the player's speed plus `over`
    * (never under `min`), up to its class's speed; within `attack` m it closes at its class's speed for the ram
    * or the PIT; the catch-up only where the player cannot see the unit.
@@ -112,7 +120,8 @@ export interface PoliceTuning {
 
 export const POLICE: PoliceTuning = {
   // two on the beat at heat 0 (M5.5): the city's eyes, lane drivers with the lights off
-  budget: [2, 2, 4, 5, 6, 8],
+  // levels 4 and 5 count the helicopter (M5.5 slice 9): the same ground rosters, one place more for it
+  budget: [2, 2, 4, 5, 7, 9],
   interceptors: [0, 0, 1, 2, 2, 3],
   escapeSeconds: [0, 6, 8, 10, 12, 15],
   sightRange: 90,
@@ -163,6 +172,7 @@ export const POLICE: PoliceTuning = {
   // clear: a unit passes the player's car no closer than this (m), at detourSpeed (m/s)
   arrest: { playerSpeed: 6, releaseSpeed: 9, range: 60, rear: 5.6, front: 5.6, side: 3.2, standby: 12, decel: 6, arrive: 1.2, accel: 12, keep: 5, clear: 4, detourSpeed: 5 },
   search: { reach: 30, discMin: 60, discMax: 150 },
+  heli: { fromLevel: 4, arriveFrom: 350, altitude: 40, speed: 50, searchSpeed: 22, accel: 24, lead: 0.6, lightRate: 6, reach: 120, spot: 14, circle: 60, sweepRate: 0.35 },
   pressure: { within: 60, attack: 25, over: 4, min: 12 },
   refillSeconds: [8, 10, 8, 7, 6, 5],
   arriveInView: { fromLevel: 2, every: 3, ahead: [60, 100] },

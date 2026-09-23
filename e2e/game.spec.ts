@@ -181,3 +181,67 @@ test('5.5 the cold open\'s door makes no ad request and offers nothing; its wall
   await expect(page.locator('.run__first')).toContainText('FIRST NEW CAR: 10,000');
   expect(errors).toEqual([]);
 });
+
+test('5.1e the save round trip across a reload: the bank, the car and its paint, the billboards', async ({ page }) => {
+  const errors = watch(page);
+  await boot(page, '');
+  await page.evaluate(async () => {
+    const g = window.__game!;
+    const sim = g.sim;
+    sim.run.bank = 40_000;
+    sim.garage.buy('compact');
+    sim.garage.select('compact');
+    sim.garage.respray('compact', 0xf45bff);
+    sim.garage.applyToVehicle();
+    sim.collectibles!.smashed[8] = 1;
+    sim.collectibles!.smashed[12] = 1;
+    sim.collectibles!.smashedCount = 2;
+    await g.save.flush(sim);
+  });
+  await page.goto('/?manual=1&quality=low&spawn=crown');
+  await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 30_000 });
+  const after = await page.evaluate(() => {
+    const sim = window.__game!.sim;
+    return { bank: sim.run.bank, car: sim.carId, shown: window.__game!.renderer.visibleCar, paint: sim.pursuit.descriptor.paint, billboards: sim.collectibles!.smashedCount, owned: [...sim.garage.owned] };
+  });
+  expect(after).toEqual({ bank: 30_000, car: 'compact', shown: 'compact', paint: 0xf45bff, billboards: 2, owned: ['muscle', 'compact'] });
+  expect(errors).toEqual([]);
+});
+
+test('1.9e a delivery from its ring by the bot: paid into the bag inside the limit', async ({ page }) => {
+  test.setTimeout(180_000);
+  const errors = watch(page);
+  await page.goto('/?job=delivery&bot=job&quality=low&fresh=1');
+  await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 60_000 });
+  await page.waitForFunction(() => window.__game?.sim.jobs.state === 'active', null, { timeout: 10_000 });
+  const limit = await page.evaluate(() => window.__game!.sim.jobs.running!.limitSeconds);
+  await page.waitForFunction(() => window.__game?.sim.jobs.state === 'done' || window.__game?.sim.jobs.state === 'failed', null, { timeout: (limit + 30) * 1000, polling: 200 });
+  const done = await page.evaluate(() => ({ state: window.__game!.sim.jobs.state, paid: window.__game!.sim.jobs.lastPaid }));
+  expect(done.state).toBe('done');
+  expect(done.paid).toBeGreaterThan(0);
+  expect(errors).toEqual([]);
+});
+
+test('2.8e an order: the bot finds the wanted car, the swap takes it, the clock starts', async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors = watch(page);
+  await page.goto('/?job=order&bot=job&quality=low&fresh=1');
+  await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 60_000 });
+  await page.waitForFunction(() => (window.__game?.sim.jobs.wantedAgent ?? -1) >= 0, null, { timeout: 15_000 });
+  // the bot closes on it; within reach the test takes it (the swap is the player's key, not the bot's)
+  await page.waitForFunction(() => {
+    const sim = window.__game!.sim, w = sim.jobs.wantedAgent;
+    return w >= 0 && Math.hypot(sim.traffic!.x[w]! - sim.probe.x, sim.traffic!.z[w]! - sim.probe.z) < 30;
+  }, null, { timeout: 180_000, polling: 100 });
+  const taken = await page.evaluate(() => {
+    const sim = window.__game!.sim;
+    const w = sim.jobs.wantedAgent;
+    const kind = sim.traffic!.kindOf(w);
+    (sim.life as unknown as { swap(agent: number): void }).swap(w);
+    return { kind, car: sim.carId, state: sim.jobs.state, remaining: sim.jobs.remaining };
+  });
+  expect(taken.car).toBe(taken.kind);
+  expect(taken.state).toBe('active');
+  expect(taken.remaining).toBeGreaterThan(200);
+  expect(errors).toEqual([]);
+});

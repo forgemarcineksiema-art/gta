@@ -21,6 +21,7 @@ import { GarageUi, type GarageActions } from '../ui/garage';
 import { routeToDropOff } from './doorRoute';
 import { BotDriver } from './bot';
 import { BotPolicy } from './botPolicy';
+import { JobBot } from './jobBot';
 import { AgentState } from '../sim/traffic/Traffic';
 import { CITY_BOT_TUNING, TrackBot } from './trackBot';
 import { FixedStepLoop } from './loop';
@@ -81,7 +82,7 @@ const BREAK_MIN_MS = 600;
 /** Measured bot runs dismiss the wall and the card themselves after this long. */
 const BREAK_AUTO_MS = 1500;
 /** Any of these on the URL is a test or a dev session: no cold open unless `coldopen=1` forces it. */
-const COLD_OPEN_OFF_PARAMS = ['bot', 'spawn', 'heat', 'car', 'map', 'manual'];
+const COLD_OPEN_OFF_PARAMS = ['bot', 'spawn', 'heat', 'car', 'map', 'manual', 'job'];
 
 /** Every action ends a break except the ones that are not about driving on. */
 const DISMISS: readonly Action[] = ACTIONS.filter((a) => a !== 'pause' && a !== 'mute' && a !== 'debug' && a !== 'camera');
@@ -101,7 +102,7 @@ export class App {
   private readonly siren: Siren;
   private readonly panel: DebugPanel | null;
   private readonly loop = new FixedStepLoop(FIXED_DT, 5);
-  private readonly bot: BotDriver | TrackBot | BotPolicy | null;
+  private readonly bot: BotDriver | TrackBot | BotPolicy | JobBot | null;
   private readonly perf: PerfProbe | null;
   private readonly simProfile: SimProfile | null;
   private readonly handle: GameHandle;
@@ -221,6 +222,7 @@ export class App {
       swap: this.input.label('swap'),
     });
     this.hintsUntil = performance.now() + 12000;
+    this.hud.setSound(this.input.label('mute'), this.audio.isUserMuted);
 
     const dev = params.get('dev') === '1';
     this.panel = new DebugPanel(uiRoot, sim, {
@@ -278,8 +280,10 @@ export class App {
     const doorBot = botParam === 'door' && sim.city !== null;
     // the policies of slice 5: the road bot as a novice, or swapping and turning away as a skilled player
     const policy = (botParam === 'novice' || botParam === 'skilled') && sim.city !== null ? botParam : null;
-    const botOn = botParam === '1' || botParam === 'track' || doorBot || policy !== null;
-    this.bot = policy ? new BotPolicy(policy, new TrackBot(sim.carId, CITY_BOT_TUNING))
+    const jobBot = botParam === 'job' && sim.city !== null;
+    const botOn = botParam === '1' || botParam === 'track' || doorBot || policy !== null || jobBot;
+    this.bot = jobBot ? new JobBot(sim.carId)
+      : policy ? new BotPolicy(policy, new TrackBot(sim.carId, CITY_BOT_TUNING))
       : botOn && sim.city ? new TrackBot(sim.carId, CITY_BOT_TUNING)
         : botParam === 'track' ? new TrackBot(this.sim.carId) : botOn ? new BotDriver(Number(params.get('seed') ?? '42')) : null;
     // the drive to the hideout: the road bot on a path of its own (slice 3a's e2e and measurement)
@@ -302,7 +306,7 @@ export class App {
       bot: botOn,
       version: __APP_VERSION__,
       renderer: this.renderer,
-      roadBot: sim.city && this.bot instanceof TrackBot ? this.bot : this.bot instanceof BotPolicy ? this.bot.bot : null,
+      roadBot: sim.city && this.bot instanceof TrackBot ? this.bot : this.bot instanceof BotPolicy || this.bot instanceof JobBot ? this.bot.bot : null,
       audio: this.audio,
       adShowing: false,
       save: store,
@@ -410,6 +414,15 @@ export class App {
     });
     // the save's flag is written as it starts, so a reload never repeats it (the M4 session flag's rule)
     if (sim.coldOpen.active) void store.flush(sim);
+    // `job=<id>` or `job=delivery|order|escape`: into that marker's ring at boot (tests and playtests)
+    const jobParam = params.get('job');
+    if (jobParam !== null && sim.city) {
+      const d = sim.jobs.defs.find((k) => String(k.id) === jobParam || k.kind === jobParam);
+      if (d) {
+        sim.city.sync(d.x, d.z, true);
+        sim.vehicle.teleport({ x: d.x, y: 0.9, z: d.z }, d.yaw);
+      }
+    }
     bootTimings['sim'] = performance.now();
     const app = new App(platform, sim, canvas, params, store);
     platform.loadingStop();
@@ -553,7 +566,11 @@ export class App {
       this.hud.setDebugVisible(v);
     }
     if (st.pressed.camera) this.renderer.chase.toggleMode();
-    if (st.pressed.mute) this.hud.showToast(this.audio.toggleUserMute() ? 'MUTED' : 'SOUND ON', 1);
+    if (st.pressed.mute) {
+      const muted = this.audio.toggleUserMute();
+      this.hud.showToast(muted ? 'MUTED' : 'SOUND ON', 1);
+      this.hud.setSound(this.input.label('mute'), muted);
+    }
     if (st.pressed.skip && this.sim.coldOpen.active) {
       this.sim.coldOpen.skip();
       this.store.markDirty();

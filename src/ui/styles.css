@@ -450,6 +450,18 @@ body {
   font-weight: 600;
   color: var(--ui-ink-dim);
 }
+.hud__pause-sound {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--ui-ink);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
+}
+.hud__pause-sound.is-muted .hud__pause-sound-state { color: var(--ui-danger); }
 .hud__pause-build {
   margin-top: 28px;
   font-size: 12px;

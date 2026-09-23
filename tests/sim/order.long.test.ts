@@ -6,37 +6,9 @@
  * seed 42, traffic on. Long: run by `npm run verify:gate`.
  */
 import { describe, expect, it } from 'vitest';
+import { routeToAgent } from '../../src/app/doorRoute';
 import { CITY_BOT_TUNING, TrackBot } from '../../src/app/trackBot';
-import type { Lane, SimWorld, TrackSample } from '../../src/sim';
-import { alongLane, chainPoints, junctionCurve, laneChain, laneSpan, resample, type Pt } from '../../src/sim/city/route';
 import { createWorld, runUntil } from './helpers';
-
-/** The lanes from the car's to the wanted car's, and on along its lane past it (an open path ends in a stop: its end must not be the car). */
-function pathTo(sim: SimWorld, agent: number): TrackSample[] {
-  const city = sim.city!, traffic = sim.traffic!;
-  const p = sim.probe;
-  const from = city.nearestLane(p.x, p.z);
-  const to = traffic.lane[agent] as number;
-  if (to < 0) return [];
-  const chain = from === to ? [from] : laneChain(city.graph, from, to);
-  if (chain.length === 0) return [];
-  const raw: Pt[] = [];
-  chainPoints(city.graph, chain, raw);
-  const last = city.graph.lanes[to] as Lane;
-  const s0 = chain.length === 1 ? alongLane(last, p.x, p.z).s : 0;
-  const end = (traffic.s[agent] as number) + 80;
-  laneSpan(last, s0, Math.max(s0 + 5, Math.min(end, traffic.lanes.length[to] as number)), raw);
-  // past the lane's end: on through the junction the wanted car will take, or any
-  if (end > (traffic.lanes.length[to] as number)) {
-    const nxt = (traffic.next[agent] as number) >= 0 ? (traffic.next[agent] as number) : (last.next[0] ?? -1);
-    if (nxt >= 0) {
-      const next = city.graph.lanes[nxt] as Lane;
-      junctionCurve(last, next, raw);
-      laneSpan(next, 0, Math.min(end - (traffic.lanes.length[to] as number), traffic.lanes.length[nxt] as number), raw);
-    }
-  }
-  return resample(raw);
-}
 
 describe('steal to order (long)', () => {
   it('2.7 a naive hunter reaches the wanted car in most orders (the measurement; a human has the radar and the ring)', async () => {
@@ -61,7 +33,7 @@ describe('steal to order (long)', () => {
           replan -= 1 / 60;
           if (replan <= 0 && s.jobs.wantedAgent >= 0) {
             replan = 2;
-            bot.setPath(pathTo(s, s.jobs.wantedAgent));
+            bot.setPath(routeToAgent(s, s.jobs.wantedAgent));
           }
           bot.drive(s, c, 1 / 60);
         });

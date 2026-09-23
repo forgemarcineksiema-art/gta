@@ -47,6 +47,10 @@ export class Hud {
   private readonly driftAngle: HTMLElement;
   private readonly debug: HTMLElement;
   private readonly pause: HTMLElement;
+  /** The pause screen names the mute key and the sound's state. */
+  private readonly sound: HTMLElement;
+  private readonly soundKey: HTMLElement;
+  private readonly soundState: HTMLElement;
   private readonly hints: HTMLElement;
   private readonly toast: HTMLElement;
   private readonly lap: HTMLElement;
@@ -159,7 +163,11 @@ export class Hud {
 
     this.pause = el('div', 'hud__pause');
     // the build stamp: which build is on screen (package version + commit, `-dirty` if uncommitted)
-    this.pause.append(el('div', 'hud__pause-title', 'PAUSED'), el('div', 'hud__pause-sub', ''), el('div', 'hud__pause-build', `build ${__APP_VERSION__}`));
+    this.sound = el('div', 'hud__pause-sound');
+    this.soundKey = el('kbd', 'key', 'M');
+    this.soundState = el('span', 'hud__pause-sound-state', 'SOUND ON');
+    this.sound.append(this.soundKey, this.soundState);
+    this.pause.append(el('div', 'hud__pause-title', 'PAUSED'), el('div', 'hud__pause-sub', ''), this.sound, el('div', 'hud__pause-build', `build ${__APP_VERSION__}`));
     this.root.appendChild(this.pause);
 
     this.hints = el('div', 'hud__hints');
@@ -210,6 +218,13 @@ export class Hud {
     this.resetKey = k.reset;
     this.swapKeycap.textContent = this.swapKey;
     this.wreckedSub.textContent = `${this.swapKey} take a car  ·  ${this.resetKey} respawn`;
+  }
+
+  /** The mute key's label and whether the player muted the sound (the pause screen shows both). */
+  setSound(key: string, muted: boolean): void {
+    this.soundKey.textContent = key;
+    this.soundState.textContent = muted ? 'MUTED' : 'SOUND ON';
+    this.sound.classList.toggle('is-muted', muted);
   }
 
   setHintsVisible(v: boolean): void {

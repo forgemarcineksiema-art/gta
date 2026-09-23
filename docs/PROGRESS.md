@@ -2,6 +2,47 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M5.1
+
+Marcin: "lecisz z M5.1", with no playtest notes yet. The plan names M5.1 as
+the pass his notes drive; without them the scope is the gate's open items,
+set here and worked in this order:
+
+1. The single long frames (0.2–1 s at 4× CPU, open since M4): traced on
+   this machine, which is Marcin's MX330 laptop; the cause fixed or bounded.
+2. The quick `verify` back under a minute of tests: `traffic.test.ts`'s
+   drives over ~10 s move to `traffic.long.test.ts` (CLAUDE.md's rule);
+   nothing loosened, every pin kept.
+3. The jobs' placement off the time to control.
+4. The coin rings round the job markers (DESIGN.md §3.2: "rings round job
+   markers join in M5"; not built at the gate).
+5. A review of the M5 code against M5_PLAN §10's checklist, with the fixes.
+
+His notes, when they come, go first.
+
+### 1. The long frames: found and fixed
+
+Traced on this machine (MX330, Chrome's ANGLE on Direct3D 11, 4× CPU, the
+60 s perf route). Long-animation-frame entries showed the page's main
+thread idle through the stall (blocking 0 ms, the frame callback 31 ms,
+rendering started 1.55 s late); new WebGL programs appear only in the first
+6 s, so it is not shader compilation; the chunk streaming does not line up
+with it. A Chrome trace with the GPU categories caught three stalls of 336,
+372 and 643 ms, each inside one `CommandBuffer::Flush` in the GPU process,
+each after the frame's second `glBufferSubData`: a whole-buffer write into
+a buffer the GPU was still reading, which the D3D11 path waits out. three.js
+rewrites every per-frame instanced attribute (traffic, peds, markers,
+particles; 13 small uploads a frame) with `bufferSubData`.
+
+The fix (`render/Renderer.ts`, `orphanWholeBufferUpdates`): a whole-buffer
+update re-specifies the storage with `bufferData` (the driver orphans the
+old one); range updates keep `bufferSubData`. Measured by alternating runs
+with the swap injected in the page: long frames over 250 ms in 5 of 9 runs
+without (433–1,717 ms), 0 of 9 with (worst 217 ms), fps the same or better.
+Then `npm run perf` three times on the build: 56.9 / 55.7 / 56.6 fps, frame
+max 100 / 133 / 83 ms (the M5 gate's 200 / 1,017, M4's 917 / 517), step p95
+6.4–7.1 ms (`perf/m5.1-fix-*.json`).
+
 ## 2026-09-23 — M5, the launch minimum
 
 Marcin: carry out the whole M5 plan. Working autonomously per

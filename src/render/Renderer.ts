@@ -46,6 +46,30 @@ interface DynamicView {
 
 const MAX_DPR = 1.5;
 
+/**
+ * A whole-buffer update re-specifies the buffer's storage (`bufferData`, the
+ * driver "orphans" the old one) instead of writing into it (`bufferSubData`).
+ * three.js rewrites every per-frame instanced attribute (traffic, peds,
+ * markers, particles) in full with `bufferSubData`; on Chrome's ANGLE/D3D11
+ * path a write into a buffer the GPU is still reading made the GPU process
+ * wait for it, 0.3–1.7 s at random on the MX330: the M4 and M5 single long
+ * frames (M5.1 trace: the stall was inside one `glBufferSubData` of the
+ * frame's first flush, the page's main thread idle). Measured by alternating
+ * runs: long frames over 250 ms in 6 of 8 runs without, 0 of 9 with. Range
+ * updates (`updateRanges`) keep `bufferSubData`.
+ */
+function orphanWholeBufferUpdates(gl: WebGLRenderingContext | WebGL2RenderingContext): void {
+  const sub = gl.bufferSubData.bind(gl) as (...args: unknown[]) => void;
+  const data = gl.bufferData.bind(gl) as (target: number, src: AllowSharedBufferSource, usage: number) => void;
+  const patched = function (this: unknown, target: number, offset: number, src: AllowSharedBufferSource, srcOffset?: number, length?: number): void {
+    if (offset === 0 && srcOffset === undefined && length === undefined) data(target, src, gl.DYNAMIC_DRAW);
+    else if (srcOffset === undefined) sub(target, offset, src);
+    else if (length === undefined) sub(target, offset, src, srcOffset);
+    else sub(target, offset, src, srcOffset, length);
+  };
+  (gl as unknown as { bufferSubData: typeof patched }).bufferSubData = patched;
+}
+
 export class Renderer {
   readonly cityView: CityView | null;
   readonly billboards: Billboards | null;
@@ -113,6 +137,7 @@ export class Renderer {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.info.autoReset = false;
+    orphanWholeBufferUpdates(this.renderer.getContext());
     try {
       const gl = this.renderer.getContext();
       const ext = gl.getExtension('WEBGL_debug_renderer_info') as { UNMASKED_RENDERER_WEBGL: number } | null;

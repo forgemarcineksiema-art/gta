@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M5.5 slice 3: traffic with character
+
+Done: a driver per record (pace 0.85/1.0/1.1/1.18 of the limit × the class, a 0.9–1.6 s time gap, one in eight bad:
+0.6 s, a weave, junctions jumped after 3 s); following at the time gap behind what is ahead at its speed; a car's
+`shift` across its lane carried through the junction curves; the highway overtake and return; the flinch (brake,
+kerb, honk) at the player head-on; the pull-over for a lit unit and the unit going round; the pass round a dead car
+on the oncoming side (the M3 abandoned-car queue); the angry driver (one bumped in ten turns after the player,
+honking); the clone cap; traffic thinning to 60 % at heat 4–5. Pins drivers 3.1–3.5; verify 278 green; the
+limit/lane pin in traffic.long updated for the shift and the paces. The taxi and the bus ride on slice 19's bodies.
+
 ## 2026-09-23 — M5.5 slice 2: the goal line and the chain
 
 Done: `sim/run/goal.ts` (one goal, one point: the job; LOSE THEM, the door with a bag; the chain's step when it says

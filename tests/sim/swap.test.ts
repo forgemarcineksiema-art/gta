@@ -45,6 +45,9 @@ describe('car-swap', () => {
     run(sim, 0.5); // settle on the wheels before pushing
     const agent = traffic.spawnAt(lane, 40, 'compact', AgentState.Kinematic, -2.5);
     traffic.speed[agent] = 11;
+    // the M3 driver: the lane's limit, no weave (M5.5 drivers draw a pace and a temper at spawn)
+    traffic.pace[agent] = 1;
+    traffic.bad[agent] = 0;
     try {
       run(sim, 1, () => { push(sim, yaw, 11); });
       expect(sim.life.state.swapCandidate).toBe(agent);

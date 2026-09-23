@@ -4,6 +4,7 @@
  * `npm run test:long`, not by the quick `npm run verify` (CLAUDE.md).
  */
 import { describe, expect, it } from 'vitest';
+import { TRAFFIC } from '../../src/sim/traffic/tuning';
 import { CITY_BOT_TUNING, TrackBot } from '../../src/app/trackBot';
 import { AgentState, type Traffic } from '../../src/sim/traffic/Traffic';
 import type { LanePose } from '../../src/sim/traffic/lanes';
@@ -25,10 +26,14 @@ describe('traffic (long)', () => {
           if (traffic.state[a] !== AgentState.Kinematic || traffic.police[a] === 1) continue;
           const lane = traffic.lane[a] as number;
           traffic.lanes.positionAt(lane, traffic.s[a] as number, traffic.laneOffset[a] as number, pose, traffic.next[a]);
-          const dx = (traffic.x[a] as number) - pose.x;
-          const dz = (traffic.z[a] as number) - pose.z;
+          // M5.5: a driver's shift across the lane (a flinch, a pull-over, a pass, a lane change easing over)
+          const sh = traffic.shift[a] as number;
+          const dx = (traffic.x[a] as number) - (pose.x - Math.cos(pose.yaw) * sh);
+          const dz = (traffic.z[a] as number) - (pose.z + Math.sin(pose.yaw) * sh);
           expect(Math.hypot(dx, dz)).toBeLessThan(0.6);
-          expect(traffic.speed[a] as number).toBeLessThanOrEqual((traffic.lanes.limit[lane] as number) + 0.1);
+          // and its own share of the limit: the fastest pace and class, or an angry driver's
+          const share = (traffic.angryLeft[a] as number) > 0 ? TRAFFIC.angry.pace : Math.max(...TRAFFIC.pace.values) * Math.max(...Object.values(TRAFFIC.classPace));
+          expect(traffic.speed[a] as number).toBeLessThanOrEqual((traffic.lanes.limit[lane] as number) * share + 0.1);
         }
       }
       expect(traffic.count(AgentState.Kinematic)).toBeGreaterThan(10);

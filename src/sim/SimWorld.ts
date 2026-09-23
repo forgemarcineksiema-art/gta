@@ -288,6 +288,8 @@ export class SimWorld {
       probe.halfLength = he.z;
       this.traffic.playerColliderHandle = this.vehicle.collider.handle;
       this.police?.preStep(probe, FIXED_DT);
+      // the streets thin as the chase grows (DESIGN.md §13.8)
+      this.traffic.densityScale = TRAFFIC.densityByLevel[this.heat.level] ?? 1;
       this.traffic.step(probe, FIXED_DT, this.events);
     }
     this.mark?.(SimPhase.Traffic);

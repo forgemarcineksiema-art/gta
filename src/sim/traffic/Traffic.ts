@@ -132,9 +132,45 @@ export class Traffic {
   guardHops = 0;
   /** An order's wanted car (docs/M5_PLAN.md D7): never despawned or claimed while it is wanted; -1 none. */
   wanted = -1;
+  /**
+   * The drivers (docs/DESIGN.md §13.8): `pace` the share of the limit drawn at spawn, `gapT` the time gap kept
+   * to what is ahead, `bad` a bad driver; `shift` metres to the right of the lane the car is (a flinch, a
+   * pull-over, a pass round a dead car, the weave of a bad driver, a lane change easing over).
+   */
+  readonly pace: Float32Array;
+  readonly gapT: Float32Array;
+  readonly bad: Uint8Array;
+  readonly shift: Float32Array;
+  /** Seconds left of a flinch, a pull-over, an angry driver's temper. */
+  readonly flinchLeft: Float32Array;
+  readonly pullLeft: Float32Array;
+  readonly angryLeft: Float32Array;
+  /** Going round this dead car (-1 none), metres of the pass left. */
+  readonly passAgent: Int16Array;
+  /** Per lane: the other lane of the same carriageway (the highway), the lane the other way (a street); -1 none. */
+  readonly parallel: Int16Array;
+  readonly reverse: Int16Array;
+  /** Traffic's share of its target now (the world sets it from the heat, `densityByLevel`). */
+  densityScale = 1;
+  /** Counters for the pins: lane changes into the fast lane, pull-overs, flinches, passes round a dead car, spawns and spawns with a clone near. */
+  overtakes = 0;
+  pullOvers = 0;
+  flinches = 0;
+  gawks = 0;
+  spawns = 0;
+  clones = 0;
 
   private readonly transforms: TransformBuffer;
   private readonly target: number;
+  private readonly passLeft: Float32Array;
+  private readonly stuck: Float32Array;
+  private readonly laneCool: Float32Array;
+  /** The car that bounded the plan last step: the leader on the lane, the one in the corridor ahead. */
+  private readonly leaderAgent: Int16Array;
+  private readonly aheadAgent: Int16Array;
+  private clock = 0;
+  private playerX = 0;
+  private playerZ = 0;
   private readonly rng: () => number;
   private readonly nodes: RoadNode[];
   private readonly nodeHolders: Int32Array;
@@ -258,6 +294,29 @@ export class Traffic {
     this.plannerLane = new Int16Array(n);
     this.plannerNext = new Int16Array(n);
     this.plannerSpeed = new Float32Array(n);
+    this.pace = new Float32Array(n).fill(1);
+    this.gapT = new Float32Array(n).fill(1.2);
+    this.bad = new Uint8Array(n);
+    this.shift = new Float32Array(n);
+    this.flinchLeft = new Float32Array(n);
+    this.pullLeft = new Float32Array(n);
+    this.angryLeft = new Float32Array(n);
+    this.passAgent = new Int16Array(n).fill(-1);
+    this.passLeft = new Float32Array(n);
+    this.stuck = new Float32Array(n);
+    this.laneCool = new Float32Array(n);
+    this.leaderAgent = new Int16Array(n).fill(-1);
+    this.aheadAgent = new Int16Array(n).fill(-1);
+    const graphLanes = city.graph.lanes;
+    this.parallel = new Int16Array(graphLanes.length).fill(-1);
+    this.reverse = new Int16Array(graphLanes.length).fill(-1);
+    for (const lane of graphLanes) {
+      for (const other of graphLanes) {
+        if (other === lane) continue;
+        if (lane.highway && other.highway && other.from === lane.from && other.to === lane.to) this.parallel[lane.id] = other.id;
+        if (!lane.highway && !other.highway && other.from === lane.to && other.to === lane.from && other.special === lane.special) this.reverse[lane.id] = other.id;
+      }
+    }
     this.ramX = new Float32Array(n);
     this.ramZ = new Float32Array(n);
     this.ramSpeed = new Float32Array(n);
@@ -679,6 +738,8 @@ export class Traffic {
     this.damage[agent] = 0;
     this.justWrecked[agent] = 0;
     this.lastPlayerContactTick[agent] = -100000;
+    this.shift[agent] = 0;
+    this.passAgent[agent] = -1;
     this.paintSerial++;
     const q = M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, oldPose.yaw);
     this.transforms.writeBoth(this.slot[agent] as number, oldPose.x, 0.03, oldPose.z, q.x, q.y, q.z, q.w);
@@ -695,6 +756,9 @@ export class Traffic {
   }
 
   step(player: PlayerProbe, dt: number, events: EventLog): void {
+    this.clock += dt;
+    this.playerX = player.x;
+    this.playerZ = player.z;
     this.justWrecked.fill(0);
     this.despawn(player);
     this.tow(player, dt);
@@ -705,6 +769,7 @@ export class Traffic {
     for (let i = 0; i < this.capacity; i++) {
       const st = this.state[i];
       if (st === AgentState.Free) continue;
+      if (st === AgentState.Kinematic || st === AgentState.Physical) this.behave(i, player, dt, events);
       this.chooseNext(i);
       if (st === AgentState.Kinematic) this.moveKinematic(i, this.plan(i, player, dt, events), dt);
       if (st === AgentState.Kinematic || st === AgentState.Physical) this.honk(i, player, dt, events);
@@ -751,28 +816,48 @@ export class Traffic {
     const s = this.s[i] as number;
     let limit = this.lanes.limit[lane] as number;
     const chasing = (this.plannerSpeed[i] as number) > 0;
+    const civilian = this.police[i] === 0 && !chasing;
     if (chasing) limit = this.plannerSpeed[i] as number;
+    // the driver (DESIGN.md §13.8): their share of the limit and the class's, or an angry one's
+    else if (this.police[i] === 0) limit *= this.drive(i);
     if (nxt >= 0 && s >= len - 6 && this.turn[i] === 1) limit = t.speedJunction;
+    const yaw = this.yaw[i] as number;
+    const fx = Math.sin(yaw), fz = Math.cos(yaw);
     let gap = this.leaderGap(i);
     let blocker = gap < 1e8 ? 1 : 0;
+    let aheadSpeed = gap < 1e8 ? this.speedAlong(this.leaderAgent[i] as number, fx, fz) : 0;
     const pGap = chasing && this.hasBody(i) ? Infinity : this.playerGapOf(i, player);
-    if (pGap < gap) { gap = pGap; blocker = 2; }
+    if (pGap < gap) { gap = pGap; blocker = 2; aheadSpeed = Math.max(0, player.vx * fx + player.vz * fz); }
     const aGap = this.aheadGap(i);
-    if (aGap < gap) { gap = aGap; blocker = 3; }
+    if (aGap < gap) { gap = aGap; blocker = 3; aheadSpeed = this.speedAlong(this.aheadAgent[i] as number, fx, fz); }
     let desired = limit;
-    if (gap < 1e8) desired = Math.min(limit, Math.sqrt(2 * t.brake * Math.max(0, gap - t.gapMin)));
+    if (gap < 1e8) {
+      // stop in time for what is ahead at its speed, and keep this driver's time gap behind it
+      const room = Math.max(0, gap - t.gapMin);
+      desired = Math.min(limit, Math.sqrt(aheadSpeed * aheadSpeed + 2 * t.brake * room), room / (this.gapT[i] as number));
+    }
     if (desired >= limit) blocker = 0;
+    if (civilian && (this.flinchLeft[i] as number) > 0) {
+      desired = 0;
+      blocker = 2;
+    } else if (civilian && (this.pullLeft[i] as number) > 0 && desired > t.pullOver.speed) {
+      desired = t.pullOver.speed;
+    } else if (civilian && (this.passAgent[i] as number) >= 0 && -(this.shift[i] as number) < 2.5 && desired > 2) {
+      // going round a dead car: a crawl until it is out beside it
+      desired = 2;
+    }
     // A lent body braking for the line creeps a little past it; within the tolerance it is still at the line.
     const entering = nxt >= 0 && s <= len + STOP_TOLERANCE;
     if (!entering) this.wait[i] = 0;
+    const waitLimit = this.bad[i] === 1 ? t.temper.badClaimAfter : t.junctionWait;
     if (entering && !this.mayEnter(i, player)) {
       const w = this.wait[i] as number;
-      if (w < t.junctionWait && w + dt >= t.junctionWait) {
+      if (w < waitLimit && w + dt >= waitLimit) {
         this.waitedPast++;
         events.push('honk', 0, this.x[i] as number, 0.03, this.z[i] as number, i);
       }
       this.wait[i] = w + dt;
-      if (w + dt < t.junctionWait) {
+      if (w + dt < waitLimit) {
         const stop = Math.sqrt(2 * t.brake * Math.max(0, len - 0.2 - s));
         if (stop < desired) { desired = stop; blocker = 4; }
       }
@@ -788,7 +873,8 @@ export class Traffic {
   private moveKinematic(i: number, desired: number, dt: number): void {
     const t = this.tuning;
     const speed = this.speed[i] as number;
-    this.speed[i] = speed < desired ? Math.min(desired, speed + t.accel * dt) : Math.max(0, Math.max(desired, speed - t.brake * dt));
+    const brake = (this.flinchLeft[i] as number) > 0 ? t.flinch.brake : t.brake;
+    this.speed[i] = speed < desired ? Math.min(desired, speed + t.accel * dt) : Math.max(0, Math.max(desired, speed - brake * dt));
     const lane = this.lane[i] as number;
     const len = this.lanes.length[lane] as number;
     const nxt = this.next[i] as number;
@@ -825,6 +911,8 @@ export class Traffic {
   private switchLane(i: number, s: number): void {
     const nxt = this.next[i] as number;
     this.retargetOffset(i, nxt);
+    // a pass round a dead car is on the lane it was stopped on
+    this.passAgent[i] = -1;
     this.lane[i] = nxt;
     this.next[i] = -1;
     this.turn[i] = 0;
@@ -866,6 +954,7 @@ export class Traffic {
       desired = this.freeSteer[i] === 1 ? (this.ramSpeed[i] as number) : Math.min(desired, this.ramSpeed[i] as number);
     } else {
       this.lanes.positionAt(lane, (this.s[i] as number) + CARROT, this.laneOffset[i] as number, this.pose, this.next[i]);
+      this.addShift(i, this.pose);
     }
     const dx = this.pose.x - (this.x[i] as number);
     const dz = this.pose.z - (this.z[i] as number);
@@ -907,11 +996,16 @@ export class Traffic {
     const lane = this.lane[i] as number;
     const count = this.laneFill[lane] as number;
     const base = lane * MAX_ON_LANE;
+    this.leaderAgent[i] = -1;
     let self = -1;
     for (let k = 0; k < count; k++) if (this.laneIndex[base + k] === i) { self = k; break; }
-    if (self >= 0 && self + 1 < count) {
-      const other = this.laneIndex[base + self + 1] as number;
-      return (this.s[other] as number) - (this.s[i] as number) - CAR_GAP;
+    if (self >= 0) {
+      for (let k = self + 1; k < count; k++) {
+        const other = this.laneIndex[base + k] as number;
+        if (this.passable(i, other)) continue;
+        this.leaderAgent[i] = other;
+        return (this.s[other] as number) - (this.s[i] as number) - CAR_GAP;
+      }
     }
     const nxt = this.next[i] as number;
     if (nxt < 0) return Infinity;
@@ -920,10 +1014,27 @@ export class Traffic {
     for (let k = 0; k < nCount; k++) {
       const other = this.laneIndex[nBase + k] as number;
       if ((this.s[other] as number) > 20) break;
+      if (this.passable(i, other)) continue;
       const remain = (this.lanes.length[lane] as number) - (this.s[i] as number);
+      this.leaderAgent[i] = other;
       return remain + this.lanes.connectionLength(lane, nxt, this.laneOffset[i]) + (this.s[other] as number) - CAR_GAP;
     }
     return Infinity;
+  }
+
+  /** What a car does not wait behind: the dead car it is going round; for a unit on a chase, a car pulling over for it. */
+  private passable(i: number, other: number): boolean {
+    if (other === this.passAgent[i]) return true;
+    return this.police[i] === 1 && (this.plannerSpeed[i] as number) > 0 && this.police[other] === 0 && (this.pullLeft[other] as number) > 0;
+  }
+
+  /** An agent's speed along a heading, never below 0 (a car crossing is not going our way); 0 for none. */
+  private speedAlong(j: number, fx: number, fz: number): number {
+    if (j < 0) return 0;
+    const st = this.state[j];
+    if (st !== AgentState.Kinematic && st !== AgentState.Physical) return 0;
+    const yaw = this.yaw[j] as number;
+    return Math.max(0, (this.speed[j] as number) * (Math.sin(yaw) * fx + Math.cos(yaw) * fz));
   }
 
   /** Along-lane distance to the player when the player is the leader. The stop band is `gapMin`. */
@@ -932,7 +1043,7 @@ export class Traffic {
     this.lanes.projectPath(lane, this.next[i] as number, player.x, player.z, this.proj);
     if (this.proj.switched) return Infinity;
     const along = this.proj.s - (this.s[i] as number);
-    const lateral = this.proj.lateral - (this.laneOffset[i] as number);
+    const lateral = this.proj.lateral - (this.laneOffset[i] as number) - (this.shift[i] as number);
     if (along > 0 && along < this.tuning.playerGap && Math.abs(lateral) < this.tuning.playerLateral) return along;
     return Infinity;
   }
@@ -948,15 +1059,16 @@ export class Traffic {
     const rz = Math.sin(yaw);
     const half = this.tuning.playerLateral;
     let gap = Infinity;
+    this.aheadAgent[i] = -1;
     for (let j = 0; j < this.capacity; j++) {
-      if (j === i || this.state[j] === AgentState.Free) continue;
+      if (j === i || this.state[j] === AgentState.Free || this.passable(i, j)) continue;
       const dx = (this.x[j] as number) - x;
       const dz = (this.z[j] as number) - z;
       const along = dx * fx + dz * fz;
       if (along < 2 || along > 14) continue;
       if (Math.abs(dx * rx + dz * rz) > half) continue;
       const spare = along - CAR_GAP;
-      if (spare < gap) gap = spare;
+      if (spare < gap) { gap = spare; this.aheadAgent[i] = j; }
     }
     return gap;
   }
@@ -966,7 +1078,7 @@ export class Traffic {
   private mayEnter(i: number, player: PlayerProbe): boolean {
     const t = this.tuning;
     if (this.forced[i] === 1) return true;
-    if ((this.wait[i] as number) >= t.junctionWait) {
+    if ((this.wait[i] as number) >= (this.bad[i] === 1 ? t.temper.badClaimAfter : t.junctionWait)) {
       this.forced[i] = 1;
       return true;
     }
@@ -1112,6 +1224,21 @@ export class Traffic {
     }
     const outs = this.lanes.outs(lane);
     const uturn = this.lanes.uturn(lane);
+    // an angry driver takes the way out nearest the player (DESIGN.md §13.8)
+    if ((this.angryLeft[i] as number) > 0 && this.police[i] === 0) {
+      let best = -1, bestD = Infinity;
+      for (let k = 0; k < outs.length; k++) {
+        const id = outs[k] as number;
+        if (id === uturn) continue;
+        const d = ((this.lanes.midX[id] as number) - this.playerX) ** 2 + ((this.lanes.midZ[id] as number) - this.playerZ) ** 2;
+        if (d < bestD) { bestD = d; best = id; }
+      }
+      if (best >= 0) {
+        this.next[i] = best;
+        this.turn[i] = this.lanes.straightThrough(lane, best) ? 0 : 1;
+        return;
+      }
+    }
     // Highway cars mostly keep their lane: a uniform pick weaves across the carriageway and drains the loop.
     if (this.isHighway(lane) && this.rng() < this.tuning.highwayKeepLane) {
       const off = this.lanes.offset[lane] as number;
@@ -1458,6 +1585,7 @@ export class Traffic {
 
   private place(i: number, lane: number, s: number, kind: number, offset: number, state: AgentState, paint: number): void {
     this.state[i] = state;
+    this.drawDriver(i);
     this.lights[i] = 0;
     this.police[i] = 0;
     this.clearPolicePlan(i);
@@ -1539,7 +1667,7 @@ export class Traffic {
   }
 
   private spawn(player: PlayerProbe): void {
-    for (let n = 0; n < 4 && this.alive() < this.target; n++) {
+    for (let n = 0; n < 4 && this.alive() < this.target * this.densityScale; n++) {
       if (!this.trySpawn(player)) return;
     }
   }
@@ -1566,7 +1694,11 @@ export class Traffic {
       const roll = this.rng();
       const w = t.kindWeights;
       const kind = roll < w.compact ? KIND_INDEX.compact : roll < w.compact + w.muscle ? KIND_INDEX.muscle : KIND_INDEX.heavy;
-      const paint = PAINTS[(this.rng() * PAINTS.length) | 0] as number;
+      let paint = PAINTS[(this.rng() * PAINTS.length) | 0] as number;
+      // no two of a class in one paint near each other (GTA's clone cap)
+      for (let r = 0; r < 6 && this.cloneNear(kind, paint, this.pose.x, this.pose.z); r++) paint = PAINTS[(this.rng() * PAINTS.length) | 0] as number;
+      if (this.cloneNear(kind, paint, this.pose.x, this.pose.z)) this.clones++;
+      this.spawns++;
       this.place(i, lane, s, kind, offset, AgentState.Kinematic, paint);
       return true;
     }
@@ -1641,6 +1773,9 @@ export class Traffic {
           const dz = (this.z[j] as number) - (this.z[i] as number);
           const dist = Math.hypot(dx, dz);
           if (dist >= CAR_GAP) continue;
+          // side by side (a pass, a pull-over, a lane change easing over): not in each other's spacing
+          const across = Math.abs(dx * -Math.cos(this.yaw[i] as number) + dz * Math.sin(this.yaw[i] as number));
+          if (across > (this.halfW[this.kind[i] as number] as number) + (this.halfW[this.kind[j] as number] as number) + 0.3) continue;
           const same = this.lane[i] === this.lane[j];
           const jAhead = same
             ? ((this.s[j] as number) > (this.s[i] as number) || ((this.s[j] as number) === (this.s[i] as number) && j < i))
@@ -1673,6 +1808,7 @@ export class Traffic {
     const lane = this.lane[i] as number;
     if (lane < 0) return;
     this.lanes.positionAt(lane, this.s[i] as number, this.laneOffset[i] as number, this.pose, this.next[i]);
+    this.addShift(i, this.pose);
     this.x[i] = this.pose.x;
     this.z[i] = this.pose.z;
     this.yaw[i] = this.pose.yaw;
@@ -1704,6 +1840,257 @@ export class Traffic {
     const kind = this.kind[i] as number;
     return Math.abs(side) <= (this.halfW[kind] as number) + player.halfWidth
       && Math.abs(along) <= (this.halfL[kind] as number) + player.halfLength;
+  }
+
+  /** Metres to the right of a pose, the car's shift across its lane. */
+  private addShift(i: number, pose: LanePose): void {
+    const sh = this.shift[i] as number;
+    if (sh === 0) return;
+    pose.x -= Math.cos(pose.yaw) * sh;
+    pose.z += Math.sin(pose.yaw) * sh;
+  }
+
+  /** The driver at spawn: the pace, the time gap, a bad one now and then. */
+  private drawDriver(i: number): void {
+    const t = this.tuning;
+    const roll = this.rng();
+    let acc = 0, pace = t.pace.values[t.pace.values.length - 1] ?? 1;
+    for (let k = 0; k < t.pace.values.length; k++) {
+      acc += t.pace.weights[k] ?? 0;
+      if (roll < acc) { pace = t.pace.values[k] ?? 1; break; }
+    }
+    this.pace[i] = pace;
+    const bad = this.rng() < t.temper.badShare;
+    this.bad[i] = bad ? 1 : 0;
+    this.gapT[i] = bad ? t.temper.badGap : t.temper.gapTime[0] + this.rng() * (t.temper.gapTime[1] - t.temper.gapTime[0]);
+    this.shift[i] = 0;
+    this.flinchLeft[i] = 0;
+    this.pullLeft[i] = 0;
+    this.angryLeft[i] = 0;
+    this.passAgent[i] = -1;
+    this.passLeft[i] = 0;
+    this.stuck[i] = 0;
+    this.laneCool[i] = 0;
+    this.leaderAgent[i] = -1;
+    this.aheadAgent[i] = -1;
+  }
+
+  /** This driver's share of the lane's limit: the pace drawn at spawn and the class's, or the angry driver's. */
+  private drive(i: number): number {
+    const t = this.tuning;
+    if ((this.angryLeft[i] as number) > 0) return t.angry.pace;
+    return (this.pace[i] as number) * (t.classPace[KINDS[this.kind[i] as number] as CarId] ?? 1);
+  }
+
+  /** A car nobody drives any more: a wreck, an abandoned car. */
+  private dead(j: number): boolean {
+    const st = this.state[j];
+    return st === AgentState.Wrecked || st === AgentState.Abandoned;
+  }
+
+  /**
+   * A driver's reactions this step (DESIGN.md §13.8), before the plan: the flinch at the player coming
+   * head-on, the pull-over for a lit unit behind, the angry driver, the pass round a dead car, the
+   * overtake on the highway; they set where across its lane the car wants to be, and the caps the plan
+   * reads. A unit on a chase only swings out round a car pulling over for it; a guided car keeps its lane.
+   */
+  private behave(i: number, player: PlayerProbe, dt: number, events: EventLog): void {
+    const t = this.tuning;
+    const lane = this.lane[i] as number;
+    if (lane < 0) return;
+    const len = this.lanes.length[lane] as number;
+    const s = this.s[i] as number;
+    if (this.police[i] === 1 || (this.plannerSpeed[i] as number) > 0) {
+      const out = this.police[i] === 1 && (this.plannerSpeed[i] as number) > 0 && this.pullingAhead(i, lane, s);
+      this.ease(i, out ? -t.pullOver.offset : 0, dt);
+      return;
+    }
+    this.flinchLeft[i] = Math.max(0, (this.flinchLeft[i] as number) - dt);
+    this.pullLeft[i] = Math.max(0, (this.pullLeft[i] as number) - dt);
+    this.angryLeft[i] = Math.max(0, (this.angryLeft[i] as number) - dt);
+    this.laneCool[i] = Math.max(0, (this.laneCool[i] as number) - dt);
+    const yaw = this.yaw[i] as number;
+    const fx = Math.sin(yaw), fz = Math.cos(yaw);
+    const x = this.x[i] as number, z = this.z[i] as number;
+    const speed = this.speed[i] as number;
+
+    // the flinch: the player coming at it head-on in its lane
+    const dx = player.x - x, dz = player.z - z;
+    const along = dx * fx + dz * fz;
+    const side = -dx * Math.cos(yaw) + dz * Math.sin(yaw) - (this.shift[i] as number);
+    const toward = -(player.vx * fx + player.vz * fz);
+    if (along > 3 && along < 60 && Math.abs(side) < 2.8 && toward > 4 && along / (speed + toward) < t.flinch.seconds) {
+      if ((this.flinchLeft[i]) <= 0) {
+        this.flinches++;
+        if ((this.honkCooldown[i] as number) <= 0) {
+          events.push('honk', 0, x, 0.03, z, i);
+          this.honkCooldown[i] = t.honkCooldown;
+        }
+      }
+      this.flinchLeft[i] = t.flinch.hold;
+    }
+
+    // the pull-over: a lit police car close behind on its lane
+    if (this.litBehind(i, lane, s)) {
+      if ((this.pullLeft[i]) <= 0) this.pullOvers++;
+      this.pullLeft[i] = t.pullOver.hold;
+    }
+
+    // the angry driver: bumped by the player, one in ten goes after them
+    if ((this.playerDv[i] as number) > 1.5 && (this.angryLeft[i]) <= 0 && this.rng() < t.angry.share) {
+      this.angryLeft[i] = t.angry.seconds;
+      this.honkCooldown[i] = 0;
+    }
+    if ((this.angryLeft[i]) > 0 && (this.honkCooldown[i] as number) <= 0 && dx * dx + dz * dz < 40 * 40) {
+      events.push('honk', 0, x, 0.03, z, i);
+      this.honkCooldown[i] = t.angry.honkEvery;
+    }
+
+    // the gawk: stopped behind a dead car, then round it on the oncoming side when that is clear
+    const pass = this.passAgent[i] as number;
+    if (pass >= 0) {
+      this.passLeft[i] = (this.passLeft[i] as number) - speed * dt;
+      if ((this.passLeft[i]) <= 0 || !this.dead(pass)) this.passAgent[i] = -1;
+    } else {
+      const b = this.blocker[i] === 1 ? this.leaderAgent[i] as number : this.blocker[i] === 3 ? this.aheadAgent[i] as number : -1;
+      const at = b >= 0 && this.dead(b) ? ((this.x[b] as number) - x) * fx + ((this.z[b] as number) - z) * fz - CAR_GAP : Infinity;
+      if (speed < 2 && at < t.gapMin + 2.5) {
+        this.stuck[i] = (this.stuck[i] as number) + dt;
+        const rev = this.reverse[lane] as number;
+        if ((this.stuck[i]) >= t.gawk.wait && rev >= 0 && this.oncomingClear(rev, (this.lanes.length[rev] as number) - s, t.gawk.clearAhead)) {
+          const ahead = ((this.x[b] as number) - x) * fx + ((this.z[b] as number) - z) * fz;
+          this.passAgent[i] = b;
+          this.passLeft[i] = Math.max(0, ahead) + 12;
+          this.stuck[i] = 0;
+          this.gawks++;
+        }
+      } else {
+        this.stuck[i] = 0;
+      }
+    }
+
+    // the overtake: two lanes a direction; into the other lane past a slower car, back when clear
+    const other = this.parallel[lane] as number;
+    if (other >= 0 && (this.laneCool[i]) <= 0 && (this.flinchLeft[i]) <= 0 && (this.pullLeft[i]) <= 0
+      && (this.passAgent[i] as number) < 0 && s > 10 && s < len - t.overtake.endClear && (this.next[i] as number) < 0) {
+      const slowLane = (this.lanes.offset[lane] as number) > (this.lanes.offset[other] as number);
+      const want = (this.lanes.limit[lane] as number) * this.drive(i);
+      const so = s * (this.lanes.length[other] as number) / len;
+      const room = Math.max(speed, want) * t.overtake.clear + 8;
+      if (slowLane) {
+        if (this.slowerAhead(lane, s, want - t.overtake.slowerBy, t.overtake.look) && this.laneClear(other, so, room)) {
+          this.changeLane(i, other, so);
+          this.overtakes++;
+        }
+      } else if (this.laneClear(other, so, room) && !this.slowerAhead(other, so, want - t.overtake.slowerBy, t.overtake.look)) {
+        this.changeLane(i, other, so);
+      }
+    }
+
+    // where across the lane it wants to be
+    const kind = KINDS[this.kind[i] as number] as CarId;
+    let target = 0;
+    if ((this.passAgent[i] as number) >= 0) target = -2 * (this.lanes.offset[this.lane[i] as number] as number);
+    else if ((this.flinchLeft[i]) > 0) target = t.flinch.offset;
+    else if ((this.pullLeft[i]) > 0 && kind !== 'heavy') target = t.pullOver.offset;
+    else if (this.bad[i] === 1) target = t.temper.badDrift * Math.sin(this.clock * 0.9 + i * 1.7);
+    this.ease(i, target, dt);
+  }
+
+  /** The shift toward where the car wants to be across its lane, at `shiftRate`. */
+  private ease(i: number, target: number, dt: number): void {
+    const cur = this.shift[i] as number;
+    if (cur === target) return;
+    const step = this.tuning.shiftRate * dt;
+    this.shift[i] = cur + Math.max(-step, Math.min(step, target - cur));
+  }
+
+  /** A lit police car (a light bar on, or a unit on a plan) behind on this lane within `pullOver.behind`. */
+  private litBehind(i: number, lane: number, s: number): boolean {
+    const count = this.laneFill[lane] as number;
+    const base = lane * MAX_ON_LANE;
+    const reach = this.tuning.pullOver.behind;
+    for (let k = 0; k < count; k++) {
+      const j = this.laneIndex[base + k] as number;
+      if (j === i) break;
+      if (s - (this.s[j] as number) > reach) continue;
+      if (this.police[j] !== 1) continue;
+      const st = this.state[j];
+      if (st !== AgentState.Kinematic && st !== AgentState.Physical) continue;
+      if (this.lights[j] === 1 || (this.plannerSpeed[j] as number) > 0) return true;
+    }
+    return false;
+  }
+
+  /** A civilian pulling over just ahead of this unit on its lane: the unit swings out round it. */
+  private pullingAhead(i: number, lane: number, s: number): boolean {
+    const count = this.laneFill[lane] as number;
+    const base = lane * MAX_ON_LANE;
+    for (let k = 0; k < count; k++) {
+      const j = this.laneIndex[base + k] as number;
+      if (j === i || this.police[j] === 1) continue;
+      const d = (this.s[j] as number) - s;
+      if (d > 0 && d < 25 && (this.pullLeft[j] as number) > 0) return true;
+    }
+    return false;
+  }
+
+  /** Nothing on the lane the other way from `sAt` (in that lane's metres) to `ahead` m before it. */
+  private oncomingClear(rev: number, sAt: number, ahead: number): boolean {
+    const count = this.laneFill[rev] as number;
+    const base = rev * MAX_ON_LANE;
+    for (let k = 0; k < count; k++) {
+      const s = this.s[this.laneIndex[base + k] as number] as number;
+      if (s > sAt - ahead && s < sAt + 5) return false;
+    }
+    return true;
+  }
+
+  /** A car on a lane within `look` m ahead of `s` slower than `below`. */
+  private slowerAhead(lane: number, s: number, below: number, look: number): boolean {
+    const count = this.laneFill[lane] as number;
+    const base = lane * MAX_ON_LANE;
+    for (let k = 0; k < count; k++) {
+      const j = this.laneIndex[base + k] as number;
+      const d = (this.s[j] as number) - s;
+      if (d <= 1 || d > look) continue;
+      if ((this.speed[j] as number) < below) return true;
+    }
+    return false;
+  }
+
+  /** Nothing on a lane within `room` m of `s`, ahead or behind. */
+  private laneClear(lane: number, s: number, room: number): boolean {
+    const count = this.laneFill[lane] as number;
+    const base = lane * MAX_ON_LANE;
+    for (let k = 0; k < count; k++) {
+      if (Math.abs((this.s[this.laneIndex[base + k] as number] as number) - s) < room) return false;
+    }
+    return true;
+  }
+
+  /** Over to the other lane of the carriageway, where it is: the shift eases it across. */
+  private changeLane(i: number, to: number, s: number): void {
+    const from = this.lane[i] as number;
+    this.shift[i] = (this.shift[i] as number) + (this.lanes.offset[from] as number) - (this.lanes.offset[to] as number);
+    this.releaseHolds(i);
+    this.lane[i] = to;
+    this.s[i] = s;
+    this.next[i] = -1;
+    this.turn[i] = 0;
+    this.wait[i] = 0;
+    this.laneCool[i] = this.tuning.overtake.cooldown;
+  }
+
+  /** A car of this class in this paint within `cloneDistance` of a point. */
+  private cloneNear(kind: number, paint: number, x: number, z: number): boolean {
+    const r2 = this.tuning.cloneDistance * this.tuning.cloneDistance;
+    for (let j = 0; j < this.capacity; j++) {
+      if (this.state[j] === AgentState.Free || this.kind[j] !== kind || this.paint[j] !== paint) continue;
+      const dx = (this.x[j] as number) - x, dz = (this.z[j] as number) - z;
+      if (dx * dx + dz * dz < r2) return true;
+    }
+    return false;
   }
 
   private honk(i: number, player: PlayerProbe, dt: number, events: EventLog): void {

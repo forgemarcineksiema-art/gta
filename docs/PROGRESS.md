@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M5.5 slice 10: the time trial on a coin line
+
+Done: four time trials (gold markers), placed after the sixteen jobs (those unchanged) from a free corner in each
+district in turn (Crown Heights has none left clear, so the Works has two) to a lane point 1.1–1.9 km on by path.
+Starting one lays the coin line to the finish, no heat; the finish reaches 12 m across the road; the time wins gold,
+silver or bronze (the path at 24, 20 and 16.5 m/s) paying 8,000 / 5,000 / 3,000 into the bag, the clean line's tip
+on top; slower than bronze fails. The HUD runs the time with the best medal still in reach; the card lists the three
+times and your best; the best medal per trial is kept, saved (a field added within save v2) and on the wall's
+DAILIES page. Jobs re-baked (20 defs). Pins 10.1–10.3.
+
 ## 2026-09-23 — M5.5 slice 9: the helicopter
 
 Done: from heat level 4, while a pursuit is on, a police helicopter flies in from the island's edge (the radio: AIR

@@ -71,6 +71,8 @@ export interface SaveDoc {
   /** The first quarter hour's chain (M5.5 slice 2): the six steps as bits, ticked in any order; the BORROW hint's appearances. */
   chain: number;
   borrowHints: number;
+  /** The time trials' best medals (M5.5 slice 10), a digit 0..3 per trial in the defs' order; '' for none. */
+  medals: string;
 }
 
 /** The current document's type under the name the app and the tests used since M5. */
@@ -97,6 +99,7 @@ function defaults(): SaveDoc {
     caches: { date: '', found: '' },
     chain: 0,
     borrowHints: 0,
+    medals: '',
   };
 }
 
@@ -146,6 +149,7 @@ export function serialize(save: SaveDoc): string {
     caches: { date: save.caches.date, found: save.caches.found },
     chain: save.chain,
     borrowHints: save.borrowHints,
+    medals: save.medals,
   });
 }
 
@@ -237,6 +241,9 @@ function sanitize(raw: Record<string, unknown>): SaveDoc {
   out.chain = typeof chain === 'number' && Number.isInteger(chain) && chain >= 0 && chain <= 63 ? chain : 0;
   const hints = raw['borrowHints'];
   out.borrowHints = typeof hints === 'number' && Number.isInteger(hints) && hints >= 0 && hints <= 9 ? hints : 0;
+  // added within v2: a document without it has no medals
+  const medals = raw['medals'];
+  out.medals = typeof medals === 'string' && /^[0-3]{0,16}$/.test(medals) ? medals : '';
   return out;
 }
 
@@ -291,6 +298,9 @@ export function collect(sim: SimWorld, into: SaveDoc): void {
   }
   into.chain = run.chain;
   into.borrowHints = run.borrowHints;
+  let medals = '';
+  for (const d of sim.jobs.defs) if (d.kind === 'trial') medals += String(sim.jobs.medals.get(d.id) ?? 0);
+  into.medals = medals.replace(/0+$/, '');
 }
 
 /** A document into a freshly built world, once, before the first step: the garage car is driven out at once. */
@@ -304,6 +314,12 @@ export function apply(sim: SimWorld, save: SaveDoc): void {
   run.playSeconds = save.playSeconds;
   run.chain = save.chain;
   run.borrowHints = save.borrowHints;
+  let k = 0;
+  for (const d of sim.jobs.defs) {
+    if (d.kind !== 'trial') continue;
+    const m = Number(save.medals[k++] ?? '0');
+    if (m > 0) sim.jobs.medals.set(d.id, m);
+  }
   garage.owned.clear();
   garage.owned.add('muscle');
   for (const id of save.owned) garage.owned.add(id);

@@ -317,5 +317,42 @@ export function placeJobs(city: City, seed: number, lanes: LaneTables): JobDef[]
       });
     }
   }
+  // the time trials: from a free corner in each district in turn to a lane point 1.1–1.9 km on by path (the
+  // nearest to the middle of that band), the coins laid along it when it starts
+  const tr = cfg.trial;
+  const finishes: JobTarget[] = city.graph.lanes.filter((l) => !l.highway || l.points.every((p) => (p.y ?? 0) === 0)).map((l) => {
+    const len = lanes.length[l.id] as number, mid = { x: 0, z: 0, yaw: 0 };
+    lanes.positionAt(l.id, len / 2, 0, mid);
+    return { x: mid.x, z: mid.z, lane: l.id, s: len / 2 };
+  });
+  const trials: Array<{ c: Candidate; target: JobTarget; length: number }> = [];
+  // round the districts; one with no clear corner left (Crown Heights, its corners taken or built up) gives its turn on
+  for (let k = 0; k < 12 && trials.length < cfg.counts.trial; k++) {
+    const [sx, sz] = [[-1, -1], [1, -1], [-1, 1], [1, 1]][k % 4] as [number, number];
+    const pool = inner.filter((c) => c.x * sx > 60 && c.z * sz > 60);
+    const start = (rng() * Math.max(1, pool.length)) | 0;
+    for (let i = 0; i < pool.length; i++) {
+      const c = pool[(start + i) % pool.length] as Candidate;
+      if (picked.includes(c) || !gapOk(c) || !clear(city, c)) continue;
+      let best: JobTarget | null = null, bestLen = 0, bestErr = Infinity;
+      for (const t of finishes) {
+        const p = lanePathTo(city, lanes, c.x, c.z, t);
+        if (p.length < tr.minPath || p.length > tr.maxPath) continue;
+        const err = Math.abs(p.length - (tr.minPath + tr.maxPath) / 2);
+        if (err < bestErr) { bestErr = err; best = t; bestLen = p.length; }
+      }
+      if (!best) continue;
+      picked.push(c);
+      trials.push({ c, target: best, length: bestLen });
+      break;
+    }
+  }
+
+  for (const t of trials) {
+    defs.push({
+      id: defs.length + 1, kind: 'trial', x: t.c.x, z: t.c.z, yaw: t.c.yaw, targetX: t.target.x, targetZ: t.target.z, level: 0, descriptor: -1,
+      payout: tr.pay[2] as number, limitSeconds: Math.round(t.length / (tr.speeds[0] as number)), heat: 0,
+    });
+  }
   return defs;
 }

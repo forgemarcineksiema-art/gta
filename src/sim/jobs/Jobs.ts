@@ -16,6 +16,10 @@
  *   stage. A wreck (stage 4) cannot arrive; the clock fails it.
  * - escape: the heat rises to the level's threshold and the police have the
  *   player at once; the `escape` event pays `bounty × level`. No clock.
+ * - trial (M5.5 slice 10): the clock starts at once, no heat, the coins lay the
+ *   line to a finish across the road; crossing it pays by the medal the time
+ *   wins (gold, silver, bronze), the best medal per trial is kept; slower than
+ *   bronze fails it.
  *
  * Money goes into the bag through the `jobDone` event (`Run` reads it). While
  * the cold open runs only its own marker is live. No allocation per step.
@@ -28,7 +32,7 @@ import { alongLane, laneChain } from '../city/route';
 import type { Lane } from '../city/roads';
 import { AgentState, type PlayerProbe } from '../traffic/Traffic';
 import { CAR_IDS } from '../vehicle/presets';
-import type { JobDef } from './catalog';
+import { trialMedal, type JobDef } from './catalog';
 import { markerRingCoins, pointTarget } from './place';
 import { goalFor, newGoal } from '../run/goal';
 
@@ -52,6 +56,9 @@ export class Jobs {
   /** The last job's pay into the bag (the HUD's result line), and whether every coin of its route was taken (the tip). */
   lastPaid = 0;
   lastTip = false;
+  /** The last trial's medal (3 gold .. 1 bronze), and the best per trial def id (saved). */
+  lastMedal = 0;
+  readonly medals = new Map<number, number>();
   /** Ensures run so far for this hunt that repainted a car, and that spawned one (the slice-2 measurement). */
   repaints = 0;
   spawns = 0;
@@ -156,10 +163,20 @@ export class Jobs {
       this.sim.events.push('jobDone', d.payout, probe.x, 0, probe.z, d.id);
       return;
     }
-    if ((d.targetX - probe.x) ** 2 + (d.targetZ - probe.z) ** 2 <= r * r && this.canArrive(d)) {
-      let paid = d.kind === 'order'
-        ? Math.round(d.payout * Math.max(0, 1 - BALANCE.jobs.order.stagePenalty * this.sim.life.state.stage))
-        : Math.round(d.payout * (1 + BALANCE.jobs.timeBonus * Math.max(0, this.remaining) / d.limitSeconds));
+    const reach = d.kind === 'trial' ? BALANCE.jobs.trial.finishRadius : r;
+    if ((d.targetX - probe.x) ** 2 + (d.targetZ - probe.z) ** 2 <= reach * reach && this.canArrive(d)) {
+      let paid: number;
+      if (d.kind === 'trial') {
+        // the medal the time wins, and the best one kept
+        const medal = Math.max(1, trialMedal(d.limitSeconds, d.limitSeconds - Math.max(0, this.remaining)));
+        this.lastMedal = medal;
+        this.medals.set(d.id, Math.max(this.medals.get(d.id) ?? 0, medal));
+        paid = BALANCE.jobs.trial.pay[medal - 1] as number;
+      } else {
+        paid = d.kind === 'order'
+          ? Math.round(d.payout * Math.max(0, 1 - BALANCE.jobs.order.stagePenalty * this.sim.life.state.stage))
+          : Math.round(d.payout * (1 + BALANCE.jobs.timeBonus * Math.max(0, this.remaining) / d.limitSeconds));
+      }
       // arriving takes the cap on the target; every coin of the route taken is the clean line, and pays the tip
       const coins = this.sim.coins;
       if (coins && coins.routeTotal > 0) {

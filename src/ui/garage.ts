@@ -14,7 +14,7 @@
  * Reports intents through `GarageActions` and never writes the sim; reads it
  * to draw. Rebuilds only when the garage, the bank or the totals change.
  */
-import { BALANCE, CAR_IDS, CAR_WORDS, PALETTE, STATS, type CarId, type PrepItem, type SimWorld, type Stat } from '../sim';
+import { BALANCE, CAR_IDS, CAR_WORDS, MEDAL_WORDS, PALETTE, STATS, type CarId, type PrepItem, type SimWorld, type Stat } from '../sim';
 
 export interface GarageActions {
   buy(car: CarId): void;
@@ -355,6 +355,13 @@ export class GarageUi {
     const streak = el('div', 'wall__streak');
     streak.textContent = d.streak.count > 0 ? `STREAK: DAY ${d.streak.count}${d.streak.topper ? ' · TOPPER ON' : ''}` : 'COME BACK TOMORROW FOR A STREAK';
     rows.push(streak);
+    // the time trials' medals (M5.5 slice 10): the best one for each, a dash for none yet
+    const trials = sim.jobs.defs.filter((j) => j.kind === 'trial');
+    if (trials.length > 0) {
+      const medals = el('div', 'wall__streak wall__medals');
+      medals.textContent = `TIME TRIALS: ${trials.map((j) => MEDAL_WORDS[sim.jobs.medals.get(j.id) ?? 0] || '—').join(' · ')}`;
+      rows.push(medals);
+    }
     this.dailiesBody.replaceChildren(...rows);
   }
 

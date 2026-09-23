@@ -4,12 +4,13 @@
  * one number (class index in the top byte, paint below), so a def stays
  * plain data the card can name.
  */
+import { BALANCE } from '../balance';
 import { CITY_COLORS, PALETTE } from '../palette';
 import { PLAYER_PAINT } from '../traffic/Traffic';
 import { CAR_IDS, type CarId } from '../vehicle/presets';
 import { BODIES, BODY_IDS, type BodyId } from '../traffic/bodies';
 
-export type JobKind = 'delivery' | 'order' | 'escape';
+export type JobKind = 'delivery' | 'order' | 'escape' | 'trial';
 
 export interface JobDef {
   id: number;
@@ -75,3 +76,18 @@ export const CAR_WORDS: Record<CarId, string> = { muscle: 'MUSCLE CAR', compact:
 export const BODY_WORDS: Record<BodyId, string> = {
   ...CAR_WORDS, sedan: 'SEDAN', hatch: 'HATCHBACK', estate: 'ESTATE', suv: 'SUV', pickup: 'PICKUP', taxi: 'TAXI', truck: 'BOX TRUCK', bus: 'BUS',
 };
+
+/** A trial's medal times from its bronze limit (M5.5 slice 10): gold, silver, bronze, seconds. */
+export function trialTimes(limitSeconds: number): [number, number, number] {
+  const sp = BALANCE.jobs.trial.speeds;
+  const b = sp[0] as number, s = sp[1] as number, g = sp[2] as number;
+  return [limitSeconds * b / g, limitSeconds * b / s, limitSeconds];
+}
+
+/** The medal a trial's time wins: 3 gold, 2 silver, 1 bronze, 0 none. */
+export function trialMedal(limitSeconds: number, elapsed: number): number {
+  const [g, s, b] = trialTimes(limitSeconds);
+  return elapsed <= g + 1e-9 ? 3 : elapsed <= s + 1e-9 ? 2 : elapsed <= b + 1e-9 ? 1 : 0;
+}
+
+export const MEDAL_WORDS = ['', 'BRONZE', 'SILVER', 'GOLD'] as const;

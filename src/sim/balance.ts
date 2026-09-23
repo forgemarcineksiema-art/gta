@@ -87,7 +87,7 @@ export const BALANCE = {
   jobs: {
     // nearDoor: the placement's first picks are a ring within this of every door (the first goal after a door, DESIGN §13.4)
     markerRadius: 4, beaconHeight: 3, timeBonus: 0.5, holdSeconds: 2, cardSeconds: 1.5, markerMinGap: 60, nearDoor: 250,
-    counts: { delivery: 6, order: 6, escape: 4 },
+    counts: { delivery: 6, order: 6, escape: 4, trial: 4 },
     // payoutPerKm 9,000 (balance script, 2026-09-23; the plan's 4,000 paid every placed delivery the 5,000 floor on
     // their 0.55–1.27 km paths): now 5,000–11,400, DESIGN.md §3.3's 5–12k
     delivery: { payoutPerKm: 9000, payoutMin: 5000, payoutMax: 12000, limitFactor: 1.3, limitMin: 45, heat: 10, minPath: 400 },
@@ -96,6 +96,12 @@ export const BALANCE = {
       ensureMin: 300, ensureMax: 600, ensureSeconds: 5, ringRange: 150, cruise: 0.5,
     },
     escape: { bounty: 1500, levels: [2, 2, 3, 4], radioSeconds: 8 },
+    /**
+     * The time trial on a coin line (M5.5 slice 10, DESIGN.md §4): one per district, a finish 1.1–1.9 km away by
+     * lane path; the medals by the average speed over that path (m/s: bronze, silver, gold) and their pay into the
+     * bag (DESIGN.md §3.3); slower than bronze fails it; the finish reaches `finishRadius` m across the road.
+     */
+    trial: { speeds: [16.5, 20, 24], pay: [3000, 5000, 8000], minPath: 1100, maxPath: 1900, finishRadius: 12 },
   },
   /**
    * The garage's catalogue (docs/M5_PLAN.md D13): cash only; the muscle car is owned from the start. The van at

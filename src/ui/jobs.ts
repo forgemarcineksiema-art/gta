@@ -10,11 +10,11 @@
  * top centre. DOM writes only on change; reads sim state only.
  */
 import {
-  BALANCE, CAR_WORDS, CHAIN_STEPS, STEP, chainStep, goalFor, newGoal, paintName, unpackDescriptor,
+  BALANCE, CAR_WORDS, CHAIN_STEPS, MEDAL_WORDS, STEP, chainStep, goalFor, newGoal, paintName, trialTimes, unpackDescriptor,
   type GoalKind, type JobDef, type SimWorld,
 } from '../sim';
 
-const KIND_TITLE: Record<JobDef['kind'], string> = { delivery: 'DELIVERY', order: 'STEAL TO ORDER', escape: 'ESCAPE' };
+const KIND_TITLE: Record<JobDef['kind'], string> = { delivery: 'DELIVERY', order: 'STEAL TO ORDER', escape: 'ESCAPE', trial: 'TIME TRIAL' };
 
 export class JobsHud {
   readonly root: HTMLElement;
@@ -169,7 +169,15 @@ export class JobsHud {
     const seconds = Number.isFinite(jobs.remaining) ? Math.ceil(jobs.remaining) : -1;
     if (seconds !== this.lastSeconds) {
       this.lastSeconds = seconds;
-      this.lineTime.textContent = seconds >= 0 ? clock(seconds) : '';
+      if (d.kind === 'trial' && seconds >= 0) {
+        // the time run, and the best medal still in reach with its time
+        const elapsed = d.limitSeconds - jobs.remaining;
+        const times = trialTimes(d.limitSeconds);
+        const next = times[0] > elapsed ? 0 : times[1] > elapsed ? 1 : 2;
+        this.lineTime.textContent = `${clock(Math.floor(elapsed))} · ${MEDAL_WORDS[3 - next]} ${clock(Math.round(times[next]))}`;
+      } else {
+        this.lineTime.textContent = seconds >= 0 ? clock(seconds) : '';
+      }
       this.line.classList.toggle('is-hurry', seconds >= 0 && seconds <= 10);
     }
     const p = sim.probe;
@@ -232,18 +240,21 @@ export class JobsHud {
   private fillJobLine(sim: SimWorld, d: JobDef): void {
     const jobs = sim.jobs;
     let kind: string;
-    let state = d.kind === 'order' ? 'is-order' : d.kind === 'escape' ? 'is-escape' : '';
+    let state = d.kind === 'order' ? 'is-order' : d.kind === 'escape' ? 'is-escape' : d.kind === 'trial' ? 'is-trial' : '';
     if (jobs.state === 'done') {
-      kind = `${d.kind === 'order' ? 'SOLD' : d.kind === 'escape' ? 'BOUNTY' : 'DELIVERED'} +${money(jobs.lastPaid)}${jobs.lastTip ? ' · CLEAN LINE' : ''}`;
+      const what = d.kind === 'order' ? 'SOLD' : d.kind === 'escape' ? 'BOUNTY' : d.kind === 'trial' ? MEDAL_WORDS[jobs.lastMedal] : 'DELIVERED';
+      kind = `${what} +${money(jobs.lastPaid)}${jobs.lastTip ? ' · CLEAN LINE' : ''}`;
       state = 'is-done';
     } else if (jobs.state === 'failed') {
-      kind = 'TOO LATE';
+      kind = d.kind === 'trial' ? 'TOO SLOW · NO MEDAL' : 'TOO LATE';
       state = 'is-failed';
     } else if (d.kind === 'order') {
       const w = unpackDescriptor(d.descriptor);
       kind = jobs.state === 'hunting' ? `FIND A ${paintName(w.paint)} ${CAR_WORDS[w.kind]}` : `DELIVER THE ${CAR_WORDS[w.kind]}`;
     } else if (d.kind === 'escape') {
       kind = `ESCAPE ${'★'.repeat(d.level)}`;
+    } else if (d.kind === 'trial') {
+      kind = 'TIME TRIAL · FOLLOW THE COINS';
     } else {
       kind = 'DELIVERY';
     }
@@ -271,6 +282,11 @@ export class JobsHud {
     } else if (d.kind === 'escape') {
       this.cardSub.textContent = 'THE POLICE HAVE YOU';
       this.cardLimit.textContent = 'LOSE THEM';
+    } else if (d.kind === 'trial') {
+      const [g, s, b] = trialTimes(d.limitSeconds);
+      const best = sim.jobs.medals.get(d.id) ?? 0;
+      this.cardSub.textContent = best > 0 ? `FOLLOW THE COINS · YOUR BEST: ${MEDAL_WORDS[best]}` : 'FOLLOW THE COINS TO THE FINISH';
+      this.cardLimit.textContent = `GOLD ${clock(Math.round(g))} · SILVER ${clock(Math.round(s))} · BRONZE ${clock(Math.round(b))}`;
     } else {
       this.cardSub.textContent = 'GET IT TO THE DROP-OFF';
       this.cardLimit.textContent = `${clock(d.limitSeconds)} · FASTER PAYS MORE`;

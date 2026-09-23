@@ -23,6 +23,8 @@ export const KIND_COLORS: Record<JobDef['kind'], number> = {
   delivery: PALETTE.carOrange,
   order: PALETTE.carMagenta,
   escape: PALETTE.policeBlue,
+  // the time trial follows a coin line: the coin's gold
+  trial: PALETTE.coin,
 };
 
 export class MarkerView {

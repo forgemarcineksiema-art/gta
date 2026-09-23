@@ -14,7 +14,7 @@ export type MarkerKind = 'tower' | 'tank' | 'glasshouse' | 'hotel' | 'garage' | 
 export interface MinimapMarker { x: number; z: number; kind: MarkerKind; color: string; yaw?: number; local?: boolean }
 
 /** The job rings by kind (the marker's own colours, docs/STYLE.md). */
-const JOB_COLORS = { delivery: hex(PALETTE.carOrange), order: hex(PALETTE.carMagenta), escape: hex(PALETTE.policeBlue) } as const;
+const JOB_COLORS = { delivery: hex(PALETTE.carOrange), order: hex(PALETTE.carMagenta), escape: hex(PALETTE.policeBlue), trial: hex(PALETTE.coin) } as const;
 
 const FONT = "'Segoe UI', 'Helvetica Neue', Arial, system-ui, sans-serif";
 const INK = '#f7f3ea';

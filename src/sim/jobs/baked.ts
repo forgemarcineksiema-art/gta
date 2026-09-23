@@ -22,5 +22,9 @@ export const BAKED_JOBS: Readonly<Record<number, readonly JobDef[]>> = {
     { id: 14, kind: 'delivery', x: -243, z: 432, yaw: 0.7853981633974483, targetX: -428.2, targetZ: -368, level: 0, descriptor: -1, payout: 8300, limitSeconds: 82, heat: 10 },
     { id: 15, kind: 'delivery', x: -432, z: 18, yaw: -2.356194490192345, targetX: -428.2, targetZ: -368, level: 0, descriptor: -1, payout: 7000, limitSeconds: 72, heat: 10 },
     { id: 16, kind: 'order', x: 18, z: -432, yaw: -2.356194490192345, targetX: 477.5, targetZ: -368, level: 0, descriptor: 16014335, payout: 6000, limitSeconds: 240, heat: 8 },
+    { id: 17, kind: 'trial', x: 432, z: -207, yaw: 2.356194490192345, targetX: -220.5, targetZ: 562.5, level: 0, descriptor: -1, payout: 8000, limitSeconds: 92, heat: 0 },
+    { id: 18, kind: 'trial', x: -468, z: 207, yaw: 0.7853981633974483, targetX: 334.32249705129857, targetZ: -336.4491819726335, level: 0, descriptor: -1, payout: 8000, limitSeconds: 91, heat: 0 },
+    { id: 19, kind: 'trial', x: 243, z: 243, yaw: -2.356194490192345, targetX: -687, targetZ: 562.5, level: 0, descriptor: -1, payout: 8000, limitSeconds: 90, heat: 0 },
+    { id: 20, kind: 'trial', x: 468, z: -650, yaw: -2.5175696006130366, targetX: 112.5, targetZ: 454.5, level: 0, descriptor: -1, payout: 8000, limitSeconds: 91, heat: 0 },
   ],
 };

@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — Marcin's playtest of 0.5.5: the overpass ramps drawn as stairs
+
+Marcin: "what is wrong with this road?" The city geometry builder read every static's rotation as a yaw, so the
+overpass ramps' pitched 10 m pieces were drawn level at their middle heights: steps up to a metre tall with dark
+fronts, the walls and lines stepped too, cars sinking into the fronts while the physics (the colliders' whole
+rotation) drove the smooth profile. Since slice 8; its pins checked the driving, not the drawing. Fix: a pitched
+static takes its quaternion's matrix (`CityView`); only the overpasses draw pitched statics (the jumps' are
+collision-only). Pin `tests/render/overpass.test.ts`: rays down both ramps of two overpasses meet the profile
+within 0.1 m (0.51 before).
+
 ## 2026-09-23 — M5.5 gate: the numbers, the perf fix, the balance
 
 **Perf.** The first two gate runs against `perf/m5.1-fix-1..3.json` were a regression by §5.3 (frame p95 33.4 in

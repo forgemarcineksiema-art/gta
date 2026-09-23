@@ -38,10 +38,15 @@ const casts = (st: StaticDesc) => !st.face && st.tag !== 'wall' && st.tag !== 'r
  * (ground, road cross) form a fifth base part.
  */
 export const PARTS = [{ ox: 0, oz: 0 }, { ox: -1, oz: -1 }, { ox: 1, oz: -1 }, { ox: -1, oz: 1 }, { ox: 1, oz: 1 }] as const;
-/** City statics rotate about +Y only; the quaternion is read back as a yaw. */
+/** A static tilted out of the horizontal (the overpass ramps' pieces): drawn with its whole rotation, not a yaw. */
+export function staticPitched(st: StaticDesc): boolean {
+  return st.rotation.x !== 0 || st.rotation.z !== 0;
+}
+
+/** Most city statics rotate about +Y only; their quaternion is read back as a yaw (0 for a pitched one). */
 export function staticYaw(st: StaticDesc): number {
   const q = st.rotation;
-  return q.y === 0 && q.w === 1 ? 0 : 2 * Math.atan2(q.y, q.w);
+  return (q.y === 0 && q.w === 1) || staticPitched(st) ? 0 : 2 * Math.atan2(q.y, q.w);
 }
 
 export function partIndex(st: StaticDesc, cx: number, cz: number): number {
@@ -57,10 +62,12 @@ export function partIndex(st: StaticDesc, cx: number, cz: number): number {
     hx = (maxX - minX) / 2; hz = (maxZ - minZ) / 2;
   } else {
     const round = shape.kind === 'cylinder' || shape.kind === 'wheel' || shape.kind === 'ball';
-    // A rotated box straddles a centre line when its bounding circle does.
-    const rotated = !round && staticYaw(st) !== 0;
-    hx = round ? shape.radius : rotated ? Math.hypot(shape.hx, shape.hz) : shape.hx;
-    hz = round ? shape.radius : rotated ? Math.hypot(shape.hx, shape.hz) : shape.hz;
+    // A rotated box straddles a centre line when its bounding circle does (a pitched one's bounding sphere).
+    const pitched = !round && staticPitched(st);
+    const rotated = !round && (pitched || staticYaw(st) !== 0);
+    const radius = round ? shape.radius : pitched ? Math.hypot(shape.hx, shape.hy, shape.hz) : Math.hypot(shape.hx, shape.hz);
+    hx = round ? shape.radius : rotated ? radius : shape.hx;
+    hz = round ? shape.radius : rotated ? radius : shape.hz;
   }
   if (Math.abs(dx) <= hx || Math.abs(dz) <= hz) return 0;
   return 1 + (dx > 0 ? 1 : 0) + (dz > 0 ? 2 : 0);
@@ -155,6 +162,15 @@ export class GeometryBuild {
       const sz = absolute ? 1 : rectangular ? shape.hz : shape.radius;
       const px = absolute ? 0 : st.position.x, py = absolute ? 0 : st.position.y, pz = absolute ? 0 : st.position.z;
       const yaw = absolute ? 0 : staticYaw(st), rotated = yaw !== 0, cos = Math.cos(yaw), sin = Math.sin(yaw);
+      // a pitched static takes its whole rotation, the matrix of its quaternion (the physics collider's own)
+      const pitched = !absolute && staticPitched(st);
+      let m00 = 1, m01 = 0, m02 = 0, m10 = 0, m11 = 1, m12 = 0, m20 = 0, m21 = 0, m22 = 1;
+      if (pitched) {
+        const { x: qx, y: qy, z: qz, w: qw } = st.rotation;
+        m00 = 1 - 2 * (qy * qy + qz * qz); m01 = 2 * (qx * qy - qz * qw); m02 = 2 * (qx * qz + qy * qw);
+        m10 = 2 * (qx * qy + qz * qw); m11 = 1 - 2 * (qx * qx + qz * qz); m12 = 2 * (qy * qz - qx * qw);
+        m20 = 2 * (qx * qz - qy * qw); m21 = 2 * (qy * qz + qx * qw); m22 = 1 - 2 * (qx * qx + qy * qy);
+      }
       const gableShape = shape.kind === 'gable';
       const [r, g, b] = rgb(st.color);
       const underlay = st.paint ? rgb(st.paint.underlay) : null;
@@ -162,21 +178,26 @@ export class GeometryBuild {
       for (const src of sourceList) {
         const sp = src.p, sn = src.n, n = sp.length;
         for (let i = 0; i < n; i += 3, index += 3) {
-          let lx = (sp[i] as number) * sx, lz = (sp[i + 2] as number) * sz;
+          let lx = (sp[i] as number) * sx, ly = (sp[i + 1] as number) * sy, lz = (sp[i + 2] as number) * sz;
           let nx = sn[i] as number, ny = sn[i + 1] as number, nz = sn[i + 2] as number;
           if (gableShape) {
             nx /= sx; ny /= sy; nz /= sz;
             const length = Math.sqrt(nx * nx + ny * ny + nz * nz);
             nx /= length; ny /= length; nz /= length;
           }
-          if (rotated) {
+          if (pitched) {
+            const rx = m00 * lx + m01 * ly + m02 * lz, ry = m10 * lx + m11 * ly + m12 * lz, rz = m20 * lx + m21 * ly + m22 * lz;
+            lx = rx; ly = ry; lz = rz;
+            const rnx = m00 * nx + m01 * ny + m02 * nz, rny = m10 * nx + m11 * ny + m12 * nz, rnz = m20 * nx + m21 * ny + m22 * nz;
+            nx = rnx; ny = rny; nz = rnz;
+          } else if (rotated) {
             // Rotation about +Y: local +Z maps to (sin yaw, cos yaw), matching quatFromYaw.
             const rx = cos * lx + sin * lz, rz = -sin * lx + cos * lz;
             lx = rx; lz = rz;
             const rnx = cos * nx + sin * nz, rnz = -sin * nx + cos * nz;
             nx = rnx; nz = rnz;
           }
-          positions[index] = px + lx; positions[index + 1] = py + (sp[i + 1] as number) * sy; positions[index + 2] = pz + lz;
+          positions[index] = px + lx; positions[index + 1] = py + ly; positions[index + 2] = pz + lz;
           normals[index] = nx; normals[index + 1] = ny; normals[index + 2] = nz;
           colors[index] = r; colors[index + 1] = g; colors[index + 2] = b;
           if (underlay && st.paint) {

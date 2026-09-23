@@ -8,11 +8,11 @@
  * clear, so "can never be hit" holds by construction (PEGI 12 slapstick).
  * `Fist` is the pose of a driver whose car the player has just taken.
  */
-import type { City } from '../city/City';
+import { districtAt, type City } from '../city/City';
 import type { RoadGraph } from '../city/roads';
 import type { EventLog } from '../events';
 import * as M from '../math';
-import { CITY_COLORS, PALETTE } from '../palette';
+import { CITY_COLORS, PED_TINTS } from '../palette';
 import { mulberry32 } from '../random';
 import type { Quat } from '../scene';
 import type { TransformBuffer } from '../transforms';
@@ -21,8 +21,13 @@ import type { LanePose, LaneProjection } from './lanes';
 import { PEDS, type PedTuning } from './tuning';
 
 export enum PedPose { Walk = 0, Dive = 1, GetUp = 2, Fist = 3 }
-
-const TINTS = [PALETTE.carLime, PALETTE.carBlue, PALETTE.carOrange, PALETTE.carMagenta, CITY_COLORS.chalk, CITY_COLORS.mint];
+/** The four silhouettes (M5.5 slice 20; render/pedMesh.ts draws them). Appended, never renumbered. */
+export enum PedLook { Coat = 0, Bag = 1, Worker = 2, Old = 3 }
+export const PED_LOOKS = 4;
+/** A place with no palette of its own dresses in the chalk of the city's facades. */
+const ANY_TINTS: readonly number[] = [CITY_COLORS.chalk];
+/** Metres of walking per full stride (two steps): the gait's phase runs 2π over it. */
+export const STRIDE = 1.4;
 /** Chance to turn round at a corner instead of continuing round the block. */
 const TURN_AROUND = 0.3;
 const CORNER_REACH = 40;
@@ -49,6 +54,10 @@ export class Pedestrians {
   readonly pose: Uint8Array;
   readonly poseFor: Float32Array;
   readonly tint: Uint32Array;
+  /** The silhouette (PedLook), drawn with the tint at spawn by the district. */
+  readonly look: Uint8Array;
+  /** Metres walked, for the walk cycle's phase (the body's bob here, the limbs' swing in the view). */
+  readonly gait: Float32Array;
   /** Bumps when a tint is assigned so the view reuploads instance colours. */
   tintSerial = 0;
   /** Last-resort hops (a car centre inside `guaranteeDistance`). */
@@ -99,6 +108,8 @@ export class Pedestrians {
     this.pose = new Uint8Array(n);
     this.poseFor = new Float32Array(n);
     this.tint = new Uint32Array(n);
+    this.look = new Uint8Array(n);
+    this.gait = new Float32Array(n);
     this.diveX = new Float32Array(n);
     this.diveZ = new Float32Array(n);
     this.scored = new Uint8Array(n);
@@ -178,11 +189,28 @@ export class Pedestrians {
     this.pose[i] = pose;
     this.poseFor[i] = 0;
     this.scored[i] = 0;
-    this.tint[i] = TINTS[(this.rng() * TINTS.length) | 0] as number;
-    this.tintSerial++;
+    this.dress(i);
     if (pose === PedPose.Walk) this.attach(i);
     this.writeOne(i, true);
     return i;
+  }
+
+  /** The seconds the crowd has run (the fist's shake in the view). */
+  get clock(): number {
+    return this.time;
+  }
+
+  /** A silhouette and clothes for where the pedestrian stands: the district's shares and palette. */
+  private dress(i: number): void {
+    const district = districtAt(this.x[i] as number, this.z[i] as number).id;
+    const shares = this.tuning.looks[district] ?? [0.25, 0.25, 0.25, 0.25];
+    let u = this.rng() * (shares[0] + shares[1] + shares[2] + shares[3]), look = 0;
+    while (look < PED_LOOKS - 1 && u >= (shares[look] as number)) { u -= shares[look] as number; look++; }
+    this.look[i] = look;
+    const tints = PED_TINTS[district] ?? ANY_TINTS;
+    this.tint[i] = tints[(this.rng() * tints.length) | 0] as number;
+    this.gait[i] = this.rng() * STRIDE;
+    this.tintSerial++;
   }
 
   /** True if any active pedestrian's centre is inside the player's chassis footprint. */
@@ -255,7 +283,8 @@ export class Pedestrians {
     let y = 0;
     let pitch = 0;
     let roll = 0;
-    if (pose === PedPose.Walk) y = Math.abs(Math.sin((this.s[i] as number) * 4)) * 0.04;
+    // highest with the legs together, lowest at the full stride
+    if (pose === PedPose.Walk) y = (1 - Math.abs(Math.sin((this.gait[i] as number) * (Math.PI * 2 / STRIDE)))) * 0.04;
     else if (pose === PedPose.Dive) pitch = Math.min(1, (this.poseFor[i] as number) / 0.25) * 70 * M.DEG;
     else if (pose === PedPose.GetUp) pitch = Math.max(0, 1 - (this.poseFor[i] as number) / this.tuning.getUpTime) * 70 * M.DEG;
     else { roll = Math.sin(this.time * 25) * 8 * M.DEG; y = Math.abs(Math.sin(this.time * 12.5)) * 0.1; }
@@ -278,6 +307,7 @@ export class Pedestrians {
     const lane = this.lane[i] as number;
     if (lane < 0) return;
     const len = this.lanes.length[lane] as number;
+    this.gait[i] = (this.gait[i] as number) + (this.speed[i] as number) * dt;
     let s = (this.s[i] as number) + (this.dir[i] as number) * (this.speed[i] as number) * dt;
     if (s > len || s < 0) {
       this.corner(i, s > len);
@@ -518,8 +548,7 @@ export class Pedestrians {
       this.pose[i] = PedPose.Walk;
       this.poseFor[i] = 0;
       this.scored[i] = 0;
-      this.tint[i] = TINTS[(this.rng() * TINTS.length) | 0] as number;
-      this.tintSerial++;
+      this.dress(i);
       this.writeOne(i, true);
       alive++;
     }

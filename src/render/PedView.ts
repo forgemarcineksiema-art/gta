@@ -1,20 +1,27 @@
 /**
- * One instanced mesh for every pedestrian: a 72-triangle figure (torso, head,
- * two legs, two arms) with its origin at the feet. The sim writes the pose into
- * the transform (walk bob, dive pitch, fist shake), so the view only interpolates
- * transforms and uploads the shirt tint when it changes. Live pedestrians are
- * packed to the front of the instance buffer and `count` is the live number.
+ * The crowd (M5.5 slice 20): one instanced mesh per silhouette (pedMesh.ts).
+ * The sim writes the body's pose into the transform (the walk's bob, the
+ * dive's pitch, the fist's shake); the view interpolates the transforms,
+ * uploads the tint when it changes and sets each instance's `anim` (the
+ * gait's phase, the pose and how far into it) for the limbs. Live
+ * pedestrians are packed to the front of their silhouette's buffer and
+ * `count` is the live number.
  */
 import * as THREE from 'three';
-import { CITY_COLORS, PALETTE } from '../sim/palette';
-import type { Pedestrians } from '../sim/traffic/Pedestrians';
+import { PED_LOOKS, PedPose, STRIDE, type Pedestrians } from '../sim/traffic/Pedestrians';
 import type { TransformBuffer } from '../sim';
+import { buildPed, pedMaterial } from './pedMesh';
 
-const PAINT = -1;
+const PHASE_PER_METRE = (Math.PI * 2) / STRIDE;
+/** The fist's shake, rad/s (the sim's body shake runs at 25). */
+const FIST_RATE = 25;
 
 export class PedView {
-  readonly mesh: THREE.InstancedMesh;
-  private readonly packed: Int16Array;
+  readonly meshes: THREE.InstancedMesh[];
+  private readonly anims: THREE.InstancedBufferAttribute[];
+  private readonly packed: Int16Array[];
+  private readonly counts: Int32Array;
+  private readonly wrote: Uint8Array;
   private readonly scratchM = new THREE.Matrix4();
   private readonly scratchP = new THREE.Vector3();
   private readonly scratchQ = new THREE.Quaternion();
@@ -23,29 +30,49 @@ export class PedView {
   private tintSerial = -1;
 
   constructor(scene: THREE.Scene, private readonly peds: Pedestrians) {
-    const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-    this.mesh = new THREE.InstancedMesh(buildFigure(), material, peds.capacity);
-    this.mesh.frustumCulled = false;
-    this.mesh.castShadow = false;
-    this.mesh.receiveShadow = false;
-    this.mesh.count = 0;
-    this.packed = new Int16Array(peds.capacity).fill(-1);
-    scene.add(this.mesh);
+    const material = pedMaterial();
+    this.anims = [];
+    this.packed = [];
+    this.counts = new Int32Array(PED_LOOKS);
+    this.wrote = new Uint8Array(PED_LOOKS);
+    this.meshes = [];
+    for (let look = 0; look < PED_LOOKS; look++) {
+      const geometry = buildPed(look);
+      const anim = new THREE.InstancedBufferAttribute(new Float32Array(peds.capacity * 3), 3);
+      anim.setUsage(THREE.DynamicDrawUsage);
+      geometry.setAttribute('anim', anim);
+      const mesh = new THREE.InstancedMesh(geometry, material, peds.capacity);
+      mesh.name = `peds-${look}`;
+      mesh.frustumCulled = false;
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      mesh.count = 0;
+      mesh.visible = false;
+      scene.add(mesh);
+      this.meshes.push(mesh);
+      this.anims.push(anim);
+      this.packed.push(new Int16Array(peds.capacity).fill(-1));
+    }
   }
 
   /** Pedestrian shadows only on the high tier. */
   setShadows(on: boolean): void {
-    this.mesh.castShadow = on;
+    for (const mesh of this.meshes) mesh.castShadow = on;
   }
 
   update(transforms: TransformBuffer, alpha: number): void {
     const peds = this.peds;
-    const mesh = this.mesh;
     const retint = peds.tintSerial !== this.tintSerial;
-    let n = 0;
-    let wroteColor = false;
+    const counts = this.counts;
+    counts.fill(0);
+    this.wrote.fill(0);
+    const clock = peds.clock;
     for (let i = 0; i < peds.capacity; i++) {
       if (!peds.active[i]) continue;
+      const look = peds.look[i] as number;
+      const mesh = this.meshes[look] as THREE.InstancedMesh;
+      const pack = this.packed[look] as Int16Array;
+      const n = counts[look] as number;
       const slot = peds.slot[i] as number;
       const p = slot * 3;
       const r = slot * 4;
@@ -62,72 +89,56 @@ export class PedView {
       );
       this.scratchQ.normalize();
       mesh.setMatrixAt(n, this.scratchM.compose(this.scratchP, this.scratchQ, this.scratchS));
-      if (retint || this.packed[n] !== i) {
+      // the limbs: the gait's phase and a stride's swing when walking, the pose and how far into it otherwise
+      const pose = peds.pose[i] as PedPose, t = peds.poseFor[i] as number;
+      const a = this.anims[look] as THREE.InstancedBufferAttribute;
+      const k = n * 3;
+      const arr = a.array as Float32Array;
+      if (pose === PedPose.Walk) {
+        arr[k] = (peds.gait[i] as number) * PHASE_PER_METRE;
+        arr[k + 1] = Math.min(1.2, (peds.speed[i] as number) / 1.35);
+        arr[k + 2] = 0;
+      } else if (pose === PedPose.Dive) {
+        arr[k] = 0;
+        arr[k + 1] = Math.min(1, t / 0.2);
+        arr[k + 2] = 1;
+      } else if (pose === PedPose.GetUp) {
+        arr[k] = 0;
+        arr[k + 1] = Math.max(0, 1 - t / peds.tuning.getUpTime);
+        arr[k + 2] = 2;
+      } else {
+        arr[k] = clock * FIST_RATE + i;
+        arr[k + 1] = 1;
+        arr[k + 2] = 3;
+      }
+      if (retint || pack[n] !== i) {
         this.color.setHex(peds.tint[i] as number);
         mesh.setColorAt(n, this.color);
-        this.packed[n] = i;
-        wroteColor = true;
+        pack[n] = i;
+        this.wrote[look] = 1;
       }
-      n++;
+      counts[look] = n + 1;
     }
-    for (let k = n; k < peds.capacity; k++) {
-      if (this.packed[k] === -1) break;
-      this.packed[k] = -1;
+    for (let look = 0; look < PED_LOOKS; look++) {
+      const mesh = this.meshes[look] as THREE.InstancedMesh;
+      const pack = this.packed[look] as Int16Array;
+      const n = counts[look] as number;
+      for (let k = n; k < peds.capacity; k++) {
+        if (pack[k] === -1) break;
+        pack[k] = -1;
+      }
+      const visible = n > 0;
+      if (mesh.visible !== visible) mesh.visible = visible;
+      mesh.count = n;
+      if (!visible) continue;
+      mesh.instanceMatrix.needsUpdate = true;
+      (this.anims[look] as THREE.InstancedBufferAttribute).needsUpdate = true;
+      if (this.wrote[look] === 1 && mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
-    mesh.count = n;
-    mesh.instanceMatrix.needsUpdate = true;
-    if (wroteColor && mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     this.tintSerial = peds.tintSerial;
   }
 }
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
-}
-
-/** Six boxes, feet at y = 0, facing +Z. Shirt vertices are white so the instance colour tints them. */
-export function buildFigure(): THREE.BufferGeometry {
-  const pos: number[] = [];
-  const nrm: number[] = [];
-  const col: number[] = [];
-  const c = new THREE.Color();
-  const box = (cx: number, cy: number, cz: number, hx: number, hy: number, hz: number, color: number): void => {
-    if (color < 0) c.setRGB(1, 1, 1);
-    else c.setHex(color);
-    const faces: Array<[number, number, number]> = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
-    for (const [nx, ny, nz] of faces) {
-      // two tangent axes for the face
-      const ux = ny !== 0 ? 1 : 0, uy = 0, uz = ny !== 0 ? 0 : (nx !== 0 ? 0 : 1) * 0 + (nx !== 0 ? 0 : 0);
-      const tx = nx !== 0 ? 0 : (nz !== 0 ? 1 : 1), ty = 0, tz = nx !== 0 ? 1 : 0;
-      void ux; void uy; void uz; void tx; void ty; void tz;
-      const corners: Array<[number, number, number]> = [];
-      for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]] as Array<[number, number]>) {
-        let x: number, y: number, z: number;
-        if (nx !== 0) { x = nx; y = a; z = b * nx; }
-        else if (ny !== 0) { x = a; y = ny; z = -b * ny; }
-        else { x = -a * nz; y = b; z = nz; }
-        corners.push([cx + x * hx, cy + y * hy, cz + z * hz]);
-      }
-      const tri = (i: number, j: number, k: number): void => {
-        for (const q of [corners[i], corners[j], corners[k]] as Array<[number, number, number]>) {
-          pos.push(q[0], q[1], q[2]);
-          nrm.push(nx, ny, nz);
-          col.push(c.r, c.g, c.b);
-        }
-      };
-      tri(0, 1, 2);
-      tri(0, 2, 3);
-    }
-  };
-  box(0, 1.2, 0, 0.2, 0.3, 0.12, PAINT);                 // torso (shirt, tinted)
-  box(0, 1.68, 0, 0.11, 0.13, 0.11, CITY_COLORS.peach);   // head
-  box(-0.1, 0.45, 0, 0.09, 0.45, 0.1, PALETTE.slate);     // legs
-  box(0.1, 0.45, 0, 0.09, 0.45, 0.1, PALETTE.slate);
-  box(-0.27, 1.2, 0, 0.06, 0.28, 0.07, PAINT);            // arms (shirt)
-  box(0.27, 1.2, 0, 0.06, 0.28, 0.07, PAINT);
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
-  g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(nrm), 3));
-  g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(col), 3));
-  return g;
 }

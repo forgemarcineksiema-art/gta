@@ -120,6 +120,12 @@ export interface PedTuning {
   hopDistance: number;
   /** A diver the player passes inside this distance scores a near miss, m. */
   scoreDistance: number;
+  /**
+   * The four silhouettes' shares by district (M5.5 slice 20): a man in a long coat, a woman with a bag, a
+   * worker in a hard hat, an old man with a stick; coats in Crown Heights, workers in the Works, the old
+   * men in the Gardens, bags on the Quay.
+   */
+  looks: Readonly<Record<string, readonly [number, number, number, number]>>;
 }
 
 export const TRAFFIC: TrafficTuning = {
@@ -214,4 +220,10 @@ export const PEDS: PedTuning = {
   guaranteeDistance: 1.3,
   hopDistance: 3,
   scoreDistance: 3,
+  looks: {
+    crown: [0.45, 0.3, 0.1, 0.15],
+    foundry: [0.1, 0.15, 0.6, 0.15],
+    gardens: [0.15, 0.3, 0.1, 0.45],
+    marina: [0.15, 0.5, 0.15, 0.2],
+  },
 };

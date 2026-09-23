@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M5.5 slice 20: pedestrians with bodies
+
+Done: four silhouettes of boxes, 150–200 triangles each (was one 72-triangle figure): a man in a long coat and
+scarf, a woman in a jacket and skirt with a bag on her arm, a worker in a hi-vis vest, boots and a yellow hard hat,
+a stooped old man in a flat cap with a stick. Each vertex names its limb and joint; one instanced material swings
+legs and arms by a per-instance phase from the metres walked (the bob follows the same gait), throws the arms
+forward in the dive, pushes up getting up, and shakes the fist (the old man shakes his stick). Dressed by district
+at spawn: coats in Crown Heights, workers in the Works, old men in the Gardens, bags on the Quay, each district's
+own six clothes colours (palette.ts). Four draws instead of one. Pins 20.1–20.3.
+
 ## 2026-09-23 — M5.5 slice 19: traffic's own bodies (taken before 7–18: Marcin asked for the city's models outright)
 
 Done: eight civilian bodies (sedan, hatchback, estate, SUV, pickup, taxi, box truck, 12 m bus) on the player's

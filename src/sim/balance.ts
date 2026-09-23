@@ -83,7 +83,8 @@ export const BALANCE = {
    * player is, so the units close in before the escape timer can start.
    */
   jobs: {
-    markerRadius: 4, beaconHeight: 3, timeBonus: 0.5, holdSeconds: 2, cardSeconds: 1.5, markerMinGap: 60,
+    // nearDoor: the placement's first picks are a ring within this of every door (the first goal after a door, DESIGN §13.4)
+    markerRadius: 4, beaconHeight: 3, timeBonus: 0.5, holdSeconds: 2, cardSeconds: 1.5, markerMinGap: 60, nearDoor: 250,
     counts: { delivery: 6, order: 6, escape: 4 },
     // payoutPerKm 9,000 (balance script, 2026-09-23; the plan's 4,000 paid every placed delivery the 5,000 floor on
     // their 0.55–1.27 km paths): now 5,000–11,400, DESIGN.md §3.3's 5–12k
@@ -114,6 +115,12 @@ export const BALANCE = {
   },
   /** One-shot prep items for the next run (DESIGN.md §3.4): the lawyer keeps `lawyerKeep` of the bag when busted, the fence adds `fenceBonus` to the multiplier. */
   prep: { lawyer: 5000, lawyerKeep: 0.75, fence: 8000, fenceBonus: 0.5 },
+  /**
+   * The first quarter hour's chain (docs/DESIGN.md §13.4): step 6 banks `bankGoal` in one run, step 4 escapes from
+   * `escapeLevel`; the goal line names the first car once the funds reach `buyShare` of its price; the BORROW
+   * prompt's second line shows the first `hintTimes` times.
+   */
+  chain: { bankGoal: 20000, escapeLevel: 2, buyShare: 0.6, hintTimes: 3 },
   /** The door's rewarded offer: above `doorThreshold` in the bag the video doubles it (`doorMultiplier`); the idle arrow turns to the doors above it too. */
   offer: { doorThreshold: 8000, doorMultiplier: 2 },
   /**

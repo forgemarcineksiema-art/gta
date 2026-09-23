@@ -4,7 +4,7 @@
  * busted card and the wall of totals behind a shut door. Yellow is money that
  * is not yours yet. DOM writes only on change; reads sim state only.
  */
-import type { CarId, RunState, SimWorld } from '../sim';
+import { CHAIN_STEPS, STEP, chainStep, type CarId, type RunState, type SimWorld } from '../sim';
 import { BALANCE } from '../sim/balance';
 
 const TWEEN_SECONDS = 0.3;
@@ -33,6 +33,8 @@ export class RunHud {
   private readonly wallLines: HTMLElement;
   /** The first door's line: how far the first new car is. */
   private readonly wallFirst: HTMLElement;
+  /** The whole game in one line, under BANKED until the chain's escape step is done (DESIGN.md §13.4). */
+  private readonly wallSentence: HTMLElement;
   private lastSerial = -1;
   private readonly wallCounts: HTMLElement;
   /** The wanted poster: the car the police will look for (the descriptor's class and paint). */
@@ -80,7 +82,8 @@ export class RunHud {
     this.wallFirst = el('div', 'run__first');
     // the totals page: the garage's pages sit beside it in the same panel
     const page = el('div', 'run__wall-page wall__page wall__page--wall');
-    page.append(el('div', 'run__title', 'BANKED'), this.wallLines, this.wallFirst, this.wallCounts, this.wanted);
+    this.wallSentence = el('div', 'run__sentence', 'CRIMES FILL THE BAG · THE POLICE MULTIPLY IT · THE DOOR BANKS IT');
+    page.append(el('div', 'run__title', 'BANKED'), this.wallLines, this.wallSentence, this.wallFirst, this.wallCounts, this.wanted);
     this.wall.append(page);
     this.root.append(this.bag, this.coinRow, this.bar, this.card, this.wall);
     parent.appendChild(this.root);
@@ -184,11 +187,18 @@ export class RunHud {
       line('BEST RUN', money(run.bestRun)),
       line('BANK', money(run.bank)),
     );
-    // the first new car is the next goal (docs/M5_PLAN.md slice 5): from the cold open's door until it is bought
-    const first = !sim.garage.owned.has('compact');
+    // the next goal (DESIGN.md §13.4): the first new car while the chain's first three steps lead there, then the
+    // chain's next step, then the first car again if it is still not bought
+    const step = chainStep(run.chain);
+    const noCar = !sim.garage.owned.has('compact');
     const price = BALANCE.prices.compact;
-    this.wallFirst.textContent = !first ? '' : run.funds >= price ? `FIRST NEW CAR: ${money(price)} · IT IS YOURS IN CARS` : `FIRST NEW CAR: ${money(price)} · YOU HAVE ${money(run.funds)}`;
-    this.wallFirst.classList.toggle('is-visible', first);
+    const firstCar = run.funds >= price ? `FIRST NEW CAR: ${money(price)} · IT IS YOURS IN CARS` : `FIRST NEW CAR: ${money(price)} · YOU HAVE ${money(run.funds)}`;
+    const next = step >= 0 && step <= STEP.car && noCar ? firstCar
+      : step >= 0 ? `NEXT: ${CHAIN_STEPS[step] ?? ''} · STEP ${step + 1} OF ${CHAIN_STEPS.length}`
+        : noCar ? firstCar : '';
+    this.wallFirst.textContent = next;
+    this.wallFirst.classList.toggle('is-visible', next !== '');
+    this.wallSentence.classList.toggle('is-visible', (run.chain & (1 << STEP.escape)) === 0);
     const c = run.counts;
     this.wallCounts.textContent = `${plural(c.takedowns, 'TAKEDOWN')} · ${plural(c.escapes, 'ESCAPE')} · ${plural(c.billboards, 'BILLBOARD')} · ${plural(c.coins, 'COIN')}`;
     // the poster: the police remember the car, not the driver (the identity rule, taught without a line of text)

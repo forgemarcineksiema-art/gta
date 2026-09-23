@@ -2,7 +2,7 @@
  * In-game HUD: plain DOM over the canvas. Speedometer, boost bar, drift readout,
  * a debug block, a pause overlay and the keycap hint strip. Reads sim state only.
  */
-import { AgentState } from '../sim';
+import { AgentState, BALANCE, POLICE } from '../sim';
 import type { SimEvent, SimWorld } from '../sim';
 import { Minimap } from './minimap';
 import { HeatHud } from './heat';
@@ -94,6 +94,9 @@ export class Hud {
   private readonly swapLabel: HTMLElement;
   /** The candidate is a police car: the prompt says BORROW (the disguise has to be discoverable). */
   private swapBorrow = false;
+  /** Under BORROW the first `chain.hintTimes` times: what the disguise does (M5.5). */
+  private readonly swapHint: HTMLElement;
+  private swapHintOn = false;
   private swapVisible = false;
   private lastDamageText = '';
   private lastStage = -1;
@@ -156,7 +159,8 @@ export class Hud {
     this.swap = el('div', 'hud__swap');
     this.swapKeycap = el('kbd', 'key', 'E');
     this.swapLabel = el('span', 'hud__swap-label', 'SWAP');
-    this.swap.append(this.swapKeycap, this.swapLabel);
+    this.swapHint = el('div', 'hud__swap-hint', `COPS WON'T KNOW YOU · ${POLICE.disguise.seconds} s`);
+    this.swap.append(this.swapKeycap, this.swapLabel, this.swapHint);
     this.root.appendChild(this.swap);
     const stack = el('div', 'hud__popups');
     this.popups = [0, 1, 2, 3].map(() => {
@@ -400,6 +404,11 @@ export class Hud {
     if (swapVisible && borrow !== this.swapBorrow) {
       this.swapBorrow = borrow;
       this.swapLabel.textContent = borrow ? 'BORROW' : 'SWAP';
+    }
+    const hint = borrow && sim.run.borrowHints <= BALANCE.chain.hintTimes;
+    if (hint !== this.swapHintOn) {
+      this.swapHintOn = hint;
+      this.swapHint.classList.toggle('is-on', hint);
     }
     this.eventSeq = sim.events.readFrom(this.eventSeq, this.onEvent);
     for (let i = 0; i < this.popups.length; i++) {

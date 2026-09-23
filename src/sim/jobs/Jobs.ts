@@ -30,6 +30,7 @@ import { AgentState, type PlayerProbe } from '../traffic/Traffic';
 import { CAR_IDS } from '../vehicle/presets';
 import type { JobDef } from './catalog';
 import { markerRingCoins, pointTarget } from './place';
+import { goalFor, newGoal } from '../run/goal';
 
 export type { JobDef, JobKind } from './catalog';
 
@@ -66,6 +67,7 @@ export class Jobs {
   /** The markers' coin rings are laid on the first step (once; the world's constructor leaves the extra coins to its callers). */
   private ringsLaid = false;
   private readonly routePoints: CoinPoint[] = [];
+  private readonly goal = newGoal();
 
   constructor(private readonly sim: SimWorld, defs: JobDef[]) {
     this.defs = defs;
@@ -204,25 +206,12 @@ export class Jobs {
    */
   idleTarget(out: { x: number; z: number }): boolean {
     if (this.state === 'hunting' || this.state === 'active') return false;
-    const p = this.sim.probe;
-    const run = this.sim.run;
-    if (run.bag > BALANCE.offer.doorThreshold && run.dropOffs.length > 0) {
-      let best = Infinity;
-      for (let i = 0; i < run.dropOffs.length; i++) {
-        const door = (run.dropOffs[i] as (typeof run.dropOffs)[number]).door;
-        const d = (door.x - p.x) ** 2 + (door.z - p.z) ** 2;
-        if (d < best) { best = d; out.x = door.x; out.z = door.z; }
-      }
-      return true;
-    }
-    let best = Infinity;
-    for (let i = 0; i < this.defs.length; i++) {
-      const d = this.defs[i] as JobDef;
-      if (!this.live(d)) continue;
-      const dist = (d.x - p.x) ** 2 + (d.z - p.z) ** 2;
-      if (dist < best) { best = dist; out.x = d.x; out.z = d.z; }
-    }
-    return best < Infinity;
+    // the goal line's point (DESIGN.md §13.4): the chain's step, the door with a bag worth banking, the nearest ring
+    goalFor(this.sim, this.goal);
+    if (!this.goal.hasTarget) return false;
+    out.x = this.goal.x;
+    out.z = this.goal.z;
+    return true;
   }
 
   /** What the arrow points at: the running job's target, else the idle target. `idle` reports which. */

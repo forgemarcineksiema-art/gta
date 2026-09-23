@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M5.5 slice 2: the goal line and the chain
+
+Done: `sim/run/goal.ts` (one goal, one point: the job; LOSE THEM, the door with a bag; the chain's step when it says
+more: BANK IT, BUY THE COMPACT · n TO GO / at a door, ESCAPE THE COPS, STEAL TO ORDER, FILL THE BAG n/20,000; the door
+above 8,000; TAKE A JOB), the arrow follows it; the chain as six bits ticked in any order from the ring, never from
+the intro (`ColdOpen.endTick`), a card per step (STEP n OF 6 · DONE · NEXT), the wall's next-step line and the
+sentence until the level-2 escape; the first order's card stays until the car is ringed (SWAP INTO IT + the key);
+BORROW's second line the first three times; a delivery ring within 250 m of every door (re-baked). Pins chain 2.1,
+2.3, 2.4, 2.5; verify 273 green. At the gate: e2e 2.5/2.6 and the `goal`/`chain` screens.
+
 ## 2026-09-23 — M5.5 slice 1: coins as breadcrumbs
 
 Done: the static island is the gate lines (4 + the cap) and the arcs (3 in

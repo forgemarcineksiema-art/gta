@@ -17,6 +17,7 @@ export { Roadblocks } from './police/Roadblocks';
 export { Cameras, placeCameras, type CameraDesc } from './city/cameras';
 export { Jumps, placeJumps, type JumpDesc } from './city/jumps';
 export { Run, type RunState, type RunCounts } from './run/Run';
+export { goalFor, newGoal, chainStep, CHAIN_STEPS, CHAIN_ALL, STEP, type Goal, type GoalKind } from './run/goal';
 export { ColdOpen, COLD_OPEN_VERBS, coldOpenRoute, type ColdOpenVerb, type ColdOpenRoute } from './run/ColdOpen';
 export { Jobs, type JobDef, type JobKind, type JobState } from './jobs/Jobs';
 export { ORDER_KINDS, CAR_WORDS, orderPaints, packDescriptor, unpackDescriptor, paintName } from './jobs/catalog';

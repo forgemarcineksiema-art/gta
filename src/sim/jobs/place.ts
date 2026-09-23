@@ -249,17 +249,34 @@ export function placeJobs(city: City, seed: number, lanes: LaneTables): JobDef[]
     }
   }
 
-  // deliveries and orders: spread by farthest-point sampling from a seeded clear start
+  // deliveries and orders: first a delivery within `nearDoor` of every door (the first goal after a door is
+  // under forty seconds away, DESIGN.md §13.4), then spread by farthest-point sampling
   const n = cfg.counts.delivery + cfg.counts.order;
-  const kinds: JobKind[] = [];
-  for (let i = 0; i < cfg.counts.delivery; i++) kinds.push('delivery');
-  for (let i = 0; i < cfg.counts.order; i++) kinds.push('order');
-  for (let i = kinds.length - 1; i > 0; i--) {
-    const j = (rng() * (i + 1)) | 0;
-    const t = kinds[i] as JobKind; kinds[i] = kinds[j] as JobKind; kinds[j] = t;
-  }
   const inner = all.filter((c) => c.side === '' || !picked.includes(c));
   const spread: Candidate[] = [];
+  const sites = coverSites(city).dropOffs;
+  for (const site of sites) {
+    let best: Candidate | null = null, bestD = cfg.nearDoor;
+    for (const c of inner) {
+      if (picked.includes(c) || !gapOk(c)) continue;
+      const dd = Math.hypot(c.x - site.door.x, c.z - site.door.z);
+      if (dd >= bestD || !clear(city, c)) continue;
+      best = c;
+      bestD = dd;
+    }
+    if (best && spread.length < cfg.counts.delivery) { spread.push(best); picked.push(best); }
+  }
+  const near = spread.length;
+  const rest: JobKind[] = [];
+  for (let i = near; i < cfg.counts.delivery; i++) rest.push('delivery');
+  for (let i = 0; i < cfg.counts.order; i++) rest.push('order');
+  for (let i = rest.length - 1; i > 0; i--) {
+    const j = (rng() * (i + 1)) | 0;
+    const t = rest[i] as JobKind; rest[i] = rest[j] as JobKind; rest[j] = t;
+  }
+  const kinds: JobKind[] = [];
+  for (let i = 0; i < near; i++) kinds.push('delivery');
+  kinds.push(...rest);
   for (let tries = 0; tries < inner.length && spread.length === 0; tries++) {
     const c = inner[(rng() * inner.length) | 0] as Candidate;
     if (gapOk(c) && clear(city, c)) { spread.push(c); picked.push(c); }
@@ -278,7 +295,7 @@ export function placeJobs(city: City, seed: number, lanes: LaneTables): JobDef[]
     picked.push(best);
   }
 
-  const drops = coverSites(city).dropOffs.map((s) => dropOffTarget(city, s));
+  const drops = sites.map((s) => dropOffTarget(city, s));
   const fences = fenceTargets(city);
   const d = cfg.delivery, o = cfg.order;
   for (let i = 0; i < spread.length; i++) {

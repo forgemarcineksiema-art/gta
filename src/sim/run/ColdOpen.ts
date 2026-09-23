@@ -70,6 +70,8 @@ export class ColdOpen {
   route: ColdOpenRoute | null = null;
   /** The job def the marker starts, -1 outside the script. */
   job = -1;
+  /** The tick the script ended (its door, a skip); -1 before. Events up to it are the intro's, not the chain's. */
+  endTick = -1;
   /** The muscle car held alongside, -1 once taken or let go. */
   candidate = -1;
   /** The furthest route distance the car has reached, m. */
@@ -178,6 +180,8 @@ export class ColdOpen {
   private finish(): void {
     this.active = false;
     this.seen = true;
+    // the last step the script owned (its door's events carry it; a skip between steps, the step before)
+    this.endTick = this.sim.events.tick;
     this.verb = null;
     this.caption = null;
     this.release();

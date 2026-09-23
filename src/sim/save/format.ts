@@ -68,7 +68,7 @@ export interface SaveDoc {
   playSeconds: number;
   /** The day's caches (M5.5 slice 1). */
   caches: SaveCaches;
-  /** The first quarter hour's chain, steps done (M5.5 slice 2); the BORROW hint shown so far. */
+  /** The first quarter hour's chain (M5.5 slice 2): the six steps as bits, ticked in any order; the BORROW hint's appearances. */
   chain: number;
   borrowHints: number;
 }
@@ -234,7 +234,7 @@ function sanitize(raw: Record<string, unknown>): SaveDoc {
   const found = c['found'];
   out.caches = { date: dateString(c['date']), found: typeof found === 'string' && /^[A-Za-z0-9+/]*={0,2}$/.test(found) && found.length <= 12 ? found : '' };
   const chain = raw['chain'];
-  out.chain = typeof chain === 'number' && Number.isInteger(chain) && chain >= 0 && chain <= 6 ? chain : 0;
+  out.chain = typeof chain === 'number' && Number.isInteger(chain) && chain >= 0 && chain <= 63 ? chain : 0;
   const hints = raw['borrowHints'];
   out.borrowHints = typeof hints === 'number' && Number.isInteger(hints) && hints >= 0 && hints <= 9 ? hints : 0;
   return out;

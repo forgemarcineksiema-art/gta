@@ -378,6 +378,18 @@ body {
   pointer-events: none;
 }
 .hud__swap.is-visible { opacity: 1; }
+.hud__swap { flex-wrap: wrap; justify-content: center; }
+.hud__swap-hint {
+  display: none;
+  flex-basis: 100%;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--ui-ink);
+  text-shadow: 2px 2px 0 #000;
+}
+.hud__swap-hint.is-on { display: block; }
 .hud__swap-label {
   font-size: 18px;
   font-weight: 800;
@@ -1001,6 +1013,12 @@ kbd.key {
 .jobs__dist { font-size: 16px; color: var(--ui-ink); }
 .jobs__dist::before { content: '· '; color: var(--ui-ink-dim); }
 .jobs__coins { font-size: 16px; color: var(--ui-accent); font-variant-numeric: tabular-nums; }
+/* the goal line (M5.5): a dot in the colour of the ring the arrow points at; LOSE THEM in danger red */
+.jobs__dot { display: none; width: 12px; height: 12px; border-radius: 50%; border: 2px solid #000; align-self: center; }
+.jobs__dot[data-ring='delivery'] { display: inline-block; background: #ff9f1c; }
+.jobs__dot[data-ring='order'] { display: inline-block; background: #f45bff; }
+.jobs__dot[data-ring='escape'] { display: inline-block; background: #1d4ed8; }
+.jobs__line.is-lose .jobs__kind { color: var(--ui-danger); }
 .jobs__coins:empty { display: none; }
 .jobs__coins::before { content: '· '; color: var(--ui-ink-dim); }
 .jobs__line.is-hurry .jobs__time { color: var(--ui-danger); }
@@ -1023,6 +1041,9 @@ kbd.key {
 }
 .jobs__card[data-kind='order'] { border-left-color: #f45bff; }
 .jobs__card[data-kind='escape'] { border-left-color: var(--ui-accent-2); }
+.jobs__card[data-kind='chain'] { border-left-color: var(--ui-accent); }
+.jobs__card-key { display: none; margin: 4px 0 2px; }
+.jobs__card.is-teach .jobs__card-key { display: inline-block; }
 .jobs__card.is-visible { display: flex; animation: cold-in 0.25s ease-out; }
 .jobs__card-title {
   font-size: 26px;
@@ -1270,6 +1291,16 @@ kbd.key {
   text-shadow: 2px 2px 0 #000;
 }
 .run__first.is-visible { display: block; }
+.run__sentence {
+  display: none;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--ui-accent);
+  text-shadow: 2px 2px 0 #000;
+}
+.run__sentence.is-visible { display: block; }
 .wall__footer {
   display: flex;
   align-items: center;

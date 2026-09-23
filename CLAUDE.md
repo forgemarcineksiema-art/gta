@@ -12,7 +12,7 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 1. Read this file, `docs/PROGRESS.md` and the current milestone contract (M5.5: `docs/M5.5_PLAN.md`; then `docs/M6_PLAN.md`; the design in `docs/DESIGN.md`, §13 first); check `git log --oneline -15`.
 2. Run `npm run verify` (the quick set) before touching anything and at the commit that ends a slice. `npm run verify:gate` (the long bot-driven pins included) only at a milestone gate. Nothing else per slice: see **Pace** below, and read it before every slice.
 3. Work autonomously inside the milestone. Decide, act, note assumptions in `docs/PROGRESS.md`. Stop only at a gate, before destructive/irreversible operations, to change a fixed decision from the brief, or when blocked on something only Marcin can provide.
-4. Commit small and often; never leave significant work uncommitted. Commit messages end with `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
+4. Commit small and often; never leave significant work uncommitted. Commit messages end with a `Co-Authored-By:` line naming the model that did the work (e.g. `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`).
 
 ## Where things live
 

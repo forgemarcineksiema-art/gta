@@ -22,6 +22,7 @@ import { POLICE } from '../police/tuning';
 import type { Quat } from '../scene';
 import type { SimWorld } from '../SimWorld';
 import type { PlayerProbe } from '../traffic/Traffic';
+import { STEP } from './goal';
 
 export type RunState = 'running' | 'closing' | 'door' | 'busted';
 
@@ -53,9 +54,19 @@ export class Run {
   bestRun = 0;
   /** Seconds driven (running or closing) over every session: the save carries it. */
   playSeconds = 0;
-  /** The first quarter hour's chain, steps done, and the BORROW hint shown so far (M5.5 slice 2; the save carries them from slice 1). */
+  /**
+   * The first quarter hour's chain (docs/DESIGN.md §13.4): six steps as bits (`goal.ts` CHAIN_STEPS), ticked
+   * in any order from the ring, never inside the intro; the goal line shows the first undone. `chainSerial`
+   * bumps on a tick and `chainLast` names it (the card). The save carries `chain`.
+   */
   chain = 0;
+  chainSerial = 0;
+  chainLast = -1;
+  /** The BORROW prompt's appearances so far: its second line teaches the disguise the first `chain.hintTimes`. */
   borrowHints = 0;
+  private borrowPrev = false;
+  /** Seconds since a police car was last alongside: a candidate that flickers for a step is the same appearance. */
+  private borrowGone = Infinity;
   /** True until the first door has been opened again: that door ends the cold open and gets no ad (M5 D10). */
   firstDoor = true;
   /** The drop-off being closed or shut, index into `dropOffs`; -1 otherwise. */
@@ -116,7 +127,15 @@ export class Run {
   step(probe: PlayerProbe, dt: number): void {
     // this step's crimes first: the bag must hold them before a door or a fine can end the run
     this.cursor = this.sim.events.readFrom(this.cursor, this.onEvent);
+    // a save from before the chain may own a car already: that step is done, silently
+    if ((this.chain & (1 << STEP.car)) === 0 && this.sim.garage.owned.size > 1) this.chain |= 1 << STEP.car;
     if (this.state === 'door' || this.state === 'busted') return;
+    // a police car alongside: the BORROW prompt comes up (counted once per appearance)
+    const cand = this.sim.life.state.swapCandidate;
+    const borrow = cand >= 0 && this.sim.traffic !== null && this.sim.traffic.police[cand] === 1;
+    if (borrow && !this.borrowPrev && this.borrowGone >= 1 && this.borrowHints < 9) this.borrowHints++;
+    this.borrowGone = borrow ? 0 : this.borrowGone + dt;
+    this.borrowPrev = borrow;
     this.playSeconds += dt;
     if (this.sim.pursuit.state === 'active') this.maxHeat = Math.max(this.maxHeat, this.sim.heat.level);
     if (this.stepBusted(probe, dt)) return;
@@ -348,7 +367,42 @@ export class Run {
     this.counts.coins = 0;
   }
 
+  /** The chain's steps from the ring, at the door too (the bank, the purchases); never the intro's own events. */
+  private chainEvent(e: SimEvent): void {
+    const co = this.sim.coldOpen;
+    if (co.active || e.tick <= co.endTick) return;
+    switch (e.kind) {
+      case 'jobStart':
+        this.tickStep(STEP.take);
+        break;
+      case 'banked':
+        if (e.value > 0) this.tickStep(STEP.bank);
+        if (e.value >= BALANCE.chain.bankGoal) this.tickStep(STEP.big);
+        break;
+      case 'purchase':
+        if (this.sim.garage.owned.size > 1) this.tickStep(STEP.car);
+        break;
+      case 'escape':
+        if (e.value >= BALANCE.chain.escapeLevel) this.tickStep(STEP.escape);
+        break;
+      case 'jobDone':
+        if (this.sim.jobs.defOf(e.target)?.kind === 'order') this.tickStep(STEP.order);
+        break;
+      default:
+        break;
+    }
+  }
+
+  private tickStep(step: number): void {
+    const bit = 1 << step;
+    if ((this.chain & bit) !== 0) return;
+    this.chain |= bit;
+    this.chainLast = step;
+    this.chainSerial++;
+  }
+
   private readonly onEvent = (e: SimEvent): void => {
+    this.chainEvent(e);
     if (this.state === 'door' || this.state === 'busted') return;
     const bag = BALANCE.bag;
     switch (e.kind) {

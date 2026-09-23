@@ -200,6 +200,7 @@ export class App {
     this.garageUi.setKeys({ left: this.input.label('steerLeft'), right: this.input.label('steerRight'), confirm: this.input.label('throttle'), back: this.input.label('brake') });
     this.coldOpenHud = new ColdOpenHud(uiRoot);
     this.jobsHud = new JobsHud(uiRoot);
+    this.jobsHud.setSwapKey(this.input.label('swap'));
     this.coldOpenHud.setKeys({
       throttle: this.input.label('throttle'),
       steerLeft: this.input.label('steerLeft'),

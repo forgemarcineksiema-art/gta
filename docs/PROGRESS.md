@@ -2,6 +2,14 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M5.5 slice 5: the garage dressed, the wall sized
+
+Done: the garage's things along its walls (a pegboard with tools over a workbench and its lamp, four tyres by the
+door, an oil drum, a hose on its hook, a shelf of boxes, the wanted poster on the back wall), one merged mesh a
+garage, no shadows, the car's floor clear (pin 5.1); the wall scales ×1.2 from 1536×864 and ×1.4 at 1080p (660 →
+790 → 920 px, the type with it), unchanged at the small sizes. Smoke 108 draws (+3), 60 fps. Verify 287 green.
+The screens at the ten sizes at the gate.
+
 ## 2026-09-23 — M5.5 slice 4: the police as a different animal
 
 Done: pressure instead of a flat speed (within 60 m the player's speed + 4, within 25 m the class's for the ram or

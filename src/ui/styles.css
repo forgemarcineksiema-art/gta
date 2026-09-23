@@ -1350,6 +1350,13 @@ kbd.key {
 }
 .run__wall .wall__drive.is-focus { background: var(--ui-accent); color: #1a1030; text-shadow: none; }
 /* short screens (800×450 and the like): the same wall, tighter */
+/* the wall grows with a big screen (M5.5, DESIGN.md §13.6): 660 px at the small sizes, 790 at 1536×864, 920 at 1080p */
+@media (min-width: 1400px) and (min-height: 820px) {
+  .run__wall { transform: translate(-50%, -50%) scale(1.2); }
+}
+@media (min-width: 1700px) and (min-height: 1000px) {
+  .run__wall { transform: translate(-50%, -50%) scale(1.4); }
+}
 @media (max-height: 560px) {
   .run__wall { padding: 8px 16px 10px; }
   .run__wall .run__title { font-size: 38px; }

@@ -2,6 +2,17 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M5.5 slice 17: life extras
+
+Done: traffic lights at the nine downtown crossings (no highway or authored road at them): 14 s green, 3 s amber,
+1 s all red per pair of arms, each crossing offset 6 s per block; a car stops at the line on red however long (no
+honk, no forcing through after the 9 s wait), on amber only when it can still stop; a chasing unit or a racer runs
+it. Poles, heads and lamps are the renderer's (no collider, like the street lamps; the chunks' statics, which the job
+placement reads, unchanged). Parked cars: 40 % of the kerbside bays hold one (the same bays and cars every time),
+placed 80–220 m out, at most 10, apart from the moving traffic's count; swap candidates. The takedown's side cut: a
+low view across the wreck from whichever side has a clear line to it, held for the slow motion. The second
+pedestrian silhouette and walk shipped with slice 20. Pins 17.1–17.3.
+
 ## 2026-09-23 — M5.5 slice 16: hidden cars and the toys
 
 Done: the ice-cream truck (a new body at the end of the list, never drawn by the spawner: a shortened box truck, mint

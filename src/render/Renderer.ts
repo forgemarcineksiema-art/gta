@@ -5,7 +5,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CAR_IDS, CAR_PRESETS, GARAGE, PALETTE, SWAP, bodySpec, bodyTuning, isShell, type BodyId, type CarId, type DynamicDesc, type GhostPose, type ShapeDesc, type SimWorld, type StaticDesc } from '../sim';
-import { ChaseCamera } from './ChaseCamera';
+import { ChaseCamera, sideCutEye } from './ChaseCamera';
+import { SignalView } from './SignalView';
 import { CAR_PROFILES } from './carProfiles';
 import { BODY_PROFILES } from './bodyProfiles';
 import { Sparks } from './Sparks';
@@ -128,6 +129,11 @@ export class Renderer {
   private readonly tmpFwd = new THREE.Vector3();
   private readonly onEvent = (e: SimEvent): void => this.handleEvent(e);
   private readonly tmpPos = new THREE.Vector3();
+  /** The takedown whose side cut is on screen, -1 when none; the cut's eye, reused. */
+  private sideCut = -1;
+  private readonly cutEye = { x: 0, y: 0, z: 0 };
+  /** The traffic lights' lamps (M5.5 slice 17). */
+  private readonly signalView: SignalView | null;
   /** The last damage's contact in the car's frame: where the wreck caves in. */
   private readonly lastDent = new THREE.Vector3(0, 0.5, 2);
   private readonly lastCarPos = new THREE.Vector3(Infinity, Infinity, Infinity);
@@ -203,6 +209,7 @@ export class Renderer {
     this.markerView = new MarkerView(this.scene, sim, this.camera);
     this.arrow = new Arrow(this.scene, this.camera);
     this.roadblockView = sim.roadblocks ? new RoadblockView(this.scene) : null;
+    this.signalView = sim.city && sim.traffic ? new SignalView(this.scene, sim) : null;
     this.rampView = sim.jumps ? new RampView(this.scene, sim) : null;
     if (sim.city) this.scene.add(buildSkyline(sim.city));
     if (sim.statics.length) this.buildStatics(sim.statics);
@@ -446,6 +453,7 @@ export class Renderer {
     this.markerView.update(this.sim, alpha);
     this.arrow.update(this.sim, carPos.x, carPos.y, carPos.z);
     this.roadblockView?.update(this.sim);
+    this.signalView?.update(this.sim);
     this.car.update(tm);
     // ghost of the best lap
     if (this.sim.ghostPose(this.ghostPose)) {
@@ -527,16 +535,42 @@ export class Renderer {
     }
   }
 
-  /** The takedown camera looks at the wreck while the slow motion runs; released as soon as it ends or is skipped. */
+  /**
+   * The takedown camera while the slow motion runs: a cut to a low side view across the wreck (M5.5 slice 17)
+   * when a side has a clear line to it, else a look at it from the chase; released as soon as it ends or is skipped.
+   */
   private syncFocus(): void {
     const life = this.sim.life.state;
     const traffic = this.sim.traffic;
     if (life.slowMo > 0 && life.slowMoTarget >= 0 && traffic) {
       const i = life.slowMoTarget;
-      this.chase.focus(traffic.x[i] as number, 0.8, traffic.z[i] as number, 0.2);
-    } else if (this.chase.focusing) {
-      this.chase.release();
+      const wx = traffic.x[i] as number, wz = traffic.z[i] as number, wy = (traffic.y[i] as number) + 0.8;
+      if (this.sideCut !== i && !this.chase.cutting && this.sim.run.state === 'running' && this.cutToSide(wx, wy, wz)) this.sideCut = i;
+      if (this.sideCut !== i) this.chase.focus(wx, 0.8, wz, 0.2);
+    } else {
+      if (this.chase.focusing) this.chase.release();
+      if (this.sideCut >= 0) {
+        this.sideCut = -1;
+        this.chase.releaseCut();
+      }
     }
+  }
+
+  /** The side cut: the eye on the travel's left or right with a clear line to the wreck, looking past it at the car. */
+  private cutToSide(wx: number, wy: number, wz: number): boolean {
+    const car = this.car.root.position;
+    let dx = this.carVel.x, dz = this.carVel.z;
+    if (Math.hypot(dx, dz) < 1) { dx = wx - car.x; dz = wz - car.z; }
+    const n = Math.hypot(dx, dz);
+    if (n < 1e-3) return false;
+    dx /= n; dz /= n;
+    for (const side of [1, -1]) {
+      const eye = sideCutEye(this.cutEye, wx, wy, wz, dx, dz, side);
+      if (this.sim.clearFraction(eye.x, eye.y, eye.z, wx, wy, wz) < 0.99) continue;
+      this.chase.cut(eye.x, eye.y, eye.z, wx + (car.x - wx) * 0.35, wy, wz + (car.z - wz) * 0.35);
+      return true;
+    }
+    return false;
   }
 
   /**

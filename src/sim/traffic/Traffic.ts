@@ -19,7 +19,7 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import { GROUP_DEFAULT, GROUP_TERRAIN, GROUPS_SOLID, interactionGroups } from '../collision';
 import type { City } from '../city/City';
-import type { RoadNode } from '../city/roads';
+import { BLOCK, type RoadNode } from '../city/roads';
 import type { EventLog } from '../events';
 import * as M from '../math';
 import { PALETTE } from '../palette';
@@ -29,11 +29,16 @@ import type { TransformBuffer } from '../transforms';
 import { BALANCE } from '../balance';
 import type { CarId } from '../vehicle/presets';
 import { districtAt } from '../city/City';
-import { BODIES, BODY_IDS, BODY_INDEX, CIVILIAN_PAINTS, pickBody, type BodyId, type RoadKind } from './bodies';
+import { BODIES, BODY_IDS, BODY_INDEX, CIVILIAN_PAINTS, bodySpec, pickBody, type BodyId, type RoadKind } from './bodies';
+import type { ParkingBay } from '../city/markings';
+import { SIGNAL, signalledNodes } from '../city/signals';
 import { LaneTables, type LanePose, type PathProjection } from './lanes';
 import { TRAFFIC, type TrafficTuning } from './tuning';
 
-/** Appended, never renumbered: tests compare the numbers. `Parked` is a stopped police car (a roadblock, a patrol at a junction, a test setup). */
+/**
+ * Appended, never renumbered: tests compare the numbers. `Parked` is a stopped police car (a roadblock, a patrol
+ * at a junction, a test setup) or a civilian in a kerbside bay (`parkedCiv`, M5.5 slice 17).
+ */
 export enum AgentState { Free = 0, Kinematic = 1, Physical = 2, Disturbed = 3, Wrecked = 4, Abandoned = 5, Parked = 6 }
 
 export interface PlayerProbe {
@@ -92,6 +97,23 @@ const ZERO = { x: 0, y: 0, z: 0 };
 export class Traffic {
   readonly tuning: TrafficTuning;
   readonly capacity: number;
+  /** A civilian standing in a kerbside bay (M5.5 slice 17): not moving traffic, not counted toward the density. */
+  readonly parkedCiv: Uint8Array;
+  /** The bay a parked civilian stands in, -1 otherwise. */
+  private readonly parkBay: Int16Array;
+  /** The kerbside bays; which hold a car (by hash), its body and paint, and its record while it stands there. */
+  private readonly bays: readonly ParkingBay[];
+  private readonly bayUsed: Uint8Array;
+  private readonly bayBody: Uint8Array;
+  private readonly bayPaint: Uint32Array;
+  private readonly bayCar: Int16Array;
+  private readonly parkedMax: number;
+  private parkClock = 0;
+  /** The traffic lights (M5.5 slice 17): each node's offset into the cycle, -1 unsignalled; each lane's arriving axis (0 X, 1 Z). */
+  private readonly signalOffset: Float32Array;
+  private readonly laneAxis: Uint8Array;
+  /** The signalled nodes, for the view. */
+  readonly signalNodes: number[] = [];
   readonly lanes: LaneTables;
   readonly state: Uint8Array;
   readonly kind: Uint8Array;
@@ -184,7 +206,8 @@ export class Traffic {
   /** The car that bounded the plan last step: the leader on the lane, the one in the corridor ahead. */
   private readonly leaderAgent: Int16Array;
   private readonly aheadAgent: Int16Array;
-  private clock = 0;
+  /** Seconds of traffic time: the drivers' clocks and the lights run on it (a test may set it). */
+  clock = 0;
   private playerX = 0;
   private playerZ = 0;
   private readonly rng: () => number;
@@ -255,13 +278,17 @@ export class Traffic {
     this.world = world;
     this.transforms = transforms;
     this.tuning = tuning;
-    this.capacity = tuning.agents;
-    this.target = Math.max(0, Math.min(this.capacity, Math.round(tuning.agents * density)));
+    // the moving traffic's records and the kerbside bays' on top
+    this.parkedMax = Math.max(0, Math.round(tuning.parked.max * density));
+    this.capacity = tuning.agents + this.parkedMax;
+    this.target = Math.max(0, Math.min(tuning.agents, Math.round(tuning.agents * density)));
     this.lanes = new LaneTables(city.graph, tuning);
     this.nodes = city.graph.nodes;
     this.rng = mulberry32(seed ^ 0x7a11);
     const n = this.capacity;
     this.state = new Uint8Array(n);
+    this.parkedCiv = new Uint8Array(n);
+    this.parkBay = new Int16Array(n).fill(-1);
     this.kind = new Uint8Array(n);
     this.body = new Uint8Array(n);
     this.police = new Uint8Array(n);
@@ -298,6 +325,37 @@ export class Traffic {
     this.laneFill = new Uint8Array(this.lanes.laneCount);
     this.laneIndex = new Int16Array(this.lanes.laneCount * MAX_ON_LANE);
     this.nodeHolders = new Int32Array(this.nodes.length * HOLDERS);
+    // the lights: the downtown crossings, off the highway and the authored roads
+    this.signalOffset = new Float32Array(this.nodes.length).fill(-1);
+    for (const id of signalledNodes(city.graph)) {
+      const node = this.nodes[id] as RoadNode;
+      const gx = Math.round(node.x / BLOCK), gz = Math.round(node.z / BLOCK);
+      this.signalOffset[id] = (gx + gz + 2 * SIGNAL.within) * tuning.signals.offset;
+      this.signalNodes.push(id);
+    }
+    this.laneAxis = new Uint8Array(this.lanes.laneCount);
+    for (const l of city.graph.lanes) {
+      const pts = l.points, a = pts[pts.length - 2], b = pts[pts.length - 1];
+      if (a && b) this.laneAxis[l.id] = Math.abs(b.x - a.x) >= Math.abs(b.z - a.z) ? 0 : 1;
+    }
+    // the bays: which hold a car, and which car, by the seed alone (the spawner's dice are left alone)
+    this.bays = city.roadMarkings.parking;
+    const nb = this.bays.length;
+    this.bayUsed = new Uint8Array(nb);
+    this.bayBody = new Uint8Array(nb);
+    this.bayPaint = new Uint32Array(nb);
+    this.bayCar = new Int16Array(nb).fill(-1);
+    const dice = mulberry32(seed ^ 0x9a2c);
+    for (let b = 0; b < nb; b++) {
+      const bay = this.bays[b] as ParkingBay;
+      this.bayUsed[b] = dice() < tuning.parked.share ? 1 : 0;
+      let id: BodyId = pickBody(dice(), districtAt(bay.x, bay.z).id, 'street', tuning.bodies);
+      // a 7 m bay: no bus, no box truck
+      if (id === 'bus' || id === 'truck') id = 'sedan';
+      this.bayBody[b] = BODY_INDEX[id];
+      const paints = bodySpec(id).paints;
+      this.bayPaint[b] = paints[Math.floor(dice() * paints.length) % paints.length] as number;
+    }
     this.nodeHoldFor = new Float32Array(this.nodes.length * HOLDERS);
     this.nodeHolders.fill(-1);
     this.next.fill(-1);
@@ -755,6 +813,8 @@ export class Traffic {
 
   private placeAtPoint(i: number, x: number, z: number, yaw: number, body: number, state: AgentState, paint: number): void {
     this.state[i] = state;
+    this.parkedCiv[i] = 0;
+    this.parkBay[i] = -1;
     this.racer[i] = 0;
     this.lights[i] = 0;
     this.police[i] = 0;
@@ -814,6 +874,8 @@ export class Traffic {
     this.police[agent] = 0;
     this.lights[agent] = 0;
     this.clearPolicePlan(agent);
+    this.parkedCiv[agent] = 0;
+    this.parkBay[agent] = -1;
     this.state[agent] = oldWrecked ? AgentState.Wrecked : AgentState.Abandoned;
     this.setBody(agent, BODY_INDEX[oldBody]);
     this.paint[agent] = oldPaint;
@@ -858,6 +920,7 @@ export class Traffic {
     this.despawn(player);
     this.tow(player, dt);
     this.spawn(player);
+    this.park(player, dt);
     this.releaseNodes(dt);
     for (let i = 0; i < this.capacity; i++) if ((this.agentBody[i] as number) >= 0) this.pullPose(i);
     this.buildLaneLists();
@@ -951,7 +1014,12 @@ export class Traffic {
     const entering = nxt >= 0 && s <= len + STOP_TOLERANCE;
     if (!entering) this.wait[i] = 0;
     const waitLimit = this.bad[i] === 1 ? t.temper.badClaimAfter : t.junctionWait;
-    if (entering && !this.mayEnter(i, player)) {
+    if (s <= len + STOP_TOLERANCE && this.redLight(i, lane, len - s)) {
+      // the light (M5.5 slice 17), whatever way on is chosen: a stop at the line however long it takes; no honk, no claim, no forcing through
+      this.wait[i] = 0;
+      const stop = Math.sqrt(2 * t.brake * Math.max(0, len - 0.2 - s));
+      if (stop < desired) { desired = stop; blocker = 4; }
+    } else if (entering && !this.mayEnter(i, player)) {
       const w = this.wait[i] as number;
       if (w < waitLimit && w + dt >= waitLimit) {
         this.waitedPast++;
@@ -1186,6 +1254,21 @@ export class Traffic {
   }
 
   // ---- junctions -------------------------------------------------------------------
+
+  /**
+   * Stopped by the light at the lane's node: not green for its axis, and on amber only when it can still stop
+   * short of the line (`toLine` m away). A car already holding the box, a chasing unit and a racer go on.
+   */
+  private redLight(i: number, lane: number, toLine: number): boolean {
+    const node = this.lanes.toNode[lane] as number;
+    const phase = this.signalPhase(node);
+    if (phase < 0 || this.fast(i) || this.forced[i] === 1 || this.isHolder(node, i)) return false;
+    const axis = this.laneAxis[lane] as number;
+    if (phase === axis * 3) return false;
+    if (phase !== axis * 3 + 1) return true;
+    const v = this.speed[i] as number;
+    return toLine > (v * v) / (2 * this.tuning.brake) + 1;
+  }
 
   private mayEnter(i: number, player: PlayerProbe): boolean {
     const t = this.tuning;
@@ -1702,8 +1785,61 @@ export class Traffic {
 
   private alive(): number {
     let n = 0;
-    for (let i = 0; i < this.capacity; i++) if (this.state[i] !== AgentState.Free) n++;
+    for (let i = 0; i < this.capacity; i++) if (this.state[i] !== AgentState.Free && this.parkedCiv[i] === 0) n++;
     return n;
+  }
+
+  /**
+   * The kerbside bays (M5.5 slice 17): twice a second, the bays that hold a car and stand `near`–`far` m from
+   * the player get it, up to the cap. A record that left its bay (taken, shoved into a wreck, freed) lets the bay
+   * go; it fills again only once the player is `near` m away.
+   */
+  private park(player: PlayerProbe, dt: number): void {
+    if (this.parkedMax <= 0) return;
+    this.parkClock -= dt;
+    if (this.parkClock > 0) return;
+    this.parkClock = 0.5;
+    const t = this.tuning.parked;
+    let n = 0;
+    for (let b = 0; b < this.bays.length; b++) {
+      const a = this.bayCar[b] as number;
+      if (a < 0) continue;
+      if (this.state[a] !== AgentState.Parked || this.parkedCiv[a] !== 1 || this.parkBay[a] !== b) { this.bayCar[b] = -1; continue; }
+      n++;
+    }
+    for (let b = 0; b < this.bays.length && n < this.parkedMax; b++) {
+      if (this.bayUsed[b] !== 1 || (this.bayCar[b] as number) >= 0) continue;
+      const bay = this.bays[b] as ParkingBay;
+      const d = Math.hypot(bay.x - player.x, bay.z - player.z);
+      if (d < t.near || d > t.far || this.nearWorld(bay.x, bay.z, 4)) continue;
+      const i = this.findFree();
+      if (i < 0) return;
+      this.placeAtPoint(i, bay.x, bay.z, bay.yaw, this.bayBody[b] as number, AgentState.Parked, this.bayPaint[b] as number);
+      this.parkedCiv[i] = 1;
+      this.parkBay[i] = b;
+      this.bayCar[b] = i;
+      n++;
+    }
+  }
+
+  /**
+   * A signalled node's light now (M5.5 slice 17): 0 green along X, 1 amber X, 2 all red, 3 green along Z,
+   * 4 amber Z, 5 all red; -1 where there is no light.
+   */
+  signalPhase(node: number): number {
+    const off = this.signalOffset[node] as number;
+    if (off < 0) return -1;
+    const s = this.tuning.signals;
+    const half = s.green + s.amber + s.allRed;
+    let u = (this.clock + off) % (2 * half);
+    const axis = u < half ? 0 : 1;
+    if (axis === 1) u -= half;
+    return axis * 3 + (u < s.green ? 0 : u < s.green + s.amber ? 1 : 2);
+  }
+
+  /** The lane's arriving axis at its node: 0 along X, 1 along Z. */
+  axisOf(lane: number): number {
+    return this.laneAxis[lane] as number;
   }
 
   /** The record's body and, with it, its class. */
@@ -1714,6 +1850,8 @@ export class Traffic {
 
   private place(i: number, lane: number, s: number, body: number, offset: number, state: AgentState, paint: number): void {
     this.state[i] = state;
+    this.parkedCiv[i] = 0;
+    this.parkBay[i] = -1;
     this.racer[i] = 0;
     this.drawDriver(i);
     this.lights[i] = 0;
@@ -1754,6 +1892,8 @@ export class Traffic {
     if ((this.agentBody[i] as number) >= 0) this.releaseBody(i);
     this.releaseHolds(i);
     this.state[i] = AgentState.Free;
+    this.parkedCiv[i] = 0;
+    this.parkBay[i] = -1;
     this.police[i] = 0;
     this.racer[i] = 0;
     this.lights[i] = 0;

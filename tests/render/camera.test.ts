@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import { describe, expect, test } from 'vitest';
-import { ChaseCamera } from '../../src/render/ChaseCamera';
+import { ChaseCamera, SIDE_CUT, sideCutEye } from '../../src/render/ChaseCamera';
 import type { VehicleTelemetry } from '../../src/sim';
 
 function telemetry(over: Partial<VehicleTelemetry> = {}): VehicleTelemetry {
@@ -171,5 +171,20 @@ describe('chase camera whip and focus', () => {
     const dir = new THREE.Vector3();
     r.cam.getWorldDirection(dir);
     expect(Math.abs(Math.atan2(dir.x, dir.z)) * 180 / Math.PI).toBeLessThan(5);
+  });
+});
+
+describe('the takedown side cut (M5.5 slice 17)', () => {
+  test('17.3 the eye stands to the side of the travel, a little behind the wreck and above it', () => {
+    const out = { x: 0, y: 0, z: 0 };
+    // travelling +Z: left is +X
+    sideCutEye(out, 10, 0.8, 20, 0, 1, 1);
+    expect(out).toEqual({ x: 10 + SIDE_CUT.side, y: 0.8 + SIDE_CUT.up, z: 20 - SIDE_CUT.back });
+    sideCutEye(out, 10, 0.8, 20, 0, 1, -1);
+    expect(out.x).toBeCloseTo(10 - SIDE_CUT.side, 9);
+    // travelling +X: left is -Z, behind is -X
+    sideCutEye(out, 0, 0, 0, 1, 0, 1);
+    expect(out.x).toBeCloseTo(-SIDE_CUT.back, 9);
+    expect(out.z).toBeCloseTo(-SIDE_CUT.side, 9);
   });
 });

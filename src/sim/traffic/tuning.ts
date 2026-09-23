@@ -29,6 +29,18 @@ export interface TrafficTuning {
   playerLateral: number;
   junctionWait: number;
   junctionClear: number;
+  /**
+   * Traffic lights at the downtown crossings (M5.5 slice 17, city/signals.ts picks them): each pair of arms gets
+   * `green` s, `amber` s and `allRed` s, then the other pair; each crossing's cycle is offset `offset` s per block
+   * along the diagonal. A chasing unit or a racing rival runs the red.
+   */
+  signals: { green: number; amber: number; allRed: number; offset: number };
+  /**
+   * Parked cars in the kerbside bays (M5.5 slice 17): `share` of the bays hold one (the same bays and cars every
+   * time, a hash of the bay and the seed), placed `near`–`far` m from the player, at most `max` at once (times the
+   * density), apart from the moving traffic's count; swap candidates like any stopped car.
+   */
+  parked: { share: number; near: number; far: number; max: number };
   highwayGap: number;
   /** Chance a highway car takes the same lane out of a junction instead of choosing among every exit. */
   highwayKeepLane: number;
@@ -153,6 +165,8 @@ export const TRAFFIC: TrafficTuning = {
   playerLateral: 2.6,
   junctionWait: 9,
   junctionClear: 4,
+  signals: { green: 14, amber: 3, allRed: 1, offset: 6 },
+  parked: { share: 0.4, near: 80, far: 220, max: 10 },
   highwayGap: 25,
   highwayKeepLane: 0.85,
   disturbedImpact: 1.5,

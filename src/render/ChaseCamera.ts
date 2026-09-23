@@ -122,6 +122,21 @@ function wrapAngle(a: number): number {
   return a;
 }
 
+/** The takedown's side cut (M5.5 slice 17): metres to the side of the wreck, behind it along the travel, above it. */
+export const SIDE_CUT = { side: 9, back: 3, up: 1.2 } as const;
+
+/**
+ * The side cut's eye for a wreck at (wx, wy, wz) and the player's travel (dx, dz), unit: `side` +1 on the travel's
+ * left, -1 on its right, `SIDE_CUT.back` m behind the wreck so the car driving on is in the frame beyond it.
+ */
+export function sideCutEye(out: { x: number; y: number; z: number }, wx: number, wy: number, wz: number, dx: number, dz: number, side: number): { x: number; y: number; z: number } {
+  // left of the travel (dx, dz) is (dz, -dx): +X is left when facing +Z
+  out.x = wx + dz * side * SIDE_CUT.side - dx * SIDE_CUT.back;
+  out.y = wy + SIDE_CUT.up;
+  out.z = wz - dx * side * SIDE_CUT.side - dz * SIDE_CUT.back;
+  return out;
+}
+
 export class ChaseCamera {
   tuning: CameraTuning = { ...DEFAULT_CAMERA };
   mode: CameraMode = 'chase';

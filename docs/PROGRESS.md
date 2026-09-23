@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-23 — M6 slice 6: the driver's kit and the STYLE page
+
+Done: `garage/kit.ts`, the catalogue of 43 items in five slots (toppers now; neon, horns, flames, smoke drawn in slice
+7), bought, won (a rival's from their win, the cone from the streak) or taken off (`BARE`); the day's pick is one item
+not had, the same all day by the date, at half price (no crate, no dice). Seventeen toppers in `render/kitMesh.ts` (the
+duck, a shark fin, a crown, a traffic light, a donut, a dish, a mattress, a trophy, a flamingo, the rivals' seven),
+under 300 triangles each, on the roof of whatever car the player drives. PAINT is STYLE: the paint, then the roof's row;
+a card wears, takes off or buys. The save keeps it. Pins M6 6.1–6.4. Verify green (365 tests).
+
 ## 2026-09-23 — M6 slices 4–5: the rivals' cars and the posters
 
 Done: eleven profiles (`bodyProfiles.ts`) on their bodies: Granny's lavender wagon (a blower, side pipes, flower pots on

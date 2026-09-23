@@ -319,7 +319,8 @@ function sanitize(raw: Record<string, unknown>): SaveDoc {
   const kit = isRecord(raw['kit']) ? raw['kit'] : {};
   const kitOwned = kit['owned'];
   const on = Array.isArray(kit['on']) ? kit['on'] : [];
-  const slot = (x: unknown): number => (typeof x === 'number' && Number.isInteger(x) && x >= -1 && x <= 255 ? x : -1);
+  // a kit index, -1 never chosen, -2 taken off on purpose (`BARE`)
+  const slot = (x: unknown): number => (typeof x === 'number' && Number.isInteger(x) && x >= -2 && x <= 255 ? x : -1);
   out.kit = {
     owned: typeof kitOwned === 'string' && /^[A-Za-z0-9+/]*={0,2}$/.test(kitOwned) && kitOwned.length <= 32 ? kitOwned : '',
     on: [slot(on[0]), slot(on[1]), slot(on[2]), slot(on[3]), slot(on[4])],
@@ -397,6 +398,9 @@ export function collect(sim: SimWorld, into: SaveDoc): void {
   into.medals = medals.replace(/0+$/, '');
   if (sim.jumps) into.jumps = encodeBits(sim.jumps.found);
   into.board.beaten = sim.board.beaten;
+  // the driver's kit: bought as bits, worn per slot
+  into.kit.owned = encodeBits(sim.kit.owned);
+  for (let i = 0; i < 5; i++) into.kit.on[i] = sim.kit.on[i] as number;
   const c = sim.career, out = into.career;
   out.races = c.races; out.zones = c.zones; out.fares = c.fares; out.hotFares = c.hotFares;
   out.orders = c.orders; out.takedowns = c.takedowns; out.caches = c.caches;
@@ -439,6 +443,10 @@ export function apply(sim: SimWorld, save: SaveDoc): void {
   // a hidden car owned is one found: its stash stays empty
   sim.stash.found.clear();
   for (const id of HIDDEN_CARS) if (garage.owned.has(id)) sim.stash.found.add(id);
+  // the driver's kit (M6 slice 6)
+  decodeBits(save.kit.owned, sim.kit.owned);
+  for (let i = 0; i < 5; i++) sim.kit.on[i] = save.kit.on[i] as number;
+  sim.kit.serial++;
   // the wanted board: the rivals beaten own their cars (their bodies may be newer than the save)
   sim.board.beaten = save.board.beaten;
   for (let i = 0; i <= CHIEF && i < RIVALS.length; i++) if (sim.board.isBeaten(i)) sim.board.ownCar(i);

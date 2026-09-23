@@ -191,6 +191,8 @@ export const BALANCE = {
     breakers: { reach: 10, behind: 120 },
     escort: 2,
   },
+  /** The driver's kit (M6, DESIGN.md §14.4): the day's pick at this share of its price; each item's price is in `garage/kit.ts`. */
+  kit: { pickShare: 0.5 },
   /** Bring it home, pay to keep it (DESIGN.md §13.7): a car driven through a door, not owned yet, is kept for this share of its price (the police car for `police`). */
   keep: { share: 0.3, police: 0.6 },
   /**

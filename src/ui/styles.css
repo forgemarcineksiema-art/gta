@@ -1204,6 +1204,8 @@ kbd.key {
   scrollbar-width: none;
 }
 .wall__cars::-webkit-scrollbar { display: none; }
+/* the STYLE page's kit rows (M6): the cars' row's cards, a little lower */
+.wall__kit .wall__card { min-height: 78px; }
 .wall__card {
   display: flex;
   flex-direction: column;

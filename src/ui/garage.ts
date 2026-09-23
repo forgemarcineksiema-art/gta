@@ -15,8 +15,8 @@
  * to draw. Rebuilds only when the garage, the bank or the totals change.
  */
 import {
-  BALANCE, BODY_IDS, BODY_WORDS, CHIEF, DISTRICTS, MEDAL_WORDS, PALETTE, RIVALS, STATS, isShell, posterNumber, reqText,
-  type BodyId, type PrepItem, type RivalDef, type SimWorld, type Stat,
+  BALANCE, BODY_IDS, BODY_WORDS, CHIEF, DISTRICTS, KIT, MEDAL_WORDS, PALETTE, RIVALS, STATS, STREAK, isShell, posterNumber, reqText,
+  type BodyId, type KitSlot, type PrepItem, type RivalDef, type SimWorld, type Stat,
 } from '../sim';
 
 export interface GarageActions {
@@ -26,6 +26,8 @@ export interface GarageActions {
   /** Any owned car as the drive-out: the catalogue's, a kept one, a hidden car found. */
   select(car: BodyId): void;
   respray(car: BodyId, paint: number): void;
+  /** A driver's kit item (M6): worn or taken off when had, bought when for sale. */
+  kit(item: number): void;
   /** The tiers of the car's class. */
   upgrade(car: BodyId, stat: Stat): void;
   buyPrep(item: PrepItem): void;
@@ -42,7 +44,11 @@ export interface WallNav {
 }
 
 export type WallPage = 'wall' | 'board' | 'cars' | 'paint' | 'tune' | 'prep' | 'dailies';
-const PAGE_TITLES: Record<WallPage, string> = { wall: 'TOTALS', board: 'BOARD', cars: 'CARS', paint: 'PAINT', tune: 'TUNE', prep: 'PREP', dailies: 'DAILIES' };
+const PAGE_TITLES: Record<WallPage, string> = { wall: 'TOTALS', board: 'BOARD', cars: 'CARS', paint: 'STYLE', tune: 'TUNE', prep: 'PREP', dailies: 'DAILIES' };
+
+/** The driver's kit's slots on the STYLE page (M6), in order, and each row's heading. */
+export const STYLE_SLOTS: readonly KitSlot[] = ['topper'];
+const SLOT_WORDS: Record<KitSlot, string> = { topper: 'ON THE ROOF · GOES INTO EVERY CAR YOU TAKE', neon: 'NEON', horn: 'HORN · H', flame: 'BOOST FLAME', smoke: 'TYRE SMOKE' };
 
 /** The seven car paints of the palette (docs/STYLE.md): the respray is free. */
 export const GARAGE_PAINTS: readonly number[] = [
@@ -75,6 +81,8 @@ export class GarageUi {
   private readonly driveButton: HTMLButtonElement;
   private readonly hint: HTMLElement;
   private readonly paintFor: HTMLElement;
+  /** The STYLE page's kit cards (M6): the item's index in `KIT` beside each card. */
+  private readonly kitCards: Array<{ el: HTMLButtonElement; item: number }> = [];
   private readonly tuneFor: HTMLElement;
   private readonly carsCount: HTMLElement;
   /** The BOARD page (M6): your place, a chip per poster, the next rival's poster. */
@@ -159,7 +167,7 @@ export class GarageUi {
     cars.append(this.carsCount, grid);
     this.items.set('cars', carItems);
 
-    // PAINT: seven swatches for the garage car
+    // STYLE (M6 slice 6; PAINT before): the car's paint, then the driver's kit a row a slot
     const paint = this.newPage('paint');
     this.paintFor = el('div', 'wall__for');
     const swatches = el('div', 'wall__swatches');
@@ -172,6 +180,22 @@ export class GarageUi {
       paintItems.push(this.item('paint', b, () => this.actions.respray(this.sim.garage.car, hex)));
     }
     paint.append(this.paintFor, swatches);
+    for (const slot of STYLE_SLOTS) {
+      const row = el('div', 'wall__cars wall__kit');
+      for (let i = 0; i < KIT.length; i++) {
+        const k = KIT[i];
+        if (!k || k.slot !== slot) continue;
+        const b = button('wall__card', '');
+        b.dataset['kit'] = k.id;
+        const sw = el('span', 'wall__card-swatch');
+        sw.style.background = `#${k.colour.toString(16).padStart(6, '0')}`;
+        b.append(sw, el('span', 'wall__card-name', k.name), el('span', 'wall__card-status'));
+        row.appendChild(b);
+        paintItems.push(this.item('paint', b, () => this.actions.kit(i)));
+        this.kitCards.push({ el: b, item: i });
+      }
+      paint.append(el('div', 'wall__for', SLOT_WORDS[slot]), row);
+    }
     this.items.set('paint', paintItems);
 
     // TUNE: three stats, three tiers
@@ -316,9 +340,9 @@ export class GarageUi {
     if (!this.isOpen) return;
     const g = sim.garage;
     const funds = sim.run.funds;
-    if (g.serial === this.garageSerial && funds === this.bank && sim.dailies.serial === this.dailySerial && sim.run.hot === this.hot) return;
+    if (g.serial + sim.kit.serial * 4096 === this.garageSerial && funds === this.bank && sim.dailies.serial === this.dailySerial && sim.run.hot === this.hot) return;
     this.hot = sim.run.hot;
-    this.garageSerial = g.serial;
+    this.garageSerial = g.serial + sim.kit.serial * 4096;
     this.bank = funds;
     this.dailySerial = sim.dailies.serial;
     this.bankValue.textContent = money(funds);
@@ -349,10 +373,25 @@ export class GarageUi {
       status.textContent = g.car === id ? 'SELECTED' : owned ? 'OWNED' : locked ? 'ESCAPE HEAT 5 FIRST'
         : hot ? `HOT · KEEP IT ${money(g.keepPrice(id))}` : money(g.price(id));
     }
-    // PAINT
+    // STYLE: the paint, and each kit card: worn, had, today's pick, its price, or who has it
     this.paintFor.textContent = `PAINT: ${BODY_WORDS[g.car]} · FREE`;
     const paint = this.items.get('paint') ?? [];
     for (let k = 0; k < GARAGE_PAINTS.length; k++) (paint[k] as Item).el.classList.toggle('is-selected', g.paintOf(g.car) === GARAGE_PAINTS[k]);
+    const kit = sim.kit, pick = kit.pick(sim.dailies.date);
+    for (const { el: b, item } of this.kitCards) {
+      const k = KIT[item];
+      if (!k) continue;
+      const has = kit.has(item), worn = kit.worn(k.slot) === item, price = kit.priceOf(item);
+      const status = b.querySelector('.wall__card-status') as HTMLElement;
+      b.classList.toggle('is-selected', worn);
+      b.classList.toggle('is-owned', has);
+      b.classList.toggle('is-locked', !has && k.price <= 0);
+      b.classList.toggle('is-hot', !has && item === pick);
+      b.classList.toggle('is-short', !has && k.price > 0 && funds < price);
+      status.textContent = worn ? 'WORN' : has ? 'WEAR IT'
+        : k.won === STREAK ? '7-DAY STREAK' : k.won >= 0 ? `BEAT ${RIVALS[k.won]?.name ?? ''}`
+          : item === pick ? `TODAY ${money(price)}` : money(price);
+    }
     // TUNE: the tiers belong to the car's class, so every car of the class drives with them
     this.tuneFor.textContent = `TUNING: ${BODY_WORDS[g.car]}`;
     const tune = this.items.get('tune') ?? [];
@@ -531,8 +570,8 @@ export class GarageUi {
     }
     const list = this.visibleItems();
     for (const items of this.items.values()) for (const it of items) it.el.classList.toggle('is-focus', this.level === 'items' && list[this.focus] === it && !this.offerOpen);
-    // the cars' row scrolls: the focused card is brought into view
-    const focused = this.level === 'items' && this.page === 'cars' ? list[this.focus]?.el : undefined;
+    // the cars' row and the kit's rows scroll: the focused card is brought into view
+    const focused = this.level === 'items' && (this.page === 'cars' || this.page === 'paint') ? list[this.focus]?.el : undefined;
     if (focused && typeof focused.scrollIntoView === 'function') focused.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     this.offerRow.classList.toggle('is-open', this.offerOpen);
     this.offerDouble.classList.toggle('is-focus', this.offerOpen && this.offerFocus === 0);

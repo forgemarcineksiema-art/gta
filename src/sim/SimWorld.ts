@@ -38,6 +38,7 @@ import { Fares } from './jobs/Fares';
 import { jobsFor } from './jobs/place';
 import { Garage } from './garage/Garage';
 import { Board } from './board/Board';
+import { Kit } from './garage/kit';
 import { Career } from './board/Career';
 import { Dailies } from './dailies/Dailies';
 import { apply as applySave, type SaveV1 } from './save/format';
@@ -158,6 +159,8 @@ export class SimWorld {
   readonly board: Board;
   /** Lifetime counts the board's requirements read (M6). */
   readonly career: Career;
+  /** The driver's kit (M6): what the player wears into every car. */
+  readonly kit: Kit;
   /** The day's three challenges and the streak (M5 slice 6). */
   readonly dailies: Dailies;
   /** The city's smashable billboards; null on the playground. */
@@ -249,6 +252,7 @@ export class SimWorld {
     this.garage = new Garage(this);
     this.board = new Board(this);
     this.career = new Career(this);
+    this.kit = new Kit(this);
     this.traffic = this.city ? new Traffic(this.world, this.transforms, this.city, opts.seed ?? 42, TRAFFIC, this.trafficDensity) : null;
     this.peds = this.city && this.traffic ? new Pedestrians(this.transforms, this.city, this.traffic.lanes, opts.seed ?? 42, PEDS, this.pedsDensity) : null;
     this.collectibles = this.city ? new Collectibles(this.city) : null;

@@ -4,7 +4,7 @@
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { CAR_IDS, CAR_PRESETS, GARAGE, PALETTE, SWAP, bodySpec, bodyTuning, isShell, type BodyId, type CarId, type DynamicDesc, type GhostPose, type ShapeDesc, type SimWorld, type StaticDesc } from '../sim';
+import { CAR_IDS, CAR_PRESETS, GARAGE, KIT, PALETTE, SWAP, bodySpec, bodyTuning, isShell, type BodyId, type CarId, type DynamicDesc, type GhostPose, type ShapeDesc, type SimWorld, type StaticDesc } from '../sim';
 import { ChaseCamera, sideCutEye } from './ChaseCamera';
 import { SignalView } from './SignalView';
 import { BreakerView } from './BreakerView';
@@ -13,7 +13,8 @@ import { CAR_PROFILES } from './carProfiles';
 import { BODY_PROFILES } from './bodyProfiles';
 import { Sparks } from './Sparks';
 import { SpeedLines } from './SpeedLines';
-import { buildCarMesh, buildTopper, type CarMesh } from './carMesh';
+import { buildCarMesh, type CarMesh } from './carMesh';
+import { topperGeometry } from './kitMesh';
 import { CityView, QUALITY, type QualityTier } from './CityView';
 import { SHADOW_HALF, SUN_OFFSET, stableShadowTarget } from './shadows';
 import { gableGeometry, prismGeometry } from './geometry';
@@ -121,8 +122,12 @@ export class Renderer {
   private eventSeq = 0;
   /** The garage's serial last applied to the player's meshes (the resprays). */
   private garageSerial = -1;
-  /** The streak's topper, on the roof of the car the player drives. */
-  private readonly topper = buildTopper();
+  /** The topper worn (the driver's kit, M6), on the roof of the car the player drives: a holder for the one shown. */
+  private readonly topper = new THREE.Group();
+  /** The topper shown, by kit id ('' none), and each one built so far. */
+  private topperId = '';
+  private readonly topperMeshes = new Map<string, THREE.Mesh>();
+  private readonly topperMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
   /** Each shown body's roof height above its origin, for the topper and the camera's fit. */
   private readonly roofY: Partial<Record<BodyId, number>>;
   private smokeAcc = 0;
@@ -399,6 +404,24 @@ export class Renderer {
     return mesh;
   }
 
+  /** The topper worn now on the roof: built the first time it is worn, one child of the holder at a time. */
+  private syncTopper(): void {
+    const worn = this.sim.kit.worn('topper');
+    const id = worn >= 0 ? (KIT[worn]?.id ?? '') : '';
+    if (id === this.topperId) return;
+    this.topperId = id;
+    this.topper.clear();
+    if (!id) return;
+    let mesh = this.topperMeshes.get(id);
+    if (!mesh) {
+      mesh = new THREE.Mesh(topperGeometry(id), this.topperMaterial);
+      mesh.name = `topper-${id}`;
+      mesh.castShadow = true;
+      this.topperMeshes.set(id, mesh);
+    }
+    this.topper.add(mesh);
+  }
+
   private syncCar(): void {
     const sim = this.sim;
     const body = sim.carBody;
@@ -438,8 +461,7 @@ export class Renderer {
       for (const id of CAR_IDS) this.cars[id].setPaint(this.sim.garage.paintOf(id));
     }
     this.syncCar();
-    const topper = this.sim.dailies.streak.topper;
-    if (this.topper.visible !== topper) this.topper.visible = topper;
+    this.syncTopper();
     this.applyTransforms(alpha);
     this.trafficView?.update(this.sim.transforms, alpha);
     this.pedView?.update(this.sim.transforms, alpha);

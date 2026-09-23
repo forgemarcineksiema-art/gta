@@ -195,6 +195,12 @@ export class App {
         if (this.adShowing || !sim.garage.select(car)) return;
         sim.garage.applyToVehicle();
       },
+      kit: (item) => {
+        if (this.adShowing) return;
+        if (sim.kit.has(item)) sim.kit.wear(item);
+        else if (sim.kit.buy(item) !== 'ok') return;
+        this.store.markDirty();
+      },
       respray: (car, paint) => {
         if (this.adShowing) return;
         sim.garage.respray(car, paint);

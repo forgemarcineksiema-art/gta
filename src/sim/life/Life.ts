@@ -56,7 +56,7 @@ export class Life {
   private oncomingEvent = 0;
   private readonly proj = { x: 0, y: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };
   private readonly rot = { x: 0, y: 0, z: 0, w: 1 };
-  private readonly handover: SwapHandover = { x: 0, y: 0, z: 0, yaw: 0, vx: 0, vz: 0, kind: 'muscle', body: 'muscle', paint: 0 };
+  private readonly handover: SwapHandover = { x: 0, y: 0, z: 0, yaw: 0, vx: 0, vz: 0, kind: 'muscle', body: 'muscle', paint: 0, police: false };
   private readonly oldPose = { x: 0, y: 0, z: 0, yaw: 0 };
 
   /** `damageEnabled` false keeps the playground a handling lab: hits are classified and reported, nothing dents or wrecks. */
@@ -310,7 +310,8 @@ export class Life {
     // a car taken on the road has no kit of the garage's (M6 slice 8)
     this.sim.garageDriven = false;
     // a civilian body keeps the paint it had (the yellow taxi stays yellow); a class's own shell takes the garage's
-    this.sim.carPaint = isShell(h.body) ? this.sim.garage.paintOf(h.kind) : h.paint;
+    // and a police car keeps its colours: the disguise is the livery (M8.8 slice 1)
+    this.sim.carPaint = isShell(h.body) && !h.police ? this.sim.garage.paintOf(h.kind) : h.paint;
     // the class's upgrades drive every body of the class (DESIGN.md §14.6), a car taken on the street too (M8.8 slice 0)
     v.tuning = this.sim.garage.tuningFor(h.body);
     v.applyTuning();
@@ -330,7 +331,7 @@ export class Life {
     this.state.swapCandidate = -1;
     // identity (docs/DESIGN.md §2.5): a swap no unit saw loses them, and they box the car you left
     const police = this.sim.police;
-    if (this.sim.pursuit.onSwap(police?.crimeSeen() ?? false, h.kind, this.sim.carPaint, h.body)) police?.box(this.oldPose.x, this.oldPose.z, oldYaw);
+    if (this.sim.pursuit.onSwap(police?.crimeSeen() ?? false, h.kind, this.sim.carPaint, h.body, h.police)) police?.box(this.oldPose.x, this.oldPose.z, oldYaw);
   }
 
   /** Set the damage directly (the cold open's beat-up van); the stage follows, silently, and a wreck is never set this way. */

@@ -1,7 +1,7 @@
 /** Police fittings share the traffic transforms; all light comes from vertex colour. */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { CAR_PRESETS, PALETTE, type CarId, type SimWorld } from '../../sim';
+import { CAR_PRESETS, PALETTE, isShell, type CarId, type SimWorld } from '../../sim';
 import { AgentState } from '../../sim/traffic/Traffic';
 import { CAR_PROFILES } from '../cars/carProfiles';
 import type { CarMesh } from '../cars/carMesh';
@@ -87,6 +87,19 @@ const CHIEF_LIVERY: LiveryStyle = {
 /** One kit per liveried class; anything else wearing `traffic.police` renders plain. The Chief's Cruiser has its own. */
 const LIVERIES: ReadonlyArray<readonly [CarId, LiveryStyle]> = [['police', POLICE_LIVERY], ['sports', SPORTS_LIVERY], ['heavy', HEAVY_LIVERY]];
 
+/**
+ * The player's livery on one class's mesh (M8.8 slice 1): a police car of any class the player drives is a disguise,
+ * so a borrowed interceptor or van wears its class's livery as the patrol car does.
+ */
+interface PlayerLivery {
+  readonly details: THREE.Mesh;
+  readonly lenses: THREE.Mesh;
+  readonly positions: Float32Array;
+  stage: number;
+  /** -1 dark, else the phase it was last lit at (lit while the disguise holds). */
+  lit: number;
+}
+
 /** Instanced meshes plus the packed-instance bookkeeping for one liveried class. */
 interface LiveryKit {
   readonly details: THREE.InstancedMesh;
@@ -106,9 +119,10 @@ export class PoliceView {
   private readonly kits: LiveryKit[] = [];
   private readonly kitOf: Partial<Record<CarId, LiveryKit>> = {};
   private readonly chiefKit: LiveryKit;
-  private readonly playerDetails: THREE.Mesh;
-  private readonly playerLenses: THREE.Mesh;
-  private readonly playerPositions: Float32Array;
+  /** The player's liveries, built on each liveried class's mesh the first time the player drives it as police. */
+  private readonly playerLiveries: Partial<Record<CarId, PlayerLivery>> = {};
+  /** The class whose livery the player's car wears now, or null. */
+  private shownLivery: CarId | null = null;
   private readonly live: Uint8Array;
   private readonly position = new THREE.Vector3();
   private readonly qa = new THREE.Quaternion();
@@ -116,11 +130,8 @@ export class PoliceView {
   private readonly matrix = new THREE.Matrix4();
   private readonly color = new THREE.Color();
   private phase = -1;
-  private playerStage = -1;
-  /** The player's own bar: -1 dark, else the phase it was last lit at (lit while the disguise holds). */
-  private playerLit = -1;
 
-  constructor(scene: THREE.Scene, private readonly sim: SimWorld, player: CarMesh) {
+  constructor(scene: THREE.Scene, private readonly sim: SimWorld, private readonly players: Partial<Record<CarId, CarMesh>>) {
     const capacity = sim.traffic?.capacity ?? 1;
     this.live = new Uint8Array(capacity);
     const kitFor = (id: CarId, style: LiveryStyle, count: number): LiveryKit => {
@@ -140,15 +151,63 @@ export class PoliceView {
     for (const [id, style] of LIVERIES) this.kitOf[id] = kitFor(id, style, capacity);
     // two: a new Chief can come on while the last one's wreck still lies in the road
     this.chiefKit = kitFor('police', CHIEF_LIVERY, 2);
+    this.liveryFor('police');
+  }
 
+  /** The player's livery on a class's mesh, built once; null for a class the police do not drive. */
+  private liveryFor(id: CarId): PlayerLivery | null {
+    const have = this.playerLiveries[id];
+    if (have) return have;
+    const style = LIVERIES.find(([k]) => k === id)?.[1], mesh = this.players[id];
+    if (!style || !mesh) return null;
     // Player bodies are authored relative to the sprung chassis, traffic to the ground.
-    const t = sim.carId === 'police' ? sim.vehicle.tuning : CAR_PRESETS.police;
+    const t = this.sim.carId === id ? this.sim.vehicle.tuning : CAR_PRESETS[id];
     const y0 = t.wheelRadius + t.suspensionRestLength - t.mass * (9.81 + t.extraGravity) / (4 * t.suspensionStiffness) - t.suspensionAttachY;
-    const body = player.root.getObjectByName('body-and-trim') as THREE.Mesh;
-    this.playerDetails = new THREE.Mesh(buildDetails(body.geometry, y0, POLICE_LIVERY), this.material.clone());
-    this.playerPositions = new Float32Array(this.playerDetails.geometry.getAttribute('position').array);
-    this.playerLenses = new THREE.Mesh(buildLenses(POLICE_LIVERY.bar.lens).translate(0, -y0, 0), this.lensMaterial);
-    player.root.add(this.playerDetails, this.playerLenses);
+    const body = mesh.root.getObjectByName('body-and-trim') as THREE.Mesh;
+    const details = new THREE.Mesh(buildDetails(body.geometry, y0, style), this.material.clone());
+    const lenses = new THREE.Mesh(buildLenses(style.bar.lens).translate(0, -y0, 0), this.lensMaterial);
+    details.visible = false;
+    lenses.visible = false;
+    mesh.root.add(details, lenses);
+    const livery: PlayerLivery = { details, lenses, positions: new Float32Array(details.geometry.getAttribute('position').array), stage: -1, lit: -2 };
+    this.playerLiveries[id] = livery;
+    return livery;
+  }
+
+  /** The player's car in police colours while it is a police car (a shell: the Chief's Cruiser carries its own bar). */
+  private updatePlayer(): void {
+    const sim = this.sim, body = sim.carBody;
+    const shown = sim.pursuit.descriptor.police && isShell(body) ? body : null;
+    if (shown !== this.shownLivery) {
+      const old = this.shownLivery ? this.playerLiveries[this.shownLivery] : undefined;
+      if (old) old.details.visible = old.lenses.visible = false;
+      this.shownLivery = shown;
+      const next = shown ? this.liveryFor(shown) : null;
+      if (next) next.details.visible = next.lenses.visible = true;
+    }
+    const livery = shown ? this.playerLiveries[shown] : undefined;
+    if (!livery) return;
+    const stage = sim.life.state.stage;
+    if (stage !== livery.stage) {
+      (livery.details.material as THREE.MeshLambertMaterial).color.setHex(PALETTE.policeWhite).lerp(this.color.setHex(PALETTE.graphite), Math.min(0.85, stage * 0.25));
+      const positions = livery.details.geometry.getAttribute('position') as THREE.BufferAttribute;
+      // The final four boxes are front/rear bumpers and mirrors, matching body damage.
+      const first = positions.count - 4 * 36;
+      for (let i = first; i < positions.count; i++) {
+        const part = Math.floor((i - first) / 36);
+        if (stage >= Math.min(3, part + 1)) positions.setXYZ(i, 0, 0, 0);
+        else positions.setXYZ(i, livery.positions[i * 3] as number, livery.positions[i * 3 + 1] as number, livery.positions[i * 3 + 2] as number);
+      }
+      positions.needsUpdate = true;
+      livery.stage = stage;
+    }
+    // in a police car nobody has seen misbehave, the player drives with the lights on: the disguise, visible
+    const lit = sim.pursuit.disguised ? Math.floor(sim.time * 4) % 2 : -1;
+    if (lit !== livery.lit) {
+      if (lit < 0) this.darken(livery.lenses.geometry);
+      else this.relight(livery.lenses.geometry, lit);
+      livery.lit = lit;
+    }
   }
 
   private instances(scene: THREE.Scene, geometry: THREE.BufferGeometry, material: THREE.Material, capacity: number): THREE.InstancedMesh {
@@ -165,27 +224,7 @@ export class PoliceView {
   /** `fade` is the traffic's (M8.6 D9): a car thinned in the camera's way shows no livery, bar or lenses. */
   update(alpha: number, fade: Float32Array | null = null): void {
     const sim = this.sim, traffic = sim.traffic;
-    const stage = sim.life.state.stage;
-    if (sim.carId === 'police' && stage !== this.playerStage) {
-      (this.playerDetails.material as THREE.MeshLambertMaterial).color.setHex(PALETTE.policeWhite).lerp(this.color.setHex(PALETTE.graphite), Math.min(0.85, stage * 0.25));
-      const positions = this.playerDetails.geometry.getAttribute('position') as THREE.BufferAttribute;
-      // The final four boxes are front/rear bumpers and mirrors, matching body damage.
-      const first = positions.count - 4 * 36;
-      for (let i = first; i < positions.count; i++) {
-        const part = Math.floor((i - first) / 36);
-        if (stage >= Math.min(3, part + 1)) positions.setXYZ(i, 0, 0, 0);
-        else positions.setXYZ(i, this.playerPositions[i * 3] as number, this.playerPositions[i * 3 + 1] as number, this.playerPositions[i * 3 + 2] as number);
-      }
-      positions.needsUpdate = true;
-      this.playerStage = stage;
-    }
-    // in a police car nobody has seen misbehave, the player drives with the lights on: the disguise, visible
-    const lit = sim.carId === 'police' && sim.pursuit.disguised ? Math.floor(sim.time * 4) % 2 : -1;
-    if (lit !== this.playerLit) {
-      if (lit < 0) this.darken(this.playerLenses.geometry);
-      else this.relight(this.playerLenses.geometry, lit);
-      this.playerLit = lit;
-    }
+    this.updatePlayer();
     if (!traffic) return;
     this.live.fill(0);
     const units = sim.police?.units;
@@ -289,9 +328,11 @@ export class PoliceView {
       kit.flashing.geometry.dispose();
       kit.unlit.geometry.dispose();
     }
-    this.playerDetails.geometry.dispose();
-    this.playerLenses.geometry.dispose();
-    (this.playerDetails.material as THREE.Material).dispose();
+    for (const livery of Object.values(this.playerLiveries)) {
+      livery.details.geometry.dispose();
+      livery.lenses.geometry.dispose();
+      (livery.details.material as THREE.Material).dispose();
+    }
     this.material.dispose();
     this.lensMaterial.dispose();
   }

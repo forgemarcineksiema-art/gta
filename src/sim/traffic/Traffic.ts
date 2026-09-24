@@ -29,7 +29,7 @@ import type { TransformBuffer } from '../transforms';
 import { BALANCE } from '../balance';
 import type { CarId } from '../vehicle/presets';
 import { districtAt } from '../city/City';
-import { BODIES, BODY_IDS, BODY_INDEX, CIVILIAN_PAINTS, bodySpec, pickBody, type BodyId, type RoadKind } from './bodies';
+import { BODIES, BODY_IDS, BODY_INDEX, CIVILIAN_PAINTS, bodySpec, pickBody, policeLiveried, type BodyId, type RoadKind } from './bodies';
 import type { ParkingBay } from '../city/markings';
 import { SIGNAL, signalledNodes } from '../city/signals';
 import { LaneTables, type LanePose, type PathProjection } from './lanes';
@@ -82,6 +82,8 @@ export interface SwapHandover {
   /** The body taken (a civilian body keeps its paint; see Life.swap). */
   body: BodyId;
   paint: number;
+  /** A police car, whatever its class: a unit on the street or the police's own body (the disguise, M8.8 slice 1). */
+  police: boolean;
 }
 const PAINTS = CIVILIAN_PAINTS;
 /** Centre spacing subtracted when one agent follows another on a lane. */
@@ -1134,6 +1136,7 @@ export class Traffic {
     out.kind = this.kindOf(agent);
     out.body = this.bodyOf(agent);
     out.paint = this.paint[agent] as number;
+    out.police = this.police[agent] === 1 || policeLiveried(out.body);
     const slot = this.agentBody[agent] as number;
     if (slot >= 0) {
       (this.bodies[slot] as RAPIER.RigidBody).linvel(this.lin);

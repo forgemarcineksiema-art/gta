@@ -18,6 +18,8 @@ export interface Descriptor {
   kind: CarId;
   body: BodyId;
   paint: number;
+  /** A police car, whatever its class (a borrowed interceptor or van too): the disguise's condition (M8.8 slice 1). */
+  police: boolean;
 }
 
 /**
@@ -37,7 +39,7 @@ export class Pursuit {
   swapEscapes = 0;
   lastX = 0;
   lastZ = 0;
-  readonly descriptor: Descriptor = { kind: 'muscle', body: 'muscle', paint: 0 };
+  readonly descriptor: Descriptor = { kind: 'muscle', body: 'muscle', paint: 0, police: false };
   /** A crime was seen from the police car the player drives: the disguise no longer holds. */
   blown = false;
   /** Seconds until the dispatcher notices the stolen police car (the slice-5 measurement's fallback, DESIGN.md §12). */
@@ -63,7 +65,7 @@ export class Pursuit {
 
   /** In a police car nobody has seen misbehave: no unit detects the player. */
   get disguised(): boolean {
-    return this.descriptor.kind === 'police' && !this.blown;
+    return this.descriptor.police && !this.blown;
   }
 
   step(dt: number, level: number, seen: boolean, x: number, z: number): void {
@@ -108,10 +110,11 @@ export class Pursuit {
    * carries no blown cover. Returns true when the swap lost the police: a
    * chase was on and no unit saw it happen.
    */
-  onSwap(seenNow: boolean, kind: CarId, paint: number, body: BodyId = kind): boolean {
+  onSwap(seenNow: boolean, kind: CarId, paint: number, body: BodyId = kind, police = false): boolean {
     this.descriptor.kind = kind;
     this.descriptor.body = body;
     this.descriptor.paint = paint;
+    this.descriptor.police = police;
     this.blown = false;
     this.coverLeft = this.tuning.disguise.seconds;
     // seen: the radio names the new car (the identity rule, taught by the police themselves)
@@ -145,7 +148,7 @@ export class Pursuit {
 
   /** A crime from the police car with a unit watching. */
   markBlown(x: number, z: number): void {
-    if (this.blown || this.descriptor.kind !== 'police') return;
+    if (this.blown || !this.descriptor.police) return;
     this.blown = true;
     this.events.push('blown', 0, x, 0, z);
   }

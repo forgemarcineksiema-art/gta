@@ -96,6 +96,8 @@ export class PlayerCar {
       // a respray on the wall shows on the car behind the door at once
       this.garageSerial = this.sim.garage.serial;
       for (const id of CAR_IDS) this.classes[id].setPaint(this.sim.garage.paintOf(id));
+      // the shown car's own paint is set again below
+      this.shownPaint = -1;
     }
     const swapped = this.syncCar();
     this.syncTopper();
@@ -209,9 +211,12 @@ export class PlayerCar {
       swapped = true;
     }
     this.carId = sim.carId;
-    if (!isShell(body) && sim.carPaint !== this.shownPaint) {
-      this.mesh.setPaint(sim.carPaint);
-      this.shownPaint = sim.carPaint;
+    // behind the door a shell shows the garage's paint, so a respray shows at once; on the road every car wears the
+    // paint it came in, a borrowed police car its own colours (M8.8 slice 1)
+    const paint = isShell(body) && sim.run.state === 'door' ? sim.garage.paintOf(body) : sim.carPaint;
+    if (paint !== this.shownPaint) {
+      this.mesh.setPaint(paint);
+      this.shownPaint = paint;
     }
     return swapped;
   }

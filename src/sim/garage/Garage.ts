@@ -15,7 +15,7 @@
 import { BALANCE } from '../balance';
 import { POLICE } from '../police/tuning';
 import type { SimWorld } from '../SimWorld';
-import { BODY_INDEX, bodySpec, bodyTuning, isRivalBody, isShell, type BodyId } from '../traffic/bodies';
+import { BODY_INDEX, bodySpec, bodyTuning, isRivalBody, isShell, policeLiveried, type BodyId } from '../traffic/bodies';
 import { PLAYER_PAINT } from '../traffic/Traffic';
 import { CAR_IDS, type CarId } from '../vehicle/presets';
 import type { VehicleTuning } from '../vehicle/tuning';
@@ -219,6 +219,8 @@ export class Garage {
     pursuit.descriptor.kind = sim.carId;
     pursuit.descriptor.body = sim.carBody;
     pursuit.descriptor.paint = sim.carPaint;
+    // the police's own cars are the disguise; the Fake Cruiser is not (M8.8 slice 1)
+    pursuit.descriptor.police = policeLiveried(body);
     pursuit.blown = false;
     pursuit.coverLeft = POLICE.disguise.seconds;
   }

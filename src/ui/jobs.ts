@@ -45,7 +45,6 @@ export class JobsHud {
   private zoneOut = false;
   private lastRoute = -1;
   private visible = false;
-  private yielding = false;
   private kindText = '';
   /** A class set on the line for the state: is-order, is-escape, is-done, is-failed, is-goal, is-lose. */
   private stateClass = '';
@@ -82,16 +81,14 @@ export class JobsHud {
     parent.appendChild(this.root);
   }
 
-  /** True while the line is up (the key hints make room). */
+  /** True while the line is up. */
   get showing(): boolean {
     return this.visible;
   }
 
-  /** The ticker has the top centre: the line hides meanwhile. */
-  setYield(v: boolean): void {
-    if (v === this.yielding) return;
-    this.yielding = v;
-    this.root.classList.toggle('is-yield', v);
+  /** True while a job's or a chain step's card is up (the key hints and the news wait, M7 slice 1). */
+  get cardShowing(): boolean {
+    return this.cardMode !== '';
   }
 
   /** The swap key's label, for the first order's card. */

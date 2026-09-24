@@ -183,6 +183,32 @@ body {
 .hud__ticker.is-on { opacity: 1; }
 .hud__ticker-level { color: var(--ui-danger); margin-right: 12px; }
 
+/*
+ * The top of the screen (M7 slice 1): the job line and its card, the intro's caption, the key hints and the news
+ * stack in one column at the top centre, so none is ever drawn over another; which of them show is `ui/lanes.ts`'s.
+ * Inside it each keeps its own look and loses its own placing; a hidden one takes no room.
+ */
+.hud__top {
+  position: absolute;
+  left: 50%;
+  top: calc(14px + var(--safe-top));
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: calc(100vw - 440px - var(--safe-left) - var(--safe-right));
+  pointer-events: none;
+}
+.hud__top > .jobs, .hud__top > .cold, .hud__top > .hud__hints, .hud__top > .hud__ticker {
+  position: static;
+  max-width: 100%;
+}
+.hud__top > .jobs, .hud__top > .cold, .hud__top > .hud__hints { transform: none; }
+.hud__top > .hud__ticker { transform: skewX(-10deg); white-space: normal; text-align: center; }
+.hud__top > .hud__ticker:not(.is-on), .hud__top > .hud__ticker.is-yield, .hud__top > .hud__hints.is-hidden { display: none; }
+
 /* speedometer, bottom right */
 .hud__speedo {
   position: absolute;
@@ -274,10 +300,11 @@ body {
   text-shadow: 2px 3px 0 #000;
 }
 .hud__oncoming.is-on { opacity: 1; }
+/* the pops (a streak, a tip, a bounty): a lane under the bag and the coins, never over the speed (M7 slice 1) */
 .hud__popups {
   position: absolute;
   right: calc(24px + var(--safe-right));
-  bottom: calc(168px + var(--safe-bottom));
+  top: calc(158px + var(--safe-top));
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -296,6 +323,13 @@ body {
   text-shadow: 2px 3px 0 #000;
 }
 .hud__popup.is-on { opacity: 1; }
+.hud__popup:not(.is-on) { display: none; }
+/* short screens: the lane between the coins and the speed is two pops high */
+@media (max-height: 560px) {
+  .hud__popups { top: calc(150px + var(--safe-top)); gap: 2px; }
+  .hud__popup { font-size: 15px; }
+  .hud__popup.is-big { font-size: 19px; }
+}
 .hud__popup.is-gain { color: var(--ui-accent); }
 .hud__popup.is-big { font-size: 24px; }
 
@@ -1068,7 +1102,6 @@ kbd.key {
   font-family: var(--font-display);
 }
 .jobs.is-visible { display: flex; }
-.jobs.is-yield { display: none; }
 .jobs__line {
   display: flex;
   flex-wrap: wrap;

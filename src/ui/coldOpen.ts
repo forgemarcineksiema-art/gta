@@ -50,6 +50,11 @@ export class ColdOpenHud {
     parent.appendChild(this.root);
   }
 
+  /** True while a caption is up (the key hints and the news wait, M7 slice 1). */
+  get captionShowing(): boolean {
+    return this.shown !== null;
+  }
+
   setKeys(k: ColdOpenKeys): void {
     const keyed: Partial<Record<ColdOpenVerb, string[]>> = {
       steer: [k.throttle, k.steerLeft, k.brake, k.steerRight],

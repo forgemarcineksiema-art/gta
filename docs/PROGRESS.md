@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M7 slice 1: the top of the screen
+
+Done: the job line and its card, the intro's caption, the key hints and the news stack in one column at the top
+centre (`ui/lanes.ts`: `mountTop`, and `arrangeTop` deciding who shows: the hints and the news wait under a card or a
+caption, the news with its clock stopped); the news wraps inside the column instead of running under the stars. The
+pops (streak, tips, bounties) moved from over the speed to a lane under the coins, two high on short screens.
+Deviation from the plan: the hints stay at the top, under the job line, since the bottom centre holds the swap
+prompt, the busted pad and the drift readout; the column stacks, so `arrangeTop` decides who, not where. Pin M7 1.1;
+the screens suite checks every driving state for intersecting HUD boxes at the gate. Verify green (332 tests).
+
 ## 2026-09-24 — M7 slice 0: the workshop
 
 Done: the quick verify's tests 105 → 39 s. Test files share their worker's modules (`isolate: false`: Rapier's WASM

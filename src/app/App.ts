@@ -19,6 +19,7 @@ import { Hud } from '../ui/hud';
 import { RunHud } from '../ui/run';
 import { ColdOpenHud } from '../ui/coldOpen';
 import { JobsHud } from '../ui/jobs';
+import { arrangeTop, mountTop, topBit } from '../ui/lanes';
 import { GarageUi, type GarageActions } from '../ui/garage';
 import { routeToDropOff } from './doorRoute';
 import { BotDriver } from './bot';
@@ -222,6 +223,9 @@ export class App {
     this.garageUi.setKeys({ left: this.input.label('steerLeft'), right: this.input.label('steerRight'), confirm: this.input.label('throttle'), back: this.input.label('brake') });
     this.coldOpenHud = new ColdOpenHud(uiRoot);
     this.jobsHud = new JobsHud(uiRoot);
+    // the top of the screen (M7 slice 1): the job line and its card, the intro's caption, the key hints and the news in
+    // one column, so none is drawn over another
+    mountTop(uiRoot, { jobLine: this.jobsHud.root, caption: this.coldOpenHud.root, hints: this.hud.hintsElement, news: this.hud.tickerElement });
     this.jobsHud.setSwapKey(this.input.label('swap'));
     this.coldOpenHud.setKeys({
       throttle: this.input.label('throttle'),
@@ -711,16 +715,18 @@ export class App {
     const frameMs = performance.now() - frameStart;
     this.frameMsSmooth += (frameMs - this.frameMsSmooth) * 0.05;
     const stats = this.renderer.stats;
-    // the cold open's captions sit where the hints do and teach the same keys
-    // the hints are for driving: behind a shut door or under the card the wall and the card have the keys
-    // the ticker (a heat level's news) takes the top centre for its two seconds: the job line and the hints make room
     // the full-screen map while its key is held, over the drive (never over the wall or the card)
     this.hud.setMapVisible(st.value.map > 0.5 && playing && !this.bot);
-    this.hud.setHintsVisible(now < this.hintsUntil && !this.bot && !this.sim.coldOpen.active && !this.jobsHud.showing && !this.hud.tickerShowing && playing);
     this.runHud.update(this.sim, frameDt);
     this.coldOpenHud.update(this.sim);
-    this.jobsHud.setYield(this.hud.tickerShowing);
     this.jobsHud.update(this.sim, frameDt);
+    // the top of the screen (M7 slice 1): the hints are for driving (behind a shut door the wall has the keys, the
+    // intro's captions teach the same ones); under a card or a caption the hints and the news wait
+    const wantsHints = now < this.hintsUntil && !this.bot && !this.sim.coldOpen.active && playing;
+    const top = arrangeTop((this.jobsHud.cardShowing ? topBit('card') : 0) | (this.coldOpenHud.captionShowing ? topBit('caption') : 0)
+      | (wantsHints ? topBit('hints') : 0) | (this.hud.tickerShowing ? topBit('news') : 0));
+    this.hud.setHintsVisible((top & topBit('hints')) !== 0);
+    this.hud.setNewsYield(this.hud.tickerShowing && (top & topBit('news')) === 0);
     this.garageUi.update(this.sim);
     this.hud.update(
       this.sim,

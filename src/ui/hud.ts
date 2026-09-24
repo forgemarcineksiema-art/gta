@@ -76,6 +76,8 @@ export class Hud {
   private lapVisible = false;
   private debugVisible = false;
   private toastTimer = 0;
+  /** The news waits while a card or the intro's caption is up (M7 slice 1). */
+  private newsYield = false;
   /** The speed camera's flash: a white overlay for `flashLeft` s. */
   private readonly flash: HTMLElement;
   private flashLeft = 0;
@@ -307,6 +309,22 @@ export class Hud {
     this.hints.classList.toggle('is-hidden', !v);
   }
 
+  /** The key hints' and the news' own elements, for the top of the screen's column (M7 slice 1). */
+  get hintsElement(): HTMLElement {
+    return this.hints;
+  }
+
+  get tickerElement(): HTMLElement {
+    return this.ticker;
+  }
+
+  /** A card or the intro's caption has the top centre: the news waits, hidden, its clock stopped (M7 slice 1). */
+  setNewsYield(v: boolean): void {
+    if (v === this.newsYield) return;
+    this.newsYield = v;
+    this.ticker.classList.toggle('is-yield', v);
+  }
+
   setPaused(paused: boolean, reason: 'user' | 'focus'): void {
     this.pause.classList.toggle('is-visible', paused);
     const sub = this.pause.querySelector('.hud__pause-sub');
@@ -318,7 +336,7 @@ export class Hud {
     this.debug.classList.toggle('is-visible', v);
   }
 
-  /** True while the ticker line is up: the job line and the key hints make room. */
+  /** True while the ticker has news to show (shown, or waiting under a card or a caption). */
   get tickerShowing(): boolean {
     return this.tickerLeft > 0;
   }
@@ -584,7 +602,7 @@ export class Hud {
       else { this.queuedLead = 'NEWS'; this.queuedText = line; }
       this.newsFor = 0;
     }
-    if (this.tickerLeft > 0) {
+    if (this.tickerLeft > 0 && !this.newsYield) {
       this.tickerLeft -= dt;
       if (this.tickerLeft <= 0) {
         if (this.queuedText) {

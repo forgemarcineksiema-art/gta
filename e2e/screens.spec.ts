@@ -6,9 +6,10 @@
  * filling, the busted card, and the wall behind the hideout's shut door; M5:
  * a delivery's line and card, and the garage's CARS and DAILIES pages on the wall; M5.5: the goal line, a chain
  * step's card, the skill chain and the full-screen map; M6: the wall's BOARD and STYLE pages and a rival's race.
+ * M7 slice 1: in every driving state no two HUD boxes intersect.
  * Output: screens/<state>-<w>x<h>.png. Look at them.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 
 const SIZES: Array<[number, number]> = [
@@ -26,6 +27,36 @@ const SIZES: Array<[number, number]> = [
 
 test.use({ deviceScaleFactor: 1 });
 
+/**
+ * No two visible HUD boxes intersect (M7 slice 1): the top column (the job line and its card, the intro's caption,
+ * the key hints, the news), the stars, the bag, the coins, the pops, the speed, the radar, the skill chain, the lap,
+ * the swap prompt, the busted pad, the drift readout, the toast.
+ */
+async function expectNoOverlap(page: Page, state: string): Promise<void> {
+  const hits = await page.evaluate(() => {
+    const selectors = ['.hud__top', '.hud__heat', '.run__bag', '.run__coins', '.hud__popup', '.hud__speedo', '.minimap', '.hud__skill', '.hud__lap', '.hud__swap', '.run__busted', '.hud__drift', '.hud__toast'];
+    const boxes: Array<{ name: string; r: DOMRect }> = [];
+    for (const selector of selectors) {
+      for (const e of Array.from(document.querySelectorAll<HTMLElement>(selector))) {
+        const cs = getComputedStyle(e);
+        if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) < 0.05) continue;
+        const r = e.getBoundingClientRect();
+        if (r.width < 1 || r.height < 1) continue;
+        boxes.push({ name: selector, r });
+      }
+    }
+    const out: string[] = [];
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i]!.r, b = boxes[j]!.r;
+        if (a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1) out.push(`${boxes[i]!.name} x ${boxes[j]!.name}`);
+      }
+    }
+    return out;
+  });
+  expect(hits, state).toEqual([]);
+}
+
 for (const [w, h] of SIZES) {
   test(`hud and pause at ${w}x${h}`, async ({ page }) => {
     mkdirSync('screens', { recursive: true });
@@ -35,6 +66,7 @@ for (const [w, h] of SIZES) {
     // let the bot get some speed so the HUD shows numbers
     await page.waitForFunction(() => Math.abs(window.__game?.sim.vehicle.telemetry.speedKmh ?? 0) > 40, null, { timeout: 20_000 });
     await page.screenshot({ path: `screens/hud-${w}x${h}.png` });
+    await expectNoOverlap(page, `hud ${w}x${h}`);
     await page.keyboard.press('KeyP');
     await page.waitForFunction(() => window.__game?.paused === true);
     await page.screenshot({ path: `screens/pause-${w}x${h}.png` });
@@ -72,6 +104,7 @@ for (const [w, h] of SIZES) {
       throw new Error(`life hud incomplete: ${state}`);
     });
     await page.screenshot({ path: `screens/life-${w}x${h}.png` });
+    await expectNoOverlap(page, `life ${w}x${h}`);
     if (w === 1280 && h === 720) {
       await page.evaluate(() => (window.__game?.sim.life as unknown as { wreck(): void }).wreck());
       await page.waitForSelector('.hud__wrecked.is-visible', { timeout: 10_000 });
@@ -107,6 +140,7 @@ for (const [w, h] of SIZES) {
     await page.waitForSelector('.jobs__card.is-visible', { timeout: 10_000 });
     await page.waitForTimeout(300);
     await page.screenshot({ path: `screens/job-${w}x${h}.png` });
+    await expectNoOverlap(page, `job ${w}x${h}`);
     await page.evaluate(() => { window.__game!.sim.jobs.abandon(); window.__game!.sim.heat.reset(); window.advanceTime!(50); });
     // boxed on the street outside the hideout at heat 3, the bag full: the busted bar half way
     await page.evaluate(`${RUN_STATES}
@@ -120,6 +154,7 @@ for (const [w, h] of SIZES) {
     `);
     await page.waitForSelector('.run__busted.is-visible', { timeout: 10_000 });
     await page.screenshot({ path: `screens/bar-${w}x${h}.png` });
+    await expectNoOverlap(page, `bar ${w}x${h}`);
     await page.evaluate(() => window.advanceTime?.(1800));
     await page.waitForSelector('.run__card.is-visible', { timeout: 10_000 });
     await page.screenshot({ path: `screens/busted-${w}x${h}.png` });
@@ -169,8 +204,10 @@ for (const [w, h] of SIZES) {
     await page.waitForSelector('.jobs__card.is-visible', { timeout: 10_000 });
     await page.waitForTimeout(300);
     await page.screenshot({ path: `screens/duel-${w}x${h}.png` });
+    await expectNoOverlap(page, `duel ${w}x${h}`);
     await page.evaluate(() => window.advanceTime?.(2000));
     await page.screenshot({ path: `screens/duel-line-${w}x${h}.png` });
+    await expectNoOverlap(page, `duel-line ${w}x${h}`);
   });
 }
 
@@ -184,6 +221,7 @@ for (const [w, h] of SIZES) {
     await page.evaluate(() => window.advanceTime?.(600));
     await page.waitForSelector('.jobs.is-visible', { timeout: 10_000 });
     await page.screenshot({ path: `screens/goal-${w}x${h}.png` });
+    await expectNoOverlap(page, `goal ${w}x${h}`);
     // a step of the chain ticked: its card
     await page.evaluate(() => {
       const run = window.__game!.sim.run;
@@ -195,6 +233,7 @@ for (const [w, h] of SIZES) {
     await page.waitForSelector('.jobs__card.is-visible', { timeout: 10_000 });
     await page.waitForTimeout(300);
     await page.screenshot({ path: `screens/chain-${w}x${h}.png` });
+    await expectNoOverlap(page, `chain ${w}x${h}`);
     // the skill chain: seven near misses, the multiplier up
     await page.evaluate(() => {
       const sim = window.__game!.sim;
@@ -203,6 +242,7 @@ for (const [w, h] of SIZES) {
     });
     await page.waitForSelector('.hud__skill.is-visible', { timeout: 10_000 });
     await page.screenshot({ path: `screens/skill-${w}x${h}.png` });
+    await expectNoOverlap(page, `skill ${w}x${h}`);
     // the full-screen map, held
     await page.keyboard.down('Tab');
     await page.evaluate(() => window.advanceTime?.(200));
@@ -224,6 +264,7 @@ for (const [w, h] of SIZES) {
     // past the caption's 0.25 s entrance
     await page.waitForTimeout(400);
     await page.screenshot({ path: `screens/cold-${w}x${h}.png` });
+    await expectNoOverlap(page, `cold ${w}x${h}`);
   });
 }
 

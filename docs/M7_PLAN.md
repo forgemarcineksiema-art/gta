@@ -154,11 +154,12 @@ export const PROP_RECORDS = 16; // the four hidden cars and the rivals' parked c
 spawnProp(x: number, z: number, yaw: number, body: BodyId, state: AgentState.Abandoned | AgentState.Parked, paint: number): number; // -1 when all are taken
 isProp(agent: number): boolean;
 
-// src/ui/lanes.ts
-export type TopItem = 'caption' | 'card' | 'jobLine' | 'news';
-export interface TopWant { item: TopItem; height: number }
-/** Bands from the top, in px: which items show and at which y; the rest wait. No allocation: fills `out`. */
-export function arrangeTop(wants: readonly TopWant[], viewportHeight: number, out: Array<{ item: TopItem; y: number } | null>): number;
+// src/ui/lanes.ts (as built, slice 1: the column stacks, so the function decides who shows, not where)
+export type TopItem = 'jobLine' | 'card' | 'caption' | 'hints' | 'news';
+export const TOP_ORDER: readonly TopItem[];
+export function topBit(item: TopItem): number;
+export function arrangeTop(wants: number): number; // a mask of topBits in, the ones shown out
+export function mountTop(parent: HTMLElement, items: Partial<Record<TopItem, HTMLElement>>): HTMLElement;
 
 // src/audio/score.ts
 export interface Layer { name: 'bass' | 'hats' | 'drums' | 'lead' | 'alarm'; fromHeat: number; notes: readonly Note[] }

@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { BALANCE } from '../../src/sim/balance';
 import { BARE, KIT, KIT_INDEX, KIT_SLOTS, RIVAL_BODIES, type SimWorld } from '../../src/sim';
 import { apply, collect, defaultSave, parse, serialize } from '../../src/sim/save/format';
-import { TOPPER_IDS, topperGeometry } from '../../src/render/kitMesh';
+import { TOPPER_IDS, topperGeometry } from '../../src/render/cars/kitMesh';
 import { createWorld } from './helpers';
 
 function world(): Promise<SimWorld> {

@@ -2,6 +2,14 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — the renderer in folders, 1 of 2: the moves
+
+Marcin: "how best to split render into folders?" Decided here (ARCHITECTURE 97): split by the thing drawn, the folders
+named after the sim's (`city`, `props`, `traffic`, `police`), plus `cars/` (every car's shape), `run/` (arrow, markers,
+coins, doors), `camera/`, `fx/`; the root keeps the frame (Renderer, quality, shadows, geometry). 33 files moved with
+`git mv`, imports rewritten in src and tests, render paths in the living docs (finished plans and history keep theirs).
+No code changed. Verify green; the smoke ran on 4174 against this worktree's build (his `npm start` holds 4173).
+
 ## 2026-09-24 — M8.6 gate, first pass (stopped at Marcin's word)
 
 `verify:gate`: 9 long pins red. Fixed: the Chief back on a full roster, the PIT a swerve from alongside, a civilian pressed

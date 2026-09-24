@@ -6,10 +6,10 @@
  */
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { buildBodyGeometry } from '../../src/render/bodyMesh';
-import { BODY_PROFILES } from '../../src/render/bodyProfiles';
-import { boardGeometry, posterStates } from '../../src/render/HideoutView';
-import { lowriderBounce } from '../../src/render/TrafficView';
+import { buildBodyGeometry } from '../../src/render/cars/bodyMesh';
+import { BODY_PROFILES } from '../../src/render/cars/bodyProfiles';
+import { boardGeometry, posterStates } from '../../src/render/run/HideoutView';
+import { lowriderBounce } from '../../src/render/traffic/TrafficView';
 import { BALANCE, CHIEF, RIVALS, RIVAL_BODIES, bodySpec, bodyTuning } from '../../src/sim';
 import { CAR_PRESETS } from '../../src/sim/vehicle/presets';
 import { createWorld } from '../sim/helpers';

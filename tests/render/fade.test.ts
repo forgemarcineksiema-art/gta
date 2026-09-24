@@ -3,7 +3,7 @@
  * screen door; the choice and the pace, pure.
  */
 import { describe, expect, it } from 'vitest';
-import { FADE, blocks, fadeTarget, stepFade } from '../../src/render/fade';
+import { FADE, blocks, fadeTarget, stepFade } from '../../src/render/camera/fade';
 
 /** A sedan's box: 0.9 half wide, 0.75 half high, 2.3 half long. */
 const HW = 0.9, HH = 0.75, HL = 2.3;

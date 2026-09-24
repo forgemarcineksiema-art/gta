@@ -6,9 +6,9 @@ import { getHeapSpaceStatistics, setFlagsFromString } from 'node:v8';
 import { runInNewContext } from 'node:vm';
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { DEBRIS_POOL, Debris } from '../../src/render/Debris';
-import { PropsView } from '../../src/render/PropsView';
-import { Sparks } from '../../src/render/Sparks';
+import { DEBRIS_POOL, Debris } from '../../src/render/fx/Debris';
+import { PropsView } from '../../src/render/props/PropsView';
+import { Sparks } from '../../src/render/fx/Sparks';
 import { PROPS, type PropDesc, type PropMaterial } from '../../src/sim';
 import { createWorld, run } from '../sim/helpers';
 

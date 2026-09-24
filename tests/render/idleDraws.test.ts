@@ -5,11 +5,11 @@
  */
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { Coins } from '../../src/render/Coins';
-import { Debris } from '../../src/render/Debris';
-import { PoliceView } from '../../src/render/PoliceView';
-import { buildCarMesh } from '../../src/render/carMesh';
-import { CAR_PROFILES } from '../../src/render/carProfiles';
+import { Coins } from '../../src/render/run/Coins';
+import { Debris } from '../../src/render/fx/Debris';
+import { PoliceView } from '../../src/render/police/PoliceView';
+import { buildCarMesh } from '../../src/render/cars/carMesh';
+import { CAR_PROFILES } from '../../src/render/cars/carProfiles';
 import { CAR_PRESETS } from '../../src/sim';
 import { createWorld, run } from '../sim/helpers';
 

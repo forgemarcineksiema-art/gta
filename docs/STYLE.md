@@ -94,7 +94,7 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   faces, no shadow pass, and omitted beyond 180 m where they are sub-pixel.
 - Each chunk renders as five meshes (base plus four quadrants) so the camera and
   shadow frusta cull streets behind the player; detail is spatial and tier
-  independent (`DETAIL_NEAR` / `DETAIL_FAR` in `render/CityView.ts`).
+  independent (`DETAIL_NEAR` / `DETAIL_FAR` in `render/city/CityView.ts`).
 - This is a street-quality pass over the regular M2 grid. Bespoke street plans,
   waterfront composition, traffic and populated shop interiors are later work.
 
@@ -114,7 +114,7 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 - Skyline: the Crown Tower is 30 floors plus crown and spire (~120 m), the Works
   add a striped chimney (67 m), the Glasshouse a beacon mast (48 m), the Coral
   Hotel is a 14-floor slab with a roof sign. Their silhouettes render in a
-  separate layer (`render/skyline.ts`) whose fog fades over three times the fog
+  separate layer (`render/city/skyline.ts`) whose fog fades over three times the fog
   distance and never past 82 %, so they place the player from any open sightline.
 - Roofs: offices and quay blocks alternate a plant box, a set-back penthouse with
   a band, and a parapet ring with stair head and water tank; buildings of eight
@@ -145,7 +145,7 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   the road (zebra stripes, stop lines, arrows, bay dividers, the P stencil)
   carries a per-vertex `paint` underlay and fade distance, and the shared
   material blends it into the surface colour underneath before its projected
-  thickness reaches a pixel (`render/roadPaint.ts`). Vertical thin members shimmer
+  thickness reaches a pixel (`render/city/roadPaint.ts`). Vertical thin members shimmer
   past 100 m below about 0.4 m: cornices are 0.44 m, lamp heads 0.28 m, and
   window frames keep low contrast against the glass.
 - Measure, do not guess: `screens/flicker-capture2.mjs` records raw canvas
@@ -298,7 +298,7 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 ## Police, the interceptor and the hideout (M4)
 
 - Two more silhouettes, built the same way as the three playable classes
-  (`src/render/carProfiles.ts`, `src/sim/vehicle/presets.ts`): the **sports**
+  (`src/render/cars/carProfiles.ts`, `src/sim/vehicle/presets.ts`): the **sports**
   car, a low wedge coupe with a 1.2 m roof, a fastback tail and a lip spoiler,
   the fastest body in the game and the one the interceptor is built on; the
   **police** saloon, four doors, square shoulders, a deep front bumper and a
@@ -544,7 +544,7 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 
 ## Camera and motion
 
-- Chase camera behind and above, FOV 60 → up to 80 with speed and boost, pulls back and drops with speed, follows the velocity direction so drifts show the car sideways. Very small shake at high speed. Steering input itself never swivels the view; actual yaw contributes only 0.04 s of heading lead and at most 0.65 m of lateral look offset. Heading follow is capped at 110°/s; speed/boost FOV changes ease at 2.5/s. See `src/render/ChaseCamera.ts`.
+- Chase camera behind and above, FOV 60 → up to 80 with speed and boost, pulls back and drops with speed, follows the velocity direction so drifts show the car sideways. Very small shake at high speed. Steering input itself never swivels the view; actual yaw contributes only 0.04 s of heading lead and at most 0.65 m of lateral look offset. Heading follow is capped at 110°/s; speed/boost FOV changes ease at 2.5/s. See `src/render/camera/ChaseCamera.ts`.
 - Sparks: only where the body scrapes a wall, at the contact point on the car's flank, thrown backwards along the wall. Chunky bright points with short tails, hot white-yellow to orange, additive, dead within half a second. Never in front of the car.
 - Speed lines: a screen-space pass of short streaks rushing outward from the frame's periphery above ~100 km/h and under boost (cyan lean). The centre of the frame, where the road is, is masked out; nothing is ever drawn in front of the car. This is how Burnout/NFS/Mario Kart do it: FOV, camera, peripheral blur or lines, sound; world particles only behind or beside the car.
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CAR_IDS, CAR_PRESETS } from '../../src/sim';
-import { CAR_PROFILES } from '../../src/render/carProfiles';
-import { buildTrafficGeometry } from '../../src/render/trafficMesh';
+import { CAR_PROFILES } from '../../src/render/cars/carProfiles';
+import { buildTrafficGeometry } from '../../src/render/cars/trafficMesh';
 
 describe.each(CAR_IDS)('%s traffic mesh', (id) => {
   it('stays under 400 triangles with finite geometry', () => {

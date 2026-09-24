@@ -6,7 +6,7 @@
  */
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { ChaseCamera } from '../../src/render/ChaseCamera';
+import { ChaseCamera } from '../../src/render/camera/ChaseCamera';
 import type { VehicleTelemetry } from '../../src/sim';
 import { COVER } from '../../src/sim/city/covers';
 import { createWorld } from '../sim/helpers';

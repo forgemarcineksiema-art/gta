@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { CAR_IDS, CAR_PRESETS, type VehicleTelemetry } from '../../src/sim';
-import { CAR_PROFILES } from '../../src/render/carProfiles';
-import { buildCarMesh } from '../../src/render/carMesh';
+import { CAR_PROFILES } from '../../src/render/cars/carProfiles';
+import { buildCarMesh } from '../../src/render/cars/carMesh';
 
 describe.each(CAR_IDS)('%s visual assembly', (id) => {
   const tuning = CAR_PRESETS[id];

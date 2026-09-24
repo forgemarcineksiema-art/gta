@@ -8,8 +8,8 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { KIT, KIT_INDEX, slotItem, slotOption, type CarSlot, type SimWorld } from '../../src/sim';
-import { wheelGeometry } from '../../src/render/carMesh';
-import { spoilerGeometry } from '../../src/render/kitMesh';
+import { wheelGeometry } from '../../src/render/cars/carMesh';
+import { spoilerGeometry } from '../../src/render/cars/kitMesh';
 import { CAR_PRESETS } from '../../src/sim/vehicle/presets';
 import { apply, collect, defaultSave } from '../../src/sim/save/format';
 import { createWorld } from './helpers';

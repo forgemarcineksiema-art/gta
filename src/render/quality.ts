@@ -5,7 +5,7 @@
  * mean of 21 ms under the 24 that steps down; the misses count now. Pure: the renderer keeps the window and acts.
  */
 
-import type { QualityTier } from './CityView';
+import type { QualityTier } from './city/CityView';
 
 /** `low`/`high`: switch the tier; `down`/`up`: move the resolution scale; `hold`: nothing. */
 export type QualityStep = 'low' | 'high' | 'down' | 'up' | 'hold';

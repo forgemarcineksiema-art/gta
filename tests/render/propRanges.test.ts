@@ -4,8 +4,8 @@
  * kinds, and the tall ones are in the shadow casters' prefix, the small ones after it.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { GeometryBuild, partitionChunk, type PropRanges } from '../../src/render/CityView';
-import { propParts } from '../../src/render/propMesh';
+import { GeometryBuild, partitionChunk, type PropRanges } from '../../src/render/city/CityView';
+import { propParts } from '../../src/render/props/propMesh';
 import { PROP_TYPES, type PropDesc, type SimWorld } from '../../src/sim';
 import { createWorld } from '../sim/helpers';
 

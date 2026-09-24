@@ -4,7 +4,7 @@
  * needs (the entry box) and of the door's opening.
  */
 import { describe, expect, it } from 'vitest';
-import { propsGeometry } from '../../src/render/HideoutView';
+import { propsGeometry } from '../../src/render/run/HideoutView';
 import { GARAGE } from '../../src/sim';
 
 describe('the garage dressed', () => {

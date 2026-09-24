@@ -5,8 +5,8 @@
  * mesh's own state, nothing of the sim's.
  */
 import { describe, expect, it } from 'vitest';
-import { BODY_PROFILES } from '../../src/render/bodyProfiles';
-import { SPIN, buildCarMesh } from '../../src/render/carMesh';
+import { BODY_PROFILES } from '../../src/render/cars/bodyProfiles';
+import { SPIN, buildCarMesh } from '../../src/render/cars/carMesh';
 import { bodyTuning } from '../../src/sim';
 
 describe('the sweeper\'s brushes', () => {

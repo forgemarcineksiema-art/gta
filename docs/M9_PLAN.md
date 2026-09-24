@@ -776,7 +776,7 @@ the code at `ba9a12f`:
   `KeyboardDevice` prevents default on Space and the arrows and latches
   taps; `ActionState` edges are per frame. `InputManager.blocked` is the ad
   window.
-- Renderer: `QUALITY` in `src/render/CityView.ts` (`low`, `high` with
+- Renderer: `QUALITY` in `src/render/city/CityView.ts` (`low`, `high` with
   `far`, `near`, `dpr`, `shadow`); the tier sampler in `Renderer.ts`
   (`qualityLocked` from `?quality=`, hysteresis 3 s windows, cooldown 15
   s, DPR from `QUALITY[tier].dpr × resolutionScale`); `pedView.setShadows`

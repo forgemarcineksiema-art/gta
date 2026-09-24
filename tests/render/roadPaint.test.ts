@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { Color } from 'three';
-import { cityGeometry } from '../../src/render/CityView';
+import { cityGeometry } from '../../src/render/city/CityView';
 import { Architecture } from '../../src/sim/city/architecture';
 import { PALETTE } from '../../src/sim/palette';
 import type { StaticDesc } from '../../src/sim/scene';

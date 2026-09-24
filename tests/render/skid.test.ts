@@ -7,8 +7,8 @@
  */
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { BURST_FLIGHT, BURST_STAGGER, burstPoint } from '../../src/render/Coins';
-import { SKID, SkidMarks, skidStrength } from '../../src/render/SkidMarks';
+import { BURST_FLIGHT, BURST_STAGGER, burstPoint } from '../../src/render/run/Coins';
+import { SKID, SkidMarks, skidStrength } from '../../src/render/fx/SkidMarks';
 import type { SimWorld } from '../../src/sim';
 import { COIN_HEIGHT } from '../../src/sim/city/coins';
 import { createWorld, fullThrottle, kmh, run, runUntil } from '../sim/helpers';

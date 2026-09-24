@@ -6,9 +6,9 @@
  */
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { buildBodyGeometry } from '../../src/render/bodyMesh';
-import { BODY_PROFILES } from '../../src/render/bodyProfiles';
-import { buildCarMesh } from '../../src/render/carMesh';
+import { buildBodyGeometry } from '../../src/render/cars/bodyMesh';
+import { BODY_PROFILES } from '../../src/render/cars/bodyProfiles';
+import { buildCarMesh } from '../../src/render/cars/carMesh';
 import { BODY_IDS, CIVILIAN_BODIES, bodySpec, bodyTuning } from '../../src/sim';
 
 describe('traffic\'s own bodies, drawn', () => {

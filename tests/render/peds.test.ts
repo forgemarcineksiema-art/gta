@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { LIMB, buildPed } from '../../src/render/pedMesh';
+import { LIMB, buildPed } from '../../src/render/traffic/pedMesh';
 import { PED_LOOKS, CROWD_LOOKS } from '../../src/sim';
 
 describe('the crowd, drawn', () => {

@@ -5,7 +5,7 @@
  */
 import { expect, it } from 'vitest';
 import * as THREE from 'three';
-import { cityGeometry } from '../../src/render/CityView';
+import { cityGeometry } from '../../src/render/city/CityView';
 import { overpassStatics } from '../../src/sim/city/overpass';
 import { BLOCK, OVERPASS, OVERPASS_NODES, overpassProfile } from '../../src/sim/city/roads';
 

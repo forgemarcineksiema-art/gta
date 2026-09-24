@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import { describe, expect, test } from 'vitest';
-import { ChaseCamera, SIDE_CUT, sideCutEye } from '../../src/render/ChaseCamera';
+import { ChaseCamera, SIDE_CUT, sideCutEye } from '../../src/render/camera/ChaseCamera';
 import type { VehicleTelemetry } from '../../src/sim';
 
 function telemetry(over: Partial<VehicleTelemetry> = {}): VehicleTelemetry {

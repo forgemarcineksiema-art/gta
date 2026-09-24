@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { TrafficView } from '../../src/render/TrafficView';
+import { TrafficView } from '../../src/render/traffic/TrafficView';
 import { BODY_IDS } from '../../src/sim';
 import { AgentState, type Traffic } from '../../src/sim/traffic/Traffic';
 import { createWorld, run } from '../sim/helpers';

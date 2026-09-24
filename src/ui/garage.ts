@@ -1,8 +1,10 @@
 /**
  * The garage on the wall behind every drop-off's door (docs/M5_PLAN.md
- * slice 4, D9; DESIGN.md §6.3): after the totals, pages for the cars, the
- * paint, the tuning, the prep items and the day's challenges. A place inside
- * the world, never a menu before gameplay; the same wall at all three doors.
+ * slice 4, D9; DESIGN.md §6.3): four pages since M8.5 (DESIGN.md §17.5,
+ * `wallPages.ts`): TOTALS, CARS (the cars, the chosen car's upgrades under
+ * them, the next run's boosters under those), STYLE, and GOALS (the next
+ * step, the day's three, the wanted board, the hunts). A place inside the
+ * world, never a menu before gameplay; the same wall at all three doors.
  *
  * Keys through the existing actions, two levels: steer left and right move
  * between pages (or between the items of a page once inside it), throttle
@@ -18,7 +20,12 @@
  * Reports intents through `GarageActions` and never writes the sim; reads it
  * to draw. Rebuilds only when the garage, the bank or the totals change.
  */
+import { huntsLine } from './bigmap';
+import { nextLine } from './totals';
 import { gridMove, gridStart, type GridMove } from './wallGrid';
+import { PAGE_TITLES, WALL_PAGES, pageOf, type WallPage } from './wallPages';
+
+export type { WallPage } from './wallPages';
 import {
   BALANCE, BODY_IDS, BODY_WORDS, CHIEF, DISTRICTS, KIT, MEDAL_WORDS, PALETTE, RIVALS, STATS, STREAK, isCarSlot, isShell, posterNumber, reqText,
   type BodyId, type CarSlot, type KitSlot, type PrepItem, type RivalDef, type SimWorld, type Stat,
@@ -50,8 +57,6 @@ export interface WallNav {
   select: boolean;
 }
 
-export type WallPage = 'wall' | 'board' | 'cars' | 'paint' | 'tune' | 'prep' | 'dailies';
-const PAGE_TITLES: Record<WallPage, string> = { wall: 'TOTALS', board: 'BOARD', cars: 'CARS', paint: 'STYLE', tune: 'TUNE', prep: 'PREP', dailies: 'DAILIES' };
 
 /** The driver's kit's slots on the STYLE page (M6), in order, and each row's heading. */
 export const STYLE_SLOTS: readonly KitSlot[] = ['wheels', 'spoiler', 'stance', 'topper', 'neon', 'horn', 'flame', 'smoke'];
@@ -97,11 +102,16 @@ export class GarageUi {
   private readonly kitCards: Array<{ el: HTMLButtonElement; item: number }> = [];
   private readonly tuneFor: HTMLElement;
   private readonly carsCount: HTMLElement;
-  /** The BOARD page (M6): your place, a chip per poster, the next rival's poster. */
+  /** CARS' upgrade rows (TUNE until M8.5) and the next run's boosters (PREP until M8.5), a cash and a video button each. */
+  private readonly tuneItems: Item[] = [];
+  private readonly prepItems: Item[] = [];
+  /** GOALS (M8.5): the next goal, the day's three, the board (your place, a chip per poster, the next rival), the hunts. */
+  private readonly goalsNext: HTMLElement;
   private readonly boardYou: HTMLElement;
   private readonly boardChips: HTMLElement[] = [];
   private readonly boardNext: HTMLElement;
   private readonly dailiesBody: HTMLElement;
+  private readonly records: HTMLElement;
   private page: WallPage = 'wall';
   private level: 'pages' | 'items' = 'pages';
   private focus = 0;
@@ -117,7 +127,7 @@ export class GarageUi {
   private dailySerial = -1;
   private keys = { left: 'A', right: 'D', confirm: 'W', back: 'S', select: 'SPACE' };
 
-  constructor(parent: HTMLElement, private readonly sim: SimWorld, private readonly actions: GarageActions, pages: readonly WallPage[] = ['wall', 'cars', 'board', 'paint', 'tune', 'prep', 'dailies']) {
+  constructor(parent: HTMLElement, private readonly sim: SimWorld, private readonly actions: GarageActions, pages: readonly WallPage[] = WALL_PAGES) {
     this.order = [...pages];
     this.root = parent;
     const tabBar = el('div', 'wall__tabs');
@@ -144,22 +154,8 @@ export class GarageUi {
     wallPage.appendChild(this.offerRow);
     this.items.set('wall', []);
 
-    // BOARD (M6 slice 1): the wanted board, the player's place on it and the next rival's poster
-    const boardPage = this.newPage('board');
-    this.boardYou = el('div', 'wall__for');
-    const strip = el('div', 'wall__board');
-    for (let i = 0; i < RIVALS.length; i++) {
-      const chip = el('div', 'wall__chip');
-      chip.append(el('span', 'wall__chip-swatch'), el('span', 'wall__chip-num', i === CHIEF ? '★' : `#${posterNumber(i)}`));
-      (chip.firstElementChild as HTMLElement).style.background = `#${((RIVALS[i] as RivalDef).paints[0] as number).toString(16).padStart(6, '0')}`;
-      strip.appendChild(chip);
-      this.boardChips.push(chip);
-    }
-    this.boardNext = el('div', 'wall__dailies wall__poster');
-    boardPage.append(this.boardYou, strip, this.boardNext);
-    this.items.set('board', []);
-
-    // CARS (M6 slice 0): the catalogue's five always, then every other car once it is owned or driven in
+    // CARS (M6 slice 0): the catalogue's five always, then every other car once it is owned or driven in; under them
+    // the chosen car's upgrades and the next run's boosters (M8.5, DESIGN.md §17.5)
     const cars = this.newPage('cars');
     this.carsCount = el('div', 'wall__for');
     const grid = el('div', 'wall__cars');
@@ -169,16 +165,44 @@ export class GarageUi {
       b.dataset['car'] = id;
       b.append(el('span', 'wall__card-swatch'), el('span', 'wall__card-name', BODY_WORDS[id]), el('span', 'wall__card-status'));
       grid.appendChild(b);
-      const it = this.item('cars', b, () => this.carAction(id));
+      const it = this.item(pageOf('buy'), b, () => this.carAction(id));
       if (!isShell(id)) {
         it.hidden = true;
         b.hidden = true;
       }
       carItems.push(it);
     }
-    cars.append(this.carsCount, grid);
-    this.items.set('cars', carItems);
-    this.rows.set('cars', [carItems]);
+    // the upgrades: three stats, three tiers, on the class of the car the drive-out takes
+    this.tuneFor = el('div', 'wall__for');
+    const rows = el('div', 'wall__rows');
+    for (const stat of STATS) {
+      const b = button('wall__row', '');
+      b.dataset['stat'] = stat;
+      b.append(el('span', 'wall__row-name', STAT_WORDS[stat]), el('span', 'wall__dots'), el('span', 'wall__row-price'));
+      rows.appendChild(b);
+      this.tuneItems.push(this.item(pageOf('upgrade'), b, () => this.actions.upgrade(this.sim.garage.car, stat)));
+    }
+    // the next run's boosters: the lawyer and the fence, cash or a video, the same size
+    const prepRows = el('div', 'wall__rows');
+    for (const it of ['lawyer', 'fence'] as const) {
+      const row = el('div', 'wall__prep');
+      row.dataset['prep'] = it;
+      const text = el('div', 'wall__prep-text');
+      text.append(el('span', 'wall__row-name', PREP_WORDS[it][0]), el('span', 'wall__prep-what', PREP_WORDS[it][1]));
+      const cash = button('wall__btn wall__btn--cash', '');
+      cash.append(el('span', 'wall__btn-label'));
+      const video = button('wall__btn wall__btn--video', '');
+      video.append(videoIcon(), el('span', 'wall__btn-label', 'FREE'));
+      row.append(text, cash, video);
+      prepRows.appendChild(row);
+      this.prepItems.push(this.item(pageOf('prep'), cash, () => this.actions.buyPrep(it)));
+      this.prepItems.push(this.item(pageOf('prepVideo'), video, () => this.actions.offer(it)));
+    }
+    cars.append(this.carsCount, grid, this.tuneFor, rows, el('div', 'wall__for', 'FOR THE NEXT RUN'), prepRows);
+    this.items.set('cars', [...carItems, ...this.tuneItems, ...this.prepItems]);
+    // the grid: the cars' row, a row an upgrade, a row a booster (its cash and its video)
+    const [lawyerCash, lawyerVideo, fenceCash, fenceVideo] = this.prepItems as [Item, Item, Item, Item];
+    this.rows.set('cars', [carItems, ...this.tuneItems.map((t) => [t]), [lawyerCash, lawyerVideo], [fenceCash, fenceVideo]]);
 
     // STYLE (M6 slice 6; PAINT before): the car's paint, then the driver's kit a row a slot
     const paint = this.newPage('paint');
@@ -192,7 +216,7 @@ export class GarageUi {
       b.style.setProperty('--swatch', `#${hex.toString(16).padStart(6, '0')}`);
       b.setAttribute('aria-label', `paint #${hex.toString(16)}`);
       swatches.appendChild(b);
-      const it = this.item('paint', b, () => this.actions.respray(this.sim.garage.car, hex));
+      const it = this.item(pageOf('respray'), b, () => this.actions.respray(this.sim.garage.car, hex));
       paintItems.push(it);
       swatchItems.push(it);
     }
@@ -209,7 +233,7 @@ export class GarageUi {
         sw.style.background = `#${k.colour.toString(16).padStart(6, '0')}`;
         b.append(sw, el('span', 'wall__card-name', k.name), el('span', 'wall__card-status'));
         row.appendChild(b);
-        const it = this.item('paint', b, () => this.actions.kit(i));
+        const it = this.item(pageOf('kit'), b, () => this.actions.kit(i));
         paintItems.push(it);
         rowItems.push(it);
         this.kitCards.push({ el: b, item: i });
@@ -220,47 +244,24 @@ export class GarageUi {
     this.items.set('paint', paintItems);
     this.rows.set('paint', paintRows);
 
-    // TUNE: three stats, three tiers
-    const tune = this.newPage('tune');
-    this.tuneFor = el('div', 'wall__for');
-    const rows = el('div', 'wall__rows');
-    const tuneItems: Item[] = [];
-    for (const stat of STATS) {
-      const b = button('wall__row', '');
-      b.dataset['stat'] = stat;
-      b.append(el('span', 'wall__row-name', STAT_WORDS[stat]), el('span', 'wall__dots'), el('span', 'wall__row-price'));
-      rows.appendChild(b);
-      tuneItems.push(this.item('tune', b, () => this.actions.upgrade(this.sim.garage.car, stat)));
-    }
-    tune.append(this.tuneFor, rows);
-    this.items.set('tune', tuneItems);
-
-    // PREP: the lawyer and the fence, cash or a video, the same size
-    const prep = this.newPage('prep');
-    const prepRows = el('div', 'wall__rows');
-    const prepItems: Item[] = [];
-    for (const it of ['lawyer', 'fence'] as const) {
-      const row = el('div', 'wall__prep');
-      row.dataset['prep'] = it;
-      const text = el('div', 'wall__prep-text');
-      text.append(el('span', 'wall__row-name', PREP_WORDS[it][0]), el('span', 'wall__prep-what', PREP_WORDS[it][1]));
-      const cash = button('wall__btn wall__btn--cash', '');
-      cash.append(el('span', 'wall__btn-label'));
-      const video = button('wall__btn wall__btn--video', '');
-      video.append(videoIcon(), el('span', 'wall__btn-label', 'FREE'));
-      row.append(text, cash, video);
-      prepRows.appendChild(row);
-      prepItems.push(this.item('prep', cash, () => this.actions.buyPrep(it)));
-      prepItems.push(this.item('prep', video, () => this.actions.offer(it)));
-    }
-    prep.appendChild(prepRows);
-    this.items.set('prep', prepItems);
-
-    // DAILIES: the day's three and the streak (slice 6 fills it)
-    const dailies = this.newPage('dailies');
+    // GOALS (M8.5, DESIGN.md §17.5; BOARD and DAILIES before): what to do next first, then the day's three and the
+    // streak, the wanted board (your place, a chip per poster, the next rival and what they want), the hunts
+    const goals = this.newPage('goals');
+    this.goalsNext = el('div', 'wall__next');
     this.dailiesBody = el('div', 'wall__dailies');
-    dailies.appendChild(this.dailiesBody);
-    this.items.set('dailies', []);
+    this.boardYou = el('div', 'wall__for');
+    const strip = el('div', 'wall__board');
+    for (let i = 0; i < RIVALS.length; i++) {
+      const chip = el('div', 'wall__chip');
+      chip.append(el('span', 'wall__chip-swatch'), el('span', 'wall__chip-num', i === CHIEF ? '★' : `#${posterNumber(i)}`));
+      (chip.firstElementChild as HTMLElement).style.background = `#${((RIVALS[i] as RivalDef).paints[0] as number).toString(16).padStart(6, '0')}`;
+      strip.appendChild(chip);
+      this.boardChips.push(chip);
+    }
+    this.boardNext = el('div', 'wall__dailies wall__poster');
+    this.records = el('div', 'wall__records');
+    goals.append(this.goalsNext, el('div', 'wall__for', 'TODAY'), this.dailiesBody, this.boardYou, strip, this.boardNext, this.records);
+    this.items.set('goals', []);
 
     const footer = el('div', 'wall__footer');
     this.hint = el('div', 'wall__hint');
@@ -443,13 +444,12 @@ export class GarageUi {
         : k.won === STREAK ? '7-DAY STREAK' : k.won >= 0 ? `BEAT ${RIVALS[k.won]?.name ?? ''}`
           : item === pick ? `TODAY ${money(price)}` : money(price);
     }
-    // TUNE: the tiers belong to the car's class, so every car of the class drives with them
-    this.tuneFor.textContent = `TUNING: ${BODY_WORDS[g.car]}`;
-    const tune = this.items.get('tune') ?? [];
+    // the upgrades: the tiers belong to the car's class, so every car of the class drives with them
+    this.tuneFor.textContent = `UPGRADES: ${BODY_WORDS[g.car]}`;
     const tiers = g.tiers[g.classOf(g.car)];
     for (let k = 0; k < STATS.length; k++) {
       const stat = STATS[k] as Stat;
-      const b = (tune[k] as Item).el;
+      const b = (this.tuneItems[k] as Item).el;
       const tier = tiers[k] as number;
       (b.querySelector('.wall__dots') as HTMLElement).textContent = '●'.repeat(tier) + '○'.repeat(3 - tier);
       const price = g.tierPrice(g.car, stat);
@@ -457,28 +457,30 @@ export class GarageUi {
       b.classList.toggle('is-short', Number.isFinite(price) && funds < price);
       b.classList.toggle('is-max', !Number.isFinite(price));
     }
-    // PREP
-    const prep = this.items.get('prep') ?? [];
+    // the boosters
     let n = 0;
     for (const it of ['lawyer', 'fence'] as const) {
-      const cash = (prep[n++] as Item).el, video = (prep[n++] as Item).el;
+      const cash = (this.prepItems[n++] as Item).el, video = (this.prepItems[n++] as Item).el;
       const bought = g.prep[it];
       (cash.querySelector('.wall__btn-label') as HTMLElement).textContent = bought ? 'BOUGHT' : money(BALANCE.prep[it]);
       cash.classList.toggle('is-bought', bought);
       cash.classList.toggle('is-short', !bought && funds < BALANCE.prep[it]);
       video.classList.toggle('is-bought', bought);
     }
+    // GOALS
+    this.goalsNext.textContent = nextLine(sim);
     this.fillDailies(sim);
     this.fillBoard(sim);
+    this.fillRecords(sim);
     this.show();
   }
 
-  /** The BOARD page: your place, the posters beaten and the next, the next rival's requirements and prize. */
+  /** GOALS' board: your place, the posters beaten and the next, the next rival's prize and requirements. */
   private fillBoard(sim: SimWorld): void {
     const board = sim.board;
     const next = board.next();
-    this.boardYou.textContent = next < 0 ? 'YOU ARE #1 · THE BOARD IS YOURS'
-      : board.rank > 10 ? 'YOU ARE NOT ON THE WANTED BOARD YET' : `YOU ARE #${board.rank} ON THE WANTED BOARD`;
+    this.boardYou.textContent = next < 0 ? 'THE WANTED BOARD · YOU ARE #1'
+      : board.rank > 10 ? 'THE WANTED BOARD · NOT ON IT YET' : `THE WANTED BOARD · YOU ARE #${board.rank}`;
     for (let i = 0; i < this.boardChips.length; i++) {
       const chip = this.boardChips[i] as HTMLElement;
       chip.classList.toggle('is-beaten', board.isBeaten(i));
@@ -494,7 +496,7 @@ export class GarageUi {
       const head = el('div', 'wall__daily');
       head.append(el('span', 'wall__daily-text', n > 0 ? `NEXT: #${n} ${r.name}` : `LAST: ${r.name}`), el('span', 'wall__daily-progress', where),
         el('span', 'wall__daily-reward', `${money(r.purse)} + THE ${BODY_WORDS[r.body]}`));
-      rows.push(head, el('div', 'wall__streak wall__medals', r.line));
+      rows.push(head);
       for (const q of r.reqs) {
         const have = board.have(q);
         const done = have >= q.count;
@@ -503,12 +505,24 @@ export class GarageUi {
           : q.kind === 'bestRun' ? `BEST ${money(have)}` : `${money(Math.min(have, q.count))}/${money(q.count)}`), el('span', 'wall__daily-reward', ''));
         rows.push(row);
       }
-      rows.push(el('div', 'wall__streak', board.ready(next) ? 'READY · THE CYAN RING IS ON THE MAP' : 'DO BOTH AND THE RING APPEARS'));
+      if (board.ready(next)) rows.push(el('div', 'wall__streak', 'READY · THE CYAN RING IS ON THE MAP'));
     }
     this.boardNext.replaceChildren(...rows);
   }
 
-  /** The DAILIES page: the day's three with their progress, the streak. */
+  /** GOALS' records: the hunts, the time trials' medals, the best run. */
+  private fillRecords(sim: SimWorld): void {
+    const rows: HTMLElement[] = [];
+    const hunts = huntsLine(sim);
+    if (hunts) rows.push(el('div', 'wall__streak wall__medals', `HUNTS: ${hunts}`));
+    // the time trials' medals (M5.5 slice 10): the best one for each, a dash for none yet
+    const trials = sim.jobs.defs.filter((j) => j.kind === 'trial');
+    if (trials.length > 0) rows.push(el('div', 'wall__streak wall__medals', `TIME TRIALS: ${trials.map((j) => MEDAL_WORDS[sim.jobs.medals.get(j.id) ?? 0] || '—').join(' · ')}`));
+    if (sim.run.bestRun > 0) rows.push(el('div', 'wall__streak wall__medals', `BEST RUN ${money(sim.run.bestRun)}`));
+    this.records.replaceChildren(...rows);
+  }
+
+  /** GOALS' day: the day's three with their progress, the streak. */
   private fillDailies(sim: SimWorld): void {
     const d = sim.dailies;
     const rows: HTMLElement[] = [];
@@ -522,22 +536,6 @@ export class GarageUi {
     const streak = el('div', 'wall__streak');
     streak.textContent = d.streak.count > 0 ? `STREAK: DAY ${d.streak.count}${d.streak.topper ? ' · TOPPER ON' : ''}` : 'COME BACK TOMORROW FOR A STREAK';
     rows.push(streak);
-    // the time trials' medals (M5.5 slice 10): the best one for each, a dash for none yet
-    const trials = sim.jobs.defs.filter((j) => j.kind === 'trial');
-    if (trials.length > 0) {
-      const medals = el('div', 'wall__streak wall__medals');
-      medals.textContent = `TIME TRIALS: ${trials.map((j) => MEDAL_WORDS[sim.jobs.medals.get(j.id) ?? 0] || '—').join(' · ')}`;
-      rows.push(medals);
-    }
-    // the hunts (M5.5 slice 14): how many of each set
-    if (sim.jumps || sim.collectibles) {
-      const hunts = el('div', 'wall__streak wall__medals');
-      const parts: string[] = [];
-      if (sim.jumps) parts.push(`JUMPS ${sim.jumps.foundCount}/${sim.jumps.descs.length}`);
-      if (sim.collectibles) parts.push(`BILLBOARDS ${sim.collectibles.smashedCount}/${sim.collectibles.total}`);
-      hunts.textContent = `HUNTS: ${parts.join(' · ')}`;
-      rows.push(hunts);
-    }
     this.dailiesBody.replaceChildren(...rows);
   }
 
@@ -580,12 +578,12 @@ export class GarageUi {
     const list = this.visibleItems();
     this.focus = 0;
     if (this.page === 'cars') {
-      // the car just driven in, else the next to buy, else the one selected
-      const ids = list.map((it) => it.el.dataset['car'] as BodyId);
+      // the car just driven in, else the next to buy, else the one selected (the upgrades and boosters carry no car)
+      const ids = list.map((it) => it.el.dataset['car'] as BodyId | undefined);
       const hot = this.sim.run.hot;
       let k = hot !== null && !g.owned.has(hot) ? ids.indexOf(hot) : -1;
-      if (k < 0) k = ids.findIndex((id) => g.canBuy(id) === 'ok');
-      if (k < 0) k = ids.findIndex((id) => isShell(id) && !g.owned.has(id) && g.canBuy(id) !== 'locked');
+      if (k < 0) k = ids.findIndex((id) => id !== undefined && g.canBuy(id) === 'ok');
+      if (k < 0) k = ids.findIndex((id) => id !== undefined && isShell(id) && !g.owned.has(id) && g.canBuy(id) !== 'locked');
       if (k < 0) k = ids.indexOf(g.car);
       this.focus = Math.max(0, k);
     } else if (this.page === 'paint') {
@@ -641,7 +639,7 @@ export class GarageUi {
     const text = this.offerOpen ? `${k.left} ${k.right} CHOOSE · ${k.confirm} OK`
       : this.level === 'items' && this.rows.has(this.page) ? `${k.left} ${k.right} PICK · ${k.confirm} ${k.back} ROWS · ${k.select} OK`
       : this.level === 'items' ? `${k.left} ${k.right} PICK · ${k.confirm} OK · ${k.back} BACK`
-        : this.page === 'wall' ? `${k.right} GARAGE · ${k.confirm} DRIVE OUT`
+        : this.page === 'wall' ? `${k.right} CARS · ${k.confirm} DRIVE OUT`
           : `${k.left} ${k.right} PAGES · ${k.confirm} OPEN · ${k.back} TOTALS`;
     if (this.hint.textContent !== text) this.hint.textContent = text;
   }

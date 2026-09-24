@@ -85,6 +85,10 @@ export class Run {
   lastFine = 0;
   /** The door's rewarded offer doubled this door's bag (at most once a door). */
   lastDoubled = false;
+  /** This door banked more than any run before it (the wall's NEW BEST, M8.5); false on a card. */
+  lastBest = false;
+  /** The best run before this door's: the double can make a run the best after the door shut. */
+  private bestBefore = 0;
   /** Prep items that paid out at the last run's end (the wall and the card name them). */
   lastLawyer = false;
   lastFence = false;
@@ -292,6 +296,7 @@ export class Run {
     this.lastBanked += extra;
     this.bank += extra;
     this.bestRun = Math.max(this.bestRun, this.lastBanked);
+    this.lastBest = this.lastBanked > this.bestBefore;
     this.lastSerial++;
     return true;
   }
@@ -313,6 +318,8 @@ export class Run {
     this.bank += this.lastBanked;
     // new tyres behind the door
     this.sim.life.mend();
+    this.bestBefore = this.bestRun;
+    this.lastBest = this.lastBanked > this.bestRun;
     this.bestRun = Math.max(this.bestRun, this.lastBanked);
     this.bag = 0;
     this.endRun(false);
@@ -337,6 +344,7 @@ export class Run {
     this.lastLawyer = prep.lawyer;
     this.lastFence = false;
     this.lastDoubled = false;
+    this.lastBest = false;
     this.lastBag = this.bag;
     this.lastMultiplier = 1;
     this.lastBanked = 0;

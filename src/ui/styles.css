@@ -964,37 +964,16 @@ kbd.key {
   color: var(--ui-ink-dim);
   text-shadow: 2px 2px 0 #000;
 }
-.run__wanted {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-  padding: 6px 10px;
-  align-self: flex-start;
-  background: rgba(247, 243, 234, 0.08);
-  border: 1px dashed var(--ui-panel-line);
-  border-radius: 3px;
-  transform: rotate(-2deg);
+/* NEW BEST beside the title when this door beat every run before it (M8.5) */
+.run__best {
+  display: none;
+  margin-left: 16px;
+  font-size: 18px;
+  letter-spacing: 0.12em;
+  vertical-align: middle;
+  color: var(--ui-accent-2);
 }
-.run__wanted-title {
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.2em;
-  color: var(--ui-danger);
-}
-.run__wanted-swatch {
-  width: 22px;
-  height: 12px;
-  border-radius: 2px;
-  box-shadow: 1px 1px 0 #000;
-}
-.run__wanted-car {
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  color: var(--ui-ink);
-  text-shadow: 1px 1px 0 #000;
-}
+.run__best.is-visible { display: inline-block; }
 .run__prompt {
   display: flex;
   align-items: center;
@@ -1242,6 +1221,20 @@ kbd.key {
 .wall__page--paint.is-current { overflow-y: auto; scrollbar-width: none; }
 .wall__page--paint::-webkit-scrollbar { display: none; }
 .wall__page--paint > * { flex-shrink: 0; }
+/* CARS carries the upgrades and the boosters under the cars, GOALS the day, the board and the hunts (M8.5): both scroll
+   the same way on a short screen, the keys bring the focus into view */
+.wall__page--cars.is-current, .wall__page--goals.is-current { overflow-y: auto; scrollbar-width: none; }
+.wall__page--cars::-webkit-scrollbar, .wall__page--goals::-webkit-scrollbar { display: none; }
+.wall__page--cars > *, .wall__page--goals > * { flex-shrink: 0; }
+.wall__next {
+  font-size: 16px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.06em;
+  color: var(--ui-accent-2);
+  text-shadow: 2px 2px 0 #000;
+}
+.wall__records { display: flex; flex-direction: column; gap: 2px; }
 .wall__card {
   display: flex;
   flex-direction: column;
@@ -1490,7 +1483,7 @@ kbd.key {
   .run__wall .run__title { font-size: 38px; }
   .run__wall .run__line { font-size: 15px; }
   .run__wall .run__counts { font-size: 13px; margin-top: 2px; }
-  .run__wall .run__wanted { margin-top: 4px; padding: 3px 8px; }
+
   .wall__card { min-height: 76px; padding: 6px 3px; }
   .wall__row { padding: 4px 10px; }
   .wall__row-name, .wall__row-price { font-size: 16px; }

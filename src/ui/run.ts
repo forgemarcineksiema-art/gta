@@ -5,9 +5,10 @@
  * busted card and the wall of totals behind a shut door. Yellow is money that
  * is not yours yet. DOM writes only on change; reads sim state only.
  */
-import { CHAIN_STEPS, RIVALS, STEP, chainStep, posterNumber, reqText, type CarId, type RunState, type SimWorld } from '../sim';
+import { STEP, type RunState, type SimWorld } from '../sim';
 import { BALANCE } from '../sim/balance';
 import { DRIVE, drive, newDriveState, readDrive } from './corners';
+import { cardLines, countsLine, doorLines, nextLine, type Line } from './totals';
 
 const TWEEN_SECONDS = 0.3;
 /** The coin counter's pop: on for the first half, off for the second, so a line's coins pulse one by one. */
@@ -33,6 +34,9 @@ export class RunHud {
   private readonly cardLines: HTMLElement;
   /** The panel behind the shut door: the garage's tabs and pages are added to it by `GarageUi`. */
   readonly wall: HTMLElement;
+  /** TOTALS' title (BANKED, or GARAGE with nothing banked) and its NEW BEST tag (M8.5). */
+  private readonly wallTitle: HTMLElement;
+  private readonly wallBest: HTMLElement;
   private readonly wallLines: HTMLElement;
   /** The first door's line: how far the first new car is. */
   private readonly wallFirst: HTMLElement;
@@ -40,10 +44,6 @@ export class RunHud {
   private readonly wallSentence: HTMLElement;
   private lastSerial = -1;
   private readonly wallCounts: HTMLElement;
-  /** The wanted poster: the car the police will look for (the descriptor's class and paint). */
-  private readonly wanted: HTMLElement;
-  private readonly wantedSwatch: HTMLElement;
-  private readonly wantedCar: HTMLElement;
   private readonly prompts: HTMLElement[] = [];
   private shownBag = 0;
   private fromBag = 0;
@@ -88,15 +88,16 @@ export class RunHud {
     this.wall = el('div', 'run__wall');
     this.wallLines = el('div', 'run__lines');
     this.wallCounts = el('div', 'run__counts');
-    this.wanted = el('div', 'run__wanted');
-    this.wantedSwatch = el('span', 'run__wanted-swatch');
-    this.wantedCar = el('span', 'run__wanted-car');
-    this.wanted.append(el('span', 'run__wanted-title', 'WANTED'), this.wantedSwatch, this.wantedCar);
     this.wallFirst = el('div', 'run__first');
-    // the totals page: the garage's pages sit beside it in the same panel
+    // the totals page (DESIGN.md §17.5): the title, one line of sums, the sentence while it teaches, the next goal, the
+    // counts; the bank is the footer's. The garage's pages sit beside it in the same panel
     const page = el('div', 'run__wall-page wall__page wall__page--wall');
     this.wallSentence = el('div', 'run__sentence', 'CRIMES FILL THE BAG · THE POLICE MULTIPLY IT · THE DOOR BANKS IT');
-    page.append(el('div', 'run__title', 'BANKED'), this.wallLines, this.wallSentence, this.wallFirst, this.wallCounts, this.wanted);
+    this.wallTitle = el('span', '', 'BANKED');
+    this.wallBest = el('span', 'run__best', 'NEW BEST');
+    const title = el('div', 'run__title');
+    title.append(this.wallTitle, this.wallBest);
+    page.append(title, this.wallLines, this.wallSentence, this.wallFirst, this.wallCounts);
     this.wall.append(page);
     this.root.append(this.bag, this.bankRow, this.bar, this.card, this.wall);
     parent.appendChild(this.root);
@@ -195,44 +196,21 @@ export class RunHud {
   }
 
   private fillCard(sim: SimWorld): void {
-    const run = sim.run;
-    this.cardLines.replaceChildren(
-      line('BAG', money(run.lastBag)),
-      line(run.lastLawyer ? 'THE LAWYER KEEPS' : 'YOU KEEP', money(run.lastFine), true),
-      line('BANK', money(run.bank)),
-    );
+    this.cardLines.replaceChildren(...cardLines(sim.run).map(line));
   }
 
   private fillWall(sim: SimWorld): void {
     const run = sim.run;
     this.lastSerial = run.lastSerial;
-    this.wallLines.replaceChildren(
-      line(run.lastDoubled ? 'BAG, DOUBLED' : 'BAG', money(run.lastBag)),
-      line(run.lastFence ? 'MULTIPLIER + FENCE' : 'MULTIPLIER', `×${run.lastMultiplier}`),
-      line('BANKED', money(run.lastBanked), true),
-      line('BEST RUN', money(run.bestRun)),
-      line('BANK', money(run.bank)),
-    );
-    // the next goal (DESIGN.md §13.4): the first new car while the chain's first three steps lead there, then the
-    // chain's next step, then the first car again if it is still not bought
-    const step = chainStep(run.chain);
-    const noCar = !sim.garage.owned.has('compact');
-    const price = BALANCE.prices.compact;
-    const firstCar = run.bank >= price ? `FIRST NEW CAR: ${money(price)} · IT IS YOURS IN CARS` : `FIRST NEW CAR: ${money(price)} · YOU HAVE ${money(run.bank)}`;
-    const next = step >= 0 && step <= STEP.car && noCar ? firstCar
-      : step >= 0 ? `NEXT: ${CHAIN_STEPS[step] ?? ''} · STEP ${step + 1} OF ${CHAIN_STEPS.length}`
-        : noCar ? firstCar : boardLine(sim);
+    // BANKED with what the door banked, GARAGE when the bag came in empty; NEW BEST when this run beat every other
+    this.wallTitle.textContent = run.lastBanked > 0 ? 'BANKED' : 'GARAGE';
+    this.wallBest.classList.toggle('is-visible', run.lastBest);
+    this.wallLines.replaceChildren(...doorLines(run).map(line));
+    const next = nextLine(sim);
     this.wallFirst.textContent = next;
     this.wallFirst.classList.toggle('is-visible', next !== '');
     this.wallSentence.classList.toggle('is-visible', (run.chain & (1 << STEP.escape)) === 0);
-    const c = run.counts;
-    // the street furniture's bill (M8 slice 6): the city's, never the player's money, so not in yellow
-    const damage = c.damage > 0 ? ` · CITY\u00a0DAMAGE\u00a0${money(c.damage)}` : '';
-    this.wallCounts.textContent = `${plural(c.takedowns, 'TAKEDOWN')} · ${plural(c.escapes, 'ESCAPE')} · ${plural(c.billboards, 'BILLBOARD')} · ${plural(c.coins, 'COIN')}${damage}`;
-    // the poster: the police remember the car, not the driver (the identity rule, taught without a line of text)
-    const d = sim.pursuit.descriptor;
-    this.wantedSwatch.style.background = `#${d.paint.toString(16).padStart(6, '0')}`;
-    this.wantedCar.textContent = CAR_WORD[d.kind];
+    this.wallCounts.textContent = countsLine(run.counts);
   }
 
   private prompt(): HTMLElement {
@@ -242,17 +220,10 @@ export class RunHud {
   }
 }
 
-const CAR_WORD: Record<CarId, string> = { muscle: 'MUSCLE CAR', compact: 'COMPACT', heavy: 'VAN', sports: 'SPORTS CAR', police: 'POLICE CAR' };
-
-function line(label: string, value: string, strong = false): HTMLElement {
-  const row = el('div', strong ? 'run__line is-strong' : 'run__line');
-  row.append(el('span', 'run__line-label', label), el('span', 'run__line-value', value));
+function line(l: Line): HTMLElement {
+  const row = el('div', l.strong ? 'run__line is-strong' : 'run__line');
+  row.append(el('span', 'run__line-label', l.label), el('span', 'run__line-value', l.value));
   return row;
-}
-
-/** A count and its word held together: the line may wrap only at the separators. */
-function plural(n: number, word: string): string {
-  return `${n} ${word}${n === 1 ? '' : 'S'}`;
 }
 
 function money(v: number): string {
@@ -266,14 +237,4 @@ function el(tag: string, className: string, text?: string): HTMLElement {
   return e;
 }
 
-/** After the chain (M6): the next rival on the wanted board and what they want first, or that they are ready. */
-function boardLine(sim: SimWorld): string {
-  const b = sim.board;
-  const i = b.next();
-  const r = RIVALS[i];
-  if (!r) return '';
-  const n = posterNumber(i);
-  const who = n > 0 ? `#${n} ${r.name}` : r.name;
-  const open = r.reqs[b.firstOpen(i)];
-  return b.ready(i) || !open ? `NEXT ON THE BOARD: ${who} · READY FOR YOU` : `NEXT ON THE BOARD: ${who} · ${reqText(open)}`;
-}
+

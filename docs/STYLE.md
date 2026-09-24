@@ -367,10 +367,12 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   (BUSTED in danger red, BANKED in accent yellow), 18 px lines with the
   values right-aligned and the one that counts in yellow, one line of run
   counts in 16 px that wraps only at its separators, and a keycap with ANY
-  KEY. The swap prompt hides while either is up. The wall carries a wanted
-  poster under the counts: a dashed card tilted −2°, WANTED in danger red at
-  12 px, a swatch of the car's paint and its class (MUSCLE CAR, VAN, …) at
-  14 px: the police remember the car, not the driver.
+  KEY. The swap prompt hides while either is up. Since M8.5 (DESIGN.md
+  §17.5, `src/ui/totals.ts`) the wall says BANKED (GARAGE for an empty bag)
+  with a NEW BEST tag in accent cyan when it is one, then one line of sums
+  (`BAG 32,500 ×2.6` … `+84,500`), the sentence while it teaches, the next
+  goal and the counts; the busted card `BAG 48,750 · YOU KEEP HALF` …
+  `+24,375` and BANK. No wanted poster.
 - The swap prompt reads SWAP for a civilian car and BORROW for a police
   car, same keycap, same size, accent cyan. COPS LOST YOU (yellow, a gain)
   on every escape and COVER BLOWN (ink) join the popup stack. The player's
@@ -421,7 +423,9 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   the limit at 14 px dim (`1:15 · FASTER PAYS MORE`, `4:00 FROM THE SWAP ·
   NO SCRATCHES`, `LOSE THEM`).
 - The wall behind the door is one panel at every drop-off: a row of tabs
-  (TOTALS, CARS, PAINT, TUNE, PREP, DAILIES; the current one on accent
+  (since M8.5 four: TOTALS, CARS, STYLE, GOALS, `src/ui/wallPages.ts`; CARS
+  carries TUNE's rows and PREP's under the cars, GOALS the day's three, the
+  board and the hunts; the current tab on accent
   yellow), one page at a time, and a footer with the key hint, BANK in
   accent yellow and DRIVE OUT. The totals page is M4's (BANKED, the lines,
   the counts, the wanted poster) plus, at the first door, FIRST NEW CAR:

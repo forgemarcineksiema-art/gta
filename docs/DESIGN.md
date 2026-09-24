@@ -1751,24 +1751,29 @@ counts its coins for the dailies and the wall. No amount moves.
 TOTALS · CARS · STYLE · GOALS (was TOTALS, CARS, BOARD, STYLE, TUNE, PREP,
 DAILIES).
 
-- **TOTALS**: BANKED, with NEW BEST when it is one; one line of sums, the
-  bag × the stars = +banked (busted: the bag, half kept); the sentence until
-  step 4, now `CRIMES FILL THE BAG · STARS MULTIPLY IT · A GARAGE BANKS IT`;
-  the next goal in one line; the run's counts; then **for the next run** the
-  lawyer and the fence, once the door's offer is answered: they belong to
-  the run about to start, and every game for this age sells its booster at
-  the start button. The footer: BANK and DRIVE OUT. The BANK line, BEST RUN
+- **TOTALS**: BANKED (GARAGE when the bag came in empty), with NEW BEST
+  when it is one; one line of sums, the bag × the stars = +banked (busted:
+  the bag, half kept); the sentence until step 4, now `CRIMES FILL THE BAG
+  · STARS MULTIPLY IT · A GARAGE BANKS IT`; the next goal in one line; the
+  run's counts. The footer: BANK and DRIVE OUT. The BANK line, BEST RUN
   and the WANTED poster leave: the footer holds the bank, GOALS the best
-  run, STYLE the poster beside the paint that changes it.
+  run, and the poster answered no question at a door (the identity rule is
+  taught where it acts: SUSPECT IN A RED MUSCLE CAR on the radio, the
+  BORROW prompt's line).
 - **CARS**: the cars, then the chosen car's POWER, GRIP and BOOST under
-  them (TUNE's rows, under the car they belong to).
-- **STYLE**: the paint and the kit as today, the WANTED poster by the paint.
+  them (TUNE's rows, under the car they belong to), then **for the next
+  run** the lawyer and the fence (PREP's rows). Set at slice 3 instead of
+  TOTALS: W on TOTALS drives out, so a row of buttons there would be one
+  key away from spending by mistake; CARS is what you take out, and its
+  footer holds DRIVE OUT too.
+- **STYLE**: the paint and the kit as today.
 - **GOALS**: the next goal; the day's three and the streak; the board (your
   place, the chips, the next rival in one line); the hunts, the trials'
   medals and the best run.
 
-One rewarded offer on screen at a time: DOUBLE THE BAG first, the prep row
-after it is answered. TOTALS and GOALS fit 800×450 without scrolling.
+One rewarded offer on TOTALS: DOUBLE THE BAG (while it is open the wall
+stays on TOTALS); the boosters' videos are CARS'. TOTALS fits 800×450
+without scrolling; CARS and GOALS scroll like STYLE on a short screen.
 
 ### 17.6 The budget is fixed
 

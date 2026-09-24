@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8.5 slice 3: the wall in four
+
+Done: TOTALS · CARS · STYLE · GOALS (`ui/wallPages.ts` names them and the page of every button). TOTALS: BANKED (GARAGE
+for an empty bag) with NEW BEST (`Run.lastBest`), one line of sums (`BAG 32,500 ×2.6` … `+84,500`), the sentence while it
+teaches, the next goal, the counts (`ui/totals.ts`); no BANK, MULTIPLIER or BEST RUN line, no poster. CARS: the cars, the
+chosen car's upgrades, then the lawyer and the fence FOR THE NEXT RUN. Decided: the boosters on CARS, not TOTALS as §17.5
+said: W on TOTALS drives out, a row of buttons there is one key from spending by mistake (§17.5 and D8 say so now). GOALS:
+the next goal, the day's three and the streak, the board (no quip, READY only when ready), the hunts, the trials, the
+best run. Pins M8.5 3.1–3.3. The game suite still clicks PREP: it changes at the gate. Verify green.
+
 ## 2026-09-24 — M8.5 slice 2: one voice
 
 Done: `ui/voice.ts` gives every event one place (the top, a pop, nowhere) and one text; the HUD asks it once per event.

@@ -73,7 +73,8 @@ export const GARAGE_PAINTS: readonly number[] = [
 const STAT_WORDS: Record<Stat, string> = { power: 'POWER', grip: 'GRIP', boost: 'BOOST' };
 const PREP_WORDS: Record<PrepItem, [string, string]> = {
   lawyer: ['LAWYER', 'BUSTED: KEEP 3/4 OF THE BAG'],
-  fence: ['FENCE', '+0.5 ON THE DOOR MULTIPLIER'],
+  // the fence (DESIGN.md §3.4) is BAG BONUS on the wall (M8.5): a fence is a thing you smash, and × is the multiplier's word
+  fence: ['BAG BONUS', 'THE GARAGE PAYS +0.5 × ON THE BAG'],
 };
 
 interface Item {
@@ -419,8 +420,8 @@ export class GarageUi {
       b.classList.toggle('is-locked', locked);
       b.classList.toggle('is-hot', hot && !locked);
       b.classList.toggle('is-short', hot ? funds < g.keepPrice(id) : can === 'cash');
-      status.textContent = g.car === id ? 'SELECTED' : owned ? 'OWNED' : locked ? 'ESCAPE HEAT 5 FIRST'
-        : hot ? `HOT · KEEP IT ${money(g.keepPrice(id))}` : money(g.price(id));
+      status.textContent = g.car === id ? 'SELECTED' : owned ? 'OWNED' : locked ? 'ESCAPE ★★★★★ FIRST'
+        : hot ? `KEEP IT ${money(g.keepPrice(id))}` : money(g.price(id));
     }
     // STYLE: the paint, and each kit card: worn, had, today's pick, its price, or who has it
     this.paintFor.textContent = `PAINT: ${BODY_WORDS[g.car]} · FREE`;

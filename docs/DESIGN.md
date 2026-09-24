@@ -1736,6 +1736,7 @@ and goes:
 | where a job ends | the ring the arrow points at | the arrow | DROP-OFF, MARK |
 | the police | COPS; POLICE CAR for the car | — | UNITS, AIR UNIT |
 | the trick run | COMBO | — | SKILL CHAIN, CHAIN |
+| the booster that raises the bag's × | BAG BONUS | — | FENCE (a fence is a thing you smash) |
 
 Names stay names: the districts, the rivals, the cars, the jobs, the kit.
 

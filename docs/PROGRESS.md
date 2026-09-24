@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8.5 slice 4: the words
+
+Done: §17.4 on every screen. The stars for heat (`ESCAPE FROM ★★★`, `ESCAPE ★★★★★ FIRST`), GARAGE for the hideout and the
+door (the cold open's caption, the sentence `CRIMES FILL THE BAG · STARS MULTIPLY IT · A GARAGE BANKS IT`), the arrow for
+a job's end (`DELIVER IT · FOLLOW THE ARROW`), COPS for the police (the map's key, the escape card), MORE STARS for the
+hot fare. Words a child would ask about: the fence is BAG BONUS (a fence is also a thing you smash), the stars' news says
+COPS ON YOUR TAIL, FAST COP CARS, HEAVY SUVS, a car driven in says KEEP IT without HOT. Pins M8.5 4.1 (the upper-case
+literals of the UI and the sim's text tables hold no retired word), 4.2 (the dailies' ids and targets stand). Verify green.
+
 ## 2026-09-24 — M8.5 slice 3: the wall in four
 
 Done: TOTALS · CARS · STYLE · GOALS (`ui/wallPages.ts` names them and the page of every button). TOTALS: BANKED (GARAGE

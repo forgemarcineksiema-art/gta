@@ -35,7 +35,7 @@ export interface CardResult {
 export function doorLines(r: DoorResult): Line[] {
   if (r.lastBag <= 0) return [];
   const doubled = r.lastDoubled ? ' DOUBLED' : '';
-  const fence = r.lastFence ? ` (FENCE +${BALANCE.prep.fenceBonus})` : '';
+  const fence = r.lastFence ? ` (BAG BONUS +${BALANCE.prep.fenceBonus})` : '';
   return [{ label: `BAG ${money(r.lastBag)}${doubled} ×${r.lastMultiplier}${fence}`, value: `+${money(r.lastBanked)}`, strong: true }];
 }
 

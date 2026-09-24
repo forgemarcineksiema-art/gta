@@ -338,10 +338,10 @@ export class JobsHud {
       this.cardSub.textContent = first ? `WANTED: ${paintName(w.paint)} ${CAR_WORDS[w.kind]} · IT'S IN TRAFFIC · SWAP INTO IT` : `WANTED: ${paintName(w.paint)} ${CAR_WORDS[w.kind]}`;
       this.cardLimit.textContent = `${clock(d.limitSeconds)} FROM THE SWAP · NO SCRATCHES`;
     } else if (d.kind === 'escape') {
-      this.cardSub.textContent = 'THE POLICE HAVE YOU';
+      this.cardSub.textContent = 'THE COPS HAVE YOU';
       this.cardLimit.textContent = 'LOSE THEM';
     } else if (d.kind === 'fare') {
-      this.cardSub.textContent = sim.fares.hot ? 'A CROOK WITH A SUITCASE · DOUBLE PAY · THE HEAT RISES' : 'TAKE THEM TO THE MARK';
+      this.cardSub.textContent = sim.fares.hot ? 'A CROOK WITH A SUITCASE · DOUBLE PAY · MORE STARS' : 'TAKE THEM THERE · FOLLOW THE ARROW';
       this.cardLimit.textContent = `${clock(d.limitSeconds)} · NEAR MISSES AND JUMPS TIP`;
     } else if (d.kind === 'rage' || d.kind === 'mayhem') {
       const z = BALANCE.jobs.zone;
@@ -357,7 +357,7 @@ export class JobsHud {
       this.cardSub.textContent = best > 0 ? `FOLLOW THE COINS · YOUR BEST: ${MEDAL_WORDS[best]}` : 'FOLLOW THE COINS TO THE FINISH';
       this.cardLimit.textContent = `GOLD ${clock(Math.round(g))} · SILVER ${clock(Math.round(s))} · BRONZE ${clock(Math.round(b))}`;
     } else {
-      this.cardSub.textContent = 'GET IT TO THE DROP-OFF';
+      this.cardSub.textContent = 'DELIVER IT · FOLLOW THE ARROW';
       this.cardLimit.textContent = `${clock(d.limitSeconds)} · FASTER PAYS MORE`;
     }
     this.card.dataset['kind'] = d.kind;

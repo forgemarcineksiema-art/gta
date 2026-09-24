@@ -58,15 +58,13 @@ export function newSaid(): Said {
 
 /** What the city sends from each level on: the stars lead it (DESIGN.md §17.4: heat is the stars, never LEVEL). */
 export const STARS_NEWS: Readonly<Record<number, string>> = {
-  1: 'PATROLS ON YOUR TAIL',
-  2: 'INTERCEPTORS ON THE ROAD',
+  1: 'COPS ON YOUR TAIL',
+  2: 'FAST COP CARS ON THE ROAD',
   3: 'ROADBLOCKS UP',
-  4: 'HEAVY UNITS ROLLING',
+  4: 'HEAVY SUVS ROLLING',
   5: 'THE CHIEF IS COMING',
 };
 
-/** The radio's codes that speak: 1 a roadblock ahead, 3 the suspect's car, 4 the helicopter (2, a unit down, is flavour). */
-export const DISPATCH_SPEAKS: readonly number[] = [1, 3, 4];
 
 /** The event's words into `out`; `out.where` is 'none' when it says nothing. */
 export function speak(kind: EventKind, value: number, target: number, ctx: VoiceContext, out: Said): Said {
@@ -83,6 +81,7 @@ export function speak(kind: EventKind, value: number, target: number, ctx: Voice
       out.text = STARS_NEWS[value] ?? '';
       break;
     case 'dispatch':
+      // the radio's codes: 1 a roadblock ahead, 3 the suspect's car, 4 the helicopter; 2 (a unit down) is flavour
       out.lead = 'DISPATCH';
       if (value === 1) out.text = 'ROADBLOCK AHEAD';
       else if (value === 4) out.text = 'HELICOPTER ON YOU';

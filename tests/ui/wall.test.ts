@@ -40,7 +40,7 @@ describe('the wall in four', () => {
     expect(doorLines({ lastBag: 32_500, lastMultiplier: 2.6, lastBanked: 84_500, lastDoubled: false, lastFence: false }))
       .toEqual([{ label: 'BAG 32,500 ×2.6', value: '+84,500', strong: true }]);
     expect(doorLines({ lastBag: 65_000, lastMultiplier: 3.1, lastBanked: 201_500, lastDoubled: true, lastFence: true })[0]!.label)
-      .toBe(`BAG 65,000 DOUBLED ×3.1 (FENCE +${BALANCE.prep.fenceBonus})`);
+      .toBe(`BAG 65,000 DOUBLED ×3.1 (BAG BONUS +${BALANCE.prep.fenceBonus})`);
     // an empty bag says nothing (the title says GARAGE)
     expect(doorLines({ lastBag: 0, lastMultiplier: 1, lastBanked: 0, lastDoubled: false, lastFence: false })).toEqual([]);
     expect(cardLines({ lastBag: 48_750, lastFine: 24_375, lastLawyer: false, bank: 24_875 })).toEqual([

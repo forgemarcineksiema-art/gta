@@ -182,7 +182,7 @@ export class BigMap {
     item('SPEED CAMERA', (c) => drawGlyph(c, 'camera', 9, 9, GLYPH, CAMERA_COLOR));
     item('PURSUIT BREAKER', (c) => drawGlyph(c, 'breaker', 9, 9, GLYPH * 0.8, BREAKER_COLOR));
     item('COVER', (c) => { c.fillStyle = COVER_COLOR; c.strokeStyle = DARK; c.lineWidth = 1.5; c.fillRect(3, 5, 12, 8); c.strokeRect(3, 5, 12, 8); });
-    item('POLICE', (c) => { this.unitDot(c, 9, 9, UNIT_LIT); });
+    item('COPS', (c) => { this.unitDot(c, 9, 9, UNIT_LIT); });
     item('HELICOPTER', (c) => drawHeli(c, 9, 9));
     return box;
   }

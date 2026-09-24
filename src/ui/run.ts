@@ -92,7 +92,7 @@ export class RunHud {
     // the totals page (DESIGN.md §17.5): the title, one line of sums, the sentence while it teaches, the next goal, the
     // counts; the bank is the footer's. The garage's pages sit beside it in the same panel
     const page = el('div', 'run__wall-page wall__page wall__page--wall');
-    this.wallSentence = el('div', 'run__sentence', 'CRIMES FILL THE BAG · THE POLICE MULTIPLY IT · THE DOOR BANKS IT');
+    this.wallSentence = el('div', 'run__sentence', 'CRIMES FILL THE BAG · STARS MULTIPLY IT · A GARAGE BANKS IT');
     this.wallTitle = el('span', '', 'BANKED');
     this.wallBest = el('span', 'run__best', 'NEW BEST');
     const title = el('div', 'run__title');

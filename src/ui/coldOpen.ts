@@ -24,7 +24,7 @@ const WORDS: Record<ColdOpenVerb, string> = {
   smash: 'SMASH THE BILLBOARD',
   takedown: 'RAM THEM INTO A WALL',
   deliver: 'PICK UP THE PACKAGE',
-  escape: 'GET IT TO THE HIDEOUT',
+  escape: 'GET IT TO THE GARAGE',
 };
 
 export class ColdOpenHud {

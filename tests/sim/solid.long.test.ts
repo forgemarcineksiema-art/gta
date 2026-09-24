@@ -17,22 +17,43 @@ function lowest(q: { x: number; y: number; z: number; w: number }, hw: number, h
   return low;
 }
 
+/** How deep a point (dx, dz from a car's centre) stands inside the car's footprint (m, > 0 inside). */
+function footprint(dx: number, dz: number, yaw: number, hw: number, hl: number): number {
+  const f = Math.sin(yaw), g = Math.cos(yaw);
+  return Math.min(hl - Math.abs(dx * f + dz * g), hw - Math.abs(dx * g - dz * f));
+}
+
 describe('solid cars: the chase read (long)', () => {
-  it('M8.6 0.4, 1.4, 2.4 under a level-5 chase no driving car leans or sinks or keeps pushing, no stopped car rests on a side or an end', async () => {
+  it('M8.6 0.4, 1.4, 2.4, 3.4 under a level-5 chase no driving car leans or sinks or keeps pushing, no stopped car rests on a side or an end, the officer never stands in a car', async () => {
     const sim = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 1, record: false, heat: 100 });
     const bot = new TrackBot('muscle', CITY_BOT_TUNING);
     const traffic = sim.traffic as Traffic;
     let driving = 0, leaning = 0, sunk = 0, worstUp = 1, worstSink = 0, busts = 0, stopped = 0, longestAskew = 0, longestPush = 0;
+    let officerSteps = 0, officerInside = 0;
     // seconds each driving car has pressed on another car while all but stopped (M8.6 D6)
     const pushing = new Float32Array(traffic.capacity);
     // seconds each record's body has rested on a side or an end
     const askew = new Float32Array(traffic.capacity);
+    let cardFor = 0;
     try {
       for (let tick = 0; tick < 120 * 60; tick++) {
-        if (sim.run.state === 'busted') { sim.run.closeCard(); busts++; }
+        // the card stays up a second, as a player reads it: the officer writes at the window meanwhile
+        if (sim.run.state === 'busted' && (cardFor += 1 / 60) > 1) { sim.run.closeCard(); busts++; cardFor = 0; }
         if (sim.heat.points !== 100) sim.heat.set(100);
         bot.drive(sim, sim.controls, 1 / 60);
         sim.step();
+        // the officer: inside the player's car or any car's footprint, never (M8.6 3.4)
+        const o = sim.ticket.ped;
+        if (o >= 0 && sim.peds) {
+          officerSteps++;
+          const x = sim.peds.x[o] as number, z = sim.peds.z[o] as number, pr = sim.probe;
+          let inside = footprint(x - pr.x, z - pr.z, pr.yaw, pr.halfWidth, pr.halfLength);
+          for (let a = 0; a < traffic.capacity; a++) {
+            if (traffic.state[a] === AgentState.Free) continue;
+            inside = Math.max(inside, footprint(x - (traffic.x[a] as number), z - (traffic.z[a] as number), traffic.yaw[a] as number, traffic.halfWidthOf(a), traffic.halfLengthOf(a)));
+          }
+          if (inside > 0) officerInside++;
+        }
         for (let a = 0; a < traffic.capacity; a++) {
           const st = traffic.state[a];
           if (st === AgentState.Wrecked || st === AgentState.Abandoned || st === AgentState.Parked) {
@@ -62,7 +83,7 @@ describe('solid cars: the chase read (long)', () => {
           if (under > 0.05) sunk++;
         }
       }
-      console.log(`[solid] level 5, 120 s, ${busts} busts: ${driving} driving samples, ${leaning} leaning over 3° (least up ${worstUp.toFixed(4)}), ${sunk} sunk over 5 cm (worst ${(worstSink * 100).toFixed(1)} cm); ${stopped} stopped samples, the longest at rest on a side or an end ${longestAskew.toFixed(2)} s; the longest push on a car, all but stopped, ${longestPush.toFixed(2)} s`);
+      console.log(`[solid] level 5, 120 s, ${busts} busts: ${driving} driving samples, ${leaning} leaning over 3° (least up ${worstUp.toFixed(4)}), ${sunk} sunk over 5 cm (worst ${(worstSink * 100).toFixed(1)} cm); ${stopped} stopped samples, the longest at rest on a side or an end ${longestAskew.toFixed(2)} s; the longest push on a car, all but stopped, ${longestPush.toFixed(2)} s; the officer inside a car on ${officerInside} of ${officerSteps} steps`);
       expect(driving).toBeGreaterThan(20_000);
       expect(leaning).toBe(0);
       expect(sunk).toBe(0);
@@ -70,6 +91,9 @@ describe('solid cars: the chase read (long)', () => {
       expect(longestAskew).toBeLessThanOrEqual(3);
       // M8.6 2.4: a car held up stops pushing
       expect(longestPush).toBeLessThanOrEqual(1);
+      // M8.6 3.4: the officer never stands in a car
+      expect(officerSteps).toBeGreaterThan(0);
+      expect(officerInside).toBe(0);
     } finally { sim.dispose(); }
   }, 300_000);
 });

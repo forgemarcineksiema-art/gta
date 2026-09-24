@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8.6 slice 3: the officer walks round
+
+Done: the officer steps out of the unit's clear door, writes at the driver's window unless a car stands at it (the
+passenger's, then behind the car), goes round the player's car by its corners when the straight way crosses it, slides
+along any car he meets, and stays at the window when the car is shoved (D8). Pins M8.6 3.1–3.3 (a cruiser pressed on
+either flank; the car shoved a metre under the card: never inside a car, the right window, 0.00 m off; the old walk was
+0.94 m inside and 1 m off), 3.4 long (inside a car on 0 of 1,352 steps). The chase read now holds the card a second, as
+a player reads it. Verify green.
+
 ## 2026-09-24 — M8.6 slice 2: the box without shoving
 
 Done: a lent car held up pushing for 0.6 s holds 1.5 s (a ram at a moving player keeps its shove); a ram's cap is on the

@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { TRAFFIC } from '../../src/sim/traffic/tuning';
 import { AgentState, type Traffic } from '../../src/sim/traffic/Traffic';
+import { PedPose } from '../../src/sim/traffic/Pedestrians';
 import type { SimWorld } from '../../src/sim';
 import { createWorld, run } from './helpers';
 
@@ -299,5 +300,84 @@ describe('solid cars: the box', () => {
       expect(carMoved).toBeLessThan(0.2);
       expect(gone).toBe(units.length);
     } finally { sim.dispose(); }
+  }, 60_000);
+});
+
+/**
+ * The player stopped on a street, a parked cruiser pressed on one flank (`side` 1 the driver's, the left) and a second
+ * one behind, the bar filling; the officer's worst step inside a car and where they write.
+ */
+async function ticketScene(side: 1 | -1, shove = false): Promise<{ inside: number; windowSide: number; atWindow: number; afterShove: number }> {
+  const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false, heat: 20 });
+  try {
+    sim.police!.dispatching = false;
+    const traffic = sim.traffic as Traffic, peds = sim.peds!;
+    const lane = streetLane(sim);
+    const at = pose(sim, lane, 80);
+    sim.city?.sync(at.x, at.z, true);
+    sim.vehicle.teleport({ x: at.x, y: 0.9, z: at.z }, at.yaw);
+    run(sim, 1, (_t, c) => { c.handbrake = 1; });
+    const probe = sim.probe, fx = Math.sin(probe.yaw), fz = Math.cos(probe.yaw);
+    // the flank's outward direction: the driver's side is +(cos, -sin)
+    const ox = Math.cos(probe.yaw) * side, oz = -Math.sin(probe.yaw) * side;
+    const pressed = probe.halfWidth + 0.95 + 0.2;
+    const cars: number[] = [];
+    cars.push(traffic.spawnParkedPolice(probe.x + ox * pressed, probe.z + oz * pressed, probe.yaw, 'police'));
+    cars.push(traffic.spawnParkedPolice(probe.x - fx * 5.8, probe.z - fz * 5.8, probe.yaw, 'police'));
+    // inside a footprint: the player's car or a cruiser's, not grown
+    const within = (x: number, z: number, cx: number, cz: number, yaw: number, hw: number, hl: number): number => {
+      const dx = x - cx, dz = z - cz, f = Math.sin(yaw), g = Math.cos(yaw);
+      return Math.min(hl - Math.abs(dx * f + dz * g), hw - Math.abs(dx * g - dz * f));
+    };
+    let inside = -Infinity, windowSide = 0, atWindow = Infinity, afterShove = Infinity;
+    for (let k = 0; k < 8 * 60; k++) {
+      sim.controls.handbrake = 1;
+      sim.step();
+      const o = sim.ticket.ped;
+      if (o < 0) continue;
+      const x = peds.x[o] as number, z = peds.z[o] as number;
+      inside = Math.max(inside, within(x, z, probe.x, probe.z, probe.yaw, probe.halfWidth, probe.halfLength));
+      for (const c of cars) inside = Math.max(inside, within(x, z, traffic.x[c] as number, traffic.z[c] as number, traffic.yaw[c] as number, traffic.halfWidthOf(c), traffic.halfLengthOf(c)));
+      if (sim.run.state === 'busted' && peds.pose[o] === PedPose.Ticket) {
+        // which window: the side of the car they stand on, and how far from its point
+        const across = (x - probe.x) * Math.cos(probe.yaw) - (z - probe.z) * Math.sin(probe.yaw);
+        windowSide = across > 0 ? 1 : -1;
+        atWindow = Math.abs(Math.abs(across) - (probe.halfWidth + 0.55));
+        if (!shove) break;
+        // shoved a metre across under the card: the window goes with the car
+        const p0 = { x: probe.x, z: probe.z };
+        sim.vehicle.teleport({ x: p0.x - ox * 1, y: 0.9, z: p0.z - oz * 1 }, probe.yaw);
+        run(sim, 0.3, (_t, c) => { c.handbrake = 1; });
+        const o2 = sim.ticket.ped;
+        const across2 = ((peds.x[o2] as number) - probe.x) * Math.cos(probe.yaw) - ((peds.z[o2] as number) - probe.z) * Math.sin(probe.yaw);
+        const along2 = ((peds.x[o2] as number) - probe.x) * fx + ((peds.z[o2] as number) - probe.z) * fz;
+        afterShove = Math.hypot(Math.abs(across2) - (probe.halfWidth + 0.55), along2);
+        break;
+      }
+    }
+    return { inside, windowSide, atWindow, afterShove };
+  } finally { sim.dispose(); }
+}
+
+describe('solid cars: the officer', () => {
+  it('M8.6 3.1 a cruiser pressed on the right: the officer comes out of its far side, goes round the car and writes at the driver\'s window, never inside a car', async () => {
+    const r = await ticketScene(-1);
+    console.log(`[solid] the officer, a cruiser on the right: deepest inside a car ${r.inside.toFixed(2)} m, writes at window ${r.windowSide} (${r.atWindow.toFixed(2)} m off)`);
+    expect(r.inside).toBeLessThan(0);
+    expect(r.windowSide).toBe(1);
+    expect(r.atWindow).toBeLessThan(0.1);
+  }, 60_000);
+
+  it('M8.6 3.2 a cruiser pressed on the driver\'s side: the officer writes at the passenger\'s window', async () => {
+    const r = await ticketScene(1);
+    console.log(`[solid] the officer, a cruiser on the left: deepest inside a car ${r.inside.toFixed(2)} m, writes at window ${r.windowSide}`);
+    expect(r.inside).toBeLessThan(0);
+    expect(r.windowSide).toBe(-1);
+  }, 60_000);
+
+  it('M8.6 3.3 the car shoved a metre under the card: the officer is still at its window', async () => {
+    const r = await ticketScene(-1, true);
+    console.log(`[solid] the officer after the shove: ${r.afterShove.toFixed(2)} m off the window`);
+    expect(r.afterShove).toBeLessThan(0.1);
   }, 60_000);
 });

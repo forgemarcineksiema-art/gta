@@ -16,6 +16,7 @@ import {
   CACHE_COLOR, DARK, FONT, GLYPH_KINDS, GRID, INK, JOB_COLORS, LOOP, ACCENT, RIVAL, SEARCH_EDGE, SEARCH_FILL, UNIT_BEAT, UNIT_LIT, WATER,
   drawArrow, drawGlyph, drawHeli, fillIsland, hex, type MapPaths, type MarkerKind,
 } from './minimap';
+import { label, labelAria, relabel, t } from './lang';
 import { MINIMAP, bigMapProject, bigMapScale, yawFromQuat, type Vec2 } from './minimapModel';
 
 /** Repaint cadence while shown, ms: the units move, the map need not be smoother than the radar. */
@@ -40,9 +41,9 @@ const LEGEND_JOBS: ReadonlyArray<[JobKind, string]> = [
 export function huntsLine(sim: SimWorld): string {
   const parts: string[] = [];
   const c = sim.collectibles, j = sim.jumps, k = sim.caches;
-  if (c) parts.push(`BILLBOARDS ${c.smashedCount}/${c.total}`);
-  if (j) parts.push(`JUMPS ${j.foundCount}/${j.descs.length}`);
-  if (k && k.today.length > 0) parts.push(`CACHES ${k.count}/${k.total}`);
+  if (c) parts.push(t('BILLBOARDS {n}/{of}', { n: c.smashedCount, of: c.total }));
+  if (j) parts.push(t('JUMPS {n}/{of}', { n: j.foundCount, of: j.descs.length }));
+  if (k && k.today.length > 0) parts.push(t('CACHES {n}/{of}', { n: k.count, of: k.total }));
   return parts.join(' · ');
 }
 
@@ -58,6 +59,8 @@ export class BigMap {
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
   private readonly keyHint: HTMLElement;
+  /** The hold key's label, kept to say the hint again in a new language. */
+  private keyLabel = 'TAB';
   /** The three hunts' counts (DESIGN.md §17.2): off the driving screen, here and on the wall's GOALS page. */
   private readonly hunts: HTMLElement;
   private huntsText = '';
@@ -77,13 +80,13 @@ export class BigMap {
   constructor(parent: HTMLElement, sim: SimWorld, private readonly paths: MapPaths) {
     this.root = el('div', 'bigmap');
     const head = el('div', 'bigmap__head');
-    this.keyHint = el('span', 'bigmap__hint', 'HOLD TAB');
+    this.keyHint = el('span', 'bigmap__hint', t('HOLD {key}', { key: this.keyLabel }));
     this.hunts = el('span', 'bigmap__hunts');
-    head.append(el('span', 'bigmap__title', 'MAP'), this.keyHint, this.hunts);
+    head.append(label(el('span', 'bigmap__title'), 'MAP'), this.keyHint, this.hunts);
     this.canvas = document.createElement('canvas');
     this.canvas.className = 'bigmap__canvas';
     this.canvas.setAttribute('role', 'img');
-    this.canvas.setAttribute('aria-label', 'Map of the island, north up. The yellow arrow is your car.');
+    labelAria(this.canvas, 'Map of the island, north up. The yellow arrow is your car.');
     const body = el('div', 'bigmap__body');
     body.append(this.canvas, this.legend());
     this.root.append(head, body);
@@ -106,8 +109,17 @@ export class BigMap {
   }
 
   /** The hold key's label in the title bar. */
-  setKey(label: string): void {
-    this.keyHint.textContent = `HOLD ${label}`;
+  setKey(key: string): void {
+    this.keyLabel = key;
+    this.keyHint.textContent = t('HOLD {key}', { key });
+  }
+
+  /** The language changed (DESIGN.md §19): the title, the key and the hint said again; the names on the next paint. */
+  relabel(): void {
+    relabel(this.root);
+    this.setKey(this.keyLabel);
+    this.huntsText = '';
+    this.lastPaint = -Infinity;
   }
 
   setVisible(v: boolean): void {
@@ -172,7 +184,7 @@ export class BigMap {
         c.setTransform(2, 0, 0, 2, 0, 0);
         draw(c);
       }
-      row.append(swatch, el('span', 'bigmap__word', word));
+      row.append(swatch, label(el('span', 'bigmap__word'), word));
       box.appendChild(row);
     };
     item('YOU', (c) => drawArrow(c, 9, 9, 0, 7));
@@ -305,9 +317,10 @@ export class BigMap {
       const p = this.at(i % 2 ? CITY_HALF / 2 : -CITY_HALF / 2, i >= 2 ? CITY_HALF / 2 : -CITY_HALF / 2, s);
       c.lineWidth = 3;
       c.strokeStyle = DARK;
-      c.strokeText(d.name, p.x, p.y);
+      const name = t(d.name);
+      c.strokeText(name, p.x, p.y);
       c.fillStyle = hex(d.color);
-      c.fillText(d.name, p.x, p.y);
+      c.fillText(name, p.x, p.y);
     }
     LANDMARKS.forEach((l, i) => this.glyphAt(GLYPH_KINDS[i] ?? 'tower', l.x, l.z, s, GLYPH, hex(DISTRICTS[i]?.accent ?? 0xffffff)));
     for (const d of sim.run.dropOffs) this.glyphAt('garage', d.door.x, d.door.z, s, GLYPH * 1.2, hex(PALETTE.carOrange));

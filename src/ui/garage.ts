@@ -18,9 +18,11 @@
  * DOUBLE THE BAG (a video) or BANK IT, the same size, BANK IT focused.
  *
  * Reports intents through `GarageActions` and never writes the sim; reads it
- * to draw. Rebuilds only when the garage, the bank or the totals change.
+ * to draw. Rebuilds only when the garage, the bank or the totals change. Every
+ * word in the player's language (`lang.ts`, DESIGN.md §19).
  */
 import { huntsLine } from './bigmap';
+import { label, labelAria, num, relabel, t } from './lang';
 import { nextLine } from './totals';
 import { gridMove, gridStart, type GridMove } from './wallGrid';
 import { PAGE_TITLES, WALL_PAGES, pageOf, type WallPage } from './wallPages';
@@ -135,7 +137,7 @@ export class GarageUi {
     this.root = parent;
     const tabBar = el('div', 'wall__tabs');
     for (const p of this.order) {
-      const tab = button('wall__tab', PAGE_TITLES[p]);
+      const tab = label(button('wall__tab', ''), PAGE_TITLES[p]);
       tab.addEventListener('click', () => this.goPage(p, false));
       tabBar.appendChild(tab);
       this.tabs.set(p, tab);
@@ -148,9 +150,9 @@ export class GarageUi {
     this.pages.set('wall', wallPage);
     this.offerRow = el('div', 'wall__offer');
     this.offerDouble = button('wall__btn wall__btn--video', '');
-    this.offerDouble.append(videoIcon(), el('span', 'wall__btn-label', 'DOUBLE THE BAG'));
+    this.offerDouble.append(videoIcon(), label(el('span', 'wall__btn-label'), 'DOUBLE THE BAG'));
     this.offerBank = button('wall__btn', '');
-    this.offerBank.append(el('span', 'wall__btn-label', 'BANK IT'));
+    this.offerBank.append(label(el('span', 'wall__btn-label'), 'BANK IT'));
     this.offerDouble.addEventListener('click', () => this.answerOffer(0));
     this.offerBank.addEventListener('click', () => this.answerOffer(1));
     this.offerRow.append(this.offerDouble, this.offerBank);
@@ -166,7 +168,7 @@ export class GarageUi {
     for (const id of BODY_IDS) {
       const b = button(isShell(id) ? 'wall__card' : 'wall__card wall__card--body', '');
       b.dataset['car'] = id;
-      b.append(el('span', 'wall__card-swatch'), el('span', 'wall__card-name', BODY_WORDS[id]), el('span', 'wall__card-status'));
+      b.append(el('span', 'wall__card-swatch'), label(el('span', 'wall__card-name'), BODY_WORDS[id]), el('span', 'wall__card-status'));
       grid.appendChild(b);
       const it = this.item(pageOf('buy'), b, () => this.carAction(id));
       if (!isShell(id)) {
@@ -181,7 +183,7 @@ export class GarageUi {
     for (const stat of STATS) {
       const b = button('wall__row', '');
       b.dataset['stat'] = stat;
-      b.append(el('span', 'wall__row-name', STAT_WORDS[stat]), el('span', 'wall__dots'), el('span', 'wall__row-price'));
+      b.append(label(el('span', 'wall__row-name'), STAT_WORDS[stat]), el('span', 'wall__dots'), el('span', 'wall__row-price'));
       rows.appendChild(b);
       this.tuneItems.push(this.item(pageOf('upgrade'), b, () => this.actions.upgrade(this.sim.garage.car, stat)));
     }
@@ -191,17 +193,17 @@ export class GarageUi {
       const row = el('div', 'wall__prep');
       row.dataset['prep'] = it;
       const text = el('div', 'wall__prep-text');
-      text.append(el('span', 'wall__row-name', PREP_WORDS[it][0]), el('span', 'wall__prep-what', PREP_WORDS[it][1]));
+      text.append(label(el('span', 'wall__row-name'), PREP_WORDS[it][0]), label(el('span', 'wall__prep-what'), PREP_WORDS[it][1]));
       const cash = button('wall__btn wall__btn--cash', '');
       cash.append(el('span', 'wall__btn-label'));
       const video = button('wall__btn wall__btn--video', '');
-      video.append(videoIcon(), el('span', 'wall__btn-label', 'FREE'));
+      video.append(videoIcon(), label(el('span', 'wall__btn-label'), 'FREE'));
       row.append(text, cash, video);
       prepRows.appendChild(row);
       this.prepItems.push(this.item(pageOf('prep'), cash, () => this.actions.buyPrep(it)));
       this.prepItems.push(this.item(pageOf('prepVideo'), video, () => this.actions.offer(it)));
     }
-    cars.append(this.carsCount, grid, this.tuneFor, rows, el('div', 'wall__for', 'FOR THE NEXT RUN'), prepRows);
+    cars.append(this.carsCount, grid, this.tuneFor, rows, label(el('div', 'wall__for'), 'FOR THE NEXT RUN'), prepRows);
     this.items.set('cars', [...carItems, ...this.tuneItems, ...this.prepItems]);
     // the grid: the cars' row, a row an upgrade, a row a booster (its cash and its video)
     const [lawyerCash, lawyerVideo, fenceCash, fenceVideo] = this.prepItems as [Item, Item, Item, Item];
@@ -217,7 +219,7 @@ export class GarageUi {
     for (const hex of GARAGE_PAINTS) {
       const b = button('wall__swatch', '');
       b.style.setProperty('--swatch', `#${hex.toString(16).padStart(6, '0')}`);
-      b.setAttribute('aria-label', `paint #${hex.toString(16)}`);
+      b.setAttribute('aria-label', t('paint {hex}', { hex: `#${hex.toString(16)}` }));
       swatches.appendChild(b);
       const it = this.item(pageOf('respray'), b, () => this.actions.respray(this.sim.garage.car, hex));
       paintItems.push(it);
@@ -234,14 +236,14 @@ export class GarageUi {
         b.dataset['kit'] = k.id;
         const sw = el('span', 'wall__card-swatch');
         sw.style.background = `#${k.colour.toString(16).padStart(6, '0')}`;
-        b.append(sw, el('span', 'wall__card-name', k.name), el('span', 'wall__card-status'));
+        b.append(sw, label(el('span', 'wall__card-name'), k.name), el('span', 'wall__card-status'));
         row.appendChild(b);
         const it = this.item(pageOf('kit'), b, () => this.actions.kit(i));
         paintItems.push(it);
         rowItems.push(it);
         this.kitCards.push({ el: b, item: i });
       }
-      paint.append(el('div', 'wall__for', SLOT_WORDS[slot]), row);
+      paint.append(label(el('div', 'wall__for'), SLOT_WORDS[slot]), row);
       paintRows.push(rowItems);
     }
     this.items.set('paint', paintItems);
@@ -251,7 +253,7 @@ export class GarageUi {
     // streak, the wanted board (your place, a chip per poster, the next rival and what they want), the hunts
     const goals = this.newPage('goals');
     this.goalsNext = el('div', 'wall__next');
-    this.todayFor = el('div', 'wall__for', 'TODAY');
+    this.todayFor = el('div', 'wall__for', t('TODAY'));
     this.dailiesBody = el('div', 'wall__dailies');
     this.boardYou = el('div', 'wall__for');
     const strip = el('div', 'wall__board');
@@ -271,12 +273,23 @@ export class GarageUi {
     this.hint = el('div', 'wall__hint');
     const bank = el('div', 'wall__bank');
     this.bankValue = el('span', 'wall__bank-value', '0');
-    bank.append(el('span', 'wall__bank-label', 'BANK'), this.bankValue);
-    this.driveButton = button('wall__drive', 'DRIVE OUT');
+    bank.append(label(el('span', 'wall__bank-label'), 'BANK'), this.bankValue);
+    this.driveButton = label(button('wall__drive', ''), 'DRIVE OUT');
     this.driveButton.addEventListener('click', () => { if (!this.offerOpen) this.actions.driveOut(); });
     footer.append(this.hint, bank, this.driveButton);
     parent.appendChild(footer);
     this.show();
+  }
+
+  /** The language changed (DESIGN.md §19): the labels now, the pages on the next update. */
+  relabel(): void {
+    relabel(this.root);
+    for (const b of this.pages.get('paint')?.querySelectorAll<HTMLElement>('.wall__swatch') ?? []) {
+      const hex = b.style.getPropertyValue('--swatch');
+      b.setAttribute('aria-label', t('paint {hex}', { hex }));
+    }
+    this.garageSerial = -1;
+    this.hintText();
   }
 
   /** The keycaps the hint line names. */
@@ -400,7 +413,7 @@ export class GarageUi {
     this.dailySerial = sim.dailies.serial;
     this.bankValue.textContent = money(funds);
     // CARS: how many of the city's cars are yours, then a card per car
-    this.carsCount.textContent = `CARS ${g.owned.size}/${BODY_IDS.length} · DRIVE ANY CAR HOME TO KEEP IT`;
+    this.carsCount.textContent = t('CARS {n}/{of} · DRIVE ANY CAR HOME TO KEEP IT', { n: g.owned.size, of: BODY_IDS.length });
     const cars = this.items.get('cars') ?? [];
     for (let k = 0; k < BODY_IDS.length; k++) {
       const id = BODY_IDS[k] as BodyId;
@@ -423,11 +436,11 @@ export class GarageUi {
       b.classList.toggle('is-locked', locked);
       b.classList.toggle('is-hot', hot && !locked);
       b.classList.toggle('is-short', hot ? funds < g.keepPrice(id) : can === 'cash');
-      status.textContent = g.car === id ? 'SELECTED' : owned ? 'OWNED' : locked ? 'ESCAPE ★★★★★ FIRST'
-        : hot ? `KEEP IT ${money(g.keepPrice(id))}` : money(g.price(id));
+      status.textContent = g.car === id ? t('SELECTED') : owned ? t('OWNED') : locked ? t('ESCAPE ★★★★★ FIRST')
+        : hot ? t('KEEP IT {cash}', { cash: Math.round(g.keepPrice(id)) }) : money(g.price(id));
     }
     // STYLE: the paint, and each kit card: worn, had, today's pick, its price, or who has it
-    this.paintFor.textContent = `PAINT: ${BODY_WORDS[g.car]} · FREE`;
+    this.paintFor.textContent = t('PAINT: {car} · FREE', { car: t(BODY_WORDS[g.car]) });
     const paint = this.items.get('paint') ?? [];
     for (let k = 0; k < GARAGE_PAINTS.length; k++) (paint[k] as Item).el.classList.toggle('is-selected', g.paintOf(g.car) === GARAGE_PAINTS[k]);
     const kit = sim.kit, pick = kit.pick(sim.dailies.date);
@@ -444,12 +457,12 @@ export class GarageUi {
       b.classList.toggle('is-locked', (!has && k.price <= 0) || !fits);
       b.classList.toggle('is-hot', !has && item === pick);
       b.classList.toggle('is-short', !has && k.price > 0 && funds < price);
-      status.textContent = !fits ? 'NOT ON THIS CAR' : worn ? (car ? 'FITTED' : 'WORN') : has ? (car ? 'FIT IT' : 'WEAR IT')
-        : k.won === STREAK ? '7-DAY STREAK' : k.won >= 0 ? `BEAT ${RIVALS[k.won]?.name ?? ''}`
-          : item === pick ? `TODAY ${money(price)}` : money(price);
+      status.textContent = !fits ? t('NOT ON THIS CAR') : worn ? t(car ? 'FITTED' : 'WORN') : has ? t(car ? 'FIT IT' : 'WEAR IT')
+        : k.won === STREAK ? t('7-DAY STREAK') : k.won >= 0 ? t('BEAT {name}', { name: t(RIVALS[k.won]?.name ?? '') })
+          : item === pick ? t('TODAY {cash}', { cash: Math.round(price) }) : money(price);
     }
     // the upgrades: the tiers belong to the car's class, so every car of the class drives with them
-    this.tuneFor.textContent = `UPGRADES: ${BODY_WORDS[g.car]}`;
+    this.tuneFor.textContent = t('UPGRADES: {car}', { car: t(BODY_WORDS[g.car]) });
     const tiers = g.tiers[g.classOf(g.car)];
     for (let k = 0; k < STATS.length; k++) {
       const stat = STATS[k] as Stat;
@@ -457,7 +470,7 @@ export class GarageUi {
       const tier = tiers[k] as number;
       (b.querySelector('.wall__dots') as HTMLElement).textContent = '●'.repeat(tier) + '○'.repeat(3 - tier);
       const price = g.tierPrice(g.car, stat);
-      (b.querySelector('.wall__row-price') as HTMLElement).textContent = Number.isFinite(price) ? money(price) : 'MAX';
+      (b.querySelector('.wall__row-price') as HTMLElement).textContent = Number.isFinite(price) ? money(price) : t('MAX');
       b.classList.toggle('is-short', Number.isFinite(price) && funds < price);
       b.classList.toggle('is-max', !Number.isFinite(price));
     }
@@ -466,7 +479,7 @@ export class GarageUi {
     for (const it of ['lawyer', 'fence'] as const) {
       const cash = (this.prepItems[n++] as Item).el, video = (this.prepItems[n++] as Item).el;
       const bought = g.prep[it];
-      (cash.querySelector('.wall__btn-label') as HTMLElement).textContent = bought ? 'BOUGHT' : money(BALANCE.prep[it]);
+      (cash.querySelector('.wall__btn-label') as HTMLElement).textContent = bought ? t('BOUGHT') : money(BALANCE.prep[it]);
       cash.classList.toggle('is-bought', bought);
       cash.classList.toggle('is-short', !bought && funds < BALANCE.prep[it]);
       video.classList.toggle('is-bought', bought);
@@ -483,8 +496,8 @@ export class GarageUi {
   private fillBoard(sim: SimWorld): void {
     const board = sim.board;
     const next = board.next();
-    this.boardYou.textContent = next < 0 ? 'THE WANTED BOARD · YOU ARE #1'
-      : board.rank > 10 ? 'THE WANTED BOARD · NOT ON IT YET' : `THE WANTED BOARD · YOU ARE #${board.rank}`;
+    this.boardYou.textContent = next < 0 ? t('THE WANTED BOARD · YOU ARE #1')
+      : board.rank > 10 ? t('THE WANTED BOARD · NOT ON IT YET') : t('THE WANTED BOARD · YOU ARE #{n}', { n: board.rank });
     for (let i = 0; i < this.boardChips.length; i++) {
       const chip = this.boardChips[i] as HTMLElement;
       chip.classList.toggle('is-beaten', board.isBeaten(i));
@@ -492,24 +505,24 @@ export class GarageUi {
     }
     const rows: HTMLElement[] = [];
     if (next < 0) {
-      rows.push(el('div', 'wall__streak', 'EVERY RIVAL BEATEN · A REMATCH PAYS A QUARTER'));
+      rows.push(el('div', 'wall__streak', t('EVERY RIVAL BEATEN · A REMATCH PAYS A QUARTER')));
     } else {
       const r = RIVALS[next] as RivalDef;
       const n = posterNumber(next);
-      const where = r.turf === 'highway' ? 'THE HIGHWAY' : DISTRICTS.find((d) => d.id === r.turf)?.name ?? '';
+      const where = t(r.turf === 'highway' ? 'THE HIGHWAY' : DISTRICTS.find((d) => d.id === r.turf)?.name ?? '');
       const head = el('div', 'wall__daily');
-      head.append(el('span', 'wall__daily-text', n > 0 ? `NEXT: #${n} ${r.name}` : `LAST: ${r.name}`), el('span', 'wall__daily-progress', where),
-        el('span', 'wall__daily-reward', `${money(r.purse)} + THE ${BODY_WORDS[r.body]}`));
+      head.append(el('span', 'wall__daily-text', n > 0 ? t('NEXT: #{n} {name}', { n, name: t(r.name) }) : t('LAST: {name}', { name: t(r.name) })), el('span', 'wall__daily-progress', where),
+        el('span', 'wall__daily-reward', t('{cash} + THE {car}', { cash: Math.round(r.purse), car: t(BODY_WORDS[r.body]) })));
       rows.push(head);
       for (const q of r.reqs) {
         const have = board.have(q);
         const done = have >= q.count;
         const row = el('div', done ? 'wall__daily is-done' : 'wall__daily');
-        row.append(el('span', 'wall__daily-text', reqText(q)), el('span', 'wall__daily-progress', done ? 'DONE'
-          : q.kind === 'bestRun' ? `BEST ${money(have)}` : `${money(Math.min(have, q.count))}/${money(q.count)}`), el('span', 'wall__daily-reward', ''));
+        row.append(el('span', 'wall__daily-text', reqText(q, t)), el('span', 'wall__daily-progress', done ? t('DONE')
+          : q.kind === 'bestRun' ? t('BEST {cash}', { cash: Math.round(have) }) : `${money(Math.min(have, q.count))}/${money(q.count)}`), el('span', 'wall__daily-reward', ''));
         rows.push(row);
       }
-      if (board.ready(next)) rows.push(el('div', 'wall__streak', 'READY · THE CYAN RING IS ON THE MAP'));
+      if (board.ready(next)) rows.push(el('div', 'wall__streak', t('READY · THE CYAN RING IS ON THE MAP')));
     }
     this.boardNext.replaceChildren(...rows);
   }
@@ -518,13 +531,13 @@ export class GarageUi {
   private fillRecords(sim: SimWorld): void {
     const rows: HTMLElement[] = [];
     const hunts = huntsLine(sim);
-    if (hunts) rows.push(el('div', 'wall__streak wall__medals', `HUNTS: ${hunts}`));
+    if (hunts) rows.push(el('div', 'wall__streak wall__medals', t('HUNTS: {list}', { list: hunts })));
     // the time trials' medals (M5.5 slice 10), counted once there is one: a row of dashes answered no question
     const won = [0, 0, 0, 0];
     for (const j of sim.jobs.defs) if (j.kind === 'trial') { const m = sim.jobs.medals.get(j.id) ?? 0; won[m] = (won[m] ?? 0) + 1; }
-    const medals = [3, 2, 1].filter((m) => (won[m] as number) > 0).map((m) => `${won[m]} ${MEDAL_WORDS[m]}`);
-    if (medals.length > 0) rows.push(el('div', 'wall__streak wall__medals', `TIME TRIAL MEDALS: ${medals.join(' · ')}`));
-    if (sim.run.bestRun > 0) rows.push(el('div', 'wall__streak wall__medals', `BEST RUN ${money(sim.run.bestRun)}`));
+    const medals = [3, 2, 1].filter((m) => (won[m] as number) > 0).map((m) => t('{n} {medal}', { n: won[m] as number, medal: t(MEDAL_WORDS[m] ?? '') }));
+    if (medals.length > 0) rows.push(el('div', 'wall__streak wall__medals', t('TIME TRIAL MEDALS: {list}', { list: medals.join(' · ') })));
+    if (sim.run.bestRun > 0) rows.push(el('div', 'wall__streak wall__medals', t('BEST RUN {cash}', { cash: Math.round(sim.run.bestRun) })));
     this.records.replaceChildren(...rows);
   }
 
@@ -536,10 +549,10 @@ export class GarageUi {
       const text = d.text(i);
       if (!text) continue;
       const row = el('div', d.done[i] ? 'wall__daily is-done' : 'wall__daily');
-      row.append(el('span', 'wall__daily-text', text), el('span', 'wall__daily-progress', d.done[i] ? 'DONE' : d.progressText(i)), el('span', 'wall__daily-reward', `+${money(d.reward(i))}`));
+      row.append(el('span', 'wall__daily-text', t(text)), el('span', 'wall__daily-progress', d.done[i] ? t('DONE') : d.progressText(i, t)), el('span', 'wall__daily-reward', `+${money(d.reward(i))}`));
       rows.push(row);
     }
-    this.todayFor.textContent = d.streak.count > 0 ? `TODAY · STREAK DAY ${d.streak.count}${d.streak.topper ? ' · TOPPER ON' : ''}` : 'TODAY';
+    this.todayFor.textContent = d.streak.count > 0 ? `${t('TODAY · STREAK DAY {n}', { n: d.streak.count })}${d.streak.topper ? ` · ${t('TOPPER ON')}` : ''}` : t('TODAY');
     this.dailiesBody.replaceChildren(...rows);
   }
 
@@ -640,17 +653,18 @@ export class GarageUi {
 
   private hintText(): void {
     const k = this.keys;
-    const text = this.offerOpen ? `${k.left} ${k.right} CHOOSE · ${k.confirm} OK`
-      : this.level === 'items' && this.rows.has(this.page) ? `${k.left} ${k.right} PICK · ${k.confirm} ${k.back} ROWS · ${k.select} OK`
-      : this.level === 'items' ? `${k.left} ${k.right} PICK · ${k.confirm} OK · ${k.back} BACK`
-        : this.page === 'wall' ? `${k.right} CARS · ${k.confirm} DRIVE OUT`
-          : `${k.left} ${k.right} PAGES · ${k.confirm} OPEN · ${k.back} TOTALS`;
+    const keys = { l: k.left, r: k.right, c: k.confirm, b: k.back, s: k.select };
+    const text = t(this.offerOpen ? '{l} {r} CHOOSE · {c} OK'
+      : this.level === 'items' && this.rows.has(this.page) ? '{l} {r} PICK · {c} {b} ROWS · {s} OK'
+      : this.level === 'items' ? '{l} {r} PICK · {c} OK · {b} BACK'
+        : this.page === 'wall' ? '{r} CARS · {c} DRIVE OUT'
+          : '{l} {r} PAGES · {c} OPEN · {b} TOTALS', keys);
     if (this.hint.textContent !== text) this.hint.textContent = text;
   }
 }
 
 function money(v: number): string {
-  return Math.round(v).toLocaleString('en-US');
+  return num(Math.round(v));
 }
 
 function el(tag: string, className: string, text?: string): HTMLElement {
@@ -672,6 +686,6 @@ function button(className: string, text: string): HTMLButtonElement {
 /** The video icon on every rewarded button (docs/CRAZYGAMES.md A6): a play triangle in a rounded frame. */
 function videoIcon(): HTMLElement {
   const i = el('span', 'wall__video');
-  i.setAttribute('aria-label', 'watch a video');
+  labelAria(i, 'watch a video');
   return i;
 }

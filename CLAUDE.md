@@ -4,7 +4,7 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 
 ## Language
 
-- Talk to Marcin in **Polish**. Everything in the repo is **English**: code, comments, docs, commit messages, in-game text.
+- Talk to Marcin in **Polish**. Everything in the repo is **English**: code, comments, docs, commit messages. In-game text is written in English in the code and the screen says it in **Polish by default** (Marcin, 2026-09-24; DESIGN §19): every on-screen string goes through `t()` (`src/ui/lang.ts`) and has its entry in `src/ui/pl.ts`, pinned by `tests/ui/lang.test.ts`; English stays one settings row (or `?lang=en`) away.
 - Be technical and direct. Recommend one option with a reason; no menus of alternatives.
 
 ## Session start
@@ -39,6 +39,7 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 | `docs/ASSETS.md` | Third-party assets with source and licence. Nothing without a clear licence. |
 | `src/sim/` | Headless game state + physics (Rapier). **No Three.js, no DOM** (enforced by `tsconfig.sim.json` and lint). |
 | `src/render/`, `src/audio/`, `src/ui/` | Read sim state, never write it. |
+| `src/ui/lang.ts`, `src/ui/pl.ts` | The screen's language (DESIGN §19): `t()`, the numbers, a paint agreeing with its car; the Polish table keyed by the English the code writes. The sim's texts with holes take a `Say` (`src/sim/say.ts`). |
 | `src/input/` | Devices → abstract actions. `KeyboardEvent.code` only. |
 | `src/platform/` | `Platform` interface; `LocalPlatform` now, `CrazyGamesPlatform` in M9. Game code never touches `window.CrazyGames`. |
 | `src/app/` | Glue: fixed-step loop, bot, perf probe, `App`. |
@@ -56,7 +57,7 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 
 Always in a vehicle, no on-foot, no guns. PEGI 12 slapstick: pedestrians always dodge, police are comic. No menu before gameplay; cold open. One seamless city. Control never taken away > 2 s. Keyboard first, touch second, input abstracted. Low-poly flat-shaded, palette in `src/sim/palette.ts`, no per-asset textures.
 
-The screen's budget (DESIGN §17, set 2026-09-24 after Marcin's review): a calm drive shows seven things (the goal line, the arrow, the stars, the bank, the radar, the speed, the boost); everything else appears on its moment and goes. A new system gets no standing place on the driving screen: it speaks through the goal line, a card, the one message at the top, a pop (two at most), the wall's GOALS page or the full map. One name for each thing (§17.4: BANK, BAG, the stars, GARAGE, COPS, COMBO), pinned by `tests/ui/words.test.ts`.
+The screen's budget (DESIGN §17, set 2026-09-24 after Marcin's review): a calm drive shows seven things (the goal line, the arrow, the stars, the bank, the radar, the speed, the boost); everything else appears on its moment and goes. A new system gets no standing place on the driving screen: it speaks through the goal line, a card, the one message at the top, a pop (two at most), the wall's GOALS page or the full map. One name for each thing (§17.4: BANK, BAG, the stars, GARAGE, COPS, COMBO), pinned by `tests/ui/words.test.ts`; in Polish (§19: BANK, ŁUP, GWIAZDKI, GARAŻ, GLINY, KOMBO), pinned by `tests/ui/lang.test.ts`.
 
 ## Budgets (`npm run budget` fails the build)
 

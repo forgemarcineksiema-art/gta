@@ -584,7 +584,7 @@ body {
   text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
 }
 .settings__row.is-focus { border-color: var(--ui-accent); background: rgba(0, 0, 0, 0.25); }
-.settings__name { width: 96px; color: var(--ui-ink-dim); }
+.settings__name { width: 112px; color: var(--ui-ink-dim); }
 .settings__row.is-focus .settings__name { color: var(--ui-accent); }
 .settings__step {
   font: 900 18px/1 var(--font-display);

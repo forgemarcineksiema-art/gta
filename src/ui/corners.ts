@@ -18,6 +18,7 @@
  * object).
  */
 import type { RunState, SimWorld } from '../sim';
+import { t } from './lang';
 
 /** The driving screen's elements this module decides, a bit each. */
 export const DRIVE = {
@@ -139,19 +140,19 @@ export interface KeyHints {
   horn: string;
 }
 
-/** The key hints' rows: the keys and the word; the tuning row only when the panel is on (D9). */
+/** The key hints' rows: the keys and the word (the player's language); the tuning row only when the panel is on (D9). */
 export function hintRows(k: KeyHints): Array<{ keys: string[]; label: string }> {
   const rows = [
-    { keys: [k.throttle, k.steerLeft, k.brake, k.steerRight], label: 'drive' },
-    { keys: [k.handbrake], label: 'drift (or brake + turn)' },
-    { keys: [k.boost], label: 'boost' },
-    { keys: [k.reset], label: 'reset' },
-    { keys: [k.camera], label: 'camera' },
-    { keys: [k.map], label: 'map (hold)' },
-    { keys: [k.horn], label: 'horn' },
-    { keys: [k.pause], label: 'pause' },
+    { keys: [k.throttle, k.steerLeft, k.brake, k.steerRight], label: t('drive') },
+    { keys: [k.handbrake], label: t('drift (or brake + turn)') },
+    { keys: [k.boost], label: t('boost') },
+    { keys: [k.reset], label: t('reset') },
+    { keys: [k.camera], label: t('camera') },
+    { keys: [k.map], label: t('map (hold)') },
+    { keys: [k.horn], label: t('horn') },
+    { keys: [k.pause], label: t('pause') },
   ];
-  if (k.debug !== '') rows.push({ keys: [k.debug], label: 'tuning' });
+  if (k.debug !== '') rows.push({ keys: [k.debug], label: t('tuning') });
   return rows;
 }
 

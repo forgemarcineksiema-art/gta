@@ -38,6 +38,7 @@ do not change with the calendar.
 | `/` | seeded 1.575 km square city; automatic rendering quality; the cold open once per profile (the save's `seen`) |
 | `/?fresh=1` | a new profile: the save's key is cleared before boot (the cold open follows) |
 | `/?coldopen=1` | force the cold open; `?coldopen=0` skips it |
+| `/?lang=en` | the screen's language for the session: `pl` (the default) or `en`, over the pick in the settings until the player picks again; the text-checking suites (`game`, `heat`, `screens`) read `en` (DESIGN.md §19) |
 | `/?date=2026-09-23` | the local date the dailies, the streak, the day's police and the thirty caches are drawn for |
 | `/?job=delivery` | start in that job's ring: a def id or the first of a kind (`delivery`, `order`, `escape`) |
 | `/?job=order&bot=job` | the road bot on the job: into a delivery's drop-off, after an order's wanted car (the swap is yours) |

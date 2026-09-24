@@ -10,6 +10,7 @@
  * is the side stack's model (two at most, the newest over the oldest's slot).
  */
 import { BODY_WORDS, DISTRICTS, RIVALS, paintName, posterNumber, unpackDescriptor, type EventKind } from '../sim';
+import { fixed, paintedCar, t } from './lang';
 
 export type Where = 'top' | 'pop' | 'none';
 
@@ -66,7 +67,7 @@ export const STARS_NEWS: Readonly<Record<number, string>> = {
 };
 
 
-/** The event's words into `out`; `out.where` is 'none' when it says nothing. */
+/** The event's words into `out`, in the player's language (`lang.ts`); `out.where` is 'none' when it says nothing. */
 export function speak(kind: EventKind, value: number, target: number, ctx: VoiceContext, out: Said): Said {
   out.where = WHERE[kind];
   out.lead = '';
@@ -74,59 +75,58 @@ export function speak(kind: EventKind, value: number, target: number, ctx: Voice
   out.big = false;
   out.gain = value > 0;
   if (out.where === 'none') return out;
-  const n = (v: number): string => v.toLocaleString('en-US');
   switch (kind) {
     case 'heatLevel':
       out.lead = '★'.repeat(Math.max(0, Math.min(5, value)));
-      out.text = STARS_NEWS[value] ?? '';
+      out.text = t(STARS_NEWS[value] ?? '');
       break;
     case 'dispatch':
       // the radio's codes: 1 a roadblock ahead, 3 the suspect's car, 4 the helicopter; 2 (a unit down) is flavour
-      out.lead = 'DISPATCH';
-      if (value === 1) out.text = 'ROADBLOCK AHEAD';
-      else if (value === 4) out.text = 'HELICOPTER ON YOU';
+      out.lead = t('DISPATCH');
+      if (value === 1) out.text = t('ROADBLOCK AHEAD');
+      else if (value === 4) out.text = t('HELICOPTER ON YOU');
       else if (value === 3) {
         const d = unpackDescriptor(target);
-        out.text = `SUSPECT IN A ${paintName(d.paint)} ${BODY_WORDS[d.body]}`;
+        out.text = t('SUSPECT IN A {car}', { car: paintedCar(paintName(d.paint), BODY_WORDS[d.body]) });
       }
       break;
     case 'rivalReady': {
       const r = RIVALS[target];
       if (!r) break;
       const p = posterNumber(target);
-      out.lead = p > 0 ? `#${p}` : 'BOARD';
-      out.text = `${r.name} ${r.call} · ${r.turf === 'highway' ? 'THE HIGHWAY' : DISTRICTS.find((d) => d.id === r.turf)?.name ?? ''}`;
+      out.lead = p > 0 ? `#${p}` : t('BOARD');
+      out.text = `${t(r.name)} ${t(r.call)} · ${t(r.turf === 'highway' ? 'THE HIGHWAY' : DISTRICTS.find((d) => d.id === r.turf)?.name ?? '')}`;
       break;
     }
     case 'twinSwap': {
       const d = unpackDescriptor(target);
-      out.lead = 'RADIO';
-      out.text = `THE TWINS SWAPPED · NOW IN A ${paintName(d.paint)} ${BODY_WORDS[d.body]}`;
+      out.lead = t('RADIO');
+      out.text = t('THE TWINS SWAPPED · NOW IN A {car}', { car: paintedCar(paintName(d.paint), BODY_WORDS[d.body]) });
       break;
     }
-    case 'takedown': out.text = 'TAKEDOWN!'; out.big = true; break;
-    case 'takedownTraffic': out.text = 'TAKEDOWN! INTO TRAFFIC!'; out.big = true; break;
-    case 'billboard': out.text = ctx.boardsTotal > 0 ? `BILLBOARD ${ctx.boards}/${ctx.boardsTotal}` : 'BILLBOARD!'; break;
-    case 'escape': out.text = 'COPS LOST YOU'; break;
-    case 'camera': out.text = `FLASHED ${Math.round((ctx.cameraLimits[target] ?? 0) + value)} KM/H`; break;
-    case 'jump': out.text = `STUNT! ${value.toFixed(1)} S`; out.big = true; break;
-    case 'dailyDone': out.text = `DAILY DONE +${n(value)}`; out.big = true; break;
-    case 'streak': out.text = `DAY ${target} STREAK +${n(value)}`; break;
-    case 'blown': out.text = 'COVER BLOWN'; break;
+    case 'takedown': out.text = t('TAKEDOWN!'); out.big = true; break;
+    case 'takedownTraffic': out.text = t('TAKEDOWN! INTO TRAFFIC!'); out.big = true; break;
+    case 'billboard': out.text = ctx.boardsTotal > 0 ? t('BILLBOARD {n}/{of}', { n: ctx.boards, of: ctx.boardsTotal }) : t('BILLBOARD!'); break;
+    case 'escape': out.text = t('COPS LOST YOU'); break;
+    case 'camera': out.text = t('FLASHED {kmh} KM/H', { kmh: Math.round((ctx.cameraLimits[target] ?? 0) + value) }); break;
+    case 'jump': out.text = t('STUNT! {s} S', { s: fixed(value, 1) }); out.big = true; break;
+    case 'dailyDone': out.text = t('DAILY DONE +{cash}', { cash: value }); out.big = true; break;
+    case 'streak': out.text = t('DAY {day} STREAK +{cash}', { day: target, cash: value }); break;
+    case 'blown': out.text = t('COVER BLOWN'); break;
     case 'cache':
-      out.text = value > 0 ? `CACHE ${target}/${ctx.cachesTotal} +${n(value)}` : `CACHE ${target}/${ctx.cachesTotal}`;
+      out.text = value > 0 ? t('CACHE {n}/{of} +{cash}', { n: target, of: ctx.cachesTotal, cash: value }) : t('CACHE {n}/{of}', { n: target, of: ctx.cachesTotal });
       out.big = value > 0;
       break;
-    case 'chase': out.text = `CHASE +${n(value)}`; break;
-    case 'skill': out.text = `COMBO +${n(value)}`; out.big = true; break;
-    case 'skillLost': out.text = 'COMBO LOST'; out.gain = false; break;
+    case 'chase': out.text = t('CHASE +{cash}', { cash: value }); break;
+    case 'skill': out.text = t('COMBO +{cash}', { cash: value }); out.big = true; break;
+    case 'skillLost': out.text = t('COMBO LOST'); out.gain = false; break;
     case 'hunt':
-      if (target === 0) out.text = value > 0 ? `ALL ${ctx.jumpsTotal} JUMPS +${n(value)}` : `NEW JUMP ${ctx.jumps}/${ctx.jumpsTotal}`;
-      else out.text = `ALL BILLBOARDS +${n(value)}`;
+      if (target === 0) out.text = value > 0 ? t('ALL {n} JUMPS +{cash}', { n: ctx.jumpsTotal, cash: value }) : t('NEW JUMP {n}/{of}', { n: ctx.jumps, of: ctx.jumpsTotal });
+      else out.text = t('ALL BILLBOARDS +{cash}', { cash: value });
       out.big = value > 0;
       break;
-    case 'hiddenCar': out.text = 'HIDDEN CAR FOUND · IN THE GARAGE NOW'; out.big = true; break;
-    case 'breaker': out.text = 'PURSUIT BREAKER!'; break;
+    case 'hiddenCar': out.text = t('HIDDEN CAR FOUND · IN THE GARAGE NOW'); out.big = true; break;
+    case 'breaker': out.text = t('PURSUIT BREAKER!'); break;
     default: break;
   }
   if (out.text === '') out.where = 'none';

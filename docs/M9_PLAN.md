@@ -202,7 +202,12 @@ by a human; the checks that a human forgets belong in the tool.
 D11. **English only at launch; the locale is read and kept.** Reason: G3
 requires English and accuracy for any extra language; a second locale is a
 translation project with a KPI question behind it, and the SDK's `locale`
-costs nothing to log now.
+costs nothing to log now. *Amended 2026-09-24 (Marcin, DESIGN.md §19):*
+Polish exists and is the default language. On CrazyGames the default
+follows G3: the SDK's `locale` starting `pl` says Polish, any other says
+English; the player's pick in the settings (the save's `settings.lang`,
+'' until picked) wins over both. The adapter hands the locale to
+`resolveLang`'s default; nothing else changes.
 
 ## 3. Architecture
 

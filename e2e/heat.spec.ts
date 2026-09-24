@@ -15,7 +15,7 @@ test('3.14 the bot drives into the hideout: the door is a break, opening it resu
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  await page.goto('/?spawn=crown&bot=door&quality=low');
+  await page.goto('/?lang=en&spawn=crown&bot=door&quality=low');
   await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 60_000 });
   const before = await page.evaluate(() => window.__game?.platformCalls as Calls);
   expect(before.gameplayStart).toBe(1);
@@ -38,7 +38,7 @@ test('3.14 the bot drives into the hideout: the door is a break, opening it resu
 test('4.9 the cold open: the steer keycaps within 3 s of control, and never again after a reload in the same session', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
-  await page.goto('/?coldopen=1&quality=low');
+  await page.goto('/?lang=en&coldopen=1&quality=low');
   await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 60_000 });
   const caption = page.locator('.cold__caption--steer');
   await expect(caption).toHaveClass(/is-visible/, { timeout: 3_000 });
@@ -46,7 +46,7 @@ test('4.9 the cold open: the steer keycaps within 3 s of control, and never agai
   await expect(caption).toContainText('DRIVE');
   expect(await page.evaluate(() => window.__game?.sim.coldOpen.active)).toBe(true);
   // a plain reload in the same tab: the session has seen it
-  await page.goto('/?quality=low');
+  await page.goto('/?lang=en&quality=low');
   await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 60_000 });
   await page.waitForTimeout(1_500);
   expect(await page.evaluate(() => window.__game?.sim.coldOpen.active)).toBe(false);
@@ -61,7 +61,7 @@ for (const heat of [1, 3, 5]) {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-    await page.goto(`/?heat=${heat}&bot=1&duration=120&quality=low`);
+    await page.goto(`/?lang=en&heat=${heat}&bot=1&duration=120&quality=low`);
     await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 60_000 });
     await page.waitForFunction(() => window.__perfDone === true, null, { timeout: 200_000 });
     const result = await page.evaluate(() => {
@@ -103,7 +103,7 @@ async function gain(page: import('@playwright/test').Page): Promise<number> {
 }
 
 test('8.1 an ad at the second door: one request, silence and no input while it runs, the door opens after', async ({ page }) => {
-  await page.goto('/?manual=1&quality=low&spawn=crown&adDuration=1.5');
+  await page.goto('/?lang=en&manual=1&quality=low&spawn=crown&adDuration=1.5');
   await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 30_000 });
   // a key wakes the audio (a user gesture)
   await page.keyboard.press('KeyW');
@@ -133,7 +133,7 @@ test('8.1 an ad at the second door: one request, silence and no input while it r
 });
 
 test('8.2 an ad that fails (adCooldown): the door opens on the next key, the sound untouched', async ({ page }) => {
-  await page.goto('/?manual=1&quality=low&spawn=crown&ad=error&adError=adCooldown');
+  await page.goto('/?lang=en&manual=1&quality=low&spawn=crown&ad=error&adError=adCooldown');
   await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 30_000 });
   await page.keyboard.press('KeyW');
   await page.evaluate(() => window.advanceTime?.(200));
@@ -151,7 +151,7 @@ test('8.2 an ad that fails (adCooldown): the door opens on the next key, the sou
 });
 
 test('8.3 with ads off no request is made', async ({ page }) => {
-  await page.goto('/?manual=1&quality=low&spawn=crown&ad=off');
+  await page.goto('/?lang=en&manual=1&quality=low&spawn=crown&ad=off');
   await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 30_000 });
   await page.evaluate(SHUT_DOOR);
   await page.evaluate(() => window.__game?.sim.run.openDoor());
@@ -161,7 +161,7 @@ test('8.3 with ads off no request is made', async ({ page }) => {
 });
 
 test('8.4 the first door after the cold open makes no request', async ({ page }) => {
-  await page.goto('/?coldopen=1&manual=1&quality=low');
+  await page.goto('/?lang=en&coldopen=1&manual=1&quality=low');
   await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 30_000 });
   await page.evaluate(SHUT_DOOR);
   expect(await page.evaluate(() => window.__game?.sim.run.state)).toBe('door');
@@ -170,7 +170,7 @@ test('8.4 the first door after the cold open makes no request', async ({ page })
 });
 
 test('8.5 the busted card requests one ad', async ({ page }) => {
-  await page.goto('/?manual=1&quality=low&spawn=crown&adDuration=1');
+  await page.goto('/?lang=en&manual=1&quality=low&spawn=crown&adDuration=1');
   await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 30_000 });
   await page.evaluate(() => {
     const sim = window.__game!.sim;

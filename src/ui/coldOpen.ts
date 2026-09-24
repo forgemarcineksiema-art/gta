@@ -6,6 +6,7 @@
  * Reads sim state only.
  */
 import type { ColdOpenVerb, SimWorld } from '../sim';
+import { label, relabel, t } from './lang';
 
 export interface ColdOpenKeys {
   throttle: string;
@@ -33,6 +34,8 @@ export class ColdOpenHud {
   private readonly skipKey: HTMLElement;
   private shown: ColdOpenVerb | null = null;
   private active = false;
+  /** The keys the captions show, kept to say them again in a new language. */
+  private keys: ColdOpenKeys | null = null;
 
   constructor(parent: HTMLElement) {
     this.root = el('div', 'cold');
@@ -45,7 +48,7 @@ export class ColdOpenHud {
     }
     const skip = el('div', 'cold__skip');
     this.skipKey = el('kbd', 'key', 'N');
-    skip.append(this.skipKey, el('span', 'cold__skip-label', 'SKIP'));
+    skip.append(this.skipKey, label(el('span', 'cold__skip-label'), 'SKIP'));
     this.root.append(line, skip);
     parent.appendChild(this.root);
   }
@@ -56,6 +59,7 @@ export class ColdOpenHud {
   }
 
   setKeys(k: ColdOpenKeys): void {
+    this.keys = k;
     const keyed: Partial<Record<ColdOpenVerb, string[]>> = {
       steer: [k.throttle, k.steerLeft, k.brake, k.steerRight],
       swap: [k.swap],
@@ -64,9 +68,15 @@ export class ColdOpenHud {
     for (const [verb, c] of this.captions) {
       c.replaceChildren();
       for (const key of keyed[verb] ?? []) c.appendChild(el('kbd', 'key cold__key', key));
-      c.appendChild(el('span', 'cold__word', WORDS[verb]));
+      c.appendChild(el('span', 'cold__word', t(WORDS[verb])));
     }
     this.skipKey.textContent = k.skip;
+  }
+
+  /** The language changed (DESIGN.md §19): the captions and SKIP said again. */
+  relabel(): void {
+    relabel(this.root);
+    if (this.keys) this.setKeys(this.keys);
   }
 
   update(sim: SimWorld): void {

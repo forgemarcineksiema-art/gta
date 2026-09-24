@@ -19,7 +19,7 @@ function watch(page: Page): string[] {
 }
 
 async function boot(page: Page, query: string): Promise<void> {
-  await page.goto(`/?manual=1&quality=low&spawn=crown&fresh=1${query}`);
+  await page.goto(`/?lang=en&manual=1&quality=low&spawn=crown&fresh=1${query}`);
   await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 30_000 });
 }
 
@@ -160,12 +160,12 @@ test('4.10 the garage by keys alone: buy the compact and drive out in it in unde
 
 test('5.4 a fresh profile gets the cold open, its first caption inside 3 s of control; a reload does not repeat it', async ({ page }) => {
   const errors = watch(page);
-  await page.goto('/?fresh=1&quality=low');
+  await page.goto('/?lang=en&fresh=1&quality=low');
   await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 60_000 });
   await expect(page.locator('.cold__caption--steer')).toHaveClass(/is-visible/, { timeout: 3_000 });
   expect(await page.evaluate(() => window.__game?.sim.coldOpen.active)).toBe(true);
   expect(await page.evaluate(() => (JSON.parse(localStorage.getItem('save') ?? '{}') as { seen?: boolean }).seen)).toBe(true);
-  await page.goto('/?quality=low');
+  await page.goto('/?lang=en&quality=low');
   await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 60_000 });
   await page.waitForTimeout(1_000);
   expect(await page.evaluate(() => window.__game?.sim.coldOpen.active)).toBe(false);
@@ -175,7 +175,7 @@ test('5.4 a fresh profile gets the cold open, its first caption inside 3 s of co
 
 test('5.5 the cold open\'s door makes no ad request and offers nothing; its wall names the first new car', async ({ page }) => {
   const errors = watch(page);
-  await page.goto('/?coldopen=1&manual=1&quality=low&fresh=1');
+  await page.goto('/?lang=en&coldopen=1&manual=1&quality=low&fresh=1');
   await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 30_000 });
   expect(await page.evaluate(() => window.__game?.sim.coldOpen.active)).toBe(true);
   await page.evaluate(() => { window.__game!.sim.run.bag = 20_000; });
@@ -203,7 +203,7 @@ test('5.1e the save round trip across a reload: the bank, the car and its paint,
     sim.collectibles!.smashedCount = 2;
     await g.save.flush(sim);
   });
-  await page.goto('/?manual=1&quality=low&spawn=crown');
+  await page.goto('/?lang=en&manual=1&quality=low&spawn=crown');
   await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 30_000 });
   const after = await page.evaluate(() => {
     const sim = window.__game!.sim;
@@ -216,7 +216,7 @@ test('5.1e the save round trip across a reload: the bank, the car and its paint,
 test('1.9e a delivery from its ring by the bot: paid into the bag inside the limit', async ({ page }) => {
   test.setTimeout(180_000);
   const errors = watch(page);
-  await page.goto('/?job=delivery&bot=job&quality=low&fresh=1');
+  await page.goto('/?lang=en&job=delivery&bot=job&quality=low&fresh=1');
   await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 60_000 });
   await page.waitForFunction(() => window.__game?.sim.jobs.state === 'active', null, { timeout: 10_000 });
   const limit = await page.evaluate(() => window.__game!.sim.jobs.running!.limitSeconds);
@@ -231,7 +231,7 @@ test('2.8e an order: the bot finds the wanted car, the swap takes it, the clock 
   test.setTimeout(240_000);
   const errors = watch(page);
   // the order's flow, clean: the beat (M5.5) would chase the speeding bot and box it in a queue before the hunt ends
-  await page.goto('/?job=order&bot=job&quality=low&fresh=1&police=off');
+  await page.goto('/?lang=en&job=order&bot=job&quality=low&fresh=1&police=off');
   await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 60_000 });
   await page.waitForFunction(() => (window.__game?.sim.jobs.wantedAgent ?? -1) >= 0, null, { timeout: 15_000 });
   // the bot closes on it; within reach the test takes it (the swap is the player's key, not the bot's)
@@ -255,7 +255,7 @@ test('2.8e an order: the bot finds the wanted car, the swap takes it, the clock 
 test("M6 1.9e the first rival's race at ?board=10: pulled up at her bay the duel starts, the bot drives it to its end", async ({ page }) => {
   test.setTimeout(240_000);
   const errors = watch(page);
-  await page.goto('/?board=10&job=duel&bot=job&quality=low&fresh=1&police=off');
+  await page.goto('/?lang=en&board=10&job=duel&bot=job&quality=low&fresh=1&police=off');
   await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 60_000 });
   await page.waitForFunction(() => window.__game?.sim.jobs.state === 'active' && window.__game.sim.jobs.running?.kind === 'duel', null, { timeout: 10_000 });
   const limit = await page.evaluate(() => window.__game!.sim.jobs.running!.limitSeconds);
@@ -372,7 +372,7 @@ test('M7 3.4e the settings on the pause screen: W/S a row, A/D its value, saved 
   });
   expect(settings.music).toBe(8);
   expect(settings.radarNorth).toBe(true);
-  expect(settings.saved).toEqual({ music: 8, effects: 10, quality: 'auto', radarNorth: true });
+  expect(settings.saved).toEqual({ music: 8, effects: 10, quality: 'auto', radarNorth: true, lang: '' });
   await key(page, 'KeyP');
   expect(errors).toEqual([]);
 });

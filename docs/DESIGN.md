@@ -1910,6 +1910,39 @@ balance; the traffic's density; the props' rules (M8); the platform (M9).
   recorded deviation said nothing of roll and pitch); a released wreck keeps
   its pose; record 31's "its lean dropped" becomes rule 2.
 
+## 19. Polish — decided (Marcin), 2026-09-24
+
+Marcin's word: the game gets a Polish translation, and Polish is the
+default. The brief's "in-game text is English" gives way for the screen;
+the code, its comments and the docs stay English.
+
+- **The code writes English; the screen says it in the player's language.**
+  Every word goes through `t` (`src/ui/lang.ts`): the English text is the
+  key, `src/ui/pl.ts` its Polish. `{n}` is a hole; `{n|one|few|many}` is a
+  Polish count's form (1 ELIMINACJA, 2 ELIMINACJE, 5 ELIMINACJI). The sim
+  stays language-free: its tables write English, its two texts with holes
+  (a requirement, a daily's progress) take a `Say` (`src/sim/say.ts`).
+- **The language:** `?lang=pl|en` for the session, else the player's pick
+  (the pause screen's LANGUAGE row, saved with the settings), else Polish.
+  A pick is said at once on every layer, without a reload. Numbers group
+  the Polish way (84 500, 2,6), a paint agrees with its car (CZERWONA
+  TAKSÓWKA), a car or a rival stands after a colon so no name needs another
+  case (KUP: KOMPAKT, WYZWIJ: BABCIA BRYKA).
+- **One name for each thing, in Polish (§17.4):** BANK; ŁUP (the bag);
+  the stars (GWIAZDKI); GARAŻ; GLINY (RADIOWÓZ for the car); KOMBO; PREMIA
+  DO ŁUPU; and ELIMINACJA (a takedown), WPADKA (busted), NITRO (the boost),
+  WYPAD (a run), ZLECENIE (a job), SKRYTKA (a cache). Never GOTÓWKA, KASA,
+  TORBA, WOREK, MNOŻNIK, POZIOM, KRYJÓWKA, JEDNOSTKI, ŁAŃCUCH, PASER.
+- **Names are Polish too**: a Polish child reads PALMOWE OGRODY and
+  KOMPAKT; the rivals keep their alliteration (BABCIA BRYKA, FAŁSZYWY
+  FRANEK, PROFESOR PSTRYK).
+- **Pinned** by `tests/ui/lang.test.ts`: no word the screen can say
+  without its Polish, the holes kept, the forms, the numbers, the glossary.
+
+What stays out: a third language; the platform's locale (M9: on
+CrazyGames G3 asks for the SDK's locale with English as the fallback,
+`docs/M9_PLAN.md` D11 as amended).
+
 ## References
 
 Burnout Paradise (free-route races, road rules, showtime), Need for Speed

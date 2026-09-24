@@ -15,7 +15,7 @@ import { HIDDEN_CARS } from '../city/stash';
 import type { SimWorld } from '../SimWorld';
 import { BODY_IDS, type BodyId } from '../traffic/bodies';
 import { CAR_IDS, type CarId } from '../vehicle/presets';
-import { DEFAULT_SETTINGS, QUALITY_SETTINGS, type Settings } from '../settings';
+import { DEFAULT_SETTINGS, LANGS, QUALITY_SETTINGS, type Settings } from '../settings';
 
 export const SAVE_VERSION = 6;
 
@@ -111,7 +111,11 @@ export interface SaveDoc {
   /** The wanted board (M6 slice 1): the rivals beaten as bits (bit 10 the Chief). */
   board: { beaten: number };
   career: SaveCareer;
-  /** The pause screen's settings (M7 slice 3): the volumes, the quality, the radar. */
+  /**
+   * The pause screen's settings (M7 slice 3): the volumes, the quality, the radar; the language (§19) since 2026-09-24,
+   * without a new version: a save without it reads as no pick (the default), and an older build dropping it loses
+   * only the pick.
+   */
   settings: Settings;
 }
 
@@ -207,7 +211,7 @@ export function serialize(save: SaveDoc): string {
       races: c.races, zones: c.zones, fares: c.fares, hotFares: c.hotFares, orders: c.orders, takedowns: c.takedowns, caches: c.caches,
       escapes: [c.escapes[0], c.escapes[1], c.escapes[2], c.escapes[3], c.escapes[4]], smashed: c.smashed,
     },
-    settings: { music: save.settings.music, effects: save.settings.effects, quality: save.settings.quality, radarNorth: save.settings.radarNorth },
+    settings: { music: save.settings.music, effects: save.settings.effects, quality: save.settings.quality, radarNorth: save.settings.radarNorth, lang: save.settings.lang },
   });
 }
 
@@ -359,6 +363,7 @@ function sanitize(raw: Record<string, unknown>): SaveDoc {
     effects: step(st['effects'], DEFAULT_SETTINGS.effects),
     quality: QUALITY_SETTINGS.find((q) => q === quality) ?? DEFAULT_SETTINGS.quality,
     radarNorth: bool(st['radarNorth'], DEFAULT_SETTINGS.radarNorth),
+    lang: LANGS.find((l) => l === st['lang']) ?? DEFAULT_SETTINGS.lang,
   };
   return out;
 }
@@ -437,7 +442,7 @@ export function collect(sim: SimWorld, into: SaveDoc): void {
   for (let i = 0; i < 5; i++) out.escapes[i] = c.escapes[i] as number;
   out.smashed = c.smashed;
   const st = sim.settings, so = into.settings;
-  so.music = st.music; so.effects = st.effects; so.quality = st.quality; so.radarNorth = st.radarNorth;
+  so.music = st.music; so.effects = st.effects; so.quality = st.quality; so.radarNorth = st.radarNorth; so.lang = st.lang;
 }
 
 /** A document into a freshly built world, once, before the first step: the garage car is driven out at once. */

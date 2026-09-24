@@ -11,6 +11,7 @@ import { BigMap } from './bigmap';
 import { DRIVE, drive, hintRows, newDriveState, newPlaceClock, readDrive, screenTaken, tickPlace, type KeyHints } from './corners';
 import { Minimap } from './minimap';
 import { HeatHud } from './heat';
+import { label, num, relabel, t } from './lang';
 import { POP_SLOTS, Pops, newSaid, speak, type VoiceContext } from './voice';
 
 export type { KeyHints } from './corners';
@@ -111,6 +112,10 @@ export class Hud {
   private lastStage = -1;
   private swapKey = 'E';
   private resetKey = 'R';
+  /** The keys the hints name and the sound's state, kept to be said again in a new language. */
+  private hintKeys: KeyHints | null = null;
+  private muteKey = 'M';
+  private muted = false;
   /** Two pops at most (DESIGN.md §17.3): `Pops` says which slot a new one takes and when each goes out. */
   private readonly popups: HTMLElement[];
   private readonly pops = new Pops();
@@ -141,9 +146,9 @@ export class Hud {
     const speedRow = el('div', 'hud__speed-row');
     this.speed = el('div', 'hud__speed', '0');
     speedRow.append(this.speed);
-    const unit = el('div', 'hud__unit', 'km/h');
+    const unit = label(el('div', 'hud__unit'), 'km/h');
     this.boostWrap = el('div', 'hud__boost');
-    const boostLabel = el('div', 'hud__boost-label', 'BOOST');
+    const boostLabel = label(el('div', 'hud__boost-label'), 'BOOST');
     const boostTrack = el('div', 'hud__boost-track');
     this.boostFill = el('div', 'hud__boost-fill');
     boostTrack.appendChild(this.boostFill);
@@ -153,17 +158,17 @@ export class Hud {
     const damageTrack = el('div', 'hud__damage-track');
     this.damageFill = el('div', 'hud__damage-fill');
     damageTrack.appendChild(this.damageFill);
-    this.damageWrap.append(el('div', 'hud__damage-label', 'DAMAGE'), damageTrack);
+    this.damageWrap.append(label(el('div', 'hud__damage-label'), 'DAMAGE'), damageTrack);
     this.speedo.append(this.damageWrap);
     this.root.appendChild(this.speedo);
     this.wrecked = el('div', 'hud__wrecked');
     this.wreckedSub = el('div', 'hud__wrecked-sub', '');
-    this.wrecked.append(el('div', 'hud__wrecked-title', 'WRECKED'), this.wreckedSub);
+    this.wrecked.append(label(el('div', 'hud__wrecked-title'), 'WRECKED'), this.wreckedSub);
     this.root.appendChild(this.wrecked);
     this.swap = el('div', 'hud__swap');
     this.swapKeycap = el('kbd', 'key', 'E');
-    this.swapLabel = el('span', 'hud__swap-label', 'SWAP');
-    this.swapHint = el('div', 'hud__swap-hint', `COPS WON'T KNOW YOU · ${POLICE.disguise.seconds} s`);
+    this.swapLabel = el('span', 'hud__swap-label', t('SWAP'));
+    this.swapHint = el('div', 'hud__swap-hint', t("COPS WON'T KNOW YOU · {s} s", { s: POLICE.disguise.seconds }));
     this.swap.append(this.swapKeycap, this.swapLabel, this.swapHint);
     this.root.appendChild(this.swap);
     const stack = el('div', 'hud__popups');
@@ -194,9 +199,9 @@ export class Hud {
     // the build stamp: which build is on screen (package version + commit, `-dirty` if uncommitted)
     this.sound = el('div', 'hud__pause-sound');
     this.soundKey = el('kbd', 'key', 'M');
-    this.soundState = el('span', 'hud__pause-sound-state', 'SOUND ON');
+    this.soundState = el('span', 'hud__pause-sound-state', t('SOUND ON'));
     this.sound.append(this.soundKey, this.soundState);
-    this.pause.append(el('div', 'hud__pause-title', 'PAUSED'), el('div', 'hud__pause-sub', ''), this.sound, el('div', 'hud__pause-build', `build ${__APP_VERSION__}`));
+    this.pause.append(label(el('div', 'hud__pause-title'), 'PAUSED'), el('div', 'hud__pause-sub', ''), this.sound, el('div', 'hud__pause-build', `build ${__APP_VERSION__}`));
     this.root.appendChild(this.pause);
 
     this.hints = el('div', 'hud__hints');
@@ -216,10 +221,10 @@ export class Hud {
     this.lapCurrent = el('div', 'hud__lap-current', '--:--.--');
     const rowLast = el('div', 'hud__lap-row');
     this.lapLast = el('span', '', '--');
-    rowLast.append(el('span', 'hud__lap-label', 'LAST'), this.lapLast);
+    rowLast.append(label(el('span', 'hud__lap-label'), 'LAST'), this.lapLast);
     const rowBest = el('div', 'hud__lap-row');
     this.lapBest = el('span', '', '--');
-    rowBest.append(el('span', 'hud__lap-label', 'BEST'), this.lapBest);
+    rowBest.append(label(el('span', 'hud__lap-label'), 'BEST'), this.lapBest);
     this.lap.append(this.lapCurrent, rowLast, rowBest);
     this.root.appendChild(this.lap);
   }
@@ -232,6 +237,7 @@ export class Hud {
   }
 
   setHints(k: KeyHints): void {
+    this.hintKeys = k;
     this.hints.replaceChildren();
     for (const r of hintRows(k)) {
       const row = el('div', 'hud__hint');
@@ -240,12 +246,25 @@ export class Hud {
       this.hints.appendChild(row);
     }
     const sub = this.pause.querySelector('.hud__pause-sub');
-    if (sub) sub.textContent = `press ${k.pause} to continue`;
+    if (sub) sub.textContent = t('press {key} to continue', { key: k.pause });
     this.swapKey = k.swap;
     this.resetKey = k.reset;
     this.bigMap?.setKey(k.map);
     this.swapKeycap.textContent = this.swapKey;
-    this.wreckedSub.textContent = `${this.swapKey} take a car  ·  ${this.resetKey} respawn`;
+    this.wreckedSub.textContent = t('{swap} take a car  ·  {reset} respawn', { swap: this.swapKey, reset: this.resetKey });
+  }
+
+  /** The language changed (DESIGN.md §19): every word the HUD shows, said again; the app sends the keys anew first. */
+  relabel(): void {
+    relabel(this.root);
+    if (this.hintKeys) this.setHints(this.hintKeys);
+    this.setSound(this.muteKey, this.muted);
+    this.swapLabel.textContent = t(this.swapBorrow ? 'BORROW' : 'SWAP');
+    this.swapHint.textContent = t("COPS WON'T KNOW YOU · {s} s", { s: POLICE.disguise.seconds });
+    // the combo's word on its next frame
+    this.skillSerial = -1;
+    this.minimap?.relabel();
+    this.bigMap?.relabel();
   }
 
   /** The full-screen map while its key is held (the app decides when it may show). */
@@ -255,8 +274,10 @@ export class Hud {
 
   /** The mute key's label and whether the player muted the sound (the pause screen shows both). */
   setSound(key: string, muted: boolean): void {
+    this.muteKey = key;
+    this.muted = muted;
     this.soundKey.textContent = key;
-    this.soundState.textContent = muted ? 'MUTED' : 'SOUND ON';
+    this.soundState.textContent = t(muted ? 'MUTED' : 'SOUND ON');
     this.sound.classList.toggle('is-muted', muted);
   }
 
@@ -293,7 +314,7 @@ export class Hud {
   setPaused(paused: boolean, reason: 'user' | 'focus'): void {
     this.pause.classList.toggle('is-visible', paused);
     const sub = this.pause.querySelector('.hud__pause-sub');
-    if (sub && paused) sub.textContent = reason === 'focus' ? 'click the game to continue' : (sub.textContent ?? '');
+    if (sub && paused) sub.textContent = reason === 'focus' ? t('click the game to continue') : (sub.textContent ?? '');
   }
 
   setDebugVisible(v: boolean): void {
@@ -434,7 +455,7 @@ export class Hud {
     const borrow = swapVisible && sim.traffic?.police[life.swapCandidate] === 1;
     if (swapVisible && borrow !== this.swapBorrow) {
       this.swapBorrow = borrow;
-      this.swapLabel.textContent = borrow ? 'BORROW' : 'SWAP';
+      this.swapLabel.textContent = t(borrow ? 'BORROW' : 'SWAP');
     }
     const hint = borrow && sim.run.borrowHints <= BALANCE.chain.hintTimes;
     if (hint !== this.swapHintOn) {
@@ -465,13 +486,13 @@ export class Hud {
       const shown = Math.round(skill.points);
       if (skill.serial !== this.skillSerial || shown !== this.skillShown) {
         if (skill.serial !== this.skillSerial) {
-          this.skillMult.textContent = `×${skill.multiplier}`;
-          this.skillWord.textContent = skill.word;
+          this.skillMult.textContent = `×${num(skill.multiplier)}`;
+          this.skillWord.textContent = t(skill.word);
           this.skill.classList.toggle('is-max', skill.multiplier >= BALANCE.skill.maxMult);
         }
         this.skillSerial = skill.serial;
         this.skillShown = shown;
-        this.skillPoints.textContent = shown.toLocaleString('en-US');
+        this.skillPoints.textContent = num(shown);
       }
       const fill = `scaleX(${Math.max(0, Math.min(1, skill.left / BALANCE.skill.window)).toFixed(2)})`;
       if (fill !== this.lastSkillFill) { this.skillFill.style.transform = fill; this.lastSkillFill = fill; }
@@ -506,7 +527,7 @@ export class Hud {
       this.lapCurrent.textContent = lap.current >= 0 ? fmtLap(lap.current) : '--:--.--';
       this.lapLast.textContent = lap.last >= 0 ? fmtLap(lap.last) : '--';
       this.lapBest.textContent = lap.best >= 0 ? fmtLap(lap.best) : '--';
-      if (lap.justCompleted) this.showToast(lap.justBest ? `BEST LAP ${fmtLap(lap.last)}` : `LAP ${fmtLap(lap.last)}`, 2);
+      if (lap.justCompleted) this.showToast(t(lap.justBest ? 'BEST LAP {time}' : 'LAP {time}', { time: fmtLap(lap.last) }), 2);
     }
 
     if (this.debugVisible && info && now - this.lastDebugAt > 120) {

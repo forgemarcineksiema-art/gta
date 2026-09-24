@@ -3,10 +3,12 @@
  * one line of sums (the bag, what the stars made of it, what landed in the
  * bank), the next goal in one line, the run's counts. The bank itself is the
  * wall's footer; the best run is GOALS'; NEW BEST is a tag on the title. Pure:
- * `run.ts` and `garage.ts` draw what these build.
+ * `run.ts` and `garage.ts` draw what these build, in the player's language
+ * (`lang.ts`, DESIGN.md §19).
  */
 import { BALANCE } from '../sim/balance';
 import { CHAIN_STEPS, RIVALS, STEP, chainStep, posterNumber, reqText, type RunCounts, type SimWorld } from '../sim';
+import { num, t } from './lang';
 
 export interface Line {
   label: string;
@@ -34,17 +36,17 @@ export interface CardResult {
 /** The door: `BAG 32,500 ×2.6 … +84,500`, the double and the fence named in it; nothing when the bag was empty. */
 export function doorLines(r: DoorResult): Line[] {
   if (r.lastBag <= 0) return [];
-  const doubled = r.lastDoubled ? ' DOUBLED' : '';
-  const fence = r.lastFence ? ` (BAG BONUS +${BALANCE.prep.fenceBonus})` : '';
-  return [{ label: `BAG ${money(r.lastBag)}${doubled} ×${r.lastMultiplier}${fence}`, value: `+${money(r.lastBanked)}`, strong: true }];
+  const doubled = r.lastDoubled ? ` ${t('DOUBLED')}` : '';
+  const fence = r.lastFence ? ` (${t('BAG BONUS')} +${num(BALANCE.prep.fenceBonus)})` : '';
+  return [{ label: `${t('BAG {cash}', { cash: Math.round(r.lastBag) })}${doubled} ×${num(r.lastMultiplier)}${fence}`, value: `+${money(r.lastBanked)}`, strong: true }];
 }
 
 /** The card: the bag, what is kept of it, and the bank (the card has no footer). */
 export function cardLines(r: CardResult): Line[] {
-  const keep = r.lastLawyer ? 'THE LAWYER KEEPS 3/4' : 'YOU KEEP HALF';
+  const keep = t(r.lastLawyer ? 'THE LAWYER KEEPS 3/4' : 'YOU KEEP HALF');
   return [
-    { label: `BAG ${money(r.lastBag)} · ${keep}`, value: `+${money(r.lastFine)}`, strong: true },
-    { label: 'BANK', value: money(r.bank), strong: false },
+    { label: `${t('BAG {cash}', { cash: Math.round(r.lastBag) })} · ${keep}`, value: `+${money(r.lastFine)}`, strong: true },
+    { label: t('BANK'), value: money(r.bank), strong: false },
   ];
 }
 
@@ -57,16 +59,18 @@ export function nextLine(sim: SimWorld): string {
   const step = chainStep(run.chain);
   const noCar = !sim.garage.owned.has('compact');
   const price = BALANCE.prices.compact;
-  const firstCar = run.bank >= price ? `FIRST NEW CAR: ${money(price)} · IT IS YOURS IN CARS` : `FIRST NEW CAR: ${money(price)} · YOU HAVE ${money(run.bank)}`;
+  const firstCar = run.bank >= price ? t('FIRST NEW CAR: {price} · IT IS YOURS IN CARS', { price })
+    : t('FIRST NEW CAR: {price} · YOU HAVE {bank}', { price, bank: Math.round(run.bank) });
   return step >= 0 && step <= STEP.car && noCar ? firstCar
-    : step >= 0 ? `NEXT: ${CHAIN_STEPS[step] ?? ''} · STEP ${step + 1} OF ${CHAIN_STEPS.length}`
+    : step >= 0 ? t('NEXT: {step} · STEP {n} OF {of}', { step: t(CHAIN_STEPS[step] ?? ''), n: step + 1, of: CHAIN_STEPS.length })
       : noCar ? firstCar : boardLine(sim);
 }
 
 /** The run's story in one line; the street furniture's bill is the city's, never the player's money. */
 export function countsLine(c: RunCounts): string {
-  const damage = c.damage > 0 ? ` · CITY DAMAGE ${money(c.damage)}` : '';
-  return `${plural(c.takedowns, 'TAKEDOWN')} · ${plural(c.escapes, 'ESCAPE')} · ${plural(c.billboards, 'BILLBOARD')} · ${plural(c.coins, 'COIN')}${damage}`;
+  const damage = c.damage > 0 ? ` · ${held(t('CITY DAMAGE {cash}', { cash: Math.round(c.damage) }))}` : '';
+  return `${held(t('{n} {n|TAKEDOWN|TAKEDOWNS}', { n: c.takedowns }))} · ${held(t('{n} {n|ESCAPE|ESCAPES}', { n: c.escapes }))} · `
+    + `${held(t('{n} {n|BILLBOARD|BILLBOARDS}', { n: c.billboards }))} · ${held(t('{n} {n|COIN|COINS}', { n: c.coins }))}${damage}`;
 }
 
 /** After the chain (M6): the next rival on the wanted board and what they want first, or that they are ready. */
@@ -76,16 +80,16 @@ function boardLine(sim: SimWorld): string {
   const r = RIVALS[i];
   if (!r) return '';
   const n = posterNumber(i);
-  const who = n > 0 ? `#${n} ${r.name}` : r.name;
+  const who = n > 0 ? `#${n} ${t(r.name)}` : t(r.name);
   const open = r.reqs[b.firstOpen(i)];
-  return b.ready(i) || !open ? `NEXT ON THE BOARD: ${who} · READY FOR YOU` : `NEXT ON THE BOARD: ${who} · ${reqText(open)}`;
+  return b.ready(i) || !open ? t('NEXT ON THE BOARD: {who} · READY FOR YOU', { who }) : t('NEXT ON THE BOARD: {who} · {req}', { who, req: reqText(open, t) });
 }
 
-/** A count and its word held together: the line may wrap only at the separators. */
-function plural(n: number, word: string): string {
-  return `${n} ${word}${n === 1 ? '' : 'S'}`;
+/** A count and its words held together (every space one that holds): the line may wrap only at the separators. */
+function held(text: string): string {
+  return text.replace(/ /g, '\u00a0');
 }
 
 export function money(v: number): string {
-  return Math.round(v).toLocaleString('en-US');
+  return num(Math.round(v));
 }

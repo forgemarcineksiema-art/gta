@@ -8,6 +8,7 @@
 import { STEP, type RunState, type SimWorld } from '../sim';
 import { BALANCE } from '../sim/balance';
 import { DRIVE, drive, newDriveState, readDrive } from './corners';
+import { label, labelAria, num, relabel, t } from './lang';
 import { cardLines, countsLine, doorLines, nextLine, type Line } from './totals';
 
 const TWEEN_SECONDS = 0.3;
@@ -45,6 +46,8 @@ export class RunHud {
   private lastSerial = -1;
   private readonly wallCounts: HTMLElement;
   private readonly prompts: HTMLElement[] = [];
+  /** The key the prompts name, kept to say it again in a new language. */
+  private anyKey = '';
   private shownBag = 0;
   private fromBag = 0;
   private toBag = 0;
@@ -65,7 +68,7 @@ export class RunHud {
     this.bagValue = el('span', 'run__bag-value', '0');
     this.mult = el('span', 'run__mult', '×1');
     this.bag.append(this.bagValue, this.mult);
-    this.bag.setAttribute('aria-label', 'Bag');
+    labelAria(this.bag, 'Bag');
     // the bank under the bag, white, with the coin: a road coin is in it the moment it is picked
     this.bankRow = el('div', 'run__coins');
     this.bankValue = el('span', 'run__coins-value', '0');
@@ -73,7 +76,7 @@ export class RunHud {
     // the busted bar is the officer's ticket book (M5.5 slice 18): three lines written as it fills
     this.bar = el('div', 'run__busted');
     const pad = el('div', 'run__ticket');
-    pad.append(el('div', 'run__ticket-head', 'BUSTED'));
+    pad.append(label(el('div', 'run__ticket-head'), 'BUSTED'));
     this.barLines = [0, 1, 2].map(() => {
       const line = el('div', 'run__ticket-line');
       const ink = el('div', 'run__ticket-ink');
@@ -84,7 +87,7 @@ export class RunHud {
     this.bar.append(pad);
     this.card = el('div', 'run__card');
     this.cardLines = el('div', 'run__lines');
-    this.card.append(el('div', 'run__title run__title--danger', 'BUSTED'), this.cardLines, this.prompt());
+    this.card.append(label(el('div', 'run__title run__title--danger'), 'BUSTED'), this.cardLines, this.prompt());
     this.wall = el('div', 'run__wall');
     this.wallLines = el('div', 'run__lines');
     this.wallCounts = el('div', 'run__counts');
@@ -92,9 +95,9 @@ export class RunHud {
     // the totals page (DESIGN.md §17.5): the title, one line of sums, the sentence while it teaches, the next goal, the
     // counts; the bank is the footer's. The garage's pages sit beside it in the same panel
     const page = el('div', 'run__wall-page wall__page wall__page--wall');
-    this.wallSentence = el('div', 'run__sentence', 'CRIMES FILL THE BAG · STARS MULTIPLY IT · A GARAGE BANKS IT');
-    this.wallTitle = el('span', '', 'BANKED');
-    this.wallBest = el('span', 'run__best', 'NEW BEST');
+    this.wallSentence = label(el('div', 'run__sentence'), 'CRIMES FILL THE BAG · STARS MULTIPLY IT · A GARAGE BANKS IT');
+    this.wallTitle = el('span', '', t('BANKED'));
+    this.wallBest = label(el('span', 'run__best'), 'NEW BEST');
     const title = el('div', 'run__title');
     title.append(this.wallTitle, this.wallBest);
     page.append(title, this.wallLines, this.wallSentence, this.wallFirst, this.wallCounts);
@@ -108,7 +111,16 @@ export class RunHud {
 
   /** The key that closes the card and opens the door: any; the label names one the player knows. */
   setKeys(k: { any: string }): void {
-    for (const p of this.prompts) p.replaceChildren(el('kbd', 'key', k.any), el('span', 'run__prompt-label', 'ANY KEY'));
+    this.anyKey = k.any;
+    for (const p of this.prompts) p.replaceChildren(el('kbd', 'key', k.any), el('span', 'run__prompt-label', t('ANY KEY')));
+  }
+
+  /** The language changed (DESIGN.md §19): the labels, the prompt, and the card or the totals up now. */
+  relabel(sim: SimWorld): void {
+    relabel(this.root);
+    this.setKeys({ any: this.anyKey });
+    if (sim.run.state === 'busted') this.fillCard(sim);
+    else if (sim.run.state === 'door') this.fillWall(sim);
   }
 
   update(sim: SimWorld, dt: number): void {
@@ -158,7 +170,7 @@ export class RunHud {
     }
     const mult = run.multiplier;
     if (mult !== this.lastMult) {
-      this.mult.textContent = `×${mult}`;
+      this.mult.textContent = `×${num(mult)}`;
       if (this.lastMult >= 0) this.popLeft = TWEEN_SECONDS;
       this.lastMult = mult;
     }
@@ -203,7 +215,7 @@ export class RunHud {
     const run = sim.run;
     this.lastSerial = run.lastSerial;
     // BANKED with what the door banked, GARAGE when the bag came in empty; NEW BEST when this run beat every other
-    this.wallTitle.textContent = run.lastBanked > 0 ? 'BANKED' : 'GARAGE';
+    this.wallTitle.textContent = t(run.lastBanked > 0 ? 'BANKED' : 'GARAGE');
     this.wallBest.classList.toggle('is-visible', run.lastBest);
     this.wallLines.replaceChildren(...doorLines(run).map(line));
     const next = nextLine(sim);
@@ -227,7 +239,7 @@ function line(l: Line): HTMLElement {
 }
 
 function money(v: number): string {
-  return Math.round(v).toLocaleString('en-US');
+  return num(Math.round(v));
 }
 
 function el(tag: string, className: string, text?: string): HTMLElement {

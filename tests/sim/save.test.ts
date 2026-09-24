@@ -47,7 +47,7 @@ function filled(smashedIds: number[]): SaveV1 {
     kit: { owned: '', on: [-1, -1, -1, -1, -1] },
     board: { beaten: 0 },
     career: { races: 0, zones: 0, fares: 0, hotFares: 0, orders: 0, takedowns: 0, caches: 0, escapes: [0, 0, 0, 0, 0], smashed: 0 },
-    settings: { music: 3, effects: 8, quality: 'low', radarNorth: true },
+    settings: { music: 3, effects: 8, quality: 'low', radarNorth: true, lang: 'en' },
   };
 }
 
@@ -189,12 +189,12 @@ describe('save format', () => {
     delete v3['settings'];
     const save = migrate(v3);
     expect(save.v).toBe(SAVE_VERSION);
-    expect(save.settings).toEqual({ music: 7, effects: 10, quality: 'auto', radarNorth: false });
+    expect(save.settings).toEqual({ music: 7, effects: 10, quality: 'auto', radarNorth: false, lang: '' });
     expect(save.bank).toBe(123456);
-    const bad = parse(JSON.stringify({ ...filled([]), settings: { music: 11, effects: 4, quality: 'ultra', radarNorth: 'yes' } }));
-    expect(bad.settings).toEqual({ music: 7, effects: 4, quality: 'auto', radarNorth: false });
+    const bad = parse(JSON.stringify({ ...filled([]), settings: { music: 11, effects: 4, quality: 'ultra', radarNorth: 'yes', lang: 'klingon' } }));
+    expect(bad.settings).toEqual({ music: 7, effects: 4, quality: 'auto', radarNorth: false, lang: '' });
     const good = parse(serialize(filled([])));
-    expect(good.settings).toEqual({ music: 3, effects: 8, quality: 'low', radarNorth: true });
+    expect(good.settings).toEqual({ music: 3, effects: 8, quality: 'low', radarNorth: true, lang: 'en' });
   });
 
   it('M8.5 0.2 an M8 document (v5) folds its coins into the bank; v6 writes no coins and reads back equal', () => {

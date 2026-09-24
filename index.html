@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="pl">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
@@ -9,16 +9,24 @@
   <body>
     <canvas id="game" tabindex="0"></canvas>
     <div id="ui"></div>
-    <div id="loading" class="loading">LOADING</div>
+    <div id="loading" class="loading">WCZYTYWANIE</div>
     <script>
-      // M7 slice 7: if the game's own script never ran (a request that failed), offer a retry the player clicks
-      setTimeout(function () {
-        var g = window.__game, l = document.getElementById('loading');
-        if ((g && g.started) || !l || l.classList.contains('is-hidden') || l.classList.contains('is-retry')) return;
-        l.textContent = 'STILL LOADING · CLICK TO RETRY';
-        l.classList.add('is-retry');
-        l.addEventListener('click', function () { location.reload(); });
-      }, 25000);
+      (function () {
+        // the loading screen speaks the game's default language, Polish (DESIGN.md §19); English with ?lang=en
+        var english = /[?&]lang=en(&|$)/.test(location.search);
+        if (english) {
+          document.documentElement.lang = 'en';
+          document.getElementById('loading').textContent = 'LOADING';
+        }
+        // M7 slice 7: if the game's own script never ran (a request that failed), offer a retry the player clicks
+        setTimeout(function () {
+          var g = window.__game, l = document.getElementById('loading');
+          if ((g && g.started) || !l || l.classList.contains('is-hidden') || l.classList.contains('is-retry')) return;
+          l.textContent = english ? 'STILL LOADING · CLICK TO RETRY' : 'WCIĄŻ WCZYTUJĘ · KLIKNIJ, BY SPRÓBOWAĆ ZNOWU';
+          l.classList.add('is-retry');
+          l.addEventListener('click', function () { location.reload(); });
+        }, 25000);
+      })();
     </script>
     <script type="module" src="./src/main.ts"></script>
   </body>

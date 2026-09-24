@@ -35,7 +35,8 @@ import { FixedStepLoop } from './loop';
 import { PerfProbe, heapMb } from './perf';
 import { SimProfile } from './simProfile';
 import { SaveStore } from './save';
-import { BALANCE, CHAIN_ALL, POLICE, defaultSave, volumeGain, type SaveV1, type SimEvent } from '../sim';
+import { BALANCE, CHAIN_ALL, POLICE, defaultSave, resolveLang, volumeGain, type Lang, type SaveV1, type SimEvent } from '../sim';
+import { lang, setLang, t } from '../ui/lang';
 
 /** Filled during `App.boot`; copied into the handle for `?dev` and the startup gate. */
 const bootTimings: Record<string, number> = {};
@@ -148,6 +149,11 @@ export class App {
   /** Test sessions (a bot, manual stepping, a spawn…) keep every police site manned and draw no dailies, unless `date` is given. */
   private readonly datesOn: boolean;
   private nextDateCheck = 0;
+  /** `?lang=` for this session (DESIGN.md §19), until the player picks a language in the settings; the pick last seen. */
+  private langParam: string | null;
+  private langPick: Lang | '';
+  /** `?dev=1`: the developer's panel and its key hint. */
+  private readonly dev: boolean;
   /** Bound once: the save's dirty marks come from the event ring. */
   private readonly onSaveEvent = (e: SimEvent): void => {
     switch (e.kind) {
@@ -183,6 +189,9 @@ export class App {
     this.jingle = new Jingle(this.audio);
     this.music = new Music(this.audio);
     const uiRoot = document.getElementById('ui') ?? document.body;
+    // the screen is built in the language `boot` set; the settings row changes it later
+    this.langParam = params.get('lang');
+    this.langPick = sim.settings.lang;
     this.hud = new Hud(uiRoot, sim);
     this.runHud = new RunHud(uiRoot, sim);
     // the settings (M7 slice 3): on the pause screen above the build stamp, applied now and on every change
@@ -191,7 +200,6 @@ export class App {
     const stamp = pause.querySelector('.hud__pause-build');
     if (stamp) pause.insertBefore(this.settingsUi.root, stamp);
     this.applySettings();
-    this.runHud.setKeys({ any: this.input.label('throttle') });
     // the garage on the wall: App is the one caller of Garage and of the rewarded ads (docs/M5_PLAN.md §3.3)
     const actions: GarageActions = {
       buy: (car) => {
@@ -239,41 +247,16 @@ export class App {
       driveOut: () => this.driveOut(),
     };
     this.garageUi = new GarageUi(this.runHud.wall, sim, actions);
-    this.garageUi.setKeys({ left: this.input.label('steerLeft'), right: this.input.label('steerRight'), confirm: this.input.label('throttle'), back: this.input.label('brake'), select: this.input.label('handbrake') });
     this.coldOpenHud = new ColdOpenHud(uiRoot);
     this.jobsHud = new JobsHud(uiRoot);
     // the top of the screen (M7 slice 1): the job line and its card, the intro's caption, the key hints and the news in
     // one column, so none is drawn over another
     mountTop(uiRoot, { jobLine: this.jobsHud.root, caption: this.coldOpenHud.root, hints: this.hud.hintsElement, news: this.hud.tickerElement });
-    this.jobsHud.setSwapKey(this.input.label('swap'));
     // the developer's panel and its key only with ?dev=1 (DESIGN.md §17.2, M8.5 D9): no hint names it otherwise
     const dev = devTools(params);
-    this.coldOpenHud.setKeys({
-      throttle: this.input.label('throttle'),
-      steerLeft: this.input.label('steerLeft'),
-      brake: this.input.label('brake'),
-      steerRight: this.input.label('steerRight'),
-      swap: this.input.label('swap'),
-      boost: this.input.label('boost'),
-      skip: this.input.label('skip'),
-    });
-    this.hud.setHints({
-      throttle: this.input.label('throttle'),
-      brake: this.input.label('brake'),
-      steerLeft: this.input.label('steerLeft'),
-      steerRight: this.input.label('steerRight'),
-      handbrake: this.input.label('handbrake'),
-      boost: this.input.label('boost'),
-      reset: this.input.label('reset'),
-      pause: this.input.label('pause'),
-      camera: this.input.label('camera'),
-      debug: dev ? this.input.label('debug') : '',
-      swap: this.input.label('swap'),
-      map: this.input.label('map'),
-      horn: this.input.label('horn'),
-    });
+    this.dev = dev;
+    this.sendKeys();
     this.hintsUntil = performance.now() + 12000;
-    this.hud.setSound(this.input.label('mute'), this.audio.isUserMuted);
 
     this.panel = !dev ? null : new DebugPanel(uiRoot, sim, {
       spawnAt: (name) => sim.spawnAt(name),
@@ -304,10 +287,10 @@ export class App {
           const from = rec.lapStarts[0] ?? 0;
           const to = rec.lapStarts[1] ?? rec.ticks;
           sim.bestLapPoses = rec.slicePoses(from, to);
-          this.hud.showToast('GHOST LOADED', 1.5);
+          this.hud.showToast(t('GHOST LOADED'), 1.5);
         } catch (e) {
           console.warn('ghost load failed', e);
-          this.hud.showToast('BAD RECORDING', 1.5);
+          this.hud.showToast(t('BAD RECORDING'), 1.5);
         }
       },
       clearGhost: () => (sim.bestLapPoses = null),
@@ -425,13 +408,16 @@ export class App {
 
   static async boot(canvas: HTMLCanvasElement): Promise<App> {
     const params = new URLSearchParams(location.search);
+    // the screen's language (DESIGN.md §19): the parameter or the default until the save says the player's pick
+    setLang(resolveLang(params.get('lang'), ''));
+    document.documentElement.lang = lang();
     // the boot's watch (M7 slice 7): a slow phase names itself on the loading screen, a stuck boot offers a retry
     const watch = new BootWatch(performance.now() / 1000);
     const loading = document.getElementById('loading');
     const shown = { text: '' };
     const onRetry = (): void => location.reload();
     bootWatchTimer = window.setInterval(() => {
-      const l = watch.label(performance.now() / 1000);
+      const l = watch.label(performance.now() / 1000, t);
       if (!loading || l.text === shown.text) return;
       shown.text = l.text;
       loading.textContent = l.text;
@@ -457,6 +443,8 @@ export class App {
     } else {
       save = await store.load();
     }
+    setLang(resolveLang(params.get('lang'), save.settings.lang));
+    document.documentElement.lang = lang();
     bootTimings['save'] = performance.now();
     watch.enter('sim', performance.now() / 1000);
     const spawn = params.get('spawn') ?? undefined;
@@ -646,13 +634,56 @@ export class App {
     });
   }
 
-  /** The settings into the mix, the renderer and the radar (M7 slice 3). */
+  /** The settings into the mix, the renderer, the radar (M7 slice 3) and the screen's words (DESIGN.md §19). */
   private applySettings(): void {
     const s = this.sim.settings;
     this.music.setVolume(volumeGain(s.music));
     this.audio.setEffectsVolume(volumeGain(s.effects));
     this.renderer.setQualityMode(s.quality);
     this.hud.setRadarNorth(s.radarNorth);
+    // a pick in the row replaces the `lang` parameter for the rest of the session
+    if (s.lang !== this.langPick) {
+      this.langPick = s.lang;
+      this.langParam = null;
+    }
+    const l = resolveLang(this.langParam, s.lang);
+    if (l !== lang()) this.setLanguage(l);
+  }
+
+  /** A key's label as the screen shows it (SPACE is SPACJA in Polish). */
+  private key(action: Action): string {
+    return t(this.input.label(action));
+  }
+
+  /** The keycaps every screen names: at the start and again in a new language. */
+  private sendKeys(): void {
+    const key = (a: Action): string => this.key(a);
+    this.runHud.setKeys({ any: key('throttle') });
+    this.garageUi.setKeys({ left: key('steerLeft'), right: key('steerRight'), confirm: key('throttle'), back: key('brake'), select: key('handbrake') });
+    this.jobsHud.setSwapKey(key('swap'));
+    this.coldOpenHud.setKeys({
+      throttle: key('throttle'), steerLeft: key('steerLeft'), brake: key('brake'), steerRight: key('steerRight'),
+      swap: key('swap'), boost: key('boost'), skip: key('skip'),
+    });
+    this.hud.setHints({
+      throttle: key('throttle'), brake: key('brake'), steerLeft: key('steerLeft'), steerRight: key('steerRight'),
+      handbrake: key('handbrake'), boost: key('boost'), reset: key('reset'), pause: key('pause'), camera: key('camera'),
+      debug: this.dev ? key('debug') : '', swap: key('swap'), map: key('map'), horn: key('horn'),
+    });
+    this.hud.setSound(key('mute'), this.audio.isUserMuted);
+  }
+
+  /** The screen in another language (DESIGN.md §19): the keycaps, then every word on every layer, said again. */
+  private setLanguage(l: Lang): void {
+    setLang(l);
+    document.documentElement.lang = l;
+    this.sendKeys();
+    this.hud.relabel();
+    this.runHud.relabel(this.sim);
+    this.garageUi.relabel();
+    this.coldOpenHud.relabel();
+    this.jobsHud.relabel();
+    this.settingsUi.relabel();
   }
 
   private toggleUserPause(): void {
@@ -689,8 +720,8 @@ export class App {
     if (st.pressed.camera) this.renderer.chase.toggleMode();
     if (st.pressed.mute) {
       const muted = this.audio.toggleUserMute();
-      this.hud.showToast(muted ? 'MUTED' : 'SOUND ON', 1);
-      this.hud.setSound(this.input.label('mute'), muted);
+      this.hud.showToast(t(muted ? 'MUTED' : 'SOUND ON'), 1);
+      this.hud.setSound(this.key('mute'), muted);
     }
     if (st.pressed.skip && this.sim.coldOpen.active) {
       this.sim.coldOpen.skip();

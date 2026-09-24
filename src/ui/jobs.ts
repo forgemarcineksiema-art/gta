@@ -7,12 +7,14 @@
  * its card once the job's card is gone; the first order's card stays until
  * the wanted car is ringed and says how to take it. Hidden inside the cold
  * open, behind a shut door, on the busted card and while the ticker has the
- * top centre. DOM writes only on change; reads sim state only.
+ * top centre. DOM writes only on change; reads sim state only. Every word in
+ * the player's language (`lang.ts`, DESIGN.md §19).
  */
 import {
   BALANCE, BODY_WORDS, CAR_WORDS, CHAIN_STEPS, CHIEF, MEDAL_WORDS, PLACE_WORDS, RIVALS, STEP, chainStep, goalFor, newGoal, paintName, posterNumber, reqText,
   trialTimes, unpackDescriptor, type GoalKind, type JobDef, type RivalDef, type SimWorld,
 } from '../sim';
+import { num, paintedCar, t } from './lang';
 
 const KIND_TITLE: Record<JobDef['kind'], string> = { delivery: 'DELIVERY', order: 'STEAL TO ORDER', escape: 'ESCAPE', trial: 'TIME TRIAL', race: 'STREET RACE', rage: 'TAKEDOWN RAGE', mayhem: 'MAYHEM', fare: 'FARE', duel: 'WANTED BOARD' };
 
@@ -57,6 +59,9 @@ export class JobsHud {
   private chainSeen = -1;
   private chainPending = -1;
   private chainLeft = 0;
+  /** The chain's step on the card now, and the language changed under a card: filled again on the next frame. */
+  private chainShown = -1;
+  private cardStale = false;
 
   constructor(parent: HTMLElement) {
     this.root = el('div', 'jobs');
@@ -93,6 +98,16 @@ export class JobsHud {
     this.cardKey.textContent = key;
   }
 
+  /** The language changed (DESIGN.md §19): the line, the card and the chain's card said again. */
+  relabel(): void {
+    this.serial = -1;
+    this.goalKind = 'none';
+    this.kindText = '';
+    this.lastSeconds = -2;
+    this.lastDist = -2;
+    this.cardStale = true;
+  }
+
   update(sim: SimWorld, dt: number): void {
     const run = sim.run;
     if (this.chainSeen < 0) this.chainSeen = run.chainSerial;
@@ -122,12 +137,15 @@ export class JobsHud {
     const teach = jobLine && d !== null && this.teaching(sim, d);
     const jobCard = jobLine && d !== null && jobs.state !== 'done' && jobs.state !== 'failed' && (jobs.elapsed < BALANCE.jobs.cardSeconds || teach);
     if (jobCard && d) {
-      if (this.cardMode !== 'job') this.fillJobCard(sim, d);
+      if (this.cardMode !== 'job' || this.cardStale) this.fillJobCard(sim, d);
+      this.cardStale = false;
       this.card.classList.toggle('is-teach', teach);
       this.showCard('job');
       return;
     }
     if (this.cardMode === 'chain') {
+      if (this.cardStale) this.fillChainCard(run.chain, this.chainShown);
+      this.cardStale = false;
       this.chainLeft -= dt;
       if (this.chainLeft > 0) return;
     }
@@ -195,7 +213,7 @@ export class JobsHud {
         const elapsed = d.limitSeconds - jobs.remaining;
         const times = trialTimes(d.limitSeconds);
         const next = times[0] > elapsed ? 0 : times[1] > elapsed ? 1 : 2;
-        this.lineTime.textContent = `${clock(Math.floor(elapsed))} · ${MEDAL_WORDS[3 - next]} ${clock(Math.round(times[next]))}`;
+        this.lineTime.textContent = `${clock(Math.floor(elapsed))} · ${t(MEDAL_WORDS[3 - next] ?? '')} ${clock(Math.round(times[next]))}`;
       } else {
         this.lineTime.textContent = seconds >= 0 ? clock(seconds) : '';
       }
@@ -205,7 +223,7 @@ export class JobsHud {
     const dist = jobs.target(this.point) ? Math.round(Math.hypot(this.point.x - p.x, this.point.z - p.z) / 10) * 10 : -1;
     if (dist !== this.lastDist) {
       this.lastDist = dist;
-      this.lineDist.textContent = dist >= 0 ? `${dist.toLocaleString('en-US')} m` : '';
+      this.lineDist.textContent = dist >= 0 ? `${num(dist)} m` : '';
     }
   }
 
@@ -226,26 +244,26 @@ export class JobsHud {
       this.goalWho = who;
       let words = '', extra = '';
       switch (g.kind) {
-        case 'take': words = 'TAKE A JOB'; break;
-        case 'bank': words = 'BANK IT'; break;
-        case 'lose': words = g.hasTarget ? 'LOSE THEM OR BANK IT' : 'LOSE THEM'; break;
+        case 'take': words = t('TAKE A JOB'); break;
+        case 'bank': words = t('BANK IT'); break;
+        case 'lose': words = t(g.hasTarget ? 'LOSE THEM OR BANK IT' : 'LOSE THEM'); break;
         case 'buy':
-          words = `BUY THE ${CAR_WORDS.compact}`;
-          if (g.amount > 0) extra = `${money(g.amount)} TO GO`;
+          words = t('BUY THE {car}', { car: t(CAR_WORDS.compact) });
+          if (g.amount > 0) extra = t('{cash} TO GO', { cash: Math.round(g.amount) });
           break;
-        case 'escape': words = 'ESCAPE THE COPS'; break;
-        case 'order': words = 'STEAL TO ORDER'; break;
-        case 'fill': words = 'FILL THE BAG'; extra = `${money(g.amount)}/${money(BALANCE.chain.bankGoal)}`; break;
+        case 'escape': words = t('ESCAPE THE COPS'); break;
+        case 'order': words = t('STEAL TO ORDER'); break;
+        case 'fill': words = t('FILL THE BAG'); extra = `${money(g.amount)}/${money(BALANCE.chain.bankGoal)}`; break;
         // the wanted board (M6): the rival ready, or what they want first
         case 'rival': {
           const r = RIVALS[g.rival];
-          words = !r ? '' : g.rival === CHIEF ? 'FACE THE CHIEF' : `CHALLENGE ${r.name}`;
+          words = !r ? '' : g.rival === CHIEF ? t('FACE THE CHIEF') : t('CHALLENGE {name}', { name: t(r.name) });
           break;
         }
         case 'needs': {
           const r = RIVALS[g.rival], q = r?.reqs[g.req];
           if (!r || !q) break;
-          words = `#${posterNumber(g.rival)} NEEDS: ${reqText(q)}`;
+          words = t('#{n} NEEDS: {req}', { n: posterNumber(g.rival), req: reqText(q, t) });
           if (q.count > 1 && q.kind !== 'bestRun') extra = `${money(Math.min(g.amount, q.count))}/${money(q.count)}`;
           break;
         }
@@ -261,7 +279,7 @@ export class JobsHud {
     const dist = g.hasTarget ? Math.round(Math.hypot(g.x - p.x, g.z - p.z) / 10) * 10 : -1;
     if (dist !== this.lastDist) {
       this.lastDist = dist;
-      this.lineDist.textContent = dist >= 0 ? `${dist.toLocaleString('en-US')} m` : '';
+      this.lineDist.textContent = dist >= 0 ? `${num(dist)} m` : '';
     }
   }
 
@@ -274,39 +292,43 @@ export class JobsHud {
     const rival = d.kind === 'duel' ? (RIVALS[d.level] as RivalDef) : null;
     if (jobs.state === 'done' && rival) {
       // beaten: the purse, and the car the first time
-      kind = jobs.lastRematch ? `REMATCH WON +${money(jobs.lastPaid)}` : `BEATEN +${money(jobs.lastPaid)} · THE ${BODY_WORDS[rival.body]} IS YOURS`;
+      const cash = Math.round(jobs.lastPaid);
+      kind = jobs.lastRematch ? t('REMATCH WON +{cash}', { cash }) : t('BEATEN +{cash} · THE {car} IS YOURS', { cash, car: t(BODY_WORDS[rival.body]) });
       state = 'is-done';
     } else if (jobs.state === 'failed' && rival) {
-      kind = jobs.lastPlace !== 2 ? 'TOO LATE · TRY AGAIN' : rival.format === 'hunt' ? `${rival.name} GOT HOME · TRY AGAIN`
-        : `${rival.name} WIN${rival.name.startsWith('THE TWINS') ? '' : 'S'} · TRY AGAIN`;
+      const name = t(rival.name);
+      kind = jobs.lastPlace !== 2 ? t('TOO LATE · TRY AGAIN') : rival.format === 'hunt' ? t('{name} GOT HOME · TRY AGAIN', { name })
+        : t(rival.name.startsWith('THE TWINS') ? '{name} WIN · TRY AGAIN' : '{name} WINS · TRY AGAIN', { name });
       state = 'is-failed';
     } else if (rival) {
-      kind = rival.format === 'chief' ? 'LOSE THE CHIEF' : rival.format === 'hunt' ? `WRECK ${rival.name}` : `${rival.name} · ${PLACE_WORDS[this.racePlace] ?? ''}`;
+      kind = rival.format === 'chief' ? t('LOSE THE CHIEF') : rival.format === 'hunt' ? t('WRECK {name}', { name: t(rival.name) })
+        : `${t(rival.name)} · ${t(PLACE_WORDS[this.racePlace] ?? '')}`;
     } else if (jobs.state === 'done') {
-      const what = d.kind === 'order' ? 'SOLD' : d.kind === 'escape' ? 'BOUNTY' : d.kind === 'trial' ? MEDAL_WORDS[jobs.lastMedal]
-        : d.kind === 'race' ? `${PLACE_WORDS[jobs.lastPlace] ?? ''} PLACE` : d.kind === 'rage' ? 'RAGE DONE' : d.kind === 'mayhem' ? 'MAYHEM DONE' : d.kind === 'fare' ? 'FARE PAID' : 'DELIVERED';
-      kind = `${what} +${money(jobs.lastPaid)}${jobs.lastTip ? ' · CLEAN LINE' : ''}`;
+      const what = d.kind === 'order' ? t('SOLD') : d.kind === 'escape' ? t('BOUNTY') : d.kind === 'trial' ? t(MEDAL_WORDS[jobs.lastMedal] ?? '')
+        : d.kind === 'race' ? t('{place} PLACE', { place: t(PLACE_WORDS[jobs.lastPlace] ?? '') })
+          : t(d.kind === 'rage' ? 'RAGE DONE' : d.kind === 'mayhem' ? 'MAYHEM DONE' : d.kind === 'fare' ? 'FARE PAID' : 'DELIVERED');
+      kind = `${what} +${money(jobs.lastPaid)}${jobs.lastTip ? ` · ${t('CLEAN LINE')}` : ''}`;
       state = 'is-done';
     } else if (jobs.state === 'failed') {
-      kind = d.kind === 'trial' ? 'TOO SLOW · NO MEDAL' : d.kind === 'race' && jobs.lastPlace > 3 ? 'LAST · NO PRIZE' : 'TOO LATE';
+      kind = t(d.kind === 'trial' ? 'TOO SLOW · NO MEDAL' : d.kind === 'race' && jobs.lastPlace > 3 ? 'LAST · NO PRIZE' : 'TOO LATE');
       state = 'is-failed';
     } else if (d.kind === 'order') {
       const w = unpackDescriptor(d.descriptor);
-      kind = jobs.state === 'hunting' ? `FIND A ${paintName(w.paint)} ${CAR_WORDS[w.kind]}` : `DELIVER THE ${CAR_WORDS[w.kind]}`;
+      kind = jobs.state === 'hunting' ? t('FIND A {car}', { car: paintedCar(paintName(w.paint), CAR_WORDS[w.kind]) }) : t('DELIVER THE {car}', { car: t(CAR_WORDS[w.kind]) });
     } else if (d.kind === 'escape') {
-      kind = `ESCAPE ${'★'.repeat(d.level)}`;
+      kind = t('ESCAPE {stars}', { stars: '★'.repeat(d.level) });
     } else if (d.kind === 'trial') {
-      kind = 'TIME TRIAL · FOLLOW THE COINS';
+      kind = t('TIME TRIAL · FOLLOW THE COINS');
     } else if (d.kind === 'race') {
-      kind = `RACE · ${PLACE_WORDS[this.racePlace] ?? ''}`;
+      kind = t('RACE · {place}', { place: t(PLACE_WORDS[this.racePlace] ?? '') });
     } else if (d.kind === 'fare') {
       const fares = sim.fares;
-      kind = `${fares.hot ? 'HOT FARE' : 'FARE'}${fares.chain > 0 ? ` ×${fares.chain + 1}` : ''}${this.fareTips > 0 ? ` · TIPS +${money(this.fareTips)}` : ''}`;
+      kind = `${t(fares.hot ? 'HOT FARE' : 'FARE')}${fares.chain > 0 ? ` ×${fares.chain + 1}` : ''}${this.fareTips > 0 ? ` · ${t('TIPS +{cash}', { cash: Math.round(this.fareTips) })}` : ''}`;
     } else if (d.kind === 'rage' || d.kind === 'mayhem') {
-      const count = d.kind === 'rage' ? `${Math.min(this.zoneCount, d.level)}/${d.level} TAKEDOWNS` : `${money(Math.min(this.zoneCount, d.level))} / ${money(d.level)}`;
-      kind = `${d.kind === 'rage' ? 'RAGE' : 'MAYHEM'} · ${count}${this.zoneOut ? ' · BACK INTO THE ZONE' : ''}`;
+      const count = d.kind === 'rage' ? t('{n}/{of} TAKEDOWNS', { n: Math.min(this.zoneCount, d.level), of: d.level }) : `${money(Math.min(this.zoneCount, d.level))} / ${money(d.level)}`;
+      kind = `${t(d.kind === 'rage' ? 'RAGE' : 'MAYHEM')} · ${count}${this.zoneOut ? ` · ${t('BACK INTO THE ZONE')}` : ''}`;
     } else {
-      kind = 'DELIVERY';
+      kind = t('DELIVERY');
     }
     if (kind !== this.kindText) {
       this.kindText = kind;
@@ -321,44 +343,46 @@ export class JobsHud {
 
   /** The card: what was taken on; the first order's says how to take the car. */
   private fillJobCard(sim: SimWorld, d: JobDef): void {
-    this.cardTitle.textContent = KIND_TITLE[d.kind];
+    this.cardTitle.textContent = t(KIND_TITLE[d.kind]);
     this.cardPay.textContent = money(d.payout);
     if (d.kind === 'duel') {
       // the rival's poster: the name and the line, the race (a hunt races until M6 slice 2), the purse and the car
       const r = RIVALS[d.level] as RivalDef;
       const n = posterNumber(d.level);
       const board = sim.board;
-      this.cardTitle.textContent = n > 0 ? `#${n} ${r.name}` : r.name;
-      this.cardSub.textContent = r.line;
-      this.cardLimit.textContent = r.format === 'chief' ? 'LOSE HIM AT ★★★★★' : r.format === 'hunt' ? `WRECK THE ${BODY_WORDS[r.body]} BEFORE IT GETS HOME` : 'FIRST TO THE FINISH · ANY ROUTE';
-      this.cardPay.textContent = board.isBeaten(d.level) ? `REMATCH · ${money(board.purse(d.level))}` : `${money(board.purse(d.level))} + THE ${BODY_WORDS[r.body]}`;
+      const car = t(BODY_WORDS[r.body]), cash = Math.round(board.purse(d.level));
+      this.cardTitle.textContent = n > 0 ? `#${n} ${t(r.name)}` : t(r.name);
+      this.cardSub.textContent = t(r.line);
+      this.cardLimit.textContent = r.format === 'chief' ? t('LOSE HIM AT ★★★★★') : r.format === 'hunt' ? t('WRECK THE {car} BEFORE IT GETS HOME', { car }) : t('FIRST TO THE FINISH · ANY ROUTE');
+      this.cardPay.textContent = board.isBeaten(d.level) ? t('REMATCH · {cash}', { cash }) : t('{cash} + THE {car}', { cash, car });
     } else if (d.kind === 'order') {
       const w = unpackDescriptor(d.descriptor);
       const first = (sim.run.chain & (1 << STEP.order)) === 0 && sim.jobs.state === 'hunting';
-      this.cardSub.textContent = first ? `WANTED: ${paintName(w.paint)} ${CAR_WORDS[w.kind]} · IT'S IN TRAFFIC · SWAP INTO IT` : `WANTED: ${paintName(w.paint)} ${CAR_WORDS[w.kind]}`;
-      this.cardLimit.textContent = `${clock(d.limitSeconds)} FROM THE SWAP · NO SCRATCHES`;
+      const car = paintedCar(paintName(w.paint), CAR_WORDS[w.kind]);
+      this.cardSub.textContent = first ? t("WANTED: {car} · IT'S IN TRAFFIC · SWAP INTO IT", { car }) : t('WANTED: {car}', { car });
+      this.cardLimit.textContent = t('{time} FROM THE SWAP · NO SCRATCHES', { time: clock(d.limitSeconds) });
     } else if (d.kind === 'escape') {
-      this.cardSub.textContent = 'THE COPS HAVE YOU';
-      this.cardLimit.textContent = 'LOSE THEM';
+      this.cardSub.textContent = t('THE COPS HAVE YOU');
+      this.cardLimit.textContent = t('LOSE THEM');
     } else if (d.kind === 'fare') {
-      this.cardSub.textContent = sim.fares.hot ? 'A CROOK WITH A SUITCASE · DOUBLE PAY · MORE STARS' : 'TAKE THEM THERE · FOLLOW THE ARROW';
-      this.cardLimit.textContent = `${clock(d.limitSeconds)} · NEAR MISSES AND JUMPS TIP`;
+      this.cardSub.textContent = t(sim.fares.hot ? 'A CROOK WITH A SUITCASE · DOUBLE PAY · MORE STARS' : 'TAKE THEM THERE · FOLLOW THE ARROW');
+      this.cardLimit.textContent = t('{time} · NEAR MISSES AND JUMPS TIP', { time: clock(d.limitSeconds) });
     } else if (d.kind === 'rage' || d.kind === 'mayhem') {
       const z = BALANCE.jobs.zone;
-      this.cardSub.textContent = d.kind === 'rage' ? 'WRECK CARS INSIDE THE RING' : 'SMASH IT UP INSIDE THE RING';
-      this.cardLimit.textContent = d.kind === 'rage' ? `${d.level} TAKEDOWNS IN ${z.seconds} S` : `${money(d.level)} OF DAMAGE IN ${z.seconds} S`;
+      this.cardSub.textContent = t(d.kind === 'rage' ? 'WRECK CARS INSIDE THE RING' : 'SMASH IT UP INSIDE THE RING');
+      this.cardLimit.textContent = d.kind === 'rage' ? t('{n} TAKEDOWNS IN {s} S', { n: d.level, s: z.seconds }) : t('{cash} OF DAMAGE IN {s} S', { cash: Math.round(d.level), s: z.seconds });
     } else if (d.kind === 'race') {
       const pay = BALANCE.jobs.race.pay;
-      this.cardSub.textContent = 'FIRST TO THE FINISH · ANY ROUTE';
-      this.cardLimit.textContent = `1ST ${money(pay[0] ?? 0)} · 2ND ${money(pay[1] ?? 0)} · 3RD ${money(pay[2] ?? 0)}`;
+      this.cardSub.textContent = t('FIRST TO THE FINISH · ANY ROUTE');
+      this.cardLimit.textContent = t('1ST {a} · 2ND {b} · 3RD {c}', { a: Math.round(pay[0] ?? 0), b: Math.round(pay[1] ?? 0), c: Math.round(pay[2] ?? 0) });
     } else if (d.kind === 'trial') {
       const [g, s, b] = trialTimes(d.limitSeconds);
       const best = sim.jobs.medals.get(d.id) ?? 0;
-      this.cardSub.textContent = best > 0 ? `FOLLOW THE COINS · YOUR BEST: ${MEDAL_WORDS[best]}` : 'FOLLOW THE COINS TO THE FINISH';
-      this.cardLimit.textContent = `GOLD ${clock(Math.round(g))} · SILVER ${clock(Math.round(s))} · BRONZE ${clock(Math.round(b))}`;
+      this.cardSub.textContent = best > 0 ? t('FOLLOW THE COINS · YOUR BEST: {medal}', { medal: t(MEDAL_WORDS[best] ?? '') }) : t('FOLLOW THE COINS TO THE FINISH');
+      this.cardLimit.textContent = t('GOLD {g} · SILVER {s} · BRONZE {b}', { g: clock(Math.round(g)), s: clock(Math.round(s)), b: clock(Math.round(b)) });
     } else {
-      this.cardSub.textContent = 'DELIVER IT · FOLLOW THE ARROW';
-      this.cardLimit.textContent = `${clock(d.limitSeconds)} · FASTER PAYS MORE`;
+      this.cardSub.textContent = t('DELIVER IT · FOLLOW THE ARROW');
+      this.cardLimit.textContent = t('{time} · FASTER PAYS MORE', { time: clock(d.limitSeconds) });
     }
     this.card.dataset['kind'] = d.kind;
   }
@@ -366,10 +390,11 @@ export class JobsHud {
   /** A ticked step: which of six, what it was, what comes next. */
   private fillChainCard(chain: number, step: number): void {
     const next = chainStep(chain);
-    this.cardTitle.textContent = `STEP ${step + 1} OF ${CHAIN_STEPS.length}`;
-    this.cardSub.textContent = CHAIN_STEPS[step] ?? '';
-    this.cardPay.textContent = 'DONE';
-    this.cardLimit.textContent = next < 0 ? 'ALL DONE · THE CITY IS YOURS' : `NEXT: ${CHAIN_STEPS[next] ?? ''}`;
+    this.chainShown = step;
+    this.cardTitle.textContent = t('STEP {n} OF {of}', { n: step + 1, of: CHAIN_STEPS.length });
+    this.cardSub.textContent = t(CHAIN_STEPS[step] ?? '');
+    this.cardPay.textContent = t('DONE');
+    this.cardLimit.textContent = next < 0 ? t('ALL DONE · THE CITY IS YOURS') : t('NEXT: {step}', { step: t(CHAIN_STEPS[next] ?? '') });
     this.card.dataset['kind'] = 'chain';
     this.card.classList.remove('is-teach');
   }
@@ -401,7 +426,7 @@ function clock(seconds: number): string {
 }
 
 function money(v: number): string {
-  return Math.round(v).toLocaleString('en-US');
+  return num(Math.round(v));
 }
 
 function el(tag: string, className: string, text?: string): HTMLElement {

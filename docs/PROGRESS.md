@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — Polish, the default language (Marcin's word)
+
+Done (DESIGN §19): every word on the screen goes through `t()` (`ui/lang.ts`), `ui/pl.ts` holds 455 Polish texts keyed by
+the English the code writes, the sim's two texts with holes take a `Say`. Polish is the default; `?lang=en` or the pause
+screen's new LANGUAGE row (`settings.lang`, no new save version) switches every layer at once, no reload. Polish counts,
+numbers (84 500, ×2,6), a paint agreeing with its car; the names Polish too (PALMOWE OGRODY, BABCIA BRYKA); the glossary
+BANK, ŁUP, GWIAZDKI, GARAŻ, GLINY, KOMBO, ELIMINACJA, WPADKA, NITRO, WYPAD. Pins PL 1–7. The `game`, `heat` and `screens`
+suites read `?lang=en`; the Polish screen's fit at the ten sizes is the gate's screens pass (no browser look here). M9's
+D11 amended: on CrazyGames the default follows the SDK's locale (G3). Verify green.
+
 ## 2026-09-24 — the renderer in folders, 2 of 2: Renderer.ts carved
 
 `Renderer.ts` 978 → 292 lines, the frame's order kept call for call: `cars/PlayerCar` (classes, taken bodies, swap,

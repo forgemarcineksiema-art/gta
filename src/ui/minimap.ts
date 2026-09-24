@@ -7,6 +7,7 @@
  */
 import { BALANCE, CITY_HALF, DISTRICTS, PALETTE, districtAt, type SimWorld } from '../sim';
 import { LANDMARKS } from '../sim/city/City';
+import { labelAria, relabel, t } from './lang';
 import { MINIMAP, advance, buildRoadLayers, clampToRim, project, yawFromQuat, type MinimapState, type Vec2 } from './minimapModel';
 
 export type MarkerKind = 'tower' | 'tank' | 'glasshouse' | 'hotel' | 'garage' | 'job' | 'cache' | 'camera' | 'breaker';
@@ -275,7 +276,7 @@ export class Minimap {
     this.canvas = document.createElement('canvas');
     this.canvas.className = 'minimap__canvas';
     this.canvas.setAttribute('role', 'img');
-    this.canvas.setAttribute('aria-label', 'Radar map. Up is your direction of travel. The yellow arrow is your car.');
+    labelAria(this.canvas, 'Radar map. Up is your direction of travel. The yellow arrow is your car.');
     this.wrap.append(this.label, this.landmark, this.canvas);
     parent.appendChild(this.wrap);
     const ctx = this.canvas.getContext('2d');
@@ -327,6 +328,12 @@ export class Minimap {
     if (v === this.placeShown) return;
     this.placeShown = v;
     this.wrap.classList.toggle('is-quiet', !v);
+  }
+
+  /** The language changed (DESIGN.md §19): the names written again on the next update. */
+  relabel(): void {
+    relabel(this.wrap);
+    this.district = '';
   }
 
   /** Call every frame; paints at most every `repaintMs` and only when something moved. */
@@ -392,8 +399,8 @@ export class Minimap {
     const d = districtAt(x, z);
     if (d.id !== this.district) {
       this.district = d.id;
-      this.label.textContent = d.name;
-      this.landmark.textContent = d.landmark;
+      this.label.textContent = t(d.name);
+      this.landmark.textContent = t(d.landmark);
       this.label.style.color = hex(d.color);
     }
 

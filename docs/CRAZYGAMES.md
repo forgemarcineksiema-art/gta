@@ -36,7 +36,7 @@ Launch model (requirements/intro): **Basic Launch** = live without SDK, no monet
 |---|---|---|---|---|
 | G1 | Text and images must be legible at `devicePixelRatio: 1` in a responsive 16:9 iframe at: 821x462, 907x510, 1077x606, 1216x684 (desktop non-fullscreen); 1280x720, 1366x768, 1536x864, 1920x1080 (desktop fullscreen); 800x450 (mobile); 1080x607 (tablet). | requirements/gameplay | todo | Add these to the QA matrix. |
 | G2 | Physics/gameplay must behave identically at different refresh rates (e.g. 144 Hz, 165 Hz); do not tie simulation to frame count. | requirements/gameplay | done | Fixed 60 Hz step with accumulator; tests/sim/loop.test.ts proves bitwise-equal results at 30/60/144/165 Hz. |
-| G3 | English localization required; extra languages must be accurate; detect language from SDK `systemInfo.locale`, fall back to English. | requirements/gameplay | todo | |
+| G3 | English localization required; extra languages must be accurate; detect language from SDK `systemInfo.locale`, fall back to English. | requirements/gameplay | todo | English and Polish on screen (DESIGN.md §19, 2026-09-24); Polish is the local build's default. M9: the default from the SDK's `locale` (`pl` → Polish, else English), a pick in the settings over it (M9_PLAN D11). |
 | G4 | Controls intuitive on every supported device; avoid restricted keys (`Escape`, `Ctrl/Cmd+W`); consider AZERTY layouts. | requirements/gameplay, requirements/quality | done | KeyboardEvent.code bindings (WASD positions + arrows), labels via getLayoutMap(); nothing on Escape; pause on P. |
 | G5 | Game loads quickly and plays without errors or crashes. | requirements/gameplay | todo | |
 | G6 | Name, assets and content must be original. | requirements/gameplay | todo | |

@@ -8,6 +8,7 @@
  * first rival met, `RIVALS[CHIEF]` the last.
  */
 import { CITY_COLORS, PALETTE } from '../palette';
+import { english, type Say } from '../say';
 import type { RivalBody } from '../traffic/bodies';
 
 export type DuelFormat = 'race' | 'hunt' | 'chief';
@@ -121,25 +122,28 @@ export function posterNumber(i: number): number {
 
 const MEDALS = ['', 'BRONZE', 'SILVER', 'GOLD'];
 
-/** A requirement as the poster and the goal line say it. */
-export function reqText(r: Req): string {
+/** A requirement as the poster and the goal line say it (in the player's language through `say`, docs/DESIGN.md §19). */
+export function reqText(r: Req, say: Say = english): string {
   const n = r.count;
   switch (r.kind) {
-    case 'chain': return 'FINISH THE FIRST SIX STEPS';
-    case 'raceWins': return n === 1 ? 'WIN A STREET RACE' : `WIN ${n} STREET RACES`;
-    case 'medal': return `${MEDALS[r.level] ?? ''} ON ${n === 1 ? 'A TIME TRIAL' : `${n} TIME TRIALS`}`;
-    case 'escape': return `ESCAPE AT ${'★'.repeat(r.level)}`;
-    case 'takedowns': return `${n} TAKEDOWNS`;
-    case 'zoneWins': return n === 1 ? 'WIN A RAGE OR MAYHEM ZONE' : `WIN ${n} RAGE OR MAYHEM ZONES`;
-    case 'fares': return `DELIVER ${n} TAXI FARES`;
-    case 'orders': return `DELIVER ${n} CARS TO ORDER`;
-    case 'carsOwned': return `OWN ${n} CARS`;
-    case 'jumps': return `${n} STUNT JUMPS`;
-    case 'bestRun': return `BANK ${n.toLocaleString('en-US')} IN ONE RUN`;
-    case 'billboards': return `${n} BILLBOARDS`;
-    case 'hotFares': return n === 1 ? 'A HOT FARE' : `${n} HOT FARES`;
-    case 'caches': return `${n} CACHES`;
-    case 'board': return 'BEAT THE TEN';
-    case 'smashed': return `SMASH ${n} THINGS`;
+    case 'chain': return say('FINISH THE FIRST SIX STEPS');
+    case 'raceWins': return n === 1 ? say('WIN A STREET RACE') : say('WIN {n} STREET RACES', { n });
+    case 'medal': {
+      const medal = say(MEDALS[r.level] ?? '');
+      return n === 1 ? say('{medal} ON A TIME TRIAL', { medal }) : say('{medal} ON {n} TIME TRIALS', { medal, n });
+    }
+    case 'escape': return say('ESCAPE AT {stars}', { stars: '★'.repeat(r.level) });
+    case 'takedowns': return say('{n} TAKEDOWNS', { n });
+    case 'zoneWins': return n === 1 ? say('WIN A RAGE OR MAYHEM ZONE') : say('WIN {n} RAGE OR MAYHEM ZONES', { n });
+    case 'fares': return say('DELIVER {n} TAXI FARES', { n });
+    case 'orders': return say('DELIVER {n} CARS TO ORDER', { n });
+    case 'carsOwned': return say('OWN {n} CARS', { n });
+    case 'jumps': return say('{n} STUNT JUMPS', { n });
+    case 'bestRun': return say('BANK {n} IN ONE RUN', { n });
+    case 'billboards': return say('{n} BILLBOARDS', { n });
+    case 'hotFares': return n === 1 ? say('A HOT FARE') : say('{n} HOT FARES', { n });
+    case 'caches': return say('{n} CACHES', { n });
+    case 'board': return say('BEAT THE TEN');
+    case 'smashed': return say('SMASH {n} THINGS', { n });
   }
 }

@@ -19,6 +19,7 @@ import { PROP_KINDS, type PropKind } from '../city/props';
 import type { EventKind, SimEvent } from '../events';
 import type { JobKind } from '../jobs/catalog';
 import { mulberry32 } from '../random';
+import { english, type Say } from '../say';
 import type { SimWorld } from '../SimWorld';
 import type { CarId } from '../vehicle/presets';
 
@@ -119,13 +120,13 @@ export class Dailies {
     return this.template(i)?.text ?? '';
   }
 
-  /** Slot i's progress for the wall, e.g. `2/3` or `12,400/25,000`. */
-  progressText(i: number): string {
+  /** Slot i's progress for the wall, e.g. `2/3` or `12,400/25,000` (the numbers the language's way through `say`). */
+  progressText(i: number, say: Say = english): string {
     const t = this.template(i);
     if (!t) return '';
     if (t.threshold) return this.done[i] ? '1/1' : '0/1';
     const p = Math.min(t.target, this.progress[i] ?? 0);
-    return `${Math.round(p).toLocaleString('en-US')}/${t.target.toLocaleString('en-US')}`;
+    return say('{have}/{of}', { have: Math.round(p), of: t.target });
   }
 
   /** Slot i's cash. */

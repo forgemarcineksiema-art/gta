@@ -4,14 +4,17 @@
  * upper-case literals of the UI and of the sim's text tables (the dailies, the
  * rivals' requirements, the chain's steps, the jobs' words); a literal with a
  * lower-case letter is code (a class, a key, a path). The props' own names
- * (a smashed FENCE is a fence) are the world's, not the glossary's.
+ * (a smashed FENCE is a fence) are the world's, not the glossary's. The Polish
+ * table (`src/ui/pl.ts`, DESIGN.md §19) is not read here: its keys are these
+ * same words (a prop's name among them), its values Polish, pinned by
+ * tests/ui/lang.test.ts PL 4.
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DAILY_TEMPLATES } from '../../src/sim/dailies/Dailies';
 
 const ROOT = new URL('../../', import.meta.url);
-const UI = readdirSync(new URL('src/ui/', ROOT)).filter((f) => f.endsWith('.ts')).map((f) => `src/ui/${f}`);
+const UI = readdirSync(new URL('src/ui/', ROOT)).filter((f) => f.endsWith('.ts') && f !== 'pl.ts').map((f) => `src/ui/${f}`);
 const TABLES = ['src/sim/dailies/Dailies.ts', 'src/sim/board/rivals.ts', 'src/sim/run/goal.ts', 'src/sim/jobs/catalog.ts'];
 
 /** §17.4's never-words as they would stand on the screen. */

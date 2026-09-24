@@ -2,6 +2,17 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8 slice 0: the props as data and where they stand
+
+Done: `sim/city/props.ts`, the catalogue (all 26 rows of M8_PLAN §3.3, with their shapes) and `chunkProps`: the kerb line
+(0.7 m: a lamp post every 36 m of the street, a sapling between, bins) and the frontage line (3.7 m: benches) on every
+footway, the parks' and the promenade's benches, from each chunk's own stream; where nothing stands is `City.propRule`
+(lanes, the walkers' band, rings, doors, billboards' lines and the verge's run-out, ramps, corners, overpasses, covers,
+the cold open's route, anything built). The old footway lamps, street trees and benches left the statics: 1,979 props,
+23–73 a block, drawn inside the chunk meshes with their vertex ranges (smoke: 125 draws as before). Deviation:
+`City.props(cx, cz)`, not `CityChunk.props` (a chunk's props need the rings and the cold open's route, whose placement
+reads chunk statics). Layout hash 11.1 unmoved (it hashes colliders; the decoration had none). Pins M8 0.1–0.3. Verify green (363).
+
 ## 2026-09-24 — design talk: M8 is the chaos, the platform becomes M9
 
 Marcin, after the M7 gate (pushed on his word, `4f1a29f`): the platform moves to M9 and M8 is designed "seriously".

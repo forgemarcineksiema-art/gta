@@ -5,7 +5,8 @@
 export type ShapeDesc =
   | { kind: 'box'; hx: number; hy: number; hz: number }
   | { kind: 'gable'; hx: number; hy: number; hz: number }
-  | { kind: 'cylinder'; radius: number; halfHeight: number }
+  /** `sides` 6 draws a six-sided one (the trees' crowns, M8); eight otherwise. */
+  | { kind: 'cylinder'; radius: number; halfHeight: number; sides?: number }
   | { kind: 'wheel'; radius: number; width: number }
   /** A sphere (the giant ball, M5.5 slice 16). */
   | { kind: 'ball'; radius: number }
@@ -48,6 +49,8 @@ export interface StaticDesc {
   paint?: { underlay: number; fadeEnd: number };
   /** Full collision envelope for a facade whose visible walls contain recesses. */
   collisionOnly?: boolean;
+  /** A piece of a standing prop (M8): its id, so the chunk's mesh knows the prop's vertex range. */
+  prop?: number;
 }
 
 /** Moving object: the renderer reads `slot` from the TransformBuffer every frame. */

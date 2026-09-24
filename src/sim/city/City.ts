@@ -8,13 +8,15 @@ import type { SpawnPoint } from '../playground';
 import { mulberry32 } from '../random';
 import { IDENTITY_QUAT as IDENTITY_ROT, quatFromYaw, type StaticDesc } from '../scene';
 import { Architecture, CITY_COLORS, type LandmarkStyle } from './architecture';
-import { placeBillboards, type BillboardDesc } from './collectibles';
-import { DROP_OFF_LOTS, cameraSites, dropOffAt, dropOffFor, hideoutStatics, nearDoor, type DropOff } from './cover';
+import { CAR_TOP, RUN_OUT_REACH, VERGE, placeBillboards, runOutFootprint, tallFootprint, type BillboardDesc } from './collectibles';
+import { DROP_OFF_LOTS, GARAGE, cameraSites, dropOffAt, dropOffFor, hideoutSign, hideoutStatics, toDropOff, type DropOff } from './cover';
 import { COVER, coverStatics, insideCover, placeCovers, type CoverAvoid, type CoverDesc } from './covers';
 import { cameraStatics, placeCameras, type CameraDesc } from './cameras';
-import { jumpStatics, placeJumps, type JumpDesc } from './jumps';
-import { layoutCoins, placeCoins, type CoinDesc, type CoinPoint } from './coins';
+import { RAMP_HALF_WIDTH, jumpStatics, placeJumps, type JumpDesc } from './jumps';
+import { gateLine, layoutCoins, placeCoins, type CoinDesc, type CoinPoint } from './coins';
 import { buildRoadMarkings } from './markings';
+import { PROP_LINES, chunkProps, type FootwayRun, type PropContext, type PropDesc, type PropPlace } from './props';
+import { signalPoles, signalledNodes } from './signals';
 import { BLOCK, CITY_HALF, HIGHWAY_HALF, HIGHWAY_LANE_OFFSETS, OVERPASS_NODES, ROAD_HALF, buildCityRoute, buildRoadGraph, distanceToPolyline, highwayHeightAt, projectOnLane, underOverpass, type Lane, type RoadPoint, type SpecialRoad } from './roads';
 import { overpassStatics } from './overpass';
 
@@ -72,6 +74,39 @@ interface QuarterPlan {
 
 /** The shallows round the island on the big map (m out from the seawall). */
 const SHALLOWS = 40;
+
+/** A circle the street furniture keeps out of (a job's ring, a parked hidden car, a breaker's tower). */
+export interface PropRing { x: number; z: number; r: number }
+/**
+ * The keep-outs' margins (m, M8 D7): a grid footway's run stops this short of its chunk's edge where it runs toward
+ * the neighbour (whose billboard's line may come this far); a car's half width plus room on the cold open's route
+ * and a billboard's line; past a door's opening, a ramp's side and before and after it; clear of an overpass, a
+ * covered street, a signal's or a sign's pole.
+ */
+const PROP_KEEP = { edge: 8, route: 1.6, line: 1.5, door: 2, doorOut: 0.5, rampSide: 2, rampBefore: 6, rampAfter: 80, overpass: 2, cover: 1, pole: 0.5, statics: 0.3 } as const;
+
+/**
+ * Whether two rectangles overlap (separating axes): each a centre, the cosine and sine of its yaw (local +X is
+ * (cos, -sin), local +Z (sin, cos)) and its half extents.
+ */
+function rectsOverlap(ax: number, az: number, ac: number, as: number, ahx: number, ahz: number, bx: number, bz: number, bc: number, bs: number, bhx: number, bhz: number): boolean {
+  const dx = bx - ax, dz = bz - az;
+  const axes = [ac, -as, as, ac, bc, -bs, bs, bc];
+  for (let k = 0; k < 8; k += 2) {
+    const ux = axes[k] as number, uz = axes[k + 1] as number;
+    const ra = ahx * Math.abs(ac * ux - as * uz) + ahz * Math.abs(as * ux + ac * uz);
+    const rb = bhx * Math.abs(bc * ux - bs * uz) + bhz * Math.abs(bs * ux + bc * uz);
+    if (Math.abs(dx * ux + dz * uz) > ra + rb) return false;
+  }
+  return true;
+}
+
+/** Distance from (px, pz) to the segment a–b. */
+function segmentDistance(px: number, pz: number, ax: number, az: number, bx: number, bz: number): number {
+  const dx = bx - ax, dz = bz - az;
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / (dx * dx + dz * dz || 1)));
+  return Math.hypot(px - ax - dx * t, pz - az - dz * t);
+}
 
 /**
  * A rotated footprint inside a block interior of chunk (cx, cz): clear of that chunk's and the neighbouring grid
@@ -153,6 +188,11 @@ export class City {
   private readonly lots = new Map<string, FrontageLot[]>();
   private readonly lotsBySegment = new Map<string, Map<number, FrontageLot[]>>();
   private footprintCache: { parks: Rect[]; blocks: Rect[]; water: Polygon[] } | null = null;
+  /** What the street furniture keeps out of that the world knows (M8): set once before any prop is asked for. */
+  private propKeepOut: { rings: ReadonlyArray<PropRing>; route: () => ReadonlyArray<{ x: number; z: number }> } | null = null;
+  private propRoute: ReadonlyArray<{ x: number; z: number }> | null = null;
+  /** Each chunk's props, placed the first time asked for (all 49 are small). */
+  private readonly propLists = new Map<string, PropDesc[]>();
   readonly spawns: SpawnPoint[];
   readonly active = new Map<string, { body: RAPIER.RigidBody; chunk: CityChunk }>();
   loaded = 0;
@@ -389,8 +429,7 @@ export class City {
           box(px, 0.18, pz, 1.6, 0.01, 18, PALETTE.kerb, 'decor', 'top');
           architecture.tree(px - 7, pz, d.id === 'marina');
           architecture.tree(px + 9, pz + 8, d.id === 'marina');
-          box(px + 4, 0.65, pz - 5, 1.4, 0.12, 0.4, c.brick);
-          box(px + 4, 0.9, pz - 5.35, 1.4, 0.35, 0.08, c.brick);
+          // its benches are props (M8, `props`)
           continue;
         }
         // A drop-off garage stands on this lot instead of its building (the plan's draw keeps the lot stream).
@@ -410,16 +449,7 @@ export class City {
           }
         }
       }
-      if (d.id !== 'foundry') for (const along of [57, 106]) {
-        if (roadClearance(x + sx * (vx + 2.7), z + sz * along) > 3 && !nearDoor(x + sx * (vx + 2.7), z + sz * along, 4) && !insideCover(this.covers, x + sx * (vx + 2.7), z + sz * along, 4) && !underOverpass(x + sx * (vx + 2.7), z + sz * along, 4)) architecture.tree(x + sx * (vx + 2.7), z + sz * along, d.id === 'marina');
-        if (roadClearance(x + sx * along, z + sz * (vz + 2.7)) > 3 && !nearDoor(x + sx * along, z + sz * (vz + 2.7), 4) && !insideCover(this.covers, x + sx * along, z + sz * (vz + 2.7), 4) && !underOverpass(x + sx * along, z + sz * (vz + 2.7), 4)) architecture.tree(x + sx * along, z + sz * (vz + 2.7), d.id === 'marina');
-      }
-      // Street lamps and planted verges are outside the driving corridor.
-      for (const offset of [36, 80]) {
-        if (roadClearance(x + sx * (vx + 2), z + sz * offset) < 1.5 || nearDoor(x + sx * (vx + 2), z + sz * offset, 4) || insideCover(this.covers, x + sx * (vx + 2), z + sz * offset, 4) || underOverpass(x + sx * (vx + 2), z + sz * offset, 4)) continue;
-        box(x + sx * (vx + 2), 4, z + sz * offset, 0.18, 4, 0.18, 0x686678);
-        box(x + sx * (vx + 1), 8, z + sz * offset, 1.4, 0.28, 0.45, PALETTE.laneMark);
-      }
+      // the street trees and the lamp posts are props on the kerb line (M8, `props`)
     }
     // Each landmark owns a reserved plaza, with paths back to both bordering streets.
     if (Math.abs(cx) === 2 && Math.abs(cz) === 2) {
@@ -498,15 +528,15 @@ export class City {
     return { key: `${cx},${cz}`, x: cx, z: cz, statics, billboards, coins };
   }
 
-  /** Coral Quay's seawall edge: paved promenade, railing, palms, benches and masts. */
+  /** Coral Quay's seawall edge: paved promenade, palms and masts (its benches are props). */
   private promenade(cx: number, cz: number, architecture: Architecture): void {
-    const box = architecture.box.bind(architecture), c = CITY_COLORS;
+    const box = architecture.box.bind(architecture);
     const start = architecture.statics.length;
     // Built along local X at the wall (local +Z is the sea); rotated for the east edge.
     const half = BLOCK / 2, wall = CITY_HALF;
     box(0, 0.16, -5, half, 0.02, 4, PALETTE.kerb, 'decor', 'top');
     for (let u = -half + 11; u < half; u += 22) architecture.tree(u, -8.5, true);
-    for (let u = -half + 22; u < half; u += 44) { box(u, 0.6, -3.2, 1.2, 0.08, 0.35, c.brick); box(u, 0.85, -3.5, 1.2, 0.3, 0.06, c.brick); }
+    // its benches are props (M8, `props`)
     for (let u = -half + 30; u < half; u += 75) architecture.mast(u, -7.6);
     const yaw = cx === 3 ? Math.PI / 2 : 0;
     architecture.rotateFrom(start, cx === 3 ? wall : cx * BLOCK, cx === 3 ? cz * BLOCK : wall, yaw);
@@ -578,20 +608,12 @@ export class City {
     const a0 = road.centre[0] as RoadPoint, a1 = road.centre[road.centre.length - 1] as RoadPoint;
     const nearJunction = (px: number, pz: number, margin: number) =>
       Math.max(Math.abs(px - a0.x), Math.abs(pz - a0.z)) < margin || Math.max(Math.abs(px - a1.x), Math.abs(pz - a1.z)) < margin;
-    // An authored road leaving a junction at a shallow angle runs inside the grid
-    // street's corridor for tens of metres: its kerbs and furniture must not be
-    // laid on that carriageway or its pavement.
-    const onGridStreet = (px: number, pz: number): boolean => {
-      const gx = Math.round(px / BLOCK), gz = Math.round(pz / BLOCK);
-      const halfX = Math.abs(gx) === 3 ? HIGHWAY_HALF : ROAD_HALF, halfZ = Math.abs(gz) === 3 ? HIGHWAY_HALF : ROAD_HALF;
-      return Math.abs(px - gx * BLOCK) < halfX + 5 || Math.abs(pz - gz * BLOCK) < halfZ + 5;
-    };
     const c = CITY_COLORS;
     const paving = road.kind === 'service' ? c.yard : road.kind === 'parkway' ? PALETTE.grass : PALETTE.kerb;
     const footprintClear = (px: number, pz: number, yaw: number, hx: number, hz: number): boolean => lotClear(cx, cz, px, pz, yaw, hx, hz);
     // Frontage: buildings face the authored road, spaced along it, both sides (the lots computed once a road).
     const lots = this.frontageBySegment(road);
-    let along = 0, nextTree = 13, nextLamp = 30, nextYard = 45;
+    let along = 0, nextYard = 45;
     for (let i = 0; i + 1 < road.centre.length; i++) {
       const a = road.centre[i] as RoadPoint, b = road.centre[i + 1] as RoadPoint;
       const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz);
@@ -623,14 +645,7 @@ export class City {
         } else architecture.prism(quad, 0, 0.14, paving);
       }
       if (!nearJunction(mx, mz, ROAD_HALF + 12)) {
-        while (nextTree < along) {
-          if (nextTree >= startAlong && road.kind !== 'service') {
-            const t = (nextTree - startAlong) / len, side = Math.floor(nextTree / 27) % 2 ? 1 : -1;
-            const tx = a.x + dx * t + nx * side * (hw + 2.7), tz = a.z + dz * t + nz * side * (hw + 2.7);
-            if (!onGridStreet(tx, tz)) architecture.tree(tx, tz, road.kind === 'quay');
-          }
-          nextTree += 27;
-        }
+        // the street trees and the lamp posts are props on the kerb line (M8, `props`)
         for (const lot of lots.get(i) ?? []) this.frontageBuilding(road, lot, architecture);
         while (road.kind === 'service' && nextYard < along) {
           if (nextYard >= startAlong) {
@@ -662,17 +677,6 @@ export class City {
             if (footprintClear(f.x, f.z, yaw, 13, 0.5)) architecture.fence(f.x, f.z, yaw + Math.PI / 2, 26);
           }
           nextYard += 30;
-        }
-        while (nextLamp < along) {
-          if (nextLamp >= startAlong) {
-            const t = (nextLamp - startAlong) / len, side = Math.floor(nextLamp / 45) % 2 ? -1 : 1;
-            const px = a.x + dx * t + nx * side * (hw + 2), pz = a.z + dz * t + nz * side * (hw + 2);
-            if (onGridStreet(px, pz)) { nextLamp += 45; continue; }
-            box(px, 4, pz, 0.18, 4, 0.18, 0x686678);
-            const head = box(px - nx * side, 8, pz - nz * side, 0.45, 0.28, 1.4, PALETTE.laneMark);
-            head.rotation = rot;
-          }
-          nextLamp += 45;
         }
       }
     }
@@ -989,5 +993,216 @@ export class City {
     this.chunkCache.set(key, chunk);
     if (this.chunkCache.size > 16) this.chunkCache.delete(this.chunkCache.keys().next().value as string);
     return chunk;
+  }
+
+  /**
+   * What the street furniture keeps out of that only the world knows (M8, D7): the job rings (a duel's round its
+   * bay), the stash's cars, the breakers' towers, the donut shop; and the cold open's route, computed the first
+   * time a chunk asks. Set by the world before any prop is asked for.
+   */
+  setPropKeepOut(rings: ReadonlyArray<PropRing>, route: () => ReadonlyArray<{ x: number; z: number }>): void {
+    this.propKeepOut = { rings, route };
+    this.propRoute = null;
+    this.propLists.clear();
+  }
+
+  /** A chunk's street furniture (M8): placed the first time it is asked for, the same list every time after. */
+  props(cx: number, cz: number): readonly PropDesc[] {
+    const key = `${cx},${cz}`;
+    let list = this.propLists.get(key);
+    if (!list) {
+      list = chunkProps(cx, cz, this.propContext(cx, cz));
+      this.propLists.set(key, list);
+    }
+    return list;
+  }
+
+  /**
+   * A chunk's footway runs, its places and the rule of where nothing may stand (M8, D7). The grid footways run from
+   * each quarter's kerb corner along its two streets (never beside the highway, never outside its ring) on the
+   * street's own rhythm (the world coordinate along it); an authored road's run from each of its segments this
+   * chunk draws, both sides, between the junctions' wedges, on the road's rhythm (metres from its first junction).
+   */
+  private propContext(cx: number, cz: number): PropContext {
+    const keep = this.propKeepOut;
+    if (!keep) throw new Error('City.props: setPropKeepOut first (the rings and the cold open\'s route)');
+    const x = cx * BLOCK, z = cz * BLOCK;
+    const ring = 3 * BLOCK;
+    const chunk = this.chunk(cx, cz);
+    const { corridors, roadClearance } = this.corridorsNear(x, z);
+    const plans = this.plan(cx, cz, corridors, roadClearance);
+    const vx = Math.abs(cx) === 3 ? HIGHWAY_HALF : ROAD_HALF, vz = Math.abs(cz) === 3 ? HIGHWAY_HALF : ROAD_HALF;
+    const runs: FootwayRun[] = [];
+    const places: PropPlace[] = [];
+    for (const q of plans) {
+      const { sx, sz } = q;
+      for (const lot of q.lots) if (lot.kind === 'park') places.push({ kind: 'park', x: lot.px, z: lot.pz, dx: 0, dz: 1, half: 18, nx: 1, nz: 0 });
+      if (Math.abs(q.qx) >= ring || Math.abs(q.qz) >= ring) continue;
+      // a building's entrance path meets the footway in front of its lot
+      const alongZ: Array<{ x: number; z: number }> = [], alongX: Array<{ x: number; z: number }> = [];
+      for (const lot of q.lots) {
+        if (lot.kind !== 'building') continue;
+        if (lot.ox === 40) alongZ.push({ x: x + sx * (vx + 4.5), z: lot.pz });
+        if (lot.oz === 40) alongX.push({ x: lot.px, z: z + sz * (vz + 4.5) });
+      }
+      // toward a neighbour the run stops short of the edge (its billboard's line may come that far)
+      const endZ = BLOCK / 2 - (sz < 0 ? PROP_KEEP.edge : 0), endX = BLOCK / 2 - (sx < 0 ? PROP_KEEP.edge : 0);
+      if (Math.abs(cx) !== 3) {
+        const z0 = z + sz * vz;
+        runs.push({ x: x + sx * vx, z: z0, dx: 0, dz: sz, nx: sx, nz: 0, length: endZ - vz, along: sz * z0, district: q.d.id, street: 'grid', entrances: alongZ });
+      }
+      if (Math.abs(cz) !== 3) {
+        const x0 = x + sx * vx;
+        runs.push({ x: x0, z: z + sz * vz, dx: sx, dz: 0, nx: 0, nz: sz, length: endX - vx, along: sx * x0, district: q.d.id, street: 'grid', entrances: alongX });
+      }
+    }
+    for (const road of corridors) {
+      const f = this.frame(road), joins = this.joinsFor(road), hw = road.halfWidth;
+      const a0 = road.centre[0] as RoadPoint, a1 = road.centre[road.centre.length - 1] as RoadPoint;
+      const lots = this.frontageBySegment(road);
+      for (let i = 0; i + 1 < road.centre.length; i++) {
+        const a = road.centre[i] as RoadPoint, b = road.centre[i + 1] as RoadPoint;
+        const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
+        if (Math.abs(mx - x) >= BLOCK / 2 || Math.abs(mz - z) >= BLOCK / 2) continue;
+        const nearEnd = Math.max(Math.abs(mx - a0.x), Math.abs(mz - a0.z)) < ROAD_HALF + 12 || Math.max(Math.abs(mx - a1.x), Math.abs(mz - a1.z)) < ROAD_HALF + 12;
+        if (nearEnd) continue;
+        const len = Math.hypot(b.x - a.x, b.z - a.z), dx = (b.x - a.x) / len, dz = (b.z - a.z) / len;
+        const entrances = (lots.get(i) ?? []).map((lot) => ({ x: lot.pathX, z: lot.pathZ }));
+        for (const side of [-1, 1] as const) {
+          const startClip = joins.start[side > 0 ? 1 : 0], endClip = joins.end[side > 0 ? 1 : 0];
+          const t0 = Math.max(f.cum[i] as number, startClip ? startClip.t : 0), t1 = Math.min(f.cum[i + 1] as number, endClip ? endClip.t : f.total);
+          if (t1 <= t0) continue;
+          // the right normal (-dz, dx) on side 1
+          const nx = -dz * side, nz = dx * side, u = t0 - (f.cum[i] as number);
+          runs.push({ x: a.x + dx * u + nx * hw, z: a.z + dz * u + nz * hw, dx, dz, nx, nz, length: t1 - t0, along: t0, district: districtAt(mx, mz).id, street: road.kind, entrances });
+        }
+      }
+    }
+    // the promenade along the Quay's seawall (its benches); `promenade` builds it along local X, the sea at local +Z
+    if ((cx === 3 && cz >= 1) || (cz === 3 && cx >= 1)) {
+      places.push(cx === 3 ? { kind: 'promenade', x: CITY_HALF, z, dx: 0, dz: -1, half: BLOCK / 2, nx: 1, nz: 0 }
+        : { kind: 'promenade', x, z: CITY_HALF, dx: 1, dz: 0, half: BLOCK / 2, nx: 0, nz: 1 });
+    }
+    return { seed: this.seed, runs, places, blocked: this.propRule(cx, cz, chunk, corridors, keep.rings) };
+  }
+
+  /** The rule of where nothing may stand for a chunk's props (M8, D7): see `PropContext.blocked`. */
+  private propRule(cx: number, cz: number, chunk: CityChunk, corridors: readonly SpecialRoad[], rings: ReadonlyArray<PropRing>): PropContext['blocked'] {
+    const x0 = cx * BLOCK, z0 = cz * BLOCK, reach = BLOCK / 2 + 30;
+    const ring = 3 * BLOCK;
+    const band = PROP_LINES.walkers, lo = band.middle - band.half, hi = band.middle + band.half;
+    // what stands above the kerb: the chunk's tall statics as rectangles turned by their yaw (the rest by their bounds)
+    const tall: Array<{ x: number; z: number; cos: number; sin: number; hx: number; hz: number }> = [];
+    for (const st of chunk.statics) {
+      const f = tallFootprint(st, CAR_TOP);
+      if (!f) continue;
+      const s = st.shape, q = st.rotation;
+      if ((s.kind === 'box' || s.kind === 'gable') && q.x === 0 && q.z === 0) {
+        const yaw = 2 * Math.atan2(q.y, q.w);
+        tall.push({ x: st.position.x, z: st.position.z, cos: Math.cos(yaw), sin: Math.sin(yaw), hx: s.hx, hz: s.hz });
+      } else tall.push({ x: (f.minX + f.maxX) / 2, z: (f.minZ + f.maxZ) / 2, cos: 1, sin: 0, hx: (f.maxX - f.minX) / 2, hz: (f.maxZ - f.minZ) / 2 });
+    }
+    const near = (px: number, pz: number): boolean => Math.abs(px - x0) < reach && Math.abs(pz - z0) < reach;
+    const circles = rings.filter((r) => near(r.x, r.z));
+    for (const site of DROP_OFF_LOTS.map((lot) => dropOffFor(lot))) {
+      const s = hideoutSign(site);
+      if (near(s.poleX, s.poleZ)) circles.push({ x: s.poleX, z: s.poleZ, r: PROP_KEEP.pole });
+    }
+    for (const node of signalledNodes(this.graph)) {
+      const n = this.graph.nodes[node];
+      if (n && near(n.x, n.z)) for (const p of signalPoles(n.x, n.z)) circles.push({ x: p.x, z: p.z, r: PROP_KEEP.pole });
+    }
+    const doors = DROP_OFF_LOTS.map((lot) => dropOffFor(lot)).filter((d) => near(d.door.x, d.door.z));
+    const boards = chunk.billboards.map((b) => ({ box: runOutFootprint(b), line: gateLine(this.graph, b) ?? [] }));
+    const jumps = this.jumps.filter((j) => near(j.x, j.z));
+    // the cold open's route near the chunk (its segments, x0 z0 x1 z1), computed once for the city
+    const whole = (this.propRoute ??= this.propKeepOut?.route() ?? []);
+    const route: number[] = [];
+    for (let i = 0; i + 1 < whole.length; i++) {
+      const p = whole[i] as { x: number; z: number }, q = whole[i + 1] as { x: number; z: number };
+      if (near(p.x, p.z) || near(q.x, q.z)) route.push(p.x, p.z, q.x, q.z);
+    }
+    const ends = corridors.flatMap((road) => [road.centre[0] as RoadPoint, road.centre[road.centre.length - 1] as RoadPoint]);
+    const frame = { along: 0, across: 0 };
+    return (x, z, yaw, hx, hz) => {
+      const cos = Math.cos(yaw), sin = Math.sin(yaw);
+      // local +X is (cos, -sin), local +Z is (sin, cos): the footprint's world half extents
+      const ex = Math.abs(cos) * hx + Math.abs(sin) * hz, ez = Math.abs(sin) * hx + Math.abs(cos) * hz, br = Math.hypot(hx, hz);
+      // the grid streets: their carriageways and the walkers' bands (the highway's only on its island side)
+      const gx = Math.round(x / BLOCK), gz = Math.round(z / BLOCK);
+      const halfX = Math.abs(gx) === 3 ? HIGHWAY_HALF : ROAD_HALF, halfZ = Math.abs(gz) === 3 ? HIGHWAY_HALF : ROAD_HALF;
+      const dX = Math.abs(x - gx * BLOCK), dZ = Math.abs(z - gz * BLOCK);
+      const streetX = Math.abs(z) <= ring + HIGHWAY_HALF + 4.5 || gx === 0, streetZ = Math.abs(x) <= ring + HIGHWAY_HALF + 4.5 || gz === 0;
+      if (streetX) {
+        if (dX - ex < halfX) return true;
+        const walkers = Math.abs(gx) !== 3 || Math.abs(x) < ring;
+        if (walkers && dX - ex < halfX + hi && dX + ex > halfX + lo) return true;
+      }
+      if (streetZ) {
+        if (dZ - ez < halfZ) return true;
+        const walkers = Math.abs(gz) !== 3 || Math.abs(z) < ring;
+        if (walkers && dZ - ez < halfZ + hi && dZ + ez > halfZ + lo) return true;
+      }
+      // the authored roads: their carriageways and walkers' bands, the footprint's extent along the road's normal
+      for (const road of corridors) {
+        let best = Infinity, nx = 0, nz = 0;
+        for (let i = 0; i + 1 < road.centre.length; i++) {
+          const a = road.centre[i] as RoadPoint, b = road.centre[i + 1] as RoadPoint;
+          const ddx = b.x - a.x, ddz = b.z - a.z;
+          const t = Math.max(0, Math.min(1, ((x - a.x) * ddx + (z - a.z) * ddz) / (ddx * ddx + ddz * ddz || 1)));
+          const px = x - a.x - ddx * t, pz = z - a.z - ddz * t, d = Math.hypot(px, pz);
+          if (d < best) { best = d; nx = d > 1e-9 ? px / d : 0; nz = d > 1e-9 ? pz / d : 0; }
+        }
+        const c = best - road.halfWidth;
+        if (c > 4.5 + br) continue;
+        const e = Math.abs(nx * cos - nz * sin) * hx + Math.abs(nx * sin + nz * cos) * hz;
+        if (c - e < 0) return true;
+        if (c - e < hi && c + e > lo) return true;
+      }
+      // a junction's corners, and 12 m round an authored road's junction
+      for (let nzi = Math.max(-3, gz - 1); nzi <= Math.min(3, gz + 1); nzi++) for (let nxi = Math.max(-3, gx - 1); nxi <= Math.min(3, gx + 1); nxi++) {
+        const vx = Math.abs(nxi) === 3 ? HIGHWAY_HALF : ROAD_HALF, vz = Math.abs(nzi) === 3 ? HIGHWAY_HALF : ROAD_HALF;
+        for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+          if (Math.hypot(x - (nxi * BLOCK + sx * vx), z - (nzi * BLOCK + sz * vz)) < PROP_LINES.corner + br) return true;
+        }
+      }
+      for (const n of ends) if (Math.max(Math.abs(x - n.x), Math.abs(z - n.z)) < ROAD_HALF + PROP_LINES.corner + br) return true;
+      // the world's circles: rings, parked cars, towers, poles
+      for (const c of circles) if (Math.hypot(x - c.x, z - c.z) < c.r + br) return true;
+      // a door's approach: from the road edge to its opening, the door's width and room either side
+      for (const site of doors) {
+        toDropOff(site, x, z, frame);
+        const front = -GARAGE.depth / 2;
+        if (frame.along > front - site.lot.setback - 4.5 - PROP_KEEP.doorOut - br && frame.along < front + PROP_KEEP.doorOut + br
+          && Math.abs(frame.across) < GARAGE.doorWidth / 2 + PROP_KEEP.door + br) return true;
+      }
+      // a billboard's run-out and its line of coins in from the lane; on the highway's outer verge any stretch may
+      // hold a panel of the chunk next door, so its run-out's strip along the whole verge
+      const verge = VERGE + RUN_OUT_REACH;
+      if (Math.abs(Math.abs(x) - VERGE) - ex < RUN_OUT_REACH && Math.abs(z) < verge) return true;
+      if (Math.abs(Math.abs(z) - VERGE) - ez < RUN_OUT_REACH && Math.abs(x) < verge) return true;
+      for (const b of boards) {
+        if (x + ex > b.box.minX && x - ex < b.box.maxX && z + ez > b.box.minZ && z - ez < b.box.maxZ) return true;
+        for (let i = 0; i + 1 < b.line.length; i++) {
+          const p = b.line[i] as CoinPoint, q = b.line[i + 1] as CoinPoint;
+          if (segmentDistance(x, z, p.x, p.z, q.x, q.z) < PROP_KEEP.line + br) return true;
+        }
+      }
+      // a ramp, the way up to it and its run-out
+      for (const j of jumps) {
+        const fx = Math.sin(j.yaw), fz = Math.cos(j.yaw), dx = x - j.x, dz = z - j.z;
+        const along = dx * fx + dz * fz, across = -dx * fz + dz * fx;
+        if (along > -j.length - PROP_KEEP.rampBefore - br && along < j.length + PROP_KEEP.rampAfter + br && Math.abs(across) < RAMP_HALF_WIDTH + PROP_KEEP.rampSide + br) return true;
+      }
+      if (underOverpass(x, z, PROP_KEEP.overpass + br) || insideCover(this.covers, x, z, PROP_KEEP.cover + br)) return true;
+      // the cold open's route
+      for (let i = 0; i + 3 < route.length; i += 4) {
+        if (segmentDistance(x, z, route[i] as number, route[i + 1] as number, route[i + 2] as number, route[i + 3] as number) < PROP_KEEP.route + br) return true;
+      }
+      // anything built that stands above the kerb
+      const m = PROP_KEEP.statics;
+      for (const t of tall) if (rectsOverlap(x, z, cos, sin, hx + m, hz + m, t.x, t.z, t.cos, t.sin, t.hx, t.hz)) return true;
+      return false;
+    };
   }
 }

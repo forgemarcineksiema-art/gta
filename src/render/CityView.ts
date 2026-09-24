@@ -1,8 +1,9 @@
 import * as THREE from 'three';
-import { BLOCK, CITY_HALF, PALETTE, type City, type CityChunk, type StaticDesc } from '../sim';
+import { BLOCK, CITY_HALF, PALETTE, propFootprint, type City, type CityChunk, type PropDesc, type StaticDesc } from '../sim';
 import { SHADOW_HALF, fadeShadowEdges } from './shadows';
 import { fadeRoadPaint } from './roadPaint';
 import { gableGeometry, prismGeometry } from './geometry';
+import { propStatics } from './propMesh';
 
 export type QualityTier = 'low' | 'high';
 export const QUALITY = {
@@ -13,6 +14,8 @@ export const QUALITY = {
 /** Direct buffer filling avoids hundreds of temporary Three geometries per streamed chunk. */
 const box = new THREE.BoxGeometry(2, 2, 2).toNonIndexed();
 const cylinder = new THREE.CylinderGeometry(1, 1, 2, 8).toNonIndexed();
+/** The six-sided one (the trees' crowns, the props' round parts, M8): a quarter fewer triangles. */
+const cylinder6 = new THREE.CylinderGeometry(1, 1, 2, 6).toNonIndexed();
 const gable = gableGeometry();
 const faces = {
   'x+': new THREE.PlaneGeometry(2, 2).rotateY(Math.PI / 2).translate(1, 0, 0).toNonIndexed(),
@@ -29,8 +32,8 @@ const color = new THREE.Color();
  * about 120 m from the driving camera, so the near level ends there.
  */
 export const DETAIL_NEAR = 120, DETAIL_FAR = 150;
-/** Order the shadow-caster prefix; trims and single-sided panels never enter the depth pass. */
-const casts = (st: StaticDesc) => !st.face && st.tag !== 'wall' && st.tag !== 'road' && st.tag !== 'ground' && st.tag !== 'kerb' && st.tag !== 'trim';
+/** Order the shadow-caster prefix; trims, single-sided panels and the small props never enter the depth pass. */
+const casts = (st: StaticDesc) => !st.face && st.tag !== 'wall' && st.tag !== 'road' && st.tag !== 'ground' && st.tag !== 'kerb' && st.tag !== 'trim' && st.tag !== 'prop-low';
 
 /**
  * Quarter a chunk so frustum culling (camera and shadow passes) discards the
@@ -77,7 +80,7 @@ export function partIndex(st: StaticDesc, cx: number, cz: number): number {
 const RAW = (() => {
   const raw = (g: THREE.BufferGeometry) => ({ p: g.getAttribute('position').array as Float32Array, n: g.getAttribute('normal').array as Float32Array });
   return {
-    box: raw(box), cylinder: raw(cylinder), gable: raw(gable),
+    box: raw(box), cylinder: raw(cylinder), cylinder6: raw(cylinder6), gable: raw(gable),
     'x+': raw(faces['x+']), 'x-': raw(faces['x-']), 'z+': raw(faces['z+']), 'z-': raw(faces['z-']), top: raw(faces.top), bottom: raw(faces.bottom),
   };
 })();
@@ -98,7 +101,8 @@ function sourcesOf(st: StaticDesc): number {
     }
     sourceList.push(raw);
   } else if (st.faces) for (const f of st.faces) sourceList.push(RAW[f]);
-  else sourceList.push(st.face ? RAW[st.face] : st.shape.kind === 'gable' ? RAW.gable : st.shape.kind === 'box' ? RAW.box : RAW.cylinder);
+  else sourceList.push(st.face ? RAW[st.face] : st.shape.kind === 'gable' ? RAW.gable : st.shape.kind === 'box' ? RAW.box
+    : st.shape.kind === 'cylinder' && st.shape.sides === 6 ? RAW.cylinder6 : RAW.cylinder);
   let count = 0;
   for (const src of sourceList) count += src.p.length / 3;
   return count;
@@ -128,6 +132,10 @@ export class GeometryBuild {
   private index = 0;
   private shadowVertices = 0;
   private done = false;
+  /** Each standing prop's vertex range (M8): its id, its first vertex and its vertex count. */
+  private readonly propIds: number[] = [];
+  private readonly propStart: number[] = [];
+  private readonly propCount: number[] = [];
 
   constructor(statics: StaticDesc[], readonly detailed: boolean) {
     // Shadow casters first, so they form a prefix of the buffer (onBeforeShadow draw range).
@@ -138,6 +146,12 @@ export class GeometryBuild {
         if (casts(st) !== (pass === 0)) continue;
         this.order.push(st);
         const vertices = sourcesOf(st);
+        if (st.prop !== undefined) {
+          // a prop's pieces are consecutive in its part's list and all in one pass: one range
+          const last = this.propIds.length - 1;
+          if (last >= 0 && this.propIds[last] === st.prop) this.propCount[last] = (this.propCount[last] as number) + vertices;
+          else { this.propIds.push(st.prop); this.propStart.push(count); this.propCount.push(vertices); }
+        }
         count += vertices;
         if (pass === 0) this.shadowVertices += vertices;
       }
@@ -224,8 +238,33 @@ export class GeometryBuild {
     out.setAttribute('roadPaint', new THREE.BufferAttribute(this.paint, 4, true));
     out.computeBoundingSphere();
     out.userData['shadowVertices'] = this.shadowVertices;
+    out.userData['props'] = { ids: Int32Array.from(this.propIds), start: Uint32Array.from(this.propStart), count: Uint32Array.from(this.propCount) } satisfies PropRanges;
     return out;
   }
+}
+
+/** The standing props' vertex ranges in a built part geometry (`userData.props`), in the buffer's order. */
+export interface PropRanges { ids: Int32Array; start: Uint32Array; count: Uint32Array }
+
+/** The part of its chunk (0 the base, 1–4 the quadrants) a prop's pieces go to: all of them to one, by where it stands. */
+export function propPartIndex(p: PropDesc, cx: number, cz: number): number {
+  const f = propFootprint(p.kind), r = Math.hypot(f.hx, f.hz) + 1.5;
+  const dx = p.x - cx, dz = p.z - cz;
+  if (Math.abs(dx) < 20 && Math.abs(dz) < 20) return 0;
+  if (Math.abs(dx) <= r || Math.abs(dz) <= r) return 0;
+  return 1 + (dx > 0 ? 1 : 0) + (dz > 0 ? 2 : 0);
+}
+
+/** A chunk's statics and its standing props by part: each prop's pieces consecutive, in its one part (M8). */
+export function partitionChunk(chunk: CityChunk, props: readonly PropDesc[]): StaticDesc[][] {
+  const cx = chunk.x * BLOCK, cz = chunk.z * BLOCK;
+  const groups = PARTS.map((): StaticDesc[] => []);
+  for (const st of chunk.statics) groups[partIndex(st, cx, cz)]?.push(st);
+  for (const p of props) {
+    const group = groups[propPartIndex(p, cx, cz)];
+    if (group) propStatics(p, group);
+  }
+  return groups;
 }
 
 export function cityGeometry(statics: StaticDesc[], detailed = true): THREE.BufferGeometry {
@@ -266,12 +305,9 @@ export class CityView {
 
   /** One chunk generation per tile claim; the descriptors are dropped once both levels exist. */
   private partition(tile: Tile): StaticDesc[][] {
-    const cx = tile.x * BLOCK, cz = tile.z * BLOCK;
     const data = this.city.chunk(tile.x, tile.z);
     this.onChunk?.(data);
-    const groups = PARTS.map((): StaticDesc[] => []);
-    for (const st of data.statics) groups[partIndex(st, cx, cz)]?.push(st);
-    return groups;
+    return partitionChunk(data, this.city.props(tile.x, tile.z));
   }
 
   private unload(tile: Tile): void {

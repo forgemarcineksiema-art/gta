@@ -50,7 +50,7 @@ const BLOCK = 225;
 /** A footway gate's centre: posts 0.5 m inside the panel's ends stand 0.6 m off the kerb and on the footway's back edge. */
 const PAVEMENT_SLOT = 14.6;
 /** The highway verge slot: 10 m outside the outer kerb line (675 + 19 + 10). */
-const VERGE = 704;
+export const VERGE = 704;
 
 export function chunkIndex(cx: number, cz: number): number {
   return (cz + 3) * 7 + (cx + 3);
@@ -137,6 +137,8 @@ function footprint(slot: { x: number; z: number; yaw: number; width: number }, h
 export const PANEL_TOP = BILLBOARD_BOTTOM + BILLBOARD_HEIGHT;
 /** Car height: what the run-out must be clear up to. */
 export const CAR_TOP = CAR_CLEARANCE;
+/** How far a panel's run-out reaches either side of it along its normal (the street furniture keeps out, M8). */
+export const RUN_OUT_REACH = 0.15 + CLEARANCE + RUN_OUT;
 
 /**
  * Conservative world-space footprint of a static that reaches above a metre

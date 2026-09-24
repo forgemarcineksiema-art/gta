@@ -12,13 +12,13 @@ import { GROUP_DEFAULT, interactionGroups } from './collision';
 
 /** A query that meets the solid statics only (buildings, walls, roofs), not kerbs, ramps or the ground. */
 const SOLID_ONLY = interactionGroups(0xffff, GROUP_DEFAULT);
-import { City } from './city/City';
+import { City, type PropRing } from './city/City';
 import { coverSites, type CoverSites } from './city/cover';
 import { Roadblocks } from './police/Roadblocks';
 import { Cameras } from './city/cameras';
 import { Jumps } from './city/jumps';
 import { Stash, cityToys } from './city/stash';
-import { Breakers } from './city/breakers';
+import { BREAKER, BREAKERS, Breakers } from './city/breakers';
 import { createControls, type VehicleControls } from './controls';
 import { EventLog } from './events';
 import { Collectibles } from './city/collectibles';
@@ -28,11 +28,11 @@ import { Life } from './life/Life';
 import { Heat } from './heat/Heat';
 import { Police } from './police/Police';
 import { Pursuit } from './police/Pursuit';
-import { ColdOpen } from './run/ColdOpen';
+import { ColdOpen, coldOpenRoute } from './run/ColdOpen';
 import { Run } from './run/Run';
 import { Skill } from './run/Skill';
 import { TicketOfficer } from './police/Ticket';
-import { DonutShop } from './police/Donuts';
+import { DONUT_SHOP, DonutShop } from './police/Donuts';
 import { Jobs } from './jobs/Jobs';
 import { Fares } from './jobs/Fares';
 import { jobsFor } from './jobs/place';
@@ -62,6 +62,9 @@ export const FIXED_DT = 1 / 60;
 export const FIXED_HZ = 60;
 /** Below this height the car has fallen off the world and is respawned. */
 const KILL_Y = -25;
+/** The street furniture keeps this far from a hidden car's spot and from the donut shop's middle (m, M8 D7). */
+const PARKED_CAR_RING = 3.5;
+const DONUT_SHOP_RING = 3.6;
 
 let physicsReady: Promise<void> | null = null;
 
@@ -294,6 +297,24 @@ export class SimWorld {
     this.coldOpen = new ColdOpen(this);
     this.dailies = new Dailies(this);
     this.caches = this.coins ? new Caches(this) : null;
+    if (this.city) {
+      // what the street furniture keeps out of (M8 D7): every job's ring and its end, the stash's cars, the
+      // breakers' towers, the donut shop; the cold open's route, the first time a chunk near it asks
+      const r = BALANCE.jobs.markerRadius;
+      const rings: PropRing[] = [];
+      for (const d of this.jobs.defs) {
+        rings.push({ x: d.x, z: d.z, r: d.kind === 'duel' ? BALANCE.board.ringRadius : r });
+        rings.push({ x: d.targetX, z: d.targetZ, r });
+      }
+      for (const spot of Object.values(this.stash.spots)) rings.push({ x: spot.x, z: spot.z, r: PARKED_CAR_RING });
+      for (const b of BREAKERS) rings.push({ x: b.x, z: b.z, r: Math.hypot(BREAKER.halfWidth, BREAKER.halfDepth) + BREAKER.clear });
+      rings.push({ x: DONUT_SHOP.x, z: DONUT_SHOP.z, r: DONUT_SHOP_RING });
+      const city = this.city;
+      city.setPropKeepOut(rings, () => {
+        const loop = city.spawns.find((s) => s.name === 'loop'), hideout = this.run.dropOffs[0];
+        return loop && hideout ? coldOpenRoute(this, loop.position.x, loop.position.z, hideout)?.samples ?? [] : [];
+      });
+    }
     this.city?.sync(spawn.position.x, spawn.position.z, true);
     if (opts.save) {
       applySave(this, opts.save);

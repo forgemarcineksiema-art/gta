@@ -97,8 +97,9 @@ const SHUT_DOOR = `
   window.advanceTime(3600);
 `;
 
+/** The whole mix's gain (the master: since M7 slice 3 `audio.output` is the effects' bus under it). */
 async function gain(page: import('@playwright/test').Page): Promise<number> {
-  return page.evaluate(() => window.__game?.audio.output?.gain.value ?? -1);
+  return page.evaluate(() => window.__game?.audio.mixGain ?? -1);
 }
 
 test('8.1 an ad at the second door: one request, silence and no input while it runs, the door opens after', async ({ page }) => {

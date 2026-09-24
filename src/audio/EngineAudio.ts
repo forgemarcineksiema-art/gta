@@ -66,6 +66,11 @@ export class EngineAudio {
     return this.master;
   }
 
+  /** The whole mix's gain after both buses: what the ad's and the player's mute set (the e2e ad pins read it). */
+  get mixGain(): number {
+    return this.master ? this.master.gain.value : -1;
+  }
+
   /** The effects' share of the mix, a gain (the settings' EFFECTS row). */
   setEffectsVolume(gain: number): void {
     this.effectsLevel = Math.max(0, gain);

@@ -58,8 +58,9 @@ async function key(page: Page, code: string): Promise<void> {
   await page.evaluate(() => window.advanceTime?.(34));
 }
 
+/** The whole mix's gain (the master: since M7 slice 3 `audio.output` is the effects' bus under it). */
 async function gain(page: Page): Promise<number> {
-  return page.evaluate(() => window.__game?.audio.output?.gain.value ?? -1);
+  return page.evaluate(() => window.__game?.audio.mixGain ?? -1);
 }
 
 test('4.7 with ads off the video buttons are absent and the cash buttons are there; no offer at the door', async ({ page }) => {

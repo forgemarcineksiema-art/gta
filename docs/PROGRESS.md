@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8.6 slice 5: the frames
+
+Measured (D10, his laptop's MX330, 1600×900): 0.8.5 and the candidate at 60 fps in the bot's chase and knocked street;
+his pile (ten cruisers, six burning wrecks) 51–60 fps at pixel ratio 1, and at 1.5 GPU-bound: 47 fps with 49–65 frames
+over 50 ms on 0.8.5, 53–59 on the candidate; the laptop's own heat moved the renderer 2–6 ms between runs. Fixed: the
+city built ahead in idle time (a first visit's chunk cost up to 40 ms in one step; now the slowest step 6.3 ms, pin 5.1
+long), and the automatic quality steps down on missed frames, not only the mean (21 ms read as fine; pins 5.2–5.3; the
+pile at 1.5 in auto: 60 fps). Verify green.
+
 ## 2026-09-24 — M8.6 slice 4: the car is always seen
 
 Done: a traffic car, a unit or a wreck between the camera and the player's car, or within 2.5 m of the camera, is drawn

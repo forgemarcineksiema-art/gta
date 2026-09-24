@@ -129,6 +129,8 @@ export class App {
   private focusPaused = false;
   private frameMsSmooth = 16.7;
   private stepMsLast = 0;
+  /** An idle callback is waiting to build the city ahead of the car (M8.6 D10). */
+  private prefetchQueued = false;
   private raf = 0;
   private readonly manual: boolean;
   /** Last frame's run was being driven (running or closing): the brackets follow its edges. */
@@ -537,6 +539,25 @@ export class App {
     return this.userPaused || this.focusPaused;
   }
 
+  /**
+   * The city built ahead of the car in the time a frame leaves (M8.6 D10): a chunk's generation or its props at a time,
+   * while the browser says it is idle (Safari has no idle callback: one piece a tenth of a second). The sim's own load
+   * of a chunk it drives into then only makes colliders.
+   */
+  private queuePrefetch(): void {
+    if (this.prefetchQueued || !this.sim.city) return;
+    this.prefetchQueued = true;
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(this.idlePrefetch);
+    else setTimeout(this.idlePrefetch, 100);
+  }
+
+  private readonly idlePrefetch = (deadline?: IdleDeadline): void => {
+    this.prefetchQueued = false;
+    const city = this.sim.city;
+    if (!city) return;
+    while (city.prefetch() && deadline && deadline.timeRemaining() > 12) { /* one more piece while the frame allows */ }
+  };
+
   private setFocusPaused(v: boolean): void {
     // automatic pause: no gameplayStop(), the platform tracks focus itself
     if (this.bot) return;
@@ -753,6 +774,7 @@ export class App {
     this.store.tick(this.sim, frameDt);
 
     this.renderer.render(alpha, this.paused ? 0 : frameDt);
+    this.queuePrefetch();
     this.audio.update(this.sim.vehicle.telemetry, frameDt);
     this.sfx.update(this.sim);
     this.siren.update(this.sim, this.paused ? 0 : frameDt);

@@ -96,4 +96,24 @@ describe('solid cars: the chase read (long)', () => {
       expect(officerInside).toBe(0);
     } finally { sim.dispose(); }
   }, 300_000);
+
+  it('M8.6 5.1 the city built ahead in the time a step leaves: no step over 8 ms after the first second', async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 1, record: false });
+    const bot = new TrackBot('muscle', CITY_BOT_TUNING);
+    let worst = 0, over = 0, pieces = 0;
+    try {
+      for (let tick = 0; tick < 120 * 60; tick++) {
+        bot.drive(sim, sim.controls, 1 / 60);
+        const t0 = performance.now();
+        sim.step();
+        const ms = performance.now() - t0;
+        if (tick >= 60) { worst = Math.max(worst, ms); if (ms > 8) over++; }
+        // what the app does when a frame leaves time: a piece of the city ahead
+        if (ms < 4 && sim.city!.prefetch()) pieces++;
+      }
+      console.log(`[solid] 120 s over the city, ${pieces} pieces built ahead: the slowest step ${worst.toFixed(1)} ms, ${over} over 8 ms`);
+      expect(pieces).toBeGreaterThan(0);
+      expect(over).toBe(0);
+    } finally { sim.dispose(); }
+  }, 300_000);
 });

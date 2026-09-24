@@ -19,6 +19,7 @@ import { CityView, QUALITY, type QualityTier } from './CityView';
 import { PropsView } from './PropsView';
 import { propParts } from './propMesh';
 import { SHADOW_HALF, SUN_OFFSET, stableShadowTarget } from './shadows';
+import { AUTO_QUALITY, qualityStep } from './quality';
 import { gableGeometry, prismGeometry } from './geometry';
 import { buildSkyline } from './skyline';
 import { TrafficView, lowriderBounce } from './TrafficView';
@@ -98,6 +99,8 @@ export class Renderer {
   private qualityElapsed = 0;
   private qualityFrames = 0;
   private qualityTotal = 0;
+  /** Frames of the window that missed their vsync (M8.6 slice 5). */
+  private qualityMissed = 0;
   private qualityCooldown = 3;
   /** Automatic tier switches this session (M7 slice 5: two and it settles). */
   private tierSwitches = 0;
@@ -865,7 +868,7 @@ export class Renderer {
     this.qualityLocked = mode !== 'auto';
     if (mode !== 'auto' && mode !== this.quality) this.setQuality(mode);
     this.qualityCooldown = 3;
-    this.qualityElapsed = 0; this.qualityFrames = 0; this.qualityTotal = 0;
+    this.qualityElapsed = 0; this.qualityFrames = 0; this.qualityTotal = 0; this.qualityMissed = 0;
   }
 
   private setQuality(tier: QualityTier): void {
@@ -888,14 +891,13 @@ export class Renderer {
     if (this.qualityLocked) return;
     if (this.qualityCooldown > 0) { this.qualityCooldown -= dt; return; }
     this.qualityElapsed += dt; this.qualityFrames++; this.qualityTotal += dt;
-    if (this.qualityElapsed < 3) return;
-    const ms = this.qualityTotal * 1000 / this.qualityFrames;
-    const settled = this.tierSwitches >= 2;
-    if (!settled && ms > 24 && this.quality === 'high') { this.setQuality('low'); this.qualityCooldown = 15; this.tierSwitches++; }
-    else if (ms > 27 && this.resolutionScale > 0.65) { this.resolutionScale = Math.max(0.65, this.resolutionScale - 0.1); this.resize(); }
-    else if (ms < 18 && this.resolutionScale < 1) { this.resolutionScale = Math.min(1, this.resolutionScale + 0.05); this.resize(); }
-    else if (!settled && ms < 17.2 && this.quality === 'low') { this.setQuality('high'); this.qualityCooldown = 15; this.tierSwitches++; }
-    this.qualityElapsed = 0; this.qualityFrames = 0; this.qualityTotal = 0;
+    if (dt > AUTO_QUALITY.missed) this.qualityMissed++;
+    if (this.qualityElapsed < AUTO_QUALITY.window) return;
+    const step = qualityStep(this.qualityTotal * 1000 / this.qualityFrames, this.qualityMissed / this.qualityFrames, this.quality, this.tierSwitches >= 2, this.resolutionScale);
+    if (step === 'low' || step === 'high') { this.setQuality(step); this.qualityCooldown = 15; this.tierSwitches++; }
+    else if (step === 'down') { this.resolutionScale = Math.max(AUTO_QUALITY.minScale, this.resolutionScale - 0.1); this.resize(); }
+    else if (step === 'up') { this.resolutionScale = Math.min(1, this.resolutionScale + 0.05); this.resize(); }
+    this.qualityElapsed = 0; this.qualityFrames = 0; this.qualityTotal = 0; this.qualityMissed = 0;
   }
 }
 

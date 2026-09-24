@@ -114,6 +114,12 @@ function apartOn(ux: number, uz: number, dx: number, dz: number, ac: number, as:
 const PROP_REACH_CAP = 8;
 
 /**
+ * Generated chunks kept (M8.6 D10): the 5×5 round the player that `prefetch` builds ahead, less the 9 the physics holds,
+ * and the render's tiles at the fog edge. It was 16.
+ */
+const CHUNK_CACHE = 32;
+
+/**
  * A coordinate of an edge park's tree kept out of the highway verge's billboard strip (its run-out's reach either
  * side of the verge line): moved past its outer edge (M8 D8).
  */
@@ -952,6 +958,30 @@ export class City {
     }
   }
 
+  /**
+   * Idle work (M8.6 D10): the nearest chunk of the 5×5 round the physics ring's centre whose generation or props are not
+   * ready gets one of the two done, so the ring's load a step later only makes colliders; true when it did something.
+   * Both are pure and cached, so when this runs never changes what the sim does. A first visit's chunk cost 5–35 ms in
+   * the step that crossed into it (three steps in a row at a corner); the app calls this when a frame leaves time.
+   */
+  prefetch(): boolean {
+    if (!Number.isFinite(this.cx)) return false;
+    let best = Infinity, bx = 0, bz = 0, props = false;
+    for (let iz = Math.max(-3, this.cz - 2); iz <= Math.min(3, this.cz + 2); iz++) {
+      for (let ix = Math.max(-3, this.cx - 2); ix <= Math.min(3, this.cx + 2); ix++) {
+        const key = `${ix},${iz}`;
+        const built = this.active.has(key) || this.chunkCache.has(key);
+        if (built && this.propLists.has(key)) continue;
+        const d = (ix - this.cx) ** 2 + (iz - this.cz) ** 2;
+        if (d < best) { best = d; bx = ix; bz = iz; props = built; }
+      }
+    }
+    if (best === Infinity) return false;
+    if (props) this.props(bx, bz);
+    else this.chunk(bx, bz);
+    return true;
+  }
+
   private load(ix: number, iz: number): void {
     const chunk = this.chunk(ix, iz);
     const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
@@ -1024,7 +1054,7 @@ export class City {
     if (cached) { this.chunkCache.delete(key); this.chunkCache.set(key, cached); return cached; }
     const chunk = this.generate(cx, cz);
     this.chunkCache.set(key, chunk);
-    if (this.chunkCache.size > 16) this.chunkCache.delete(this.chunkCache.keys().next().value as string);
+    if (this.chunkCache.size > CHUNK_CACHE) this.chunkCache.delete(this.chunkCache.keys().next().value as string);
     return chunk;
   }
 

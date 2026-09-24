@@ -30,6 +30,7 @@
  * steps physics. No allocation per step.
  */
 import RAPIER from '@dimforge/rapier3d-compat';
+import { QUERY_NOT_PROP } from '../collision';
 import { BALANCE } from '../balance';
 import { PALETTE } from '../palette';
 import type { SimEvent } from '../events';
@@ -781,7 +782,7 @@ export class Police {
       this.ray.dir.y = 0;
       this.ray.dir.z = dz / reach;
       // a slot behind a wall or inside a building is no slot: the car beyond it would grind the wall
-      this.slotOpen[k] = this.sim.world.castRay(this.ray, reach + 1.5, true, RAPIER.QueryFilterFlags.ONLY_FIXED | RAPIER.QueryFilterFlags.EXCLUDE_SENSORS) === null ? 1 : 0;
+      this.slotOpen[k] = this.sim.world.castRay(this.ray, reach + 1.5, true, RAPIER.QueryFilterFlags.ONLY_FIXED | RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, QUERY_NOT_PROP) === null ? 1 : 0;
     }
     const held = this.slotOf;
     for (let k = 0; k < SLOTS; k++) {
@@ -1067,7 +1068,7 @@ export class Police {
     this.ray.dir.x = dx / length;
     this.ray.dir.y = dy / length;
     this.ray.dir.z = dz / length;
-    return this.sim.world.castRay(this.ray, length, true, RAPIER.QueryFilterFlags.ONLY_FIXED | RAPIER.QueryFilterFlags.EXCLUDE_SENSORS) === null;
+    return this.sim.world.castRay(this.ray, length, true, RAPIER.QueryFilterFlags.ONLY_FIXED | RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, QUERY_NOT_PROP) === null;
   }
 
   /** Heavy vans in the roster now. */

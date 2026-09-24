@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { SimWorld, initPhysics } from '../../src/sim';
+import { GROUP_PROP } from '../../src/sim/collision';
 import { HIGHWAY_LANE_OFFSETS, buildRoadGraph, roadTour } from '../../src/sim/city/roads';
 
 beforeAll(initPhysics);
@@ -40,10 +41,18 @@ describe('M2 city', () => {
       expect(city).toBeTruthy();
       const original = JSON.stringify(city?.generate(-2, -2));
       const initial = sim.world.colliders.len();
+      // the street furniture's posts (M8 D2) are the loaded chunks' anchored props, counted apart from the city's own
+      const posts = (): number => { let n = 0; sim.world.colliders.forEach((c) => { if (c.collisionGroups() >>> 16 === GROUP_PROP && c.parent()?.isFixed()) n++; }); return n; };
+      const anchored = (): number => {
+        let n = 0;
+        for (const e of city?.active.values() ?? []) for (const p of city?.props(e.chunk.x, e.chunk.z) ?? []) if (sim.props?.typeOf(p.id)?.breakImpulse) n++;
+        return n;
+      };
       for (let lap = 0; lap < 3; lap++) for (const name of ['crown', 'foundry', 'marina', 'gardens', 'city']) {
         sim.spawnAt(name); sim.step();
         expect(city?.active.size).toBeLessThanOrEqual(25);
-        expect(sim.world.colliders.len()).toBeLessThan(600);
+        expect(sim.world.colliders.len() - posts()).toBeLessThan(600);
+        expect(posts()).toBe(anchored());
         expect(sim.hasNaN()).toBe(false);
       }
       expect(JSON.stringify(city?.generate(-2, -2))).toBe(original);

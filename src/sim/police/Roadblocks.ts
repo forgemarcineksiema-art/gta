@@ -13,6 +13,7 @@
  * No allocation per step.
  */
 import RAPIER from '@dimforge/rapier3d-compat';
+import { QUERY_NOT_PROP } from '../collision';
 import type { Chokepoint } from '../city/cover';
 import type { Lane } from '../city/roads';
 import type { EventLog } from '../events';
@@ -204,7 +205,7 @@ export class Roadblocks {
     this.ray.dir.x = dx / len;
     this.ray.dir.y = dy / len;
     this.ray.dir.z = dz / len;
-    return this.sim.world.castRay(this.ray, len, true, RAPIER.QueryFilterFlags.ONLY_FIXED | RAPIER.QueryFilterFlags.EXCLUDE_SENSORS) !== null;
+    return this.sim.world.castRay(this.ray, len, true, RAPIER.QueryFilterFlags.ONLY_FIXED | RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, QUERY_NOT_PROP) !== null;
   }
 
   private place(site: Chokepoint, probe: PlayerProbe): void {

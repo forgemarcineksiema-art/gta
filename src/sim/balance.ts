@@ -274,3 +274,29 @@ export const BALANCE = {
     takedownRange: 20, takedownTimeout: 20, deliverCue: 200,
   },
 };
+
+/**
+ * The street furniture (M8, docs/M8_PLAN.md §3.3; the catalogue's rows are `PROP_TYPES` in city/props.ts). The pool
+ * of flying bodies; a loose prop goes from `looseMin` m/s of closing speed, a lying one from `lyingMin`; a knocked
+ * prop leaves up the bonnet's `slopeDeg`, with `tangential` of the car's speed across the contact, spun by the
+ * lever from the bumper (`contactHeight` m) to its centre of mass; it settles under `settleSpeed` m/s and
+ * `settleSpin` rad/s held `settleSeconds`, or lies after `maxFlight` s of flight; a lying prop `healRadius` m from
+ * the player (beyond every tier's resident city) for `healSeconds` stands again; the contact grid's cell (m).
+ */
+export const PROPS = {
+  pool: 16,
+  looseMin: 0.5,
+  lyingMin: 1,
+  slopeDeg: 12,
+  tangential: 0.3,
+  contactHeight: 0.5,
+  settleSpeed: 0.3,
+  settleSpin: 0.6,
+  settleSeconds: 0.5,
+  maxFlight: 8,
+  healRadius: 730,
+  healSeconds: 60,
+  cell: 8,
+  /** A knocked prop's friction against the ground and the rest. */
+  friction: 0.6,
+} as const;

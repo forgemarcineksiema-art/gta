@@ -16,6 +16,7 @@ import { SpeedLines } from './SpeedLines';
 import { buildCarMesh, restHeight, wheelGeometry, type CarMesh } from './carMesh';
 import { buildFlame, buildNeon, setNeonColours, spoilerGeometry, topperGeometry } from './kitMesh';
 import { CityView, QUALITY, type QualityTier } from './CityView';
+import { PropsView } from './PropsView';
 import { SHADOW_HALF, SUN_OFFSET, stableShadowTarget } from './shadows';
 import { gableGeometry, prismGeometry } from './geometry';
 import { buildSkyline } from './skyline';
@@ -84,6 +85,8 @@ export class Renderer {
   readonly pedView: PedView | null;
   readonly policeView: PoliceView;
   private readonly heliView: HeliView | null;
+  /** The street furniture that is down (M8). */
+  private readonly propsView: PropsView | null;
   readonly hideoutView: HideoutView | null;
   readonly coinsView: Coins | null;
   readonly markerView: MarkerView;
@@ -227,7 +230,8 @@ export class Renderer {
     this.sky = buildSkyDome();
     this.scene.add(this.sky);
 
-    this.cityView = sim.city ? new CityView(this.scene, sim.city) : null;
+    this.cityView = sim.city ? new CityView(this.scene, sim.city, sim.props) : null;
+    this.propsView = sim.props ? new PropsView(this.scene, sim) : null;
     this.billboards = sim.collectibles ? new Billboards(this.scene) : null;
     this.coinsView = sim.coins ? new Coins(this.scene) : null;
     if (this.cityView) {
@@ -611,6 +615,7 @@ export class Renderer {
     this.applyTransforms(alpha);
     this.trafficView?.update(this.sim.transforms, alpha);
     this.pedView?.update(this.sim.transforms, alpha);
+    this.propsView?.update(this.sim, alpha);
     this.policeView.update(alpha);
     this.heliView?.update(dt);
     const tm = this.sim.vehicle.telemetry;

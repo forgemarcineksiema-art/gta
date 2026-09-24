@@ -19,7 +19,7 @@
  * rotation about +Y turns the nose to the left, so "steer right" rotates by -steer.
  */
 import RAPIER from '@dimforge/rapier3d-compat';
-import { GROUPS_CHASSIS_FLIPPED, GROUPS_CHASSIS_UPRIGHT } from '../collision';
+import { GROUPS_CHASSIS_FLIPPED, GROUPS_CHASSIS_UPRIGHT, QUERY_NOT_PROP } from '../collision';
 import type { VehicleControls } from '../controls';
 import * as M from '../math';
 import type { Vec3 } from '../math';
@@ -451,7 +451,7 @@ export class Vehicle {
       this.ray.dir.x = s.rayDir.x;
       this.ray.dir.y = s.rayDir.y;
       this.ray.dir.z = s.rayDir.z;
-      const hit = this.world.castRayAndGetNormal(this.ray, rayLen, true, undefined, undefined, undefined, body);
+      const hit = this.world.castRayAndGetNormal(this.ray, rayLen, true, undefined, QUERY_NOT_PROP, undefined, body);
       if (hit && hit.timeOfImpact > 0) {
         const d = hit.timeOfImpact;
         w.grounded = true;
@@ -927,7 +927,7 @@ export class Vehicle {
         this.ray.dir.x = 0;
         this.ray.dir.y = -1;
         this.ray.dir.z = 0;
-        const hit = this.world.castRayAndGetNormal(this.ray, 14, true, undefined, undefined, undefined, body);
+        const hit = this.world.castRayAndGetNormal(this.ray, 14, true, undefined, QUERY_NOT_PROP, undefined, body);
         if (hit) {
           const gap = Math.max(0, hit.timeOfImpact - (t.suspensionRestLength + t.wheelRadius));
           if (gap / Math.max(0.5, -s.vel.y) < t.airLandingLevelTime) M.set(s.b, hit.normal.x, hit.normal.y, hit.normal.z);

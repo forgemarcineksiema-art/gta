@@ -47,10 +47,31 @@ function segDist(px: number, pz: number, a: { x: number; z: number }, b: { x: nu
   return Math.hypot(px - a.x - dx * t, pz - a.z - dz * t);
 }
 
-function polylineDist(points: ReadonlyArray<{ x: number; z: number }>, x: number, z: number): number {
-  let best = Infinity;
-  for (let i = 0; i + 1 < points.length; i++) best = Math.min(best, segDist(x, z, points[i]!, points[i + 1]!));
-  return best;
+/** Polylines' segments by the 16 m cells they cross, so a point meets only its neighbours'. */
+class Segments {
+  private readonly cells = new Map<string, Array<[{ x: number; z: number }, { x: number; z: number }]>>();
+  add(points: ReadonlyArray<{ x: number; z: number }>): void {
+    for (let i = 0; i + 1 < points.length; i++) {
+      const a = points[i]!, b = points[i + 1]!;
+      for (let cx = Math.floor(Math.min(a.x, b.x) / 16); cx <= Math.floor(Math.max(a.x, b.x) / 16); cx++) {
+        for (let cz = Math.floor(Math.min(a.z, b.z) / 16); cz <= Math.floor(Math.max(a.z, b.z) / 16); cz++) {
+          const key = `${cx},${cz}`;
+          const list = this.cells.get(key) ?? [];
+          list.push([a, b]);
+          this.cells.set(key, list);
+        }
+      }
+    }
+  }
+  /** The nearest distance from a point to any segment within one cell of it (Infinity beyond). */
+  dist(x: number, z: number): number {
+    let best = Infinity;
+    const cx = Math.floor(x / 16), cz = Math.floor(z / 16);
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+      for (const [a, b] of this.cells.get(`${cx + i},${cz + j}`) ?? []) best = Math.min(best, segDist(x, z, a, b));
+    }
+    return best;
+  }
 }
 
 describe('the street furniture\'s places (M8 slice 0)', () => {
@@ -97,6 +118,29 @@ describe('the street furniture\'s places (M8 slice 0)', () => {
         return { x: p.x - tz / l * out, z: p.z + tx / l * out };
       }));
     }
+    const walkerSegs = new Segments(), lineSegs = new Segments(), routeSegs = new Segments(), roadSegs = new Map<string, Segments>();
+    for (const w of walkers) walkerSegs.add(w);
+    for (const line of lines) if (line.length > 1) lineSegs.add(line);
+    routeSegs.add(route);
+    for (const road of graph.special) { const segs = new Segments(); segs.add(road.centre); roadSegs.set(road.name, segs); }
+    // every chunk's statics that stand above the kerb, once: a box turned about +Y by its own yaw, anything else by its bounds
+    const tall = new Map<string, Array<(q: { x: number; z: number }) => boolean>>();
+    for (let cz = -3; cz <= 3; cz++) for (let cx = -3; cx <= 3; cx++) {
+      const list: Array<(q: { x: number; z: number }) => boolean> = [];
+      for (const st of city.generate(cx, cz).statics) {
+        const f = tallFootprint(st, CAR_TOP);
+        if (!f) continue;
+        const s = st.shape, rot = st.rotation;
+        const turned = (s.kind === 'box' || s.kind === 'gable') && rot.x === 0 && rot.z === 0;
+        const yaw = turned ? 2 * Math.atan2(rot.y, rot.w) : 0, c = Math.cos(yaw), sn = Math.sin(yaw);
+        list.push((q) => {
+          if (!turned) return q.x > f.minX && q.x < f.maxX && q.z > f.minZ && q.z < f.maxZ;
+          const dx = q.x - st.position.x, dz = q.z - st.position.z;
+          return Math.abs(c * dx - sn * dz) < (s as { hx: number }).hx && Math.abs(sn * dx + c * dz) < (s as { hz: number }).hz;
+        });
+      }
+      tall.set(`${cx},${cz}`, list);
+    }
     const frame = { along: 0, across: 0 };
     const why: string[] = [];
     for (const p of props) {
@@ -109,9 +153,9 @@ describe('the street furniture\'s places (M8 slice 0)', () => {
           if (Math.abs(q.z) <= 3 * BLOCK + HIGHWAY_HALF && Math.abs(q.x - g * BLOCK) < half) why.push(`${at}: on the street x ${g * BLOCK}`);
           if (Math.abs(q.x) <= 3 * BLOCK + HIGHWAY_HALF && Math.abs(q.z - g * BLOCK) < half) why.push(`${at}: on the street z ${g * BLOCK}`);
         }
-        for (const road of graph.special) if (distanceToPolyline(road.centre, q.x, q.z) < road.halfWidth) why.push(`${at}: on ${road.name}`);
+        for (const road of graph.special) if (roadSegs.get(road.name)!.dist(q.x, q.z) < road.halfWidth) why.push(`${at}: on ${road.name}`);
         // the walkers' band: 0.9 m either side of their line
-        if (walkers.some((w) => polylineDist(w, q.x, q.z) < 0.9)) why.push(`${at}: in the walkers' band`);
+        if (walkerSegs.dist(q.x, q.z) < 0.9) why.push(`${at}: in the walkers' band`);
         for (const r of rings) if (Math.hypot(q.x - r.x, q.z - r.z) < r.r) why.push(`${at}: in a ring at ${r.x.toFixed(0)},${r.z.toFixed(0)}`);
         for (const d of doors) {
           toDropOff(d, q.x, q.z, frame);
@@ -122,7 +166,7 @@ describe('the street furniture\'s places (M8 slice 0)', () => {
           const box = runOutFootprint(b);
           if (q.x > box.minX && q.x < box.maxX && q.z > box.minZ && q.z < box.maxZ) why.push(`${at}: in billboard ${b.id}'s run-out`);
         }
-        for (const line of lines) if (line.length > 1 && polylineDist(line, q.x, q.z) < 1.1) why.push(`${at}: on a billboard's line`);
+        if (lineSegs.dist(q.x, q.z) < 1.1) why.push(`${at}: on a billboard's line`);
         // the ramps: their slabs and the flight over them to the landing
         for (const j of city.jumps) {
           const fx = Math.sin(j.yaw), fz = Math.cos(j.yaw), dx = q.x - j.x, dz = q.z - j.z;
@@ -137,25 +181,11 @@ describe('the street furniture\'s places (M8 slice 0)', () => {
           for (const sx of [-1, 1]) for (const sz of [-1, 1]) if (Math.hypot(q.x - n.x - sx * vx, q.z - n.z - sz * vz) < 12) why.push(`${at}: at a corner of ${n.id}`);
         }
         if (underOverpass(q.x, q.z)) why.push(`${at}: under an overpass`);
-        if (polylineDist(route, q.x, q.z) < 1.1) why.push(`${at}: on the cold open's route`);
+        if (routeSegs.dist(q.x, q.z) < 1.1) why.push(`${at}: on the cold open's route`);
       }
       // nothing built above the kerb in its chunk or the ones round it
       for (let cz = chunkCoord(p.z) - 1; cz <= chunkCoord(p.z) + 1; cz++) for (let cx = chunkCoord(p.x) - 1; cx <= chunkCoord(p.x) + 1; cx++) {
-        if (Math.abs(cx) > 3 || Math.abs(cz) > 3) continue;
-        for (const st of city.chunk(cx, cz).statics) {
-          const f = tallFootprint(st, CAR_TOP);
-          if (!f) continue;
-          const s = st.shape, rot = st.rotation;
-          // a box turned about +Y by its own yaw; anything else by its bounds
-          const turned = (s.kind === 'box' || s.kind === 'gable') && rot.x === 0 && rot.z === 0;
-          const yaw = turned ? 2 * Math.atan2(rot.y, rot.w) : 0, c = Math.cos(yaw), sn = Math.sin(yaw);
-          const inside = (q: { x: number; z: number }): boolean => {
-            if (!turned) return q.x > f.minX && q.x < f.maxX && q.z > f.minZ && q.z < f.maxZ;
-            const dx = q.x - st.position.x, dz = q.z - st.position.z;
-            return Math.abs(c * dx - sn * dz) < (s as { hx: number }).hx && Math.abs(sn * dx + c * dz) < (s as { hz: number }).hz;
-          };
-          if (pts.some(inside)) why.push(`${at}: in a ${st.tag} static at ${st.position.x.toFixed(1)},${st.position.z.toFixed(1)}`);
-        }
+        for (const inside of tall.get(`${cx},${cz}`) ?? []) if (pts.some(inside)) why.push(`${at}: in a static`);
       }
     }
     // 0.3 m between two props' footprints (their bounding circles)

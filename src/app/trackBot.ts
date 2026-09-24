@@ -36,6 +36,12 @@ export interface TrackBotTuning {
    * open's scripted bot turns it on. Off by default, so the other bot-driven pins keep their baseline.
    */
   unblock: boolean;
+  /**
+   * On the pavement (M8, the pins and the chaos run): along a straight the bot holds its line this many metres to
+   * the right of its path (8.2 puts a car's middle on a grid street's kerb line, 0.7 m past the road edge), back on
+   * the lane before a bend or a junction. 0, the default, is the road.
+   */
+  pavement: number;
 }
 
 export const DEFAULT_TRACK_BOT: TrackBotTuning = {
@@ -51,6 +57,7 @@ export const DEFAULT_TRACK_BOT: TrackBotTuning = {
   boostAbove: 0,
   careful: false,
   unblock: false,
+  pavement: 0,
 };
 
 /**
@@ -70,6 +77,9 @@ export const TRACK_BOT_BY_CAR: Record<CarId, Partial<TrackBotTuning>> = {
 
 /** A police car this close to a stopped bot is an arrest in progress: the bot waits it out instead of resetting (m). */
 const BOXED_RANGE = 15;
+/** The pavement's line moves across at this rate (m/s) and needs this many 3 m samples of straight past the target. */
+const PAVEMENT_RATE = 4;
+const PAVEMENT_CLEAR = 10;
 
 /** Conservative junction speeds; this is a coverage driver, not a racing opponent. */
 export const CITY_BOT_TUNING: Partial<TrackBotTuning> = {
@@ -85,6 +95,8 @@ export class TrackBot {
   private stuckTime = 0;
   /** Overtaking (M5.5 gate): the lateral offset from the path (+ left), its target, and the car being passed. */
   private offset = 0;
+  /** The pavement's offset now (M8, + left), moved toward its target at `PAVEMENT_RATE`. */
+  private pave = 0;
   private pass = 0;
   private passing = -1;
   /** Blocked (M6 gate): seconds held up by a car that will not move on, seconds left backing off, the car gone round. */
@@ -106,6 +118,7 @@ export class TrackBot {
     this.loop = loop || !this.path;
     this.idx = 0;
     this.offset = 0;
+    this.pave = 0;
     this.pass = 0;
     this.passing = -1;
     this.blockedFor = 0;
@@ -173,7 +186,19 @@ export class TrackBot {
     const qw = q[qi + 3] as number;
     const yaw = Math.atan2(2 * (qx * qz + qw * qy), 1 - 2 * (qx * qx + qy * qy));
     this.offset += Math.max(-3 * dt, Math.min(3 * dt, this.pass - this.offset));
-    const tx = target.x + Math.cos(target.yaw) * this.offset, tz = target.z - Math.sin(target.yaw) * this.offset;
+    // the pavement (M8): only along a straight, clear of bends from a little behind to well past the target
+    let pave = 0;
+    if (t.pavement > 0) {
+      pave = -t.pavement;
+      for (let k = -4; k <= Math.round(look / 3) + PAVEMENT_CLEAR; k++) {
+        const i = best + k;
+        if (!this.loop && (i < 0 || i >= m)) { pave = 0; break; }
+        if (Math.abs((S[this.at(i, m)] as TrackSample).curvature) > 0.01) { pave = 0; break; }
+      }
+    }
+    this.pave += Math.max(-PAVEMENT_RATE * dt, Math.min(PAVEMENT_RATE * dt, pave - this.pave));
+    const lateral = this.offset + this.pave;
+    const tx = target.x + Math.cos(target.yaw) * lateral, tz = target.z - Math.sin(target.yaw) * lateral;
     const desired = Math.atan2(tx - px, tz - pz);
     let d = desired - yaw;
     while (d > Math.PI) d -= Math.PI * 2;

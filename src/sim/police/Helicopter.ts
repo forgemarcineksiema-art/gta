@@ -10,6 +10,7 @@
  * Kinematic, above everything; the world is only read (one ray a step).
  */
 import RAPIER from '@dimforge/rapier3d-compat';
+import { QUERY_NOT_PROP } from '../collision';
 import type { EventLog } from '../events';
 import type { PlayerProbe } from '../traffic/Traffic';
 import { CITY_HALF } from '../city/roads';
@@ -127,6 +128,6 @@ export class Helicopter {
     const dx = player.x - this.x, dy = player.y + 0.6 - this.y, dz = player.z - this.z;
     const len = Math.hypot(dx, dy, dz);
     ray.dir.x = dx / len; ray.dir.y = dy / len; ray.dir.z = dz / len;
-    return this.world.castRay(ray, len, true, RAPIER.QueryFilterFlags.ONLY_FIXED | RAPIER.QueryFilterFlags.EXCLUDE_SENSORS) === null;
+    return this.world.castRay(ray, len, true, RAPIER.QueryFilterFlags.ONLY_FIXED | RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, QUERY_NOT_PROP) === null;
   }
 }

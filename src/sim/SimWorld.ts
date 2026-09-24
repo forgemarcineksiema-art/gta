@@ -47,6 +47,7 @@ import { POSE_STRIDE, Recorder } from './recorder';
 import type { DynamicDesc, StaticDesc } from './scene';
 import { LapTimer, type LapState, type TrackDef } from './track';
 import { Pedestrians } from './traffic/Pedestrians';
+import { Props } from './props/Props';
 import { Traffic, type PlayerProbe } from './traffic/Traffic';
 import { PEDS, TRAFFIC } from './traffic/tuning';
 import { SimPhase, type PhaseMark } from './profile';
@@ -175,6 +176,8 @@ export class SimWorld {
   readonly dailies: Dailies;
   /** The city's smashable billboards; null on the playground. */
   readonly collectibles: Collectibles | null;
+  /** The street furniture's states, the knock before the physics and the flying bodies after it (M8); null off the city. */
+  readonly props: Props | null;
   /** Coins on the road and the spill pool; null on the playground. */
   readonly coins: Coins | null;
   /** The day's thirty caches (DESIGN.md §13.5); null on the playground. */
@@ -315,6 +318,8 @@ export class SimWorld {
         return loop && hideout ? coldOpenRoute(this, loop.position.x, loop.position.z, hideout)?.samples ?? [] : [];
       });
     }
+    // before the first sync: the ring's chunks bring their props' posts
+    this.props = this.city ? new Props(this) : null;
     this.city?.sync(spawn.position.x, spawn.position.z, true);
     if (opts.save) {
       applySave(this, opts.save);
@@ -376,8 +381,13 @@ export class SimWorld {
     this.mark?.(SimPhase.Traffic);
     if (this.traffic) this.peds?.step(this.probe, this.traffic, FIXED_DT, this.events);
     this.mark?.(SimPhase.Peds);
+    // the street furniture's contacts, decided before the solver (M8 D1)
+    this.props?.step(FIXED_DT);
+    this.mark?.(SimPhase.Props);
     this.world.step();
     this.mark?.(SimPhase.Physics);
+    this.props?.afterPhysics(FIXED_DT);
+    this.mark?.(SimPhase.Props);
     this.vehicle.writeTransforms();
     this.traffic?.writeTransforms();
     this.peds?.writeTransforms();

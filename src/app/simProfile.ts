@@ -31,7 +31,11 @@ export class SimProfile {
   /** Install as `SimWorld.mark`. */
   readonly mark = (phase: SimPhase): void => {
     const now = performance.now();
-    if (this.count < CAPACITY) (this.samples[phase] as Float64Array)[this.count] = now - this.last;
+    // a phase marked twice in a step adds both (the props, before and after the physics); each step's row starts at 0
+    if (this.count < CAPACITY) {
+      const row = this.samples[phase] as Float64Array;
+      row[this.count] = (row[this.count] as number) + now - this.last;
+    }
     this.last = now;
     if (phase === SimPhase.Post && this.count < CAPACITY) this.count++;
   };

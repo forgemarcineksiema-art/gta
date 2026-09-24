@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BLOCK, CITY_HALF, PALETTE, propFootprint, type City, type CityChunk, type PropDesc, type StaticDesc } from '../sim';
+import { BLOCK, CITY_HALF, PALETTE, PROP_KINDS, PropState, propFootprint, type City, type CityChunk, type PropDesc, type PropKind, type Props, type StaticDesc } from '../sim';
 import { SHADOW_HALF, fadeShadowEdges } from './shadows';
 import { fadeRoadPaint } from './roadPaint';
 import { gableGeometry, prismGeometry } from './geometry';
@@ -239,6 +239,7 @@ export class GeometryBuild {
     out.computeBoundingSphere();
     out.userData['shadowVertices'] = this.shadowVertices;
     out.userData['props'] = { ids: Int32Array.from(this.propIds), start: Uint32Array.from(this.propStart), count: Uint32Array.from(this.propCount) } satisfies PropRanges;
+    out.userData['detailed'] = this.detailed;
     return out;
   }
 }
@@ -293,7 +294,10 @@ export class CityView {
   unloaded = 0;
   /** Frames left of the faster catch-up after a synchronous (near ring only) load. */
   private burst = 0;
-  constructor(private readonly scene: THREE.Scene, private readonly city: City) {
+  /** The props' serial the resident parts show (M8): a knock, a settle or a heal since then is applied on the next sync. */
+  private propSerial = -1;
+  private readonly propScratch: PropDesc = { id: 0, kind: 'lamp', x: 0, z: 0, yaw: 0 };
+  constructor(private readonly scene: THREE.Scene, private readonly city: City, private readonly props: Props | null = null) {
     fadeShadowEdges(this.material);
     fadeRoadPaint(this.material);
     for (let z = -3; z <= 3; z++) for (let x = -3; x <= 3; x++) this.tiles.push({ key: `${x},${z}`, x, z, parts: null, groups: null, queue: [], build: null });
@@ -326,6 +330,7 @@ export class CityView {
     tile.build ??= new GeometryBuild(tile.groups[job.part.index] ?? [], job.detailed);
     if (!tile.build.step(BUILD_SLICE)) return;
     const geometry = tile.build.finish();
+    this.applyProps(geometry);
     tile.build = null; tile.queue.shift();
     if (job.detailed) job.part.near = geometry; else job.part.far = geometry;
     if (job.detailed === job.part.detailed || job.part.mesh.geometry === EMPTY) {
@@ -422,6 +427,14 @@ export class CityView {
       if (!tile) break;
       this.buildNext(tile); uploads++;
     }
+    // a knock, a settle or a heal: every resident level shows each prop's state (M8 D5)
+    if (this.props && this.props.serial !== this.propSerial) {
+      this.propSerial = this.props.serial;
+      for (const tile of this.tiles) for (const part of tile.parts ?? []) {
+        if (part.near) this.applyProps(part.near);
+        if (part.far) this.applyProps(part.far);
+      }
+    }
     // Detail is spatial, identical on both quality tiers: frames and sills are
     // sub-pixel past DETAIL_NEAR at DPR 1.5. Swapping is free once both levels
     // exist; hysteresis prevents toggling at a part boundary.
@@ -434,6 +447,46 @@ export class CityView {
         CityView.swap(part, detailed);
       }
     }
+  }
+
+  /**
+   * A part level's standing props as the sim has them (M8 D5): a knocked prop's range collapsed onto its first
+   * vertex (degenerate, drawn as nothing, the part's bounds unchanged), one standing again rebuilt from its model;
+   * each a ranged upload.
+   */
+  applyProps(geometry: THREE.BufferGeometry): void {
+    const props = this.props;
+    const ranges = geometry.userData['props'] as PropRanges | undefined;
+    if (!props || !ranges || ranges.ids.length === 0) return;
+    let shown = geometry.userData['collapsed'] as Uint8Array | undefined;
+    if (!shown) { shown = new Uint8Array(ranges.ids.length); geometry.userData['collapsed'] = shown; }
+    const attr = geometry.getAttribute('position') as THREE.BufferAttribute;
+    const pos = attr.array as Float32Array;
+    let dirty = false;
+    for (let k = 0; k < ranges.ids.length; k++) {
+      const id = ranges.ids[k] as number;
+      const want = props.state[id] !== PropState.Standing ? 1 : 0;
+      if (want === shown[k]) continue;
+      const start = ranges.start[k] as number, count = ranges.count[k] as number;
+      if (want) {
+        const x0 = pos[start * 3] as number, y0 = pos[start * 3 + 1] as number, z0 = pos[start * 3 + 2] as number;
+        for (let v = start; v < start + count; v++) { pos[v * 3] = x0; pos[v * 3 + 1] = y0; pos[v * 3 + 2] = z0; }
+      } else {
+        // standing again (a heal, far from the player): its pieces rebuilt from its model
+        const p = this.propScratch;
+        p.id = id; p.kind = PROP_KINDS[props.kind[id] as number] as PropKind; p.x = props.x[id] as number; p.z = props.z[id] as number; p.yaw = props.yaw[id] as number;
+        const pieces: StaticDesc[] = [];
+        propStatics(p, pieces);
+        const built = new GeometryBuild(pieces, geometry.userData['detailed'] as boolean).finish();
+        const src = built.getAttribute('position').array as Float32Array;
+        pos.set(src.subarray(0, Math.min(src.length, count * 3)), start * 3);
+        built.dispose();
+      }
+      shown[k] = want;
+      attr.addUpdateRange(start * 3, count * 3);
+      dirty = true;
+    }
+    if (dirty) attr.needsUpdate = true;
   }
 
   dispose(): void {

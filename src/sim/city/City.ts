@@ -195,6 +195,9 @@ export class City {
   private readonly propLists = new Map<string, PropDesc[]>();
   readonly spawns: SpawnPoint[];
   readonly active = new Map<string, { body: RAPIER.RigidBody; chunk: CityChunk }>();
+  /** The physics ring took a chunk in (its fixed body) or let it go (M8: the props' posts live on that body). */
+  onLoad: ((cx: number, cz: number, body: RAPIER.RigidBody) => void) | null = null;
+  onUnload: ((cx: number, cz: number) => void) | null = null;
   loaded = 0;
   unloaded = 0;
   private cx = Infinity;
@@ -921,6 +924,7 @@ export class City {
     if (!this.complete) return;
     for (const [key, entry] of this.active) {
       if (Math.abs(entry.chunk.x - cx) > 2 || Math.abs(entry.chunk.z - cz) > 2) {
+        this.onUnload?.(entry.chunk.x, entry.chunk.z);
         this.world.removeRigidBody(entry.body); this.active.delete(key); this.unloaded++;
       }
     }
@@ -946,6 +950,7 @@ export class City {
         .setCollisionGroups(st.tag === 'building' ? GROUPS_SOLID : GROUPS_TERRAIN), body);
     }
     this.active.set(`${ix},${iz}`, { body, chunk }); this.loaded++;
+    this.onLoad?.(ix, iz, body);
   }
 
   /** Project onto the closest driveable lane instead of resetting to a distant junction. */

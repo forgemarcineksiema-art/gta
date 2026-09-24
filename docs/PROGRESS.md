@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8 slice 1: the knock
+
+Done: `sim/props/Props.ts`: every loaded prop's state by id, a grid of 8 m cells, the player's footprint swept before
+`world.step` (the probe's numbers, the body read only on a hit), the two-body rule (`knockImpulse`, `carSpeedLoss`),
+anchored props' posts on their chunk's fixed body (restitution 1: a wall below the base's strength), 16 CCD bodies,
+arcs past them, settling to lying, lying ones knocked from 1 m/s, the heal at 730 m after 60 s, `smash`; the render
+collapses a knocked prop's range and `PropsView` draws the down ones by kind. Props are their own collision group:
+the wheels', the police's and the helicopter's rays never meet one. `TrackBot.pavement` (opt-in). The M2 residency
+pin counts the posts apart from its 600 (the posts are exactly the loaded anchored props). Pins M8 1.1–1.7. Verify green (370).
+
 ## 2026-09-24 — M8 slice 0: the props as data and where they stand
 
 Done: `sim/city/props.ts`, the catalogue (all 26 rows of M8_PLAN §3.3, with their shapes) and `chunkProps`: the kerb line

@@ -47,6 +47,7 @@ export { Recorder, POSE_STRIDE, TELEMETRY_STRIDE, CONTROL_STRIDE, type Recording
 export { LapTimer, type LapState, type TrackDef, type TrackSample } from './track';
 export { Vehicle, type VehicleTelemetry, type WheelState } from './vehicle/Vehicle';
 export { City, DISTRICTS, districtAt, chunkCoord, type CityChunk, type PropRing } from './city/City';
+export { Props, PropState, knockImpulse, carSpeedLoss } from './props/Props';
 export { PROP_TYPES, PROP_KINDS, PROPS_PER_CHUNK, propFootprint, propHeight, type PropKind, type PropType, type PropDesc, type PropMaterial, type PropShape } from './city/props';
 export { Collectibles, BILLBOARD_TOTAL, type BillboardDesc } from './city/collectibles';
 export { BLOCK, CITY_HALF, type RoadGraph, type Lane, type RoadNode } from './city/roads';

@@ -17,7 +17,7 @@ import { BODY_IDS, type BodyId } from '../traffic/bodies';
 import { CAR_IDS, type CarId } from '../vehicle/presets';
 import { DEFAULT_SETTINGS, QUALITY_SETTINGS, type Settings } from '../settings';
 
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 export type Tiers = [number, number, number];
 
@@ -64,10 +64,12 @@ export interface SaveCareer {
   caches: number;
   /** Escapes by the level escaped from, 1..5. */
   escapes: [number, number, number, number, number];
+  /** The street furniture the player smashed, lifetime (M8 slice 9). */
+  smashed: number;
 }
 
 export interface SaveDoc {
-  v: 4;
+  v: 5;
   /** The cold open was shown (started, completed or skipped): never again for this profile. */
   seen: boolean;
   bank: number;
@@ -118,7 +120,7 @@ export type SaveV1 = SaveDoc;
 
 function defaults(): SaveDoc {
   return {
-    v: 4,
+    v: 5,
     seen: false,
     bank: 0,
     coins: 0,
@@ -142,7 +144,7 @@ function defaults(): SaveDoc {
     carKit: {},
     kit: { owned: '', on: [-1, -1, -1, -1, -1] },
     board: { beaten: 0 },
-    career: { races: 0, zones: 0, fares: 0, hotFares: 0, orders: 0, takedowns: 0, caches: 0, escapes: [0, 0, 0, 0, 0] },
+    career: { races: 0, zones: 0, fares: 0, hotFares: 0, orders: 0, takedowns: 0, caches: 0, escapes: [0, 0, 0, 0, 0], smashed: 0 },
     settings: { ...DEFAULT_SETTINGS },
   };
 }
@@ -205,7 +207,7 @@ export function serialize(save: SaveDoc): string {
     board: { beaten: save.board.beaten },
     career: {
       races: c.races, zones: c.zones, fares: c.fares, hotFares: c.hotFares, orders: c.orders, takedowns: c.takedowns, caches: c.caches,
-      escapes: [c.escapes[0], c.escapes[1], c.escapes[2], c.escapes[3], c.escapes[4]],
+      escapes: [c.escapes[0], c.escapes[1], c.escapes[2], c.escapes[3], c.escapes[4]], smashed: c.smashed,
     },
     settings: { music: save.settings.music, effects: save.settings.effects, quality: save.settings.quality, radarNorth: save.settings.radarNorth },
   });
@@ -255,6 +257,8 @@ const MIGRATIONS: Record<number, (raw: Record<string, unknown>) => Record<string
   },
   // M7: the settings; an M6 save starts on the defaults
   3: (raw) => ({ ...raw, v: 4, settings: { ...DEFAULT_SETTINGS } }),
+  // M8: the career's smashed things; an M7 save starts at none (the sanitizer's 0)
+  4: (raw) => ({ ...raw, v: 5 }),
 };
 
 /** Walks the table from the document's version to `SAVE_VERSION`, then keeps every valid field. Unknown or newer versions give the defaults. */
@@ -342,6 +346,7 @@ function sanitize(raw: Record<string, unknown>): SaveDoc {
     races: count(cr['races']), zones: count(cr['zones']), fares: count(cr['fares']), hotFares: count(cr['hotFares']),
     orders: count(cr['orders']), takedowns: count(cr['takedowns']), caches: count(cr['caches']),
     escapes: [count(esc[0]), count(esc[1]), count(esc[2]), count(esc[3]), count(esc[4])],
+    smashed: count(cr['smashed']),
   };
   const st = isRecord(raw['settings']) ? raw['settings'] : {};
   const step = (x: unknown, d: number): number => (typeof x === 'number' && Number.isInteger(x) && x >= 0 && x <= 10 ? x : d);
@@ -362,7 +367,7 @@ function sanitize(raw: Record<string, unknown>): SaveDoc {
  */
 export function collect(sim: SimWorld, into: SaveDoc): void {
   const run = sim.run, garage = sim.garage, dailies = sim.dailies;
-  into.v = 4;
+  into.v = 5;
   // shown once per profile: a cold open that has started counts, so a reload mid-way never repeats it
   into.seen = sim.coldOpen.seen || sim.coldOpen.active;
   into.bank = run.bank;
@@ -428,6 +433,7 @@ export function collect(sim: SimWorld, into: SaveDoc): void {
   out.races = c.races; out.zones = c.zones; out.fares = c.fares; out.hotFares = c.hotFares;
   out.orders = c.orders; out.takedowns = c.takedowns; out.caches = c.caches;
   for (let i = 0; i < 5; i++) out.escapes[i] = c.escapes[i] as number;
+  out.smashed = c.smashed;
   const st = sim.settings, so = into.settings;
   so.music = st.music; so.effects = st.effects; so.quality = st.quality; so.radarNorth = st.radarNorth;
 }
@@ -485,6 +491,7 @@ export function apply(sim: SimWorld, save: SaveDoc): void {
   career.races = cr.races; career.zones = cr.zones; career.fares = cr.fares; career.hotFares = cr.hotFares;
   career.orders = cr.orders; career.takedowns = cr.takedowns; career.caches = cr.caches;
   for (let i = 0; i < 5; i++) career.escapes[i] = cr.escapes[i] as number;
+  career.smashed = cr.smashed;
   Object.assign(sim.settings, save.settings);
   garage.serial++;
   garage.applyToVehicle();

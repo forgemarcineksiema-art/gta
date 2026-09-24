@@ -15,6 +15,7 @@
  */
 import { BALANCE } from '../balance';
 import { setDailyOrder } from '../city/cover';
+import { PROP_KINDS, type PropKind } from '../city/props';
 import type { EventKind, SimEvent } from '../events';
 import type { JobKind } from '../jobs/catalog';
 import { mulberry32 } from '../random';
@@ -38,6 +39,10 @@ export interface DailyTemplate {
   police?: boolean;
   /** One event whose value reaches `target` completes it (an escape from a level, an airtime). */
   threshold?: boolean;
+  /** A smash of this kind of street furniture only (M8 slice 9). */
+  prop?: PropKind;
+  /** Counted within one run: a run that ends short of it starts the count again. */
+  oneRun?: boolean;
   /** 0, 1, 2 → `BALANCE.dailies.rewards`. */
   weight: 0 | 1 | 2;
 }
@@ -57,6 +62,9 @@ export const DAILY_TEMPLATES: readonly DailyTemplate[] = [
   { id: 10, text: 'PICK UP 150 COINS', kind: 'coin', target: 150, weight: 0 },
   { id: 11, text: '10 NEAR MISSES', kind: 'nearMiss', target: 10, weight: 0 },
   { id: 12, text: 'BANK 3 RUNS WITHOUT GETTING BUSTED', kind: 'run', target: 3, weight: 1 },
+  // the chaos (M8 slice 9): the player's smashes only
+  { id: 13, text: 'SMASH 60 THINGS IN ONE RUN', kind: 'smash', target: 60, oneRun: true, weight: 1 },
+  { id: 14, text: 'FLATTEN 10 LAMP POSTS', kind: 'smash', target: 10, prop: 'lamp', weight: 0 },
 ];
 
 /** 32-bit FNV-1a of a string: the date's seed. */
@@ -187,6 +195,9 @@ export class Dailies {
         this.progress[i] = busted ? 0 : (this.progress[i] ?? 0) + 1;
         this.serial++;
         if ((this.progress[i] ?? 0) >= t.target) this.complete(i);
+      } else if (t.oneRun) {
+        this.progress[i] = 0;
+        this.serial++;
       }
     }
   }
@@ -230,6 +241,10 @@ export class Dailies {
       case 'coin':
         // a road coin, not the bag's spill coming back
         return e.kind === 'coin' && e.target !== -2;
+      case 'smash':
+        // the player's (a bill), of the kind when it names one
+        if (e.kind !== 'smash' || e.value <= 0) return false;
+        return !t.prop || sim.props?.kind[e.target] === PROP_KINDS.indexOf(t.prop);
       case 'jobDone': {
         if (e.kind !== 'jobDone') return false;
         const d = sim.jobs.defOf(e.target);

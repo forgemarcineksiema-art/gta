@@ -15,7 +15,7 @@ export type Twist = 'none' | 'bad' | 'heavy' | 'twins' | 'disguise' | 'bus' | 'b
 /** A rival's district (city/City.ts DISTRICTS ids and the highway), where the ring stands. */
 export type Turf = 'crown' | 'foundry' | 'gardens' | 'marina' | 'highway';
 export type ReqKind = 'chain' | 'raceWins' | 'medal' | 'escape' | 'takedowns' | 'zoneWins' | 'fares' | 'orders'
-  | 'carsOwned' | 'jumps' | 'bestRun' | 'billboards' | 'hotFares' | 'caches' | 'board';
+  | 'carsOwned' | 'jumps' | 'bestRun' | 'billboards' | 'hotFares' | 'caches' | 'board' | 'smashed';
 /** A requirement: `count` of a kind; `level` is a medal's (1 bronze .. 3 gold) or an escape's stars, 0 otherwise. */
 export interface Req { kind: ReqKind; count: number; level: number }
 /**
@@ -85,7 +85,7 @@ export const RIVALS: readonly RivalDef[] = [
   {
     name: 'BIG BERNIE', line: 'NEXT STOP: THE FINISH LINE', call: 'WANTS A RACE', turf: 'crown', body: 'partybus',
     paints: [PALETTE.carMagenta], format: 'race', heat: 2, twist: 'bus', item: 'airHorn', purse: 15000,
-    reqs: [req('medal', 2, 2), req('jumps', 10)], target: 'lane', path: [1400, 2400],
+    reqs: [req('medal', 2, 2), req('smashed', 300)], target: 'lane', path: [1400, 2400],
   },
   {
     name: 'NEON NIKO', line: 'LOW, SLOW, THEN SUDDENLY NOT', call: 'WANTS A RACE', turf: 'marina', body: 'lowrider',
@@ -140,5 +140,6 @@ export function reqText(r: Req): string {
     case 'hotFares': return n === 1 ? 'A HOT FARE' : `${n} HOT FARES`;
     case 'caches': return `${n} CACHES`;
     case 'board': return 'BEAT THE TEN';
+    case 'smashed': return `SMASH ${n} THINGS`;
   }
 }

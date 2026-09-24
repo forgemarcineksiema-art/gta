@@ -22,7 +22,7 @@ function filled(smashedIds: number[]): SaveV1 {
   const ramps = new Uint8Array(20);
   for (const k of [1, 7, 19]) ramps[k] = 1;
   return {
-    v: 4,
+    v: 5,
     seen: true,
     bank: 123456,
     coins: 7890,
@@ -46,7 +46,7 @@ function filled(smashedIds: number[]): SaveV1 {
     carKit: {},
     kit: { owned: '', on: [-1, -1, -1, -1, -1] },
     board: { beaten: 0 },
-    career: { races: 0, zones: 0, fares: 0, hotFares: 0, orders: 0, takedowns: 0, caches: 0, escapes: [0, 0, 0, 0, 0] },
+    career: { races: 0, zones: 0, fares: 0, hotFares: 0, orders: 0, takedowns: 0, caches: 0, escapes: [0, 0, 0, 0, 0], smashed: 0 },
     settings: { music: 3, effects: 8, quality: 'low', radarNorth: true },
   };
 }
@@ -66,7 +66,7 @@ describe('save format', () => {
     save.carKit = { muscle: [1, 2, 0, 1], taxi: [4, 0, 2, 2] };
     save.kit = { owned: encodeBits(new Uint8Array([1, 0, 1, 1, 0, 0, 0, 1])), on: [0, 3, -1, 2, -1] };
     save.board = { beaten: 0b111 };
-    save.career = { races: 3, zones: 1, fares: 4, hotFares: 1, orders: 2, takedowns: 17, caches: 41, escapes: [2, 3, 1, 0, 0] };
+    save.career = { races: 3, zones: 1, fares: 4, hotFares: 1, orders: 2, takedowns: 17, caches: 41, escapes: [2, 3, 1, 0, 0], smashed: 57 };
     const text = serialize(save);
     expect(parse(text)).toEqual(save);
     expect(serialize(parse(text))).toBe(text);
@@ -74,7 +74,7 @@ describe('save format', () => {
     expect(bad.carKit).toEqual({ muscle: [15, 0, 0, 2] });
     expect(bad.kit).toEqual({ owned: '', on: [7, -1, -1, -1, -1] });
     expect(bad.board).toEqual({ beaten: 0 });
-    expect(bad.career).toEqual({ races: 0, zones: 0, fares: 0, hotFares: 0, orders: 0, takedowns: 0, caches: 0, escapes: [0, 0, 0, 0, 0] });
+    expect(bad.career).toEqual({ races: 0, zones: 0, fares: 0, hotFares: 0, orders: 0, takedowns: 0, caches: 0, escapes: [0, 0, 0, 0, 0], smashed: 0 });
     expect(bad.bank).toBe(123456);
   });
 
@@ -182,11 +182,11 @@ describe('save format', () => {
     expect(save.kit.on).toEqual([-1, -1, -1, -1, -1]);
   });
 
-  it('M7 3.1 an M6 document (v3) migrates to v4 with the default settings; a broken setting falls back alone', () => {
+  it('M7 3.1 an M6 document (v3) migrates through v4 (the default settings) to the current version; a broken setting falls back alone', () => {
     const v3: Record<string, unknown> = { ...(JSON.parse(serialize(filled([4]))) as Record<string, unknown>), v: 3 };
     delete v3['settings'];
     const save = migrate(v3);
-    expect(save.v).toBe(4);
+    expect(save.v).toBe(5);
     expect(save.settings).toEqual({ music: 7, effects: 10, quality: 'auto', radarNorth: false });
     expect(save.bank).toBe(123456);
     const bad = parse(JSON.stringify({ ...filled([]), settings: { music: 11, effects: 4, quality: 'ultra', radarNorth: 'yes' } }));
@@ -206,7 +206,7 @@ describe('save format', () => {
     }
     save.kit = { owned: encodeBits(new Uint8Array(KIT.length).fill(1)), on: [16, 20, 25, 30, 35] };
     save.board = { beaten: 0b111_1111_1111 };
-    save.career = { races: 9999, zones: 9999, fares: 9999, hotFares: 9999, orders: 9999, takedowns: 99999, caches: 9999, escapes: [999, 999, 999, 999, 999] };
+    save.career = { races: 9999, zones: 9999, fares: 9999, hotFares: 9999, orders: 9999, takedowns: 99999, caches: 9999, escapes: [999, 999, 999, 999, 999], smashed: 999999 };
     const text = serialize(save);
     expect(parse(text)).toEqual(save);
     expect(text.length).toBeLessThan(BALANCE.save.maxBytes);

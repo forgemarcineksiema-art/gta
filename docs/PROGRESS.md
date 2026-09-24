@@ -2,6 +2,14 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8 slice 9: the long game
+
+Done: save version 5 with `career.smashed` (the player's smashes, lifetime; a v4 save migrates with 0; the save pins
+moved to v5). Two dailies: SMASH 60 THINGS IN ONE RUN (a new `oneRun` count, cleared at a run's end short of it) and
+FLATTEN 10 LAMP POSTS (the `prop` filter); the draw now picks from fifteen. Big Bernie's second requirement is SMASH
+300 THINGS, read from the lifetime count; his jumps requirement is gone, the jumps keep their hunt. Pins M8 9.1–9.3.
+Verify green.
+
 ## 2026-09-24 — M8 slice 8: mayhem and the cold open
 
 Done: each mayhem zone's corner is a market along its footways (a fruit or fish stall on the frontage line, a crate

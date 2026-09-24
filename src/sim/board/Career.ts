@@ -19,6 +19,8 @@ export class Career {
   caches = 0;
   /** Escapes by the level escaped from, 1..5 at 0..4. */
   readonly escapes = [0, 0, 0, 0, 0];
+  /** The street furniture the player smashed, lifetime (M8 slice 9; a unit's knocks are not the player's). */
+  smashed = 0;
   /** Bumps on every count (the wall's BOARD page). */
   serial = 0;
   private cursor: number;
@@ -71,6 +73,10 @@ export class Career {
       }
       case 'cache':
         this.caches++;
+        break;
+      case 'smash':
+        if (e.value <= 0) return;
+        this.smashed++;
         break;
       default:
         return;

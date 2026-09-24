@@ -94,6 +94,7 @@ export class Board {
       case 'hotFares': return c.hotFares;
       case 'caches': return c.caches;
       case 'board': return this.beatenCount;
+      case 'smashed': return c.smashed;
     }
   }
 

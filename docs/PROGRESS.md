@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8 slice 2: the trees
+
+Done: a thick tree's trunk (the parks', the front gardens', the promenade's and the plaza's palms) is a solid cylinder
+in the physics ring (`trunk`, restitution 1: a wall; the props' group, so no sight or wheel ray meets it); the street
+trees are the saplings, which snap; every crown six-sided (BACKLOG's shadow-pass line shipped). Found by pin 2.1: two
+edge parks' trees stood in a neighbour chunk's verge billboard run-out (0.7.0's placer sees only its own chunk), now
+moved out of the verge's strip; jobs, billboards and coins unchanged. The corner clearance applies on the corner's
+footways (a plaza palm 7 m off the road stays). Pin 1.1 in one world (2.6 → 0.9 s). Pins M8 2.1, 2.2 (the compact's
+sapling costs 8 %, the formula's for 1,050 kg; the plan's 6 % is 1,400 kg's). Verify green.
+
 ## 2026-09-24 — M8 slice 1: the measurement (MX330, the plan's one exception)
 
 Draws at the M7 gate's 40 tour points (`&life=0`): 69.0 a frame against 0.7.0's 68.9 (chunks 20.6 / 20.5), 116k / 115k

@@ -46,21 +46,25 @@ export class Architecture {
     return st;
   }
 
-  cylinder(x: number, y: number, z: number, radius: number, halfHeight: number, color: number): void {
-    this.statics.push({ shape: { kind: 'cylinder', radius, halfHeight }, position: { x, y, z }, rotation: IDENTITY_QUAT, color, tag: 'decor' });
+  cylinder(x: number, y: number, z: number, radius: number, halfHeight: number, color: number, sides?: number, tag = 'decor'): void {
+    this.statics.push({ shape: { kind: 'cylinder', radius, halfHeight, ...(sides ? { sides } : {}) }, position: { x, y, z }, rotation: IDENTITY_QUAT, color, tag });
   }
 
+  /**
+   * A thick tree (a park's, a front garden's, the promenade's palm): its trunk is solid (`trunk`, a wall, M8 D8), its
+   * crown six-sided (a quarter fewer triangles in the shadow pass than eight).
+   */
   tree(x: number, z: number, palm = false): void {
-    this.cylinder(x, 2.5, z, 0.24, 2.35, 0x8b7966);
+    this.cylinder(x, 2.5, z, 0.24, 2.35, 0x8b7966, 6, 'trunk');
     if (palm) {
       // A narrow trunk and four broad fronds give the quay its own street silhouette.
       this.box(x, 5, z, 3.2, 0.15, 0.7, CITY_COLORS.hedge);
       this.box(x, 5.2, z, 0.7, 0.15, 3.2, CITY_COLORS.leaves);
-      this.cylinder(x, 5.4, z, 1.2, 0.45, CITY_COLORS.hedge);
+      this.cylinder(x, 5.4, z, 1.2, 0.45, CITY_COLORS.hedge, 6);
     } else {
-      this.cylinder(x, 4.8, z, 2.7, 1.2, CITY_COLORS.hedge);
-      this.cylinder(x + 0.5, 6.25, z, 2, 0.75, CITY_COLORS.leaves);
-      this.cylinder(x - 1.8, 4.3, z + 0.5, 1.4, 0.8, CITY_COLORS.leaves);
+      this.cylinder(x, 4.8, z, 2.7, 1.2, CITY_COLORS.hedge, 6);
+      this.cylinder(x + 0.5, 6.25, z, 2, 0.75, CITY_COLORS.leaves, 6);
+      this.cylinder(x - 1.8, 4.3, z + 0.5, 1.4, 0.8, CITY_COLORS.leaves, 6);
     }
   }
 

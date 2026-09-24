@@ -41,8 +41,6 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 - The main thread needs about 10 ms of real CPU per frame; at CPU ×4 that is
   the 33 ms vsync step for p95. Reaching 60 fps at ×4 would need the draw
   submission (Intel driver) and the 60 Hz simulation both roughly halved. (M2.2)
-- Trees are 4 × 8-segment cylinders (128 triangles) and are a large share of the
-  remaining shadow-pass cost; billboards or 6-segment crowns would halve it. (M2.1)
 
 
 ## Life (M3)

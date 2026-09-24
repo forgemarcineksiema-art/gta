@@ -82,52 +82,49 @@ describe('the knock (M8 slice 1)', () => {
     expect(knockImpulse(1400, lamp, 18.1 * KMH)).toBeGreaterThan(lamp.breakImpulse);
     expect(knockImpulse(1400, PROP_TYPES.kiosk, 31.5 * KMH)).toBeLessThan(PROP_TYPES.kiosk.breakImpulse);
 
-    // in the city: a bin and a lamp post at 60 km/h, head on
-    for (const [kind, loss] of [['bin', 0.023], ['lamp', 0.13]] as const) {
-      const sim = await world();
-      try {
-        const p = lonely(sim, kind);
+    // in the city, one world: a bin and a lamp post at 60 km/h head on; another lamp post holds at 15 and goes at 25
+    const sim = await world();
+    try {
+      const props = sim.props!;
+      const lamps = (): PropDesc[] => {
+        const out: PropDesc[] = [];
+        for (const entry of sim.city!.active.values()) {
+          const list = sim.city!.props(entry.chunk.x, entry.chunk.z);
+          for (const p of list) if (p.kind === 'lamp' && !list.some((o) => o !== p && Math.hypot(o.x - p.x, o.z - p.z) < 6)) out.push(p);
+        }
+        return out;
+      };
+      const [first, second] = lamps();
+      for (const [p, loss] of [[lonely(sim, 'bin'), 0.023], [first!, 0.13]] as const) {
         const { yaw } = approach(sim, p);
         const r = drive(sim, p, 60, yaw);
-        expect(r.knocked, kind).toBe(true);
-        expect((r.before - r.after) / r.before, kind).toBeGreaterThan(loss - (kind === 'bin' ? 0.003 : 0.01));
-        expect((r.before - r.after) / r.before, kind).toBeLessThan(loss + (kind === 'bin' ? 0.003 : 0.01));
-        expect(sim.props!.smashed).toBe(1);
-      } finally { sim.dispose(); }
-    }
-
-    // a lamp post at 15 km/h holds: the car stops at it, a wall's hit, the chain lost
-    {
-      const sim = await world();
-      try {
-        const p = lonely(sim, 'lamp');
-        const { yaw } = approach(sim, p);
-        sim.skill.points = 400;
-        sim.skill.tricks = 2;
-        sim.skill.left = 4;
-        const seq = sim.events.sequence;
-        const r = drive(sim, p, 15, yaw);
-        expect(r.knocked).toBe(false);
-        expect(r.stopped).toBe(true);
-        const kinds: string[] = [];
-        sim.events.readFrom(seq, (e) => { kinds.push(e.kind); });
-        expect(kinds).toContain('hit');
-        expect(kinds).toContain('skillLost');
-        expect(sim.props!.state[p.id]).toBe(PropState.Standing);
-      } finally { sim.dispose(); }
-    }
-    // and goes at 25, with the rule's loss
-    {
-      const sim = await world();
-      try {
-        const p = lonely(sim, 'lamp');
-        const { yaw } = approach(sim, p);
-        const r = drive(sim, p, 25, yaw);
-        expect(r.knocked).toBe(true);
-        const want = carSpeedLoss(1400, lamp, 25 * KMH)! / (25 * KMH);
-        expect(Math.abs((r.before - r.after) / r.before - want)).toBeLessThan(0.01);
-      } finally { sim.dispose(); }
-    }
+        expect(r.knocked, p.kind).toBe(true);
+        expect((r.before - r.after) / r.before, p.kind).toBeGreaterThan(loss - (p.kind === 'bin' ? 0.003 : 0.01));
+        expect((r.before - r.after) / r.before, p.kind).toBeLessThan(loss + (p.kind === 'bin' ? 0.003 : 0.01));
+      }
+      expect(props.smashed).toBe(2);
+      // the other lamp post at 15 km/h holds: the car stops at it, a wall's hit, the chain lost
+      const post = second!;
+      let { yaw } = approach(sim, post);
+      sim.skill.points = 400;
+      sim.skill.tricks = 2;
+      sim.skill.left = 4;
+      const seq = sim.events.sequence;
+      const slow = drive(sim, post, 15, yaw);
+      expect(slow.knocked).toBe(false);
+      expect(slow.stopped).toBe(true);
+      const kinds: string[] = [];
+      sim.events.readFrom(seq, (e) => { kinds.push(e.kind); });
+      expect(kinds).toContain('hit');
+      expect(kinds).toContain('skillLost');
+      expect(props.state[post.id]).toBe(PropState.Standing);
+      // and goes at 25, with the rule's loss
+      ({ yaw } = approach(sim, post));
+      const fast = drive(sim, post, 25, yaw);
+      expect(fast.knocked).toBe(true);
+      const want = carSpeedLoss(1400, lamp, 25 * KMH)! / (25 * KMH);
+      expect(Math.abs((fast.before - fast.after) / fast.before - want)).toBeLessThan(0.01);
+    } finally { sim.dispose(); }
   }, 60_000);
 
   it('M8 1.2 a knocked prop leaves at J / m ± 2 % along the normal tilted up the bonnet', async () => {

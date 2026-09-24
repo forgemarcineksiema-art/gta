@@ -8,7 +8,7 @@
 export const GROUP_DEFAULT = 0x0001;
 export const GROUP_TERRAIN = 0x0002;
 export const GROUP_CHASSIS = 0x0004;
-/** The street furniture (M8): an anchored prop's post and a knocked one's body. */
+/** The street furniture and the trees (M8): an anchored prop's post, a knocked one's body, a thick tree's trunk. */
 export const GROUP_PROP = 0x0008;
 const ALL = 0xffff;
 

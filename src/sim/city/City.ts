@@ -1,6 +1,6 @@
 /** Seeded, independently reproducible chunks. Only nearby solid bodies live in Rapier. */
 import RAPIER from '@dimforge/rapier3d-compat';
-import { GROUPS_SOLID, GROUPS_TERRAIN } from '../collision';
+import { GROUPS_PROP, GROUPS_SOLID, GROUPS_TERRAIN } from '../collision';
 import { PALETTE } from '../palette';
 import { POLICE } from '../police/tuning';
 import { BALANCE } from '../balance';
@@ -99,6 +99,15 @@ function rectsOverlap(ax: number, az: number, ac: number, as: number, ahx: numbe
     if (Math.abs(dx * ux + dz * uz) > ra + rb) return false;
   }
   return true;
+}
+
+/**
+ * A coordinate of an edge park's tree kept out of the highway verge's billboard strip (its run-out's reach either
+ * side of the verge line): moved past its outer edge (M8 D8).
+ */
+function offVerge(v: number): number {
+  const a = Math.abs(v), lo = VERGE - RUN_OUT_REACH - 0.5, hi = VERGE + RUN_OUT_REACH + 0.5;
+  return a > lo && a < hi ? Math.sign(v) * hi : v;
 }
 
 /** Distance from (px, pz) to the segment a–b. */
@@ -430,8 +439,9 @@ export class City {
           const { px, pz } = lot;
           box(px, 0.16, pz, 18, 0.015, 18, PALETTE.grass, 'decor', 'top');
           box(px, 0.18, pz, 1.6, 0.01, 18, PALETTE.kerb, 'decor', 'top');
-          architecture.tree(px - 7, pz, d.id === 'marina');
-          architecture.tree(px + 9, pz + 8, d.id === 'marina');
+          // a verge billboard's run-out may cross an edge park, and a trunk is solid (M8 D8): its trees stand out of that strip
+          architecture.tree(offVerge(px - 7), offVerge(pz), d.id === 'marina');
+          architecture.tree(offVerge(px + 9), offVerge(pz + 8), d.id === 'marina');
           // its benches are props (M8, `props`)
           continue;
         }
@@ -934,6 +944,12 @@ export class City {
     const chunk = this.chunk(ix, iz);
     const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
     for (const st of chunk.statics) {
+      // a thick tree's trunk (M8 D8): a wall, in the props' group (no ray of sight or of the wheels meets it)
+      if (st.tag === 'trunk' && st.shape.kind === 'cylinder') {
+        this.world.createCollider(RAPIER.ColliderDesc.cylinder(st.shape.halfHeight, st.shape.radius)
+          .setTranslation(st.position.x, st.position.y, st.position.z).setFriction(1).setRestitution(1).setCollisionGroups(GROUPS_PROP), body);
+        continue;
+      }
       if (st.tag !== 'building' && st.tag !== 'kerb') continue;
       if (st.shape.kind === 'prism') {
         const pts = st.shape.points, y0 = st.shape.y0, y1 = st.shape.y1, hull = new Float32Array(pts.length * 6);

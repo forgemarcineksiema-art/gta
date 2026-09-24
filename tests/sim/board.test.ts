@@ -326,6 +326,8 @@ describe('the wanted board', () => {
       expect(sim.jobs.target(out)).toBe(false);
       run(sim, 1);
       expect(sim.police!.chief).toBeGreaterThanOrEqual(0);
+      // M8.8 0.2: the Chief chases in his own cruiser, the car this duel wins
+      expect(sim.traffic!.bodyOf(sim.police!.chief)).toBe('chiefcar');
       // lost him: the escape
       sim.pursuit.lose();
       run(sim, 2 / 60);

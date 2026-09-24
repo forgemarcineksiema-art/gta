@@ -7,6 +7,7 @@ import type { SimWorld } from '../../src/sim';
 import { districtAt, cityFootprints } from '../../src/sim/city/City';
 import type { PropDesc, PropKind } from '../../src/sim/city/props';
 import { BLOCK, HIGHWAY_HALF, ROAD_HALF } from '../../src/sim/city/roads';
+import { slice8Place } from './clearances';
 import { createWorld } from './helpers';
 
 const HOME: Partial<Record<PropKind, readonly string[]>> = {
@@ -29,7 +30,10 @@ describe('the districts\' things over the island (M8 slice 4, long)', () => {
     const props: PropDesc[] = [];
     for (let cz = -3; cz <= 3; cz++) for (let cx = -3; cx <= 3; cx++) props.push(...city.props(cx, cz));
     const seen = new Set<string>();
+    // a mayhem zone's market and the cold open's things are their places', in any district (slice 8's pins)
+    const place = slice8Place(sim);
     for (const p of props) {
+      if (place(p)) continue;
       seen.add(p.kind);
       const home = HOME[p.kind];
       if (home) expect(home, `${p.kind} ${p.id} at ${p.x.toFixed(0)},${p.z.toFixed(0)}`).toContain(districtAt(p.x, p.z).id);
@@ -42,7 +46,7 @@ describe('the districts\' things over the island (M8 slice 4, long)', () => {
       const x0 = bx * BLOCK + (bx === -3 ? HIGHWAY_HALF : ROAD_HALF), x1 = (bx + 1) * BLOCK - (bx + 1 === 3 ? HIGHWAY_HALF : ROAD_HALF);
       const z0 = bz * BLOCK + (bz === -3 ? HIGHWAY_HALF : ROAD_HALF), z1 = (bz + 1) * BLOCK - (bz + 1 === 3 ? HIGHWAY_HALF : ROAD_HALF);
       const inside = props.filter((p) => p.x > x0 && p.x < x1 && p.z > z0 && p.z < z1);
-      const extra = inside.filter((p) => YARD.includes(p.kind) || parks.some((r) => Math.abs(p.x - r.x) <= r.hx && Math.abs(p.z - r.z) <= r.hz));
+      const extra = inside.filter((p) => YARD.includes(p.kind) || place(p) !== null || parks.some((r) => Math.abs(p.x - r.x) <= r.hx && Math.abs(p.z - r.z) <= r.hz));
       const street = inside.length - extra.length;
       const at = `block ${bx},${bz} ${districtAt((x0 + x1) / 2, (z0 + z1) / 2).id}: ${street} (+${extra.length})`;
       // a highway side holds none (the highway is out of M8), an authored road through the block adds its two sides

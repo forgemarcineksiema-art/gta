@@ -9,7 +9,7 @@ import type { SimWorld } from '../../src/sim';
 import type { City } from '../../src/sim/city/City';
 import { PROPS_PER_CHUNK, PROP_TYPES, propFootprint, propRadius, type PropDesc } from '../../src/sim/city/props';
 import { BLOCK, HIGHWAY_HALF, ROAD_HALF, distanceToPolyline } from '../../src/sim/city/roads';
-import { Clearances } from './clearances';
+import { Clearances, slice8Place } from './clearances';
 import { createWorld } from './helpers';
 
 /** FNV-1a over a string (tests/sim/look.test.ts's fingerprint). */
@@ -60,11 +60,17 @@ describe('the street furniture\'s places (M8 slice 0)', () => {
 
     const clear = new Clearances(sim);
     expect(clear.routeLength).toBeGreaterThan(300);
+    // the things the cold open drives through (slice 8) stand on its route, the gate's line and the walkers' band by
+    // design, the loose ones in the gate's run-out too (pin 8.2); every other clearance holds for them as for the rest
+    const place = slice8Place(sim);
     const why: string[] = [];
     for (const p of props) {
       const pts = footprintPoints(p);
       const at = `${p.kind} ${p.id} at ${p.x.toFixed(1)},${p.z.toFixed(1)}`;
-      for (const q of pts) clear.point(q, at, why);
+      const mine: string[] = [];
+      for (const q of pts) clear.point(q, at, mine);
+      const waived = place(p) !== 'route' ? null : PROP_TYPES[p.kind].breakImpulse > 0 ? /walkers' band|billboard's line|cold open's route/ : /walkers' band|billboard's line|run-out|cold open's route/;
+      why.push(...(waived ? mine.filter((w) => !waived.test(w)) : mine));
       // nothing built above the kerb in its chunk or the ones round it
       if (clear.built(pts, p.x, p.z)) why.push(`${at}: in a static`);
     }
@@ -127,7 +133,9 @@ describe('the street furniture\'s places (M8 slice 0)', () => {
     const all = props;
     const shops = city.graph.special.filter((r) => r.kind === 'avenue').flatMap((r) => city.frontage(r).filter((l) => l.turn !== 0));
     expect(shops.length).toBeGreaterThanOrEqual(8);
-    const terrace = all.filter((p) => p.kind === 'table' || p.kind === 'chair');
+    // a market's and the cold open's tables and chairs are theirs (slice 8's pins)
+    const place = slice8Place(sim);
+    const terrace = all.filter((p) => (p.kind === 'table' || p.kind === 'chair') && place(p) === null);
     expect(terrace.length).toBeGreaterThan(0);
     // each table and chair in front of a corner shop: within its width of the shop's entrance
     for (const p of terrace) {

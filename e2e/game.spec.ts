@@ -4,7 +4,7 @@
  * path (off, an error, a finished video), the save across a reload, a
  * delivery and an order by the bot, the cold open once and not twice; M6
  * (docs/M6_PLAN.md §5.2): a rival's race driven by the bot, the STYLE page's
- * kit on the car, the horn.
+ * kit on the car, the horn; M8 (docs/M8_PLAN.md §5.2): a lamp post smashed on its kerb line.
  * Every case ends with no page errors.
  */
 import { expect, test, type Page } from '@playwright/test';
@@ -303,6 +303,51 @@ test('M6 7.1e the horn on H: one horn a press, carrying the horn worn', async ({
     return n;
   }, from);
   expect(horns).toBe(1);
+  expect(errors).toEqual([]);
+});
+
+test('M8 5.3e a lamp post knocked on its kerb line: the smash, its standing self collapsed, its flying self drawn, the chain names it', async ({ page }) => {
+  const errors = watch(page);
+  await boot(page, '');
+  const r = await page.evaluate(() => {
+    const g = window.__game!, sim = g.sim, city = sim.city!;
+    // a lamp post with nothing else within 6 m, in the loaded chunks
+    let lamp: { id: number; x: number; z: number; yaw: number } | null = null;
+    for (const e of city.active.values()) {
+      const list = city.props(e.chunk.x, e.chunk.z);
+      for (const p of list) if (!lamp && p.kind === 'lamp' && !list.some((o) => o !== p && Math.hypot(o.x - p.x, o.z - p.z) < 6)) lamp = p;
+    }
+    if (!lamp) return null;
+    const id = lamp.id, fx = Math.sin(lamp.yaw), fz = Math.cos(lamp.yaw), yaw = Math.atan2(-fx, -fz), v = 50 / 3.6;
+    sim.vehicle.teleport({ x: lamp.x + fx * 9, y: 1, z: lamp.z + fz * 9 }, yaw);
+    window.advanceTime!(400);
+    const from = sim.events.sequence, lv = { x: 0, y: 0, z: 0 };
+    for (let i = 0; i < 90 && sim.props!.state[id] === 0; i++) {
+      sim.vehicle.setVelocity(Math.sin(yaw) * v, sim.vehicle.body.linvel(lv).y, Math.cos(yaw) * v);
+      window.advanceTime!(17);
+    }
+    window.advanceTime!(100);
+    let smashed = false;
+    sim.events.readFrom(from, (e) => { if (e.kind === 'smash' && e.target === id) smashed = true; });
+    // its standing self: collapsed in its chunk's part (either level that holds it)
+    let collapsed = -1;
+    g.renderer.scene.traverse((o) => {
+      const geo = (o as { geometry?: { userData: Record<string, unknown> } }).geometry;
+      const ranges = geo?.userData['props'] as { ids: Int32Array } | undefined;
+      const k = ranges ? ranges.ids.indexOf(id) : -1;
+      if (k < 0) return;
+      const shown = geo!.userData['collapsed'] as Uint8Array | undefined;
+      collapsed = Math.max(collapsed, shown ? shown[k] ?? 0 : 0);
+    });
+    const mesh = g.renderer.scene.getObjectByName('props-lamp') as { visible: boolean; count: number } | undefined;
+    return { smashed, collapsed, drawn: mesh ? mesh.visible && mesh.count > 0 : false, word: sim.skill.word, hud: document.querySelector('.hud__skill-word')?.textContent ?? '' };
+  });
+  expect(r).not.toBeNull();
+  expect(r!.smashed).toBe(true);
+  expect(r!.collapsed).toBe(1);
+  expect(r!.drawn).toBe(true);
+  expect(r!.word).toBe('LAMP POST');
+  expect(r!.hud).toBe('LAMP POST');
   expect(errors).toEqual([]);
 });
 

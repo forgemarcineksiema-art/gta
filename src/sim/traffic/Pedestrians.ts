@@ -69,8 +69,9 @@ export class Pedestrians {
   readonly gait: Float32Array;
   /** Bumps when a tint is assigned so the view reuploads instance colours. */
   tintSerial = 0;
-  /** Last-resort hops (a car centre inside `guaranteeDistance`). */
+  /** Last-resort hops (a car centre inside `guaranteeDistance`), and those from a flying prop's bound (M8). */
   guaranteeHops = 0;
+  propHops = 0;
   /** Dives triggered by the player this step (Life pays boost for them). */
   dodgesThisStep = 0;
   /** Test hook: disable the dive so the guarantee alone must keep pedestrians clear. */
@@ -353,13 +354,13 @@ export class Pedestrians {
         }
       }
     }
-    this.guarantee(player.x, player.z, player.vx, player.vz, player.yaw, player.halfWidth, player.halfLength);
+    this.guaranteeHops += this.guarantee(player.x, player.z, player.vx, player.vz, player.yaw, player.halfWidth, player.halfLength);
     if (traffic) {
       for (let a = 0; a < traffic.capacity; a++) {
         if (traffic.state[a] === AgentState.Free || !traffic.hasBody(a)) continue;
         const yaw = traffic.yaw[a] as number;
         const speed = traffic.speed[a] as number;
-        this.guarantee(traffic.x[a] as number, traffic.z[a] as number, Math.sin(yaw) * speed, Math.cos(yaw) * speed, yaw, traffic.halfWidthOf(a), traffic.halfLengthOf(a));
+        this.guaranteeHops += this.guarantee(traffic.x[a] as number, traffic.z[a] as number, Math.sin(yaw) * speed, Math.cos(yaw) * speed, yaw, traffic.halfWidthOf(a), traffic.halfLengthOf(a));
       }
     }
     if (props) this.fromProps(props, player, dt, events);
@@ -380,7 +381,7 @@ export class Pedestrians {
       if (this.dodgeEnabled) this.dodgeFrom(x, z, vx, vz, false, player, events);
       const speed = Math.sqrt(vx * vx + vz * vz), travel = speed * dt;
       const yaw = speed > 1e-6 ? Math.atan2(vx, vz) : 0;
-      this.guarantee(x + vx * dt / 2, z + vz * dt / 2, vx, vz, yaw, r, r + travel / 2);
+      this.propHops += this.guarantee(x + vx * dt / 2, z + vz * dt / 2, vx, vz, yaw, r, r + travel / 2);
     }
   }
 
@@ -587,8 +588,8 @@ export class Pedestrians {
     events.push('nearMissPed', 0, this.x[i] as number, 0, this.z[i] as number, i);
   }
 
-  /** Last resort: a pedestrian inside a car's footprint grown by `guaranteeDistance` hops `hopDistance` clear of its side. */
-  private guarantee(cx: number, cz: number, vx: number, vz: number, yaw: number, halfWidth: number, halfLength: number): void {
+  /** Last resort: a pedestrian inside a car's footprint grown by `guaranteeDistance` hops `hopDistance` clear of its side; the hops. */
+  private guarantee(cx: number, cz: number, vx: number, vz: number, yaw: number, halfWidth: number, halfLength: number): number {
     const t = this.tuning;
     const fx = Math.sin(yaw);
     const fz = Math.cos(yaw);
@@ -597,6 +598,7 @@ export class Pedestrians {
     const reachAlong = halfLength + t.guaranteeDistance;
     const reachSide = halfWidth + t.guaranteeDistance;
     // the officer at a stopped car's window (M5.5 slice 18) stays put; a car moving off still clears them
+    let hops = 0;
     const crawling = Math.hypot(vx, vz) < 3;
     for (let i = 0; i < this.capacity; i++) {
       if (!this.active[i]) continue;
@@ -611,12 +613,13 @@ export class Pedestrians {
       const target = dir * (reachSide + t.hopDistance);
       this.x[i] = (this.x[i] as number) + rx * (target - side);
       this.z[i] = (this.z[i] as number) + rz * (target - side);
-      this.guaranteeHops++;
+      hops++;
       if (this.pose[i] === PedPose.Walk) {
         this.pose[i] = PedPose.GetUp;
         this.poseFor[i] = 0;
       }
     }
+    return hops;
   }
 
   // ---- pool -----------------------------------------------------------------------

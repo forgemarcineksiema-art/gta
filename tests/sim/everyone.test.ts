@@ -146,7 +146,7 @@ describe('everyone else (M8 slice 7)', () => {
         peds.lane[i] = -1;
       });
       // thrown at them, toward the road, by a 60 km/h knock
-      const r = props.boundOf(bench.id), hops = peds.guaranteeHops;
+      const r = props.boundOf(bench.id), hops = peds.propHops;
       props.knock(bench.id, 1400, 60 * KMH, fx, fz, 0, 0);
       expect(props.state[bench.id]).not.toBe(PropState.Standing);
       let dove = 0, nearest = Infinity;
@@ -162,7 +162,7 @@ describe('everyone else (M8 slice 7)', () => {
       // it went through where they stood, and they got out of its way
       expect(Math.hypot((props.pose[bench.id * 7] as number) - bench.x, (props.pose[bench.id * 7 + 2] as number) - bench.z)).toBeGreaterThan(3);
       expect(nearest).toBeGreaterThan(r);
-      expect(dove + peds.guaranteeHops - hops).toBeGreaterThan(0);
+      expect(dove + peds.propHops - hops).toBeGreaterThan(0);
     } finally { sim.dispose(); }
   }, 60_000);
 

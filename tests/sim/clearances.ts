@@ -10,9 +10,29 @@ import { gateLine, layoutCoins } from '../../src/sim/city/coins';
 import { runOutFootprint, tallFootprint, CAR_TOP, type BillboardDesc } from '../../src/sim/city/collectibles';
 import { DROP_OFF_LOTS, GARAGE, dropOffFor, toDropOff } from '../../src/sim/city/cover';
 import { BLOCK, HIGHWAY_HALF, ROAD_HALF, underOverpass } from '../../src/sim/city/roads';
-import { coldOpenRoute } from '../../src/sim/run/ColdOpen';
+import { coldOpenRoute, coldOpenSpots } from '../../src/sim/run/ColdOpen';
+import type { PropDesc, PropKind } from '../../src/sim/city/props';
 
 type Pt = { x: number; z: number };
+
+const MARKET_KINDS: ReadonlySet<PropKind> = new Set(['fruitStand', 'fishStall', 'crate', 'table', 'chair']);
+
+/**
+ * The places M8 slice 8 added, which keep their own rules (pins 8.1, 8.2): a mayhem zone's market (its stalls,
+ * crates, tables and chairs within 60 m of the zone's ring) and the things the cold open drives through (on its
+ * route by design). Null for everything else.
+ */
+export function slice8Place(sim: SimWorld): (p: PropDesc) => 'market' | 'route' | null {
+  const zones = sim.jobs.defs.filter((d) => d.kind === 'mayhem');
+  const loop = sim.city!.spawns.find((s) => s.name === 'loop'), hideout = sim.run.dropOffs[0];
+  const route = loop && hideout ? coldOpenRoute(sim, loop.position.x, loop.position.z, hideout) : null;
+  const spots = route ? coldOpenSpots(route) : [];
+  return (p) => {
+    if (spots.some((s) => s.kind === p.kind && Math.hypot(s.x - p.x, s.z - p.z) < 1e-3)) return 'route';
+    if (MARKET_KINDS.has(p.kind) && zones.some((d) => Math.hypot(d.x - p.x, d.z - p.z) < 60)) return 'market';
+    return null;
+  };
+}
 
 export function segDist(px: number, pz: number, a: { x: number; z: number }, b: { x: number; z: number }): number {
   const dx = b.x - a.x, dz = b.z - a.z;

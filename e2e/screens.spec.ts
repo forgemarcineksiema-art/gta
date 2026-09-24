@@ -183,13 +183,20 @@ for (const [w, h] of SIZES) {
     await page.evaluate(`${RUN_STATES}
       sim.run.bag = 32500;
       sim.run.maxHeat = 4;
-      Object.assign(sim.run.counts, { takedowns: 3, escapes: 2, billboards: 5, coins: 84 });
+      Object.assign(sim.run.counts, { takedowns: 3, escapes: 2, billboards: 5, coins: 84, smashes: 46, damage: 18400 });
       place(-2);
       window.advanceTime(3400);
     `);
     await page.waitForSelector('.run__wall.is-visible', { timeout: 10_000 });
     await page.screenshot({ path: `screens/door-${w}x${h}.png` });
     await expectClearOfWall(page, `door ${w}x${h}`);
+    // the run's bill (M8): on the counts' line, which stays inside the wall's page
+    expect(await page.locator('.run__counts').textContent()).toContain('CITY DAMAGE 18,400');
+    const fits = await page.evaluate(() => {
+      const c = document.querySelector('.run__counts')!.getBoundingClientRect(), p = document.querySelector('.run__wall-page')!.getBoundingClientRect();
+      return c.left >= p.left - 1 && c.right <= p.right + 1 && c.bottom <= p.bottom + 1;
+    });
+    expect(fits, `the counts inside the page at ${w}x${h}`).toBe(true);
     // the garage: the CARS page with the compact in reach and the rest not
     await page.evaluate(() => { window.__game!.sim.run.bank = 25000; window.advanceTime!(700); });
     for (const code of ['KeyD', 'KeyW']) {

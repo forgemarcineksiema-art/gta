@@ -375,10 +375,12 @@ export function coldOpenRoute(sim: SimWorld, x: number, z: number, hideout: Drop
 
 /**
  * The cold open's footway run (M8 slice 8, DESIGN.md §6.6), in metres past the billboard gate (the footway before it
- * is the hideout door's approach): a café terrace's two tables with a chair either side of each (`chair` m across)
- * and a newspaper box, loose, in the gate's run-out; then the newsstand, which would hold a slow car, past the run-out.
+ * is the hideout door's approach): a café terrace's two tables with a chair either side of each (`chair` m across),
+ * a newspaper box and a bin on the line, all loose, in the gate's run-out; the newsstand beside the line past the
+ * run-out, `kioskAcross` m to its right: on the line it would hold a car slowed by the rest (the gate's bot stopped
+ * on it), and nothing solid stands on the route.
  */
-const FOOTWAY_RUN = { tables: [3.2, 7], chair: 1.05, newsbox: 9.8, kiosk: 13, kioskAcross: 0.4 } as const;
+const FOOTWAY_RUN = { tables: [3.2, 7], chair: 1.05, newsbox: 9.8, bin: 12.2, kiosk: 13, kioskAcross: 2.8 } as const;
 
 /** The things the cold open drives through on its footway run, on the route's line facing the car; none without a gate. */
 export function coldOpenSpots(route: ColdOpenRoute): PropSpot[] {
@@ -402,6 +404,7 @@ export function coldOpenSpots(route: ColdOpenRoute): PropSpot[] {
     at(back, 'chair', FOOTWAY_RUN.chair);
   }
   at(FOOTWAY_RUN.newsbox, 'newsbox');
+  at(FOOTWAY_RUN.bin, 'bin');
   at(FOOTWAY_RUN.kiosk, 'kiosk', FOOTWAY_RUN.kioskAcross, true);
   return out;
 }

@@ -1,7 +1,7 @@
 /**
  * Mayhem and the cold open (M8 slice 8, docs/M8_PLAN.md): each mayhem zone's corner is a market of thirty things
  * and more, a smash in the zone is priced at its bill toward a quota of 15,000; the cold open drives through a café
- * terrace, a newspaper box and a newsstand on its footway run, and nothing on its route would hold it.
+ * terrace, a newspaper box and a bin on its footway run, a newsstand beside it, and nothing on its route would hold it.
  */
 import { describe, expect, it } from 'vitest';
 import { CAR_PRESETS, type SimWorld } from '../../src/sim';
@@ -60,7 +60,7 @@ describe('mayhem and the cold open (M8 slice 8)', () => {
     } finally { sim.dispose(); }
   }, 60_000);
 
-  it('M8 8.2 the cold open\'s route crosses eight things and more, and nothing on it would hold the car at 40 km/h', async () => {
+  it('M8 8.2 the cold open\'s route crosses eight things and more, all loose: nothing on it would hold the car', async () => {
     const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
     try {
       const city = sim.city!;
@@ -81,10 +81,14 @@ describe('mayhem and the cold open (M8 slice 8)', () => {
       };
       const crossed = keys.flatMap(([cx, cz]) => city.props(cx, cz)).filter((p) => onLine(p.x, p.z, propRadius(p.kind)));
       expect(crossed.length).toBeGreaterThanOrEqual(8);
-      expect(new Set(crossed.map((p) => p.kind))).toEqual(new Set(['table', 'chair', 'newsbox', 'kiosk']));
-      // every one goes at 40 km/h under the lightest car the player can be in there (the van is heavier)
-      const mass = Math.min(CAR_PRESETS.muscle.mass, CAR_PRESETS.heavy.mass);
-      for (const p of crossed) expect(carSpeedLoss(mass, PROP_TYPES[p.kind], 40 * KMH), p.kind).not.toBeNull();
+      expect(new Set(crossed.map((p) => p.kind))).toEqual(new Set(['table', 'chair', 'newsbox', 'bin']));
+      // the newsstand stands beside the line, past the gate: in the run, never in the way
+      const loop2 = route.samples.filter((s) => s.s > route.gateS && s.s < route.gateS + 20);
+      const kiosk = keys.flatMap(([cx, cz]) => city.props(cx, cz)).find((p) => p.kind === 'kiosk' && loop2.some((s) => Math.hypot(s.x - p.x, s.z - p.z) < 5));
+      expect(kiosk).toBeDefined();
+      // every one loose, so it goes at any speed (the gate's bot met a newsstand on the line slowed by the rest: it held)
+      for (const p of crossed) expect(PROP_TYPES[p.kind].breakImpulse, p.kind).toBe(0);
+      expect(carSpeedLoss(CAR_PRESETS.muscle.mass, PROP_TYPES.bin, 5 * KMH)).not.toBeNull();
       // and no tree's solid trunk on it
       for (const [cx, cz] of keys) {
         for (const st of city.chunk(cx, cz).statics) {

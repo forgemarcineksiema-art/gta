@@ -110,9 +110,10 @@ export interface TrafficTuning {
   gawk: { wait: number; clearAhead: number };
   /**
    * The standoff (M5.5 gate): a civilian held up nose to nose by the player, who is not moving on (under
-   * `playerSpeed` m/s), for `wait` s pulls to its kerb as for a siren and creeps by: neither would ever give way.
+   * `playerSpeed` m/s), for `wait` s goes round them on the side away from them (M7: to its kerb, or out on the
+   * oncoming side when the player stands at its kerb) at `creep` m/s: neither would ever give way.
    */
-  standoff: { wait: number; playerSpeed: number };
+  standoff: { wait: number; playerSpeed: number; creep: number };
   /** Metres a second a car's place across its lane moves toward where it wants to be. */
   shiftRate: number;
   /** Traffic by heat level 0..5: the streets thin as the chase grows. */
@@ -227,7 +228,7 @@ export const TRAFFIC: TrafficTuning = {
   // 3 m clears a car's width beside it and stops 0.2 m short of the kerbside bays
   pullOver: { behind: 60, offset: 3, speed: 4, hold: 3 },
   gawk: { wait: 2, clearAhead: 40 },
-  standoff: { wait: 1, playerSpeed: 3 },
+  standoff: { wait: 1, playerSpeed: 3, creep: 1.5 },
   shiftRate: 2.5,
   densityByLevel: [1, 1, 1, 0.9, 0.6, 0.6],
   cloneDistance: 150,

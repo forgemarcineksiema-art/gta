@@ -94,6 +94,10 @@ const HOLDERS = 4;
 const WOBBLE_RAD = 5 * Math.PI / 180;
 /** Look-ahead of the velocity controller along the path, m. */
 const CARROT = 8;
+/** The carrot going round a stopped player (M7 slice 8): close, so a crawling body turns aside within a car length. */
+const CARROT_ROUND = 3.5;
+/** Seconds a returned body takes to blend back onto its lane (M7 slice 8). */
+const BLEND_BACK = 1;
 /** A unit on a chase brakes and pulls away this much harder than traffic (POLICE.mode.accelFactor; traffic may not import police). */
 const POLICE_ACCEL = 1.5;
 /** A unit on a chase goes round a car this much slower (m/s) within this reach (m) (POLICE.mode). */
@@ -220,6 +224,13 @@ export class Traffic {
   readonly passAgent: Int16Array;
   /** Seconds a civilian has been held up by a player who is not moving on (the standoff, M5.5 gate). */
   private readonly standoff: Float32Array;
+  /** Seconds left going round a stopped player on the oncoming side (the standoff with the player at its kerb, M7). */
+  private readonly roundLeft: Float32Array;
+  /** A returned body's way back onto its lane (M7 slice 8): the offset left over, faded out over `BLEND_BACK` s. */
+  private readonly blendX: Float32Array;
+  private readonly blendZ: Float32Array;
+  private readonly blendYaw: Float32Array;
+  private readonly blendLeft: Float32Array;
   /** Per lane: the other lane of the same carriageway (the highway), the lane the other way (a street); -1 none. */
   readonly parallel: Int16Array;
   readonly reverse: Int16Array;
@@ -443,6 +454,11 @@ export class Traffic {
     this.angryLeft = new Float32Array(n);
     this.passAgent = new Int16Array(n).fill(-1);
     this.standoff = new Float32Array(n);
+    this.roundLeft = new Float32Array(n);
+    this.blendX = new Float32Array(n);
+    this.blendZ = new Float32Array(n);
+    this.blendYaw = new Float32Array(n);
+    this.blendLeft = new Float32Array(n);
     this.passLeft = new Float32Array(n);
     this.stuck = new Float32Array(n);
     this.laneCool = new Float32Array(n);
@@ -1153,6 +1169,17 @@ export class Traffic {
       // going round a dead car: a crawl until it is out beside it
       desired = 2;
     }
+    // the standoff (M7 slice 8): going round a stopped player, a crawl until the car is clear of them by where it
+    // actually is (a lent body lags the path it steers for), steering aside as it goes; stopped only by another car
+    if (civilian && (this.flinchLeft[i] as number) <= 0
+      && ((this.roundLeft[i] as number) > 0 || ((this.pullLeft[i] as number) > 0 && (this.standoff[i] as number) >= t.standoff.wait))) {
+      const px = player.x - (this.x[i] as number), pz = player.z - (this.z[i] as number);
+      const pAlong = px * fx + pz * fz;
+      const pAcross = Math.abs(-px * Math.cos(yaw) + pz * Math.sin(yaw));
+      if (pAlong > -3 && pAlong < 14 && pAcross < this.halfWidthOf(i) + player.halfWidth + 0.5) {
+        desired = blocker === 2 ? t.standoff.creep : Math.min(desired, t.standoff.creep);
+      }
+    }
     // A lent body braking for the line creeps a little past it; within the tolerance it is still at the line.
     const entering = nxt >= 0 && s <= len + STOP_TOLERANCE;
     if (!entering) this.wait[i] = 0;
@@ -1184,6 +1211,7 @@ export class Traffic {
 
   private moveKinematic(i: number, desired: number, dt: number): void {
     const t = this.tuning;
+    if ((this.blendLeft[i] as number) > 0) this.blendLeft[i] = Math.max(0, (this.blendLeft[i] as number) - dt);
     const speed = this.speed[i] as number;
     const unit = this.fast(i) ? POLICE_ACCEL : 1;
     const brake = ((this.flinchLeft[i] as number) > 0 ? t.flinch.brake : t.brake) * unit;
@@ -1267,7 +1295,9 @@ export class Traffic {
       // a ram still keeps its lane gaps; a unit driving to an arrest slot steers straight there
       desired = this.freeSteer[i] === 1 ? (this.ramSpeed[i] as number) : Math.min(desired, this.ramSpeed[i] as number);
     } else {
-      this.lanes.positionAt(lane, (this.s[i] as number) + CARROT, this.laneOffset[i] as number, this.pose, this.next[i]);
+      // going round a stopped player (M7 slice 8) the carrot comes close, so the crawling body turns aside in the room
+      const round = (this.roundLeft[i] as number) > 0 || ((this.pullLeft[i] as number) > 0 && (this.standoff[i] as number) >= this.tuning.standoff.wait);
+      this.lanes.positionAt(lane, (this.s[i] as number) + (round ? CARROT_ROUND : CARROT), this.laneOffset[i] as number, this.pose, this.next[i]);
       this.addShift(i, this.pose);
     }
     const dx = this.pose.x - (this.x[i] as number);
@@ -1821,11 +1851,21 @@ export class Traffic {
     else this.speed[i] = 0;
     const lane = this.lane[i] as number;
     if (lane >= 0) {
+      const x0 = this.x[i] as number, z0 = this.z[i] as number, yaw0 = this.yaw[i] as number;
       this.lanes.projectPath(lane, this.next[i] as number, this.x[i] as number, this.z[i] as number, this.proj, this.laneOffset[i]);
       if (this.proj.switched) this.switchLane(i, this.proj.s);
       else this.s[i] = this.proj.s;
-      // Far from the player (this is where bodies are returned): snap back onto the lane.
+      // back onto the lane, blended over a second from where the body stood (M7 slice 8: it used to jump)
+      this.blendLeft[i] = 0;
       this.reposition(i);
+      const dx = x0 - (this.x[i] as number), dz = z0 - (this.z[i] as number);
+      if (dx * dx + dz * dz > 0.01) {
+        this.blendX[i] = dx;
+        this.blendZ[i] = dz;
+        this.blendYaw[i] = Math.atan2(Math.sin(yaw0 - (this.yaw[i] as number)), Math.cos(yaw0 - (this.yaw[i] as number)));
+        this.blendLeft[i] = BLEND_BACK;
+        this.reposition(i);
+      }
     }
   }
 
@@ -2329,6 +2369,13 @@ export class Traffic {
     this.yaw[i] = this.pose.yaw;
     this.y[i] = this.pose.y ?? 0;
     this.grade[i] = this.pose.grade ?? 0;
+    const blend = this.blendLeft[i] as number;
+    if (blend > 0) {
+      const f = blend / BLEND_BACK;
+      this.x[i] = this.x[i] + (this.blendX[i] as number) * f;
+      this.z[i] = this.z[i] + (this.blendZ[i] as number) * f;
+      this.yaw[i] = this.yaw[i] + (this.blendYaw[i] as number) * f;
+    }
   }
 
   /** Last resort when the body pool is exhausted and a kinematic car overlaps the player. */
@@ -2388,6 +2435,8 @@ export class Traffic {
     this.hornLeft[i] = 0;
     this.hornCool[i] = 0;
     this.standoff[i] = 0;
+    this.roundLeft[i] = 0;
+    this.blendLeft[i] = 0;
     this.angryLeft[i] = 0;
     this.passAgent[i] = -1;
     this.passLeft[i] = 0;
@@ -2457,6 +2506,7 @@ export class Traffic {
     }
     this.flinchLeft[i] = Math.max(0, (this.flinchLeft[i] as number) - dt);
     this.pullLeft[i] = Math.max(0, (this.pullLeft[i] as number) - dt);
+    this.roundLeft[i] = Math.max(0, (this.roundLeft[i] as number) - dt);
     this.hornLeft[i] = Math.max(0, (this.hornLeft[i] as number) - dt);
     this.hornCool[i] = Math.max(0, (this.hornCool[i] as number) - dt);
     this.angryLeft[i] = Math.max(0, (this.angryLeft[i] as number) - dt);
@@ -2488,15 +2538,23 @@ export class Traffic {
       this.pullLeft[i] = t.pullOver.hold;
     }
 
-    // the standoff: held up nose to nose by a player who is not moving on, it pulls to its kerb the same way and
-    // creeps by (a player stopped ahead the same way gets a queue behind them, as ever)
+    // the standoff: held up nose to nose by a player who is not moving on, it goes round them on the side away from
+    // them (M7 slice 8): to its kerb as for a siren, or, with the player at its kerb, out on the oncoming side when
+    // that is clear; it creeps while it steers (`plan`). A player stopped ahead the same way gets a queue, as ever.
     if (this.police[i] === 0 && this.blocker[i] === 2 && speed < 0.5 && player.speed < t.standoff.playerSpeed
       && Math.cos(player.yaw - yaw) < -0.5) {
       this.standoff[i] = (this.standoff[i] as number) + dt;
-      if ((this.standoff[i]) >= t.standoff.wait) this.pullLeft[i] = t.pullOver.hold;
-    } else if ((this.pullLeft[i]) <= 0) {
+      if ((this.standoff[i]) >= t.standoff.wait) {
+        const rev = this.reverse[lane] as number;
+        const kerbSide = side + (this.shift[i] as number) > 0;
+        if (kerbSide && rev >= 0 && this.oncomingClear(rev, (this.lanes.length[rev] as number) - s, t.gawk.clearAhead)) this.roundLeft[i] = t.pullOver.hold;
+        else this.pullLeft[i] = t.pullOver.hold;
+      }
+    } else if ((this.pullLeft[i]) <= 0 && (this.roundLeft[i]) <= 0) {
       this.standoff[i] = 0;
     }
+    // going round: held while the player is still alongside, so the car never swings back into them
+    if ((this.roundLeft[i]) > 0 && along > -6 && along < 12 && Math.abs(side) < 5) this.roundLeft[i] = Math.max(this.roundLeft[i], 0.5);
 
     // the angry driver: bumped by the player, one in ten goes after them
     if ((this.playerDv[i] as number) > 1.5 && (this.angryLeft[i]) <= 0 && this.rng() < t.angry.share) {
@@ -2556,6 +2614,7 @@ export class Traffic {
     if ((this.passAgent[i] as number) >= 0) target = -2 * (this.lanes.offset[this.lane[i] as number] as number);
     else if ((this.flinchLeft[i]) > 0) target = t.flinch.offset;
     else if (this.hornLeft[i] > 0 && !spec.big) target = t.horn.shift;
+    else if ((this.roundLeft[i]) > 0) target = -2 * (this.lanes.offset[this.lane[i] as number] as number);
     else if ((this.pullLeft[i]) > 0 && !spec.big) target = t.pullOver.offset;
     else if (this.bad[i] === 1) target = t.temper.badDrift * Math.sin(this.clock * 0.9 + i * 1.7);
     this.ease(i, target, dt);

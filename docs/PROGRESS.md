@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M7 slice 8: the civilians
+
+Done: the standoff goes round on the side away from the player: with the player at its kerb (the M6 gate's case,
+where it pulled toward them for good) it swings out on the oncoming side when that is clear, else to its kerb; it
+crawls at 1.5 m/s until clear of the player by where it actually is (a lent body lags its path), its carrot close
+so it turns aside within a car length, and never touches them. A shoved car whose body is returned blends back onto
+its lane over a second instead of jumping (3 m in one step before). Measured, not changed: the forced junction
+entries (two a minute at seeds 42 and 7) are the bad drivers' early claim (their character since M5.5) and side
+streets at the highway waiting on its flow. Pins M7 8.1, 8.3. Verify green (348 tests).
+
 ## 2026-09-24 — M7 slice 7: the boot
 
 Read the boot for races: every await (the platform, Rapier's WASM, the save) resolves once and never waits on an

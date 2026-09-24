@@ -202,7 +202,8 @@ export class Hud {
     this.soundState = el('span', 'hud__pause-sound-state', t('SOUND ON'));
     this.sound.append(this.soundKey, this.soundState);
     this.pause.append(label(el('div', 'hud__pause-title'), 'PAUSED'), el('div', 'hud__pause-sub', ''), this.sound, el('div', 'hud__pause-build', `build ${__APP_VERSION__}`));
-    this.root.appendChild(this.pause);
+    // a sibling of the HUD, the run's layer and the full map, on top of them all: its veil covers the whole screen
+    parent.appendChild(this.pause);
 
     this.hints = el('div', 'hud__hints');
     this.root.appendChild(this.hints);

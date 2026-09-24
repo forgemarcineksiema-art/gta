@@ -842,10 +842,10 @@ export class App {
     this.runHud.update(this.sim, frameDt);
     this.coldOpenHud.update(this.sim);
     this.jobsHud.update(this.sim, frameDt);
-    // the pay over the nearest open sign ahead, a metre over its face (M8.7 D5)
+    // the nearest open sign ahead: its kind and its pay, a metre over its face (M8.7 D5, M8.9 R7)
     this.renderer.view(this.signView);
     const paid = playing && !this.bot ? paySign(this.sim, this.signView) : null;
-    if (paid && this.renderer.toScreen(paid.x, SIGN_Y + 1.05, paid.z, this.payAt)) this.payLabel.show(this.payAt.x, this.payAt.y, payOf(this.sim, paid));
+    if (paid && this.renderer.toScreen(paid.x, SIGN_Y + 1.05, paid.z, this.payAt)) this.payLabel.show(this.payAt.x, this.payAt.y, paid, payOf(this.sim, paid));
     else this.payLabel.hide();
     // the top of the screen (M7 slice 1): the hints are for driving (behind a shut door the wall has the keys, the
     // intro's captions teach the same ones); under a card or a caption the hints and the news wait

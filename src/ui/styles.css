@@ -523,10 +523,14 @@ body {
   display: block;
 }
 
-/* pause */
+/* pause: its own top layer, a sibling of the HUD, the run's layer and the full map, so its veil covers them all (the
+   goal line, the bag and the bank were drawn over it, M8.9 slice 0); only the settings take the pointer */
 .hud__pause {
-  position: absolute;
+  position: fixed;
   inset: 0;
+  z-index: 45;
+  pointer-events: none;
+  font-family: var(--font-display);
   display: none;
   flex-direction: column;
   align-items: center;
@@ -1095,7 +1099,8 @@ kbd.key {
 .jobs__dist { font-size: 16px; color: var(--ui-ink); }
 .jobs__dist::before { content: '· '; color: var(--ui-ink-dim); }
 
-/* the pay over the nearest open sign (M8.7 D5): the line's yellow type, only near a sign */
+/* the nearest open sign's kind and pay (M8.7 D5, M8.9 R7): the kind in ink, the pay in the line's yellow, only near a
+   sign */
 .pay {
   position: absolute;
   left: 0;
@@ -1107,10 +1112,11 @@ kbd.key {
   font-style: italic;
   letter-spacing: 0.04em;
   white-space: nowrap;
-  color: var(--ui-accent);
+  color: var(--ui-ink);
   text-shadow: 2px 3px 0 #000;
 }
 .pay.is-visible { display: block; }
+.pay__cash { margin-left: 0.3em; color: var(--ui-accent); }
 
 /* the goal line (M8.7 D7): the goal's badge, its pictogram in the way's cyan ring; LOSE THEM in danger red; no kind
    has a colour of its own */

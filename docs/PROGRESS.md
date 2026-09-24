@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.9 slice 0: the pay label, the sign in the camera, the pause's veil
+
+Done (R7, R12): `PayLabel` wrote its place only when it moved half a pixel from `NaN`, so it never did and sat in the
+screen's top-left corner since M8.7 slice 3; now `moved()` is true from an unplaced point, and the label names the kind
+in ink with the pay in yellow (UCIECZKA +3000, a rival by name). A sign whose face grows past 15 % of the screen's height
+shrinks with its pole and is gone at 20 % (`signFold`, stateless by size: at the resting 60° that is 8.8 m to 6.6 m
+from the camera), so driving through a ring never fills the screen. The pause is its own fixed layer on the UI's root
+(z 45): its veil covers the line, the bag and the bank. Pins M8.9 0.1–0.4. Verify green; the stills come with slice 1.
+
 ## 2026-09-25 — each worktree's e2e on its own port
 
 Found setting up `m8.8-fleet`: the quick verify's smoke (and every e2e suite) served on 4173 and Playwright reused

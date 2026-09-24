@@ -766,10 +766,13 @@ export class Traffic {
     return -1;
   }
 
-  /** Only an unseen, undisturbed civilian may give up a full agent slot. `inView`: the roadside ambush, placed where the player sees it. */
-  spawnPoliceAt(lane: number, s: number, kind: 'police' | 'sports' | 'heavy', player: PlayerProbe, near: number, cosHalf: number, clearance: number, paint = -1, inView = false): number {
+  /**
+   * Only an unseen, undisturbed civilian may give up a full agent slot. `inView`: the roadside ambush, placed where the
+   * player sees it. `body`: a unit in a body of its own (the Chief's Cruiser, M8.8 slice 0), else its class's shell.
+   */
+  spawnPoliceAt(lane: number, s: number, kind: 'police' | 'sports' | 'heavy', player: PlayerProbe, near: number, cosHalf: number, clearance: number, paint = -1, inView = false, body: BodyId = kind): number {
     if (!this.canSpawnAt(lane, s, clearance)) return -1;
-    const index = KIND_INDEX[kind];
+    const index = BODY_INDEX[body];
     const radius = Math.hypot(this.halfW[index] as number, this.halfL[index] as number);
     if (!inView && !this.outOfView(this.pose.x, this.pose.z, radius, player, near, cosHalf)) return -1;
     const agent = this.claim(player, near, cosHalf);

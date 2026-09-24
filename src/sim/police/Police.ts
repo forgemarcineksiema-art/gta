@@ -32,7 +32,7 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import { QUERY_NOT_PROP } from '../collision';
 import { BALANCE } from '../balance';
-import { PALETTE } from '../palette';
+import { bodySpec } from '../traffic/bodies';
 import type { SimEvent } from '../events';
 import type { ParkedJunction } from '../city/cover';
 import type { RoadGraph, Lane, RoadNode } from '../city/roads';
@@ -58,6 +58,8 @@ export function pressureSpeed(t: PoliceTuning, gap: number, inView: boolean, pla
 }
 
 /** Distance fields over the road graph: toward the player's near future, and toward where the player is heading. */
+/** The Chief's Cruiser in the chase in its own paint, the car the duel wins (M8.8 slice 0). */
+const CHIEF_PAINT = bodySpec('chiefcar').paints[0] as number;
 const CHASE = 0;
 const AHEAD = 1;
 /** Toward the donut shop (M5.5 slice 18): where the units that stand down head. */
@@ -496,8 +498,9 @@ export class Police {
         this.seen[u] = 1;
         continue;
       }
-      const pit = traffic.kindOf(agent) === 'sports';
       const isChief = agent === this.chief;
+      // the Chief drives his own cruiser (M8.8 slice 0) and keeps the interceptor's PIT
+      const pit = isChief || traffic.kindOf(agent) === 'sports';
       const next = this.isCutter(u, agent, level) && gap > t.cutoff.breakRange ? this.routeExit(agent, AHEAD) : this.routeExit(agent, CHASE);
       // pressure (DESIGN.md §13.9): close, the player's speed and a little more; far, the catch-up only out of view
       const classSpeed = isChief ? t.chief.speed : pit ? t.interceptorSpeed : t.chaseSpeed;
@@ -1318,7 +1321,7 @@ export class Police {
     }
     if (bestLane < 0) return -1;
     return kind === 'chief'
-      ? this.traffic.spawnPoliceAt(bestLane, bestS, 'sports', player, t.viewNear, cosHalf, t.spawnClearance, PALETTE.ink)
+      ? this.traffic.spawnPoliceAt(bestLane, bestS, 'police', player, t.viewNear, cosHalf, t.spawnClearance, CHIEF_PAINT, false, 'chiefcar')
       : this.traffic.spawnPoliceAt(bestLane, bestS, kind, player, t.viewNear, cosHalf, t.spawnClearance);
   }
 

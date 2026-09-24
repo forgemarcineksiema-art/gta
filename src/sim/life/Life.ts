@@ -4,7 +4,7 @@
  */
 import { BALANCE } from '../balance';
 import { BILLBOARD_BOTTOM, BILLBOARD_HEIGHT } from '../city/collectibles';
-import { bodyTuning, isShell } from '../traffic/bodies';
+import { isShell } from '../traffic/bodies';
 import type { VehicleControls } from '../controls';
 import { DAMAGE, ECONOMY, SWAP } from '../economy';
 import * as M from '../math';
@@ -311,7 +311,8 @@ export class Life {
     this.sim.garageDriven = false;
     // a civilian body keeps the paint it had (the yellow taxi stays yellow); a class's own shell takes the garage's
     this.sim.carPaint = isShell(h.body) ? this.sim.garage.paintOf(h.kind) : h.paint;
-    v.tuning = bodyTuning(h.body);
+    // the class's upgrades drive every body of the class (DESIGN.md §14.6), a car taken on the street too (M8.8 slice 0)
+    v.tuning = this.sim.garage.tuningFor(h.body);
     v.applyTuning();
     this.proj.x = h.x;
     this.proj.y = p.y;

@@ -71,10 +71,20 @@ const HEAVY_LIVERY: LiveryStyle = {
   },
 };
 
-/** The Chief (slice 7): the interceptor's body in ink with a carOrange band and one red lens. */
-const CHIEF_LIVERY: LiveryStyle = { ...SPORTS_LIVERY, bandColor: PALETTE.carOrange, singleLens: true };
+/**
+ * The Chief (M8.8 slice 0): his own cruiser, the police shell in gold trim with its own bar and push bar
+ * (`bodyProfiles.ts`), so no band; the kit's lenses sit over his bar's red and blue and flash in the chase.
+ */
+const CHIEF_LIVERY: LiveryStyle = {
+  ...POLICE_LIVERY,
+  band: { ...POLICE_LIVERY.band, zones: [] },
+  bar: {
+    housing: { w: 1.27, h: 0.1, d: 0.3, x: 0, y: 1.545, z: -0.45 },
+    lens: { w: 0.52, h: 0.13, d: 0.28, x: 0.32, y: 1.64, z: -0.45 },
+  },
+};
 
-/** One kit per liveried class; anything else wearing `traffic.police` renders plain. The Chief has its own. */
+/** One kit per liveried class; anything else wearing `traffic.police` renders plain. The Chief's Cruiser has its own. */
 const LIVERIES: ReadonlyArray<readonly [CarId, LiveryStyle]> = [['police', POLICE_LIVERY], ['sports', SPORTS_LIVERY], ['heavy', HEAVY_LIVERY]];
 
 /** Instanced meshes plus the packed-instance bookkeeping for one liveried class. */
@@ -128,7 +138,8 @@ export class PoliceView {
       return kit;
     };
     for (const [id, style] of LIVERIES) this.kitOf[id] = kitFor(id, style, capacity);
-    this.chiefKit = kitFor('sports', CHIEF_LIVERY, 1);
+    // two: a new Chief can come on while the last one's wreck still lies in the road
+    this.chiefKit = kitFor('police', CHIEF_LIVERY, 2);
 
     // Player bodies are authored relative to the sprung chassis, traffic to the ground.
     const t = sim.carId === 'police' ? sim.vehicle.tuning : CAR_PRESETS.police;
@@ -198,7 +209,7 @@ export class PoliceView {
     for (let i = 0; i < traffic.capacity; i++) {
       if (!traffic.police[i] || traffic.state[i] === AgentState.Free) continue;
       if (fade && (fade[i] as number) < 0.6) continue;
-      const kit = i === sim.police?.chief ? this.chiefKit : this.kitOf[traffic.kindOf(i)];
+      const kit = traffic.bodyOf(i) === 'chiefcar' ? this.chiefKit : this.kitOf[traffic.kindOf(i)];
       if (!kit || kit.n >= kit.packed.length) continue;
       const slot = traffic.slot[i] as number, p = slot * 3, r = slot * 4;
       this.position.set(

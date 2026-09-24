@@ -5,6 +5,8 @@
  * a wreck, and the new class drives like its preset.
  */
 import { describe, expect, it } from 'vitest';
+import { BALANCE } from '../../src/sim/balance';
+import { bodyTuning } from '../../src/sim/traffic/bodies';
 import { PedPose, type Pedestrians } from '../../src/sim/traffic/Pedestrians';
 import { AgentState, type Traffic } from '../../src/sim/traffic/Traffic';
 import type { LanePose } from '../../src/sim/traffic/lanes';
@@ -162,6 +164,34 @@ describe('car-swap', () => {
       // cars.test.ts pins the compact at 9-13 s
       expect(t).toBeGreaterThan(8.5);
       expect(t).toBeLessThan(13.5);
+    } finally { sim.dispose(); }
+  }, 60_000);
+
+  it('M8.8 0.1 a car taken on the street drives with its class\'s upgrades; at tier 0 it is its body\'s stock', async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
+    const traffic = sim.traffic as Traffic;
+    const lane = highwayLane(traffic);
+    // a parked taxi (the muscle class) 2.5 m to the right, taken; each time further along, clear of the car left behind
+    const takeTaxi = (s: number): void => {
+      traffic.lanes.positionAt(lane, s, 0, pose);
+      sim.vehicle.teleport({ x: pose.x, y: 1, z: pose.z }, pose.yaw);
+      run(sim, 0.5); // settle on the wheels
+      const p = sim.vehicle.body.translation();
+      const agent = traffic.spawnAtPoint(p.x - Math.cos(pose.yaw) * 2.5, p.z + Math.sin(pose.yaw) * 2.5, pose.yaw, 'taxi', AgentState.Abandoned);
+      run(sim, 0.3);
+      expect(sim.life.state.swapCandidate).toBe(agent);
+      sim.controls.swap = true;
+      sim.step();
+      expect(sim.carBody).toBe('taxi');
+      sim.vehicle.setVelocity(0, 0, 0);
+      run(sim, 0.5);
+    };
+    try {
+      takeTaxi(10);
+      expect(sim.vehicle.tuning).toEqual(bodyTuning('taxi'));
+      sim.garage.tiers.muscle[0] = 3;
+      takeTaxi(60);
+      expect(sim.vehicle.tuning.torqueMax).toBe(bodyTuning('taxi').torqueMax * (BALANCE.tiers.power[3] as number));
     } finally { sim.dispose(); }
   }, 60_000);
 });

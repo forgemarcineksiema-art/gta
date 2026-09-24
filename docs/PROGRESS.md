@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.8 slice 0: upgrades after a swap, the Chief's one car
+
+Done: a car taken on the street drives with its class's upgrades (`Life.swap` retunes with `Garage.tuningFor`, as the
+drive-out does; tier 0 is the body's stock bitwise). The Chief chases in his own cruiser (`chiefcar`, the police class,
+its own paint) instead of an ink interceptor: `spawnPoliceAt` takes a body, his PIT stays (`pit` is the Chief or the
+sports class); `PoliceView`'s Chief kit sits on the police shell, no band, its two lenses over his bar's red and blue,
+picked by body. Pins M8.8 0.1 (swap.test), 0.2 (board.test M6 2.3); heavy.long 7.1 and 7.3 moved to the cruiser (the
+long set, run at the gate). Verify green.
+
 ## 2026-09-25 — each worktree's e2e on its own port
 
 Found setting up `m8.8-fleet`: the quick verify's smoke (and every e2e suite) served on 4173 and Playwright reused

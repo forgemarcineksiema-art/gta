@@ -38,8 +38,10 @@ describe('heavies and the Chief', () => {
         expect(live.filter((a) => traffic.kindOf(a) === 'sports' && a !== police.chief).length).toBe(interceptors);
         if (level === 5) {
           expect(live).toContain(police.chief);
-          expect(traffic.kindOf(police.chief)).toBe('sports');
-          expect(traffic.paint[police.chief]).toBe(PALETTE.ink);
+          // M8.8 slice 0: the Chief drives his own cruiser (the police class in gold trim), the car the duel wins
+          expect(traffic.bodyOf(police.chief)).toBe('chiefcar');
+          expect(traffic.kindOf(police.chief)).toBe('police');
+          expect(traffic.paint[police.chief]).toBe(PALETTE.policeWhite);
         } else {
           expect(police.chief).toBe(-1);
         }
@@ -102,7 +104,7 @@ describe('heavies and the Chief', () => {
         run(sim, 0.3, (_t, _c, s) => s.vehicle.setVelocity(fx * v, s.vehicle.telemetry.vy, fz * v));
         const proj = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };
         lanes.project(lane, sim.probe.x, sim.probe.z, proj);
-        const chief = traffic.spawnPoliceAt(lane, Math.max(4, proj.s - 30), 'sports', sim.probe, 0, -1, 4, PALETTE.ink);
+        const chief = traffic.spawnPoliceAt(lane, Math.max(4, proj.s - 30), 'police', sim.probe, 0, -1, 4, PALETTE.policeWhite, false, 'chiefcar');
         sim.police!.enlist(chief);
         sim.police!.chief = chief;
         let contactAt = -10, landedAt = -10;

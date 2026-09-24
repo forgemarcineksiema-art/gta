@@ -2,7 +2,7 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
-## 2026-09-24 — M10 "The fleet" planned (a talk with Marcin on the vehicles)
+## 2026-09-24 — M8.8 "The fleet" planned (a talk with Marcin on the vehicles)
 
 From "list every vehicle": the 28 bodies, the five classes measured (0–60, 0–100, top, 100–0), and what they lack. Found
 in the code: a swap drops the class's upgrades; a borrowed interceptor or police van shows BORROW but gives no disguise
@@ -10,7 +10,8 @@ in the code: a swap drops the class's upgrades; a borrowed interceptor or police
 Chief is two cars; the compact, the first purchase, is worse than the free starter at every speed. Designed with him:
 a job per class, the trophies each best at one thing, the 4×4 on grass and dirt, three crazy cars, the motorbike, the
 hovercraft and the sea, a mega-ramp instead of a helicopter, a steamroller instead of a tank, the police on the car
-model. One document at his request: `docs/M10_PLAN.md`, after M9's launch; its phase A may run before M9 on his word.
+model. One document at his request, first as M10 after the launch; on 2026-09-25 he put the whole of it before the
+platform: `docs/M8.8_PLAN.md`, on his word after M8.7's gate, then M9.
 
 ## 2026-09-24 — M8.7 gate, the long pins (M8.6's two with them)
 

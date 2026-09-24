@@ -15,9 +15,14 @@ wants a touch button beside boost (slice 2). What M7 hands over: the
 settings in the save (version 4 then, 5 since M8; slice 0 checks the current
 version through the Data module), the settings row on the pause screen (the
 SDK's mute and the quality ride on it), the synthesized music (no file to
-load: the loading brackets only wrap the city).
+load: the loading brackets only wrap the city). What M8.8 hands over
+(`docs/M8.8_PLAN.md`): new vehicles on the same controls (the motorbike and
+the hovercraft included, so the touch layer maps nothing new), the scooters
+in the traffic the mobile tier thins, `physicalUnits` for the mobile tier to
+set (0 until its phones hold the budget), and the cover's picture (the
+monster truck on a police car).
 
-Executor: the agent that starts after the M8 gate, on Marcin's word.
+Executor: the agent that starts after the M8.8 gate, on Marcin's word.
 Reviewer: Claude, at the gate. Director, tester on real devices and the one
 who submits: Marcin. This document is the milestone contract: what to build,
 in which order, with which numbers, and what "done" means; each fixed

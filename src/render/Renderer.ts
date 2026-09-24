@@ -23,7 +23,6 @@ import { PoliceView } from './police/PoliceView';
 import { RoadblockView } from './police/RoadblockView';
 import { PropsView } from './props/PropsView';
 import { AutoQuality, QUALITY, type QualityTier } from './quality';
-import { Arrow } from './run/Arrow';
 import { Coins } from './run/Coins';
 import { HideoutView } from './run/HideoutView';
 import { MarkerView } from './run/MarkerView';
@@ -80,7 +79,6 @@ export class Renderer {
   readonly hideoutView: HideoutView | null;
   readonly coinsView: Coins | null;
   readonly markerView: MarkerView;
-  readonly arrow: Arrow;
   readonly roadblockView: RoadblockView | null;
   readonly rampView: RampView | null;
   /** The traffic lights' lamps (M5.5 slice 17). */
@@ -153,7 +151,6 @@ export class Renderer {
     this.pedView = sim.peds && sim.pedsDensity > 0 ? new PedView(this.scene, sim.peds) : null;
     this.hideoutView = sim.run.dropOffs.length > 0 ? new HideoutView(this.scene, sim) : null;
     this.markerView = new MarkerView(this.scene, sim, this.camera);
-    this.arrow = new Arrow(this.scene, this.camera);
     this.roadblockView = sim.roadblocks ? new RoadblockView(this.scene) : null;
     this.signalView = sim.city && sim.traffic ? new SignalView(this.scene, sim) : null;
     this.breakerView = sim.breakers ? new BreakerView(this.scene, sim.breakers.descs.length) : null;
@@ -224,7 +221,6 @@ export class Renderer {
     this.hideoutView?.update(sim);
     this.coinsView?.update(sim, dt, carPos);
     this.markerView.update(sim, alpha);
-    this.arrow.update(sim, carPos.x, carPos.y, carPos.z);
     this.roadblockView?.update(sim);
     this.signalView?.update(sim);
     this.breakerView?.update(sim);

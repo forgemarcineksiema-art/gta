@@ -46,7 +46,6 @@ import { CAR_IDS } from '../vehicle/presets';
 import { trialMedal, type JobDef } from './catalog';
 import { Race } from './Race';
 import { markerRingCoins, pointTarget } from './place';
-import { goalFor, newGoal } from '../run/goal';
 
 export type { JobDef, JobKind } from './catalog';
 
@@ -94,7 +93,6 @@ export class Jobs {
   /** The markers' coin rings are laid on the first step (once; the world's constructor leaves the extra coins to its callers). */
   private ringsLaid = false;
   private readonly routePoints: CoinPoint[] = [];
-  private readonly goal = newGoal();
 
   constructor(private readonly sim: SimWorld, defs: JobDef[]) {
     this.defs = defs;
@@ -307,33 +305,6 @@ export class Jobs {
     out.x = d.targetX;
     out.z = d.targetZ;
     return true;
-  }
-
-  /**
-   * Between jobs (DESIGN.md §4, §20): the goal line's point, the way's held
-   * goal (the nearest ring by road, or a door once the bag is above the door
-   * offer's threshold); without a way, the straight line's. False while a job
-   * runs or there is nothing to point at.
-   */
-  idleTarget(out: { x: number; z: number }): boolean {
-    if (this.state === 'hunting' || this.state === 'active') return false;
-    const way = this.sim.way;
-    const g = way ? way.goal : this.goal;
-    if (!way) goalFor(this.sim, this.goal);
-    if (!g.hasTarget) return false;
-    out.x = g.x;
-    out.z = g.z;
-    return true;
-  }
-
-  /** What the arrow points at: the running job's target, else the idle target. `idle` reports which. */
-  arrowTarget(out: { x: number; z: number; idle: boolean }): boolean {
-    if (this.target(out)) {
-      out.idle = false;
-      return true;
-    }
-    out.idle = true;
-    return this.idleTarget(out);
   }
 
   /** The door and busted: back to idle with no event. */

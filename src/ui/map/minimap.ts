@@ -8,7 +8,7 @@
 import { BALANCE, CITY_HALF, DISTRICTS, PALETTE, districtAt, type SimWorld } from '../../sim';
 import { LANDMARKS } from '../../sim/city/City';
 import { labelAria, relabel, t } from '../lang';
-import { MINIMAP, advance, buildRoadLayers, clampToRim, project, yawFromQuat, type MinimapState, type Vec2 } from './minimapModel';
+import { MINIMAP, advance, buildRoadLayers, clampToRim, drawInShare, project, routeStop, yawFromQuat, type MinimapState, type Vec2 } from './minimapModel';
 
 export type MarkerKind = 'tower' | 'tank' | 'glasshouse' | 'hotel' | 'garage' | 'job' | 'cache' | 'camera' | 'breaker';
 /** A point of interest on the map. `local` markers show only inside the circle (the job rings: sixteen chevrons on the rim would be noise). */
@@ -29,6 +29,8 @@ export const UNIT_BEAT = '#9d9da8';
 export const SEARCH_FILL = 'rgba(59, 130, 246, 0.22)';
 export const SEARCH_EDGE = 'rgba(59, 130, 246, 0.7)';
 export const LOOP = '#ffe9a8';
+/** The way's cyan (DESIGN.md §20.3 rule 6): the route and the goal's ring, and nothing else on the maps. */
+export const ROUTE = '#2bd1ff';
 export const GRID = 'rgba(247, 243, 234, 0.85)';
 const RIM = 'rgba(255, 210, 63, 0.45)';
 const PANEL = 0x160e28;
@@ -193,6 +195,22 @@ export function drawGlyph(c: CanvasRenderingContext2D, kind: MarkerKind, x: numb
   }
 }
 
+/** The goal's badge (M8.7 D3): an ink disc in a cyan ring with a dark edge; slice 3 puts the kind's outline in it. */
+export function drawGoalBadge(c: CanvasRenderingContext2D, x: number, y: number, r: number): void {
+  c.beginPath();
+  c.arc(x, y, r, 0, Math.PI * 2);
+  c.fillStyle = INK;
+  c.fill();
+  c.lineWidth = 3;
+  c.strokeStyle = ROUTE;
+  c.stroke();
+  c.beginPath();
+  c.arc(x, y, r + 2, 0, Math.PI * 2);
+  c.lineWidth = 1.5;
+  c.strokeStyle = DARK;
+  c.stroke();
+}
+
 /** The player's arrow at a screen point, turned `angle` from screen up. */
 export function drawArrow(c: CanvasRenderingContext2D, x: number, y: number, angle: number, a: number): void {
   c.save();
@@ -241,10 +259,12 @@ export class Minimap {
   private jobSerial = -1;
   private cacheSerial = -1;
   private sim: SimWorld | null = null;
-  /** The running job's target on the rim: the drop-off, the fence or the wanted car. Moved in place. */
-  private readonly jobTarget: MinimapMarker = { x: 0, z: 0, kind: 'job', color: JOB_COLORS.delivery };
-  private readonly jobPoint = { x: 0, z: 0 };
-  private jobTargetShown = false;
+  /** The way's route last seen (its serial, when it changed, its length) and where the draw-in stops (M8.7 D3). */
+  private routeSerial = -1;
+  private routeChanged = -Infinity;
+  private routeLength = NaN;
+  private paintNow = 0;
+  private readonly stop = { count: 0, x: 0, z: 0 };
   private readonly state: MinimapState = { heading: 0, radiusM: MINIMAP.radiusMinM };
   private readonly tmp: Vec2 = { x: 0, y: 0 };
   /** CSS size of the (square) canvas and the backing-store ratio. */
@@ -276,7 +296,7 @@ export class Minimap {
     this.canvas = document.createElement('canvas');
     this.canvas.className = 'minimap__canvas';
     this.canvas.setAttribute('role', 'img');
-    labelAria(this.canvas, 'Radar map. Up is your direction of travel. The yellow arrow is your car.');
+    labelAria(this.canvas, 'Radar map. Up is your direction of travel. The yellow arrow is your car; the cyan line is the way to your goal.');
     this.wrap.append(this.label, this.landmark, this.canvas);
     parent.appendChild(this.wrap);
     const ctx = this.canvas.getContext('2d');
@@ -361,8 +381,8 @@ export class Minimap {
     const caches = sim.caches;
     const cacheSerial = caches ? caches.serial : 0;
     if (jobs.serial !== this.jobSerial || cacheSerial !== this.cacheSerial) {
-      // the live rings while no job runs (inside the circle only); the running job's target clamps to the rim;
-      // the day's caches still to find as gold dots inside the circle (M5.5)
+      // the live rings while no job runs (inside the circle only; the goal's badge is the way's); the day's caches
+      // still to find as gold dots inside the circle (M5.5)
       this.jobSerial = jobs.serial;
       this.cacheSerial = cacheSerial;
       const running = jobs.running;
@@ -375,23 +395,23 @@ export class Minimap {
         }
       }
       if (running) {
-        this.markers = [...this.base, ...dots, this.jobTarget];
+        this.markers = [...this.base, ...dots];
       } else {
         const live = jobs.state === 'idle' ? jobs.defs.filter((d) => jobs.live(d)) : [];
         this.markers = [...this.base, ...dots, ...live.map((d): MinimapMarker => ({ x: d.x, z: d.z, kind: 'job', color: JOB_COLORS[d.kind], local: true }))];
       }
-      this.jobTargetShown = false;
       this.dirty = true;
     }
-    if (jobs.running) {
-      const shown = jobs.target(this.jobPoint);
-      if (shown && (this.jobPoint.x !== this.jobTarget.x || this.jobPoint.z !== this.jobTarget.z)) {
-        this.jobTarget.x = this.jobPoint.x;
-        this.jobTarget.z = this.jobPoint.z;
-        this.dirty = true;
+    // the way's route: drawn in when it changes, painted again when it moves
+    const way = sim.way;
+    if (way) {
+      if (way.serial !== this.routeSerial) {
+        this.routeSerial = way.serial;
+        this.routeChanged = now;
       }
-      if (shown !== this.jobTargetShown) {
-        this.jobTargetShown = shown;
+      if (now - this.routeChanged < MINIMAP.drawInMs) this.dirty = true;
+      if (way.length !== this.routeLength && !(Number.isNaN(way.length) && Number.isNaN(this.routeLength))) {
+        this.routeLength = way.length;
         this.dirty = true;
       }
     }
@@ -412,6 +432,7 @@ export class Minimap {
       || Math.abs(this.state.radiusM - this.paintedRadius) > 0.1;
     if (!this.dirty && !moved) return;
     if (!this.dirty && !snap && now - this.lastPaint < MINIMAP.repaintMs) return;
+    this.paintNow = now;
     this.paint(x, z, yaw);
     this.dirty = false;
     this.lastPaint = now;
@@ -498,17 +519,42 @@ export class Minimap {
       c.strokeStyle = SEARCH_EDGE;
       c.stroke();
     }
+    // the way's route (M8.7 D3): over the roads, under the rings, the units and the car
+    const way = this.sim?.way;
+    if (way && way.count > 1) {
+      const pts = way.points, stop = this.stop;
+      routeStop(pts, way.count, drawInShare(this.paintNow - this.routeChanged), stop);
+      c.beginPath();
+      c.moveTo(pts[0] as number, pts[1] as number);
+      for (let k = 1; k < stop.count; k++) c.lineTo(pts[k * 2] as number, pts[k * 2 + 1] as number);
+      c.lineTo(stop.x, stop.z);
+      c.lineCap = 'round';
+      c.lineJoin = 'round';
+      c.strokeStyle = DARK;
+      c.lineWidth = (MINIMAP.routePx + MINIMAP.routeEdgePx * 2) / s;
+      c.stroke();
+      c.strokeStyle = ROUTE;
+      c.lineWidth = MINIMAP.routePx / s;
+      c.stroke();
+    }
     c.restore();
 
     // Screen space from here: glyphs stay upright.
     const rimR = R - MINIMAP.rimInset;
     for (const m of this.markers) {
-      if (m === this.jobTarget && !this.jobTargetShown) continue;
       project(this.tmp, m.x, m.z, x, z, h, s, px, py);
       if (m.local && (this.tmp.x - ccx) ** 2 + (this.tmp.y - ccy) ** 2 > rimR * rimR) continue;
       const clamped = clampToRim(this.tmp, px, py, this.tmp.x, this.tmp.y, ccx, ccy, rimR);
       drawGlyph(c, m.kind, this.tmp.x, this.tmp.y, clamped ? MINIMAP.glyphPx * 0.75 : MINIMAP.glyphPx, m.color);
       if (clamped) this.chevron(this.tmp.x, this.tmp.y, Math.atan2(this.tmp.x - px, py - this.tmp.y), m.color);
+    }
+
+    // the goal's badge (M8.7 D3): white in a cyan ring at the route's end, on the rim with a chevron when past it
+    if (way && way.goal.hasTarget) {
+      project(this.tmp, way.goal.x, way.goal.z, x, z, h, s, px, py);
+      const clamped = clampToRim(this.tmp, px, py, this.tmp.x, this.tmp.y, ccx, ccy, rimR);
+      drawGoalBadge(c, this.tmp.x, this.tmp.y, MINIMAP.goalPx);
+      if (clamped) this.chevron(this.tmp.x, this.tmp.y, Math.atan2(this.tmp.x - px, py - this.tmp.y), ROUTE);
     }
 
     // the police: every unit inside the circle, lit in a chase

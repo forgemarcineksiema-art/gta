@@ -369,7 +369,7 @@ export class JobsHud {
       this.cardSub.textContent = t('THE COPS HAVE YOU');
       this.cardLimit.textContent = t('LOSE THEM');
     } else if (d.kind === 'fare') {
-      this.cardSub.textContent = t(sim.fares.hot ? 'A CROOK WITH A SUITCASE · DOUBLE PAY · MORE STARS' : 'TAKE THEM THERE · FOLLOW THE ARROW');
+      this.cardSub.textContent = t(sim.fares.hot ? 'A CROOK WITH A SUITCASE · DOUBLE PAY · MORE STARS' : 'TAKE THEM THERE · FOLLOW THE LINE');
       this.cardLimit.textContent = t('{time} · NEAR MISSES AND JUMPS TIP', { time: clock(d.limitSeconds) });
     } else if (d.kind === 'rage' || d.kind === 'mayhem') {
       const z = BALANCE.jobs.zone;
@@ -385,7 +385,7 @@ export class JobsHud {
       this.cardSub.textContent = best > 0 ? t('FOLLOW THE COINS · YOUR BEST: {medal}', { medal: t(MEDAL_WORDS[best] ?? '') }) : t('FOLLOW THE COINS TO THE FINISH');
       this.cardLimit.textContent = t('GOLD {g} · SILVER {s} · BRONZE {b}', { g: clock(Math.round(g)), s: clock(Math.round(s)), b: clock(Math.round(b)) });
     } else {
-      this.cardSub.textContent = t('DELIVER IT · FOLLOW THE ARROW');
+      this.cardSub.textContent = t('DELIVER IT · FOLLOW THE LINE');
       this.cardLimit.textContent = t('{time} · FASTER PAYS MORE', { time: clock(d.limitSeconds) });
     }
     this.card.dataset['kind'] = d.kind;

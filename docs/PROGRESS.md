@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8.7 slice 1: the route on the radar, no arrow
+
+Done (D3, D4, D11's route): the radar draws the way's route, a 5 px cyan line on a dark edge over the roads and under the
+rings, the units and the car, drawn out from the car over 0.5 s when the goal changes or the car leaves the route, still
+otherwise; the goal's badge (an ink disc in a cyan ring) ends it, on the rim with a chevron when past. The full map draws
+the whole route. The arrow is gone (`render/run/Arrow.ts`, `Jobs.arrowTarget`/`idleTarget`); the cards say FOLLOW THE
+LINE (JEDŹ ZA LINIĄ). The cold open's ring is the goal in its own chase, so its route is there from the first second.
+Pins M8.7 1.1 (the route's inner points on lanes), 1.2 (the draw-in), 1.4 (the cold open); corners count six; jobs 1.3,
+1.8, the chain's 2.3 and the screens suite read the way. Verify green; the radar is looked at at the gate.
+
 ## 2026-09-24 — M8.7 slice 0: the goal holds, the way
 
 Done (D1, D2, ARCHITECTURE 99): `run/way.ts` keeps the goal the line names and its route. A forward pass from the car's

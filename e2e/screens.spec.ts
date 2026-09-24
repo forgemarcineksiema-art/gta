@@ -297,7 +297,7 @@ for (const [w, h] of SIZES) {
     await page.screenshot({ path: `screens/goal-${w}x${h}.png` });
     await expectNoOverlap(page, `goal ${w}x${h}`);
     // a calm drive (M8.5, DESIGN.md §17.2): once the key hints have taught and the district's name has had its seconds,
-    // the line, the stars, the bank, the radar, the speed with the boost, and the arrow in the world: the seven
+    // the line, the stars, the bank, the radar with the way's route, the speed with the boost: the six (no arrow, DESIGN.md §20)
     // the frames' clock is the manual one here: 12.5 s of it and the hints have taught (their 12 s), the district's
     // name has had its 4 s
     await page.evaluate(() => window.advanceTime?.(12_500));
@@ -306,7 +306,7 @@ for (const [w, h] of SIZES) {
     await page.waitForTimeout(700);
     await page.screenshot({ path: `screens/calm-${w}x${h}.png` });
     expect(await drivingShown(page), `calm ${w}x${h}`).toEqual(['.jobs__line', '.hud__heat', '.run__coins', '.minimap__canvas', '.hud__speedo']);
-    expect(await page.evaluate(() => window.__game!.renderer.arrow.mesh.visible), `the arrow at ${w}x${h}`).toBe(true);
+    expect(await page.evaluate(() => window.__game!.sim.way!.count), `the route on the radar at ${w}x${h}`).toBeGreaterThan(1);
     // a step of the chain ticked: its card
     await page.evaluate(() => {
       const run = window.__game!.sim.run;

@@ -1,7 +1,7 @@
 /**
  * The driving screen's corners (M8.5 slice 1, docs/DESIGN.md §17.2): a calm
  * drive shows the stars, the bank, the radar, the speed and the boost (with
- * the goal line and the arrow, the seven); the bag from its first money, its
+ * the goal line, the six: no arrow, DESIGN.md §20); the bag from its first money, its
  * × from the first level that multiplies, the district's name for four
  * seconds, nothing of it behind a shut door or on the busted card; the key
  * hints and the developer's panel only with `?dev=1`.
@@ -22,8 +22,8 @@ const KEYS: KeyHints = {
 describe('the corners', () => {
   it('M8.5 1.1 a calm drive shows exactly the stars, the bank, the radar, the speed and the boost; the test track the car alone', () => {
     expect(driveNames(drive(calm()))).toEqual(['stars', 'bank', 'radar', 'speed', 'boost']);
-    // with the goal line and the arrow (jobs.ts, Arrow.ts): the seven of §17.2
-    expect(driveNames(drive(calm())).length + 2).toBe(7);
+    // with the goal line (jobs.ts): the six of §17.2 since §20 took the arrow out
+    expect(driveNames(drive(calm())).length + 1).toBe(6);
     expect(driveNames(drive(calm({ city: false })))).toEqual(['speed', 'boost']);
     // a dent and a running combo come and go with their moments
     expect(driveNames(drive(calm({ damage: 0.2, combo: true })))).toEqual(['stars', 'bank', 'radar', 'speed', 'boost', 'damage', 'combo']);

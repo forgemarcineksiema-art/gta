@@ -32,6 +32,14 @@ export const MINIMAP = {
   snapJumpM: 80,
   glyphPx: 8,
   arrowPx: 11,
+  /**
+   * The way's route (docs/M8.7_PLAN.md D3): its line, px, on a dark edge `routeEdgePx` wider on each side; drawn in
+   * from the car over `drawInMs` when the goal or the route changes, still otherwise. The goal's badge, px (radius).
+   */
+  routePx: 5,
+  routeEdgePx: 2,
+  drawInMs: 500,
+  goalPx: 7,
 } as const;
 
 export interface Segment { x0: number; z0: number; x1: number; z1: number }
@@ -161,6 +169,39 @@ export function clampToRim(out: Vec2, px: number, py: number, sx: number, sy: nu
 }
 
 /** The full-screen map (M5.5 slice 15): pixels a metre when the island (`half` m each way) and `margin` m of water fill a `size` px square. */
+/** The share of the route drawn `ms` after it last changed: 0 → 1 over `drawInMs`, eased out. */
+export function drawInShare(ms: number): number {
+  const t = Math.max(0, Math.min(1, ms / MINIMAP.drawInMs));
+  return 1 - (1 - t) * (1 - t);
+}
+
+/**
+ * Where a route's line stops at `share` of its length: the whole points before the stop (`count`) and the stop
+ * (`x`, `z`). `points` is x and z interleaved, `n` points of it. Writes into `out`; no allocation.
+ */
+export function routeStop(points: ArrayLike<number>, n: number, share: number, out: { count: number; x: number; z: number }): void {
+  let total = 0;
+  for (let i = 1; i < n; i++) total += Math.hypot((points[i * 2] as number) - (points[i * 2 - 2] as number), (points[i * 2 + 1] as number) - (points[i * 2 - 1] as number));
+  let left = total * Math.max(0, Math.min(1, share));
+  out.count = n > 0 ? 1 : 0;
+  out.x = (points[0] as number) ?? 0;
+  out.z = (points[1] as number) ?? 0;
+  for (let i = 1; i < n; i++) {
+    const ax = points[i * 2 - 2] as number, az = points[i * 2 - 1] as number, bx = points[i * 2] as number, bz = points[i * 2 + 1] as number;
+    const len = Math.hypot(bx - ax, bz - az);
+    if (len >= left) {
+      const t = len > 0 ? left / len : 0;
+      out.x = ax + (bx - ax) * t;
+      out.z = az + (bz - az) * t;
+      return;
+    }
+    left -= len;
+    out.count = i + 1;
+    out.x = bx;
+    out.z = bz;
+  }
+}
+
 export function bigMapScale(size: number, half: number, margin = 25): number {
   return size / 2 / (half + margin);
 }

@@ -177,7 +177,8 @@ export function goalFor(sim: SimWorld, out: Goal, choose: GoalChooser = NEAREST)
     return;
   }
   const run = sim.run;
-  if (sim.pursuit.state !== 'idle') {
+  // the cold open starts in its chase: its ring is the goal all the same (M8.7 D11)
+  if (sim.pursuit.state !== 'idle' && !sim.coldOpen.active) {
     out.kind = 'lose';
     if (run.bag > 0) out.hasTarget = choose.door(sim, out);
     return;

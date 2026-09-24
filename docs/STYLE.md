@@ -241,6 +241,15 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   places the street canyons hide. No text inside the circle but the rotating N;
   the district and landmark names sit above it at 12 px. Flat drop shadow, no
   glow. Numbers in `MINIMAP` (`src/ui/map/minimapModel.ts`).
+- The way's route (M8.7 slice 1, DESIGN §20.3 rule 4): on the radar a 5 px
+  line in the way's cyan `#2bd1ff` on a dark edge 2 px wider each side, round
+  joins, over the roads and under the rings, the units and the car, from the
+  car to the goal; it draws itself out from the car over 0.5 s (eased out)
+  when the goal or the route changes (a missed turn) and is still otherwise.
+  The goal's badge at its end: an ink disc 7 px in a 3 px cyan ring with a
+  dark edge, on the rim with a cyan chevron when the goal is past it. The
+  full map draws the whole route at 4 px and the badge at 9 px. Cyan means
+  the way on the maps and nothing else.
 
 ## Traffic and pedestrians (M3)
 
@@ -399,16 +408,9 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 
 ## Jobs, the arrow and the wall (M5)
 
-- The arrow (leaves with M8.7 slice 1, DESIGN §20; the markers, the goal
-  line, the radar and the colours below change by that milestone's slices):
-  one chevron in `carOrange`, 1.2 m long, 12 triangles, unlit,
-  2.5 m above the roof. It lies in a plane tipped 45° toward the camera and
-  turns inside it to the bearing (a flat arrow is edge-on to a chase camera
-  below it): up the screen is ahead, down is behind. Full colour on a job;
-  40 % between jobs, pointing at the nearest marker, or at the nearest door
-  once the bag is above the door offer's threshold. Hidden behind a shut
-  door, on the busted card, within 6 m of its target, and in the cold open
-  until its delivery runs (the captions lead).
+- No arrow (M8.7 slice 1, DESIGN §20, Marcin's decision): where to go is the
+  radar's route (the minimap entry above). The markers, the goal line and
+  the colours below change by M8.7's later slices.
 - The job line: top centre where the key hints sit (they give way), 20 px
   heavy italic uppercase skewed −10° in the popup type: the job, its clock
   in accent yellow (danger red from 10 s), the distance in ink at 16 px
@@ -498,7 +500,7 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 - **The helicopter** (slice 9): a police-white body with a spinning rotor,
   a blinking bar, an additive searchlight cone and a spot on the ground.
 - **The goal line** (slice 2): the job line's place at the top centre, a
-  12 px dot in the colour of the ring the arrow points at, the goal in
+  12 px dot in the colour of the goal's ring, the goal in
   capitals (LOSE THEM in danger red); the chain's cards in the job card's
   frame with an accent border. **The ticker** (slice 4): one italic
   uppercase line at the top centre, the level in danger red before the

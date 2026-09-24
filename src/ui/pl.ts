@@ -149,7 +149,7 @@ export const PL: Readonly<Record<string, string>> = {
   '{time} FROM THE SWAP · NO SCRATCHES': '{time} OD PRZESIADKI · BEZ RYSY',
   'THE COPS HAVE YOU': 'GLINY CIĘ MAJĄ',
   'A CROOK WITH A SUITCASE · DOUBLE PAY · MORE STARS': 'KANCIARZ Z WALIZKĄ · PODWÓJNA STAWKA · WIĘCEJ GWIAZDEK',
-  'TAKE THEM THERE · FOLLOW THE ARROW': 'ZAWIEŹ PASAŻERA · JEDŹ ZA STRZAŁKĄ',
+  'TAKE THEM THERE · FOLLOW THE LINE': 'ZAWIEŹ PASAŻERA · JEDŹ ZA LINIĄ',
   '{time} · NEAR MISSES AND JUMPS TIP': '{time} · NAPIWKI ZA SKOKI I MIJANKI O WŁOS',
   'WRECK CARS INSIDE THE RING': 'ROZBIJAJ AUTA W KRĘGU',
   'SMASH IT UP INSIDE THE RING': 'DEMOLUJ WSZYSTKO W KRĘGU',
@@ -159,7 +159,7 @@ export const PL: Readonly<Record<string, string>> = {
   'FOLLOW THE COINS · YOUR BEST: {medal}': 'JEDŹ ZA MONETAMI · TWÓJ REKORD: {medal}',
   'FOLLOW THE COINS TO THE FINISH': 'JEDŹ ZA MONETAMI DO METY',
   'GOLD {g} · SILVER {s} · BRONZE {b}': 'ZŁOTO {g} · SREBRO {s} · BRĄZ {b}',
-  'DELIVER IT · FOLLOW THE ARROW': 'DOSTARCZ PACZKĘ · JEDŹ ZA STRZAŁKĄ',
+  'DELIVER IT · FOLLOW THE LINE': 'DOSTARCZ PACZKĘ · JEDŹ ZA LINIĄ',
   '{time} · FASTER PAYS MORE': '{time} · IM SZYBCIEJ, TYM WIĘCEJ',
   'STEP {n} OF {of}': 'KROK {n} Z {of}',
   'DONE': 'ZROBIONE',
@@ -182,7 +182,7 @@ export const PL: Readonly<Record<string, string>> = {
   'COPS': 'GLINY',
   'HELICOPTER': 'HELIKOPTER',
   'Map of the island, north up. The yellow arrow is your car.': 'Mapa wyspy, północ u góry. Żółta strzałka to twoje auto.',
-  'Radar map. Up is your direction of travel. The yellow arrow is your car.': 'Radar. U góry jest kierunek jazdy. Żółta strzałka to twoje auto.',
+  'Radar map. Up is your direction of travel. The yellow arrow is your car; the cyan line is the way to your goal.': 'Radar. U góry jest kierunek jazdy. Żółta strzałka to twoje auto, turkusowa linia to droga do celu.',
 
   // the run: the busted card and the wall's TOTALS (run.ts, totals.ts)
   'BUSTED': 'WPADKA',

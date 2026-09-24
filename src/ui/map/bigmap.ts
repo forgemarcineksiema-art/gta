@@ -13,14 +13,16 @@ import { LANDMARKS, cityFootprints } from '../../sim/city/City';
 import { COVER } from '../../sim/city/covers';
 import { BLOCK, HIGHWAY_HALF, OVERPASS, OVERPASS_NODES } from '../../sim/city/roads';
 import {
-  CACHE_COLOR, DARK, FONT, GLYPH_KINDS, GRID, INK, JOB_COLORS, LOOP, ACCENT, RIVAL, SEARCH_EDGE, SEARCH_FILL, UNIT_BEAT, UNIT_LIT, WATER,
-  drawArrow, drawGlyph, drawHeli, fillIsland, hex, type MapPaths, type MarkerKind,
+  CACHE_COLOR, DARK, FONT, GLYPH_KINDS, GRID, INK, JOB_COLORS, LOOP, ACCENT, RIVAL, ROUTE, SEARCH_EDGE, SEARCH_FILL, UNIT_BEAT, UNIT_LIT, WATER,
+  drawArrow, drawGlyph, drawGoalBadge, drawHeli, fillIsland, hex, type MapPaths, type MarkerKind,
 } from './minimap';
 import { label, labelAria, relabel, t } from '../lang';
 import { MINIMAP, bigMapProject, bigMapScale, yawFromQuat, type Vec2 } from './minimapModel';
 
 /** Repaint cadence while shown, ms: the units move, the map need not be smoother than the radar. */
 const REPAINT_MS = 66;
+/** The way's route on the full map, px (M8.7 D3). */
+const ROUTE_PX = 4;
 const GLYPH = 7;
 /** The cover on the map: where the helicopter cannot see (DESIGN.md §13.10). */
 const COVER_COLOR = 'rgba(126, 196, 214, 0.9)';
@@ -74,7 +76,6 @@ export class BigMap {
   private measure = true;
   private lastPaint = -Infinity;
   private readonly tmp: Vec2 = { x: 0, y: 0 };
-  private readonly jobPoint = { x: 0, z: 0 };
   private readonly onResize = (): void => { this.measure = true; };
 
   constructor(parent: HTMLElement, sim: SimWorld, private readonly paths: MapPaths) {
@@ -306,6 +307,21 @@ export class BigMap {
       c.strokeStyle = SEARCH_EDGE;
       c.stroke();
     }
+    // the way's whole route (M8.7 D3): cyan on a dark edge
+    const way = sim.way;
+    if (way && way.count > 1) {
+      c.beginPath();
+      c.moveTo(way.points[0] as number, way.points[1] as number);
+      for (let k = 1; k < way.count; k++) c.lineTo(way.points[k * 2] as number, way.points[k * 2 + 1] as number);
+      c.lineCap = 'round';
+      c.lineJoin = 'round';
+      c.strokeStyle = DARK;
+      c.lineWidth = (ROUTE_PX + 3) / s;
+      c.stroke();
+      c.strokeStyle = ROUTE;
+      c.lineWidth = ROUTE_PX / s;
+      c.stroke();
+    }
     c.restore();
 
     // Screen space from here: glyphs and words stay upright.
@@ -340,11 +356,13 @@ export class BigMap {
         if (spot) this.glyphAt('cache', spot.x, spot.z, s, GLYPH, CACHE_COLOR);
       }
     }
-    if (running) {
-      // the running job's target: where to go
-      if (jobs.target(this.jobPoint)) this.glyphAt('job', this.jobPoint.x, this.jobPoint.z, s, GLYPH * 1.6, JOB_COLORS[running.kind]);
-    } else if (jobs.state === 'idle') {
+    if (!running && jobs.state === 'idle') {
       for (const d of jobs.defs) if (jobs.live(d)) this.glyphAt('job', d.x, d.z, s, GLYPH, JOB_COLORS[d.kind]);
+    }
+    // the goal's badge: where the route ends
+    if (way && way.goal.hasTarget) {
+      const g = this.at(way.goal.x, way.goal.z, s);
+      drawGoalBadge(c, g.x, g.y, GLYPH * 1.1);
     }
     // the pursuit's units, lit in a chase; a race's rivals; the helicopter
     const police = sim.police, traffic = sim.traffic;

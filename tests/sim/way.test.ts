@@ -270,4 +270,41 @@ describe('the way', () => {
       expect(worst).toBeLessThan(80);
     } finally { sim.dispose(); }
   }, 60_000);
+
+  it('M8.7 1.1 the route runs on the road: from the car, along lanes, to the goal', async () => {
+    const sim = await createWorld(CITY);
+    try {
+      const way = sim.way!, lanes = sim.traffic!.lanes, city = sim.city!;
+      let routes = 0;
+      for (let lane = 0; lane < lanes.laneCount; lane += 6) {
+        onLane(sim, lane, (lanes.length[lane] as number) / 2);
+        way.release();
+        way.step(BALANCE.way.routeEvery);
+        if (way.count < 3) continue;
+        routes++;
+        expect([way.points[0], way.points[1]]).toEqual([Math.fround(sim.probe.x), Math.fround(sim.probe.z)]);
+        expect([way.points[way.count * 2 - 2], way.points[way.count * 2 - 1]]).toEqual([Math.fround(way.goal.x), Math.fround(way.goal.z)]);
+        for (let k = 1; k < way.count - 1; k++) {
+          const x = way.points[k * 2] as number, z = way.points[k * 2 + 1] as number;
+          const near = city.nearestLane(x, z);
+          const proj = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };
+          lanes.project(near, x, z, proj);
+          expect(proj.dist).toBeLessThan(0.5);
+        }
+      }
+      expect(routes).toBeGreaterThan(20);
+    } finally { sim.dispose(); }
+  }, 60_000);
+
+  it('M8.7 1.4 the cold open: its ring is the goal and the route is there from its first second', async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 0, record: false });
+    try {
+      sim.coldOpen.start();
+      run(sim, 1);
+      const way = sim.way!;
+      expect(way.goal.id).toBe(sim.coldOpen.job);
+      expect(way.count).toBeGreaterThan(1);
+      expect(Number.isFinite(way.length)).toBe(true);
+    } finally { sim.dispose(); }
+  }, 60_000);
 });

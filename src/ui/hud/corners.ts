@@ -3,11 +3,11 @@
  * answers one question. Top right, how hot and how much: the stars, the bag
  * with its ×, the bank. Bottom left, where: the radar. Bottom right, the car:
  * the speed, the boost, the damage. Top left, the combo while one runs. The
- * goal line and the arrow (top centre) decide their own words and targets in
- * `jobs.ts` and `render/Arrow.ts`.
+ * goal line (top centre) decides its own words in `jobs.ts`; where is the
+ * radar's route (`map/minimap.ts`, DESIGN.md §20: no arrow).
  *
- * A calm drive shows seven things: the line, the arrow, the stars, the bank,
- * the radar, the speed, the boost. The rest comes on its moment and goes: the
+ * A calm drive shows six things: the line, the stars, the bank, the radar,
+ * the speed, the boost. The rest comes on its moment and goes: the
  * bag with its first money, its × from the first level that multiplies, the
  * district's name for a few seconds, the damage once dented, the combo while
  * it runs. Behind a shut door and on the busted card none of it shows: the

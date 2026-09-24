@@ -5,7 +5,7 @@
  */
 import { describe, expect, test } from 'vitest';
 import { buildRoadGraph } from '../../src/sim/city/roads';
-import { MINIMAP, advance, bigMapProject, bigMapScale, buildRoadLayers, clampToRim, project, wrapAngle, type MinimapState, type Vec2 } from '../../src/ui/map/minimapModel';
+import { MINIMAP, advance, bigMapProject, bigMapScale, buildRoadLayers, clampToRim, drawInShare, project, routeStop, wrapAngle, type MinimapState, type Vec2 } from '../../src/ui/map/minimapModel';
 import { CITY_HALF } from '../../src/sim/city/roads';
 
 describe('minimap model', () => {
@@ -92,5 +92,27 @@ describe('minimap model', () => {
       expect(out.y).toBeGreaterThan(0);
       expect(out.y).toBeLessThan(size);
     }
+  });
+
+  test('M8.7 1.2 the route draws in from the car over drawInMs, eased out, and stops where its share of the length says', () => {
+    expect(drawInShare(0)).toBe(0);
+    expect(drawInShare(-50)).toBe(0);
+    expect(drawInShare(MINIMAP.drawInMs / 2)).toBeCloseTo(0.75, 6);
+    expect(drawInShare(MINIMAP.drawInMs)).toBe(1);
+    expect(drawInShare(MINIMAP.drawInMs * 3)).toBe(1);
+    // an L of 30 m then 10 m: 40 m in all
+    const pts = new Float32Array([0, 0, 30, 0, 30, 10]);
+    const out = { count: 0, x: 0, z: 0 };
+    routeStop(pts, 3, 0, out);
+    expect(out).toEqual({ count: 1, x: 0, z: 0 });
+    routeStop(pts, 3, 0.5, out);
+    expect(out).toEqual({ count: 1, x: 20, z: 0 });
+    routeStop(pts, 3, 0.875, out);
+    expect(out.count).toBe(2);
+    expect(out.x).toBeCloseTo(30, 6);
+    expect(out.z).toBeCloseTo(5, 6);
+    routeStop(pts, 3, 1, out);
+    expect(out.count).toBe(2);
+    expect([out.x, out.z]).toEqual([30, 10]);
   });
 });

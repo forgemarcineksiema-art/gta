@@ -3,7 +3,7 @@
  * job and adds its heat once, arrival pays the payout with the time bonus
  * into the bag, the clock fails it, a second ring does nothing while one
  * runs, and abandon is silent. M5 slice 1: the generator's placement, the
- * delivery on a placed def, the arrow's bearing and its idle target (the bot
+ * delivery on a placed def, the way's goal during a job and between jobs (the bot
  * drives one, 1.7, in jobs.long.test.ts).
  */
 import { writeFileSync } from 'node:fs';
@@ -12,7 +12,6 @@ import { BALANCE } from '../../src/sim/balance';
 import type { EventKind } from '../../src/sim/events';
 import type { JobDef, SimWorld } from '../../src/sim';
 import { lanePathTo, placeJobs, pointTarget } from '../../src/sim/jobs/place';
-import { bearing } from '../../src/sim/math';
 import { BLOCK, HIGHWAY_HALF, ROAD_HALF, distanceToPolyline, projectOnLane } from '../../src/sim/city/roads';
 import { createWorld, run, runUntil } from './helpers';
 
@@ -124,22 +123,21 @@ describe('jobs (M5 slice 1)', () => {
     } finally { sim.dispose(); }
   });
 
-  it('1.3 the arrow: the target is the drop-off and the bearing to it is right within 2 degrees', async () => {
+  it('1.3 the target is the drop-off; the goal is the job and the route of the way ends on it (M8.7, no arrow)', async () => {
     const sim = await placedWorld();
     try {
       const d = firstDelivery(sim);
       drop(sim, d.x, d.z);
-      const t = { x: 0, z: 0, idle: true };
+      const t = { x: 0, z: 0 };
       expect(sim.jobs.target(t)).toBe(true);
       expect(t.x).toBe(d.targetX);
       expect(t.z).toBe(d.targetZ);
-      expect(sim.jobs.arrowTarget(t)).toBe(true);
-      expect(t.idle).toBe(false);
-      const p = sim.probe;
-      const expected = Math.atan2(d.targetX - p.x, d.targetZ - p.z);
-      const got = bearing(p.x, p.z, t.x, t.z);
-      const diff = Math.abs(Math.atan2(Math.sin(got - expected), Math.cos(got - expected))) * 180 / Math.PI;
-      expect(diff).toBeLessThan(2);
+      run(sim, 0.3);
+      const way = sim.way!;
+      expect(way.goal.kind).toBe('job');
+      expect([way.goal.x, way.goal.z]).toEqual([d.targetX, d.targetZ]);
+      expect(way.count).toBeGreaterThan(1);
+      expect([way.points[way.count * 2 - 2], way.points[way.count * 2 - 1]]).toEqual([Math.fround(d.targetX), Math.fround(d.targetZ)]);
     } finally { sim.dispose(); }
   });
 
@@ -202,25 +200,20 @@ describe('jobs (M5 slice 1)', () => {
     try {
       run(sim, 0.1);
       const way = sim.way!;
-      const t = { x: 0, z: 0, idle: false };
-      expect(sim.jobs.arrowTarget(t)).toBe(true);
-      expect(t.idle).toBe(true);
+      expect(way.goal.kind).toBe('take');
       const live = sim.jobs.defs.filter((d) => d.kind !== 'fare' && sim.jobs.live(d));
       const nearest = live.reduce((a, b) => (way.ringDistance(b.id) < way.ringDistance(a.id) ? b : a));
       expect(way.goal.id).toBe(nearest.id);
-      expect([t.x, t.z]).toEqual([nearest.x, nearest.z]);
+      expect([way.goal.x, way.goal.z]).toEqual([nearest.x, nearest.z]);
       sim.run.bag = BALANCE.offer.doorThreshold + 1;
       run(sim, 0.1);
-      expect(sim.jobs.idleTarget(t)).toBe(true);
       expect(way.goal.kind).toBe('bank');
       const door = sim.run.dropOffs[way.goal.door]!.door;
-      expect([t.x, t.z]).toEqual([door.x, door.z]);
+      expect([way.goal.x, way.goal.z]).toEqual([door.x, door.z]);
       const d = firstDelivery(sim);
       drop(sim, d.x, d.z);
-      expect(sim.jobs.idleTarget(t)).toBe(false);
-      expect(sim.jobs.arrowTarget(t)).toBe(true);
-      expect(t.idle).toBe(false);
-      expect([t.x, t.z]).toEqual([d.targetX, d.targetZ]);
+      expect(way.goal.kind).toBe('job');
+      expect([way.goal.x, way.goal.z]).toEqual([d.targetX, d.targetZ]);
     } finally { sim.dispose(); }
   });
 

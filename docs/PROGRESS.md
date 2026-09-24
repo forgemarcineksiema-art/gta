@@ -2,6 +2,19 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — design talk: the clean screen (M8.5) before the platform
+
+Marcin brought a review of the screen ("too dense for a child": fourteen things on a calm drive, seven tabs on the
+wall, money under four names with BANK and CASH as two numbers on one screen) and agreed: crowded and chaotic in the
+bad sense, and a CrazyGames game cannot ship careless. Counted on the M7 gate's screens: also heat under three names
+(the stars, LEVEL, HEAT), the garage under three, four NEAR MISS pops beside the combo that already says it, the
+news over the busted card, and the key hints naming the tuning panel, which opens without `?dev=1`. Set here, DESIGN
+§17: each corner answers one question (seven things on a calm drive), one voice at a time, one name for each thing, a
+road coin in the bank (save v6), the wall as TOTALS · CARS · STYLE · GOALS, the screen's budget in `CLAUDE.md`. The
+contract `docs/M8.5_PLAN.md` (slices 0–5); the platform keeps M9. M8's gate closes inside M8.5's (one A/B, one
+report, 0.8.5): the new work touches only the screen and the coin pool, and M8's long pins hold. Open for it: the
+heat suite's last run crashed its browser at 14:29 (`Target crashed`). Next: M8.5 on his word.
+
 ## 2026-09-24 — M8 slice 9: the long game
 
 Done: save version 5 with `career.smashed` (the player's smashes, lifetime; a v4 save migrates with 0; the save pins

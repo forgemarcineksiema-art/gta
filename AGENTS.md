@@ -9,10 +9,13 @@ For any coding agent working in this repository (Cursor, Codex, Claude Code):
 2. `docs/BRIEF.md` is the project brief and is read-only.
 3. `docs/PROGRESS.md` is the session log; read the newest entry and the last
    15 commits before starting, and add your own entry before stopping.
-4. Every remaining milestone has a written contract (now `docs/M8_PLAN.md`,
-   the chaos, after the M7 gate; then `docs/M9_PLAN.md`, the platform; the
-   design behind them in `docs/DESIGN.md`; the finished ones `docs/M3_PLAN.md`,
-   `M4_PLAN.md`, `M5_PLAN.md`, `M5.5_PLAN.md`, `M6_PLAN.md`, `M7_PLAN.md`). A contract fixes scope,
+4. Every remaining milestone has a written contract (now `docs/M8.5_PLAN.md`,
+   the clean screen, whose gate closes `docs/M8_PLAN.md`'s too; then
+   `docs/M9_PLAN.md`, the platform; the design behind them in
+   `docs/DESIGN.md`; the finished ones `docs/M3_PLAN.md`, `M4_PLAN.md`,
+   `M5_PLAN.md`, `M5.5_PLAN.md`, `M6_PLAN.md`, `M7_PLAN.md`). The screen's
+   budget in `CLAUDE.md` (a calm drive shows seven things; a new system gets
+   no standing place on it) binds every milestone. A contract fixes scope,
    decisions, numbers, tests and the gate; work through its slices in order
    and stop only where it says to stop.
 5. `npm run verify` must be green before your first edit and at every commit

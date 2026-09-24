@@ -649,7 +649,8 @@ onto the front page.
 The contracts with done criteria, pins and measurements per slice are
 `docs/M4_PLAN.md` (its §5 holds update 1), `docs/M5_PLAN.md` and
 `docs/M6_PLAN.md` (the board), `docs/M7_PLAN.md` (the polish),
-`docs/M8_PLAN.md` (the chaos) and `docs/M9_PLAN.md` (the platform); this
+`docs/M8_PLAN.md` (the chaos), `docs/M8.5_PLAN.md` (the clean screen) and
+`docs/M9_PLAN.md` (the platform); this
 section is the summary. Update 2 gets its contract after the first Basic
 Launch numbers.
 
@@ -711,6 +712,11 @@ both.
   `docs/M8_PLAN.md`): the street made of things with mass, the knock
   decided before the physics step, each district's things, the smash as a
   trick, the bill at the door. On his word after the 0.7.0 playtest.
+- **M8.5 The clean screen** (set here 2026-09-24 after Marcin's review of
+  the screen, §17; the contract is `docs/M8.5_PLAN.md`): each corner
+  answers one question, one voice at a time, one name for each thing, the
+  wall in four pages, a road coin in the bank. On his word; M8's gate
+  closes inside its gate.
 - **M9 Platform**, the brief's M6 (`docs/M9_PLAN.md`), then Basic Launch;
   only when all of it is in and on his word that the game is good.
 - Later, by the KPIs: cop mode, ghosts, multiplayer (§8).
@@ -1621,6 +1627,188 @@ the platform (M9).
 - §14.3: Big Bernie's second requirement.
 - The balance is re-measured at the M8 gate and refitted if the smashes
   move its inputs.
+
+## 17. M8.5 "The clean screen": what a twelve-year-old sees — set here, 2026-09-24
+
+After the M8 slices Marcin brought a review of the screen: too dense for a
+child. Stars, the bag with its multiplier, coins, the trick chain, the news,
+the job line with its clock and its count, the arrow, the gear, the speed,
+the boost, three counters (50/20/30) and the radar at once; seven tabs on
+the garage wall; money under four names, BANK and CASH with two different
+numbers on one screen; after M5 he himself did not know what to do after
+the intro, and three milestones of systems have landed since; §3.1's rule,
+"a twelve-year-old understands it from the HUD alone", never met a
+twelve-year-old. His word: it is crowded and chaotic in the bad sense, and
+a game going to CrazyGames cannot be made carelessly. The fix sits before
+the platform, because M9's touch layer puts buttons on the same screen.
+What the fix is, is set here (he overrides).
+
+### 17.1 What the screen says today
+
+Counted on the M7 gate's screens at 1280×720 (M8 adds the damage news to
+the ticker and CITY DAMAGE to the wall's counts):
+
+- **A calm drive** (no job, no stars): fourteen things. The goal line, the
+  arrow, five stars, the bag `0 ×1`, the coins, the district and landmark
+  names, the radar, the gear, the speed, `km/h`, the boost, BILLBOARDS 0/50,
+  JUMPS 0/20, CACHES 0/30.
+- **A job's first seconds on the chain**: twenty. The above, the step card,
+  the combo and four NEAR MISS pops for the misses the combo already counts.
+- **The busted card**: the stars' news over it; the radar, the speed and the
+  three counters around it.
+- **The door**: seven tabs; BAG, MULTIPLIER, BANKED, BEST RUN, BANK; the
+  sentence, the first car's line, the counts, the WANTED poster; CASH in the
+  footer. BANK and CASH differ by the coin pool (`funds` is the bank plus
+  the coins, D14 of `docs/M5_PLAN.md`). The radar, the speed and the
+  counters still show beside the wall.
+- **Names**: money is COINS, BAG, BANK, CASH and BANKED; heat is the stars,
+  LEVEL 3 (the news) and HEAT 3 (the dailies, the police car's card); the
+  place the bag is banked is the GARAGE, the DOOR, the HIDEOUT, and a
+  delivery ends at a DROP-OFF; the trick run is the SKILL CHAIN.
+- **The key hints** name ` TUNING, the developer's panel, to every player,
+  and the key opens it without `?dev=1`.
+
+Why it happened: §3.1's test was run on each feature alone. Each milestone
+added a system and gave it a place on the screen; none took one away. Why
+it matters: the player is eleven to sixteen, gives the game thirty seconds,
+and on a portal played worldwide often reads English slowly. A glyph, a
+colour and a number are read before a word.
+
+### 17.2 The rule: each corner answers one question
+
+- **Top centre, what now?** The goal line, and the arrow in the world. A
+  card, a caption or one message shows under the line for a moment and goes.
+- **Top right, how hot and how much?** The stars; the bag with its ×; the
+  bank.
+- **Bottom left, where?** The radar.
+- **Bottom right, the car.** The speed and the boost; the damage once dented.
+- **Top left, the combo**, only while one runs.
+- **The centre is the road**: the swap prompt, WRECKED, the ticket book and
+  the busted card, nothing else.
+
+A calm drive shows seven things: the line, the arrow, the stars, the bank,
+the radar, the speed, the boost. Everything else appears when it happens
+and goes:
+
+- The bag appears with its first money, in a pop; a bag of `0` never shows.
+  Its × appears at the first level that multiplies (×1.3, two stars): the
+  moment that teaches it. `×1` never shows. The bag's place stays reserved,
+  so the bank never jumps.
+- The district's name shows for four seconds on entering one and at the
+  drive-out.
+- The three hunts leave the screen: a find pops with its count (BILLBOARD
+  13/50, NEW JUMP 4/20, CACHE 5/30); the counts live on the wall's GOALS
+  page and the full map.
+- The gear goes (the box is automatic; the debug block keeps it). ONCOMING
+  and the drift readout go (the combo's word says both). The job line loses
+  its coin count (the coins are on the road; a fare's card says every coin
+  is a tip).
+- Behind a shut door and on the busted card the driving screen goes whole:
+  the wall or the card has the screen.
+- The key hints lose TUNING; the backtick opens the panel only with
+  `?dev=1`.
+
+### 17.3 One voice at a time
+
+- **The top centre speaks only when it changes what you do**: the stars'
+  news (led by the stars: `★★★ ROADBLOCKS UP`), a warning (ROADBLOCK AHEAD,
+  HELICOPTER), the police's description of your car (SUSPECT IN A RED MUSCLE
+  CAR, the identity rule's one teacher), a rival ready, the twins' new car.
+  The evening news after a level and after an escape, UNIT DOWN, a rival
+  driving by and the property damage news go: the screen tells those jokes
+  better (the cruisers queue at the donut shop). Nothing speaks over the
+  busted card.
+- **One event, one text.** A trick the combo counts (a near miss, oncoming,
+  a dodge, air, a smash) never pops: the combo shows it. The pops are what
+  pays or counts outside it: TAKEDOWN!, a find with its count, FLASHED,
+  COPS LOST YOU, the combo's end (COMBO +2,100), DAILY DONE, the streak,
+  HIDDEN CAR, PURSUIT BREAKER. Two at a time at most.
+
+### 17.4 One name for each thing
+
+| The thing | On screen | Glyph | Never |
+|---|---|---|---|
+| money that is yours | BANK | the coin | CASH, FUNDS, COINS as a sum |
+| money at risk in a run | BAG | the sack | — |
+| what the stars do to the bag | ×1.3 … ×3 | — | MULTIPLIER |
+| heat | the stars: `★★★`, 3 STARS | the star | HEAT, LEVEL |
+| where the bag is banked | GARAGE | the house | DOOR, HIDEOUT |
+| where a job ends | the ring the arrow points at | the arrow | DROP-OFF, MARK |
+| the police | COPS; POLICE CAR for the car | — | UNITS, AIR UNIT |
+| the trick run | COMBO | — | SKILL CHAIN, CHAIN |
+
+Names stay names: the districts, the rivals, the cars, the jobs, the kit.
+
+The one change under the words: **a road coin goes into the bank.** The coin
+pool was already the player's and already spent as one with the bank; two
+numbers for one purse was the confusion. D14's reason holds (a child's money
+is never at risk): the bank is never at risk either. `Run.coins` goes, the
+save's v6 folds it into the bank, the garage spends the bank. The run still
+counts its coins for the dailies and the wall. No amount moves.
+
+### 17.5 The wall in four
+
+TOTALS · CARS · STYLE · GOALS (was TOTALS, CARS, BOARD, STYLE, TUNE, PREP,
+DAILIES).
+
+- **TOTALS**: BANKED, with NEW BEST when it is one; one line of sums, the
+  bag × the stars = +banked (busted: the bag, half kept); the sentence until
+  step 4, now `CRIMES FILL THE BAG · STARS MULTIPLY IT · A GARAGE BANKS IT`;
+  the next goal in one line; the run's counts; then **for the next run** the
+  lawyer and the fence, once the door's offer is answered: they belong to
+  the run about to start, and every game for this age sells its booster at
+  the start button. The footer: BANK and DRIVE OUT. The BANK line, BEST RUN
+  and the WANTED poster leave: the footer holds the bank, GOALS the best
+  run, STYLE the poster beside the paint that changes it.
+- **CARS**: the cars, then the chosen car's POWER, GRIP and BOOST under
+  them (TUNE's rows, under the car they belong to).
+- **STYLE**: the paint and the kit as today, the WANTED poster by the paint.
+- **GOALS**: the next goal; the day's three and the streak; the board (your
+  place, the chips, the next rival in one line); the hunts, the trials'
+  medals and the best run.
+
+One rewarded offer on screen at a time: DOUBLE THE BAG first, the prep row
+after it is answered. TOTALS and GOALS fit 800×450 without scrolling.
+
+### 17.6 The budget is fixed
+
+- A new system gets no standing place on the driving screen: it speaks
+  through the goal line, a card, the one message, a pop, the wall's GOALS
+  page or the full map. `CLAUDE.md` carries this among the fixed decisions.
+- M9's touch buttons take the thumbs' corners and carry no numbers.
+- The gate counts: a calm drive shows exactly the seven; the top centre
+  never more than the line and one card, caption or message; never more
+  than two pops; no word on screen outside §17.4 but names.
+
+### 17.7 The twelve-year-old's pass
+
+There is no twelve-year-old to ask, so the gate plays one. On each state of
+the screens suite the reviewer asks the five questions a child asks (what
+do I do now, where, am I in trouble, how much have I got, what is it for)
+and names the one thing on screen that answers each. A thing that answers
+none is a defect; a question with two answers is a defect; a word a child
+would have to ask about is a defect. The first five minutes are walked the
+same way, from the cold open to the second door. This replaces §3.1's
+feature-by-feature test with a whole-screen one; Marcin's playtest stays
+the last word.
+
+### 17.8 What stays out
+
+No system is removed and no balance number moves; the cold open's route and
+captions; the full map's layout; the job kinds; localisation (every word cut
+here is one fewer to translate); the platform (M9).
+
+### 17.9 What this changes elsewhere
+
+- §2.2, §3.2 and D14: a road coin lands in the bank; the pools are one.
+- §2.1: the stars' news leads with the stars.
+- §3.1: the test is §17.7's.
+- §13.3, §13.9: the ticker's lines are §17.3's.
+- §13.4: the sentence's words.
+- §11: M8.5 between M8 and M9, set here; the platform keeps its number.
+- `CLAUDE.md`: the screen's budget among the fixed decisions.
+- `docs/STYLE.md`: the corners replace the entries for the popups, the
+  counters and the radar's label (slice 1).
 
 ## References
 

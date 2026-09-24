@@ -130,7 +130,7 @@ test('4.9 a finished video doubles the bag once, one request for that door, sile
 test('4.10 the garage by keys alone: buy the compact and drive out in it in under eight presses; gameplayStart once more', async ({ page }) => {
   const errors = watch(page);
   await boot(page, '&ad=off');
-  await page.evaluate(() => { window.__game!.sim.run.bank = 12_000; });
+  await page.evaluate(() => { window.__game!.sim.run.bank = 19_000; });
   await shutDoor(page, 0);
   const starts = await page.evaluate(() => (window.__game?.platformCalls as Calls).gameplayStart);
   let presses = 0;
@@ -147,7 +147,7 @@ test('4.10 the garage by keys alone: buy the compact and drive out in it in unde
   expect(out.state).toBe('running');
   expect(out.car).toBe('compact');
   expect(out.owned).toContain('compact');
-  expect(out.bank).toBe(2_000);
+  expect(out.bank).toBe(1_000);
   expect(out.calls.gameplayStart).toBe(starts + 1);
   expect(out.calls.happyTime).toBe(1);
   expect(presses).toBeLessThan(8);
@@ -180,7 +180,7 @@ test('5.5 the cold open\'s door makes no ad request and offers nothing; its wall
   expect(await page.evaluate(() => window.__game?.sim.coldOpen.active)).toBe(false);
   expect(await page.evaluate(() => (window.__game?.platformCalls as Calls).adRequests)).toBe(0);
   expect(await page.locator('.wall__offer.is-open').count()).toBe(0);
-  await expect(page.locator('.run__first')).toContainText('FIRST NEW CAR: 10,000');
+  await expect(page.locator('.run__first')).toContainText('FIRST NEW CAR: 18,000');
   expect(errors).toEqual([]);
 });
 
@@ -206,7 +206,7 @@ test('5.1e the save round trip across a reload: the bank, the car and its paint,
     const sim = window.__game!.sim;
     return { bank: sim.run.bank, car: sim.carId, shown: window.__game!.renderer.visibleCar, paint: sim.pursuit.descriptor.paint, billboards: sim.collectibles!.smashedCount, owned: [...sim.garage.owned] };
   });
-  expect(after).toEqual({ bank: 30_000, car: 'compact', shown: 'compact', paint: 0xf45bff, billboards: 2, owned: ['muscle', 'compact'] });
+  expect(after).toEqual({ bank: 22_000, car: 'compact', shown: 'compact', paint: 0xf45bff, billboards: 2, owned: ['muscle', 'compact'] });
   expect(errors).toEqual([]);
 });
 

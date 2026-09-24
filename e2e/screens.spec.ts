@@ -171,7 +171,7 @@ for (const [w, h] of SIZES) {
     await page.waitForSelector('.run__wall.is-visible', { timeout: 10_000 });
     await page.screenshot({ path: `screens/door-${w}x${h}.png` });
     // the garage: the CARS page with the compact in reach and the rest not
-    await page.evaluate(() => { window.__game!.sim.run.bank = 24000; window.advanceTime!(700); });
+    await page.evaluate(() => { window.__game!.sim.run.bank = 19000; window.advanceTime!(700); });
     for (const code of ['KeyD', 'KeyW']) {
       await page.keyboard.press(code);
       await page.evaluate(() => window.advanceTime?.(34));

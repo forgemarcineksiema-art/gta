@@ -11,44 +11,47 @@
  *    10 s, as M4 measured, once the car is `AWAY` m from where the card fell:
  *    a bot wedged in a queue at the lights was busted there every 13 s, eight
  *    cards for one trap). The same novice at heat 0, same seeds, gives the
- *    bag and the coins a minute.
- * 2. The EV model of §2.7 with those rates: one job per level, two minutes
- *    each, the placed jobs' mean payout; capture as a Poisson rate per level;
- *    busted keeps the fine; the door pays the level's multiplier; coins are
- *    kept either way. The expected bank per cash-out level, both profiles.
+ *    bag and the coins a minute. The novice drives as a cautious player does
+ *    (M7 slice 10, docs/M7_PLAN.md D8): the careful bot, which waits at the
+ *    lights and in a queue and backs off and goes round a car that will not
+ *    move on; the skilled keeps the plain bot's speed.
+ * 2. The model (`model.ts`, the quick half the fitting runs on): the EV of
+ *    §2.7 on the measured rates pooled so they never fall with the level, one
+ *    job per level, two minutes each, the placed jobs' mean payout; busted
+ *    keeps the fine; the door pays the level's multiplier; coins are kept
+ *    either way. The expected bank per cash-out level, both profiles.
  * 3. The first hour of a novice at its best cash-out level (the cold open,
- *    then runs of two minutes a level and one to the door, as long as the
- *    model expects them; dailies left out): the minute each purchase becomes
- *    affordable at a door (the wall is where the garage is), in the ladder's
- *    order: the compact, the tiers between the cars, the sports car last.
- * 4. Three assertions: (a) the skilled profile's best cash-out level is
- *    higher than the novice's; (b) the compact is affordable between minute
- *    5 and 7; (c) no gap between purchases in the first hour is over 10
- *    minutes or under 3.
- * 5. The kit (M6 slice 10, DESIGN.md §14.4): at a door with no rung
- *    affordable, four minutes after the last thing seen bought, the cheapest
- *    kit item not had goes (a twelve-year-old's buy); (d) something to see
- *    bought, a car or a kit item, at least every 8 minutes of the first hour.
- *    And the minute each of the wanted board's cash gates is reached: a
- *    40,000 run (Neon Niko) and three cars owned (Fake Frank).
+ *    then runs as long as the model expects them; dailies left out): the
+ *    minute each purchase becomes affordable at a door, in the ladder's order:
+ *    the compact, the tiers between the cars, the sports car last; at a door
+ *    with no rung affordable, four minutes after the last thing seen bought,
+ *    the cheapest kit item not had (M6).
+ * 4. The four assertions: (a) the skilled profile's best cash-out level is at
+ *    least one above the novice's, its bank rising from level 1 to it; (b) the
+ *    compact is bought between minute 5 and 7; (c) no gap between purchases in
+ *    the first hour is over 10 minutes or under 3; (d) something to see bought,
+ *    a car or a kit item, at least every 8 minutes. And the minute each of the
+ *    wanted board's cash gates is reached: a 40,000 run (Neon Niko) and three
+ *    cars owned (Fake Frank).
  */
 import { describe, expect, it } from 'vitest';
 import { BotPolicy, type PolicyName } from '../../src/app/botPolicy';
-import { CITY_BOT_TUNING, TrackBot } from '../../src/app/trackBot';
+import { CITY_BOT_TUNING, TrackBot, type TrackBotTuning } from '../../src/app/trackBot';
 import { BALANCE } from '../../src/sim/balance';
-import { KIT, type SimWorld } from '../../src/sim';
+import type { SimWorld } from '../../src/sim';
 import { createWorld, run, runUntil } from './helpers';
+import { best, COLD_OPEN, evTable, LEVELS, pooled, verdict, type ModelInput } from './model';
 
 const SECONDS = 180;
-const LEVELS = [1, 2, 3, 4, 5];
 /** The M4 gate's reference seeds (BALANCE.measured). */
 const SEEDS = [42, 7, 123];
 /** After a card the heat comes back only this far (m) from where it fell: one trap is one capture, not a loop. */
 const AWAY = 50;
-/** Minutes of a run spent at each level, and the drive to the door (DESIGN.md §2.7). */
-const STAGE_MINUTES = 2;
-const DOOR_MINUTES = 1;
-const HOUR = 60;
+/** The novice is the careful bot (it goes round a car that will not move on, too); the skilled the plain one. */
+const BOT: Record<PolicyName, Partial<TrackBotTuning>> = {
+  novice: { ...CITY_BOT_TUNING, careful: true, unblock: true },
+  skilled: CITY_BOT_TUNING,
+};
 
 interface Capture { busted: number; perMinute: number }
 
@@ -58,7 +61,7 @@ async function capture(policy: PolicyName, level: number, seed: number): Promise
   const sim = await createWorld({ map: 'city', seed, traffic: 1, peds: 0, record: false, heat: threshold });
   let busted = 0, rearm = -1, fellX = 0, fellZ = 0;
   try {
-    const bot = new BotPolicy(policy, new TrackBot(sim.carId, CITY_BOT_TUNING));
+    const bot = new BotPolicy(policy, new TrackBot(sim.carId, BOT[policy]));
     run(sim, SECONDS, (_t, c, s) => {
       if (s.run.state === 'busted') {
         busted++;
@@ -91,7 +94,7 @@ async function capture(policy: PolicyName, level: number, seed: number): Promise
 async function earnings(seed: number): Promise<{ bag: number; coins: number; jobMean: number }> {
   const sim: SimWorld = await createWorld({ map: 'city', seed, traffic: 1, peds: 0, record: false });
   try {
-    const bot = new BotPolicy('novice', new TrackBot(sim.carId, CITY_BOT_TUNING));
+    const bot = new BotPolicy('novice', new TrackBot(sim.carId, BOT.novice));
     let bag = 0;
     let last = 0;
     run(sim, SECONDS, (_t, c, s) => {
@@ -113,7 +116,7 @@ async function earnings(seed: number): Promise<{ bag: number; coins: number; job
 async function timeToLevel(policy: PolicyName, cap = 540): Promise<{ t2: number; t3: number }> {
   const sim = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 0, record: false });
   try {
-    const bot = new BotPolicy(policy, new TrackBot(sim.carId, CITY_BOT_TUNING));
+    const bot = new BotPolicy(policy, new TrackBot(sim.carId, BOT[policy]));
     let t2 = -1;
     const t3 = runUntil(sim, cap, (s) => {
       if (t2 < 0 && s.heat.level >= 2) t2 = s.time;
@@ -125,53 +128,8 @@ async function timeToLevel(policy: PolicyName, cap = 540): Promise<{ t2: number;
   } finally { sim.dispose(); }
 }
 
-interface Ev { level: number; bank: number; minutes: number; perMinute: number }
-
-/**
- * DESIGN.md §2.7: stages 1..L of two minutes, each a job and the free-roam bag; a Poisson capture at each
- * stage's rate; busted mid-stage keeps the fine of the bag so far (half the stage earned); the door pays the
- * bag at level L's multiplier; the coins of every minute driven are kept.
- */
-function ev(rates: readonly number[], bagPerMinute: number, coinsPerMinute: number, job: number, cashOut: number): Ev {
-  let alive = 1, bank = 0, minutes = 0, bag = 0, t = 0;
-  for (let l = 1; l <= cashOut; l++) {
-    const survive = Math.exp(-(rates[l] ?? 0) * STAGE_MINUTES);
-    const busted = alive * (1 - survive);
-    // busted mid-stage: half the stage's free roam in the bag, the job not done, half its time driven
-    bank += busted * (BALANCE.fine * (bag + bagPerMinute * STAGE_MINUTES / 2) + coinsPerMinute * (t + STAGE_MINUTES / 2));
-    minutes += busted * (t + STAGE_MINUTES / 2);
-    alive *= survive;
-    bag += job + bagPerMinute * STAGE_MINUTES;
-    t += STAGE_MINUTES;
-  }
-  const runMinutes = t + DOOR_MINUTES;
-  bank += alive * (bag * (BALANCE.multiplier[cashOut] ?? 1) + coinsPerMinute * runMinutes);
-  minutes += alive * runMinutes;
-  return { level: cashOut, bank, minutes, perMinute: bank / minutes };
-}
-
-/**
- * The purchase ladder in the order a player buys: the compact, a tier, the van, then the tiers, with the sports
- * car last (the plan put it sixth; at any price above the van's it is a longer save than the ten-minute cadence
- * allows, so it is the second hour's goal and the tiers carry the first).
- */
-const LADDER: Array<[string, number]> = [
-  ['compact', BALANCE.prices.compact],
-  ['tier 1 power', BALANCE.tierPrices[0] as number],
-  ['heavy', BALANCE.prices.heavy],
-  ['tier 1 grip', BALANCE.tierPrices[0] as number],
-  ['tier 2 power', BALANCE.tierPrices[1] as number],
-  ['tier 1 boost', BALANCE.tierPrices[0] as number],
-  ['tier 2 grip', BALANCE.tierPrices[1] as number],
-  ['tier 3 power', BALANCE.tierPrices[2] as number],
-  ['tier 2 boost', BALANCE.tierPrices[1] as number],
-  ['tier 3 grip', BALANCE.tierPrices[2] as number],
-  ['tier 3 boost', BALANCE.tierPrices[2] as number],
-  ['sports', BALANCE.prices.sports],
-];
-
 describe('the balance script', () => {
-  it('captures, the EV table, the first hour, and the three assertions', async () => {
+  it('captures, the EV table, the first hour, and the four assertions', async () => {
     const rates: Record<PolicyName, number[]> = { novice: [0], skilled: [0] };
     const rows: string[] = [];
     for (const level of LEVELS) {
@@ -186,7 +144,7 @@ describe('the balance script', () => {
     const earns: Array<{ bag: number; coins: number; jobMean: number }> = [];
     for (const seed of SEEDS) earns.push(await earnings(seed));
     const mean = (f: (e: { bag: number; coins: number; jobMean: number }) => number): number => earns.reduce((n, e) => n + f(e), 0) / earns.length;
-    const earn = { bag: mean((e) => e.bag), coins: mean((e) => e.coins), jobMean: mean((e) => e.jobMean) };
+    const input: ModelInput = { novice: rates.novice, skilled: rates.skilled, bagPerMinute: mean((e) => e.bag), coinsPerMinute: mean((e) => e.coins), jobMean: mean((e) => e.jobMean) };
     const out: string[] = [];
     for (const policy of ['novice', 'skilled'] as const) {
       const t = await timeToLevel(policy);
@@ -194,85 +152,38 @@ describe('the balance script', () => {
       out.push(`time to level from heat 0, ${policy}: level 2 ${fmt(t.t2)}, level 3 ${fmt(t.t3)}`);
     }
     out.push(`busted a minute (seeds ${SEEDS.join(' / ')}, traffic on, ${SECONDS} s a level, M4 measured novice ${BALANCE.measured.bustedPerMinute.slice(1).join(' / ')}, skilled ${BALANCE.measured.bustedPerMinuteSkilled.slice(1).join(' / ')}):`, ...rows);
-    out.push(`bag ${earn.bag.toFixed(0)} a minute (${earns.map((e) => e.bag.toFixed(0)).join(' / ')}), coins ${earn.coins.toFixed(0)} a minute from heat 0 (M4: ${BALANCE.measured.bagPerMinute}, ${BALANCE.measured.coinsPerMinute} coins); the placed jobs' mean payout ${earn.jobMean.toFixed(0)}`);
+    out.push(`pooled (never falling with the level): novice ${pooled(input.novice).slice(1).map((v) => v.toFixed(2)).join(' / ')}, skilled ${pooled(input.skilled).slice(1).map((v) => v.toFixed(2)).join(' / ')}`);
+    out.push(`bag ${input.bagPerMinute.toFixed(0)} a minute (${earns.map((e) => e.bag.toFixed(0)).join(' / ')}), coins ${input.coinsPerMinute.toFixed(0)} a minute from heat 0 (M4: ${BALANCE.measured.bagPerMinute}, ${BALANCE.measured.coinsPerMinute} coins); the placed jobs' mean payout ${input.jobMean.toFixed(0)}`);
 
-    const table: Record<PolicyName, Ev[]> = { novice: [], skilled: [] };
-    for (const policy of ['novice', 'skilled'] as const) {
-      for (const level of LEVELS) table[policy].push(ev(rates[policy], earn.bag, earn.coins, earn.jobMean, level));
-    }
-    const best = (list: Ev[]): Ev => list.reduce((a, b) => (b.bank > a.bank ? b : a));
+    const table = evTable(input);
     out.push('expected bank a run by cash-out level (DESIGN.md §2.7), and a minute:');
     for (const policy of ['novice', 'skilled'] as const) {
       out.push(`  ${policy.padEnd(7)} ${table[policy].map((e) => `L${e.level} ${(e.bank / 1000).toFixed(1)}k (${e.perMinute.toFixed(0)}/min)`).join('  ')}   best L${best(table[policy]).level}`);
     }
 
-    // the first hour of a novice at its best level
-    const nov = best(table.novice);
-    const runMinutes = nov.minutes;
-    const perRun = nov.bank;
-    // the cold open: 90 s at heat 1, its delivery with a third of the clock left, the route's gate and a takedown
-    const coldOpen = { minutes: 1.5, bank: Math.round(BALANCE.coldOpen.payout * (1 + BALANCE.jobs.timeBonus / 3)) + BALANCE.bag.billboard + BALANCE.bag.policeTakedown };
-    let funds = coldOpen.bank + earn.coins * coldOpen.minutes;
-    const bought: Array<[string, number]> = [];
-    let rung = 0;
-    // the kit for sale, the cheapest first (M6), and what was bought that shows: the cars and the kit
-    const kitShop = KIT.filter((k) => k.price > 0).sort((a, b) => a.price - b.price);
-    let kitNext = 0, lastSeen = coldOpen.minutes, cars = 1;
-    const seen: number[] = [];
-    const CARS = new Set(['compact', 'heavy', 'sports']);
-    // a tick at a time: coins as they come, a run's bank at its door, the purchases at the doors
-    const step = 1 / 60, doorTicks = Math.round(runMinutes / step);
-    for (let tick = 1, start = Math.round(coldOpen.minutes / step); start + tick <= HOUR / step && rung < LADDER.length; tick++) {
-      funds += earn.coins * step;
-      if (tick % doorTicks !== 0) continue;
-      funds += perRun - earn.coins * runMinutes;
-      const minute = (start + tick) * step;
-      let rungBought = false;
-      while (rung < LADDER.length && funds >= (LADDER[rung] as [string, number])[1]) {
-        const [name, price] = LADDER[rung] as [string, number];
-        funds -= price;
-        bought.push([name, minute]);
-        rung++;
-        rungBought = true;
-        if (CARS.has(name)) { cars++; seen.push(minute); lastSeen = minute; }
-      }
-      const kit = kitShop[kitNext];
-      if (!rungBought && kit && minute - lastSeen >= 4 && funds >= kit.price) {
-        funds -= kit.price;
-        kitNext++;
-        bought.push([`kit: ${kit.name.toLowerCase()}`, minute]);
-        seen.push(minute);
-        lastSeen = minute;
-      }
-    }
-    out.push(`the novice's first hour at L${nov.level} (runs of ${runMinutes.toFixed(1)} min banking ${(perRun / 1000).toFixed(1)}k with the coins; the cold open ${(coldOpen.bank / 1000).toFixed(1)}k in ${coldOpen.minutes} min):`);
+    const v = verdict(input);
+    const h = v.hour;
+    out.push(`the novice's first hour at L${h.run.level} (runs of ${h.run.minutes.toFixed(1)} min banking ${(h.run.bank / 1000).toFixed(1)}k with the coins; the cold open ${(COLD_OPEN.bank / 1000).toFixed(1)}k in ${COLD_OPEN.minutes} min):`);
     let prev = 0;
-    const gaps: number[] = [];
-    for (const [name, minute] of bought) {
+    for (const [name, minute] of h.bought) {
       out.push(`  minute ${minute.toFixed(1).padStart(5)}  ${name}${prev > 0 && !name.startsWith('kit') ? `  (+${(minute - prev).toFixed(1)})` : ''}`);
-      if (name.startsWith('kit')) continue;
-      if (prev > 0) gaps.push(minute - prev);
-      prev = minute;
+      if (!name.startsWith('kit')) prev = minute;
     }
-    // the wanted board's cash gates (M6): a 40,000 run and three cars
-    const third = bought.filter(([n]) => CARS.has(n))[1];
-    out.push(`the board's cash gates: a 40,000 run ${perRun >= 40000 ? 'at every door' : `not at L${nov.level} (${(perRun / 1000).toFixed(1)}k a run)`}; three cars at ${third ? `minute ${third[1].toFixed(1)}` : 'not in the first hour'} (${cars} owned)`);
-    const seenGaps = seen.map((m, k) => m - (k === 0 ? coldOpen.minutes : seen[k - 1] as number));
-    out.push(`something to see bought (a car or a kit item) every ${seenGaps.map((g) => g.toFixed(1)).join(' / ')} min`);
+    out.push(`the board's cash gates: a 40,000 run ${h.run.bank >= 40000 ? 'at every door' : `not at L${h.run.level} (${(h.run.bank / 1000).toFixed(1)}k a run)`}; three cars at ${h.thirdCar >= 0 ? `minute ${h.thirdCar.toFixed(1)}` : 'not in the first hour'} (${h.cars} owned)`);
+    out.push(`something to see bought (a car or a kit item) every ${h.seenGaps.map((g) => g.toFixed(1)).join(' / ')} min`);
     console.info(out.join('\n'));
 
-    // (a) the optimum rises with skill
-    expect(best(table.skilled).level).toBeGreaterThan(best(table.novice).level);
+    // (a) the optimum rises with skill, the skilled bank climbing to it
+    expect(v.skilledBest).toBeGreaterThanOrEqual(v.noviceBest + 1);
+    expect(v.skilledRising).toBe(true);
     // (b) the first car inside the brief's five to seven minutes
-    const compact = bought.find(([n]) => n === 'compact');
-    expect(compact).toBeDefined();
-    expect(compact![1]).toBeGreaterThanOrEqual(5 - 1e-6);
-    expect(compact![1]).toBeLessThanOrEqual(7);
+    expect(v.compact).toBeGreaterThanOrEqual(5 - 1e-6);
+    expect(v.compact).toBeLessThanOrEqual(7);
     // (c) something new every three to ten minutes
-    expect(Math.max(...gaps)).toBeLessThanOrEqual(10);
-    expect(Math.min(...gaps)).toBeGreaterThanOrEqual(3);
+    expect(Math.max(...h.gaps)).toBeLessThanOrEqual(10);
+    expect(Math.min(...h.gaps)).toBeGreaterThanOrEqual(3);
     // (d) something to see bought at least every 8 minutes (M6)
-    expect(seenGaps.length).toBeGreaterThan(0);
-    expect(Math.max(...seenGaps)).toBeLessThanOrEqual(8);
+    expect(h.seenGaps.length).toBeGreaterThan(0);
+    expect(Math.max(...h.seenGaps)).toBeLessThanOrEqual(8);
   }, 1_800_000);
 });

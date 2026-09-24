@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M7 slice 10: the money
+
+Done: `tests/sim/model.ts`, the EV table and the first hour, pure; the balance script measures and calls it, its
+novice now the careful bot. Decided: the model pools the measured capture rates where they fall with the level (a
+level's police have all the level below has; the M6 gate's novice was caught more at 2 than at 3, luck of three
+seeds). Fitted on the M6 gate's inputs: multipliers ×1.3 / ×1.65 / ×2.6 / ×3 (novice best door level 2, skilled 4,
+its bank rising to it), the compact 18,000 (minute 6.3, not 3.9), tiers 15,000 / 17,000 / 21,000 (a purchase every
+4.8–7.2 minutes, something to see every 7.2 at most). Pins M7 10.1, 10.2; the door and garage pins read the new
+values. Verify green (352 tests).
+
 ## 2026-09-24 — M7 slice 9: the police's corners and levels 4–5
 
 Done: a unit on a chase takes a turn on its inside line, 1.6 m in from the traffic's curve from 14 m out (a left

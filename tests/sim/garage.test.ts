@@ -36,7 +36,7 @@ describe('garage', () => {
     const sim = await createWorld({ map: 'playground' });
     try {
       const g = sim.garage;
-      sim.run.bank = 12_000;
+      sim.run.bank = BALANCE.prices.compact + 2_000;
       const seq = sim.events.sequence;
       expect(g.buy('compact')).toBe('ok');
       expect(sim.run.bank).toBe(2_000);

@@ -40,8 +40,13 @@ export const BALANCE = {
     /** Every 10 s the pursuit is active, this × the heat level into the bag (NFS's bounty, DESIGN.md §13.9). */
     pursuitPer10s: 100,
   },
-  /** The door's multiplier by the highest level at which the pursuit went active (index = level; 0 and 1 both x1). */
-  multiplier: [1, 1, 1.25, 1.6, 2.2, 3],
+  /**
+   * The door's multiplier by the highest level at which the pursuit went active (index = level; 0 and 1 both x1).
+   * Fitted by the model's quick half (M7 slice 10, `tests/sim/model.ts`) on the M6 gate's capture rates: the novice's
+   * best door is level 2, the skilled driver's level 4, their bank rising level by level to it (×1.25 / ×1.6 / ×2.2
+   * put both at level 3 within 1 %).
+   */
+  multiplier: [1, 1, 1.3, 1.65, 2.6, 3],
   /** Busted banks this share of the bag, with no multiplier. */
   fine: 0.5,
   /** Pulling into a drop-off under `enterSpeed` (m/s) starts the door; it takes `closeSeconds` to shut, busted live. */
@@ -153,11 +158,13 @@ export const BALANCE = {
     hot: { share: 0.25, pay: 2, heatPerSecond: 0.8 },
   },
   /**
-   * The garage's catalogue (docs/M5_PLAN.md D13): cash only; the muscle car is owned from the start. The van at
-   * 20,000, not 30,000 (balance script, 2026-09-23): at a novice's 2.5k a minute 30,000 is a 12-minute save and
-   * breaks the first hour's something-new-every-3-to-10-minutes; the sports car stays the second hour's goal.
+   * The garage's catalogue (docs/M5_PLAN.md D13): cash only; the muscle car is owned from the start. The compact at
+   * 18,000 (the model's quick half, M7 slice 10): at the M6 gate's novice (7k a run of 2.4 minutes, the cold open
+   * 8k) 10,000 was the first run's door at minute 3.9, before the brief's 5–7; 18,000 is the second's, at 6.3. The
+   * van at 20,000, not 30,000 (balance script, 2026-09-23): 30,000 is a 12-minute save and breaks the first hour's
+   * something new every 3 to 10 minutes; the sports car stays the second hour's goal.
    */
-  prices: { compact: 10000, heavy: 20000, sports: 60000, police: 120000 },
+  prices: { compact: 18000, heavy: 20000, sports: 60000, police: 120000 },
   /**
    * The wanted board (M6, DESIGN.md §14.3): a rematch pays `rematchShare` of the purse (the car is won once); a
    * race duel's rival runs at `pace` × the street race's pace, rubber-banded between `band`, both by rival index
@@ -201,11 +208,11 @@ export const BALANCE = {
    */
   bodyPrices: { sedan: 12000, hatch: 9000, estate: 13000, suv: 18000, pickup: 16000, taxi: 14000, truck: 24000, bus: 30000, icecream: 0, roadster: 0, sweeper: 0, hotdog: 0 },
   /**
-   * Each upgrade tier's price, tier 1 to 3, the same for every stat and car: 12,000 / 16,000 / 22,000 (balance
-   * script, M5.5 slice 1; M5's 8,000 / 14,000 / 22,000 fell tier 1 to the first car's door once the beat's
-   * police income arrived): the tiers are the first hour's cadence between the cars.
+   * Each upgrade tier's price, tier 1 to 3, the same for every stat and car: 15,000 / 17,000 / 21,000 (the model's
+   * quick half, M7 slice 10; 12,000 / 16,000 / 22,000 at M5.5): the tiers are the first hour's cadence between the
+   * cars, two or three runs each, so no two purchases share a door or follow at the next.
    */
-  tierPrices: [12000, 16000, 22000],
+  tierPrices: [15000, 17000, 21000],
   /** Multipliers on the preset per tier 0..3 (D8): power × torqueMax, grip × muFront and muRear, boost × boostDrain. */
   tiers: {
     power: [1, 1.06, 1.12, 1.2],

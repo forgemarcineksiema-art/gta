@@ -148,8 +148,9 @@ measurement, §12).
 | 5 | everything plus the Chief in a boss car | as 4, 15 s |
 
 Bag multiplier by the highest heat at which the pursuit went active, not
-merely reached (revised 2026-09-22, decided): ×1 / ×1.25 / ×1.6 / ×2.2 /
-×3. The disguise (§2.5) made "reached" exploitable: a cruiser, billboards
+merely reached (revised 2026-09-22, decided): ×1 / ×1.3 / ×1.65 / ×2.6 /
+×3 (fitted by the model's quick half, M7 slice 10, §2.7; ×1.25 / ×1.6 /
+×2.2 before). The disguise (§2.5) made "reached" exploitable: a cruiser, billboards
 and cameras with no witness, heat 5 without a single chase, the door at ×3.
 Now the city has to have seen you at that level; a crime nobody saw raises
 the stars but not the bounty. On the HUD the multiplier jumps when the
@@ -179,6 +180,19 @@ is 5. That property is the point: "one more job or run"
 calibrates itself to skill. The balance script prints this table for two
 profiles and asserts the optimum rises with skill; the capture rates come from
 the bot driving under the police headless, not from guesses.
+
+The model's quick half (M7 slice 10, set here): the table and the first hour
+run apart from the bots (`tests/sim/model.ts`), on the last gate's measured
+inputs, in a second; the bots measure at the gate. A level's police have
+everything the level below has, so the model pools the measured rates where
+they fall with the level (three seeds of three minutes count busts in ninths:
+the M6 gate's novice was caught 0.78 a minute at level 2 and 0.44 at 3). On the
+M6 gate's inputs, with the multipliers of §2.6 and the prices of §3.3, the
+novice's best door is level 2 (6.9k a run of 2.4 minutes) and the skilled
+driver's level 4 (4.8k / 6.6k / 6.9k / 7.2k from level 1); the compact at
+minute 6.3, a purchase every 4.8–7.2 minutes, something to see every 7.2 at
+most. The gate's novice is the careful bot, which waits at lights and drives
+round a queue like a cautious player.
 
 ### 2.8 Pacing and the cold open
 
@@ -309,12 +323,15 @@ locked district. Revised around the audience.
 | wreck spill | 30 % of the bag as coins ahead of the wreck, 10 s to recover |
 | rampage zone | 6,000–15,000 |
 
-A five-minute novice run: about 3k in coins plus 8k in the bag at ×1.25 is
-13k. Cars, cash only: Hatch 10k (run 2, inside the brief's 5–7 minutes), Van
-30k, Coupe 60k, Muscle Pro 100k, Interceptor 120k plus one heat-5 escape, GT
-160k, the ice-cream truck a hidden car (§8). Upgrades stay three stats × three
-tiers as multipliers on the preset; looks stay cash-only and carry the
-descriptor; repainting at the hideout is the respray, free. Dailies, the
+A five-minute novice run: about 3k in coins plus 8k in the bag at ×1.3 is
+13k. Cars, cash only (the prices fitted by the model's quick half, M7 slice
+10, §2.7): the compact 18,000 (the second run's door after the cold open, at
+minute 6.3, inside the brief's 5–7), the van 20,000, the sports car 60,000
+(the second hour's goal), the police car 120,000 plus one heat-5 escape; the
+hidden cars are found, not bought (§8). Upgrades stay three stats × three
+tiers as multipliers on the preset, 15,000 / 17,000 / 21,000 a tier, two or
+three runs each; looks stay cash-only and carry the descriptor; repainting at
+the hideout is the respray, free. Dailies, the
 streak and the two prep items (lawyer, fence) are in §3.4.
 
 ### 3.4 Dailies and retention

@@ -87,7 +87,7 @@ describe('the run', () => {
       sim.pursuit.state = 'active';
       sim.run.step(sim.probe, 1 / 60);
       expect(sim.run.maxHeat).toBe(3);
-      expect(sim.run.multiplier).toBe(1.6);
+      expect(sim.run.multiplier).toBe(BALANCE.multiplier[3]);
       // it never falls before the door
       sim.pursuit.state = 'lost';
       sim.run.step(sim.probe, 1 / 60);
@@ -127,8 +127,10 @@ describe('the run', () => {
         else expect(closing).toBeGreaterThan(entered);
         expect(shut).toBeGreaterThan(0);
         expect(Math.abs((shut - closing + 1) / 60 - BALANCE.door.closeSeconds)).toBeLessThan(0.05);
-        expect(sim.run.bank).toBe(16_000);
-        expect(sim.run.lastBanked).toBe(16_000);
+        // the bag at level 3's multiplier (×1.6 until M7 slice 10 fitted ×1.65)
+        const banked = Math.round(10_000 * (BALANCE.multiplier[3] as number));
+        expect(sim.run.bank).toBe(banked);
+        expect(sim.run.lastBanked).toBe(banked);
         expect(sim.run.bag).toBe(0);
         expect(sim.heat.points).toBe(0);
         expect(sim.pursuit.state).toBe('idle');

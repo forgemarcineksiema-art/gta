@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M7 slice 5: no hitches
+
+Measured first (Node, a minute of the city driven by the bot, traffic and walkers): no major collection, 19
+scavenges of at most 2.1 ms, the worst step 4.6 ms; about 120 KB a step of short-lived numbers, which the
+scavenges take cheaply. The sim is not what stutters, and its streaming was already one chunk of collision a step
+(the render's one claim and a few parts a frame since M2.2). Done: the automatic quality settles after two tier
+switches a session (each reallocates the drawing buffer and the shadow map; near the line it flipped every 15 s);
+the perf run now counts frames over 50 ms after the first 5 s, for the gate. Plan's 1 KB-a-step pin replaced by
+M7 5.1 (long: no major collection, under 40 scavenges, one chunk a step). Verify green (343 tests).
+
 ## 2026-09-24 — M7 slice 4: skid marks and the spill's burst
 
 Done: `render/SkidMarks.ts`: a rear wheel sliding past 8° of slip angle or 0.25 of slip ratio above 3 m/s (a front

@@ -95,6 +95,8 @@ export class Renderer {
   private qualityFrames = 0;
   private qualityTotal = 0;
   private qualityCooldown = 3;
+  /** Automatic tier switches this session (M7 slice 5: two and it settles). */
+  private tierSwitches = 0;
   private resolutionScale = 1;
   private qualityLocked: boolean;
   /** `?quality=` fixed the tier: the settings row leaves it. */
@@ -860,17 +862,22 @@ export class Renderer {
     this.resize();
   }
 
-  /** Start conservatively, benchmark real frames, then use hysteresis and dynamic resolution. */
+  /**
+   * Start conservatively, benchmark real frames, then use hysteresis and dynamic resolution. A tier switch reallocates
+   * the drawing buffer and the shadow map, a hitch each time: the tier settles after two switches in a session (up
+   * and back down on a machine near the line would otherwise flip every 15 s, M7 slice 5); the resolution still moves.
+   */
   private adaptQuality(dt: number): void {
     if (this.qualityLocked) return;
     if (this.qualityCooldown > 0) { this.qualityCooldown -= dt; return; }
     this.qualityElapsed += dt; this.qualityFrames++; this.qualityTotal += dt;
     if (this.qualityElapsed < 3) return;
     const ms = this.qualityTotal * 1000 / this.qualityFrames;
-    if (ms > 24 && this.quality === 'high') { this.setQuality('low'); this.qualityCooldown = 15; }
+    const settled = this.tierSwitches >= 2;
+    if (!settled && ms > 24 && this.quality === 'high') { this.setQuality('low'); this.qualityCooldown = 15; this.tierSwitches++; }
     else if (ms > 27 && this.resolutionScale > 0.65) { this.resolutionScale = Math.max(0.65, this.resolutionScale - 0.1); this.resize(); }
     else if (ms < 18 && this.resolutionScale < 1) { this.resolutionScale = Math.min(1, this.resolutionScale + 0.05); this.resize(); }
-    else if (ms < 17.2 && this.quality === 'low') { this.setQuality('high'); this.qualityCooldown = 15; }
+    else if (!settled && ms < 17.2 && this.quality === 'low') { this.setQuality('high'); this.qualityCooldown = 15; this.tierSwitches++; }
     this.qualityElapsed = 0; this.qualityFrames = 0; this.qualityTotal = 0;
   }
 }

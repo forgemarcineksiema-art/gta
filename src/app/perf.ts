@@ -25,6 +25,8 @@ export interface PerfResult {
   heapMb: { start: number; end: number; max: number };
   droppedTime: number;
   botResets: number;
+  /** Frames over 50 ms after the first 5 s of the window: the hitches a player feels (M7 slice 5). */
+  longFrames: number;
   dpr: number;
   width: number;
   height: number;
@@ -64,6 +66,7 @@ export class PerfProbe {
   }
 
   private warmup = WARMUP_FRAMES;
+  private longFrames = 0;
 
   frame(frameMs: number, stepMs: number, stats: RenderStats, dropped: number, botResets: number): void {
     if (this.done) return;
@@ -83,6 +86,7 @@ export class PerfProbe {
     this.draws.push(stats.drawCalls);
     this.tris.push(stats.triangles);
     this.elapsed += frameMs / 1000;
+    if (this.elapsed > 5 && frameMs > 50) this.longFrames++;
     if (this.elapsed >= this.duration) this.finish(stats, dropped, botResets);
   }
 
@@ -99,6 +103,7 @@ export class PerfProbe {
       heapMb: { start: this.heapStart, end: this.heapEnd, max: this.heapMax },
       droppedTime: dropped,
       botResets,
+      longFrames: this.longFrames,
       dpr: stats.dpr,
       width: stats.width,
       height: stats.height,

@@ -40,7 +40,7 @@ test('bot drives 60 s under 4x CPU throttle within budget', async ({ page, brows
   const lines = [
     `gl ${perf.glRenderer}${perf.softwareGl ? '  (SOFTWARE GL: frame times are a CPU signal only)' : ''}`,
     `frames ${perf.frames}  fps(mean) ${perf.fpsMean.toFixed(1)}`,
-    `frame ms  p50 ${perf.frameMs.p50.toFixed(2)}  p95 ${perf.frameMs.p95.toFixed(2)}  p99 ${perf.frameMs.p99.toFixed(2)}  max ${perf.frameMs.max.toFixed(2)}`,
+    `frame ms  p50 ${perf.frameMs.p50.toFixed(2)}  p95 ${perf.frameMs.p95.toFixed(2)}  p99 ${perf.frameMs.p99.toFixed(2)}  max ${perf.frameMs.max.toFixed(2)}  over 50 ms after 5 s ${perf.longFrames}`,
     `step ms   p50 ${perf.stepMs.p50.toFixed(2)}  p95 ${perf.stepMs.p95.toFixed(2)}  max ${perf.stepMs.max.toFixed(2)}`,
     `draw calls mean ${perf.drawCalls.mean.toFixed(0)} max ${perf.drawCalls.max}   tris mean ${(perf.triangles.mean / 1000).toFixed(0)}k max ${(perf.triangles.max / 1000).toFixed(0)}k`,
     `heap MB start ${perf.heapMb.start.toFixed(0)} end ${perf.heapMb.end.toFixed(0)} max ${perf.heapMb.max.toFixed(0)}   dropped ${perf.droppedTime.toFixed(2)} s  bot resets ${perf.botResets}`,

@@ -2,6 +2,20 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — the way: M8.7 planned from Marcin's notes on guidance
+
+Marcin: the arrow is unintuitive, the radar's dots say nothing, the road says nothing, at a job there is "only some
+stick", and in a chase nobody knows whether to flee or take a job. Found (DESIGN §20.1, the code and the M8.5 screens):
+the arrow aims straight through the blocks, at 40 % in orange on the peach sky, where the card and the key hints cover it;
+the goal is the straight-line nearest ring every frame, so it flips; nothing shows the way between jobs; a ring is a flat
+circle and a 3 m pole told apart by eight colours; any ring starts at any speed, in a chase too; all seven kinds are open
+from minute one. Decided by Marcin in the talk: one answer per question (he cut seven signals to four) and no arrow. Set
+here (§20, `docs/M8.7_PLAN.md`, six slices): a goal that holds; the route on the radar, laid from the goal over the
+lanes; road-sign pictograms shared by the world, the radar, the map and the line; colour by state (cyan the goal, white
+open, grey closed); a job taken by rolling in under 20 km/h; nothing opened in a chase; the kinds one at a time with the
+chain; the pick on the full map; the detour round a roadblock. CLAUDE.md's budget is six things. M8.6's gate closes
+inside M8.7's (jobs 1.7 is the route's promise). Next: M8.7 on his word. Docs only; verify not run (no code touched).
+
 ## 2026-09-24 — the screen's code in folders
 
 Marcin: "continue with the ui". Decided here (ARCHITECTURE 98): `hud/` (the driving screen, nine files), `map/` (radar,

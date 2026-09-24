@@ -303,7 +303,9 @@ locked district. Revised around the audience.
   roadblocks) and the skill chain. At risk until banked, multiplied by the
   highest heat. The strategist's game sits on top of the kid's game.
 - **No reputation.** Unlocks are cash only; every job and every district is
-  open from the first run. Discovery is the progression: heat 3 shows
+  open from the first run (the jobs revised by §20, 2026-09-24: they come
+  out over the first quarter hour with the chain; the districts stay open).
+  Discovery is the progression: heat 3 shows
   roadblocks for the first time, heat 4 the heavy units (the helicopter
   joins in update 1, §5), a first escape from heat 5 unlocks the police car
   (the Interceptor of §3.3; at launch the police saloon, `docs/M5_PLAN.md`
@@ -454,7 +456,9 @@ cost, the cheap ones first so the city fills early.
    the M3 slow motion; they are the cheapest reward in free roam. The hunt
    (a counter and a reward for all twenty) is update 2.
 
-Every job uses the Crazy Taxi arrow: one big destination arrow over the car,
+Superseded by §20 (2026-09-24; the arrow's removal decided by Marcin): no job
+uses an arrow; the goal holds and the radar draws its route. As it was:
+every job uses the Crazy Taxi arrow: one big destination arrow over the car,
 no map needed. Between jobs it does not vanish (set here, 2026-09-22): dimmed,
 it points at the nearest marker, and at the hideout once the bag is above the
 door offer's threshold, so nobody wanders and the run's exit is pointed at
@@ -542,7 +546,9 @@ from that district's jobs to its drop-off, and the four overpasses.
 
 The four landmarks already read from anywhere; the hideout gets a lit sign
 visible from the highway. The full-screen map (update 2) shows jobs, drop-offs,
-cover, cameras and the pursuit's units.
+cover, cameras and the pursuit's units. Since §20 (M8.7) the radar and the
+full map draw the route to the goal, and a click on a sign on the full map
+makes it the goal.
 
 ### 6.6 The cold-open route
 
@@ -558,7 +564,10 @@ ahead through the junction; a coin line marks the route. On the way: boost
 on the straight (boost), a billboard gate on the footway (smash), a patrol
 that lines up for a wall (takedown), the delivery, then "get it to the
 hideout" 300 m on, with the patrols losing sight in the grid (escape). About
-1.5 km, 90 s at 60 km/h, skippable, never shown twice.
+1.5 km, 90 s at 60 km/h, skippable, never shown twice. Since §20 (M8.7): the
+route on the radar from the first second, and the delivery ring asks to
+slow down (a job is taken by rolling in); its ring stays open under its own
+pursuit.
 
 ## 7. Free-roam scoring — set here
 
@@ -650,8 +659,8 @@ The contracts with done criteria, pins and measurements per slice are
 `docs/M4_PLAN.md` (its §5 holds update 1), `docs/M5_PLAN.md` and
 `docs/M6_PLAN.md` (the board), `docs/M7_PLAN.md` (the polish),
 `docs/M8_PLAN.md` (the chaos), `docs/M8.5_PLAN.md` (the clean screen),
-`docs/M8.6_PLAN.md` (solid cars) and `docs/M9_PLAN.md` (the platform); this
-section is the summary. Update 2 gets its contract after the first Basic
+`docs/M8.6_PLAN.md` (solid cars), `docs/M8.7_PLAN.md` (the way) and
+`docs/M9_PLAN.md` (the platform); this section is the summary. Update 2 gets its contract after the first Basic
 Launch numbers.
 
 Revised 2026-09-22 (decided by Marcin): the game goes to Basic Launch after
@@ -722,6 +731,13 @@ both.
   stays on its wheels, a wreck lies on its wheels or its roof and keeps its
   pose, the police box without shoving, the officer walks round cars, the
   player's car is always seen, the frames measured in his scenes and fixed.
+  Its gate closes inside M8.7's.
+- **M8.7 The way** (set here 2026-09-24 after Marcin's notes on how the game
+  tells a player where to go, §20; the arrow's removal decided by him; the
+  contract is `docs/M8.7_PLAN.md`): one answer to each question (the goal
+  line, the route on the radar, the sign over the ring), a goal that holds,
+  a job taken by rolling in, nothing opened in a chase, the kinds one at a
+  time over the first quarter hour.
 - **M9 Platform**, the brief's M6 (`docs/M9_PLAN.md`), then Basic Launch;
   only when all of it is in and on his word that the game is good.
 - Later, by the KPIs: cop mode, ghosts, multiplayer (§8).
@@ -893,6 +909,9 @@ and clock); the run needs the same, in the run's own words.
   guideline behind it: the player always knows the goal they are working
   toward. The first goal is under forty seconds away (The Witcher 3's
   rule): the placement guarantees a ring within 250 m of every door.
+  (Revised by §20, 2026-09-24: one line and one route, no arrow; the line
+  names the goal with its badge, its pay and the distance by road; the
+  goal holds instead of following the nearest ring.)
 - **The first quarter hour is a chain**, six steps counted on the wall's
   TOTALS page and in the save (`save.chain`, a byte): 1 TAKE A JOB, 2 BANK
   THE BAG, 3 BUY YOUR FIRST CAR (the compact, 24,000), 4 LOSE THE COPS AT
@@ -1681,19 +1700,21 @@ colour and a number are read before a word.
 
 ### 17.2 The rule: each corner answers one question
 
-- **Top centre, what now?** The goal line, and the arrow in the world. A
-  card, a caption or one message shows under the line for a moment and goes.
+- **Top centre, what now?** The goal line, and the arrow in the world (the
+  arrow goes with §20: the line alone). A card, a caption or one message
+  shows under the line for a moment and goes.
 - **Top right, how hot and how much?** The stars; the bag with its ×; the
   bank.
-- **Bottom left, where?** The radar.
+- **Bottom left, where?** The radar (with the route to the goal since §20,
+  the only answer to "where").
 - **Bottom right, the car.** The speed and the boost; the damage once dented.
 - **Top left, the combo**, only while one runs.
 - **The centre is the road**: the swap prompt, WRECKED, the ticket book and
   the busted card, nothing else.
 
 A calm drive shows seven things: the line, the arrow, the stars, the bank,
-the radar, the speed, the boost. Everything else appears when it happens
-and goes:
+the radar, the speed, the boost (six since §20: the arrow goes). Everything
+else appears when it happens and goes:
 
 - The bag appears with its first money, in a pop; a bag of `0` never shows.
   Its × appears at the first level that multiplies (×1.3, two stars): the
@@ -1738,7 +1759,7 @@ and goes:
 | what the stars do to the bag | ×1.3 … ×3 | — | MULTIPLIER |
 | heat | the stars: `★★★`, 3 STARS | the star | HEAT, LEVEL |
 | where the bag is banked | GARAGE | the house | DOOR, HIDEOUT |
-| where a job ends | the ring the arrow points at | the arrow | DROP-OFF, MARK |
+| where a job ends | the ring the route leads to (§20; was the ring the arrow points at) | its sign | DROP-OFF, MARK |
 | the police | COPS; POLICE CAR for the car | — | UNITS, AIR UNIT |
 | the trick run | COMBO | — | SKILL CHAIN, CHAIN |
 | the booster that raises the bag's × | BAG BONUS | — | FENCE (a fence is a thing you smash) |
@@ -1787,9 +1808,10 @@ without scrolling; CARS and GOALS scroll like STYLE on a short screen.
   through the goal line, a card, the one message, a pop, the wall's GOALS
   page or the full map. `CLAUDE.md` carries this among the fixed decisions.
 - M9's touch buttons take the thumbs' corners and carry no numbers.
-- The gate counts: a calm drive shows exactly the seven; the top centre
-  never more than the line and one card, caption or message; never more
-  than two pops; no word on screen outside §17.4 but names.
+- The gate counts: a calm drive shows exactly the seven (six since §20);
+  the top centre never more than the line and one card, caption or
+  message; never more than two pops; no word on screen outside §17.4 but
+  names.
 
 ### 17.7 The twelve-year-old's pass
 
@@ -1942,6 +1964,207 @@ the code, its comments and the docs stay English.
 What stays out: a third language; the platform's locale (M9: on
 CrazyGames G3 asks for the SDK's locale with English as the fallback,
 `docs/M9_PLAN.md` D11 as amended).
+
+## 20. M8.7 "The way": where to go and what it is — the arrow's removal decided (Marcin), the rest set here, 2026-09-24
+
+After the solid cars Marcin asked how the game should tell a player what
+to do, where to go and what comes next. His notes: the arrow is "mega
+unintuitive"; the radar shows coloured dots that tell a player nothing;
+the road says nothing; arrived at a job, nobody knows what it is, "there is
+only some stick"; the line names a job and a distance and no more; with the
+police behind, nobody knows whether to flee or take a job; and it seems a
+job can be driven into while another runs. In the talk he cut the first
+proposal from seven signals to four ("seven things at once?") and then took
+the arrow out too: it sits in the middle of the screen, takes all the
+attention, and says what the radar says. The rest is set here (he
+overrides). It sits before the platform: a portal's player who does not
+know where to go in the first minute does not play the second.
+
+### 20.1 What the screen says today (the code and the M8.5 gate's screens)
+
+- **The arrow aims in a straight line**, through the blocks (the bearing
+  from the car to the target): it says "somewhere over there", never "left
+  at the next junction". Between jobs it is drawn at 40 %, pale orange on
+  the peach sky with no outline; on the calm screen it reads as a paper
+  kite. It floats 2.5 m over the roof, which puts it where the job's card
+  and the run's key hints open: at a job's start and a run's start it is
+  covered.
+- **The goal flips.** The nearest ring is taken by straight line, every
+  frame: between two rings the arrow swings from one to the other, and a
+  ring behind a block beats the one along the player's street.
+- **Nothing shows the way between jobs.** No route on the road or the
+  radar; §13.5 lays route coins only while a job runs, by design.
+- **A ring is a flat 4 m circle on the road and a 3 m pole** (his "stick").
+  From a camera about 2 m up, a ring 60 m ahead is seen at 2° and reads as
+  nothing. Its kind is its colour alone: eight colours, two of them blue;
+  the key to them is on the full map only.
+- **A ring starts its job when it is crossed, at any speed**, in a chase
+  too, and a cap coin inside every ring pulls a player into it. The card
+  that says what the job is and what it pays opens after the start, for
+  1.5 s, at speed.
+- **Any ring on the way takes over the line's task.** One job at a time
+  holds (M5's D6), but BANK IT, BUY THE COMPACT and LOSE THEM are not jobs,
+  and a ring crossed on the way to the garage starts one. In a chase the
+  line says LOSE THEM and the rings still start: two orders at once.
+- **Each colour means several things**: orange the delivery, the garage,
+  the pursuit breaker, the billboards and the arrow; yellow the time trial,
+  the caches, the coins, the highway and the player's car on the radar;
+  blue the escape and the cops.
+- **All 28 rings of seven kinds are open from the first minute** (§3.2).
+- The calm screen of M8.5's gate reads `TAKE A JOB · 30 M` with nothing 30 m
+  away on screen: the ring is behind the car, on the radar only.
+
+### 20.2 What the genre does
+
+GTA V draws the route on the radar's streets in the objective's colour,
+marks a mission's start with a lettered blip, and hides mission starts
+while the player is wanted. Forza Horizon gives each kind of event its own
+icon; near one, a panel names it and the button that starts it, and
+driving through starts nothing. Burnout Paradise starts an event only when
+the player stops at a junction's lights and holds the throttle and the
+brake together. Crazy Taxi has one arrow and no map, and a customer's
+circle colour means one thing: how far the ride goes. The rule under all
+four: each question a player has gets one answer, and a job starts
+because the player chose it.
+
+### 20.3 The rules
+
+1. **One question, one answer.** What now: the goal line. Where: the route
+   on the radar. What is it: the sign over the ring. **No arrow** (decided,
+   Marcin): it takes the eyes off the road and repeats the radar. A calm
+   drive shows six things: the line, the stars, the bank, the radar, the
+   speed, the boost.
+2. **The goal holds.** Between jobs the goal is the open ring nearest by
+   road from the car's lane (a ring behind costs the way round, so the ones
+   ahead win). It is kept until it is taken or closed, until a goal of
+   another kind takes the line (BANK IT, LOSE THEM, a chain's step, a
+   rival), or until another open ring is clearly nearer by road: under
+   60 % of the kept one's distance and at least 150 m less. A ring picked
+   on the full map (rule 4) holds until it is taken.
+3. **The route is the road's.** It is laid from the goal outward over the
+   city's lanes (U-turns allowed), so every lane knows its way to the goal:
+   computed once when the goal changes (the graph is a few hundred lanes;
+   well under a millisecond), a missed turn only reads the next lane from
+   where the car now is. A goal that moves (the wanted car, a hunted rival)
+   is laid again every second. A lane through a roadblock that is up costs
+   800 m more, so the route goes round it where there is another way. The
+   line's distance is the route's length.
+4. **The radar draws the route**: a thick cyan line with a dark edge from
+   the car to the goal, the goal's badge at its end or on the rim. It draws
+   itself outward from the car in half a second when the goal changes and
+   when the route does (a missed turn), and is still otherwise: the one
+   movement in the corner brings the eye when it is needed. The radar turns
+   with the car, so a line turning right is a right turn. The full map
+   draws the whole route, and a click on a sign there makes it the goal.
+5. **Every job has a sign.** The pole becomes a signpost: a round sign
+   1.4 m across, 3 m up, always turned to the camera, white with a dark rim
+   and a dark pictogram of its kind: a parcel (delivery), a car key (steal
+   to order), a police light (escape), a stopwatch (time trial), a
+   chequered flag (street race), a crash star (takedown rage), a hammer
+   (mayhem), the rival's number (a duel), a taxi sign (a fare's hailer,
+   instead of the yellow pole), the house (the garage). One outline per
+   kind is the sign's face, the radar's and the full map's glyph and the
+   line's badge: one drawing at four sizes. Within 100 m and in front of
+   the camera a sign's pay shows over it in the line's yellow type. **The
+   goal always wears its sign in a cyan rim**: a ring; the garage when the
+   line says BANK IT or BUY; the wanted car, the key over its roof; a rival
+   at the kerb.
+6. **Shape says what, colour says the state.** Rings, signs and badges are
+   white when open, cyan for the goal, grey when closed; no kind has a
+   colour of its own (about one boy in twelve does not tell red from green;
+   a pictogram needs no colour to be told apart). Cyan means the next move,
+   the route, the goal and the swap prompt (in a steal-to-order the swap is
+   the goal), and nothing else: the boost bar and the rival's ring give it
+   up. Yellow is money, red is trouble, blue is the cops. Everything that
+   guides has a dark outline: cyan and the evening sky are about as light
+   as each other, so the outline carries it against the sky and the fill
+   against the asphalt. Only the goal moves: its sign bobs, its ring
+   pulses; the others stand still.
+7. **The line names the goal**: the goal's badge, the job's name, its pay
+   in yellow, the distance by road: `[parcel] DELIVERY +1,200 · 450 M`
+   (DOSTAWA in Polish). The line pairs the pictogram with its word, so the
+   world and the radar can use the pictogram alone; after two jobs a child
+   reads the parcel without the word. The cards' FOLLOW THE ARROW becomes
+   FOLLOW THE LINE (JEDŹ ZA LINIĄ).
+8. **A job is taken, not hit.** Rolled into under 20 km/h (as a rival's
+   pull-up is today, §14) a ring starts its job at once, the ring lit cyan
+   with a chime; driven through faster, nothing happens. The first ring and
+   the first three fast passes say SLOW DOWN IN THE RING (ZWOLNIJ W KÓŁKU)
+   in the one message at the top. The choice is made on the way in: the
+   sign and its pay read from 100 m.
+9. **One thing at a time, said plainly.** A running job is the goal and the
+   cops are in its way. With no job running and the cops on the player (a
+   pursuit in any state but idle), every ring, hailer and rival is closed
+   and drawn grey until the cops lose him, and the line says LOSE THEM, or
+   LOSE THEM OR BANK IT with the route to the nearest garage when the bag
+   holds something (GTA V's rule). Stars without a pursuit close nothing:
+   they are what multiplies the bag. The cold open's delivery is the
+   exception: a scene, not a choice, and no other ring is open in it.
+10. **One kind at a time.** The kinds come out with the first quarter
+    hour's chain (§13.4): deliveries from the start (one already stands
+    within 250 m of every door); street races and time trials after the
+    first job; takedown rage and mayhem after the first bag banked; escapes
+    after the first car; steal-to-order after the cops are lost at two
+    stars, the step before the chain asks for one. Each kind comes with one
+    card, `NEW: [flag] STREET RACE` (NOWOŚĆ: WYŚCIG ULICZNY), and its signs
+    rise in the city. The save's chain decides, with no new save field; the
+    rivals' rings and the fares keep their own gates (the board, the taxi).
+11. **The cold open teaches it**: the route on the radar from its first
+    second (the coin line stays and the captions lead), its delivery ring
+    asks to slow down with rule 8's caption, and nothing else in it
+    changes.
+
+### 20.4 What stays out, and why
+
+- **The arrow in any form** (Marcin). If the gate shows players lost
+  without it, the answer is a short hint before a turn, never a standing
+  arrow.
+- **Chevron boards at the turns, the car's blinker before a turn, a
+  searchlight over the goal**: proposed in the talk and dropped; each said
+  again what the route says.
+- **Figurines of the kinds** (low-poly models over the rings): a figure
+  seen at an angle and from afar is a blob; a flat sign turned to the
+  camera reads.
+- **A line painted on the road**: from a camera about 2 m up, a turn 60 m
+  ahead is seen at 2°.
+- **A voice** saying the turns; new job kinds; the jobs' pay, limits and
+  heat; the police; the platform (M9).
+
+### 20.5 How we know it reads (the gate)
+
+- A calm drive shows six things.
+- Every state of the screens suite, read in greyscale: the goal and each
+  sign's kind are still told apart.
+- At 800×450 the badges are 14 px or more and the route 4 px or more.
+- The still test: a frame of each state shown for three seconds; the
+  reviewer says where to go and what the nearest sign is.
+- The first five minutes walked as §17.7's twelve-year-old, from the cold
+  open to the second job, the seconds from the drive-out to the first
+  job's start written down.
+- Marcin's play is the last word.
+
+### 20.6 What this changes elsewhere
+
+- §3.2: the jobs are no longer all open from the first run; they come out
+  over the first quarter hour (rule 10). The districts stay open.
+- §4: no job uses an arrow; between jobs the goal holds (rule 2) and the
+  radar draws its route.
+- §6.5: the route on the radar and the full map; the pick on the full map.
+- §6.6: the route on the radar from the first second; the delivery ring
+  asks to slow down.
+- §11: M8.7 between M8.6 and M9, set here; M8.6's gate closes inside
+  M8.7's; the platform keeps its number.
+- §13.4: one line and one route; the line's words (rule 7).
+- §17.2, §17.6 and `CLAUDE.md`: a calm drive shows six things; the top
+  centre holds the line alone; "where" is the radar's.
+- §17.4: where a job ends is the sign the route leads to.
+- `docs/M9_PLAN.md`: on touch the radar is the only "where", so it stays at
+  its full size in the top-left, and a tap on a sign on the full map picks
+  the goal.
+- `docs/STYLE.md`: the arrow's entry goes; the markers, the goal line, the
+  radar and the colours change, each by its slice.
+- `src/ui/pl.ts`: the new words' Polish (SLOW DOWN IN THE RING, NEW,
+  FOLLOW THE LINE).
 
 ## References
 

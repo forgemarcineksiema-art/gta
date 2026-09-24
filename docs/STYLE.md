@@ -399,7 +399,9 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 
 ## Jobs, the arrow and the wall (M5)
 
-- The arrow: one chevron in `carOrange`, 1.2 m long, 12 triangles, unlit,
+- The arrow (leaves with M8.7 slice 1, DESIGN §20; the markers, the goal
+  line, the radar and the colours below change by that milestone's slices):
+  one chevron in `carOrange`, 1.2 m long, 12 triangles, unlit,
   2.5 m above the roof. It lies in a plane tipped 45° toward the camera and
   turns inside it to the bearing (a flat arrow is edge-on to a chase camera
   below it): up the screen is ahead, down is behind. Full colour on a job;

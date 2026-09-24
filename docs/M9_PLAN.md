@@ -503,7 +503,10 @@ Behaviour:
   and `InputManager.label` falls through to the keyboard's only when the
   keyboard is first in the device list, so the touch device is added
   first when it shows). The radar moves to the top-left while the layer is
-  visible (one CSS class on `.minimap`).
+  visible (one CSS class on `.minimap`). Amended 2026-09-24 (DESIGN §20,
+  M8.7): with no arrow the radar's route is the only answer to "where", so
+  on touch the radar keeps its full size, and a tap on a sign on the full
+  map picks the goal as a click does.
 - `touch-action: none` and `user-select: none` exist on the body; the
   AudioContext resumes on `touchend` (exists).
 

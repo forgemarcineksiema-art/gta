@@ -221,7 +221,7 @@ src/input/TouchDevice.ts           pointer events → raw actions; one pointer p
 src/ui/touch.ts                    the control layer DOM (zones and buttons), safe-area padding, show/hide rules, the swap prompt as a button
 src/ui/rotate.ts                   the portrait overlay
 src/ui/styles.css                  touch layer, rotate overlay, safe-area padding on HUD edges, radar top-left on touch
-src/render/Renderer.ts             QUALITY.mobile, the tier from device type, the resolution floor per tier
+src/render/quality.ts              QUALITY.mobile, the resolution floor per tier; Renderer.ts the tier from device type
 src/sim/traffic/tuning.ts          TRAFFIC.mobile: { agents: 32, physicsBodies: 12 }; SimWorldOptions.tier?: 'desktop' | 'mobile'
 src/app/App.ts                     device type → tier, the touch device, the rotate overlay, the mute setting, the auth reload, the date tick unchanged
 src/audio/EngineAudio.ts           resume on touchend (exists), setMuted from the SDK setting
@@ -347,7 +347,7 @@ export interface TouchTuning { steerZoneWidth: 0.34; deadBand: 0.08; lockWidth: 
 // steerZoneWidth: the left share of the screen that steers; lockWidth: share of the screen width from the touch-down point to full lock
 // src/platform/index.ts
 export const PLATFORM = { sdkInitTimeoutMs: 3000 };
-// src/render/Renderer.ts
+// src/render/quality.ts
 QUALITY.mobile = { far: 260, near: 80, dpr: 1, shadow: 512, resolutionFloor: 0.6 };   // shadow 0 if the proxy needs it, measured in slice 3
 // src/sim/traffic/tuning.ts
 TRAFFIC.mobile = { agents: 32, physicsBodies: 12 };
@@ -531,7 +531,7 @@ executor's).
 
 ### Slice 3 — the mobile tier, safe areas, orientation, the 20 MB (1.5 days)
 
-Files: `src/render/Renderer.ts`, `CityView.ts` (`QUALITY.mobile`),
+Files: `src/render/Renderer.ts`, `quality.ts` (`QUALITY.mobile`),
 `src/sim/traffic/tuning.ts`, `SimWorld.ts` (`tier`), `App.ts`,
 `src/ui/rotate.ts`, `styles.css`, `tools/budget.mjs`, `e2e/perf.spec.ts`,
 `package.json` (`perf:mobile`), `e2e/mobile.spec.ts`.
@@ -776,10 +776,10 @@ the code at `ba9a12f`:
   `KeyboardDevice` prevents default on Space and the arrows and latches
   taps; `ActionState` edges are per frame. `InputManager.blocked` is the ad
   window.
-- Renderer: `QUALITY` in `src/render/city/CityView.ts` (`low`, `high` with
-  `far`, `near`, `dpr`, `shadow`); the tier sampler in `Renderer.ts`
-  (`qualityLocked` from `?quality=`, hysteresis 3 s windows, cooldown 15
-  s, DPR from `QUALITY[tier].dpr × resolutionScale`); `pedView.setShadows`
+- Renderer: `QUALITY` in `src/render/quality.ts` (`low`, `high` with
+  `far`, `near`, `dpr`, `shadow`); the tier sampler `AutoQuality` beside it
+  (locked by `?quality=`, hysteresis 3 s windows, cooldown 15 s), the DPR in
+  `Renderer.ts` from `QUALITY[tier].dpr × scale`; `pedView.setShadows`
   by tier. A third tier is one more key and one more branch in the sampler.
 - CSS: `--safe-top/right/bottom/left` from `env()` exist in `styles.css`;
   `user-select: none` and `touch-action: none` on the body;

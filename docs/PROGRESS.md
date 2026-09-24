@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — the renderer in folders, 2 of 2: Renderer.ts carved
+
+`Renderer.ts` 978 → 292 lines, the frame's order kept call for call: `cars/PlayerCar` (classes, taken bodies, swap,
+resprays, crumple, the kit), `cars/GhostCar`, `camera/CameraDirector` (swap whip, door cut, takedown cut), `fx/Effects`
+(what an event throws, bonnet and wreck smoke), `sky.ts`, `shapes.ts` (the sim's statics and dynamics), and in
+`quality.ts` the tiers (were in CityView) and `AutoQuality` (the window). MUSCLE moved to carProfiles. Verify green; the
+smoke's gameplay-start read 3.5–4.4 s against 2.1 s at the base while Marcin's Chrome and two other sessions ran (his
+word); the A/B stopped there, the construction does the same work in the same order.
+
 ## 2026-09-24 — the renderer in folders, 1 of 2: the moves
 
 Marcin: "how best to split render into folders?" Decided here (ARCHITECTURE 97): split by the thing drawn, the folders

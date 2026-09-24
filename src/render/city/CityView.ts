@@ -4,12 +4,7 @@ import { SHADOW_HALF, fadeShadowEdges } from '../shadows';
 import { fadeRoadPaint } from './roadPaint';
 import { gableGeometry, prismGeometry } from '../geometry';
 import { propStatics } from '../props/propMesh';
-
-export type QualityTier = 'low' | 'high';
-export const QUALITY = {
-  low: { far: 340, near: 100, dpr: 1, shadow: 1024 },
-  high: { far: 580, near: 180, dpr: 1.5, shadow: 2048 },
-} as const;
+import { QUALITY, type QualityTier } from '../quality';
 
 /** Direct buffer filling avoids hundreds of temporary Three geometries per streamed chunk. */
 const box = new THREE.BoxGeometry(2, 2, 2).toNonIndexed();

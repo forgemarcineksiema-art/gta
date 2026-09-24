@@ -3,7 +3,39 @@
  * tuning). Heights above ground with the car at rest, +Z forward.
  */
 import { PALETTE, type CarId } from '../../sim';
-import { MUSCLE, type CarProfile } from './carMesh';
+import type { CarProfile } from './carMesh';
+
+/** A long-bonnet coupe: the first car. Heights above ground, length 4.5 m, width ~1.9 m at the belt. */
+export const MUSCLE: CarProfile = {
+  name: 'muscle',
+  sections: [
+    { z: 2.25, floor: 0.34, belt: 0.78, roof: 0.83, hwFloor: 0.8, hwBelt: 0.88, hwRoof: 0.8 },
+    { z: 1.95, floor: 0.32, belt: 0.88, roof: 0.94, hwFloor: 0.88, hwBelt: 0.98, hwRoof: 0.87 },
+    { z: 1.3, floor: 0.32, belt: 0.91, roof: 0.96, hwFloor: 0.88, hwBelt: 1.0, hwRoof: 0.88 },
+    { z: 0.65, floor: 0.32, belt: 0.89, roof: 0.94, hwFloor: 0.86, hwBelt: 0.97, hwRoof: 0.87 },
+    { z: -0.05, floor: 0.32, belt: 0.91, roof: 1.39, hwFloor: 0.85, hwBelt: 0.96, hwRoof: 0.73 },
+    { z: -0.86, floor: 0.32, belt: 0.93, roof: 1.37, hwFloor: 0.87, hwBelt: 0.99, hwRoof: 0.73 },
+    { z: -1.55, floor: 0.33, belt: 0.96, roof: 1.0, hwFloor: 0.89, hwBelt: 1.0, hwRoof: 0.87 },
+    { z: -1.95, floor: 0.34, belt: 0.9, roof: 0.95, hwFloor: 0.85, hwBelt: 0.95, hwRoof: 0.86 },
+    { z: -2.25, floor: 0.38, belt: 0.85, roof: 0.91, hwFloor: 0.8, hwBelt: 0.9, hwRoof: 0.81 },
+  ],
+  glassSides: [4, 5],
+  glassTops: [3, 5],
+  aPillar: 3,
+  cPillar: 5,
+  pillars: [-0.42],
+  doorSeams: [0.72, -0.52],
+  handleZ: -0.25,
+  headlight: { width: 0.42, height: 0.17, y: 0.665, inset: 0.27 },
+  taillight: { width: 0.57, height: 0.16, y: 0.71, inset: 0.32 },
+  grille: { width: 0.63, height: 0.18, y: 0.65 },
+  bumperHeight: 0.1,
+  lipSpoiler: true,
+  mirrors: true,
+  exhausts: 2,
+  wheelInset: 0.015,
+  paint: PALETTE.carRed,
+};
 
 /** Small hatchback: short bonnet, tall greenhouse, upright tail. */
 export const COMPACT: CarProfile = {

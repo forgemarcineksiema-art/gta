@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — each worktree's e2e on its own port
+
+Found setting up `m8.8-fleet`: the quick verify's smoke (and every e2e suite) served on 4173 and Playwright reused
+whatever answered there, so from this worktree it tested the main folder's `vite preview` (Marcin's game), not the
+branch. `e2e/port.ts` gives a linked worktree its own port from its folder's name (`m8.8-fleet` 4291, `m8.9-ui` 4238),
+never reused, so a busy port fails the run instead of testing another build; the main folder keeps 4173 and its reuse;
+`E2E_PORT` overrides. Pin `tests/tools/port.test.ts`; CLAUDE.md rule 6 and DEV say it. Verify green, the smoke on 4291.
+And the harness keeps a worktree session's git inside its worktree (`git -C` on the main folder is refused), so a slice
+reaches main by a fast-forward push to origin (CLAUDE.md rules 1–2); Marcin pulls in the main folder before he plays.
+
 ## 2026-09-25 — two milestones at once: M8.8 beside M8.9 (Marcin)
 
 Marcin runs M8.8 (the fleet; session "Pojazdy w grze", branch `m8.8-fleet`) and M8.9 (the look; "UI/UX i style",

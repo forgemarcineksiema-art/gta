@@ -8,7 +8,7 @@ where the scratch output goes. The one way to *play* the game is `npm start`
 
 | Command | Port | What |
 |---|---|---|
-| `npm start` | 4173 | `vite build` then `vite preview`: the production bundle from `dist/`, the game as shipped. The e2e suites run against this. |
+| `npm start` | 4173 | `vite build` then `vite preview`: the production bundle from `dist/`, the game as shipped. In the main folder the e2e suites run against this. |
 | `npm run dev` | 5173 | Vite dev server from source with live reload; unminified. For editing. |
 | `npm run preview` | 4173 | Serve the last `dist/` without rebuilding. |
 
@@ -16,6 +16,13 @@ Both ports are `strictPort`: a second server on the same port fails instead of
 picking another, so there is never more than one of each. Other agents or
 Marcin may have one running in this folder; never kill a process you did not
 start.
+
+The e2e suites (the quick verify's smoke included) serve the build on the
+checkout's own port (`e2e/port.ts`): 4173 in the main folder, where a running
+`npm start` is reused; in a linked git worktree a port from 4200–4299 derived
+from its folder's name (`m8.8-fleet` 4291, `m8.9-ui` 4238), never reused, so a
+busy port fails the run instead of testing another build. `E2E_PORT=<port>`
+overrides it.
 
 ## Build stamp
 

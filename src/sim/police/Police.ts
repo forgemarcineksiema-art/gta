@@ -797,7 +797,7 @@ export class Police {
         if (current >= 0 && current < k) continue;
         const d = Math.hypot((traffic.x[agent] as number) - (this.slotX[k] as number), (traffic.z[agent] as number) - (this.slotZ[k] as number));
         if (Math.hypot((traffic.x[agent] as number) - player.x, (traffic.z[agent] as number) - player.z) > a.range) continue;
-        const cost = d - (current === k ? a.keep : 0);
+        const cost = slotCost(d, current === k, traffic.kindOf(agent) === 'heavy', a);
         if (cost < bestCost) { bestCost = cost; best = u; }
       }
       for (let u = 0; u < this.units.length; u++) if (held[u] === k && u !== best) held[u] = -1;
@@ -1238,4 +1238,12 @@ export class Police {
     }
     return next;
   }
+}
+
+/**
+ * What a slot of the box costs a unit (lowest takes it): its distance, less `keep` for the slot it holds, and at
+ * levels 4-5 (M7 slice 9) less `heavyFirst` for a heavy, so a heavy within reach takes a slot before a nearer saloon.
+ */
+export function slotCost(distance: number, holding: boolean, heavy: boolean, arrest: { keep: number; heavyFirst: number }): number {
+  return distance - (holding ? arrest.keep : 0) - (heavy ? arrest.heavyFirst : 0);
 }

@@ -103,6 +103,9 @@ const POLICE_ACCEL = 1.5;
 /** A unit on a chase goes round a car this much slower (m/s) within this reach (m) (POLICE.mode). */
 const POLICE_SLOWER_BY = 3;
 const POLICE_LOOK = 25;
+/** A chasing unit's inside line through a turn (M7 slice 9): metres in from the traffic's curve, and from how far out. */
+const POLICE_CORNER = 1.6;
+const POLICE_CORNER_LEAD = 14;
 /** Driving cars ignore the ground; a disturbed or wrecked car is switched onto GROUPS_SOLID so it can tumble and rest. */
 const GROUPS_TRAFFIC = interactionGroups(GROUP_DEFAULT, 0xffff & ~GROUP_TERRAIN);
 const ZERO = { x: 0, y: 0, z: 0 };
@@ -2500,6 +2503,12 @@ export class Traffic {
         }
         if ((this.passAgent[i] as number) >= 0) target = -2 * (this.lanes.offset[this.lane[i] as number] as number);
         else if (this.pullingAhead(i, lane, s)) target = -t.pullOver.offset;
+        else {
+          // the corner (M7 slice 9): a unit on a chase takes a turn on its inside line, a lane's half in from the
+          // traffic's curve, so it reads as police driving (a left turn cuts in over the middle, a right one hugs the kerb)
+          const nxt = this.next[i] as number;
+          if (nxt >= 0 && this.turn[i] === 1 && s > len - POLICE_CORNER_LEAD) target = this.lanes.headingChange(lane, nxt) > 0 ? -POLICE_CORNER : POLICE_CORNER;
+        }
       }
       this.ease(i, target, dt);
       return;

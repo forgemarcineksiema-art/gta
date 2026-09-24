@@ -2,6 +2,14 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M7 slice 9: the police's corners and levels 4–5
+
+Done: a unit on a chase takes a turn on its inside line, 1.6 m in from the traffic's curve from 14 m out (a left
+turn cuts in over the middle, a right one hugs the kerb), so it reads as police driving: 2.4 m shorter through a
+right-angle junction than a civilian. The box's slots go to a heavy within reach before a nearer saloon
+(`POLICE.arrest.heavyFirst`, 12 m; `slotCost`), so levels 4–5 box with their weight. Whether that makes level 4 catch
+as often as level 3 is the balance's capture table at the gate. Pins M7 9.1, 9.2. Verify green (350 tests).
+
 ## 2026-09-24 — M7 slice 8: the civilians
 
 Done: the standoff goes round on the side away from the player: with the player at its kerb (the M6 gate's case,

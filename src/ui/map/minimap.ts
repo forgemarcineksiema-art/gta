@@ -590,7 +590,7 @@ export class Minimap {
       project(this.tmp, m.x, m.z, x, z, h, s, px, py);
       if (m.local && (this.tmp.x - ccx) ** 2 + (this.tmp.y - ccy) ** 2 > rimR * rimR) continue;
       const clamped = clampToRim(this.tmp, px, py, this.tmp.x, this.tmp.y, ccx, ccy, rimR);
-      if (m.kind === 'job') drawBadge(c, m.glyph ?? 0, this.tmp.x, this.tmp.y, MINIMAP.goalPx * 0.85, m.state ?? 0);
+      if (m.kind === 'job') drawBadge(c, m.glyph ?? 0, this.tmp.x, this.tmp.y, MINIMAP.badgePx, m.state ?? 0);
       else drawGlyph(c, m.kind, this.tmp.x, this.tmp.y, clamped ? MINIMAP.glyphPx * 0.75 : MINIMAP.glyphPx, m.color);
       if (clamped) this.chevron(this.tmp.x, this.tmp.y, Math.atan2(this.tmp.x - px, py - this.tmp.y), m.color);
     }

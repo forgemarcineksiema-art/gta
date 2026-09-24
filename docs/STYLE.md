@@ -415,7 +415,8 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   a hailer, the house over a door the way leads to. Within 100 m the nearest
   open sign ahead carries its pay a metre over it in the line's yellow type.
   The maps draw the same pictogram in a badge (open ink, the goal in a cyan
-  ring, closed grey); the goal line's badge is 30 px. The kinds' colours are
+  ring, closed grey), on the radar 14.5 px across with its edge (the gate's
+  floor at 800×450 is 14); the goal line's badge is 30 px. The kinds' colours are
   gone everywhere (the line's words ink, the card's edge cyan, a zone's edge
   cyan); the boost bar's fill is dim ink, since cyan is the way's.
 - Job markers, M8.7 slice 2 (DESIGN §20.3 rules 8–9): with the police on

@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.7 gate: 0.8.7 (M8.6's gate closed inside it)
+
+Report `docs/M8.7_REPORT.md`. `verify:gate` 525 of 526 on the final tree: the city tour's 120 s timeout at 134 s under
+the suite's load (64 s alone); the gate now runs a worker a core. §20.5 read: six things at the ten sizes, greyscale, the
+still test; the radar's signs were 13.4 px across, under the 14 px floor at 800×450, now 14.5; a bot's first five
+minutes: the first job 11.6 s after the drive-out. Not run, stopped at Marcin's word: the perf A/B against 0.8.5, the e2e
+suites, the balance (BACKLOG, the next gate's first job). The 0.8.5 copy for the A/B deleted. Next: his play of 0.8.7,
+then M8.8 on his word. Verify green.
+
 ## 2026-09-24 — M8.8 "The fleet" planned (a talk with Marcin on the vehicles)
 
 From "list every vehicle": the 28 bodies, the five classes measured (0–60, 0–100, top, 100–0), and what they lack. Found

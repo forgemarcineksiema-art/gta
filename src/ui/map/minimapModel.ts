@@ -34,12 +34,14 @@ export const MINIMAP = {
   arrowPx: 11,
   /**
    * The way's route (docs/M8.7_PLAN.md D3): its line, px, on a dark edge `routeEdgePx` wider on each side; drawn in
-   * from the car over `drawInMs` when the goal or the route changes, still otherwise. The goal's badge, px (radius).
+   * from the car over `drawInMs` when the goal or the route changes, still otherwise. The goal's badge, px (radius),
+   * and every other sign's: 6.5 with its edge is 14.5 px across, the gate's floor at 800×450 (DESIGN §20.5).
    */
   routePx: 5,
   routeEdgePx: 2,
   drawInMs: 500,
   goalPx: 7,
+  badgePx: 6.5,
 } as const;
 
 export interface Segment { x0: number; z0: number; x1: number; z1: number }

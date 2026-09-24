@@ -7,6 +7,7 @@
  * form for milestone gates and for the commit of a slice that added one.
  */
 import { spawnSync } from 'node:child_process';
+import { availableParallelism } from 'node:os';
 
 const stages = [
   ['typecheck', 'npx', ['tsc', '--noEmit', '-p', 'tsconfig.json']],
@@ -21,6 +22,10 @@ const stages = [
 const args = process.argv.slice(2);
 const gate = args.includes('--gate');
 const only = args.filter((a) => !a.startsWith('--'));
+// The long pins time sim steps and carry timeouts sized for a core each: at the M8.7 gate seven workers on a laptop's
+// four cores (eight threads) doubled them (the traffic pool's step 6.0 ms against 1.5 alone, the city tour 215 s
+// against 64). The gate runs a worker a core.
+if (gate) (stages.find(([name]) => name === 'test') ?? [])[2]?.push(`--maxWorkers=${Math.max(1, Math.floor(availableParallelism() / 2))}`);
 const results = [];
 let failed = false;
 for (const [name, cmd, args] of stages) {

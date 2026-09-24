@@ -629,10 +629,14 @@ export class Jobs {
   };
 }
 
-/** What an event is worth to mayhem (DESIGN.md §4): a traffic hit by its impact, capped; a wall by less; the rest priced. */
+/**
+ * What an event is worth to mayhem (DESIGN.md §4): a traffic hit by its impact, capped; a wall by less; a smashed
+ * thing by its bill (M8 slice 8; the player's, a unit's is 0); the rest priced.
+ */
 function damagePrice(e: SimEvent): number {
   const m = BALANCE.jobs.zone.mayhem;
   switch (e.kind) {
+    case 'smash': return e.value;
     case 'hit': return e.target >= 0 ? Math.min(m.hitCap, Math.round(e.value * m.hitPerMs)) : Math.min(m.wallCap, Math.round(e.value * m.wallPerMs));
     case 'takedownTraffic': return m.takedownTraffic;
     case 'takedown': return m.takedown;

@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8 slice 8: mayhem and the cold open
+
+Done: each mayhem zone's corner is a market along its footways (a fruit or fish stall on the frontage line, a crate
+behind it in the yard, a table with two chairs after every other one; 40 and 41 things, 7,420 and 6,500 at the
+sticker); a smash in the zone counts its bill, the quota 15,000 (jobs rebaked). The cold open drives through a café
+terrace, a newspaper box and a newsstand. Decided: just past the billboard gate, not before it: the footway before
+the gate is the hideout door's approach, and a newsstand there would hold a car crawling home. Loose things on the
+route may stand in the gate's run-out. Pins M8 8.1, 8.2. Verify green.
+
 ## 2026-09-24 — M8 slice 7: everyone else
 
 Done: a lent body (a civilian shoved loose, a police unit) knocks by the rule with its own mass, swept at its body's

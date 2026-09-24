@@ -15,7 +15,7 @@ import { cameraStatics, placeCameras, type CameraDesc } from './cameras';
 import { RAMP_HALF_WIDTH, jumpStatics, placeJumps, type JumpDesc } from './jumps';
 import { gateLine, layoutCoins, placeCoins, type CoinDesc, type CoinPoint } from './coins';
 import { buildRoadMarkings } from './markings';
-import { PROP_LINES, chunkProps, type FootwayRun, type PropContext, type PropDesc, type PropPlace } from './props';
+import { MARKET, PROP_LINES, chunkProps, type FootwayRun, type PropContext, type PropDesc, type PropPlace, type PropSpot } from './props';
 import { signalPoles, signalledNodes } from './signals';
 import { BLOCK, CITY_HALF, HIGHWAY_HALF, HIGHWAY_LANE_OFFSETS, OVERPASS_NODES, ROAD_HALF, buildCityRoute, buildRoadGraph, distanceToPolyline, highwayHeightAt, projectOnLane, underOverpass, type Lane, type RoadPoint, type SpecialRoad } from './roads';
 import { overpassStatics } from './overpass';
@@ -77,6 +77,8 @@ const SHALLOWS = 40;
 
 /** A circle the street furniture keeps out of (a job's ring, a parked hidden car, a breaker's tower). */
 export interface PropRing { x: number; z: number; r: number }
+/** The cold open's route (its samples, which nothing else stands on) and the things it drives through (M8 slice 8). */
+export interface ColdOpenKeep { samples: ReadonlyArray<{ x: number; z: number }>; spots: readonly PropSpot[] }
 /**
  * The keep-outs' margins (m, M8 D7): a grid footway's run stops this short of its chunk's edge where it runs toward
  * the neighbour (whose billboard's line may come this far); a car's half width plus room on the cold open's route
@@ -198,8 +200,8 @@ export class City {
   private readonly lotsBySegment = new Map<string, Map<number, FrontageLot[]>>();
   private footprintCache: { parks: Rect[]; blocks: Rect[]; water: Polygon[] } | null = null;
   /** What the street furniture keeps out of that the world knows (M8): set once before any prop is asked for. */
-  private propKeepOut: { rings: ReadonlyArray<PropRing>; route: () => ReadonlyArray<{ x: number; z: number }> } | null = null;
-  private propRoute: ReadonlyArray<{ x: number; z: number }> | null = null;
+  private propKeepOut: { rings: ReadonlyArray<PropRing>; route: () => ColdOpenKeep; markets: ReadonlyArray<{ x: number; z: number }> } | null = null;
+  private propRoute: ColdOpenKeep | null = null;
   /** Each chunk's props, placed the first time asked for (all 49 are small). */
   private readonly propLists = new Map<string, PropDesc[]>();
   readonly spawns: SpawnPoint[];
@@ -1018,11 +1020,12 @@ export class City {
 
   /**
    * What the street furniture keeps out of that only the world knows (M8, D7): the job rings (a duel's round its
-   * bay), the stash's cars, the breakers' towers, the donut shop; and the cold open's route, computed the first
-   * time a chunk asks. Set by the world before any prop is asked for.
+   * bay), the stash's cars, the breakers' towers, the donut shop; and the cold open's route with the things it
+   * drives through, computed the first time a chunk asks; the mayhem zones, whose corners hold a market (slice 8).
+   * Set by the world before any prop is asked for.
    */
-  setPropKeepOut(rings: ReadonlyArray<PropRing>, route: () => ReadonlyArray<{ x: number; z: number }>): void {
-    this.propKeepOut = { rings, route };
+  setPropKeepOut(rings: ReadonlyArray<PropRing>, route: () => ColdOpenKeep, markets: ReadonlyArray<{ x: number; z: number }> = []): void {
+    this.propKeepOut = { rings, route, markets };
     this.propRoute = null;
     this.propLists.clear();
   }
@@ -1084,6 +1087,13 @@ export class City {
         const x0 = x + sx * vx;
         runs.push({ x: x0, z: z + sz * vz, dx: sx, dz: 0, nx: 0, nz: sz, length: endX - vx, along: sx * x0, district: q.d.id, street: 'grid', entrances: alongX });
       }
+      // a mayhem zone on this corner: its market along the quarter's footways (never beside the highway), split between them
+      const zone = keep.markets.some((m) => Math.round(m.x / BLOCK) === cx && Math.round(m.z / BLOCK) === cz && Math.sign(m.x - x) === sx && Math.sign(m.z - z) === sz);
+      if (zone) {
+        const legs = runs.slice(-((Math.abs(cx) !== 3 ? 1 : 0) + (Math.abs(cz) !== 3 ? 1 : 0)));
+        const half = MARKET.start + (Math.ceil(MARKET.units / Math.max(1, legs.length)) - 1) * MARKET.pitch;
+        for (const r of legs) places.push({ kind: 'market', x: r.x, z: r.z, dx: r.dx, dz: r.dz, half, nx: r.nx, nz: r.nz, entrances: r.entrances });
+      }
     }
     for (const road of corridors) {
       const f = this.frame(road), joins = this.joinsFor(road), hw = road.halfWidth;
@@ -1119,6 +1129,9 @@ export class City {
       places.push(cx === 3 ? { kind: 'promenade', x: CITY_HALF, z, dx: 0, dz: -1, half: BLOCK / 2, nx: 1, nz: 0 }
         : { kind: 'promenade', x, z: CITY_HALF, dx: 1, dz: 0, half: BLOCK / 2, nx: 0, nz: 1 });
     }
+    // the cold open's things on its footway run, where they stand in this chunk
+    const spots = (this.propRoute ??= keep.route()).spots.filter((s) => Math.round(s.x / BLOCK) === cx && Math.round(s.z / BLOCK) === cz);
+    if (spots.length > 0) places.push({ kind: 'route', x, z, dx: 1, dz: 0, half: 0, nx: 0, nz: 1, spots });
     return { seed: this.seed, runs, places, blocked: this.propRule(cx, cz, chunk, corridors, keep.rings) };
   }
 
@@ -1152,7 +1165,7 @@ export class City {
     const boards = chunk.billboards.map((b) => ({ box: runOutFootprint(b), line: gateLine(this.graph, b) ?? [] }));
     const jumps = this.jumps.filter((j) => near(j.x, j.z));
     // the cold open's route near the chunk (its segments, x0 z0 x1 z1), computed once for the city
-    const whole = (this.propRoute ??= this.propKeepOut?.route() ?? []);
+    const whole = (this.propRoute ??= this.propKeepOut?.route() ?? { samples: [], spots: [] }).samples;
     const route: number[] = [];
     for (let i = 0; i + 1 < whole.length; i++) {
       const p = whole[i] as { x: number; z: number }, q = whole[i + 1] as { x: number; z: number };
@@ -1160,7 +1173,7 @@ export class City {
     }
     const ends = corridors.flatMap((road) => [road.centre[0] as RoadPoint, road.centre[road.centre.length - 1] as RoadPoint]);
     const frame = { along: 0, across: 0 };
-    return (x, z, yaw, hx, hz) => {
+    return (x, z, yaw, hx, hz, onRoute) => {
       const cos = Math.cos(yaw), sin = Math.sin(yaw);
       // local +X is (cos, -sin), local +Z is (sin, cos): the footprint's world half extents
       const ex = Math.abs(cos) * hx + Math.abs(sin) * hz, ez = Math.abs(sin) * hx + Math.abs(cos) * hz, br = Math.hypot(hx, hz);
@@ -1172,12 +1185,12 @@ export class City {
       if (streetX) {
         if (dX - ex < halfX) return true;
         const walkers = Math.abs(gx) !== 3 || Math.abs(x) < ring;
-        if (walkers && dX - ex < halfX + hi && dX + ex > halfX + lo) return true;
+        if (walkers && !onRoute && dX - ex < halfX + hi && dX + ex > halfX + lo) return true;
       }
       if (streetZ) {
         if (dZ - ez < halfZ) return true;
         const walkers = Math.abs(gz) !== 3 || Math.abs(z) < ring;
-        if (walkers && dZ - ez < halfZ + hi && dZ + ez > halfZ + lo) return true;
+        if (walkers && !onRoute && dZ - ez < halfZ + hi && dZ + ez > halfZ + lo) return true;
       }
       // the authored roads: their carriageways and walkers' bands, the footprint's extent along the road's normal
       for (const road of corridors) {
@@ -1193,7 +1206,7 @@ export class City {
         if (c > 4.5 + br) continue;
         const e = Math.abs(nx * cos - nz * sin) * hx + Math.abs(nx * sin + nz * cos) * hz;
         if (c - e < 0) return true;
-        if (c - e < hi && c + e > lo) return true;
+        if (!onRoute && c - e < hi && c + e > lo) return true;
       }
       // a junction's corners, and 12 m round an authored road's junction
       for (let nzi = Math.max(-3, gz - 1); nzi <= Math.min(3, gz + 1); nzi++) for (let nxi = Math.max(-3, gx - 1); nxi <= Math.min(3, gx + 1); nxi++) {
@@ -1218,8 +1231,8 @@ export class City {
       if (Math.abs(Math.abs(x) - VERGE) - ex < RUN_OUT_REACH && Math.abs(z) < verge) return true;
       if (Math.abs(Math.abs(z) - VERGE) - ez < RUN_OUT_REACH && Math.abs(x) < verge) return true;
       for (const b of boards) {
-        if (x + ex > b.box.minX && x - ex < b.box.maxX && z + ez > b.box.minZ && z - ez < b.box.maxZ) return true;
-        for (let i = 0; i + 1 < b.line.length; i++) {
+        if (onRoute !== 'loose' && x + ex > b.box.minX && x - ex < b.box.maxX && z + ez > b.box.minZ && z - ez < b.box.maxZ) return true;
+        if (!onRoute) for (let i = 0; i + 1 < b.line.length; i++) {
           const p = b.line[i] as CoinPoint, q = b.line[i + 1] as CoinPoint;
           if (segmentDistance(x, z, p.x, p.z, q.x, q.z) < PROP_KEEP.line + br) return true;
         }
@@ -1232,7 +1245,7 @@ export class City {
       }
       if (underOverpass(x, z, PROP_KEEP.overpass + br) || insideCover(this.covers, x, z, PROP_KEEP.cover + br)) return true;
       // the cold open's route
-      for (let i = 0; i + 3 < route.length; i += 4) {
+      if (!onRoute) for (let i = 0; i + 3 < route.length; i += 4) {
         if (segmentDistance(x, z, route[i] as number, route[i + 1] as number, route[i + 2] as number, route[i + 3] as number) < PROP_KEEP.route + br) return true;
       }
       // anything built that stands above the kerb

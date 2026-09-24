@@ -107,6 +107,8 @@ export function propHeight(kind: PropKind): number {
 
 /** One placed prop. `yaw` turns its local +Z (its face: the lamp's arm, the bench's seat) toward the road. */
 export interface PropDesc { id: number; kind: PropKind; x: number; z: number; yaw: number }
+/** A thing placed where given (the cold open's route, M8 slice 8). */
+export interface PropSpot { kind: PropKind; x: number; z: number; yaw: number }
 
 /** Ids: chunk index × PROPS_PER_CHUNK + the prop's place in its chunk's list. */
 export const PROPS_PER_CHUNK = 256;
@@ -133,16 +135,19 @@ export interface FootwayRun {
 /**
  * A place with its own things: a park's path, the promenade along the seawall, a corner shop's terrace, a Works
  * lot's front yard, a Gardens house's front garden. A lot's place stands on the road edge in front of the lot's
- * middle, `half` its half width along the road.
+ * middle, `half` its half width along the road. A mayhem zone's market leg (M8 slice 8) starts at its kerb corner
+ * and runs `half` m along the footway, its doors in `entrances`; the cold open's things stand at their `spots`.
  */
 export interface PropPlace {
-  kind: 'park' | 'promenade' | 'terrace' | 'yard' | 'garden';
+  kind: 'park' | 'promenade' | 'terrace' | 'yard' | 'garden' | 'market' | 'route';
   /** Its centre and the way its length runs (a park's path, the promenade's wall), and its half length. */
   x: number; z: number;
   dx: number; dz: number;
   half: number;
   /** The way toward the side it faces: the promenade's sea (the park: either side of its path; a terrace: from the road). */
   nx: number; nz: number;
+  entrances?: ReadonlyArray<{ x: number; z: number }>;
+  spots?: readonly PropSpot[];
 }
 
 export interface PropContext {
@@ -152,9 +157,11 @@ export interface PropContext {
   /**
    * Whether a footprint (centre, yaw of its +Z, half extents across and along +Z) stands where nothing may: a
    * lane, the walkers' band, a ring, a door's approach, a billboard's line, a ramp, a junction's corner, an
-   * overpass, a covered street, the cold open's route, or anything built that stands above the kerb.
+   * overpass, a covered street, the cold open's route, or anything built that stands above the kerb. `onRoute`: a
+   * thing the cold open drives through, which the route, the gate's line and the walkers' band do not keep out, nor
+   * a billboard's run-out a loose one (a car through the panel knocks it aside; a solid one would hold it).
    */
-  blocked(x: number, z: number, yaw: number, hx: number, hz: number): boolean;
+  blocked(x: number, z: number, yaw: number, hx: number, hz: number, onRoute?: 'loose' | 'solid'): boolean;
 }
 
 /** The lines and their rhythms (M8_PLAN D7). */
@@ -192,6 +199,12 @@ const GARDEN = { fence: 4.8, pitch: 2.1, path: 1.6, letterbox: 4.1, lawn: 8.2 } 
  * road edge (the shop's front is 5.8 m out), a chair beside it either way.
  */
 const TERRACE = { along: 5, out: 4.6, beside: 1.05 } as const;
+/**
+ * A mayhem zone's market (M8 slice 8): `units` along its footway legs from `start` m past the kerb corner, one every
+ * `pitch` m: a stall on the frontage line facing the road (fruit and fish in turn), a crate behind it in the yard
+ * `crate` m from the road edge, and after every other one a table `table` m out with a chair either side.
+ */
+export const MARKET = { start: 13, pitch: 4, units: 12, crate: 6.6, table: 8.8, chair: 1.05 } as const;
 
 /**
  * A chunk's props from its own random stream: the kerb line and the frontage line of every footway run it holds,
@@ -203,16 +216,33 @@ export function chunkProps(cx: number, cz: number, ctx: PropContext): PropDesc[]
   const index = (cz + 3) * 7 + (cx + 3);
   const out: PropDesc[] = [];
   const taken: Array<{ x: number; z: number; r: number }> = [];
-  const put = (kind: PropKind, x: number, z: number, yaw: number): boolean => {
+  const put = (kind: PropKind, x: number, z: number, yaw: number, onRoute?: 'loose' | 'solid'): boolean => {
     if (out.length >= PROPS_PER_CHUNK) return false;
     const f = propFootprint(kind);
     const r = propRadius(kind);
     for (const t of taken) if (Math.hypot(t.x - x, t.z - z) < t.r + r + PROP_LINES.apart) return false;
-    if (ctx.blocked(x, z, yaw, f.hx, f.hz)) return false;
+    if (ctx.blocked(x, z, yaw, f.hx, f.hz, onRoute)) return false;
     taken.push({ x, z, r });
     out.push({ id: index * PROPS_PER_CHUNK + out.length, kind, x, z, yaw });
     return true;
   };
+  // the places that claim their ground first, drawing nothing: the things the cold open drives through, a market
+  for (const place of ctx.places) {
+    if (place.kind === 'route') for (const s of place.spots ?? []) put(s.kind, s.x, s.z, s.yaw, PROP_TYPES[s.kind].breakImpulse > 0 ? 'solid' : 'loose');
+    if (place.kind !== 'market') continue;
+    const face = Math.atan2(-place.nx, -place.nz);
+    const at = (u: number, off: number): [number, number] => [place.x + place.dx * u + place.nx * off, place.z + place.dz * u + place.nz * off];
+    for (let k = 0, u = MARKET.start; u <= place.half; k++, u += MARKET.pitch) {
+      const stall: PropKind = k % 2 === 0 ? 'fruitStand' : 'fishStall', f = propFootprint(stall);
+      const [sx, sz] = at(u, PROP_LINES.frontage.offset + f.hz);
+      if (!(place.entrances ?? []).some((e) => Math.hypot(e.x - sx, e.z - sz) < PROP_LINES.entrance + f.hx)) put(stall, sx, sz, face);
+      put('crate', ...at(u, MARKET.crate), face);
+      if (k % 2 === 0) continue;
+      const v = u + MARKET.pitch / 2;
+      put('table', ...at(v, MARKET.table), face);
+      for (const s of [-1, 1]) put('chair', ...at(v + s * MARKET.chair, MARKET.table), Math.atan2(-place.dx * s, -place.dz * s));
+    }
+  }
   for (const run of ctx.runs) {
     // facing the road: local +Z along -n
     const yaw = Math.atan2(-run.nx, -run.nz);
@@ -301,7 +331,7 @@ export function chunkProps(cx: number, cz: number, ctx: PropContext): PropDesc[]
       put('letterbox', ...at(GARDEN.path + 0.6, GARDEN.letterbox), face);
       if (pink < 0.7) { put('flamingo', ...at(spot, GARDEN.lawn), face + 0.6); put('flamingo', ...at(spot + 0.7, GARDEN.lawn + 0.4), face - 0.4); }
       if (gnome < 0.6) put('gnome', ...at(-spot, GARDEN.lawn + 1), face);
-    } else {
+    } else if (place.kind === 'promenade') {
       // the promenade: its wooden benches facing the sea every 44 m, deckchairs under a parasol between them, lobster pots by the wall
       const sea = Math.atan2(place.nx, place.nz);
       for (let u = -place.half + 22; u < place.half; u += 44) {

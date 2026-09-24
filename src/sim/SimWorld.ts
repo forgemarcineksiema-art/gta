@@ -28,7 +28,7 @@ import { Life } from './life/Life';
 import { Heat } from './heat/Heat';
 import { Police } from './police/Police';
 import { Pursuit } from './police/Pursuit';
-import { ColdOpen, coldOpenRoute } from './run/ColdOpen';
+import { ColdOpen, coldOpenRoute, coldOpenSpots } from './run/ColdOpen';
 import { Run } from './run/Run';
 import { Skill } from './run/Skill';
 import { TicketOfficer } from './police/Ticket';
@@ -303,7 +303,8 @@ export class SimWorld {
     this.caches = this.coins ? new Caches(this) : null;
     if (this.city) {
       // what the street furniture keeps out of (M8 D7): every job's ring and its end, the stash's cars, the
-      // breakers' towers, the donut shop; the cold open's route, the first time a chunk near it asks
+      // breakers' towers, the donut shop; the cold open's route, the first time a chunk near it asks, with the things
+      // it drives through; the mayhem zones' markets (slice 8)
       const r = BALANCE.jobs.markerRadius;
       const rings: PropRing[] = [];
       for (const d of this.jobs.defs) {
@@ -316,8 +317,9 @@ export class SimWorld {
       const city = this.city;
       city.setPropKeepOut(rings, () => {
         const loop = city.spawns.find((s) => s.name === 'loop'), hideout = this.run.dropOffs[0];
-        return loop && hideout ? coldOpenRoute(this, loop.position.x, loop.position.z, hideout)?.samples ?? [] : [];
-      });
+        const route = loop && hideout ? coldOpenRoute(this, loop.position.x, loop.position.z, hideout) : null;
+        return route ? { samples: route.samples, spots: coldOpenSpots(route) } : { samples: [], spots: [] };
+      }, this.jobs.defs.filter((d) => d.kind === 'mayhem').map((d) => ({ x: d.x, z: d.z })));
     }
     // before the first sync: the ring's chunks bring their props' posts
     this.props = this.city ? new Props(this) : null;

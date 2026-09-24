@@ -145,7 +145,7 @@ export const BALANCE = {
     zone: {
       radius: 160, seconds: 60,
       rage: { quota: 6, payout: 10000, heat: 10 },
-      mayhem: { quota: 5000, payout: 8000, heat: 15, hitPerMs: 40, hitCap: 600, wallPerMs: 10, wallCap: 150, takedownTraffic: 600, takedown: 1000, billboard: 400, camera: 500, roadblock: 800 },
+      mayhem: { quota: 15000, payout: 8000, heat: 15, hitPerMs: 40, hitCap: 600, wallPerMs: 10, wallCap: 150, takedownTraffic: 600, takedown: 1000, billboard: 400, camera: 500, roadblock: 800 },
     },
     race: { pace: 1.85, band: [0.72, 1.25], bandRange: 250, gridAhead: 16, finishRadius: 12, pay: [6000, 2500, 1000], minPath: 1200, maxPath: 2000, limitSpeed: 10 },
   },

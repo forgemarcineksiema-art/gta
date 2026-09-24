@@ -21,6 +21,7 @@ import { BALANCE } from '../balance';
 import type { VehicleControls } from '../controls';
 import { gateLine } from '../city/coins';
 import type { BillboardDesc } from '../city/collectibles';
+import type { PropKind, PropSpot } from '../city/props';
 import type { DropOff } from '../city/cover';
 import { GARAGE } from '../city/cover';
 import { alongLane, crawlInto, garageEntry, junctionCurve, laneAt, laneLength, laneSpan, resample, type Pt } from '../city/route';
@@ -370,6 +371,39 @@ export function coldOpenRoute(sim: SimWorld, x: number, z: number, hideout: Drop
   while (m < samples.length - 1 && nearNode(samples[m] as TrackSample)) m++;
   const marker = samples[m] as TrackSample;
   return { samples, markerX: marker.x, markerZ: marker.z, markerYaw: marker.yaw, markerS: marker.s, gateS, gate, entryS };
+}
+
+/**
+ * The cold open's footway run (M8 slice 8, DESIGN.md §6.6), in metres past the billboard gate (the footway before it
+ * is the hideout door's approach): a café terrace's two tables with a chair either side of each (`chair` m across)
+ * and a newspaper box, loose, in the gate's run-out; then the newsstand, which would hold a slow car, past the run-out.
+ */
+const FOOTWAY_RUN = { tables: [3.2, 7], chair: 1.05, newsbox: 9.8, kiosk: 13, kioskAcross: 0.4 } as const;
+
+/** The things the cold open drives through on its footway run, on the route's line facing the car; none without a gate. */
+export function coldOpenSpots(route: ColdOpenRoute): PropSpot[] {
+  const out: PropSpot[] = [];
+  const samples = route.samples;
+  if (!route.gate || route.gateS < 0 || samples.length < 2) return out;
+  const at = (past: number, kind: PropKind, across = 0, facing = across === 0): void => {
+    const s = route.gateS + past;
+    let i = 0;
+    while (i < samples.length - 2 && (samples[i + 1] as TrackSample).s <= s) i++;
+    const a = samples[i] as TrackSample, b = samples[i + 1] as TrackSample;
+    const t = Math.max(0, Math.min(1, (s - a.s) / (b.s - a.s || 1)));
+    const len = Math.hypot(b.x - a.x, b.z - a.z) || 1, fx = (b.x - a.x) / len, fz = (b.z - a.z) / len;
+    // across to the route's right (fz, -fx); a chair faces its table, the rest the oncoming car
+    const yaw = facing ? Math.atan2(-fx, -fz) : across > 0 ? Math.atan2(-fz, fx) : Math.atan2(fz, -fx);
+    out.push({ kind, x: a.x + (b.x - a.x) * t + fz * across, z: a.z + (b.z - a.z) * t - fx * across, yaw });
+  };
+  for (const back of FOOTWAY_RUN.tables) {
+    at(back, 'table');
+    at(back, 'chair', -FOOTWAY_RUN.chair);
+    at(back, 'chair', FOOTWAY_RUN.chair);
+  }
+  at(FOOTWAY_RUN.newsbox, 'newsbox');
+  at(FOOTWAY_RUN.kiosk, 'kiosk', FOOTWAY_RUN.kioskAcross, true);
+  return out;
 }
 
 /** The billboard gate beside a lane (within 25 m of it, clear of its ends), or null. */

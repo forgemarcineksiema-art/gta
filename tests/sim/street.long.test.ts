@@ -122,4 +122,19 @@ describe('the street furniture\'s places (M8 slice 0)', () => {
     expect(fnv(parts.join('|'))).toBe(2338173748);
     expect(decoration).toBe(0);
   });
+
+  it('M8 3.1 café terraces only in front of the avenues\' corner shops, every such shop with one', () => {
+    const all = props;
+    const shops = city.graph.special.filter((r) => r.kind === 'avenue').flatMap((r) => city.frontage(r).filter((l) => l.turn !== 0));
+    expect(shops.length).toBeGreaterThanOrEqual(8);
+    const terrace = all.filter((p) => p.kind === 'table' || p.kind === 'chair');
+    expect(terrace.length).toBeGreaterThan(0);
+    // each table and chair in front of a corner shop: within its width of the shop's entrance
+    for (const p of terrace) {
+      const near = shops.some((l) => Math.hypot(p.x - l.pathX, p.z - l.pathZ) < l.width + 3);
+      expect(near, `${p.kind} ${p.id} at ${p.x.toFixed(1)},${p.z.toFixed(1)}`).toBe(true);
+    }
+    for (const l of shops) expect(all.some((p) => p.kind === 'table' && Math.hypot(p.x - l.pathX, p.z - l.pathZ) < l.width + 3), `shop at ${l.px.toFixed(0)},${l.pz.toFixed(0)}`).toBe(true);
+  });
+
 });

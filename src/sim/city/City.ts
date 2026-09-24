@@ -1059,12 +1059,20 @@ export class City {
       const { sx, sz } = q;
       for (const lot of q.lots) if (lot.kind === 'park') places.push({ kind: 'park', x: lot.px, z: lot.pz, dx: 0, dz: 1, half: 18, nx: 1, nz: 0 });
       if (Math.abs(q.qx) >= ring || Math.abs(q.qz) >= ring) continue;
-      // a building's entrance path meets the footway in front of its lot
+      // a building's entrance path meets the footway in front of its lot; a Works lot's front is a yard, a Gardens
+      // house's a garden (M8 slice 4), unless it faces the highway
       const alongZ: Array<{ x: number; z: number }> = [], alongX: Array<{ x: number; z: number }> = [];
+      const front: PropPlace['kind'] | null = q.d.id === 'foundry' ? 'yard' : q.d.id === 'gardens' ? 'garden' : null;
       for (const lot of q.lots) {
         if (lot.kind !== 'building') continue;
-        if (lot.ox === 40) alongZ.push({ x: x + sx * (vx + 4.5), z: lot.pz });
-        if (lot.oz === 40) alongX.push({ x: lot.px, z: z + sz * (vz + 4.5) });
+        if (lot.ox === 40) {
+          alongZ.push({ x: x + sx * (vx + 4.5), z: lot.pz });
+          if (front && Math.abs(cx) !== 3) places.push({ kind: front, x: x + sx * vx, z: lot.pz, dx: 0, dz: 1, half: lot.depth, nx: sx, nz: 0 });
+        }
+        if (lot.oz === 40) {
+          alongX.push({ x: lot.px, z: z + sz * (vz + 4.5) });
+          if (front && Math.abs(cz) !== 3) places.push({ kind: front, x: lot.px, z: z + sz * vz, dx: 1, dz: 0, half: lot.w, nx: 0, nz: sz });
+        }
       }
       // toward a neighbour the run stops short of the edge (its billboard's line may come that far)
       const endZ = BLOCK / 2 - (sz < 0 ? PROP_KEEP.edge : 0), endX = BLOCK / 2 - (sx < 0 ? PROP_KEEP.edge : 0);

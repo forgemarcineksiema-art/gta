@@ -16,13 +16,14 @@ const POLE = 0x686678;
 const TRUNK = 0x8b7966;
 const STAKE = PALETTE.wafer;
 const WOOD = CITY_COLORS.brick;
-/** Crown Heights' accent: the terraces' umbrellas, the newsstand's awning. */
+/** Crown Heights' accent: the terraces' umbrellas, the newsstand's awning; the Quay's, the fish stalls'. */
 const CROWN = 0xf5cd75;
+const QUAY = 0x67c9ce;
+/** Fresh pine (pallets, crates, lobster pots) and a flamingo's pink. */
+const PINE = 0xc9a26b;
+const PINK = PALETTE.iceCream;
 
-/**
- * The models (slices 0 and 3: the street's things; the districts' come with slice 4 and stand in as their
- * collider's box until then).
- */
+/** The models: the street's things (slices 0 and 3) and each district's (slice 4). */
 const MODELS: Partial<Record<PropKind, readonly PropPart[]>> = {
   // an 8 m steel pole on a base, its arm and lit head reaching over the road
   lamp: [
@@ -97,6 +98,103 @@ const MODELS: Partial<Record<PropKind, readonly PropPart[]>> = {
     box(-0.55, 1.35, 0.76, 0.4, 0.3, 0.02, PALETTE.carMagenta),
     box(0.1, 1.35, 0.76, 0.2, 0.3, 0.02, PALETTE.carOrange),
     box(0.65, 1.35, 0.76, 0.35, 0.3, 0.02, PALETTE.carBlue),
+  ],
+  // the Works: a pallet's deck on three runners; a steel drum with its hoops; a crate; a traffic cone; a water-filled
+  // barrier; a stack of four tyres
+  pallet: [
+    box(0, 0.12, 0, 0.6, 0.02, 0.5, PINE),
+    box(0, 0.05, -0.44, 0.6, 0.05, 0.05, WOOD),
+    box(0, 0.05, 0, 0.6, 0.05, 0.05, WOOD),
+    box(0, 0.05, 0.44, 0.6, 0.05, 0.05, WOOD),
+  ],
+  barrel: [
+    cyl(0, 0.44, 0, 0.28, 0.44, PALETTE.carOrange),
+    cyl(0, 0.3, 0, 0.295, 0.02, PALETTE.graphite),
+    cyl(0, 0.6, 0, 0.295, 0.02, PALETTE.graphite),
+    cyl(0, 0.885, 0, 0.26, 0.01, PALETTE.steel),
+  ],
+  crate: [
+    box(0, 0.4, 0, 0.39, 0.39, 0.39, PINE),
+    box(0, 0.12, 0, 0.4, 0.04, 0.4, WOOD),
+    box(0, 0.68, 0, 0.4, 0.04, 0.4, WOOD),
+  ],
+  cone: [
+    box(0, 0.02, 0, 0.19, 0.02, 0.19, PALETTE.cone),
+    cyl(0, 0.2, 0, 0.12, 0.17, PALETTE.cone),
+    cyl(0, 0.34, 0, 0.095, 0.035, PALETTE.barrier),
+    cyl(0, 0.52, 0, 0.065, 0.16, PALETTE.cone),
+  ],
+  barrier: [
+    box(0, 0.35, 0, 0.9, 0.35, 0.18, PALETTE.carRed),
+    box(0, 0.8, 0, 0.84, 0.1, 0.12, PALETTE.barrier),
+  ],
+  tyres: [
+    cyl(0, 0.11, 0, 0.33, 0.1, PALETTE.tyre),
+    cyl(0, 0.33, 0, 0.33, 0.1, PALETTE.tyre),
+    cyl(0, 0.55, 0, 0.33, 0.1, PALETTE.tyre),
+    cyl(0, 0.77, 0, 0.33, 0.1, PALETTE.tyre),
+  ],
+  // the Gardens: a fruit stand under its awning; a lawn flamingo; a garden gnome; two metres of picket fence; a letterbox on its post
+  fruitStand: [
+    box(0, 0.4, 0, 1.0, 0.4, 0.45, WOOD),
+    box(-0.6, 0.88, 0.1, 0.28, 0.08, 0.2, PALETTE.carOrange),
+    box(0, 0.88, 0.1, 0.28, 0.08, 0.2, PALETTE.carRed),
+    box(0.6, 0.88, 0.1, 0.28, 0.08, 0.2, PALETTE.carLime),
+    box(1.0, 1.2, -0.4, 0.03, 0.8, 0.03, PALETTE.steel),
+    box(-1.0, 1.2, -0.4, 0.03, 0.8, 0.03, PALETTE.steel),
+    box(0, 2.0, 0, 1.08, 0.03, 0.5, CITY_COLORS.leaves),
+  ],
+  flamingo: [
+    box(0, 0.25, 0, 0.012, 0.25, 0.012, PALETTE.steel),
+    box(0, 0.62, 0, 0.07, 0.07, 0.14, PINK),
+    box(0, 0.78, 0.1, 0.025, 0.12, 0.025, PINK),
+    box(0, 0.9, 0.14, 0.03, 0.03, 0.06, PINK),
+  ],
+  gnome: [
+    cyl(0, 0.1, 0, 0.1, 0.1, PALETTE.carBlue),
+    cyl(0, 0.22, 0, 0.075, 0.04, PALETTE.carWhite),
+    cyl(0, 0.33, 0, 0.065, 0.08, PALETTE.carRed),
+    cyl(0, 0.44, 0, 0.03, 0.04, PALETTE.carRed),
+  ],
+  fence: [
+    box(0, 0.25, 0, 1.0, 0.03, 0.02, PALETTE.carWhite),
+    box(0, 0.7, 0, 1.0, 0.03, 0.02, PALETTE.carWhite),
+    box(-0.75, 0.45, 0.025, 0.05, 0.45, 0.015, PALETTE.carWhite),
+    box(-0.25, 0.45, 0.025, 0.05, 0.45, 0.015, PALETTE.carWhite),
+    box(0.25, 0.45, 0.025, 0.05, 0.45, 0.015, PALETTE.carWhite),
+    box(0.75, 0.45, 0.025, 0.05, 0.45, 0.015, PALETTE.carWhite),
+  ],
+  letterbox: [
+    box(0, 0.45, 0, 0.03, 0.45, 0.03, WOOD),
+    box(0, 1.0, 0, 0.12, 0.1, 0.18, PALETTE.carRed),
+    box(0.13, 1.06, -0.1, 0.01, 0.06, 0.02, PALETTE.carOrange),
+  ],
+  // the Quay: a deckchair facing the sea; a beach parasol; a fish stall on ice under its awning; a lobster pot
+  deckchair: [
+    box(0, 0.3, 0.1, 0.28, 0.03, 0.3, PALETTE.carBlue),
+    box(0, 0.55, -0.25, 0.28, 0.3, 0.03, PALETTE.carWhite),
+    box(0.29, 0.15, 0, 0.02, 0.15, 0.3, WOOD),
+    box(-0.29, 0.15, 0, 0.02, 0.15, 0.3, WOOD),
+  ],
+  parasol: [
+    cyl(0, 0.04, 0, 0.2, 0.04, PALETTE.graphite),
+    box(0, 1.1, 0, 0.02, 1.1, 0.02, PALETTE.carWhite),
+    cyl(0, 2.2, 0, 1.2, 0.07, PALETTE.carOrange),
+  ],
+  fishStall: [
+    box(0, 0.42, 0, 1.1, 0.42, 0.45, PALETTE.carWhite),
+    box(0, 0.88, 0.05, 1.0, 0.04, 0.35, PALETTE.lightGrey),
+    box(-0.5, 0.95, 0.05, 0.15, 0.03, 0.05, PALETTE.silver),
+    box(0, 0.95, 0.1, 0.15, 0.03, 0.05, PALETTE.carOrange),
+    box(0.5, 0.95, 0, 0.15, 0.03, 0.05, PALETTE.silver),
+    box(1.05, 1.2, -0.4, 0.03, 0.8, 0.03, PALETTE.steel),
+    box(-1.05, 1.2, -0.4, 0.03, 0.8, 0.03, PALETTE.steel),
+    box(0, 2.0, 0, 1.15, 0.03, 0.55, QUAY),
+  ],
+  lobsterPot: [
+    box(0, 0.22, 0, 0.34, 0.22, 0.24, PINE),
+    box(0, 0.46, 0, 0.3, 0.03, 0.25, WOOD),
+    cyl(0.28, 0.06, 0.2, 0.06, 0.06, PALETTE.carOrange),
   ],
   // wooden slats on two iron frames, the seat toward the road
   bench: [

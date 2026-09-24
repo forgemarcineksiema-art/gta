@@ -130,9 +130,13 @@ export interface FootwayRun {
   entrances: ReadonlyArray<{ x: number; z: number }>;
 }
 
-/** A place with its own things: a park's path, the promenade along the seawall, a corner shop's terrace. */
+/**
+ * A place with its own things: a park's path, the promenade along the seawall, a corner shop's terrace, a Works
+ * lot's front yard, a Gardens house's front garden. A lot's place stands on the road edge in front of the lot's
+ * middle, `half` its half width along the road.
+ */
 export interface PropPlace {
-  kind: 'park' | 'promenade' | 'terrace';
+  kind: 'park' | 'promenade' | 'terrace' | 'yard' | 'garden';
   /** Its centre and the way its length runs (a park's path, the promenade's wall), and its half length. */
   x: number; z: number;
   dx: number; dz: number;
@@ -158,7 +162,7 @@ export const PROP_LINES = {
   /** The kerb line's distance from the road edge, and a slot every `pitch` m along the street. */
   kerb: { offset: 0.7, pitch: 9 },
   /** The frontage line starts this far from the road edge; a slot every `pitch` m. */
-  frontage: { offset: 3.7, pitch: 12 },
+  frontage: { offset: 3.7, pitch: 15 },
   /** The walkers' band: its middle and half width from the road edge (Pedestrians' PAVEMENT_HALF). */
   walkers: { middle: 2.25, half: 0.9 },
   /** Kept from a junction's corner and between two props' footprints. */
@@ -173,7 +177,16 @@ export const PROP_LINES = {
  * Works, else a bin; a Crown Heights run's middle odd slot may be a bus stop. The frontage's slots: a newsstand in
  * Crown Heights, a newspaper box there and on the Quay, else a bench.
  */
-const CHANCE = { hydrant: 0.08, meter: 0.3, bin: 0.25, shelter: 0.6, kiosk: 0.07, newsbox: 0.15, bench: 0.12, parkBench: 0.8 } as const;
+const CHANCE = {
+  hydrant: 0.08, meter: 0.22, bin: 0.2, shelter: 0.6, kiosk: 0.07, newsbox: 0.15, bench: 0.12, parkBench: 0.8,
+  // the districts' (M8 slice 4): the Works' kerb (a row of cones or a barrier), the Gardens' fruit stands, the Quay's fish
+  // stalls, a Gardens house's fence
+  cones: 0.3, barrier: 0.25, fruitStand: 0.14, fishStall: 0.12, fence: 0.4,
+} as const;
+/** A Works front yard's two clusters, this far along from the door either way and this far from the road edge. */
+const YARD = { along: 0.55, out: 7.5 } as const;
+/** A Gardens front garden: its fence this far out, the letterbox by the path, the lawn's things this far out. */
+const GARDEN = { fence: 4.8, pitch: 2.1, path: 1.6, letterbox: 4.1, lawn: 8.2 } as const;
 /**
  * A café terrace (M8 slice 3): a table either side of the shop's door, this far along from it and this far from the
  * road edge (the shop's front is 5.8 m out), a chair beside it either way.
@@ -216,7 +229,13 @@ export function chunkProps(cx: number, cz: number, ctx: PropContext): PropDesc[]
       let kind: PropKind | null;
       if (k === stop) kind = 'shelter';
       else if (phase === 0) kind = 'lamp';
-      else if (phase === 2) kind = run.district === 'foundry' ? null : 'sapling';
+      else if (phase === 2 && run.district === 'foundry') {
+        // the Works' kerb: a row of three cones, or a plastic barrier along it
+        const u0 = a + jitter;
+        if (chance < CHANCE.cones) for (const s of [-1.4, 0, 1.4]) put('cone', run.x + run.dx * (u0 + s) + run.nx * kerb.offset, run.z + run.dz * (u0 + s) + run.nz * kerb.offset, yaw);
+        else if (chance < CHANCE.cones + CHANCE.barrier) put('barrier', run.x + run.dx * u0 + run.nx * kerb.offset, run.z + run.dz * u0 + run.nz * kerb.offset, yaw);
+        continue;
+      } else if (phase === 2) kind = run.district === 'gardens' || (((k % 8) + 8) % 8) === 2 ? 'sapling' : null;
       else if (chance < CHANCE.hydrant) kind = 'hydrant';
       else if (metered && chance < CHANCE.hydrant + CHANCE.meter) kind = 'meter';
       else kind = chance < CHANCE.hydrant + (metered ? CHANCE.meter : 0) + CHANCE.bin ? 'bin' : null;
@@ -229,7 +248,10 @@ export function chunkProps(cx: number, cz: number, ctx: PropContext): PropDesc[]
       const a = k * front.pitch - run.along;
       const chance = rnd(), jitter = (rnd() - 0.5) * 2;
       const kiosk = crown ? CHANCE.kiosk : 0, news = crown || run.district === 'marina' ? CHANCE.newsbox : 0;
-      const kind: PropKind | null = chance < kiosk ? 'kiosk' : chance < kiosk + news ? 'newsbox' : chance < kiosk + news + CHANCE.bench ? 'bench' : null;
+      const stall = run.district === 'gardens' ? CHANCE.fruitStand : run.district === 'marina' ? CHANCE.fishStall : 0;
+      const stallKind: PropKind = run.district === 'gardens' ? 'fruitStand' : 'fishStall';
+      const kind: PropKind | null = chance < kiosk ? 'kiosk' : chance < kiosk + news ? 'newsbox' : chance < kiosk + news + stall ? stallKind
+        : chance < kiosk + news + stall + CHANCE.bench ? 'bench' : null;
       if (!kind) continue;
       const f = propFootprint(kind);
       const u = a + jitter, out2 = front.offset + f.hz;
@@ -258,12 +280,42 @@ export function chunkProps(cx: number, cz: number, ctx: PropContext): PropDesc[]
         const x = place.x + place.dx * u + place.nx * side * off, z = place.z + place.dz * u + place.nz * side * off;
         put('bench', x, z, Math.atan2(-place.nx * side, -place.nz * side));
       }
+    } else if (place.kind === 'yard') {
+      // a Works front yard: two clusters either side of the door (barrels in a row, pallets side by side, crates, tyres)
+      const face = Math.atan2(-place.nx, -place.nz);
+      for (const side of [-1, 1]) {
+        const pick = rnd(), shift = (rnd() - 0.5) * 2;
+        const u = side * place.half * YARD.along + shift;
+        const at = (du: number, dout: number): [number, number] => [place.x + place.dx * (u + du) + place.nx * (YARD.out + dout), place.z + place.dz * (u + du) + place.nz * (YARD.out + dout)];
+        if (pick < 0.3) for (const du of [-0.65, 0, 0.65]) put('barrel', ...at(du, 0), face);
+        else if (pick < 0.55) for (const du of [-0.65, 0.65]) put('pallet', ...at(du, 0), face);
+        else if (pick < 0.8) { put('crate', ...at(0, 0), face); put('crate', ...at(0.9, 0.2), face); }
+        else { put('tyres', ...at(-0.4, 0), face); put('tyres', ...at(0.4, 0.6), face); }
+      }
+    } else if (place.kind === 'garden') {
+      // a Gardens front garden: a picket fence along its front (the path open), the letterbox by the path, flamingos and a gnome on the lawn
+      const face = Math.atan2(-place.nx, -place.nz);
+      const at = (u: number, out: number): [number, number] => [place.x + place.dx * u + place.nx * out, place.z + place.dz * u + place.nz * out];
+      const fenced = rnd(), pink = rnd(), gnome = rnd(), spot = (rnd() - 0.5) * place.half;
+      if (fenced < CHANCE.fence) for (let u = -place.half + 1; u <= place.half - 1; u += GARDEN.pitch) if (Math.abs(u) > GARDEN.path + 0.9) put('fence', ...at(u, GARDEN.fence), face);
+      put('letterbox', ...at(GARDEN.path + 0.6, GARDEN.letterbox), face);
+      if (pink < 0.7) { put('flamingo', ...at(spot, GARDEN.lawn), face + 0.6); put('flamingo', ...at(spot + 0.7, GARDEN.lawn + 0.4), face - 0.4); }
+      if (gnome < 0.6) put('gnome', ...at(-spot, GARDEN.lawn + 1), face);
     } else {
-      // the promenade's benches, facing the sea, every 44 m of the wall
+      // the promenade: its wooden benches facing the sea every 44 m, deckchairs under a parasol between them, lobster pots by the wall
+      const sea = Math.atan2(place.nx, place.nz);
       for (let u = -place.half + 22; u < place.half; u += 44) {
         rnd();
         const off = 3.3;
-        put('bench', place.x + place.dx * u - place.nx * off, place.z + place.dz * u - place.nz * off, Math.atan2(place.nx, place.nz));
+        put('bench', place.x + place.dx * u - place.nx * off, place.z + place.dz * u - place.nz * off, sea);
+      }
+      const at = (u: number, off: number): [number, number] => [place.x + place.dx * u - place.nx * off, place.z + place.dz * u - place.nz * off];
+      for (let u = -place.half + 44; u < place.half; u += 44) {
+        const pots = rnd();
+        put('parasol', ...at(u, 5.9), sea);
+        put('deckchair', ...at(u - 1.3, 5.1), sea);
+        put('deckchair', ...at(u + 1.3, 5.1), sea);
+        if (pots < 0.6) { put('lobsterPot', ...at(u + 11, 1.8), sea); put('lobsterPot', ...at(u + 11.9, 1.8), sea + 0.3); }
       }
     }
   }

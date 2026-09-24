@@ -5,13 +5,10 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { SimWorld } from '../../src/sim';
-import { BLOCK } from '../../src/sim/city/roads';
 import { CAR_TOP, tallFootprint } from '../../src/sim/city/collectibles';
-import { GROUP_PROP } from '../../src/sim/collision';
 import { PROP_TYPES, type PropDesc } from '../../src/sim/city/props';
 import { PropState, carSpeedLoss } from '../../src/sim/props/Props';
 import type { StaticDesc } from '../../src/sim/scene';
-import { Clearances } from './clearances';
 import { createWorld, run } from './helpers';
 
 const KMH = 1 / 3.6;
@@ -20,32 +17,6 @@ describe('the trees (M8 slice 2)', () => {
   let sim: SimWorld;
   beforeAll(async () => { sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false, car: 'compact' }); });
   afterAll(() => sim.dispose());
-
-  it('M8 2.1 every thick trunk of the 49 chunks has its collider in the ring, and none stands in a clearance', () => {
-    const city = sim.city!, clear = new Clearances(sim);
-    let trunks = 0;
-    const why: string[] = [];
-    for (let cz = -3; cz <= 3; cz++) for (let cx = -3; cx <= 3; cx++) {
-      city.sync(cx * BLOCK, cz * BLOCK, true);
-      const posts: Array<{ x: number; z: number; r: number }> = [];
-      sim.world.colliders.forEach((c) => {
-        if (c.collisionGroups() >>> 16 !== GROUP_PROP || !c.parent()?.isFixed()) return;
-        const t = c.translation();
-        posts.push({ x: t.x, z: t.z, r: c.radius() });
-      });
-      for (const st of city.chunk(cx, cz).statics) {
-        if (st.tag !== 'trunk' || st.shape.kind !== 'cylinder') continue;
-        trunks++;
-        const at = `trunk at ${st.position.x.toFixed(1)},${st.position.z.toFixed(1)}`;
-        if (!posts.some((p) => Math.hypot(p.x - st.position.x, p.z - st.position.z) < 0.01 && Math.abs(p.r - (st.shape as { radius: number }).radius) < 1e-4)) why.push(`${at}: no collider`);
-        const r = st.shape.radius;
-        clear.point(st.position, at, why);
-        for (let k = 0; k < 8; k++) clear.point({ x: st.position.x + Math.cos(k * Math.PI / 4) * r, z: st.position.z + Math.sin(k * Math.PI / 4) * r }, at, why);
-      }
-    }
-    expect(trunks).toBeGreaterThan(100);
-    expect(why.slice(0, 12)).toEqual([]);
-  }, 60_000);
 
   it('M8 2.2 the compact at 40 km/h into a park tree: a wall\'s hit and damage; at 60 through a sapling it snaps at the rule\'s cost', () => {
     const city = sim.city!;

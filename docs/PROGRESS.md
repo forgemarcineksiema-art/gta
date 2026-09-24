@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8 slice 4: the districts' sets
+
+Done: the Works' kerbs (rows of cones, barriers) and front yards (barrels, pallets, crates, tyre stacks), the Gardens'
+front gardens (picket fences on some, a letterbox by every path, flamingos, gnomes) and fruit stands, the Quay's
+promenade (deckchairs under a parasol, lobster pots, its wooden benches) and fish stalls; their models. Thinned to the
+plan's density: a sapling every 72 m (every 36 in the leafy Gardens), frontage slots every 15 m: a plain block's
+streets hold 45–65 (a block with a highway side 25–51, the highway being out of M8; a block an avenue crosses up to
+106). The island-wide placement pins (0.1, 0.2, 2.1, 3.1, 4.1) moved to long files (the quick tests were at 67 s); pin
+1.3's slowest 40 → 8 km/h (a Crown kerb run of anchored things now costs speed; it never stops). Pins M8 4.1, 4.2.
+
 ## 2026-09-24 — M8 slice 3: the street set
 
 Done: hydrants on any kerb line, parking meters in Crown Heights and the Works, newspaper boxes (Crown, Quay) and

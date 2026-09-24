@@ -1,7 +1,7 @@
 /**
- * The street set (M8 slice 3, docs/M8_PLAN.md §4): the café terraces stand only in front of the avenues' corner
- * shops; a broken hydrant's water pushes a car with its real thrust, never flings it; a bus shelter and a newsstand
- * hold at 20 km/h and go at 40 with the rule's loss.
+ * The street set (M8 slice 3, docs/M8_PLAN.md §4): a broken hydrant's water pushes a car with its real thrust, never
+ * flings it; a bus shelter and a newsstand hold at 20 km/h and go at 40 with the rule's loss. (The terraces' places,
+ * pin 3.1, are with the island's placement pins in street.long.test.ts.)
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { cloneTuning, CAR_PRESETS, type SimWorld } from '../../src/sim';
@@ -12,9 +12,10 @@ import { createWorld, run } from './helpers';
 
 const KMH = 1 / 3.6;
 
-function all(sim: SimWorld): PropDesc[] {
+/** Crown Heights' props (its chunks): where the shelters and the newsstands stand. */
+function crown(sim: SimWorld): PropDesc[] {
   const out: PropDesc[] = [];
-  for (let cz = -3; cz <= 3; cz++) for (let cx = -3; cx <= 3; cx++) out.push(...sim.city!.props(cx, cz));
+  for (let cz = -3; cz <= 0; cz++) for (let cx = -3; cx <= 0; cx++) out.push(...sim.city!.props(cx, cz));
   return out;
 }
 
@@ -26,20 +27,6 @@ describe('the street set (M8 slice 3)', () => {
     sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false, tuning });
   });
   afterAll(() => sim.dispose());
-
-  it('M8 3.1 café terraces only in front of the avenues\' corner shops, every such shop with one', () => {
-    const city = sim.city!, props = all(sim);
-    const shops = city.graph.special.filter((r) => r.kind === 'avenue').flatMap((r) => city.frontage(r).filter((l) => l.turn !== 0));
-    expect(shops.length).toBeGreaterThanOrEqual(8);
-    const terrace = props.filter((p) => p.kind === 'table' || p.kind === 'chair');
-    expect(terrace.length).toBeGreaterThan(0);
-    // each table and chair in front of a corner shop: within its width of the shop's entrance
-    for (const p of terrace) {
-      const near = shops.some((l) => Math.hypot(p.x - l.pathX, p.z - l.pathZ) < l.width + 3);
-      expect(near, `${p.kind} ${p.id} at ${p.x.toFixed(1)},${p.z.toFixed(1)}`).toBe(true);
-    }
-    for (const l of shops) expect(props.some((p) => p.kind === 'table' && Math.hypot(p.x - l.pathX, p.z - l.pathZ) < l.width + 3), `shop at ${l.px.toFixed(0)},${l.pz.toFixed(0)}`).toBe(true);
-  });
 
   it('M8 3.2 a car parked over a broken hydrant rises no faster than 1 m/s; a car through it rocks and nothing flies', () => {
     const props = sim.props!, city = sim.city!;
@@ -80,7 +67,7 @@ describe('the street set (M8 slice 3)', () => {
 
   it('M8 3.3 a bus shelter and a newsstand hold at 20 km/h and go at 40, with the rule\'s loss', () => {
     const props = sim.props!, city = sim.city!;
-    const everything = all(sim);
+    const everything = crown(sim);
     for (const kind of ['shelter', 'kiosk'] as PropKind[]) {
       const t = PROP_TYPES[kind];
       expect(knockImpulse(1400, t, 20 * KMH)).toBeLessThan(t.breakImpulse);

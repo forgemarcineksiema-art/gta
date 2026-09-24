@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8.6 slice 0: on four wheels
+
+Done: a driving lent body turns about the vertical only (`lockDriving`: roll and pitch locked with its height); a shaken
+car meets the ground with every axis free (`unlock`; `disturb` now lets a driving car go too) and drives on only level
+within 6°, not rocking, within 15 cm of its road; leaning at rest it is rocked toward level; overdue, a wreck. Pins M8.6
+0.1 (pushed on its flank and carrying the player on its tail: level, on its road; the old code tipped it to 67°), 0.2
+(dropped at a 20° lean: the reattach turns it 0°, the old one 20°), 0.4 long (the chase read: 0 of 49,082 driving
+samples leaning over 3° or sunk; before, 18 % and ten cars). The sim step in the chase 0.50 ms (0.81). Verify green.
+
 ## 2026-09-24 — M8.6 "Solid cars": Marcin's screenshots, measured, and the plan
 
 Marcin's six screenshots of a five-star chase: police cars and wrecks on two wheels, in the road, on a nose, a truck on a

@@ -745,6 +745,8 @@ export class Traffic {
   disturb(agent: number): void {
     const st = this.state[agent];
     if (st !== AgentState.Parked && st !== AgentState.Abandoned && st !== AgentState.Physical) return;
+    // a driving car's body is let go too (M8.6: it kept its height held and, since D1, its roll and pitch)
+    this.loosen(agent);
     this.state[agent] = AgentState.Disturbed;
     this.disturbedFor[agent] = this.tuning.disturbedTime;
     this.lights[agent] = 0;
@@ -1013,8 +1015,7 @@ export class Traffic {
       return;
     }
     const body = this.bodies[slot] as RAPIER.RigidBody;
-    (this.bodyCollider[slot] as RAPIER.Collider).setCollisionGroups(GROUPS_TRAFFIC);
-    body.setEnabledTranslations(true, false, true, true);
+    this.lockDriving(slot, this.yaw[agent] as number);
     body.setAngvel(ZERO, true);
     this.state[agent] = AgentState.Physical;
   }
@@ -1390,6 +1391,8 @@ export class Traffic {
     const headTarget = arrived ? yaw : moving ? Math.atan2(this.lin.x, this.lin.z) : Math.atan2(dx, dz);
     let err = headTarget - yaw;
     err = Math.atan2(Math.sin(err), Math.cos(err));
+    this.ang.x = 0;
+    this.ang.z = 0;
     this.ang.y = M.clamp(err * t.yawGain, -t.yawRateMax, t.yawRateMax);
     body.setAngvel(this.ang, true);
   }
@@ -1860,8 +1863,7 @@ export class Traffic {
     body.setTranslation(this.pos, true);
     body.setRotation(q, true);
     if (driving) {
-      col.setCollisionGroups(GROUPS_TRAFFIC);
-      body.setEnabledTranslations(true, false, true, true);
+      this.lockDriving(slot, yaw);
       const speed = this.speed[i] as number;
       this.lin.x = Math.sin(yaw) * speed;
       this.lin.y = 0;
@@ -1870,8 +1872,7 @@ export class Traffic {
       this.state[i] = AgentState.Physical;
     } else {
       // a wreck or an abandoned car: an obstacle that can be pushed and can tumble
-      col.setCollisionGroups(GROUPS_SOLID);
-      body.setEnabledTranslations(true, true, true, true);
+      this.unlock(slot);
       body.setLinvel(ZERO, true);
     }
     body.setAngvel(ZERO, true);
@@ -1958,8 +1959,28 @@ export class Traffic {
   private loosen(i: number): void {
     const slot = this.agentBody[i] as number;
     if (slot < 0) return;
+    this.unlock(slot);
+  }
+
+  /**
+   * A lent body under lane control (M8.6 D1): no ground contact, its height held by `driveBody`, and it turns about the
+   * vertical only, upright on `yaw`. With roll and pitch free a push tipped a driving car and nothing righted it: 18 % of
+   * the driving samples of a level-5 chase leant over 15°, ten cars sank into the road, two drove on their roofs.
+   */
+  private lockDriving(slot: number, yaw: number): void {
+    const body = this.bodies[slot] as RAPIER.RigidBody;
+    (this.bodyCollider[slot] as RAPIER.Collider).setCollisionGroups(GROUPS_TRAFFIC);
+    body.setEnabledTranslations(true, false, true, true);
+    body.setEnabledRotations(false, true, false, true);
+    body.setRotation(M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, yaw), true);
+  }
+
+  /** A lent body left to the physics: it meets the ground and every axis is free. */
+  private unlock(slot: number): void {
+    const body = this.bodies[slot] as RAPIER.RigidBody;
     (this.bodyCollider[slot] as RAPIER.Collider).setCollisionGroups(GROUPS_SOLID);
-    (this.bodies[slot] as RAPIER.RigidBody).setEnabledTranslations(true, true, true, true);
+    body.setEnabledTranslations(true, true, true, true);
+    body.setEnabledRotations(true, true, true, true);
   }
 
   /** The agent is a wreck from now on: a stopped obstacle until it despawns. */
@@ -1974,51 +1995,69 @@ export class Traffic {
   }
 
   /**
-   * After a disturbance an upright car that has stopped spinning drives back
-   * onto its path at whatever speed (the controller blends in over
-   * `reattachBlend`). A car on its side, pushed far off its road, or still
-   * tumbling after `disturbedMax` is a wreck. A shove is not a kill.
+   * After a disturbance a car drives back onto its path at whatever speed (the controller blends in over
+   * `reattachBlend`) once it is back on its wheels (M8.6 D2): level within `reattachLevel`, not rocking, its body on
+   * its road, not spinning (or overdue), so what is left to turn and drop is under the eye's notice; it used to be
+   * stood up in one step from any lean under 45°. One at rest leaning on a bumper or a kerb's edge is rocked toward
+   * level. A car on its side, pushed far off its road, or still not on its wheels after `disturbedMax` is a wreck. A
+   * shove is not a kill.
    */
   private settle(i: number, dt: number): void {
     const t = this.tuning;
     this.disturbedFor[i] = (this.disturbedFor[i] as number) - dt;
     if ((this.disturbedFor[i]) > 0) return;
-    const body = this.bodies[this.agentBody[i] as number] as RAPIER.RigidBody;
+    const slot = this.agentBody[i] as number;
+    const body = this.bodies[slot] as RAPIER.RigidBody;
     const r = body.rotation(this.rot);
     const up = 1 - 2 * (r.x * r.x + r.z * r.z);
     body.angvel(this.ang);
     const spin = Math.abs(this.ang.y);
+    const rock = Math.hypot(this.ang.x, this.ang.z);
     const lane = this.lane[i] as number;
     let lateral = Infinity;
     if (lane >= 0) {
       this.lanes.projectPath(lane, this.next[i] as number, this.x[i] as number, this.z[i] as number, this.proj, this.laneOffset[i]);
       lateral = Math.abs(this.proj.lateral);
     }
+    if (up <= 0.3 || (up > 0.7 && lateral >= t.reattachDistance)) {
+      this.wreck(i);
+      this.justWrecked[i] = 1;
+      return;
+    }
     const overdue = -this.disturbedFor[i] > t.disturbedMax - t.disturbedTime;
-    if (up > 0.7 && spin > t.settleSpin && !overdue) return;
-    if (up > 0.7 && lateral < t.reattachDistance) {
+    const level = up >= Math.cos(t.reattachLevel * Math.PI / 180);
+    body.translation(this.pos);
+    const road = lane >= 0 ? this.lanes.heightAt(this.proj.switched ? this.next[i] as number : lane, this.proj.s) + 0.03 : 0;
+    if (lane >= 0 && level && rock < t.reattachSpin && Math.abs(this.pos.y - road) < t.reattachHeight && (spin <= t.settleSpin || overdue)) {
       this.state[i] = AgentState.Physical;
       this.reattachLeft[i] = this.tuning.reattachBlend;
       if (this.proj.switched) this.switchLane(i, this.proj.s);
       else this.s[i] = this.proj.s;
-      const col = this.bodyCollider[this.agentBody[i] as number] as RAPIER.Collider;
-      col.setCollisionGroups(GROUPS_TRAFFIC);
-      body.setEnabledTranslations(true, false, true, true);
-      this.pos.x = this.x[i] as number;
-      this.pos.y = (lane >= 0 ? this.lanes.heightAt(lane, this.s[i] as number) : 0) + 0.03;
-      this.pos.z = this.z[i] as number;
+      this.pos.y = road;
       body.setTranslation(this.pos, true);
-      // back on four wheels: keep the heading, drop the lean and the roll
-      body.setRotation(M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, this.yaw[i] as number), true);
+      // on four wheels: the heading kept, the last few degrees of lean and centimetres of drop dropped
+      this.lockDriving(slot, this.yaw[i] as number);
       this.ang.x = 0;
       this.ang.z = 0;
       body.setAngvel(this.ang, true);
-    } else if (up <= 0.7 && up > 0.3 && !overdue) {
-      // tilted but not over (a wheel on a kerb, a landing): give it a moment
       return;
-    } else {
+    }
+    if (overdue) {
       this.wreck(i);
       this.justWrecked[i] = 1;
+      return;
+    }
+    // leaning at rest (a wheel on a bumper, a kerb's edge): now and then a turn toward level about the axis that takes
+    // the car's up to the world's (up × Y); gravity and the contacts do the rest, or it is a wreck when overdue
+    const lin = body.linvel(this.lin);
+    const since = -this.disturbedFor[i];
+    if (!level && rock < t.reattachSpin && spin < t.reattachSpin && Math.hypot(lin.x, lin.y, lin.z) < 1
+      && Math.floor(since / t.rockEvery) !== Math.floor((since - dt) / t.rockEvery)) {
+      const ux = 2 * (r.x * r.y - r.w * r.z), uz = 2 * (r.y * r.z + r.w * r.x);
+      const len = Math.hypot(ux, uz) || 1;
+      this.ang.x += -uz / len * t.rockSpin;
+      this.ang.z += ux / len * t.rockSpin;
+      body.setAngvel(this.ang, true);
     }
   }
 

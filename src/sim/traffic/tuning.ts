@@ -57,6 +57,16 @@ export interface TrafficTuning {
   reattachBlend: number;
   /** Still spinning faster than this (rad/s) after `disturbedTime`: wait before reattaching. */
   settleSpin: number;
+  /**
+   * Back on its wheels (M8.6 D2): a shaken car drives again only level within `reattachLevel` degrees, rocking slower
+   * than `reattachSpin` rad/s about its long and cross axes, its body within `reattachHeight` m of its road; one at rest
+   * leaning further (on a bumper, a kerb's edge) is rocked toward level at `rockSpin` rad/s every `rockEvery` s.
+   */
+  reattachLevel: number;
+  reattachSpin: number;
+  reattachHeight: number;
+  rockSpin: number;
+  rockEvery: number;
   /** Disturbed this long without settling (on its side, spinning, stuck), a car is a wreck, s. */
   disturbedMax: number;
   /** A single contact of this dv wrecks outright, m/s. */
@@ -186,6 +196,11 @@ export const TRAFFIC: TrafficTuning = {
   reattachDistance: 14,
   reattachBlend: 1.5,
   settleSpin: 2,
+  reattachLevel: 6,
+  reattachSpin: 0.6,
+  reattachHeight: 0.15,
+  rockSpin: 1.2,
+  rockEvery: 0.5,
   disturbedMax: 8,
   wreckImpact: 7,
   damageThreshold: 3,

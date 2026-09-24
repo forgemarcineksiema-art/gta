@@ -1,9 +1,12 @@
 import { FIXED_HZ, SimWorld, clearControls, initPhysics, type SimWorldOptions, type VehicleControls } from '../../src/sim';
 
-/** A headless world; the rivals' teaser off unless asked for (the bot pins' traffic predates it, M7 slice 13). */
+/**
+ * A headless world; the rivals' teaser off unless asked for (the bot pins' traffic predates it, M7 slice 13), and every
+ * job kind shown from the start unless asked for the game's reveal (M8.7 D10: the pins start any kind's ring).
+ */
 export async function createWorld(opts: SimWorldOptions = {}): Promise<SimWorld> {
   await initPhysics();
-  return new SimWorld({ teasers: false, ...opts });
+  return new SimWorld({ teasers: false, reveal: true, ...opts });
 }
 
 export type Script = (tick: number, c: VehicleControls, sim: SimWorld) => void;

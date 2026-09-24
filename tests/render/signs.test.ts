@@ -13,7 +13,7 @@ import * as Minimap from '../../src/ui/map/minimap';
 import {
   SIGN_CLOSED, SIGN_COLORS, SIGN_GOAL, SIGN_OPEN, collectSigns, newRingList, newSignList, paySign, payOf,
 } from '../../src/render/run/signs';
-import { badgeMarkup, goalWords } from '../../src/ui/hud/jobs';
+import { badgeMarkup, goalWords, newCardWords } from '../../src/ui/hud/jobs';
 import { setLang } from '../../src/ui/lang';
 import { createWorld, run, runUntil } from '../sim/helpers';
 
@@ -162,5 +162,15 @@ describe('the signs (M8.7 slice 3)', () => {
     expect(css).not.toMatch(/data-ring=/);
     expect(css).not.toMatch(/\.is-(order|escape|duel|trial|race|zone) \.jobs__kind/);
     expect(css).not.toMatch(/jobs__card\[data-kind='(order|escape|duel|delivery)'\]/);
+  });
+
+  it('M8.7 4.2 a kind brought out has its NEW card: its name, what it asks, where to look, in both languages', () => {
+    setLang('en');
+    expect(newCardWords('race')).toEqual({ title: 'NEW: STREET RACE', sub: 'FIRST TO THE FINISH · ANY ROUTE', limit: 'LOOK FOR ITS SIGN' });
+    setLang('pl');
+    const pl = newCardWords('race');
+    expect(pl.title).toBe('NOWOŚĆ: WYŚCIG ULICZNY');
+    expect(pl.limit).toBe('SZUKAJ JEGO ZNAKU');
+    for (const kind of ['trial', 'rage', 'mayhem', 'escape', 'order'] as const) expect(newCardWords(kind).sub).not.toBe('');
   });
 });

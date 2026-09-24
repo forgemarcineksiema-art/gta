@@ -278,6 +278,9 @@ export const PL: Readonly<Record<string, string>> = {
   'PICK UP THE PACKAGE · SLOW DOWN IN THE RING': 'ODBIERZ PACZKĘ · ZWOLNIJ W KÓŁKU',
   'SLOW DOWN IN THE RING': 'ZWOLNIJ W KÓŁKU',
   'JOB': 'ZLECENIE',
+  'NEW: {kind}': 'NOWOŚĆ: {kind}',
+  'LOOK FOR ITS SIGN': 'SZUKAJ JEGO ZNAKU',
+  'A WANTED CAR · SWAP INTO IT': 'ZAMÓWIONE AUTO · PRZESIĄDŹ SIĘ',
   'GET IT TO THE GARAGE': 'ZAWIEŹ JĄ DO GARAŻU',
   'SKIP': 'POMIŃ',
 

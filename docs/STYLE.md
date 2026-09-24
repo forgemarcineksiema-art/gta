@@ -395,6 +395,11 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   `N SKIP` underneath. A caption slides in over 0.25 s and shows only while
   its cue holds; the bottom swap prompt hides while the caption says SWAP.
   Never a modal, never over the car.
+- One kind at a time, M8.7 slice 4 (DESIGN §20.3 rule 10): a kind the
+  chain brings out gets a card after the step's own, twice as long: its
+  40 px badge over NEW: its name (NOWOŚĆ: …), what it asks, LOOK FOR ITS
+  SIGN; its signs rise from the ground over 0.6 s (eased out). A click on a
+  ring's badge on the full map makes it the goal (a pointer cursor there).
 - Job signs, M8.7 slice 3 (DESIGN §20.3 rules 5–7; `sim/glyphs.ts`,
   `render/run/signs.ts`): every marker is a ring on the road and a round
   sign 1.4 m across on a 3.3 m steel pole (`#6d6d78`), always turned to the

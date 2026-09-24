@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../src/sim/balance';
 import { lanePathTo, pointTarget } from '../../src/sim/jobs/place';
-import type { JobDef, SimWorld } from '../../src/sim';
+import { STEP, kindsRevealedBy, type JobDef, type SimWorld } from '../../src/sim';
 import type { Lane } from '../../src/sim/city/roads';
 import { createWorld, run, runUntil } from './helpers';
 
@@ -307,6 +307,98 @@ describe('the way', () => {
       expect(way.goal.id).toBe(sim.coldOpen.job);
       expect(way.count).toBeGreaterThan(1);
       expect(Number.isFinite(way.length)).toBe(true);
+    } finally { sim.dispose(); }
+  }, 60_000);
+
+  it('M8.7 4.1 a fresh save shows deliveries only; each chain step shows its kinds; a finished chain shows them all', async () => {
+    const sim = await createWorld({ ...CITY, reveal: false });
+    try {
+      run(sim, 0.1);
+      const kinds = (): string[] => [...new Set(sim.jobs.defs.filter((d) => d.kind !== 'duel' && d.kind !== 'fare' && sim.jobs.shown(d)).map((d) => d.kind))].sort();
+      expect(kinds()).toEqual(['delivery']);
+      sim.run.chain = 1 << STEP.take;
+      expect(kinds()).toEqual(['delivery', 'race', 'trial']);
+      sim.run.chain |= 1 << STEP.bank;
+      expect(kinds()).toEqual(['delivery', 'mayhem', 'race', 'rage', 'trial']);
+      sim.run.chain |= 1 << STEP.car;
+      expect(kinds()).toEqual(['delivery', 'escape', 'mayhem', 'race', 'rage', 'trial']);
+      sim.run.chain |= 1 << STEP.escape;
+      expect(kinds()).toEqual(['delivery', 'escape', 'mayhem', 'order', 'race', 'rage', 'trial']);
+      expect(kindsRevealedBy(STEP.take)).toEqual(['race', 'trial']);
+      expect(kindsRevealedBy(STEP.bank)).toEqual(['rage', 'mayhem']);
+      expect(kindsRevealedBy(STEP.car)).toEqual(['escape']);
+      expect(kindsRevealedBy(STEP.escape)).toEqual(['order']);
+      expect(kindsRevealedBy(STEP.order)).toEqual([]);
+      // the first goal on a fresh save is a delivery
+      sim.run.chain = 0;
+      run(sim, 0.6);
+      expect(sim.way!.goal.ring).toBe('delivery');
+    } finally { sim.dispose(); }
+  }, 60_000);
+
+  it('M8.7 4.3 a ring picked on the full map is the goal, even with another nearer, until it is taken or let go', async () => {
+    const sim = await createWorld(CITY);
+    try {
+      run(sim, 0.6);
+      const way = sim.way!, near = way.goal.id;
+      const far = sim.jobs.defs.find((d) => d.kind !== 'fare' && d.kind !== 'duel' && sim.jobs.shown(d) && way.ringDistance(d.id) > way.ringDistance(near) + 500) as JobDef;
+      way.pick(far.id);
+      run(sim, 0.6);
+      expect(way.goal.id).toBe(far.id);
+      run(sim, 1.2);
+      expect(way.goal.id).toBe(far.id);
+      way.pick(-1);
+      run(sim, 0.6);
+      expect(way.goal.id).toBe(near);
+      // taken: the pick lets go
+      way.pick(far.id);
+      run(sim, 0.1);
+      sim.city!.sync(far.x, far.z, true);
+      sim.vehicle.teleport({ x: far.x, y: 0.8, z: far.z }, far.yaw);
+      run(sim, 0.3);
+      expect(sim.jobs.active).toBe(far.id);
+      expect(way.pinned).toBe(-1);
+    } finally { sim.dispose(); }
+  }, 60_000);
+
+  it('M8.7 4.4 a roadblock up on the route moves it when another way costs under 800 m more; down, the route comes back', async () => {
+    const sim = await createWorld({ ...CITY, traffic: 1 });
+    try {
+      const way = sim.way!, blocks = sim.roadblocks!, graph = sim.city!.graph, lanes = sim.traffic!.lanes;
+      let moved = 0, checked = 0;
+      for (const site of blocks.sites) {
+        const feeds = graph.lanes.map((l, i) => (l.next.includes(site.lane) ? i : -1)).filter((i) => i >= 0);
+        for (const from of feeds) {
+          onLane(sim, from, (lanes.length[from] as number) / 2);
+          way.release();
+          // a ring whose route from here runs on through the site's lane
+          let through = false;
+          for (const d of sim.jobs.defs) {
+            if (d.kind === 'fare' || !sim.jobs.shown(d)) continue;
+            way.pick(d.id);
+            way.step(BALANCE.way.routeEvery);
+            if (way.goal.id === d.id && way.fieldNext[from] === site.lane) { through = true; break; }
+          }
+          if (!through) continue;
+          const before = way.length;
+          blocks.raise(site);
+          if (blocks.active !== 1) continue;
+          way.step(BALANCE.way.routeEvery);
+          checked++;
+          if (way.fieldNext[from] !== site.lane) {
+            moved++;
+            expect(way.length - before).toBeLessThan(BALANCE.way.roadblockCost);
+          }
+          blocks.clear();
+          way.step(BALANCE.way.routeEvery);
+          expect(way.fieldNext[from]).toBe(site.lane);
+          expect(way.length).toBeCloseTo(before, 3);
+          break;
+        }
+      }
+      console.info(`roadblocks on a route: ${checked}, the route went round ${moved}`);
+      expect(checked).toBeGreaterThan(0);
+      expect(moved).toBeGreaterThan(0);
     } finally { sim.dispose(); }
   }, 60_000);
 });

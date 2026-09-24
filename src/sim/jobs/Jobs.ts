@@ -53,6 +53,12 @@ export type { JobDef, JobKind } from './catalog';
 
 export type JobState = 'idle' | 'hunting' | 'active' | 'done' | 'failed';
 
+/** The kinds the chain's step `step` brings out (M8.7 D10), in the order their NEW cards show. */
+export function kindsRevealedBy(step: number): JobDef['kind'][] {
+  const order: JobDef['kind'][] = ['race', 'trial', 'rage', 'mayhem', 'escape', 'order'];
+  return order.filter((k) => (BALANCE.reveal as Partial<Record<string, number>>)[k] === step);
+}
+
 export class Jobs {
   readonly defs: JobDef[];
   state: JobState = 'idle';
@@ -133,11 +139,20 @@ export class Jobs {
     return this.state === 'hunting' || this.state === 'active' ? this.defOf(this.active) : null;
   }
 
-  /** A marker that is there: during the cold open only its own; a rival's ring while the board says so (M6). */
+  /** Every kind shown from the start (the test worlds, `?reveal=all`, `?job=`); else they come out with the chain (M8.7 D10). */
+  revealAll = false;
+
+  /** A kind the city shows: from the start, or from the chain's step that reveals it (`BALANCE.reveal`). */
+  revealed(kind: JobDef['kind']): boolean {
+    const bit = (BALANCE.reveal as Partial<Record<string, number>>)[kind];
+    return this.revealAll || bit === undefined || bit < 0 || (this.sim.run.chain & (1 << bit)) !== 0;
+  }
+
+  /** A marker that is there: during the cold open only its own; its kind revealed; a rival's ring while the board says so (M6). */
   shown(d: JobDef): boolean {
     const co = this.sim.coldOpen;
     if (co.active) return d.id === co.job;
-    return d.id !== co.job && (d.kind !== 'duel' || this.sim.board.live(d.level));
+    return d.id !== co.job && this.revealed(d.kind) && (d.kind !== 'duel' || this.sim.board.live(d.level));
   }
 
   /** A marker the player can start now (M8.7 D9): shown, and not while the police are on the player; the cold open's own in its chase too. */

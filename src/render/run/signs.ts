@@ -48,6 +48,8 @@ export interface SignList {
   glyph: Int16Array;
   /** 1: on a pole from the ground. */
   pole: Uint8Array;
+  /** The marker's index in the jobs' defs, -1 for a sign that is not a marker's (a door, a hailer, a car). */
+  def: Int16Array;
 }
 
 export interface RingList {
@@ -64,7 +66,7 @@ export interface SignView { x: number; z: number; dirX: number; dirZ: number }
 export function newSignList(capacity: number): SignList {
   return {
     count: 0, x: new Float32Array(capacity), y: new Float32Array(capacity), z: new Float32Array(capacity),
-    state: new Uint8Array(capacity), glyph: new Int16Array(capacity), pole: new Uint8Array(capacity),
+    state: new Uint8Array(capacity), glyph: new Int16Array(capacity), pole: new Uint8Array(capacity), def: new Int16Array(capacity),
   };
 }
 
@@ -72,9 +74,10 @@ export function newRingList(capacity: number): RingList {
   return { count: 0, x: new Float32Array(capacity), z: new Float32Array(capacity), scale: new Float32Array(capacity), state: new Uint8Array(capacity) };
 }
 
-function addSign(out: SignList, x: number, y: number, z: number, state: number, glyph: number, pole: boolean): void {
+function addSign(out: SignList, x: number, y: number, z: number, state: number, glyph: number, pole: boolean, def = -1): void {
   if (out.count >= out.x.length) return;
   const i = out.count++;
+  out.def[i] = def;
   out.x[i] = x;
   out.y[i] = y;
   out.z[i] = z;
@@ -118,8 +121,8 @@ export function collectSigns(sim: SimWorld, time: number, view: SignView | null,
       addRing(rings, d.x, d.z, wide * pulse, state);
       const up = state === SIGN_GOAL ? bob : 0;
       // a rival's sign floats over the car parked in its ring; the others stand on their poles
-      if (d.kind === 'duel') addSign(signs, d.x, FLOAT_Y + up, d.z, state, glyphOf(d), false);
-      else addSign(signs, d.x, SIGN_Y + up, d.z, state, glyphOf(d), true);
+      if (d.kind === 'duel') addSign(signs, d.x, FLOAT_Y + up, d.z, state, glyphOf(d), false, i);
+      else addSign(signs, d.x, SIGN_Y + up, d.z, state, glyphOf(d), true, i);
     }
   } else {
     const running = jobs.running;

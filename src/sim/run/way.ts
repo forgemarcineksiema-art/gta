@@ -91,6 +91,11 @@ export class Way implements GoalChooser {
   private readonly ringReach = new Map<number, Reach>();
   private readonly doorReach: Reach[];
   private readonly pointReach = newReach();
+  /** A ring the player picked on the full map (M8.7 D7): it is the goal while one of its kind is asked for, until taken or closed. */
+  pinned = -1;
+  /** The roadblock last seen (its serial) and the lane it stands on: the field costs it `roadblockCost` more. */
+  private roadblockSerial = -1;
+  private blockedLane = -1;
   /** The held pick: a def's id or a door's index, and the ring kind it was picked for ('door' for a door). */
   private heldId = -1;
   private heldDoor = -1;
@@ -207,6 +212,11 @@ export class Way implements GoalChooser {
       this.heldFor = '';
       goalFor(this.sim, next, this);
     }
+    // a pinned ring taken or closed lets go
+    if (this.pinned >= 0) {
+      const d = this.sim.jobs.defOf(this.pinned);
+      if (!d || !this.sim.jobs.shown(d) || this.sim.jobs.active === this.pinned) this.pinned = -1;
+    }
     const phase = this.sim.jobs.state;
     const changed = next.kind !== goal.kind || next.id !== goal.id || next.door !== goal.door || next.hasTarget !== goal.hasTarget
       || (next.kind === 'job' && phase !== this.phase);
@@ -220,10 +230,24 @@ export class Way implements GoalChooser {
     } else if (goal.hasTarget && this.fieldAge >= w.movingReplan && (goal.x - this.laidX) ** 2 + (goal.z - this.laidZ) ** 2 > w.moveReplan ** 2) {
       laid = this.layField();
     }
+    // a roadblock up or down: the route goes round it, or back (D2)
+    const blocks = this.sim.roadblocks;
+    if (blocks && blocks.serial !== this.roadblockSerial) {
+      this.roadblockSerial = blocks.serial;
+      this.blockedLane = blocks.blockedLane;
+      if (goal.hasTarget) laid = this.layField() || laid;
+    }
     if (located || laid) {
       if (!located) this.locateCar();
       this.build(!changed);
     }
+  }
+
+  /** The player's pick on the full map (D7): a shown ring's id, or -1 to let the pick go. */
+  pick(id: number): void {
+    const d = id >= 0 ? this.sim.jobs.defOf(id) : null;
+    this.pinned = d && this.sim.jobs.shown(d) ? id : -1;
+    this.repickLeft = 0;
   }
 
   /** Lets the held pick go: the next step picks afresh by road. */
@@ -249,6 +273,16 @@ export class Way implements GoalChooser {
 
   ring(sim: SimWorld, kind: JobKind | '', out: Goal): boolean {
     const jobs = sim.jobs, defs = jobs.defs;
+    // the player's pick wins while the goal asks for any ring or for its kind
+    if (this.pinned >= 0) {
+      const d = jobs.defOf(this.pinned);
+      if (d && jobs.shown(d) && (kind === '' || d.kind === kind)) {
+        this.heldId = d.id;
+        this.heldDoor = -1;
+        this.heldFor = kind;
+        return writeRing(d, out);
+      }
+    }
     let held = -1;
     if (this.heldId >= 0 && this.heldFor === kind) {
       for (let i = 0; i < defs.length; i++) {
@@ -416,7 +450,7 @@ export class Way implements GoalChooser {
       done[u] = 1;
       for (let e = this.inStart[u] as number; e < (this.inStart[u + 1] as number); e++) {
         const from = this.inFrom[e] as number;
-        const d = best + (this.len[from] as number) + (this.inConn[e] as number);
+        const d = best + (this.len[from] as number) + (this.inConn[e] as number) + (from === this.blockedLane ? BALANCE.way.roadblockCost : 0);
         if (d < (rev[from] as number)) { rev[from] = d; nextLane[from] = u; }
       }
     }

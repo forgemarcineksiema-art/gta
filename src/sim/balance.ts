@@ -253,7 +253,13 @@ export const BALANCE = {
    * `moveReplan` m and `movingReplan` s have passed; the route's points are rebuilt every `routeEvery` s, at least
    * `pointGap` m apart along a lane.
    */
-  way: { repick: 0.5, switchShare: 0.6, switchGain: 150, reach: 25, moveReplan: 10, movingReplan: 1, routeEvery: 0.25, pointGap: 15 },
+  way: { repick: 0.5, switchShare: 0.6, switchGain: 150, reach: 25, moveReplan: 10, movingReplan: 1, routeEvery: 0.25, pointGap: 15, roadblockCost: 800 },
+  /**
+   * One kind at a time (docs/M8.7_PLAN.md D10, DESIGN.md §20.3 rule 10): a placed kind shows from the first quarter
+   * hour's chain step at this bit (`STEP`: take 0, bank 1, car 2, escape 3); a kind not listed shows from the start
+   * (the deliveries; the rivals and the fares keep their own gates).
+   */
+  reveal: { race: 0, trial: 0, rage: 1, mayhem: 1, escape: 2, order: 3 } as Readonly<Partial<Record<'delivery' | 'order' | 'escape' | 'trial' | 'race' | 'rage' | 'mayhem', number>>>,
   /**
    * Daily challenge rewards by template weight, and the streak's cash for day 1..7 (day 7 on repeats); `police` is
    * the share of each fixed site list the date mans (roadblock chokepoints, parked-patrol junctions, cameras).

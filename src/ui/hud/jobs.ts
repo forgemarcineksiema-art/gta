@@ -11,10 +11,10 @@
  * the player's language (`lang.ts`, DESIGN.md §19).
  */
 import {
-  BALANCE, BODY_WORDS, CAR_WORDS, CHAIN_STEPS, CHIEF, MEDAL_WORDS, PLACE_WORDS, RIVALS, STEP, chainStep, copyGoal, goalFor, newGoal, paintName, posterNumber, reqText,
+  BALANCE, BODY_WORDS, CAR_WORDS, CHAIN_STEPS, CHIEF, MEDAL_WORDS, kindsRevealedBy, PLACE_WORDS, RIVALS, STEP, chainStep, copyGoal, goalFor, newGoal, paintName, posterNumber, reqText,
   trialTimes, unpackDescriptor, type Goal, type GoalKind, type JobDef, type RivalDef, type SimWorld,
 } from '../../sim';
-import { GLYPHS, GLYPH_ORDER, NO_GLYPH, digitSlot, glyphOf, goalGlyph, numberGlyphs, type GlyphId } from '../../sim/glyphs';
+import { GLYPHS, GLYPH_ORDER, KIND_GLYPH, NO_GLYPH, digitSlot, glyphIndex, glyphOf, goalGlyph, numberGlyphs, type GlyphId } from '../../sim/glyphs';
 import { num, paintedCar, t } from '../lang';
 
 const KIND_TITLE: Record<JobDef['kind'], string> = { delivery: 'DELIVERY', order: 'STEAL TO ORDER', escape: 'ESCAPE', trial: 'TIME TRIAL', race: 'STREET RACE', rage: 'TAKEDOWN RAGE', mayhem: 'MAYHEM', fare: 'FARE', duel: 'WANTED BOARD' };
@@ -62,10 +62,13 @@ export class JobsHud {
   /** The goal's rival and requirement (M6), packed: the line's words change with them. */
   private goalWho = -1;
   /** Who has the card, and for how long the chain's card still shows. */
-  private cardMode: '' | 'job' | 'chain' = '';
+  private cardMode: '' | 'job' | 'chain' | 'new' = '';
   private chainSeen = -1;
   private chainPending = -1;
   private chainLeft = 0;
+  /** The kinds a ticked step brought out, waiting for their NEW cards after its own (M8.7 D10). */
+  private readonly newPending: JobDef['kind'][] = [];
+  private readonly cardBadge: HTMLElement;
   /** The chain's step on the card now, and the language changed under a card: filled again on the next frame. */
   private chainShown = -1;
   private cardStale = false;
@@ -85,7 +88,8 @@ export class JobsHud {
     this.cardKey = el('kbd', 'key jobs__card-key', 'E');
     this.cardPay = el('div', 'jobs__card-pay');
     this.cardLimit = el('div', 'jobs__card-limit');
-    this.card.append(this.cardTitle, this.cardSub, this.cardKey, this.cardPay, this.cardLimit);
+    this.cardBadge = el('span', 'jobs__card-badge');
+    this.card.append(this.cardBadge, this.cardTitle, this.cardSub, this.cardKey, this.cardPay, this.cardLimit);
     this.root.append(this.line, this.card);
     parent.appendChild(this.root);
   }
@@ -120,7 +124,11 @@ export class JobsHud {
     if (this.chainSeen < 0) this.chainSeen = run.chainSerial;
     if (run.chainSerial !== this.chainSeen) {
       this.chainSeen = run.chainSerial;
-      if (run.chainLast >= 0) this.chainPending = run.chainLast;
+      if (run.chainLast >= 0) {
+        this.chainPending = run.chainLast;
+        // the kinds this step brings out: a NEW card each after the step's own (none when every kind is out already)
+        if (!sim.jobs.revealAll) this.newPending.push(...kindsRevealedBy(run.chainLast));
+      }
     }
     const jobs = sim.jobs;
     const d = jobs.defOf(jobs.active);
@@ -154,8 +162,8 @@ export class JobsHud {
       this.showCard('job');
       return;
     }
-    if (this.cardMode === 'chain') {
-      if (this.cardStale) this.fillChainCard(run.chain, this.chainShown);
+    if (this.cardMode === 'chain' || this.cardMode === 'new') {
+      if (this.cardStale && this.cardMode === 'chain') this.fillChainCard(run.chain, this.chainShown);
       this.cardStale = false;
       this.chainLeft -= dt;
       if (this.chainLeft > 0) return;
@@ -165,6 +173,13 @@ export class JobsHud {
       this.chainPending = -1;
       this.chainLeft = BALANCE.jobs.cardSeconds;
       this.showCard('chain');
+      return;
+    }
+    const kind = this.newPending.shift();
+    if (kind) {
+      this.fillNewCard(kind);
+      this.chainLeft = BALANCE.jobs.cardSeconds * 2;
+      this.showCard('new');
       return;
     }
     this.showCard('');
@@ -376,8 +391,21 @@ export class JobsHud {
     this.card.dataset['kind'] = d.kind;
   }
 
+  /** A kind brought out (M8.7 D10): its badge, NEW: its name, what it asks, where to look. */
+  private fillNewCard(kind: JobDef['kind']): void {
+    const words = newCardWords(kind);
+    this.cardBadge.innerHTML = badgeMarkup(glyphIndex(KIND_GLYPH[kind]));
+    this.cardTitle.textContent = words.title;
+    this.cardSub.textContent = words.sub;
+    this.cardPay.textContent = '';
+    this.cardLimit.textContent = words.limit;
+    this.card.dataset['kind'] = 'new';
+    this.card.classList.remove('is-teach');
+  }
+
   /** A ticked step: which of six, what it was, what comes next. */
   private fillChainCard(chain: number, step: number): void {
+    this.cardBadge.innerHTML = '';
     const next = chainStep(chain);
     this.chainShown = step;
     this.cardTitle.textContent = t('STEP {n} OF {of}', { n: step + 1, of: CHAIN_STEPS.length });
@@ -403,7 +431,7 @@ export class JobsHud {
     this.stateClass = state;
   }
 
-  private showCard(mode: '' | 'job' | 'chain'): void {
+  private showCard(mode: '' | 'job' | 'chain' | 'new'): void {
     if (mode === this.cardMode) return;
     const was = this.cardMode !== '';
     this.cardMode = mode;
@@ -421,6 +449,18 @@ export class JobsHud {
 function metres(sim: SimWorld, dx: number, dz: number): number {
   const road = sim.way?.length ?? NaN;
   return Math.round((Number.isFinite(road) ? road : Math.hypot(dx, dz)) / 10) * 10;
+}
+
+/** What a kind asks, one line, for its NEW card. */
+const NEW_LINES: Record<JobDef['kind'], string> = {
+  delivery: 'DELIVER IT · FOLLOW THE LINE', order: 'A WANTED CAR · SWAP INTO IT', escape: 'THE COPS HAVE YOU', trial: 'FOLLOW THE COINS TO THE FINISH',
+  race: 'FIRST TO THE FINISH · ANY ROUTE', rage: 'WRECK CARS INSIDE THE RING', mayhem: 'SMASH IT UP INSIDE THE RING',
+  fare: 'TAKE THEM THERE · FOLLOW THE LINE', duel: 'FIRST TO THE FINISH · ANY ROUTE',
+};
+
+/** A kind's NEW card (M8.7 D10): NEW: its name, what it asks, where to look. Pure; `t` says it in the screen's language. */
+export function newCardWords(kind: JobDef['kind']): { title: string; sub: string; limit: string } {
+  return { title: t('NEW: {kind}', { kind: t(KIND_TITLE[kind]) }), sub: t(NEW_LINES[kind]), limit: t('LOOK FOR ITS SIGN') };
 }
 
 /**

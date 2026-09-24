@@ -9,7 +9,7 @@
  * (four draw calls and one per pictogram in sight). Reads sim state only; no allocation per frame.
  */
 import * as THREE from 'three';
-import { BALANCE, FIXED_DT, type SimWorld } from '../../sim';
+import { BALANCE, FIXED_DT, type JobDef, type SimWorld } from '../../sim';
 import { GLYPHS, GLYPH_ORDER, digitSlot, glyphIndex, numberGlyphs, type GlyphShape } from '../../sim/glyphs';
 import { SIGN_COLORS, SIGN_Y, collectSigns, newRingList, newSignList, type SignView } from './signs';
 
@@ -24,6 +24,9 @@ const RIM_OUT = 0.76;
 const GLYPH_SIZE = 0.84;
 const DEPTH = 0.03;
 const POLE = 0x6d6d78;
+/** A kind brought out by the chain (M8.7 D10): its signs rise from the ground over `RISE` s. */
+const RISE = 0.6;
+const REVEALED_KINDS = Object.keys(BALANCE.reveal) as JobDef['kind'][];
 
 /** A state's colours, the open ones for anything unknown. */
 function stateColours(state: number): { face: number; rim: number; glyph: number; ring: number } {
@@ -81,6 +84,9 @@ export class MarkerView {
   private readonly digitLocal: THREE.Matrix4[][];
   private readonly numbers: number[][];
   private readonly view: SignView = { x: 0, z: 0, dirX: 0, dirZ: 1 };
+  /** Each chain-revealed kind: out at the last frame, and when it came out (its signs rise). */
+  private readonly wasOut = new Map<JobDef['kind'], boolean>();
+  private readonly riseStart = new Map<JobDef['kind'], number>();
   private sim: SimWorld | null = null;
   private alpha = 0;
   private readonly color = new THREE.Color();
@@ -151,6 +157,12 @@ export class MarkerView {
       }
     }
     this.lastState = jobs.state;
+    // a kind the chain brings out: its signs rise (never at the first frame: a save's kinds are simply there)
+    for (const kind of REVEALED_KINDS) {
+      const out = jobs.revealed(kind), was = this.wasOut.get(kind);
+      if (was === false && out) this.riseStart.set(kind, time);
+      if (was !== out) this.wasOut.set(kind, out);
+    }
     const cam = this.camera;
     let view: SignView | null = null;
     if (cam) {
@@ -192,7 +204,9 @@ export class MarkerView {
     this.glyphCount.fill(0);
     let poles = 0;
     for (let i = 0; i < signs.count; i++) {
-      const x = signs.x[i] as number, y = signs.y[i] as number, z = signs.z[i] as number;
+      const x = signs.x[i] as number, z = signs.z[i] as number;
+      const rise = this.rise(jobs.defs[signs.def[i] as number], time);
+      const y = (signs.y[i] as number) * rise;
       const colours = stateColours(signs.state[i] as number);
       const yaw = cam ? Math.atan2(cam.position.x - x, cam.position.z - z) : 0;
       this.q.setFromAxisAngle(this.up, yaw);
@@ -200,7 +214,16 @@ export class MarkerView {
       this.faces.setColorAt(i, this.color.setHex(colours.face));
       this.rims.setMatrixAt(i, this.m);
       this.rims.setColorAt(i, this.color.setHex(colours.rim));
-      if (signs.pole[i] === 1) this.put(this.poles, poles++, x, 0, z, 1, this.qIdentity);
+      if (signs.pole[i] === 1) {
+        this.p.set(x, 0, z);
+        this.s.set(1, rise, 1);
+        this.m.compose(this.p, this.qIdentity, this.s);
+        this.poles.setMatrixAt(poles++, this.m);
+        // the face's matrix again for the pictogram below
+        this.p.set(x, y, z);
+        this.s.set(1, 1, 1);
+        this.m.compose(this.p, this.q, this.s);
+      }
       const glyph = signs.glyph[i] as number;
       this.color.setHex(colours.glyph);
       if (glyph >= 0) {
@@ -237,6 +260,17 @@ export class MarkerView {
     this.material.dispose();
     this.poleMaterial.dispose();
     for (const mesh of [this.rings, this.poles, this.faces, this.rims, ...this.glyphs]) mesh.dispose();
+  }
+
+  /** How far a marker's sign has risen: 1 unless its kind came out under `RISE` s ago (eased out). */
+  private rise(d: JobDef | undefined, time: number): number {
+    if (!d) return 1;
+    const start = this.riseStart.get(d.kind);
+    if (start === undefined) return 1;
+    const u = (time - start) / RISE;
+    if (u >= 1) return 1;
+    const k = Math.max(0, u);
+    return 1 - (1 - k) * (1 - k);
   }
 
   /** A mesh's count for this frame; hidden while it draws nothing (no draw call). */

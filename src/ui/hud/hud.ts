@@ -268,6 +268,11 @@ export class Hud {
   }
 
   /** The full-screen map while its key is held (the app decides when it may show). */
+  /** The full map's pick (M8.7 D7): the app turns a click on a ring's badge into the way's goal. */
+  setMapPick(onPick: (id: number) => void): void {
+    if (this.bigMap) this.bigMap.onPick = onPick;
+  }
+
   setMapVisible(v: boolean): void {
     this.bigMap?.setVisible(v);
   }

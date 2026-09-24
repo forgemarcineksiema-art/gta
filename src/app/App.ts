@@ -256,6 +256,8 @@ export class App {
     this.coldOpenHud = new ColdOpenHud(uiRoot);
     this.jobsHud = new JobsHud(uiRoot);
     this.payLabel = new PayLabel(uiRoot);
+    // a click on a ring on the full map makes it the goal (M8.7 D7)
+    this.hud.setMapPick((id) => this.sim.way?.pick(id));
     // the top of the screen (M7 slice 1): the job line and its card, the intro's caption, the key hints and the news in
     // one column, so none is drawn over another
     mountTop(uiRoot, { jobLine: this.jobsHud.root, caption: this.coldOpenHud.root, hints: this.hud.hintsElement, news: this.hud.tickerElement });
@@ -494,6 +496,8 @@ export class App {
     }
     // `kit=all` (M6): every item of the kit had, to try them on (tests and playtests)
     if (params.get('kit') === 'all') sim.kit.owned.fill(1);
+    // `reveal=all` (M8.7 D10): every job kind out from the start, not with the chain (tests and playtests); `job=` too
+    if (params.get('reveal') === 'all' || params.get('job') !== null) sim.jobs.revealAll = true;
     // `job=<id>` or `job=delivery|order|escape`: into that marker's ring at boot (tests and playtests); `job=duel`
     // is the next rival's
     const jobParam = params.get('job');

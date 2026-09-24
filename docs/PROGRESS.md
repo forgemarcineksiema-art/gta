@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8.7 slice 4: one kind at a time, the pick, the detour
+
+Done (D10, D7's pick, D2's roadblock): the kinds come out with the chain (`BALANCE.reveal`: deliveries from the start;
+races and trials after the first job; rage and mayhem after the first bank; escapes after the first car; orders after the
+escape at two stars), each with a NEW card after its step's and its signs rising; the save's chain decides. The test
+worlds show every kind (`reveal: true` in the helper, as the teasers are off); `?reveal=all` and `?job=` do in the game.
+A click on a ring on the full map pins it as the goal until taken or let go (`Way.pick`). A roadblock up costs its lane
+800 m in the field, so the route goes round it when it can; down, it comes back. Pins M8.7 4.1–4.4 (4.2 the NEW card's
+words). Verify green.
+
 ## 2026-09-24 — M8.7 slice 3: the signs and the colours
 
 Done (D5–D7): `sim/glyphs.ts` holds one outline per kind (parcel, key, police light, stopwatch, chequered flag, crash

@@ -22,8 +22,9 @@ import { MINIMAP, bigMapProject, bigMapScale, yawFromQuat, type Vec2 } from './m
 
 /** Repaint cadence while shown, ms: the units move, the map need not be smoother than the radar. */
 const REPAINT_MS = 66;
-/** The way's route on the full map, px (M8.7 D3). */
+/** The way's route on the full map, px (M8.7 D3); a click within `PICK_PX` of a ring's badge picks it (D7). */
 const ROUTE_PX = 4;
+const PICK_PX = 14;
 const GLYPH = 7;
 /** The cover on the map: where the helicopter cannot see (DESIGN.md §13.10). */
 const COVER_COLOR = 'rgba(126, 196, 214, 0.9)';
@@ -79,6 +80,10 @@ export class BigMap {
   private readonly tmp: Vec2 = { x: 0, y: 0 };
   private readonly onResize = (): void => { this.measure = true; };
 
+  /** The player's pick (M8.7 D7): a click on a ring's badge makes it the goal, a click elsewhere lets it go (-1). */
+  onPick: ((id: number) => void) | null = null;
+  private simRef: SimWorld | null = null;
+
   constructor(parent: HTMLElement, sim: SimWorld, private readonly paths: MapPaths) {
     this.root = el('div', 'bigmap');
     const head = el('div', 'bigmap__head');
@@ -91,6 +96,7 @@ export class BigMap {
     labelAria(this.canvas, 'Map of the island, north up. The yellow arrow is your car.');
     const body = el('div', 'bigmap__body');
     body.append(this.canvas, this.legend());
+    this.canvas.addEventListener('pointerdown', (e) => this.pick(e));
     this.root.append(head, body);
     parent.appendChild(this.root);
     const ctx = this.canvas.getContext('2d');
@@ -124,6 +130,24 @@ export class BigMap {
     this.lastPaint = -Infinity;
   }
 
+  /** A click on the map: the shown ring whose badge is within `PICK_PX` of it, else none. */
+  private pick(e: PointerEvent): void {
+    const sim = this.simRef;
+    if (!sim || !this.onPick || !this.shown) return;
+    const box = this.canvas.getBoundingClientRect();
+    const x = e.clientX - box.left, y = e.clientY - box.top;
+    const s = bigMapScale(this.size, CITY_HALF);
+    let best = -1, bestD = PICK_PX * PICK_PX;
+    for (const d of sim.jobs.defs) {
+      if (d.kind === 'fare' || !sim.jobs.shown(d)) continue;
+      const p = this.at(d.x, d.z, s);
+      const dd = (p.x - x) ** 2 + (p.y - y) ** 2;
+      if (dd < bestD) { bestD = dd; best = d.id; }
+    }
+    this.onPick(best);
+    e.preventDefault();
+  }
+
   setVisible(v: boolean): void {
     if (v === this.shown) return;
     this.shown = v;
@@ -144,6 +168,7 @@ export class BigMap {
   }
 
   update(sim: SimWorld, now: number): void {
+    this.simRef = sim;
     if (!this.shown) return;
     if (this.measure) {
       this.measure = false;

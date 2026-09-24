@@ -49,6 +49,7 @@ do not change with the calendar.
 | `/?board=8` | the wanted board (M6) as if every rival under #8 was beaten (their cars owned) and #8's requirements met, the chain done; `board=0` puts the Chief next; turns the cold open off |
 | `/?board=10&job=duel` | pulled up at the next rival's bay: their duel starts at boot |
 | `/?kit=all` | every item of the driver's and the car's kit had, to try them on the STYLE page |
+| `/?reveal=all` | every job kind out from the start, not one at a time with the chain (M8.7 D10; `?job=` implies it) |
 | `/?quality=low` | lock `low` or `high` for reproducible visual/performance comparisons |
 | `/?seed=123` | regenerate building lots from a seed (road topology stays fixed) |
 | `/?dev=1` | debug HUD + live tuning panel (also the backtick key); the panel's Life section holds the traffic, pedestrian, economy, damage and swap numbers |

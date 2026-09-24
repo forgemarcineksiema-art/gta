@@ -90,6 +90,11 @@ export class Roadblocks {
     if (site) this.place(site, probe);
   }
 
+  /** The lane a roadblock stands on while one is up, else -1 (the way goes round it, M8.7 D2). */
+  get blockedLane(): number {
+    return this.active === 1 && this.site ? this.site.lane : -1;
+  }
+
   /** Test hook: put a roadblock up at this chokepoint now, whatever the heat and the view. */
   raise(site: Chokepoint): void {
     if (this.active === 1) this.release();

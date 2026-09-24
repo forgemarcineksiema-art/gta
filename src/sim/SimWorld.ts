@@ -102,6 +102,8 @@ export interface SimWorldOptions {
   coldOpen?: boolean;
   /** The next rival's car cruising their turf (M7 slice 13). Default on; the test helper turns it off. */
   teasers?: boolean;
+  /** Every job kind shown from the start (M8.7 D10: the game reveals them with the chain). Default off; the test helper turns it on. */
+  reveal?: boolean;
 }
 
 interface TrackedBody {
@@ -304,6 +306,7 @@ export class SimWorld {
     this.coldOpen = new ColdOpen(this);
     this.dailies = new Dailies(this);
     this.caches = this.coins ? new Caches(this) : null;
+    this.jobs.revealAll = opts.reveal ?? false;
     this.way = this.city && this.traffic ? new Way(this, this.city.graph, this.traffic.lanes) : null;
     if (this.city) {
       // what the street furniture keeps out of (M8 D7): every job's ring and its end, the stash's cars, the

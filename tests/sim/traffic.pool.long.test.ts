@@ -54,6 +54,9 @@ describe('traffic pool (long)', () => {
     const lastS = new Float32Array(traffic.capacity).fill(-1);
     const physicalSince = new Int32Array(traffic.capacity);
     const contactAt = new Int32Array(traffic.capacity).fill(-1000);
+    // a car's yaw rate is read a step late: a crash's spin shows in the step it happens, its contact only in the next
+    // (M8.6 gate: a unit at 18 m/s into a stopped car spun it 3.2 rad/s, a crash counted against the controller)
+    const pendingRate = new Float32Array(traffic.capacity).fill(NaN);
     let laneChanges = 0;
     let maxYawRate = 0;
     let maxHeadingError = 0;
@@ -67,7 +70,7 @@ describe('traffic pool (long)', () => {
         let lent = 0;
         for (let i = 0; i < traffic.capacity; i++) {
           const st = traffic.state[i];
-          if (st === AgentState.Free) { prevLane[i] = -1; continue; }
+          if (st === AgentState.Free) { prevLane[i] = -1; pendingRate[i] = NaN; continue; }
           const dx = (traffic.x[i] as number) - px;
           const dz = (traffic.z[i] as number) - pz;
           const dist = Math.hypot(dx, dz);
@@ -82,7 +85,9 @@ describe('traffic pool (long)', () => {
           if (st === AgentState.Physical && lane >= 0) {
             // heading: a stable controller, no spinning, nose within 25 degrees of the path
             // (a car the player is shoving from 8 m or less is physics, not the controller)
-            if (dist > 8) maxYawRate = Math.max(maxYawRate, Math.abs(traffic.bodyYawRate(i)));
+            const pending = pendingRate[i] as number;
+            if (!Number.isNaN(pending) && (traffic.contactDv[i] as number) === 0) maxYawRate = Math.max(maxYawRate, Math.abs(pending));
+            pendingRate[i] = dist > 8 ? traffic.bodyYawRate(i) : NaN;
             // the nose points at the path 8 m ahead (the controller's carrot); on a tight corner the tangent at the
             // car's own position can differ by 45 degrees, so the pin is against the carrot direction
             traffic.lanes.positionAt(lane, (traffic.s[i] as number) + 8, traffic.laneOffset[i] as number, pose, traffic.next[i]);
@@ -103,7 +108,7 @@ describe('traffic pool (long)', () => {
               maxAtEnd = Math.max(maxAtEnd, atEnd[i] as number);
             } else atEnd[i] = 0;
             lastS[i] = s;
-          } else { atEnd[i] = 0; lastS[i] = -1; }
+          } else { atEnd[i] = 0; lastS[i] = -1; pendingRate[i] = NaN; }
           prevLane[i] = st === AgentState.Physical ? lane : -1;
         }
         expect(lent).toBeLessThanOrEqual(bodies);

@@ -173,8 +173,10 @@ describe('identity', () => {
       expect(Math.hypot(sim.police!.boxX - left.x, sim.police!.boxZ - left.z)).toBeLessThan(0.5);
       // the player sits in the new car beside the old one (in reach of the bodies); the units close on the one left behind
       const dist = (u: number): number => Math.hypot((traffic.x[u] as number) - left.x, (traffic.z[u] as number) - left.z);
+      // held still on the handbrake (M8.6 gate: the foot brake held at a standstill is reverse, and the car backed 21 m
+      // into the units on their way)
       const boxedAt = runUntil(sim, POLICE.box.maxSeconds, () => units.every((u) => dist(u) < POLICE.box.range && (traffic.speed[u] as number) < 1),
-        (_t, ctl) => { ctl.brake = 1; });
+        (_t, ctl) => { ctl.handbrake = 1; });
       expect(boxedAt).toBeGreaterThan(0);
       expect(sim.pursuit.state).toBe('idle');
       // they hold it while the timer runs from the first arrival

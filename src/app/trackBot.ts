@@ -285,7 +285,12 @@ export class TrackBot {
         if (st === AgentState.Free) continue;
         const dx = (traffic.x[i] as number) - px, dz = (traffic.z[i] as number) - pz;
         const along = dx * fx + dz * fz, across = dx * -fz + dz * fx;
-        if (along < 0.5 || along > 7 || Math.abs(across) > 2.6) continue;
+        // its middle or either end in the way (M8.6 gate: a truck across the road with its middle 2.6 m aside held
+        // the bot nose to its flank till it gave up)
+        const reach = traffic.halfLengthOf(i), ex = Math.sin(traffic.yaw[i] as number) * reach, ez = Math.cos(traffic.yaw[i] as number) * reach;
+        const ea = ex * fx + ez * fz, ec = ex * -fz + ez * fx;
+        const inWay = (a: number, c: number): boolean => a >= 0.5 && a <= 7 && Math.abs(c) <= 2.6;
+        if (!inWay(along, across) && !inWay(along + ea, across + ec) && !inWay(along - ea, across - ec)) continue;
         const driving = st === AgentState.Kinematic || st === AgentState.Physical;
         if (driving && Math.cos((traffic.yaw[i] as number) - yaw) > 0) continue;
         blocker = i;
@@ -354,8 +359,11 @@ export class TrackBot {
     if (this.passing >= 0) {
       const i = this.passing;
       const gone = traffic.state[i] === AgentState.Free;
-      const behind = gone || ((traffic.x[i] as number) - px) * fx + ((traffic.z[i] as number) - pz) * fz < -6;
-      if (behind || !oncomingFree()) {
+      const along = ((traffic.x[i] as number) - px) * fx + ((traffic.z[i] as number) - pz) * fz;
+      const behind = gone || along < -6;
+      // a car it is passing that stops ahead (a queue for a junction) is braked for, not passed (M8.6 gate)
+      const stopped = !gone && along > 0 && (traffic.speed[i] as number) < 1.5;
+      if (behind || stopped || !oncomingFree()) {
         this.pass = 0;
         this.passing = -1;
       }
@@ -376,6 +384,9 @@ export class TrackBot {
       const along = dx * fx + dz * fz;
       if (along < 3 || along > 30 || Math.abs(dx * -fz + dz * fx) > 2.2) continue;
       if ((traffic.speed[i] as number) > Math.min(allowed, speed + 2) - 3) continue;
+      // a slow car, not a stopped one: a car standing on the road waits for something, and the bot passed a queue into
+      // the junction at 20 m/s (M8.6 gate)
+      if ((traffic.speed[i] as number) < 3) continue;
       if (along < slowAlong) { slowAlong = along; slow = i; }
     }
     if (slow < 0 || !oncomingFree()) return;

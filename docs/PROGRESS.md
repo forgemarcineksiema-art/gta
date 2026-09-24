@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8.6 gate, first pass (stopped at Marcin's word)
+
+`verify:gate`: 9 long pins red. Fixed: the Chief back on a full roster, the PIT a swerve from alongside, a civilian pressed
+by the player yields, the held-up rule for units only, the bot's blocks and passes; pins corrected (a crash's spin read a
+step late; the streaming pin counts work, not time; the box pin held the car in reverse, the handbrake now; the flow pin
+reads three seeds, one run swinging 1–6 give-ups on 0.8.5's rules too). Still red: jobs 1.7 (delivery #12 over its limit on
+the hotel route; over three seeds 5 of 18 deliveries slower than 0.8.5, none faster, cause not found) and botPolicy 5.8
+(a reset). Not run: the e2e suites, balance, the perf gate. Marcin cut the search short; this commit and the push on his
+word. Verify green.
+
 ## 2026-09-24 — M8.6 slice 5: the frames
 
 Measured (D10, his laptop's MX330, 1600×900): 0.8.5 and the candidate at 60 fps in the bot's chase and knocked street;

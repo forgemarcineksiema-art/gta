@@ -97,23 +97,30 @@ describe('solid cars: the chase read (long)', () => {
     } finally { sim.dispose(); }
   }, 300_000);
 
-  it('M8.6 5.1 the city built ahead in the time a step leaves: no step over 8 ms after the first second', async () => {
+  it('M8.6 5.1 the city built ahead in the time a step leaves: after the first second no step builds a chunk or its props', async () => {
     const sim = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 1, record: false });
     const bot = new TrackBot('muscle', CITY_BOT_TUNING);
-    let worst = 0, over = 0, pieces = 0;
+    // the two pieces of work a first visit costs (5–35 ms each on Marcin's laptop): counted, not timed, so the pin holds
+    // under the parallel suite
+    const city = sim.city as unknown as { generate: (...a: unknown[]) => unknown; propContext: (...a: unknown[]) => unknown };
+    let inStep = false, built = 0, ahead = 0;
+    for (const key of ['generate', 'propContext'] as const) {
+      const own = city[key].bind(city);
+      city[key] = (...a: unknown[]) => { if (inStep) built++; else ahead++; return own(...a); };
+    }
     try {
       for (let tick = 0; tick < 120 * 60; tick++) {
         bot.drive(sim, sim.controls, 1 / 60);
-        const t0 = performance.now();
+        if (tick === 60) built = 0;
+        inStep = true;
         sim.step();
-        const ms = performance.now() - t0;
-        if (tick >= 60) { worst = Math.max(worst, ms); if (ms > 8) over++; }
+        inStep = false;
         // what the app does when a frame leaves time: a piece of the city ahead
-        if (ms < 4 && sim.city!.prefetch()) pieces++;
+        sim.city!.prefetch();
       }
-      console.log(`[solid] 120 s over the city, ${pieces} pieces built ahead: the slowest step ${worst.toFixed(1)} ms, ${over} over 8 ms`);
-      expect(pieces).toBeGreaterThan(0);
-      expect(over).toBe(0);
+      console.log(`[solid] 120 s over the city: ${ahead} pieces built ahead, ${built} built inside a step after the first second`);
+      expect(ahead).toBeGreaterThan(0);
+      expect(built).toBe(0);
     } finally { sim.dispose(); }
   }, 300_000);
 });

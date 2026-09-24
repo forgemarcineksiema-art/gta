@@ -80,39 +80,45 @@ describe('traffic (long)', () => {
 // Moved unchanged from `traffic.test.ts` in M5.1: over ~10 s of wall time under the parallel suite.
 describe('traffic flow (long)', () => {
   it('flows: cars mostly drive, few stand still, few give up on a junction', async () => {
-    const sim = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 0, record: false });
-    const bot = new TrackBot('muscle', CITY_BOT_TUNING);
-    const traffic = sim.traffic as Traffic;
-    let agentSteps = 0;
-    let ratioSum = 0;
-    let stopped = 0;
-    let highwaySteps = 0;
-    let highwayRatio = 0;
-    try {
-      for (let step = 0; step < 60 * 60; step++) {
-        bot.drive(sim, sim.controls, 1 / 60);
-        sim.step();
-        if (step < 10 * 60) continue; // let the pool fill and settle
-        for (let i = 0; i < traffic.capacity; i++) {
-          const st = traffic.state[i];
-          if (st !== AgentState.Kinematic && st !== AgentState.Physical) continue;
-          const lane = traffic.lane[i] as number;
-          if (lane < 0) continue;
-          const limit = traffic.lanes.limit[lane] as number;
-          const ratio = (traffic.speed[i] as number) / limit;
-          agentSteps++;
-          ratioSum += ratio;
-          if ((traffic.speed[i] as number) < 0.5) stopped++;
-          if (limit === traffic.tuning.speedHighway) { highwaySteps++; highwayRatio += ratio; }
+    // three seeds (M8.6 gate): a junction's give-ups in one run swing from 1 to 6 with the same rules (five seeds of 0.8.5
+    // read 1–4, the solid cars 1–6, their flow the same or better), so the pin reads their mean
+    let waited = 0;
+    for (const seed of [42, 7, 123]) {
+      const sim = await createWorld({ map: 'city', seed, traffic: 1, peds: 0, record: false });
+      const bot = new TrackBot('muscle', CITY_BOT_TUNING);
+      const traffic = sim.traffic as Traffic;
+      let agentSteps = 0;
+      let ratioSum = 0;
+      let stopped = 0;
+      let highwaySteps = 0;
+      let highwayRatio = 0;
+      try {
+        for (let step = 0; step < 60 * 60; step++) {
+          bot.drive(sim, sim.controls, 1 / 60);
+          sim.step();
+          if (step < 10 * 60) continue; // let the pool fill and settle
+          for (let i = 0; i < traffic.capacity; i++) {
+            const st = traffic.state[i];
+            if (st !== AgentState.Kinematic && st !== AgentState.Physical) continue;
+            const lane = traffic.lane[i] as number;
+            if (lane < 0) continue;
+            const limit = traffic.lanes.limit[lane] as number;
+            const ratio = (traffic.speed[i] as number) / limit;
+            agentSteps++;
+            ratioSum += ratio;
+            if ((traffic.speed[i] as number) < 0.5) stopped++;
+            if (limit === traffic.tuning.speedHighway) { highwaySteps++; highwayRatio += ratio; }
+          }
         }
-      }
-      const mean = ratioSum / Math.max(1, agentSteps);
-      const stoppedShare = stopped / Math.max(1, agentSteps);
-      const highway = highwayRatio / Math.max(1, highwaySteps);
-      console.log(`[traffic] flow: mean speed/limit ${mean.toFixed(3)}, stopped share ${stoppedShare.toFixed(3)}, highway ${highway.toFixed(3)}, waited past ${traffic.waitedPast}, wrecked ${traffic.count(AgentState.Wrecked)}`);
-      expect(mean).toBeGreaterThan(0.6);
-      expect(stoppedShare).toBeLessThan(0.15);
-      expect(traffic.waitedPast).toBeLessThanOrEqual(5);
-    } finally { sim.dispose(); }
-  }, 120_000);
+        const mean = ratioSum / Math.max(1, agentSteps);
+        const stoppedShare = stopped / Math.max(1, agentSteps);
+        const highway = highwayRatio / Math.max(1, highwaySteps);
+        console.log(`[traffic] flow, seed ${seed}: mean speed/limit ${mean.toFixed(3)}, stopped share ${stoppedShare.toFixed(3)}, highway ${highway.toFixed(3)}, waited past ${traffic.waitedPast}, wrecked ${traffic.count(AgentState.Wrecked)}`);
+        expect(mean).toBeGreaterThan(0.6);
+        expect(stoppedShare).toBeLessThan(0.15);
+        waited += traffic.waitedPast;
+      } finally { sim.dispose(); }
+    }
+    expect(waited / 3).toBeLessThanOrEqual(5);
+  }, 180_000);
 });

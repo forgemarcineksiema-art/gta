@@ -100,6 +100,8 @@ const CARROT_ROUND = 3.5;
 const BLEND_BACK = 1;
 /** A stopped car's body slower than this (m/s and rad/s) is at rest for the tip rule (M8.6 D3). */
 const TIP_REST = 0.3;
+/** A yielding car's tyres wear a push off at this rate (1/s): pushed at 2 m/s it stops in half a second (M8.6 gate). */
+const YIELD_GRIP = 4;
 
 /**
  * A traffic car's centre of mass as a share of its box's height above the road (M8.6 slice 1): a sedan's sits at about
@@ -322,6 +324,8 @@ export class Traffic {
   /** Seconds a lent car has been held up pushing (M8.6 D6), and the seconds it still holds before it tries again. */
   readonly heldFor: Float32Array;
   private readonly holdLeft: Float32Array;
+  /** 1 while a held civilian yields to the player's push instead of holding its path (M8.6 gate). */
+  readonly yielding: Uint8Array;
   /** A stopped car's rotation, written from its body every step it has one and drawn while it has none (M8.6 D4). */
   private readonly poseQ: Float32Array;
   /** 1 while `poseQ` and `y` hold the pose its body left (M8.6 D4); a record placed anew has none. */
@@ -477,6 +481,7 @@ export class Traffic {
     this.reattachLeft = new Float32Array(n);
     this.heldFor = new Float32Array(n);
     this.holdLeft = new Float32Array(n);
+    this.yielding = new Uint8Array(n);
     this.poseQ = new Float32Array(n * 4);
     this.posed = new Uint8Array(n);
     this.tipFor = new Float32Array(n);
@@ -1422,19 +1427,41 @@ export class Traffic {
     const turningBack = !ramming && Math.abs(toCarrot) > Math.PI / 3;
     let speedTarget = turningBack ? 0 : desired;
     body.linvel(this.lin);
-    // Held up (M8.6 D6): moving at under a third of its command for `holdAfter` s while it touches something, it stops
-    // pushing and holds for `holdFor` s, then tries again; a velocity command into a car is a shove, and the shoves built
-    // the piles. A ram at a moving player shoves by design; a unit driving to its place round a stopped one does not.
+    // Pressed by the player's car (M8.6 gate): a civilian touching it, all but stopped, for `holdAfter` s yields for
+    // `holdFor` s: no command, only its tyres wearing the push off, so the player's push moves it. Holding its path it
+    // stood like a wall, and a truck turning back against the bot's car held both till the bot gave up. A unit keeps
+    // its brakes: the box holds.
+    if ((this.holdLeft[i] as number) > 0 && this.yielding[i] === 1) {
+      this.holdLeft[i] = Math.max(0, (this.holdLeft[i] as number) - dt);
+      if (this.holdLeft[i] === 0) this.yielding[i] = 0;
+      const grip = Math.max(0, 1 - YIELD_GRIP * dt);
+      this.lin.x *= grip;
+      this.lin.z *= grip;
+      body.setLinvel(this.lin, true);
+      this.holdHeight(i, body, lane);
+      body.angvel(this.ang);
+      this.ang.x = 0;
+      this.ang.z = 0;
+      this.ang.y *= grip;
+      body.setAngvel(this.ang, true);
+      return;
+    }
+    const pressed = this.police[i] === 0 && (this.playerDv[i] as number) > 0 && Math.hypot(this.lin.x, this.lin.z) < 2;
+    // Held up (M8.6 D6): a unit moving at under a third of its command for `holdAfter` s while it touches something stops
+    // pushing and holds for `holdFor` s, then tries again; a velocity command into a car is a shove, and the units'
+    // shoves built the piles. A ram at a moving player shoves by design; a unit driving to its place round a stopped one
+    // does not. Civilians keep the lane's own rules (holding in a junction's box, one kept the junction from the rest).
     if ((this.holdLeft[i] as number) > 0) {
       this.holdLeft[i] = Math.max(0, (this.holdLeft[i] as number) - dt);
       speedTarget = 0;
-    } else if ((!ramming || this.freeSteer[i] === 1) && speedTarget > 1 && (this.contactDv[i] as number) > 0
-      && (this.lin.x * dx + this.lin.z * dz) / len < speedTarget / 3) {
+    } else if (pressed || (this.police[i] === 1 && (!ramming || this.freeSteer[i] === 1) && speedTarget > 1 && (this.contactDv[i] as number) > 0
+      && (this.lin.x * dx + this.lin.z * dz) / len < speedTarget / 3)) {
       this.heldFor[i] = (this.heldFor[i] as number) + dt;
       if (this.heldFor[i] >= t.holdAfter) {
         this.holdLeft[i] = t.holdFor;
         this.heldFor[i] = 0;
         speedTarget = 0;
+        if (pressed) this.yielding[i] = 1;
       }
     } else this.heldFor[i] = 0;
     const left = this.reattachLeft[i] as number;
@@ -1443,22 +1470,16 @@ export class Traffic {
     const k = Math.min(1, 6 * dt) * Math.max(0, Math.min(1, blend));
     const dvx = dx / len * speedTarget - this.lin.x;
     const dvz = dz / len * speedTarget - this.lin.z;
-    // A ram accelerates only the patrol's lent body. Rapier contacts deliver the shove. The cap is on the shove, not on
-    // the brakes (M8.6 D6): a unit faster than its command slows as any car does; capped, a unit coming in at 24 m/s
-    // for a stopped player took 30 m to slow and went through whatever stood round the car.
-    const braking = (this.lin.x * dx + this.lin.z * dz) / len > speedTarget + 0.5;
+    // A ram accelerates only the patrol's lent body. Rapier contacts deliver the shove. Driving to a place round a stopped
+    // car the cap is on the shove, not on the brakes (M8.6 D6): a unit faster than its command slows as any car does;
+    // capped, a unit coming in at 24 m/s for a stopped player took 30 m to slow and went through whatever stood round the
+    // car. A ram or a PIT at a moving player keeps its tuned closing (the Chief's two PITs a minute).
+    const braking = this.freeSteer[i] === 1 && (this.lin.x * dx + this.lin.z * dz) / len > speedTarget + 0.5;
     const gain = ramming && !braking ? Math.min(k, (this.ramAccel[i] as number) * dt / (Math.hypot(dvx, dvz) || 1)) : k;
     this.lin.x += dvx * gain;
     this.lin.z += dvz * gain;
     body.setLinvel(this.lin, true);
-    // on an overpass's ramp the body rides at the road's height: its height is held, not simulated
-    const h = this.lanes.heightAt(lane, this.s[i] as number);
-    this.y[i] = h;
-    body.translation(this.pos);
-    if (Math.abs(this.pos.y - (h + 0.03)) > 0.001) {
-      this.pos.y = h + 0.03;
-      body.setTranslation(this.pos, true);
-    }
+    this.holdHeight(i, body, lane);
     // Heading: a first-order controller with a rate cap (stable while yawGain × dt < 1).
     // Moving, the nose follows the motion so the car never crabs; stopped, it turns toward the path.
     body.angvel(this.ang);
@@ -1472,6 +1493,17 @@ export class Traffic {
     this.ang.z = 0;
     this.ang.y = M.clamp(err * t.yawGain, -t.yawRateMax, t.yawRateMax);
     body.setAngvel(this.ang, true);
+  }
+
+  /** On an overpass's ramp the body rides at the road's height: its height is held, not simulated. */
+  private holdHeight(i: number, body: RAPIER.RigidBody, lane: number): void {
+    const h = this.lanes.heightAt(lane, this.s[i] as number);
+    this.y[i] = h;
+    body.translation(this.pos);
+    if (Math.abs(this.pos.y - (h + 0.03)) > 0.001) {
+      this.pos.y = h + 0.03;
+      body.setTranslation(this.pos, true);
+    }
   }
 
   // ---- gaps ---------------------------------------------------------------------
@@ -1965,6 +1997,7 @@ export class Traffic {
     this.reattachLeft[i] = 0;
     this.heldFor[i] = 0;
     this.holdLeft[i] = 0;
+    this.yielding[i] = 0;
   }
 
   /** Return the body. Driving and disturbed cars go back to kinematic; wrecks and abandoned cars keep their state and stop. */

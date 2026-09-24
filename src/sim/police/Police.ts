@@ -71,6 +71,12 @@ const SLOTS = 4;
 const PLACES = 8;
 /** Per slot, its two diagonals in the order tried. */
 const DIAGONALS = new Int8Array([4, 5, 6, 7, 4, 6, 5, 7]);
+/**
+ * A PIT (M8.6 gate): alongside with the interceptor's nose this far up the car's rear quarter, then the swerve aimed this
+ * far past the car's centre line, m.
+ */
+const PIT_OVERLAP = 1.2;
+const PIT_SWERVE = 0.8;
 /** Seconds after a busted card that a unit stuck in the pile goes back to the pool out of view (M8.6 D7). */
 const AFTER_BUST = 20;
 /** After a box: the leave point is this far past the empty car along the unit's lane (m), reached within this (m) or given up after this (s). */
@@ -518,9 +524,18 @@ export class Police {
           pz += player.vz * lead;
         }
         const fx = Math.sin(yaw), fz = Math.cos(yaw);
-        const side = -dx * -fz - dz * fx >= 0 ? 1 : -1;
-        aimX = px - fx * player.halfLength * 0.9 + -fz * side * t.pitSideOffset;
-        aimZ = pz - fz * player.halfLength * 0.9 + fx * side * t.pitSideOffset;
+        const across = -dx * -fz - dz * fx, side = across >= 0 ? 1 : -1;
+        // M8.6 gate: rigid cars need a real PIT. Alongside first, its nose a metre up the rear quarter and clear of the
+        // flank; then the swerve across it, aimed past the centre line over the rear wheel: a blow on the quarter panel
+        // that swings the tail. Aimed at the rear corner (the old `pitSideOffset`), a rigid car only sat on the bumper
+        // and pushed the car along; the tilting bodies' bounces had been the blows.
+        const along = -(dx * fx + dz * fz), abreast = player.halfWidth + traffic.halfWidthOf(agent);
+        const alongside = -player.halfLength - traffic.halfLengthOf(agent) + PIT_OVERLAP;
+        const beside = Math.abs(along - alongside) < 1.2 && Math.abs(across) > abreast - 0.25 && Math.abs(across) < abreast + 1.5;
+        const back = beside ? player.halfLength * 0.4 : -alongside;
+        const reach = beside ? -PIT_SWERVE : abreast + 0.3;
+        aimX = px - fx * back + -fz * side * reach;
+        aimZ = pz - fz * back + fx * side * reach;
       } else if (traffic.kindOf(agent) === 'heavy') {
         // a van shoves the rear corner on its own side: the car goes across the road, not just ahead
         const fx = Math.sin(player.yaw), fz = Math.cos(player.yaw);
@@ -1087,7 +1102,28 @@ export class Police {
   /** Fill the roster up to the level's budget, out of view, one retry window at a time; now and then one pulls out ahead, in view. */
   private dispatch(player: PlayerProbe, cosHalf: number, level: number): void {
     const t = this.tuning;
-    if (!this.dispatching || this.count >= this.budget || this.spawnLeft > 0) return;
+    if (!this.dispatching || this.spawnLeft > 0) return;
+    // the Chief comes back on its cadence even with the roster full, as one more (M8.6 gate: the roster used to thin by
+    // wrecks that no longer happen, and a full one kept the Chief away for good)
+    if (this.count >= this.budget && level >= t.chief.level && this.chief < 0 && this.chiefWait <= 0) {
+      this.spawnLeft = t.spawnRetrySeconds;
+      for (let u = 0; u < this.units.length; u++) {
+        if ((this.units[u] as number) >= 0) continue;
+        const agent = this.spawn(player, cosHalf, 'chief');
+        if (agent < 0) return;
+        this.arrivals++;
+        this.chief = agent;
+        this.units[u] = agent;
+        this.seen[u] = 0;
+        this.withdrawing[u] = 0;
+        this.ramCooldown[u] = 0;
+        this.slotOf[u] = -1;
+        this.count++;
+        return;
+      }
+      return;
+    }
+    if (this.count >= this.budget) return;
     this.spawnLeft = t.spawnRetrySeconds;
     for (let u = 0; u < this.units.length && this.count < this.budget; u++) {
       if ((this.units[u] as number) >= 0) continue;

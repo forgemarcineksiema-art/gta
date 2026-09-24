@@ -98,6 +98,25 @@ const CARROT = 8;
 const CARROT_ROUND = 3.5;
 /** Seconds a returned body takes to blend back onto its lane (M7 slice 8). */
 const BLEND_BACK = 1;
+/** A stopped car's body slower than this (m/s and rad/s) is at rest for the tip rule (M8.6 D3). */
+const TIP_REST = 0.3;
+
+/**
+ * A traffic car's centre of mass as a share of its box's height above the road (M8.6 slice 1): a sedan's sits at about
+ * 0.55 m. It was set in the collider's frame as if in the body's, three quarters up the box (1.05 m): a top-heavy car
+ * rolled onto its side or its roof at a touch.
+ */
+const COM_SHARE = 0.38;
+
+/** Half the height of a body's box: tall enough to meet the player's chassis, a truck's and a bus's to their shoulders. */
+function boxHalfHeight(spec: { stretch?: unknown }): number {
+  return spec.stretch ? 1.1 : 0.7;
+}
+
+/** A stopped car (a wreck, an abandoned or a parked car) keeps the pose its body left (M8.6 D4). */
+function keepsPose(st: AgentState): boolean {
+  return st === AgentState.Wrecked || st === AgentState.Abandoned || st === AgentState.Parked;
+}
 /** A unit on a chase brakes and pulls away this much harder than traffic (POLICE.mode.accelFactor; traffic may not import police). */
 const POLICE_ACCEL = 1.5;
 /** A unit on a chase goes round a car this much slower (m/s) within this reach (m) (POLICE.mode). */
@@ -300,6 +319,13 @@ export class Traffic {
   private closestAgent = -1;
   private readonly agentBody: Int16Array;
   private readonly reattachLeft: Float32Array;
+  /** A stopped car's rotation, written from its body every step it has one and drawn while it has none (M8.6 D4). */
+  private readonly poseQ: Float32Array;
+  /** 1 while `poseQ` and `y` hold the pose its body left (M8.6 D4); a record placed anew has none. */
+  private readonly posed: Uint8Array;
+  /** Seconds a stopped car's body has rested on a side or an end (M8.6 D3). */
+  private readonly tipFor: Float32Array;
+  private readonly poseRot: Quat = { x: 0, y: 0, z: 0, w: 1 };
   private readonly plannerLane: Int16Array;
   private readonly plannerNext: Int16Array;
   private readonly plannerSpeed: Float32Array;
@@ -446,6 +472,9 @@ export class Traffic {
     for (let i = 0; i < n; i++) this.slot[i] = transforms.allocate();
     this.agentBody = new Int16Array(n);
     this.reattachLeft = new Float32Array(n);
+    this.poseQ = new Float32Array(n * 4);
+    this.posed = new Uint8Array(n);
+    this.tipFor = new Float32Array(n);
     this.agentBody.fill(-1);
     this.plannerLane = new Int16Array(n);
     this.plannerNext = new Int16Array(n);
@@ -509,8 +538,9 @@ export class Traffic {
   private colliderDesc(body: number): RAPIER.ColliderDesc {
     const spec = BODIES[body] as (typeof BODIES)[number];
     const mass = this.massOfBody(body);
-    // Tall enough to meet the player's chassis (a truck's and a bus's to their shoulders). The body origin stays on the road for the mesh.
-    const hy = spec.stretch ? 1.1 : 0.7;
+    // Tall enough to meet the player's chassis (a truck's and a bus's to their shoulders). The body origin stays on the
+    // road for the mesh; the centre of mass is given in the box's own frame, `COM_SHARE` of its height above the road.
+    const hy = boxHalfHeight(spec);
     const w = spec.halfWidth * 2;
     const h = hy * 2;
     const l = spec.halfLength * 2;
@@ -522,7 +552,7 @@ export class Traffic {
       .setRestitution(this.tuning.restitution)
       .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Multiply)
       .setCollisionGroups(GROUPS_TRAFFIC)
-      .setMassProperties(mass, { x: 0, y: hy * 0.5, z: 0 }, {
+      .setMassProperties(mass, { x: 0, y: hy * (2 * COM_SHARE - 1), z: 0 }, {
         x: (mass / 12) * (h * h + l * l),
         y: (mass / 12) * (w * w + l * l),
         z: (mass / 12) * (w * w + h * h),
@@ -619,6 +649,7 @@ export class Traffic {
   /** Test hook: yaw the agent (and its lent body) without moving it. */
   setFacing(agent: number, yaw: number): void {
     this.yaw[agent] = yaw;
+    this.posed[agent] = 0;
     const slot = this.agentBody[agent] as number;
     if (slot < 0) return;
     const body = this.bodies[slot] as RAPIER.RigidBody;
@@ -1001,6 +1032,7 @@ export class Traffic {
    */
   unpark(agent: number, lane: number, s: number, offset = 0): void {
     if (this.state[agent] !== AgentState.Parked) return;
+    this.posed[agent] = 0;
     this.lane[agent] = lane;
     this.next[agent] = -1;
     this.s[agent] = s;
@@ -1052,6 +1084,9 @@ export class Traffic {
     this.justWrecked[i] = 0;
     this.lastPlayerContactTick[i] = -100000;
     this.paintSerial++;
+    this.y[i] = 0;
+    this.posed[i] = 0;
+    this.tipFor[i] = 0;
     const q = M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, yaw);
     this.transforms.writeBoth(this.slot[i] as number, x, 0.03, z, q.x, q.y, q.z, q.w);
   }
@@ -1110,6 +1145,8 @@ export class Traffic {
     this.shift[agent] = 0;
     this.passAgent[agent] = -1;
     this.paintSerial++;
+    this.posed[agent] = 0;
+    this.tipFor[agent] = 0;
     const q = M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, oldPose.yaw);
     this.transforms.writeBoth(this.slot[agent] as number, oldPose.x, 0.03, oldPose.z, q.x, q.y, q.z, q.w);
   }
@@ -1166,6 +1203,23 @@ export class Traffic {
         this.z[i] = this.pos.z;
         this.yaw[i] = M.yawOf(this.rot);
         tb.write(slot, this.pos.x, this.pos.y, this.pos.z, this.rot.x, this.rot.y, this.rot.z, this.rot.w);
+        if (keepsPose(this.state[i] as AgentState)) {
+          // what it will be drawn as and lent again as when its body goes (M8.6 D4)
+          const k = i * 4;
+          this.poseQ[k] = this.rot.x;
+          this.poseQ[k + 1] = this.rot.y;
+          this.poseQ[k + 2] = this.rot.z;
+          this.poseQ[k + 3] = this.rot.w;
+          this.y[i] = this.pos.y - 0.03;
+          this.posed[i] = 1;
+        }
+        continue;
+      }
+      if (this.posed[i] === 1 && keepsPose(this.state[i] as AgentState)) {
+        // a stopped car lies as its body left it: on its roof, on its side, askew (M8.6 D4)
+        const k = i * 4;
+        tb.write(slot, this.x[i] as number, (this.y[i] as number) + 0.03, this.z[i] as number,
+          this.poseQ[k] as number, this.poseQ[k + 1] as number, this.poseQ[k + 2] as number, this.poseQ[k + 3] as number);
         continue;
       }
       let yaw = this.yaw[i] as number;
@@ -1753,10 +1807,9 @@ export class Traffic {
       } else if (st === AgentState.Physical) {
         this.driveBody(i, player, dt, events);
         this.senseImpact(i);
-      } else if (st === AgentState.Wrecked) {
+      } else if (st === AgentState.Wrecked || st === AgentState.Abandoned || st === AgentState.Parked) {
         this.senseImpact(i);
-      } else if (st === AgentState.Abandoned || st === AgentState.Parked) {
-        this.senseImpact(i);
+        this.tip(i, dt);
       }
     }
   }
@@ -1871,8 +1924,16 @@ export class Traffic {
       body.setLinvel(this.lin, true);
       this.state[i] = AgentState.Physical;
     } else {
-      // a wreck or an abandoned car: an obstacle that can be pushed and can tumble
+      // a wreck or an abandoned car: an obstacle that can be pushed and can tumble, lent in the pose it lay in
       this.unlock(slot);
+      if (this.posed[i] === 1) {
+        const k = i * 4, q = this.poseRot;
+        q.x = this.poseQ[k] as number;
+        q.y = this.poseQ[k + 1] as number;
+        q.z = this.poseQ[k + 2] as number;
+        q.w = this.poseQ[k + 3] as number;
+        body.setRotation(q, true);
+      }
       body.setLinvel(ZERO, true);
     }
     body.setAngvel(ZERO, true);
@@ -1903,7 +1964,8 @@ export class Traffic {
     else if (st === AgentState.Disturbed) { this.state[i] = AgentState.Kinematic; this.speed[i] = 0; }
     else this.speed[i] = 0;
     const lane = this.lane[i] as number;
-    if (lane >= 0) {
+    // a stopped car keeps the pose its body left (M8.6 D4): it used to be moved onto its lane and stood upright
+    if (lane >= 0 && !(this.posed[i] === 1 && keepsPose(st as AgentState))) {
       const x0 = this.x[i] as number, z0 = this.z[i] as number, yaw0 = this.yaw[i] as number;
       this.lanes.projectPath(lane, this.next[i] as number, this.x[i] as number, this.z[i] as number, this.proj, this.laneOffset[i]);
       if (this.proj.switched) this.switchLane(i, this.proj.s);
@@ -1981,6 +2043,58 @@ export class Traffic {
     (this.bodyCollider[slot] as RAPIER.Collider).setCollisionGroups(GROUPS_SOLID);
     body.setEnabledTranslations(true, true, true, true);
     body.setEnabledRotations(true, true, true, true);
+  }
+
+  /**
+   * A stopped car at rest on a side or an end is laid on its wheels (M8.6 D3): a box rests on any face, a car does not
+   * stand on its nose (4 of 12 wrecks of a level-5 chase came to rest on a side). After `tipAfter` s at rest there its
+   * body gets `tipSpin` rad/s about the axis that lays it down, the cross axis off an end, the long axis off a side,
+   * toward its wheels unless it leans onto its roof; again after each `tipAfter` at rest until it lies.
+   */
+  private tip(i: number, dt: number): void {
+    const t = this.tuning;
+    const body = this.bodies[this.agentBody[i] as number] as RAPIER.RigidBody;
+    const r = body.rotation(this.rot);
+    const upY = 1 - 2 * (r.x * r.x + r.z * r.z);
+    const fwdY = 2 * (r.y * r.z - r.w * r.x);
+    body.linvel(this.lin);
+    body.angvel(this.ang);
+    const resting = Math.hypot(this.lin.x, this.lin.y, this.lin.z) < TIP_REST && Math.hypot(this.ang.x, this.ang.y, this.ang.z) < TIP_REST;
+    if (!resting || (Math.abs(upY) >= 0.7 && Math.abs(fwdY) <= 0.7)) {
+      this.tipFor[i] = 0;
+      return;
+    }
+    this.tipFor[i] = (this.tipFor[i] as number) + dt;
+    if (this.tipFor[i] < t.tipAfter) return;
+    this.tipFor[i] = 0;
+    // the car's axes in the world: up (u), forward (f, its height `fwdY`) and across (s)
+    const ux = 2 * (r.x * r.y - r.w * r.z), uz = 2 * (r.y * r.z + r.w * r.x);
+    const fx = 2 * (r.x * r.z + r.w * r.y), fz = 1 - 2 * (r.x * r.x + r.y * r.y);
+    const sx = 1 - 2 * (r.y * r.y + r.z * r.z), sy = 2 * (r.x * r.y + r.w * r.z), sz = 2 * (r.x * r.z - r.w * r.y);
+    // the turn: about the cross axis off an end, the long axis off a side; the edge it rolls over lies along that axis,
+    // at the lower end of the other one
+    const onEnd = Math.abs(fwdY) > 0.7;
+    const ax = onEnd ? sx : fx, ay = onEnd ? sy : fwdY, az = onEnd ? sz : fz;
+    const ex = onEnd ? fx : sx, ey = onEnd ? fwdY : sy, ez = onEnd ? fz : sz;
+    const reach = (onEnd ? this.halfLengthOf(i) : this.halfWidthOf(i)) * (ey > 0 ? -1 : 1);
+    // a turn about the axis moves the car's up by axis × up: the sign that raises it lays it on its wheels
+    const wheels = upY > -0.3;
+    const sign = (az * ux - ax * uz >= 0) === wheels ? 1 : -1;
+    const wx = ax * sign * t.tipSpin, wy = ay * sign * t.tipSpin, wz = az * sign * t.tipSpin;
+    // It turns about that edge, not about its centre, or the road stops the turn: the edge of the face it falls onto
+    // (its wheels' at the body's origin, its roof's a box's height up), and the centre of mass moves with the turn,
+    // v = ω × (centre − edge).
+    const hy = boxHalfHeight(BODIES[this.body[i] as number] as (typeof BODIES)[number]);
+    const face = wheels ? 0 : 2 * hy, com = 2 * hy * COM_SHARE;
+    const rx = ux * (com - face) - ex * reach, ry = upY * (com - face) - ey * reach, rz = uz * (com - face) - ez * reach;
+    this.lin.x = wy * rz - wz * ry;
+    this.lin.y = wz * rx - wx * rz;
+    this.lin.z = wx * ry - wy * rx;
+    this.ang.x = wx;
+    this.ang.y = wy;
+    this.ang.z = wz;
+    body.setLinvel(this.lin, true);
+    body.setAngvel(this.ang, true);
   }
 
   /** The agent is a wreck from now on: a stopped obstacle until it despawns. */
@@ -2135,6 +2249,8 @@ export class Traffic {
 
   private place(i: number, lane: number, s: number, body: number, offset: number, state: AgentState, paint: number): void {
     this.state[i] = state;
+    this.posed[i] = 0;
+    this.tipFor[i] = 0;
     this.parkedCiv[i] = 0;
     this.parkBay[i] = -1;
     this.racer[i] = 0;
@@ -2180,6 +2296,7 @@ export class Traffic {
     if ((this.agentBody[i] as number) >= 0) this.releaseBody(i);
     this.releaseHolds(i);
     this.state[i] = AgentState.Free;
+    this.posed[i] = 0;
     this.parkedCiv[i] = 0;
     this.parkBay[i] = -1;
     this.police[i] = 0;

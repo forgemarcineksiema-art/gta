@@ -18,11 +18,13 @@ function lowest(q: { x: number; y: number; z: number; w: number }, hw: number, h
 }
 
 describe('solid cars: the chase read (long)', () => {
-  it('M8.6 0.4 under a level-5 chase no driving car leans or sinks', async () => {
+  it('M8.6 0.4, 1.4 under a level-5 chase no driving car leans or sinks, no stopped car rests on a side or an end', async () => {
     const sim = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 1, record: false, heat: 100 });
     const bot = new TrackBot('muscle', CITY_BOT_TUNING);
     const traffic = sim.traffic as Traffic;
-    let driving = 0, leaning = 0, sunk = 0, worstUp = 1, worstSink = 0, busts = 0;
+    let driving = 0, leaning = 0, sunk = 0, worstUp = 1, worstSink = 0, busts = 0, stopped = 0, longestAskew = 0;
+    // seconds each record's body has rested on a side or an end
+    const askew = new Float32Array(traffic.capacity);
     try {
       for (let tick = 0; tick < 120 * 60; tick++) {
         if (sim.run.state === 'busted') { sim.run.closeCard(); busts++; }
@@ -30,7 +32,20 @@ describe('solid cars: the chase read (long)', () => {
         bot.drive(sim, sim.controls, 1 / 60);
         sim.step();
         for (let a = 0; a < traffic.capacity; a++) {
-          if (traffic.state[a] !== AgentState.Physical) continue;
+          const st = traffic.state[a];
+          if (st === AgentState.Wrecked || st === AgentState.Abandoned || st === AgentState.Parked) {
+            const body = traffic.rigidBodyOf(a);
+            if (!body) { askew[a] = 0; continue; }
+            stopped++;
+            const q = body.rotation(), v = body.linvel(), w = body.angvel();
+            const up = 1 - 2 * (q.x * q.x + q.z * q.z), nose = 2 * (q.y * q.z - q.w * q.x);
+            const resting = Math.hypot(v.x, v.y, v.z) < 0.3 && Math.hypot(w.x, w.y, w.z) < 0.3;
+            askew[a] = resting && (Math.abs(up) < 0.7 || Math.abs(nose) > 0.7) ? (askew[a] as number) + 1 / 60 : 0;
+            longestAskew = Math.max(longestAskew, askew[a] as number);
+            continue;
+          }
+          askew[a] = 0;
+          if (st !== AgentState.Physical) continue;
           const body = traffic.rigidBodyOf(a);
           if (!body) continue;
           driving++;
@@ -43,10 +58,12 @@ describe('solid cars: the chase read (long)', () => {
           if (under > 0.05) sunk++;
         }
       }
-      console.log(`[solid] level 5, 120 s, ${busts} busts: ${driving} driving samples, ${leaning} leaning over 3° (least up ${worstUp.toFixed(4)}), ${sunk} sunk over 5 cm (worst ${(worstSink * 100).toFixed(1)} cm)`);
+      console.log(`[solid] level 5, 120 s, ${busts} busts: ${driving} driving samples, ${leaning} leaning over 3° (least up ${worstUp.toFixed(4)}), ${sunk} sunk over 5 cm (worst ${(worstSink * 100).toFixed(1)} cm); ${stopped} stopped samples, the longest at rest on a side or an end ${longestAskew.toFixed(2)} s`);
       expect(driving).toBeGreaterThan(20_000);
       expect(leaning).toBe(0);
       expect(sunk).toBe(0);
+      // M8.6 1.4: a stopped car lies on its wheels or its roof
+      expect(longestAskew).toBeLessThanOrEqual(3);
     } finally { sim.dispose(); }
   }, 300_000);
 });

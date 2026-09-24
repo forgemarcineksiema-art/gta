@@ -57,20 +57,25 @@ describe('everyone else (M8 slice 7)', () => {
       const standing = (): number => row.filter((p) => props.state[p.id] === PropState.Standing).length;
       // each step starts at 40 km/h: a step with no knock loses only the ground's friction, one with a knock the rule's speed on top
       const losses: Array<{ lost: number; went: PropDesc[] }> = [];
-      let plain = -1;
+      // the plain loss is the median of the steps with no knock (M8.6: the first such step can still be the body settling
+      // onto the kerb, 0.03 m/s off the steady friction)
+      const plains: number[] = [];
       for (let i = 0; i < 150 && standing() > 0; i++) {
         body!.linvel(lv);
         body!.setLinvel({ x: ax * v, y: lv.y, z: az * v }, true);
+        // held straight, as a chase's body is (its turn is its own): every knock head on
+        body!.setAngvel({ x: 0, y: 0, z: 0 }, true);
         const up = row.filter((p) => props.state[p.id] === PropState.Standing);
         sim.step();
         body!.linvel(lv);
         const lost = v - Math.hypot(lv.x, lv.z);
         const went = up.filter((p) => props.state[p.id] !== PropState.Standing);
-        if (went.length === 0 && plain < 0 && i > 3) plain = lost;
+        if (went.length === 0 && i > 3) plains.push(lost);
         if (went.length > 0) losses.push({ lost, went });
       }
       expect(standing()).toBe(0);
-      expect(plain).toBeGreaterThanOrEqual(0);
+      expect(plains.length).toBeGreaterThan(10);
+      const plain = plains.sort((x, y) => x - y)[plains.length >> 1] as number;
       // the steps where one piece went: the rule's loss with the cruiser's mass, head on
       const single = losses.filter((l) => l.went.length === 1);
       expect(single.length).toBeGreaterThanOrEqual(3);

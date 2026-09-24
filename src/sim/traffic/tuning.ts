@@ -83,6 +83,12 @@ export interface TrafficTuning {
   wreckTowNear: number;
   /** Half angle of the forward cone that counts as the player's view, deg. */
   wreckTowConeDeg: number;
+  /**
+   * A stopped car at rest on a side or an end for `tipAfter` s is given `tipSpin` rad/s about the axis that lays it on
+   * its wheels (M8.6 D3): a box rests on any face, a car does not stand on its nose.
+   */
+  tipAfter: number;
+  tipSpin: number;
   honkCooldown: number;
   wobbleTime: number;
   /** Lent bodies: heading rate per radian of error (1/s) and its cap (rad/s). Stable while yawGain × dt < 1. */
@@ -210,6 +216,8 @@ export const TRAFFIC: TrafficTuning = {
   wreckTow: 60,
   wreckTowNear: 40,
   wreckTowConeDeg: 55,
+  tipAfter: 0.5,
+  tipSpin: 2.2,
   honkCooldown: 3,
   wobbleTime: 1,
   yawGain: 3,

@@ -163,7 +163,7 @@ export const POLICE: PoliceTuning = {
   roadblock: {
     fromLevel: 3, minAhead: 150, maxAhead: 300, minDistance: 100, cars: 2, gap: 5,
     sawhorseLoss: 0.05, sawhorseWidth: 3, spikeBefore: 25, spikeLength: 4, spikeDepth: 0.8,
-    breachSpeed: 22.2, breachClass: 'heavy', breachDamageFactor: 0.3, carDamageFactor: 3.5, retryAfter: 20, clearPast: 150,
+    breachSpeed: 22.2, breachClass: 'heavy', breachDamageFactor: 0.3, carDamageFactor: 4, retryAfter: 20, clearPast: 150,
   },
   spike: { grip: 0.6, pull: 900 },
   parked: { fromLevel: 3, count: 4, radius: 450, lightsRange: 200 },

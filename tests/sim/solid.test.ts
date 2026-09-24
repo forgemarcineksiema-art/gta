@@ -140,3 +140,101 @@ describe('solid cars: on four wheels', () => {
     } finally { sim.dispose(); }
   }, 60_000);
 });
+
+/** q = yaw about Y, then `angle` about the car's own axis (1, 0, 0) or (0, 0, 1). */
+function yawThen(yaw: number, axis: 'x' | 'z', angle: number): { x: number; y: number; z: number; w: number } {
+  const a = { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) };
+  const h = angle / 2;
+  const b = axis === 'x' ? { x: Math.sin(h), y: 0, z: 0, w: Math.cos(h) } : { x: 0, y: 0, z: Math.sin(h), w: Math.cos(h) };
+  return {
+    x: a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+    y: a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+    z: a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
+    w: a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,
+  };
+}
+
+/** A compact wreck with a body on the street, the player stopped 15 m back; the world, the wreck, the lane pose. */
+async function wreckOnStreet(): Promise<{ sim: SimWorld; agent: number; at: { x: number; z: number; yaw: number } }> {
+  const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
+  const traffic = sim.traffic as Traffic;
+  const lane = streetLane(sim);
+  const at = pose(sim, lane, 60), back = pose(sim, lane, 45);
+  sim.city?.sync(at.x, at.z, true);
+  sim.vehicle.teleport({ x: back.x, y: 0.8, z: back.z }, back.yaw);
+  sim.vehicle.setVelocity(0, 0, 0);
+  const agent = traffic.spawnAtPoint(at.x, at.z, at.yaw, 'compact', AgentState.Wrecked);
+  run(sim, 0.3);
+  expect(traffic.hasBody(agent)).toBe(true);
+  return { sim, agent, at };
+}
+
+/** The drawn pose's up and nose heights (world y of the car's up and forward axes). */
+function lie(sim: SimWorld, agent: number): { up: number; nose: number } {
+  const q = drawn(sim, agent).q;
+  return { up: upOf(q), nose: 2 * (q[1] * q[2] - q[3] * q[0]) };
+}
+
+describe('solid cars: wrecks', () => {
+  for (const [name, axis, angle, lift] of [['on its side', 'z', Math.PI / 2, 'halfWidth'], ['on its nose', 'x', Math.PI / 2, 'halfLength']] as const) {
+    it(`M8.6 1.${axis === 'z' ? 1 : 2} a wreck left at rest ${name} lies on its wheels or its roof within 3 s`, async () => {
+      const { sim, agent, at } = await wreckOnStreet();
+      try {
+        const traffic = sim.traffic as Traffic;
+        const body = traffic.rigidBodyOf(agent)!;
+        const p = body.translation();
+        const h = lift === 'halfWidth' ? traffic.halfWidthOf(agent) : traffic.halfLengthOf(agent);
+        body.setTranslation({ x: p.x, y: h + 0.02, z: p.z }, true);
+        body.setRotation(yawThen(at.yaw, axis, angle), true);
+        body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+        run(sim, 0.3);
+        const start = lie(sim, agent);
+        expect(Math.abs(start.up) < 0.7 || Math.abs(start.nose) > 0.7).toBe(true);
+        run(sim, 3);
+        const end = lie(sim, agent);
+        console.log(`[solid] a wreck ${name}: up ${start.up.toFixed(2)} nose ${start.nose.toFixed(2)} -> up ${end.up.toFixed(2)} nose ${end.nose.toFixed(2)}`);
+        expect(Math.abs(end.up)).toBeGreaterThan(0.7);
+        expect(Math.abs(end.nose)).toBeLessThan(0.7);
+      } finally { sim.dispose(); }
+    }, 60_000);
+  }
+
+  it('M8.6 1.3 a wreck on its roof keeps its pose when its body is taken back and lent again', async () => {
+    const { sim, agent, at } = await wreckOnStreet();
+    try {
+      const traffic = sim.traffic as Traffic;
+      const body = traffic.rigidBodyOf(agent)!;
+      const p = body.translation();
+      body.setTranslation({ x: p.x, y: 1.45, z: p.z }, true);
+      body.setRotation(yawThen(at.yaw + 0.4, 'z', Math.PI), true);
+      body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      run(sim, 2);
+      const lay = drawn(sim, agent), x0 = traffic.x[agent] as number, z0 = traffic.z[agent] as number;
+      expect(upOf(lay.q)).toBeLessThan(-0.9);
+      // the player 150 m off: the body goes back to the pool, the wreck stays drawn as it lay
+      const far = { x: x0 + 150, z: z0 };
+      sim.city?.sync(far.x, far.z, true);
+      sim.vehicle.teleport({ x: far.x, y: 0.8, z: far.z }, 0);
+      sim.vehicle.setVelocity(0, 0, 0);
+      run(sim, 0.5);
+      expect(traffic.hasBody(agent)).toBe(false);
+      const away = drawn(sim, agent);
+      expect(turn(away.q, lay.q)).toBeLessThan(1);
+      expect(Math.abs(away.y - lay.y)).toBeLessThan(0.01);
+      expect(Math.hypot((traffic.x[agent] as number) - x0, (traffic.z[agent] as number) - z0)).toBeLessThan(0.01);
+      // back: lent again in the same pose
+      sim.city?.sync(x0, z0, true);
+      const back = pose(sim, streetLane(sim), 45);
+      sim.vehicle.teleport({ x: back.x, y: 0.8, z: back.z }, back.yaw);
+      sim.vehicle.setVelocity(0, 0, 0);
+      for (let k = 0; k < 30 && !traffic.hasBody(agent); k++) sim.step();
+      expect(traffic.hasBody(agent)).toBe(true);
+      const again = drawn(sim, agent);
+      console.log(`[solid] a wreck on its roof: away ${turn(away.q, lay.q).toFixed(2)}° ${((away.y - lay.y) * 100).toFixed(1)} cm, lent again ${turn(again.q, lay.q).toFixed(2)}° ${((again.y - lay.y) * 100).toFixed(1)} cm`);
+      expect(turn(again.q, lay.q)).toBeLessThan(1);
+      expect(Math.abs(again.y - lay.y)).toBeLessThan(0.01);
+    } finally { sim.dispose(); }
+  }, 60_000);
+});

@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8.6 slice 1: wrecks lie like wrecks
+
+Done: a stopped car keeps its pose (rotation and height written from its body, drawn and lent again so, never moved onto
+its lane); one at rest on a side or an end is turned over the edge onto its wheels (D3, D4). Found: the traffic's centre
+of mass sat 1.05 m up (the collider's frame read as the body's); now 0.38 of the box (0.53 m). The bot's level-5 run: no
+wreck and no bust in 120 s (3 and 8 before): the balance at the gate. Two M8 pins leaned on the old weight: the braced
+roadblock car's damage factor 3.5 → 4 (the compact's 80 km/h wreck was 1.000 exactly, now 0.998); the terrace pin's
+baseline was a settling step and its cruiser turned (median of the plain steps, held straight). Pins M8.6 1.1–1.3, 1.4
+long. Verify green.
+
 ## 2026-09-24 — M8.6 slice 0: on four wheels
 
 Done: a driving lent body turns about the vertical only (`lockDriving`: roll and pitch locked with its height); a shaken

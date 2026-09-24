@@ -24,7 +24,7 @@ tests/render/         Vitest camera pins (three.js math in Node, no WebGL)
 tests/ui/             Vitest minimap model pins (road layers, projection, easing, rim clamp)
 e2e/                  Playwright: smoke, perf, screens, city (M2 tour), life (M3 traffic run)
 tools/                verify.mjs, budget.mjs
-docs/                 BRIEF, PROGRESS, DESIGN, M4_PLAN … M8_PLAN, ARCHITECTURE, BACKLOG, CRAZYGAMES, STYLE, TITLES, ASSETS
+docs/                 BRIEF, PROGRESS, DESIGN, M4_PLAN … M9_PLAN, ARCHITECTURE, BACKLOG, CRAZYGAMES, STYLE, TITLES, ASSETS
 ```
 
 ## City (M2)

@@ -69,7 +69,7 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 ## The wanted board and the kit (M6)
 
-- The day's pick as the rewarded offer (free for a video, the half price as the equal alternative): M8 slice 4 (`docs/M8_PLAN.md`).
+- The day's pick as the rewarded offer (free for a video, the half price as the equal alternative): M9 slice 4 (`docs/M9_PLAN.md`).
 - The lowrider's hop reaches the traffic's other lowriders only when the rival waits (the sweeper's brushes turn since M7): render polish.
 - SELL / KEEP at a fence was dropped in M6 slice 0 (a fence has no wall; the order pays there and the car can still be kept at a door).
 

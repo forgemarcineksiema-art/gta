@@ -7,12 +7,13 @@ takedowns and fifty smashable billboards. M4 (`docs/M4_REPORT.md`) is the
 police and the run. M5 (at its gate, `docs/M5_REPORT.md`) is the launch
 minimum: the save, three jobs with the arrow, the garage on the wall, the
 dailies and the streak, the balance script. M5.5 (`docs/M5.5_REPORT.md`)
-is the whole game before the platform. M6 (at its gate, `docs/M6_REPORT.md`)
-is the wanted board: ten rivals and the Chief, their cars, the kit; M7 is
-the polish, the same game finished (`docs/M7_PLAN.md`); M8 is the platform
-and the submission (`docs/M8_PLAN.md`); all designed in `docs/DESIGN.md`. Older
-acceptance reports: `docs/M2_REPORT.md`, `docs/M3_REPORT.md` and
-`docs/history/`.
+is the whole game before the platform. M6 (`docs/M6_REPORT.md`) is the
+wanted board: ten rivals and the Chief, their cars, the kit; M7 (at its gate,
+`docs/M7_REPORT.md`) is the polish, the same game finished; M8 is the chaos,
+the street furniture made of things with mass (`docs/M8_PLAN.md`); M9 is the
+platform and the submission (`docs/M9_PLAN.md`); all designed in
+`docs/DESIGN.md`. Older acceptance reports: `docs/M2_REPORT.md`,
+`docs/M3_REPORT.md` and `docs/history/`.
 
 ## Play
 

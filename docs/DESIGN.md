@@ -626,7 +626,7 @@ onto the front page.
   on a navigation button, mute on `adStarted`, no reward on `adError`.
 - **Discovery** is the title, the cover and the tags: car, police chase, open
   world, driving, 3D. The description leads with the fantasy in one line.
-- **Mobile** is M8 (the brief's M6): touch, the mobile tier, under 20 MB
+- **Mobile** is M9 (the brief's M6): touch, the mobile tier, under 20 MB
   (3.8 MB today) for the mobile homepage.
 
 ## 10. Engineering constraints
@@ -648,9 +648,10 @@ onto the front page.
 
 The contracts with done criteria, pins and measurements per slice are
 `docs/M4_PLAN.md` (its §5 holds update 1), `docs/M5_PLAN.md` and
-`docs/M6_PLAN.md` (the board), `docs/M7_PLAN.md` (the polish) and
-`docs/M8_PLAN.md` (the platform); this section is the summary. Update 2 gets its contract
-after the first Basic Launch numbers.
+`docs/M6_PLAN.md` (the board), `docs/M7_PLAN.md` (the polish),
+`docs/M8_PLAN.md` (the chaos) and `docs/M9_PLAN.md` (the platform); this
+section is the summary. Update 2 gets its contract after the first Basic
+Launch numbers.
 
 Revised 2026-09-22 (decided by Marcin): the game goes to Basic Launch after
 M4 and a minimum M5, and the rest ships as updates. Revised again
@@ -705,7 +706,12 @@ both.
   contract is `docs/M7_PLAN.md`): the recorded issues a player can meet,
   worked off, plus our own music, a settings row, skid marks and the
   screen's lanes. On his word after the M6 playtest.
-- **M8 Platform**, the brief's M6 (`docs/M8_PLAN.md`), then Basic Launch;
+- **M8 Chaos** (decided by Marcin 2026-09-24 that a milestone designed
+  "seriously" sits here; what it is, §16, set here; the contract is
+  `docs/M8_PLAN.md`): the street made of things with mass, the knock
+  decided before the physics step, each district's things, the smash as a
+  trick, the bill at the door. On his word after the 0.7.0 playtest.
+- **M9 Platform**, the brief's M6 (`docs/M9_PLAN.md`), then Basic Launch;
   only when all of it is in and on his word that the game is good.
 - Later, by the KPIs: cop mode, ghosts, multiplayer (§8).
 
@@ -768,8 +774,9 @@ is `docs/M5.5_PLAN.md`.
 
 ### 13.1 The decision — decided
 
-**M6 (the platform, the submission; M7 since 2026-09-23, §14, and M8
-since 2026-09-24, §15) starts only when the game plays well.**
+**M6 (the platform, the submission; M7 since 2026-09-23, §14, M8 since
+2026-09-24, §15, and M9 since later that day, §16) starts only when the
+game plays well.**
 Basic Launch is not a beta: the platform reads the three KPIs from the first
 day and a game that is not good gets its verdict in a week; updates during
 Basic Launch continue, they do not rescue a bad first week. So a polish
@@ -1178,9 +1185,9 @@ behaviour (§13.8) rides on these bodies.
 ## 14. M6 "The board": rivals, their cars, your style — set here, 2026-09-23
 
 Marcin, after the M5.5 gate: a new M6 before the platform, the platform
-becoming M7 (decided; M8 since 2026-09-24, §15). What M6 is, is my idea (set
-here; he overrides). The contract is `docs/M6_PLAN.md`; the platform's is
-`docs/M8_PLAN.md`.
+becoming M7 (decided; M8 since 2026-09-24, §15, M9 since later that day,
+§16). What M6 is, is my idea (set here; he overrides). The contract is
+`docs/M6_PLAN.md`; the platform's is `docs/M9_PLAN.md`.
 
 ### 14.1 What is missing after M5.5
 
@@ -1295,7 +1302,7 @@ works this way. **The car's kit belongs to a car in the garage**: the paint
   the upgrade tiers (eight of its ten purchases today are stat tiers, which
   nobody sees).
 - **The day's pick**: one kit item a day by the date seed at half price on
-  the STYLE page; in M8 the same item free for a rewarded ad, the half
+  the STYLE page; in M9 the same item free for a rewarded ad, the half
   price as the equal alternative. That is the brief's "daily cosmetic
   crate" (§7) without the randomness: PEGI 12 and the brief rule out
   gambling, and a crate you cannot see into is one.
@@ -1334,7 +1341,7 @@ comes with it.
   something visible to buy every few minutes.
 - **Day-1**: a rival nearly beaten, a car nearly won, #2's forty caches,
   the day's pick.
-- **Conversion**: the first minute does not change; M8's cover brief gets a
+- **Conversion**: the first minute does not change; M9's cover brief gets a
   cast (a party bus, a granny's wagon, a duck on a roof).
 - **Cost**: fourteen bodies (M5.5 built eight in one slice), two duel
   formats on the race and the takedown, eight twists on systems that exist,
@@ -1344,7 +1351,8 @@ comes with it.
 ### 14.8 What this section changes elsewhere
 
 - §11: M6 is the board; the platform (the brief's M6) is M7 (decided by
-  Marcin, 2026-09-23; M8 since 2026-09-24, §15).
+  Marcin, 2026-09-23; M8 since 2026-09-24, §15; M9 since later that day,
+  §16).
 - §3.3's car list (Hatch, Van, Coupe, Muscle Pro, GT) is superseded by the
   bodies of §14.6.
 - `docs/BACKLOG.md`: the garage keeps classes and SELL / KEEP at a fence
@@ -1355,9 +1363,10 @@ comes with it.
 ## 15. M7 "Polish": the same game, finished — set here, 2026-09-24
 
 Marcin, after the M6 gate: the next milestone improves and fixes what the
-game already has, and the platform becomes M8 (decided). What goes in and
+game already has, and the platform becomes M8 (decided; M9 since later that
+day, §16). What goes in and
 in which order is set here (he overrides). The contract is
-`docs/M7_PLAN.md`; the platform's is `docs/M8_PLAN.md`.
+`docs/M7_PLAN.md`; the platform's is `docs/M9_PLAN.md`.
 
 ### 15.1 The bar
 
@@ -1439,7 +1448,7 @@ gate: a known-issues list is for working off). By test:
 
 ### 15.4 What stays out
 
-New content of any kind; the platform (M8: the SDK, touch, the mobile tier,
+New content of any kind; the platform (M9: the SDK, touch, the mobile tier,
 the ads, the day's pick as a rewarded offer); cop mode, ghosts,
 multiplayer; the multi-storey car park; the test bots' own limits that no
 player meets (race #23's reset loop, the naive hunter's U-turn, the bot at
@@ -1457,10 +1466,161 @@ the gate. Version 0.7.0, save version 4.
 
 ### 15.6 What this changes elsewhere
 
-- §11: M7 is the polish, M8 the platform (decided by Marcin, 2026-09-24).
-- The platform plan is `docs/M8_PLAN.md`; its perf bases become the M7
+- §11: M7 is the polish, M8 the platform (decided by Marcin, 2026-09-24;
+  M8 is the chaos and M9 the platform since later that day, §16).
+- The platform plan is `docs/M9_PLAN.md` (then `M8_PLAN.md`); its perf bases become the M7
   gate's.
 - The backlog lines M7 takes leave `docs/BACKLOG.md` as each ships.
+
+## 16. M8 "Chaos": the city you can wreck — set here, 2026-09-24
+
+Marcin, after the M7 gate: M8 is designed "seriously" and the platform
+becomes M9 (decided). What M8 is, is my proposal from the design talk the
+same day, which he took ("Dobra, napisz M8"); the design below is set here
+(he overrides). The contract is `docs/M8_PLAN.md`; the platform's is
+`docs/M9_PLAN.md`.
+
+### 16.1 What is missing
+
+Of the brief's four references, two are strong: GTA (the seamless city,
+the stars, any car can be yours) and Need for Speed (pursuits, races,
+tuning). Burnout and Saints Row are the thin ones. The cars already crash
+well (dents, parts, smoke, the takedown's slow motion); the city does not.
+Apart from the fifty billboards and the scaffold towers nothing in it
+breaks, and worse, the street furniture is decoration only: the lamp posts,
+the street trees, the benches and the railings have no collider, so the
+car and the pedestrians pass through them. The brief asks the opposite
+twice: light props that barely slow the player and heavy hits that are
+crashes (§4), and free roam that pays every 20–30 seconds (§3). In the
+genre that payment is the street: lamp posts, hydrants, benches, fences,
+market stalls. Even the mayhem job prices only cars and billboards today.
+
+### 16.2 The rule: the street is made of things with mass
+
+Every piece of street furniture is a prop with a mass, a restitution and,
+if it is anchored to the ground, a base that holds up to a break impulse.
+When anything with wheels meets a prop, the sim decides the contact itself,
+before the physics step, as a collision between two bodies:
+
+- The impulse along the contact normal is `J = (1 + e) · v · m_car · m_prop
+  / (m_car + m_prop)`, `v` the closing speed. A loose prop (a bin, a chair,
+  a cone) always goes. An anchored prop (a lamp post, a hydrant, a sapling,
+  a bus shelter) goes when `J` passes its base's break impulse; below it,
+  it holds, and the car hits it like a wall, with the wall's damage and the
+  skill chain lost.
+- The car pays what the prop takes: `Δv = (J + J_base) / m_car` against its
+  motion. For a 1,400 kg car at 60 km/h a bin (25 kg) costs 2 % of the
+  speed, a sapling 6 %, a lamp post (140 kg, 700 N·s) 13 %, a kiosk (400 kg,
+  3,000 N·s) over a third. A lamp post holds below about 18 km/h.
+- The prop leaves with the momentum it received, up the slope of the
+  bonnet, spinning about its centre of mass from the contact's height: a
+  tall post hit at the bumper folds its top toward the car.
+- Flying props are real rigid bodies for their few seconds in the air (a
+  pool of sixteen); once they come to rest they lie where they fell, drawn
+  but not simulated, and anything that drives over them knocks them again.
+  With the pool empty a prop flies a ballistic arc instead; it never simply
+  fails to move.
+- The city heals: a fallen prop a minute out of sight stands again.
+
+Deciding the contact before the solver matters: a static collider would
+stop the car dead at any speed, a sensor would let it through and knock the
+prop a step late. The rule is closed-form, deterministic and pinned in
+Node, like the handling.
+
+Trees split by trunk: the thick ones (the parks, the quay's palms, the
+gardens) become solid, a crash; the street trees become thin staked
+saplings that snap at speed.
+
+### 16.3 What stands where
+
+Two lines on every footway, clear of the walkers: the kerb line 0.7 m from
+the road (lamp posts, saplings, hydrants, bins, parking meters) and the
+frontage line from 3.7 m (terraces, benches, stalls, kiosks); the walkers'
+line down the middle (2.25 m) stays free, so a walker never passes through
+a post again. Then each district's own:
+
+| District | Its things |
+|---|---|
+| Crown Heights | café terraces (tables, chairs, umbrellas) in front of the corner shops, bus shelters with glass, newsstand kiosks, parking meters |
+| Sunset Works | pallets, barrels that roll, crates, traffic cones and barriers round the yards, stacked tyres |
+| Palm Gardens | fruit stands that spill, lawn flamingos, garden gnomes, picket fences, letterboxes |
+| Coral Quay | deckchairs and beach umbrellas on the promenade, fish stalls, lobster pots, wooden benches |
+
+About 40–70 a block, from each chunk's own random stream so the buildings,
+billboards and coins stay where they are. Never in a lane, a job's ring, a
+door's approach, a billboard's line, a jump's ramp or run-out, within 12 m
+of a junction's corner, or on the cold open's route except where it is
+meant to smash through.
+
+### 16.4 What it pays
+
+- **The skill chain.** Every smash is a trick: its points by weight (a
+  chair 10, a bin 20, a bench 40, a lamp post 80, a hydrant 100, a kiosk
+  200) and the prop's name as the chain's word (`HYDRANT`, `FRUIT STAND`).
+  Smashes within half a second count as one trick toward the multiplier,
+  so a terrace pays its points without pumping the chain. The chain banks
+  into the bag as today, and a crash still loses it: speed through the
+  loose things, respect the anchored ones.
+- **Boost**, a little per smash by weight (the brief: boost earned by
+  risk).
+- **Heat**: breaking public property is a crime, a point or three, times
+  the police's sight (§13.3).
+- **The bill**: each prop carries a sticker price (a lamp post 1,200, a
+  hydrant 900, a bus shelter 2,500); the run's total is `CITY DAMAGE` on
+  the door's wall and the mayhem job's measure. It is never the player's
+  money: the city's cost, played for the joke.
+- **The news**: the ticker names the damage ("PROPERTY DAMAGE IN CROWN
+  HEIGHTS PASSES 10,000").
+- **The long game**: a lifetime count (save version 5), two dailies
+  (`SMASH 60 THINGS IN ONE RUN`, `FLATTEN 10 LAMP POSTS`), and Big Bernie's
+  second requirement becomes `SMASH 300 THINGS` (his party bus that never
+  yields; the jumps keep their hunt).
+
+### 16.5 Everyone else
+
+The police and every car on a physics body knock props by the same rule and
+pay the same speed for them, so a café terrace is an escape tool: the
+cruiser behind eats the tables too. Cars on their lanes push fallen things
+off their path. The walkers treat a flying prop like a car and dive:
+"never hit" holds for props by construction. Props never damage a car;
+only what holds does, as a wall.
+
+### 16.6 How it looks and sounds
+
+Grounded, like everything since M1: glass shards from a shelter, paper
+from a newsstand, fruit rolling from a stand, splinters from a pallet,
+sparks from a post, and from a broken hydrant a water column for twenty
+seconds that pushes a car with its real thrust (about 1.2 kN: the car
+rocks in it, it does not fly). One synthesized voice per material (metal,
+glass, wood, plastic, water). No screen effects.
+
+### 16.7 What it moves and what it costs
+
+Conversion: the first minute gains its spectacle (the cold open's van goes
+through a café terrace before the billboard) and the cover its frame.
+Play time: free roam pays every few seconds, and the pavement becomes a
+choice with a price. Retention: a toy worth coming back to, and a named
+requirement on the board. Cost: the frame on the low tier. Standing props
+are drawn inside the city's existing chunk meshes (no extra draw call) and
+simulate nothing; only what is down is separate (at most one draw per
+type), and the pool caps the bodies. The first slice builds the mechanism
+alone and measures it on the MX330 before any content lands.
+
+### 16.8 What stays out
+
+Destructible buildings, new districts, story missions, cop mode, multiplayer
+(§8), traffic-light poles (the signals keep working), props on the highway,
+the platform (M9).
+
+### 16.9 What this changes elsewhere
+
+- §11: M8 is the chaos, M9 the platform (decided by Marcin, 2026-09-24).
+- §4 (mayhem) prices smashes by the bill; its zones are dressed as markets.
+- §6.6: the cold open's footway run gains a café terrace and a newsstand
+  before the billboard gate.
+- §14.3: Big Bernie's second requirement.
+- The balance is re-measured at the M8 gate and refitted if the smashes
+  move its inputs.
 
 ## References
 

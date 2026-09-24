@@ -288,3 +288,10 @@ question the model cannot answer). His notes drive a short pass, one or two
 play items each committed, the rest to BACKLOG. Then M8, the platform
 (`docs/M8_PLAN.md`: the SDK adapter, touch, the mobile tier, the ads, the
 submission), on his word.
+
+Revised 2026-09-24 (Marcin): the milestone after M7 is designed "seriously"
+before the platform. M8 is now the chaos (DESIGN §16, `docs/M8_PLAN.md`):
+the street furniture made of things with mass, knocked by a rule decided
+before the physics step, each district's things, the smash paid through the
+skill chain. The platform is M9 (`docs/M9_PLAN.md`). Both on his word, his
+0.7.0 notes first.

@@ -2,6 +2,17 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — design talk: M8 is the chaos, the platform becomes M9
+
+Marcin, after the M7 gate (pushed on his word, `4f1a29f`): the platform moves to M9 and M8 is designed "seriously".
+Proposed and taken ("Dobra, napisz M8"): the chaos, DESIGN §16 (set here). Found for it: the footway's lamp posts,
+street trees, benches and railings are decoration without colliders (cars and walkers pass through them), and
+nothing in the city breaks but the billboards and the scaffold towers. The design: props with mass and a base's
+strength, the contact decided before the physics step (closed-form, pinned), a pool of 16 bodies, fallen props
+that lie and heal, each district's things, the smash as a skill-chain trick, the bill at the door, save v5. The
+contract `docs/M8_PLAN.md` (slices 0–10); the platform's plan renamed `docs/M9_PLAN.md`. Next: his 0.7.0 notes,
+then M8 on his word.
+
 ## 2026-09-24 — M7 gate: the numbers
 
 **Suites.** `verify:gate` green (431 tests, 157 s, smoke 60 fps); on the final build `verify` green (360 tests in

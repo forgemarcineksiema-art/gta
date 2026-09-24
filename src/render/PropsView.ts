@@ -52,8 +52,8 @@ export class PropsView {
     scene.add(this.columns);
   }
 
-  /** This frame's poses: every prop that is down, by kind; `alpha` between the last step and this one. */
-  update(sim: SimWorld = this.sim, alpha = 1): void {
+  /** This frame's poses: every prop that is down, by kind; `alpha` between the last step and this one; `time` (s) moves the water. */
+  update(sim: SimWorld = this.sim, alpha = 1, time = 0): void {
     const props = sim.props;
     if (!props) return;
     for (const km of this.meshes) if (km) km.count = 0;
@@ -90,8 +90,8 @@ export class PropsView {
     for (let j = 0; j < jet.max; j++) {
       const left = props.jets[j * 3 + 2] as number;
       if (left <= 0) continue;
-      // full for most of its life, sinking over its last three seconds
-      const h = 7 * Math.min(1, left / 3);
+      // full for most of its life, sinking over its last three seconds; its top never still
+      const h = 7 * Math.min(1, left / 3) * (0.94 + 0.06 * Math.sin(time * 9 + j * 1.7));
       this.p.set(props.jets[j * 3] as number, 0, props.jets[j * 3 + 1]);
       this.size.set(0.35, h, 0.35);
       this.m.compose(this.p, this.upright, this.size);

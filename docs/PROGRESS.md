@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8 slice 5: the spectacle
+
+Done: a smashed prop throws its material's debris from where it stood, with the knock's way: glass shards, paper
+fluttering down (a fifth of gravity), fruit rolling (round pieces, their own instanced mesh), splinters, plastic and
+ceramic chunks, bolts; sparks off metal (`Sparks.burst`). The debris pool 32 → 96, each mesh hidden with nothing in
+flight. The hydrant's column wobbles at its top and sinks over its last three seconds. `Sfx`: a voice per material
+(metal clangs, glass shatters, wood cracks, plastic bonks, fruit squelches, paper rustles, ceramic clinks), quieter
+with distance, and the jets' hiss by the nearest one (silent past 50 m). Pins M8 5.1, 5.2. Verify green (374).
+
 ## 2026-09-24 — M8 slice 4: the districts' sets
 
 Done: the Works' kerbs (rows of cones, barriers) and front yards (barrels, pallets, crates, tyre stacks), the Gardens'

@@ -4,8 +4,9 @@
  * are bound once because the ring is polled every frame.
  */
 import type { EngineAudio } from './EngineAudio';
-import type { SimEvent, SimWorld } from '../sim';
-import { BALANCE } from '../sim/balance';
+import type { PropMaterial, SimEvent, SimWorld } from '../sim';
+import { BALANCE, PROPS } from '../sim/balance';
+import { PROP_KINDS, PROP_TYPES } from '../sim/city/props';
 import { BODIES } from '../sim/traffic/bodies';
 import { KIT } from '../sim/garage/kit';
 import { CAR_IDS } from '../sim/vehicle/presets';
@@ -15,6 +16,11 @@ export class Sfx {
   private ctx: BaseAudioContext | null = null;
   private master: AudioNode | null = null;
   private traffic: SimWorld['traffic'] = null;
+  private props: SimWorld['props'] = null;
+  private px = 0;
+  private pz = 0;
+  /** A broken hydrant's hiss (M8 slice 5): one looping noise, its gain by the nearest jet's distance. */
+  private hiss: GainNode | null = null;
   /** The player's class index (the horn's pitch when none is worn). */
   private playerKind = 0;
   private readonly drop = (): void => undefined;
@@ -31,6 +37,12 @@ export class Sfx {
     else if (e.kind === 'takedown' || e.kind === 'takedownTraffic') { this.crunch(ctx, master, 4); this.boom(ctx, master); }
     else if (e.kind === 'billboard') { this.splinter(ctx, master); this.ding(ctx, master); }
     else if (e.kind === 'breaker') this.splinter(ctx, master);
+    else if (e.kind === 'smash') {
+      // a prop knocked down (M8 slice 5): its material's voice, quieter with the distance (a chasing unit's smash 60 m back)
+      const k = this.props ? this.props.kind[e.target] ?? 255 : 255;
+      const near = Math.max(0, 1 - Math.hypot(e.x - this.px, e.z - this.pz) / 90);
+      if (k !== 255 && near > 0) this.smash(ctx, master, PROP_TYPES[PROP_KINDS[k] as keyof typeof PROP_TYPES].material, near);
+    }
     else if (e.kind === 'door') this.thud(ctx, master);
     else if (e.kind === 'coin') this.coin(ctx, master, e.value);
     else if (e.kind === 'spill') this.cascade(ctx, master);
@@ -68,6 +80,10 @@ export class Sfx {
     this.ctx = master.context;
     this.master = master;
     this.traffic = sim.traffic;
+    this.props = sim.props;
+    this.px = sim.probe.x;
+    this.pz = sim.probe.z;
+    this.water(master.context, master, sim);
     this.playerKind = Math.max(0, CAR_IDS.indexOf(sim.carId));
     this.seq = sim.events.readFrom(this.seq, this.play);
   }
@@ -251,6 +267,107 @@ export class Sfx {
     noise.connect(filter).connect(cg).connect(master);
     noise.start(t);
     noise.stop(t + 2.6);
+  }
+
+  /** A noise burst through a filter: `type` at `freq` (Q), up in `attack` s to `peak`, down by `end` s. */
+  private burst(ctx: BaseAudioContext, master: AudioNode, type: BiquadFilterType, freq: number, q: number, attack: number, peak: number, end: number, delay = 0): void {
+    const t = ctx.currentTime + delay;
+    const noise = ctx.createBufferSource();
+    noise.buffer = noiseBuffer(ctx);
+    const filter = ctx.createBiquadFilter();
+    filter.type = type;
+    filter.frequency.setValueAtTime(freq, t);
+    filter.Q.setValueAtTime(q, t);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(peak, t + attack);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + end);
+    noise.connect(filter).connect(gain).connect(master);
+    noise.start(t);
+    noise.stop(t + end + 0.02);
+  }
+
+  /** A pitch falling from `from` to `to` Hz over `dur` s. */
+  private fallTo(ctx: BaseAudioContext, master: AudioNode, type: OscillatorType, from: number, to: number, dur: number, peak: number): void {
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.setValueAtTime(from, t);
+    osc.frequency.exponentialRampToValueAtTime(to, t + dur);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(peak, t + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(gain).connect(master);
+    osc.start(t);
+    osc.stop(t + dur + 0.02);
+  }
+
+  /**
+   * A smash's voice by what the thing is made of (M8 slice 5): metal clangs (two inharmonic partials over a tick),
+   * glass shatters (a hiss and tinkles), wood cracks (a snap over a thump), plastic bonks, fruit squelches, paper
+   * rustles, ceramic clinks and crashes. `near` (0..1) the distance's share.
+   */
+  private smash(ctx: BaseAudioContext, master: AudioNode, material: PropMaterial, near: number): void {
+    const g = near * near;
+    switch (material) {
+      case 'metal':
+        this.note(ctx, master, 383, 0, 0.45, 0.07 * g, 'triangle');
+        this.note(ctx, master, 587, 0, 0.3, 0.05 * g, 'square');
+        this.burst(ctx, master, 'bandpass', 3200, 2, 0.003, 0.12 * g, 0.06);
+        break;
+      case 'glass':
+        this.burst(ctx, master, 'highpass', 4200, 0.7, 0.004, 0.2 * g, 0.35);
+        for (let k = 0; k < 5; k++) this.note(ctx, master, 2600 + ((k * 1297) % 2400), 0.03 + k * 0.05, 0.12, 0.03 * g, 'sine');
+        break;
+      case 'wood':
+        this.burst(ctx, master, 'bandpass', 950, 1.4, 0.002, 0.24 * g, 0.12);
+        this.fallTo(ctx, master, 'sine', 140, 70, 0.16, 0.12 * g);
+        break;
+      case 'plastic':
+        this.fallTo(ctx, master, 'triangle', 240, 140, 0.13, 0.1 * g);
+        this.burst(ctx, master, 'bandpass', 1500, 1.2, 0.002, 0.08 * g, 0.07);
+        break;
+      case 'fruit':
+        this.burst(ctx, master, 'lowpass', 650, 0.8, 0.01, 0.2 * g, 0.22);
+        this.fallTo(ctx, master, 'sine', 320, 70, 0.22, 0.09 * g);
+        break;
+      case 'paper':
+        this.burst(ctx, master, 'bandpass', 2600, 0.6, 0.03, 0.09 * g, 0.55);
+        break;
+      case 'ceramic':
+        this.note(ctx, master, 1850, 0, 0.1, 0.05 * g, 'sine');
+        this.note(ctx, master, 2730, 0.01, 0.08, 0.04 * g, 'sine');
+        this.burst(ctx, master, 'highpass', 3000, 0.7, 0.004, 0.14 * g, 0.2);
+        break;
+    }
+  }
+
+  /** The hydrants' hiss: made once, its gain following the nearest running jet (silent past 50 m). */
+  private water(ctx: BaseAudioContext, master: AudioNode, sim: SimWorld): void {
+    const props = sim.props;
+    if (!props) return;
+    let best = Infinity;
+    for (let j = 0; j < PROPS.jet.max; j++) {
+      if ((props.jets[j * 3 + 2] as number) <= 0) continue;
+      best = Math.min(best, Math.hypot((props.jets[j * 3] as number) - this.px, (props.jets[j * 3 + 1] as number) - this.pz));
+    }
+    if (!this.hiss) {
+      if (best === Infinity) return;
+      const noise = ctx.createBufferSource();
+      noise.buffer = noiseBuffer(ctx);
+      noise.loop = true;
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.value = 2100;
+      filter.Q.value = 0.6;
+      this.hiss = ctx.createGain();
+      this.hiss.gain.value = 0;
+      noise.connect(filter).connect(this.hiss).connect(master);
+      noise.start();
+    }
+    const k = Math.max(0, 1 - best / 50);
+    this.hiss.gain.setTargetAtTime(0.14 * k * k, ctx.currentTime, 0.15);
   }
 
   /** Billboard: a short bright noise burst, the panel splintering. */

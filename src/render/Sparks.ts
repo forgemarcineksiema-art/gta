@@ -139,6 +139,25 @@ export class Sparks {
     }
   }
 
+  /** A burst from a point, thrown every way and up (a lamp post's base giving, a meter sheared: M8 slice 5). */
+  burst(x: number, y: number, z: number, count: number): void {
+    const t = this.tuning;
+    for (let k = 0; k < count; k++) {
+      const i = this.next;
+      this.next = (this.next + 1) % POOL;
+      this.px[i] = x + (this.rand() - 0.5) * 0.3;
+      this.py[i] = y + this.rand() * 0.3;
+      this.pz[i] = z + (this.rand() - 0.5) * 0.3;
+      const a = this.rand() * Math.PI * 2, s = t.spread * (0.6 + this.rand());
+      this.vx[i] = Math.cos(a) * s;
+      this.vy[i] = 1.5 + this.rand() * s;
+      this.vz[i] = Math.sin(a) * s;
+      const l = t.lifeMin + (t.lifeMax - t.lifeMin) * this.rand();
+      this.life[i] = l;
+      this.maxLife[i] = l;
+    }
+  }
+
   /** Per frame. `carVel` is the car's world velocity. */
   update(tm: VehicleTelemetry, carVel: THREE.Vector3, dt: number): void {
     const t = this.tuning;

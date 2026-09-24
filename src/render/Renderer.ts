@@ -4,7 +4,7 @@
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { CAR_IDS, CAR_PRESETS, GARAGE, KIT, PALETTE, SWAP, bodySpec, bodyTuning, isShell, type BodyId, type CarId, type DynamicDesc, type GhostPose, type ShapeDesc, type SimWorld, type StaticDesc } from '../sim';
+import { CAR_IDS, CAR_PRESETS, GARAGE, KIT, PALETTE, PROP_KINDS, PROP_TYPES, SWAP, bodySpec, bodyTuning, isShell, type BodyId, type CarId, type DynamicDesc, type GhostPose, type PropKind, type ShapeDesc, type SimWorld, type StaticDesc } from '../sim';
 import { ChaseCamera, sideCutEye } from './ChaseCamera';
 import { SignalView } from './SignalView';
 import { BreakerView } from './BreakerView';
@@ -17,6 +17,7 @@ import { buildCarMesh, restHeight, wheelGeometry, type CarMesh } from './carMesh
 import { buildFlame, buildNeon, setNeonColours, spoilerGeometry, topperGeometry } from './kitMesh';
 import { CityView, QUALITY, type QualityTier } from './CityView';
 import { PropsView } from './PropsView';
+import { propParts } from './propMesh';
 import { SHADOW_HALF, SUN_OFFSET, stableShadowTarget } from './shadows';
 import { gableGeometry, prismGeometry } from './geometry';
 import { buildSkyline } from './skyline';
@@ -615,7 +616,7 @@ export class Renderer {
     this.applyTransforms(alpha);
     this.trafficView?.update(this.sim.transforms, alpha);
     this.pedView?.update(this.sim.transforms, alpha);
-    this.propsView?.update(this.sim, alpha);
+    this.propsView?.update(this.sim, alpha, this.elapsed);
     this.policeView.update(alpha);
     this.heliView?.update(dt);
     const tm = this.sim.vehicle.telemetry;
@@ -700,6 +701,14 @@ export class Renderer {
       this.debris.burst(e.x, e.y, e.z, this.carVel.x * 0.3, 3, this.carVel.z * 0.3, 16, 0.5, PALETTE.sand, 5);
       this.debris.burst(e.x, e.y * 0.6, e.z, 0, 2, 0, 8, 0.3, PALETTE.steel, 4);
       this.chase.kick(0.3);
+    } else if (e.kind === 'smash') {
+      // a prop knocked down (M8 slice 5): what its material throws from where it stood, with the knock's way; sparks off metal
+      const props = this.sim.props, k = props ? props.kind[e.target] ?? 255 : 255;
+      if (k !== 255) {
+        const kind = PROP_KINDS[k] as PropKind, material = PROP_TYPES[kind].material;
+        this.debris.smash(material, e.x, Math.min(e.y, 1.2), e.z, this.carVel.x * 0.6, this.carVel.z * 0.6, propParts(kind)[0]?.color ?? PALETTE.steel);
+        if (material === 'metal') this.sparks.burst(e.x, 0.5, e.z, 24);
+      }
     } else if (e.kind === 'billboard') {
       // planks in the panel's paint fly on with the car, and the camera takes a jolt
       const tint = this.billboards?.descOf(e.target)?.paint ?? PALETTE.charcoal;

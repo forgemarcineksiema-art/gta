@@ -102,6 +102,12 @@ const POLICE_LOOK = 25;
 /** Driving cars ignore the ground; a disturbed or wrecked car is switched onto GROUPS_SOLID so it can tumble and rest. */
 const GROUPS_TRAFFIC = interactionGroups(GROUP_DEFAULT, 0xffff & ~GROUP_TERRAIN);
 const ZERO = { x: 0, y: 0, z: 0 };
+/** Metres past the gap and the lateral band within which the player may still be a car's leader: a shift across the
+ * lane (a pull-over, a pass) and a lent body's drift from its lane point, with room. */
+const PLAYER_GAP_SLACK = 32;
+/** The unstick's grid (M7 slice 6): cells as wide as the longest reach (two buses' half lengths), hashed into buckets. */
+const UNSTICK_CELL = 16;
+const UNSTICK_BUCKETS = 512;
 /**
  * Records above the pool for the city's props (M7 slice 0): the stash's hidden cars and the rivals' parked cars. The
  * spawner, the density count and the traffic's random stream never touch them, so a car standing far away moves
@@ -253,6 +259,17 @@ export class Traffic {
   private readonly halfL: Float32Array;
   /** The longest body's half length: no two cars' spacing exceeds this plus their own (the pair scans' cheap reject). */
   private readonly maxHalfL: number;
+  /** The unstick's grid (M7 slice 6): bucket heads, the next record in a bucket, a pass's candidates, a dedupe stamp. */
+  private readonly unstickHead = new Int32Array(UNSTICK_BUCKETS);
+  private readonly unstickNext: Int32Array;
+  private readonly unstickCand: Int32Array;
+  private readonly unstickSeen: Int32Array;
+  private unstickStamp = 0;
+  /** Counters the pins read (M7 slice 6): the unstick's pair checks and the player-gap projections since the start. */
+  pairChecks = 0;
+  gapProjections = 0;
+  /** Tests only: every unstick pass scans every record, the grid's reference. */
+  unstickFullScan = false;
   private readonly colliderAgent = new Map<number, number>();
   private readonly pose: LanePose = { x: 0, z: 0, yaw: 0 };
   private readonly proj: PathProjection = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0, switched: false };
@@ -319,6 +336,9 @@ export class Traffic {
     this.rng = mulberry32(seed ^ 0x7a11);
     const n = this.capacity;
     this.state = new Uint8Array(n);
+    this.unstickNext = new Int32Array(n);
+    this.unstickCand = new Int32Array(n);
+    this.unstickSeen = new Int32Array(n);
     this.parkedCiv = new Uint8Array(n);
     this.parkBay = new Int16Array(n).fill(-1);
     this.kind = new Uint8Array(n);
@@ -1342,9 +1362,18 @@ export class Traffic {
 
   /** Along-lane distance to the player when the player is the leader. The stop band is `gapMin`. */
   private playerGapOf(i: number, player: PlayerProbe): number {
+    // M7 slice 6: a player further than the gap, the lateral band and any shift across the lane could be can never be
+    // the leader; the projection (the traffic's dearest call, every car every step) is skipped for them
+    const dx = player.x - (this.x[i] as number), dz = player.z - (this.z[i] as number);
+    const reach = this.tuning.playerGap + this.tuning.playerLateral + PLAYER_GAP_SLACK;
+    if (dx * dx + dz * dz > reach * reach) return Infinity;
     const lane = this.lane[i] as number;
+    this.gapProjections++;
     this.lanes.projectPath(lane, this.next[i] as number, player.x, player.z, this.proj);
     if (this.proj.switched) return Infinity;
+    // beside the path, not past its end: a player beyond a lane's end (no next lane chosen yet) projects onto the end
+    // with no lateral, and cars braked for them from anywhere down the line (found in M7 slice 6)
+    if (this.proj.dist > Math.abs(this.proj.lateral) + 0.5) return Infinity;
     const along = this.proj.s - (this.s[i] as number);
     const lateral = this.proj.lateral - (this.laneOffset[i] as number) - (this.shift[i] as number);
     if (along > 0 && along < this.tuning.playerGap && Math.abs(lateral) < this.tuning.playerLateral) return along;
@@ -2177,40 +2206,105 @@ export class Traffic {
     }
   }
 
-  /** Push a kinematic car back along its lane when any car ahead of it is inside the 4.5 m spacing. */
+  /**
+   * Push a kinematic car back along its lane when any car ahead of it is inside the 4.5 m spacing. M7 slice 6: while
+   * nothing has moved in a pass, a car's candidates come from the grid's nine cells round it, in index order; from the
+   * first push on, the pass scans every record as before, so the result is the full scan's, bit for bit.
+   */
   private unstick(): void {
     for (let pass = 0; pass < 4; pass++) {
       let moved = false;
+      this.buildUnstickGrid();
       for (let i = 0; i < this.capacity; i++) {
         if (this.state[i] !== AgentState.Kinematic) continue;
         const reach = Math.max(CAR_GAP, (this.halfL[this.body[i] as number] as number) + this.maxHalfL);
-        for (let j = 0; j < this.capacity; j++) {
-          if (j === i || this.state[j] === AgentState.Free) continue;
-          const dx = (this.x[j] as number) - (this.x[i] as number);
-          const dz = (this.z[j] as number) - (this.z[i] as number);
-          if (dx >= reach || dx <= -reach || dz >= reach || dz <= -reach) continue;
-          const dist = Math.hypot(dx, dz);
-          const gap = this.spacing(i, j);
-          if (dist >= gap || Math.abs((this.y[i] as number) - (this.y[j] as number)) > 3) continue;
-          // side by side (a pass, a pull-over, a lane change easing over): not in each other's spacing
-          const across = Math.abs(dx * -Math.cos(this.yaw[i] as number) + dz * Math.sin(this.yaw[i] as number));
-          if (across > (this.halfW[this.body[i] as number] as number) + (this.halfW[this.body[j] as number] as number) + 0.3) continue;
-          const same = this.lane[i] === this.lane[j];
-          const jAhead = same
-            ? ((this.s[j] as number) > (this.s[i] as number) || ((this.s[j] as number) === (this.s[i] as number) && j < i))
-            : dx * Math.sin(this.yaw[i] as number) + dz * Math.cos(this.yaw[i] as number) > 0;
-          if (!jAhead) continue;
-          const deficit = gap - dist + 0.2;
-          const nextS = Math.max(0, (this.s[i] as number) - deficit);
-          if (nextS === (this.s[i] as number)) continue;
-          this.s[i] = nextS;
-          if ((this.speed[i] as number) > (this.speed[j] as number)) this.speed[i] = this.speed[j] as number;
-          this.reposition(i);
+        if (moved || this.unstickFullScan) {
+          if (this.unstickFrom(i, reach, 0)) moved = true;
+          continue;
+        }
+        const n = this.unstickCandidates(i);
+        for (let k = 0; k < n; k++) {
+          const j = this.unstickCand[k] as number;
+          if (!this.unstickPair(i, j, reach)) continue;
           moved = true;
+          this.unstickFrom(i, reach, j + 1);
+          break;
         }
       }
       if (!moved) return;
     }
+  }
+
+  /** The full scan from record `from` on (what every pass did before the grid); true when it pushed. */
+  private unstickFrom(i: number, reach: number, from: number): boolean {
+    let pushed = false;
+    for (let j = from; j < this.capacity; j++) if (this.unstickPair(i, j, reach)) pushed = true;
+    return pushed;
+  }
+
+  /** One pair: `i` pushed back behind `j` when `j` is ahead inside the spacing. True when it moved. */
+  private unstickPair(i: number, j: number, reach: number): boolean {
+    this.pairChecks++;
+    if (j === i || this.state[j] === AgentState.Free) return false;
+    const dx = (this.x[j] as number) - (this.x[i] as number);
+    const dz = (this.z[j] as number) - (this.z[i] as number);
+    if (dx >= reach || dx <= -reach || dz >= reach || dz <= -reach) return false;
+    const dist = Math.hypot(dx, dz);
+    const gap = this.spacing(i, j);
+    if (dist >= gap || Math.abs((this.y[i] as number) - (this.y[j] as number)) > 3) return false;
+    // side by side (a pass, a pull-over, a lane change easing over): not in each other's spacing
+    const across = Math.abs(dx * -Math.cos(this.yaw[i] as number) + dz * Math.sin(this.yaw[i] as number));
+    if (across > (this.halfW[this.body[i] as number] as number) + (this.halfW[this.body[j] as number] as number) + 0.3) return false;
+    const same = this.lane[i] === this.lane[j];
+    const jAhead = same
+      ? ((this.s[j] as number) > (this.s[i] as number) || ((this.s[j] as number) === (this.s[i] as number) && j < i))
+      : dx * Math.sin(this.yaw[i] as number) + dz * Math.cos(this.yaw[i] as number) > 0;
+    if (!jAhead) return false;
+    const deficit = gap - dist + 0.2;
+    const nextS = Math.max(0, (this.s[i] as number) - deficit);
+    if (nextS === (this.s[i] as number)) return false;
+    this.s[i] = nextS;
+    if ((this.speed[i] as number) > (this.speed[j] as number)) this.speed[i] = this.speed[j] as number;
+    this.reposition(i);
+    return true;
+  }
+
+  private unstickBucket(cx: number, cz: number): number {
+    return (Math.imul(cx, 73856093) ^ Math.imul(cz, 19349663)) & (UNSTICK_BUCKETS - 1);
+  }
+
+  /** Every live record into its cell's bucket (a linked list through `unstickNext`). */
+  private buildUnstickGrid(): void {
+    this.unstickHead.fill(-1);
+    for (let j = 0; j < this.capacity; j++) {
+      if (this.state[j] === AgentState.Free) continue;
+      const b = this.unstickBucket(Math.floor((this.x[j] as number) / UNSTICK_CELL), Math.floor((this.z[j] as number) / UNSTICK_CELL));
+      this.unstickNext[j] = this.unstickHead[b] as number;
+      this.unstickHead[b] = j;
+    }
+  }
+
+  /** The records in the nine cells round `i`, each once, in index order, into `unstickCand`; returns how many. */
+  private unstickCandidates(i: number): number {
+    const cx = Math.floor((this.x[i] as number) / UNSTICK_CELL), cz = Math.floor((this.z[i] as number) / UNSTICK_CELL);
+    const stamp = ++this.unstickStamp;
+    let n = 0;
+    for (let oz = -1; oz <= 1; oz++) {
+      for (let ox = -1; ox <= 1; ox++) {
+        for (let j = this.unstickHead[this.unstickBucket(cx + ox, cz + oz)] as number; j >= 0; j = this.unstickNext[j] as number) {
+          if (this.unstickSeen[j] === stamp) continue;
+          this.unstickSeen[j] = stamp;
+          // insertion into index order: the full scan's order
+          let k = n++;
+          while (k > 0 && (this.unstickCand[k - 1] as number) > j) {
+            this.unstickCand[k] = this.unstickCand[k - 1] as number;
+            k--;
+          }
+          this.unstickCand[k] = j;
+        }
+      }
+    }
+    return n;
   }
 
   /** The least `s` on a lane; `closestAgent` is whose it is (-1 on an empty lane). */

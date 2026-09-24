@@ -1,6 +1,7 @@
 /**
  * One instanced mesh per body (M5.5 slice 19: the player's five shells and
- * the city's eight). Live agents are packed into the front of their body's
+ * the city's eight), built the first time a car of that body spawns (M7 slice
+ * 6: most of the 28 never do in a session). Live agents are packed into the front of their body's
  * instance buffer and `count` is the live number, so zero-scale slots are not
  * submitted and an empty body is not drawn. Colours upload when an agent moves
  * into a slot or its paint changes; the paint mask keeps glass and lights
@@ -13,7 +14,8 @@ import { BODY_PROFILES } from './bodyProfiles';
 import { buildBodyGeometry, paintMaskMaterial } from './bodyMesh';
 
 export class TrafficView {
-  private readonly meshes: THREE.InstancedMesh[];
+  private readonly meshes: Array<THREE.InstancedMesh | null>;
+  private readonly material: THREE.Material;
   private readonly packed: Int16Array[];
   private readonly counts: Int32Array;
   private readonly wrote: Uint8Array;
@@ -26,22 +28,36 @@ export class TrafficView {
   /** Seconds of frames drawn (the lowrider's hop). */
   private clock = 0;
 
-  constructor(scene: THREE.Scene, private readonly traffic: Traffic, private readonly civilians = true) {
-    const material = paintMaskMaterial();
+  constructor(private readonly scene: THREE.Scene, private readonly traffic: Traffic, private readonly civilians = true) {
+    this.material = paintMaskMaterial();
     this.packed = BODY_IDS.map(() => new Int16Array(traffic.capacity).fill(-1));
     this.counts = new Int32Array(BODY_IDS.length);
     this.wrote = new Uint8Array(BODY_IDS.length);
-    this.meshes = BODY_IDS.map((id) => {
-      const mesh = new THREE.InstancedMesh(buildBodyGeometry(BODY_PROFILES[id], bodyTuning(id)), material, traffic.capacity);
-      mesh.name = `traffic-${id}`;
-      mesh.frustumCulled = false;
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      mesh.count = 0;
-      mesh.visible = false;
-      scene.add(mesh);
-      return mesh;
-    });
+    this.meshes = BODY_IDS.map(() => null);
+  }
+
+  /** The body's mesh, built the first time a car of it is drawn. */
+  private meshFor(b: number): THREE.InstancedMesh {
+    const built = this.meshes[b];
+    if (built) return built;
+    const id = BODY_IDS[b] as (typeof BODY_IDS)[number];
+    const mesh = new THREE.InstancedMesh(buildBodyGeometry(BODY_PROFILES[id], bodyTuning(id)), this.material, this.traffic.capacity);
+    mesh.name = `traffic-${id}`;
+    mesh.frustumCulled = false;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.count = 0;
+    mesh.visible = false;
+    this.scene.add(mesh);
+    this.meshes[b] = mesh;
+    return mesh;
+  }
+
+  /** How many bodies have a mesh built (M7 slice 6's pin). */
+  get built(): number {
+    let n = 0;
+    for (const m of this.meshes) if (m) n++;
+    return n;
   }
 
   update(transforms: TransformBuffer, alpha: number): void {
@@ -54,7 +70,7 @@ export class TrafficView {
     for (let i = 0; i < traffic.capacity; i++) {
       if (traffic.state[i] === AgentState.Free || (!this.civilians && !traffic.police[i])) continue;
       const b = traffic.body[i] as number;
-      const mesh = this.meshes[b] as THREE.InstancedMesh;
+      const mesh = this.meshFor(b);
       const pack = this.packed[b] as Int16Array;
       const n = counts[b] as number;
       const slot = traffic.slot[i] as number;
@@ -85,7 +101,8 @@ export class TrafficView {
       counts[b] = n + 1;
     }
     for (let b = 0; b < this.meshes.length; b++) {
-      const mesh = this.meshes[b] as THREE.InstancedMesh;
+      const mesh = this.meshes[b];
+      if (!mesh) continue;
       const pack = this.packed[b] as Int16Array;
       const n = counts[b] as number;
       for (let k = n; k < traffic.capacity; k++) {

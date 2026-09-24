@@ -2,6 +2,17 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M7 slice 6: the frame budget
+
+Profiled first (Node, a minute of the city): the traffic's plan, its unstick pass and the player-gap projection led.
+Done: the unstick finds its pairs through a grid of 16 m cells in index order and falls back to the full scan from
+the first push, so it is the full scan's traffic bit for bit (checked two ways) with 23× fewer pair checks; the
+player-gap projection runs only for cars within reach of the player (1.5 a step, not 58). Found on the way: a player
+past a lane's end (no next lane chosen yet) projected onto the end with no lateral, and cars braked for them from
+anywhere down the line; now the projection must be beside the path. The traffic builds a body's mesh the first time
+one spawns. Not done: the six-sided tree crowns (a quarter of the trees' triangles against their look; the gate's
+A/B decides). Pins M7 6.1, 6.2. Verify green (345 tests).
+
 ## 2026-09-24 — M7 slice 5: no hitches
 
 Measured first (Node, a minute of the city driven by the bot, traffic and walkers): no major collection, 19

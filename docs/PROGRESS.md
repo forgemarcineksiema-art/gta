@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M7 slice 7: the boot
+
+Read the boot for races: every await (the platform, Rapier's WASM, the save) resolves once and never waits on an
+event that could have fired first; the one hang seen (a page at LOADING in the M6 gate's screens run) most likely
+never ran the game's script. Done: `app/bootWatch.ts`: a phase over 5 s names itself on the loading screen (LOADING
+· CITY), and 20 s without control offers STILL LOADING · CLICK TO RETRY (a reload only on the player's click); the
+page's own inline fallback offers the same at 25 s if the script never ran. `npm run boot` (e2e/boot.spec.ts) runs
+200 fresh boots at the gate. Plan's automatic phase retry dropped: a reload the player chooses is the honest retry.
+Pin M7 7.1. Verify green (346 tests).
+
 ## 2026-09-24 — M7 slice 6: the frame budget
 
 Profiled first (Node, a minute of the city): the traffic's plan, its unstick pass and the player-gap projection led.

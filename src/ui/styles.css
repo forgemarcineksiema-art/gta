@@ -842,6 +842,8 @@ kbd.key {
   opacity: 0;
   pointer-events: none;
 }
+/* a boot that has not given control in 20 s offers a retry (M7 slice 7) */
+.loading.is-retry { cursor: pointer; font-size: 22px; letter-spacing: 0.12em; }
 
 /* the run (docs/STYLE.md, the run HUD): the bag under the stars, the busted bar, the card and the wall */
 .run {

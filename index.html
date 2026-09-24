@@ -10,6 +10,16 @@
     <canvas id="game" tabindex="0"></canvas>
     <div id="ui"></div>
     <div id="loading" class="loading">LOADING</div>
+    <script>
+      // M7 slice 7: if the game's own script never ran (a request that failed), offer a retry the player clicks
+      setTimeout(function () {
+        var g = window.__game, l = document.getElementById('loading');
+        if ((g && g.started) || !l || l.classList.contains('is-hidden') || l.classList.contains('is-retry')) return;
+        l.textContent = 'STILL LOADING · CLICK TO RETRY';
+        l.classList.add('is-retry');
+        l.addEventListener('click', function () { location.reload(); });
+      }, 25000);
+    </script>
     <script type="module" src="./src/main.ts"></script>
   </body>
 </html>

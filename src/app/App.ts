@@ -22,6 +22,7 @@ import { ColdOpenHud } from '../ui/coldOpen';
 import { JobsHud } from '../ui/jobs';
 import { arrangeTop, mountTop, topBit } from '../ui/lanes';
 import { SettingsUi } from '../ui/settings';
+import { BootWatch } from './bootWatch';
 import { GarageUi, type GarageActions } from '../ui/garage';
 import { routeToDropOff } from './doorRoute';
 import { BotDriver } from './bot';
@@ -415,12 +416,29 @@ export class App {
 
   static async boot(canvas: HTMLCanvasElement): Promise<App> {
     const params = new URLSearchParams(location.search);
+    // the boot's watch (M7 slice 7): a slow phase names itself on the loading screen, a stuck boot offers a retry
+    const watch = new BootWatch(performance.now() / 1000);
+    const loading = document.getElementById('loading');
+    const shown = { text: '' };
+    const onRetry = (): void => location.reload();
+    bootWatchTimer = window.setInterval(() => {
+      const l = watch.label(performance.now() / 1000);
+      if (!loading || l.text === shown.text) return;
+      shown.text = l.text;
+      loading.textContent = l.text;
+      if (l.retry) {
+        loading.classList.add('is-retry');
+        loading.addEventListener('click', onRetry, { once: true });
+      }
+    }, 500);
     const platform = createPlatform();
     await platform.init();
     platform.loadingStart();
     bootTimings['platform'] = performance.now();
+    watch.enter('physics', performance.now() / 1000);
     await initPhysics();
     bootTimings['physics'] = performance.now();
+    watch.enter('save', performance.now() / 1000);
     // the save before the world: the garage car, the bank and the seen flag are in place for the first step
     const store = new SaveStore(platform);
     let save: SaveV1;
@@ -431,6 +449,7 @@ export class App {
       save = await store.load();
     }
     bootTimings['save'] = performance.now();
+    watch.enter('sim', performance.now() / 1000);
     const spawn = params.get('spawn') ?? undefined;
     const carParam = params.get('car');
     const car = (CAR_IDS as string[]).includes(carParam ?? '') ? (carParam as CarId) : undefined;
@@ -483,13 +502,16 @@ export class App {
       }
     }
     bootTimings['sim'] = performance.now();
+    watch.enter('renderer', performance.now() / 1000);
     const app = new App(platform, sim, canvas, params, store);
+    watch.enter('firstFrame', performance.now() / 1000);
     platform.loadingStop();
     app.start();
     return app;
   }
 
   private start(): void {
+    window.clearInterval(bootWatchTimer);
     document.getElementById('loading')?.classList.add('is-hidden');
     this.lastTime = performance.now();
     if (this.manual) this.frame(this.lastTime + FIXED_DT * 1000);
@@ -787,6 +809,9 @@ export class App {
     this.sim.dispose();
   }
 }
+
+/** The boot's watch timer (M7 slice 7), cleared when the first frame shows. */
+let bootWatchTimer = 0;
 
 /** The cold open runs on a plain load until the save has seen it; `coldopen=1` forces it, `coldopen=0` and test parameters turn it off. */
 function coldOpenWanted(params: URLSearchParams, save: SaveV1): boolean {

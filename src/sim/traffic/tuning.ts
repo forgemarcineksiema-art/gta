@@ -94,6 +94,12 @@ export interface TrafficTuning {
   /** Lent bodies: heading rate per radian of error (1/s) and its cap (rad/s). Stable while yawGain × dt < 1. */
   yawGain: number;
   yawRateMax: number;
+  /**
+   * Held up (M8.6 D6): a lent car moving at under a third of its command for `holdAfter` s while it touches something
+   * stops pushing and holds for `holdFor` s. A ram at a moving player is the one shove by design.
+   */
+  holdAfter: number;
+  holdFor: number;
   subLaneOffsets: { highway: readonly number[]; street: readonly number[] };
   /**
    * The civilian bodies' spawn shares and the place's factors (docs/DESIGN.md §13.11): buses on the streets and
@@ -222,6 +228,8 @@ export const TRAFFIC: TrafficTuning = {
   wobbleTime: 1,
   yawGain: 3,
   yawRateMax: 1.5,
+  holdAfter: 0.6,
+  holdFor: 1.5,
   // The highway's two lanes per direction are real graph lanes now, so nothing sits off its lane.
   subLaneOffsets: { highway: [0], street: [0] },
   bodies: {

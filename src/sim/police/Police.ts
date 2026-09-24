@@ -64,6 +64,15 @@ const AHEAD = 1;
 const DONUT = 2;
 /** Arrest slots: behind, ahead, left, right of the player; units beyond four stand by behind. */
 const SLOTS = 4;
+/**
+ * The places a slot can stand on (M8.6 D5): its own four, then the diagonals rear-left, rear-right, front-left,
+ * front-right; a slot whose place is shut (a wall, a wreck, a car standing there) takes a free diagonal beside it.
+ */
+const PLACES = 8;
+/** Per slot, its two diagonals in the order tried. */
+const DIAGONALS = new Int8Array([4, 5, 6, 7, 4, 6, 5, 7]);
+/** Seconds after a busted card that a unit stuck in the pile goes back to the pool out of view (M8.6 D7). */
+const AFTER_BUST = 20;
 /** After a box: the leave point is this far past the empty car along the unit's lane (m), reached within this (m) or given up after this (s). */
 const LEAVE_PAST = 14;
 const LEAVE_REACHED = 4;
@@ -157,6 +166,20 @@ export class Police {
   private readonly slotX = new Float64Array(SLOTS);
   private readonly slotZ = new Float64Array(SLOTS);
   private readonly slotOpen = new Uint8Array(SLOTS);
+  private readonly placeX = new Float64Array(PLACES);
+  private readonly placeZ = new Float64Array(PLACES);
+  private readonly placeOpen = new Uint8Array(PLACES);
+  /** Per slot: the place it stands on (M8.6 D5), its own or a diagonal. */
+  private readonly slotPlace = new Int8Array([0, 1, 2, 3]);
+  /** Per unit, after a busted card: where it last moved 2 m from, and for how long it has not (M8.6 D7). */
+  private readonly stuckFor: Float32Array;
+  private readonly stuckX: Float64Array;
+  private readonly stuckZ: Float64Array;
+  private afterBust = 0;
+  /** The round-an-obstacle point `obstacleOn` found, and how far along the unit's line the obstacle stands. */
+  private detourX = 0;
+  private detourZ = 0;
+  private detourAt = 0;
   private readonly ray = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 });
   /** The air unit from level 4 (M5.5 slice 9): its light is sight; it counts in the budget while on duty. */
   readonly heli: Helicopter;
@@ -221,6 +244,9 @@ export class Police {
     this.ramCooldown = new Float32Array(this.units.length);
     this.slotOf = new Int8Array(this.units.length);
     this.slotOf.fill(-1);
+    this.stuckFor = new Float32Array(this.units.length);
+    this.stuckX = new Float64Array(this.units.length);
+    this.stuckZ = new Float64Array(this.units.length);
     this.assaultCooldown = new Float32Array(this.traffic.capacity);
     this.copSpeedMax = new Float32Array(this.traffic.capacity);
     this.fields = [new Float64Array(this.graph.nodes.length), new Float64Array(this.graph.nodes.length), new Float64Array(this.graph.nodes.length)];
@@ -289,6 +315,24 @@ export class Police {
     const assaulted = this.assaults(dt);
     // last step's crimes, judged by who could see the car when they happened
     this.cursor = this.sim.events.readFrom(this.cursor, this.onCrime);
+    // The card is up (M8.6 D7): the chase is over and every unit stands where it is until it closes. Driving on through
+    // the card, the units shoved the car out from under the officer at its window.
+    if (this.sim.run.state === 'busted') {
+      for (let u = 0; u < this.units.length; u++) {
+        const agent = this.units[u] as number;
+        if (agent < 0) continue;
+        traffic.setPolicePlan(agent, -1, 0, traffic.x[agent], traffic.z[agent], 0, t.arrest.accel, true);
+        this.stuckFor[u] = 0;
+        this.stuckX[u] = traffic.x[agent] as number;
+        this.stuckZ[u] = traffic.z[agent] as number;
+      }
+      this.arresting = false;
+      this.slotOf.fill(-1);
+      this.afterBust = AFTER_BUST;
+      this.heli.step(dt, 0, false, false, player, pursuit.lastX, pursuit.lastZ);
+      return;
+    }
+    this.afterBust = Math.max(0, this.afterBust - dt);
     const level = this.sim.heat.level;
     const parkedSaw = this.stepParked(player, level, dt, cosHalf);
     // the beat is part of the traffic: a world without civilians (the tours, the sandboxes) has none
@@ -310,7 +354,7 @@ export class Police {
       this.slotOf.fill(-1);
       pursuit.step(dt, level, false, player.x, player.z);
       this.heli.step(dt, level, false, false, player, pursuit.lastX, pursuit.lastZ);
-      this.standDown(player, cosHalf);
+      this.standDown(player, cosHalf, dt);
       this.dispatch(player, cosHalf, level);
       this.recycle(player, cosHalf);
       this.watch(player, cosHalf);
@@ -437,8 +481,11 @@ export class Police {
       const dz = player.z - (traffic.z[agent] as number);
       const gap = Math.hypot(dx, dz);
       const slot = this.slotOf[u] as number;
-      if (arresting && slot >= 0 && traffic.hasBody(agent) && gap < a.range) {
-        this.driveToSlot(agent, slot, player, a.standby, a.detourSpeed);
+      if (arresting && traffic.hasBody(agent) && gap < a.range) {
+        // one not dealt yet (it came on duty since the last deal) waits on the first standby place and is dealt next
+        // step (M8.6 D6): it used to ram the stopped car at its class's speed meanwhile
+        if (slot < 0) this.slotLeft = 0;
+        this.driveToSlot(agent, slot >= 0 ? slot : SLOTS, player, a.standby, a.detourSpeed);
         // a unit at the player's elbow sees the player
         this.seen[u] = 1;
         continue;
@@ -755,16 +802,62 @@ export class Police {
     return assaulted;
   }
 
-  /** The four slots around the player, and which of them a car can reach (no fixed collider between). */
+  /** The places round the player (the four and the diagonals), and each slot on the place it was dealt. */
   private placeSlots(player: PlayerProbe): void {
     const a = this.tuning.arrest;
     const fx = Math.sin(player.yaw), fz = Math.cos(player.yaw);
     // right of the heading; +X is left when facing +Z
     const rx = -fz, rz = fx;
-    this.slotX[0] = player.x - fx * a.rear; this.slotZ[0] = player.z - fz * a.rear;
-    this.slotX[1] = player.x + fx * a.front; this.slotZ[1] = player.z + fz * a.front;
-    this.slotX[2] = player.x - rx * a.side; this.slotZ[2] = player.z - rz * a.side;
-    this.slotX[3] = player.x + rx * a.side; this.slotZ[3] = player.z + rz * a.side;
+    const px = this.placeX, pz = this.placeZ;
+    px[0] = player.x - fx * a.rear; pz[0] = player.z - fz * a.rear;
+    px[1] = player.x + fx * a.front; pz[1] = player.z + fz * a.front;
+    px[2] = player.x - rx * a.side; pz[2] = player.z - rz * a.side;
+    px[3] = player.x + rx * a.side; pz[3] = player.z + rz * a.side;
+    // the diagonals: rear-left, rear-right, front-left, front-right (M8.6 D5)
+    px[4] = player.x - fx * a.diagonal - rx * a.side; pz[4] = player.z - fz * a.diagonal - rz * a.side;
+    px[5] = player.x - fx * a.diagonal + rx * a.side; pz[5] = player.z - fz * a.diagonal + rz * a.side;
+    px[6] = player.x + fx * a.diagonal - rx * a.side; pz[6] = player.z + fz * a.diagonal - rz * a.side;
+    px[7] = player.x + fx * a.diagonal + rx * a.side; pz[7] = player.z + fz * a.diagonal + rz * a.side;
+    for (let k = 0; k < SLOTS; k++) {
+      const p = this.slotPlace[k] as number;
+      this.slotX[k] = px[p] as number;
+      this.slotZ[k] = pz[p] as number;
+    }
+  }
+
+  /**
+   * A place a unit can stand on (M8.6 D5): no fixed collider between the player and it (the car beyond a wall would grind
+   * the wall), and no car standing there, a wreck, a parked or abandoned car or a civilian (a unit on duty moves off it):
+   * the unit's length, read at three points along the player's heading, clear of every such car's footprint grown by
+   * the unit's half width.
+   */
+  private placeFree(p: number, player: PlayerProbe): boolean {
+    const traffic = this.traffic;
+    const x = this.placeX[p] as number, z = this.placeZ[p] as number;
+    const dx = x - player.x, dz = z - player.z;
+    const reach = Math.hypot(dx, dz);
+    this.ray.origin.x = player.x;
+    this.ray.origin.y = this.pos.y + 0.6;
+    this.ray.origin.z = player.z;
+    this.ray.dir.x = dx / reach;
+    this.ray.dir.y = 0;
+    this.ray.dir.z = dz / reach;
+    if (this.sim.world.castRay(this.ray, reach + 1.5, true, RAPIER.QueryFilterFlags.ONLY_FIXED | RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, QUERY_NOT_PROP) !== null) return false;
+    const fx = Math.sin(player.yaw), fz = Math.cos(player.yaw);
+    for (let o = 0; o < traffic.capacity; o++) {
+      const st = traffic.state[o];
+      if (st === AgentState.Free) continue;
+      if (traffic.police[o] === 1 && (st === AgentState.Kinematic || st === AgentState.Physical)) continue;
+      const ox = traffic.x[o] as number, oz = traffic.z[o] as number;
+      if (Math.abs(ox - x) > 9 || Math.abs(oz - z) > 9) continue;
+      const yaw = traffic.yaw[o] as number, ofx = Math.sin(yaw), ofz = Math.cos(yaw);
+      const hl = traffic.halfLengthOf(o) + 1.1, hw = traffic.halfWidthOf(o) + 1.1;
+      for (let k = -1; k <= 1; k++) {
+        const qx = x + fx * 1.8 * k - ox, qz = z + fz * 1.8 * k - oz;
+        if (Math.abs(qx * ofx + qz * ofz) < hl && Math.abs(qx * -ofz + qz * ofx) < hw) return false;
+      }
+    }
+    return true;
   }
 
   /** Deal the open slots to the nearest units, a unit keeping its own slot unless another is `keep` metres nearer. */
@@ -772,17 +865,22 @@ export class Police {
     const traffic = this.traffic;
     const a = this.tuning.arrest;
     this.sim.vehicle.body.translation(this.pos);
+    for (let p = 0; p < PLACES; p++) this.placeOpen[p] = this.placeFree(p, player) ? 1 : 0;
+    // each slot on its own place, or on a free diagonal beside it not taken by another slot (M8.6 D5); a diagonal it
+    // stands on stays its place while free, so a unit is not sent back and forth as the pile shifts
+    let taken = 0;
     for (let k = 0; k < SLOTS; k++) {
-      const dx = (this.slotX[k] as number) - player.x, dz = (this.slotZ[k] as number) - player.z;
-      const reach = Math.hypot(dx, dz);
-      this.ray.origin.x = player.x;
-      this.ray.origin.y = this.pos.y + 0.6;
-      this.ray.origin.z = player.z;
-      this.ray.dir.x = dx / reach;
-      this.ray.dir.y = 0;
-      this.ray.dir.z = dz / reach;
-      // a slot behind a wall or inside a building is no slot: the car beyond it would grind the wall
-      this.slotOpen[k] = this.sim.world.castRay(this.ray, reach + 1.5, true, RAPIER.QueryFilterFlags.ONLY_FIXED | RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, QUERY_NOT_PROP) === null ? 1 : 0;
+      const held = this.slotPlace[k] as number;
+      let pick = held >= SLOTS && this.placeOpen[held] === 1 && (taken & (1 << held)) === 0 ? held : this.placeOpen[k] === 1 ? k : -1;
+      for (let j = 0; j < 2 && pick < 0; j++) {
+        const alt = DIAGONALS[k * 2 + j] as number;
+        if (this.placeOpen[alt] === 1 && (taken & (1 << alt)) === 0) pick = alt;
+      }
+      if (pick >= SLOTS) taken |= 1 << pick;
+      this.slotOpen[k] = pick >= 0 ? 1 : 0;
+      this.slotPlace[k] = pick >= 0 ? pick : k;
+      this.slotX[k] = this.placeX[this.slotPlace[k] as number] as number;
+      this.slotZ[k] = this.placeZ[this.slotPlace[k] as number] as number;
     }
     const held = this.slotOf;
     for (let k = 0; k < SLOTS; k++) {
@@ -840,8 +938,10 @@ export class Police {
     const d = Math.hypot(sx - ux, sz - uz);
     // v² = 2 a d: a stopped player is reached at walking pace, never at chase speed
     let arrive = d < a.arrive ? 0 : Math.min(t.chaseSpeed, Math.sqrt(2 * a.decel * (d - a.arrive)));
-    // beside the stopped car, whatever slot it is going to: a walking pace, never a rush past the door
-    if (Math.hypot(player.x - ux, player.z - uz) < a.near) arrive = Math.min(arrive, a.nearSpeed);
+    // beside the stopped car, whatever slot it is going to: a walking pace, never a rush past the door; and braked down
+    // to it on the way in (M8.6 D6: a unit dealt the far slot came in at chase speed and rammed what stood round the car)
+    const gap = Math.hypot(player.x - ux, player.z - uz);
+    arrive = Math.min(arrive, Math.sqrt(a.nearSpeed * a.nearSpeed + 2 * a.decel * Math.max(0, gap - a.near)));
     // a slot on the far side of the player is reached round the car, not through it
     let tx = sx, tz = sz;
     const vx = sx - ux, vz = sz - uz;
@@ -854,8 +954,44 @@ export class Police {
       tx = player.x + nx * (a.clear + 1.5);
       tz = player.z + nz * (a.clear + 1.5);
     }
+    // and round a car standing on the way there, a wreck, a parked car, a unit holding (M8.6 D6): not through it
+    const wx = tx - ux, wz = tz - uz, w = Math.hypot(wx, wz);
+    let past = detour;
+    if (w > a.arrive && this.obstacleOn(agent, ux, uz, wx, wz, w)) {
+      tx = this.detourX;
+      tz = this.detourZ;
+      // at the detour's pace by the time it is beside the obstacle, braked down to it on the way
+      past = Math.min(Math.sqrt(detour * detour + 2 * a.decel * Math.max(0, this.detourAt - 8)), arrive);
+    }
     // round the player's car at a walking pace: it is a detour past a stopped car, not a pass
-    traffic.setPolicePlan(agent, this.routeExit(agent, CHASE), t.chaseSpeed, tx, tz, tx === sx ? arrive : Math.min(arrive, detour), a.accel, true);
+    traffic.setPolicePlan(agent, this.routeExit(agent, CHASE), t.chaseSpeed, tx, tz, tx === sx ? arrive : Math.min(arrive, past), a.accel, true);
+  }
+
+  /**
+   * The nearest car standing on a unit's straight line to its place within 25 m (M8.6 D6): a wreck, a parked or
+   * abandoned car, a civilian or a unit, slower than 2 m/s; its round-point, beside it on the side the line passes,
+   * into `detourX`/`detourZ`. False when the line is clear.
+   */
+  private obstacleOn(agent: number, ux: number, uz: number, vx: number, vz: number, d: number): boolean {
+    const traffic = this.traffic;
+    const own = traffic.halfWidthOf(agent) + 0.4;
+    let best = Infinity;
+    for (let o = 0; o < traffic.capacity; o++) {
+      if (o === agent || traffic.state[o] === AgentState.Free || (traffic.speed[o] as number) > 2) continue;
+      const ox = traffic.x[o] as number, oz = traffic.z[o] as number;
+      const t = ((ox - ux) * vx + (oz - uz) * vz) / (d * d);
+      if (t <= 0 || t >= 1 || t * d > 25 || t * d >= best) continue;
+      const cx = ux + vx * t, cz = uz + vz * t;
+      const miss = Math.hypot(cx - ox, cz - oz), clear = traffic.halfLengthOf(o) * 0.9 + own;
+      if (miss >= clear) continue;
+      best = t * d;
+      let nx = cx - ox, nz = cz - oz;
+      if (miss < 1e-3) { nx = -vz / d; nz = vx / d; } else { nx /= miss; nz /= miss; }
+      this.detourX = ox + nx * (clear + 1.2);
+      this.detourZ = oz + nz * (clear + 1.2);
+    }
+    this.detourAt = best;
+    return best < Infinity;
   }
 
   /** From heat 2 every second saloon heads for where the player is going instead of where the player is. */
@@ -891,13 +1027,31 @@ export class Police {
    * crime. The first `budget` live units stay on the beat: no plan, lane
    * driving, lights off.
    */
-  private standDown(player: PlayerProbe, cosHalf: number): void {
+  private standDown(player: PlayerProbe, cosHalf: number, dt: number): void {
     const traffic = this.traffic;
     const t = this.tuning;
     let kept = 0;
     for (let u = 0; u < this.units.length; u++) {
       const agent = this.units[u] as number;
       if (agent < 0) continue;
+      if (this.afterBust > 0) {
+        // stuck in the box's pile after a card (M8.6 D7): a unit that has not moved 2 m in 3 s goes back to the pool
+        // the moment nobody sees it, beat or not; the dispatcher sends a fresh one where it is needed
+        const x = traffic.x[agent] as number, z = traffic.z[agent] as number;
+        if (Math.hypot(x - (this.stuckX[u] as number), z - (this.stuckZ[u] as number)) > 2) {
+          this.stuckX[u] = x;
+          this.stuckZ[u] = z;
+          this.stuckFor[u] = 0;
+        } else this.stuckFor[u] = (this.stuckFor[u] as number) + dt;
+        if ((this.stuckFor[u] as number) >= 3 && traffic.outOfView(x, z, this.radius, player, t.viewNear, cosHalf)
+          && (traffic.state[agent] === AgentState.Kinematic || traffic.state[agent] === AgentState.Physical)) {
+          traffic.releasePolice(agent);
+          if (agent === this.chief) this.chief = -1;
+          this.units[u] = -1;
+          this.count--;
+          continue;
+        }
+      }
       if (kept < this.budget) {
         kept++;
         continue;

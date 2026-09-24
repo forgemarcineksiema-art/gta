@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8.6 slice 2: the box without shoving
+
+Done: a lent car held up pushing for 0.6 s holds 1.5 s (a ram at a moving player keeps its shove); a ram's cap is on the
+shove, not the brakes (a unit at 24 m/s for a stopped player took 30 m to slow); eight places, a shut one (a wall, a car
+standing there) handing its slot a free diagonal; a unit goes round a slow car on its line, braked to a walk near the
+player; under the card every unit holds; after it, one stuck for 3 s goes back to the pool out of view. Pin M8.6 2.1–2.3
+(a wreck on the rear place: shoved 0.00 m, 4.78 before; under the card the units 0.02 m, 24.65 before), 2.4 long (the
+longest push 0.13 s). The bot's level-5 run: 2 busts, 1 wreck. Verify green.
+
 ## 2026-09-24 — M8.6 slice 1: wrecks lie like wrecks
 
 Done: a stopped car keeps its pose (rotation and height written from its body, drawn and lent again so, never moved onto

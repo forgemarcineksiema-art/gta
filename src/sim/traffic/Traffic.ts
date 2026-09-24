@@ -319,6 +319,9 @@ export class Traffic {
   private closestAgent = -1;
   private readonly agentBody: Int16Array;
   private readonly reattachLeft: Float32Array;
+  /** Seconds a lent car has been held up pushing (M8.6 D6), and the seconds it still holds before it tries again. */
+  readonly heldFor: Float32Array;
+  private readonly holdLeft: Float32Array;
   /** A stopped car's rotation, written from its body every step it has one and drawn while it has none (M8.6 D4). */
   private readonly poseQ: Float32Array;
   /** 1 while `poseQ` and `y` hold the pose its body left (M8.6 D4); a record placed anew has none. */
@@ -472,6 +475,8 @@ export class Traffic {
     for (let i = 0; i < n; i++) this.slot[i] = transforms.allocate();
     this.agentBody = new Int16Array(n);
     this.reattachLeft = new Float32Array(n);
+    this.heldFor = new Float32Array(n);
+    this.holdLeft = new Float32Array(n);
     this.poseQ = new Float32Array(n * 4);
     this.posed = new Uint8Array(n);
     this.tipFor = new Float32Array(n);
@@ -1415,16 +1420,34 @@ export class Traffic {
     let toCarrot = Math.atan2(dx, dz) - yaw;
     toCarrot = Math.atan2(Math.sin(toCarrot), Math.cos(toCarrot));
     const turningBack = !ramming && Math.abs(toCarrot) > Math.PI / 3;
-    const speedTarget = turningBack ? 0 : desired;
+    let speedTarget = turningBack ? 0 : desired;
     body.linvel(this.lin);
+    // Held up (M8.6 D6): moving at under a third of its command for `holdAfter` s while it touches something, it stops
+    // pushing and holds for `holdFor` s, then tries again; a velocity command into a car is a shove, and the shoves built
+    // the piles. A ram at a moving player shoves by design; a unit driving to its place round a stopped one does not.
+    if ((this.holdLeft[i] as number) > 0) {
+      this.holdLeft[i] = Math.max(0, (this.holdLeft[i] as number) - dt);
+      speedTarget = 0;
+    } else if ((!ramming || this.freeSteer[i] === 1) && speedTarget > 1 && (this.contactDv[i] as number) > 0
+      && (this.lin.x * dx + this.lin.z * dz) / len < speedTarget / 3) {
+      this.heldFor[i] = (this.heldFor[i] as number) + dt;
+      if (this.heldFor[i] >= t.holdAfter) {
+        this.holdLeft[i] = t.holdFor;
+        this.heldFor[i] = 0;
+        speedTarget = 0;
+      }
+    } else this.heldFor[i] = 0;
     const left = this.reattachLeft[i] as number;
     const blend = left > 0 ? 1 - left / t.reattachBlend : 1;
     if (left > 0) this.reattachLeft[i] = Math.max(0, left - dt);
     const k = Math.min(1, 6 * dt) * Math.max(0, Math.min(1, blend));
     const dvx = dx / len * speedTarget - this.lin.x;
     const dvz = dz / len * speedTarget - this.lin.z;
-    // A ram accelerates only the patrol's lent body. Rapier contacts deliver the shove.
-    const gain = ramming ? Math.min(k, (this.ramAccel[i] as number) * dt / (Math.hypot(dvx, dvz) || 1)) : k;
+    // A ram accelerates only the patrol's lent body. Rapier contacts deliver the shove. The cap is on the shove, not on
+    // the brakes (M8.6 D6): a unit faster than its command slows as any car does; capped, a unit coming in at 24 m/s
+    // for a stopped player took 30 m to slow and went through whatever stood round the car.
+    const braking = (this.lin.x * dx + this.lin.z * dz) / len > speedTarget + 0.5;
+    const gain = ramming && !braking ? Math.min(k, (this.ramAccel[i] as number) * dt / (Math.hypot(dvx, dvz) || 1)) : k;
     this.lin.x += dvx * gain;
     this.lin.z += dvz * gain;
     body.setLinvel(this.lin, true);
@@ -1940,6 +1963,8 @@ export class Traffic {
     this.bodyAgent[slot] = i;
     this.agentBody[i] = slot;
     this.reattachLeft[i] = 0;
+    this.heldFor[i] = 0;
+    this.holdLeft[i] = 0;
   }
 
   /** Return the body. Driving and disturbed cars go back to kinematic; wrecks and abandoned cars keep their state and stop. */

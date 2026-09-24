@@ -238,3 +238,66 @@ describe('solid cars: wrecks', () => {
     } finally { sim.dispose(); }
   }, 60_000);
 });
+
+/** The player stopped on a street at s = 100 with three units coming up behind, the chase on; the world, the lane pose. */
+async function boxScene(): Promise<{ sim: SimWorld; units: number[]; at: { x: number; z: number; yaw: number }; lane: number }> {
+  const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false, heat: 100 });
+  sim.police!.dispatching = false;
+  const traffic = sim.traffic as Traffic;
+  const lane = streetLane(sim);
+  const at = pose(sim, lane, 100);
+  sim.city?.sync(at.x, at.z, true);
+  sim.vehicle.teleport({ x: at.x, y: 0.9, z: at.z }, at.yaw);
+  sim.vehicle.setVelocity(0, 0, 0);
+  run(sim, 1.5, (_t, c, s) => { c.handbrake = 1; s.pursuit.force(); });
+  const units: number[] = [];
+  for (const s of [72, 62, 52]) {
+    const unit = traffic.spawnPoliceAt(lane, s, 'police', sim.probe, 0, -1, 4, -1, true);
+    expect(unit).toBeGreaterThanOrEqual(0);
+    expect(sim.police!.enlist(unit)).toBeGreaterThanOrEqual(0);
+    units.push(unit);
+  }
+  return { sim, units, at, lane };
+}
+
+describe('solid cars: the box', () => {
+  it('M8.6 2.1–2.3 a wreck in the rear place is gone round, not shoved; under the card nobody moves; after it the units go', async () => {
+    const { sim, units, at } = await boxScene();
+    try {
+      const traffic = sim.traffic as Traffic;
+      // a wreck standing on the rear place, square across the lane
+      const fx = Math.sin(at.yaw), fz = Math.cos(at.yaw);
+      const wreck = traffic.spawnAtPoint(at.x - fx * 5.6, at.z - fz * 5.6, at.yaw + Math.PI / 2, 'sedan', AgentState.Wrecked);
+      run(sim, 0.2, (_t, c, s) => { c.handbrake = 1; s.pursuit.force(); });
+      const w0 = { x: traffic.x[wreck] as number, z: traffic.z[wreck] as number };
+      let shoved = 0;
+      const t0 = sim.time;
+      for (let k = 0; k < 12 * 60 && sim.run.state !== 'busted'; k++) {
+        sim.controls.handbrake = 1;
+        sim.pursuit.force();
+        sim.step();
+        shoved = Math.max(shoved, Math.hypot((traffic.x[wreck] as number) - w0.x, (traffic.z[wreck] as number) - w0.z));
+      }
+      const tookFor = sim.time - t0;
+      expect(sim.run.state).toBe('busted');
+      // under the card: nobody moves, the car stays where the officer writes
+      const u0 = units.map((u) => ({ x: traffic.x[u] as number, z: traffic.z[u] as number }));
+      const p0 = { x: sim.probe.x, z: sim.probe.z };
+      let moved = 0;
+      run(sim, 2, () => {
+        units.forEach((u, k) => { moved = Math.max(moved, Math.hypot((traffic.x[u] as number) - u0[k]!.x, (traffic.z[u] as number) - u0[k]!.z)); });
+      });
+      const carMoved = Math.hypot(sim.probe.x - p0.x, sim.probe.z - p0.z);
+      // after it the player drives off down the street, and each unit drives off or goes back to the pool
+      sim.run.closeCard();
+      run(sim, 10, (_t, c) => { c.throttle = 0.5; });
+      const gone = units.filter((u, k) => traffic.police[u] !== 1 || traffic.state[u] === AgentState.Free
+        || Math.hypot((traffic.x[u] as number) - u0[k]!.x, (traffic.z[u] as number) - u0[k]!.z) > 6).length;
+      console.log(`[solid] the box: busted after ${tookFor.toFixed(1)} s, the wreck shoved ${shoved.toFixed(2)} m; under the card units moved ${moved.toFixed(2)} m, the car ${carMoved.toFixed(2)} m; ${gone} of ${units.length} units gone 10 s after`);
+      expect(shoved).toBeLessThan(0.5);
+      expect(moved).toBeLessThan(0.3);
+      expect(carMoved).toBeLessThan(0.2);
+      expect(gone).toBe(units.length);
+    } finally { sim.dispose(); }
+  }, 60_000);
+});

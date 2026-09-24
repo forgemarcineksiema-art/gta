@@ -89,7 +89,7 @@ export interface PoliceTuning {
    * the rest stand by `standby` m behind. `accel` caps the body's velocity change; `keep` m of hysteresis on a slot. Within
    * `near` m of the stopped player a unit moves at `nearSpeed` at most (M5.5: one passing to the front slot is not a rush).
    */
-  arrest: { playerSpeed: number; releaseSpeed: number; range: number; rear: number; front: number; side: number; standby: number; decel: number; arrive: number; accel: number; keep: number; clear: number; detourSpeed: number; near: number; nearSpeed: number; heavyFirst: number };
+  arrest: { playerSpeed: number; releaseSpeed: number; range: number; rear: number; front: number; side: number; diagonal: number; standby: number; decel: number; arrive: number; accel: number; keep: number; clear: number; detourSpeed: number; near: number; nearSpeed: number; heavyFirst: number };
   /** Sight lost: units drive to the last fix and fan out once within `reach` m of it; the radar's disc there grows from `discMin` to `discMax` m over the cooldown. */
   search: { reach: number; discMin: number; discMax: number };
   /**
@@ -171,7 +171,7 @@ export const POLICE: PoliceTuning = {
   heavy: { fromLevel: 4, share: 0.5, ramAcceleration: 20, aimSide: 1.3 },
   chief: { level: 5, speed: 45, pitAcceleration: 30, pitRange: 14, reinforceFactor: 2 },
   // clear: a unit passes the player's car no closer than this (m), at detourSpeed (m/s)
-  arrest: { playerSpeed: 6, releaseSpeed: 9, range: 60, rear: 5.6, front: 5.6, side: 3.2, standby: 12, decel: 6, arrive: 1.2, accel: 12, keep: 5, clear: 4, detourSpeed: 5, near: 10, nearSpeed: 7, heavyFirst: 12 },
+  arrest: { playerSpeed: 6, releaseSpeed: 9, range: 60, rear: 5.6, front: 5.6, side: 3.2, diagonal: 5, standby: 12, decel: 6, arrive: 1.2, accel: 12, keep: 5, clear: 4, detourSpeed: 5, near: 10, nearSpeed: 7, heavyFirst: 12 },
   search: { reach: 30, discMin: 60, discMax: 150 },
   heli: { fromLevel: 4, arriveFrom: 350, altitude: 40, speed: 50, searchSpeed: 22, accel: 24, lead: 0.6, lightRate: 6, reach: 120, spot: 14, circle: 60, sweepRate: 0.35 },
   pressure: { within: 60, attack: 25, over: 4, min: 12 },

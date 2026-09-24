@@ -18,11 +18,13 @@ function lowest(q: { x: number; y: number; z: number; w: number }, hw: number, h
 }
 
 describe('solid cars: the chase read (long)', () => {
-  it('M8.6 0.4, 1.4 under a level-5 chase no driving car leans or sinks, no stopped car rests on a side or an end', async () => {
+  it('M8.6 0.4, 1.4, 2.4 under a level-5 chase no driving car leans or sinks or keeps pushing, no stopped car rests on a side or an end', async () => {
     const sim = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 1, record: false, heat: 100 });
     const bot = new TrackBot('muscle', CITY_BOT_TUNING);
     const traffic = sim.traffic as Traffic;
-    let driving = 0, leaning = 0, sunk = 0, worstUp = 1, worstSink = 0, busts = 0, stopped = 0, longestAskew = 0;
+    let driving = 0, leaning = 0, sunk = 0, worstUp = 1, worstSink = 0, busts = 0, stopped = 0, longestAskew = 0, longestPush = 0;
+    // seconds each driving car has pressed on another car while all but stopped (M8.6 D6)
+    const pushing = new Float32Array(traffic.capacity);
     // seconds each record's body has rested on a side or an end
     const askew = new Float32Array(traffic.capacity);
     try {
@@ -45,9 +47,11 @@ describe('solid cars: the chase read (long)', () => {
             continue;
           }
           askew[a] = 0;
-          if (st !== AgentState.Physical) continue;
+          if (st !== AgentState.Physical) { pushing[a] = 0; continue; }
           const body = traffic.rigidBodyOf(a);
-          if (!body) continue;
+          if (!body) { pushing[a] = 0; continue; }
+          pushing[a] = (traffic.trafficDv[a] as number) > 0.05 && (traffic.speed[a] as number) < 1 ? (pushing[a] as number) + 1 / 60 : 0;
+          longestPush = Math.max(longestPush, pushing[a] as number);
           driving++;
           const q = body.rotation();
           const up = 1 - 2 * (q.x * q.x + q.z * q.z);
@@ -58,12 +62,14 @@ describe('solid cars: the chase read (long)', () => {
           if (under > 0.05) sunk++;
         }
       }
-      console.log(`[solid] level 5, 120 s, ${busts} busts: ${driving} driving samples, ${leaning} leaning over 3° (least up ${worstUp.toFixed(4)}), ${sunk} sunk over 5 cm (worst ${(worstSink * 100).toFixed(1)} cm); ${stopped} stopped samples, the longest at rest on a side or an end ${longestAskew.toFixed(2)} s`);
+      console.log(`[solid] level 5, 120 s, ${busts} busts: ${driving} driving samples, ${leaning} leaning over 3° (least up ${worstUp.toFixed(4)}), ${sunk} sunk over 5 cm (worst ${(worstSink * 100).toFixed(1)} cm); ${stopped} stopped samples, the longest at rest on a side or an end ${longestAskew.toFixed(2)} s; the longest push on a car, all but stopped, ${longestPush.toFixed(2)} s`);
       expect(driving).toBeGreaterThan(20_000);
       expect(leaning).toBe(0);
       expect(sunk).toBe(0);
       // M8.6 1.4: a stopped car lies on its wheels or its roof
       expect(longestAskew).toBeLessThanOrEqual(3);
+      // M8.6 2.4: a car held up stops pushing
+      expect(longestPush).toBeLessThanOrEqual(1);
     } finally { sim.dispose(); }
   }, 300_000);
 });

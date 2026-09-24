@@ -9,7 +9,7 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 
 ## Session start
 
-1. Read this file, `docs/PROGRESS.md` and the current milestone contract (M8.5 at its gate, `docs/M8.5_REPORT.md`, with M8's; then `docs/M9_PLAN.md`, the platform, only on Marcin's word; the design in `docs/DESIGN.md`, §17 first); check `git log --oneline -15`.
+1. Read this file, `docs/PROGRESS.md` and the current milestone contract (M8.6, `docs/M8.6_PLAN.md`: solid cars; then `docs/M9_PLAN.md`, the platform, only on Marcin's word; the design in `docs/DESIGN.md`, §18 first); check `git log --oneline -15`.
 2. Run `npm run verify` (the quick set) before touching anything and at the commit that ends a slice. `npm run verify:gate` (the long bot-driven pins included) only at a milestone gate. Nothing else per slice: see **Pace** below, and read it before every slice.
 3. Work autonomously inside the milestone. Decide, act, note assumptions in `docs/PROGRESS.md`. Stop only at a gate, before destructive/irreversible operations, to change a fixed decision from the brief, or when blocked on something only Marcin can provide.
 4. Commit small and often; never leave significant work uncommitted. Commit messages end with a `Co-Authored-By:` line naming the model that did the work (e.g. `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`).
@@ -24,11 +24,12 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 | `docs/DESIGN.md` | Design decisions on top of the brief: the run, progression, the city as a level, platform KPIs, the M4 slice order. Each section is marked decided (Marcin) or set here (mine). |
 | `docs/M7_PLAN.md` | The finished contract of the polish (DESIGN §15; `docs/M7_REPORT.md`, 0.7.0). |
 | `docs/M8_PLAN.md` | The finished contract of the chaos (its gate closed inside M8.5's, `docs/M8.5_REPORT.md`): the chaos (DESIGN §16): street furniture with mass, the knock decided before the physics step, each district's things, the smash as a skill-chain trick, the bill at the door. |
-| `docs/M8.5_PLAN.md` | The last milestone's contract, at its gate (`docs/M8.5_REPORT.md`, 0.8.5, M8's gate inside it): the clean screen (DESIGN §17): seven things on a calm drive, one voice at a time, one name for each thing, the wall in four pages, a road coin in the bank. M9 starts only on his word. |
+| `docs/M8.5_PLAN.md` | The finished contract of the clean screen (`docs/M8.5_REPORT.md`, 0.8.5, M8's gate inside it; DESIGN §17): seven things on a calm drive, one voice at a time, one name for each thing, the wall in four pages, a road coin in the bank. |
+| `docs/M8.6_PLAN.md` | The current contract: solid cars (DESIGN §18), from Marcin's screenshots of a five-star chase: a driving car on its wheels, wrecks on their wheels or roofs keeping their pose, the police box without shoving, the officer round the cars, the player's car always seen, the frames measured in his scenes. |
 | `docs/M6_PLAN.md` | The finished contract of the wanted board (DESIGN §14; kept for its numbers and as-built notes). |
 | `docs/M4_PLAN.md`, `docs/M5_PLAN.md` | The finished contracts (kept for their numbers and as-built notes). M4's §5 holds the contract for post-launch update 1. |
 | `docs/M5.5_PLAN.md` | The finished contract before it: the whole game before the platform (kept for its numbers and as-built notes). |
-| `docs/M9_PLAN.md` | The platform contract (SDK adapter, touch, mobile tier, submission), the brief's M6, after M8.5 on Marcin's word. |
+| `docs/M9_PLAN.md` | The platform contract (SDK adapter, touch, mobile tier, submission), the brief's M6, after M8.6 on Marcin's word. |
 | `docs/ARCHITECTURE.md` | Structure, dependency justifications, decision records. |
 | `docs/DEV.md` | Servers and ports, the build stamp, test URLs, QA hooks, the suites, scratch folders. `npm start` (4173) is the one way to play; `npm run dev` (5173) is for editing. |
 | `docs/BACKLOG.md` | Out-of-milestone ideas and non-blocking bugs, one line of context each. |

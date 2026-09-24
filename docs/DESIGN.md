@@ -649,8 +649,8 @@ onto the front page.
 The contracts with done criteria, pins and measurements per slice are
 `docs/M4_PLAN.md` (its §5 holds update 1), `docs/M5_PLAN.md` and
 `docs/M6_PLAN.md` (the board), `docs/M7_PLAN.md` (the polish),
-`docs/M8_PLAN.md` (the chaos), `docs/M8.5_PLAN.md` (the clean screen) and
-`docs/M9_PLAN.md` (the platform); this
+`docs/M8_PLAN.md` (the chaos), `docs/M8.5_PLAN.md` (the clean screen),
+`docs/M8.6_PLAN.md` (solid cars) and `docs/M9_PLAN.md` (the platform); this
 section is the summary. Update 2 gets its contract after the first Basic
 Launch numbers.
 
@@ -717,6 +717,11 @@ both.
   answers one question, one voice at a time, one name for each thing, the
   wall in four pages, a road coin in the bank. On his word; M8's gate
   closes inside its gate.
+- **M8.6 Solid cars** (set here 2026-09-24 after Marcin's screenshots of a
+  five-star chase, §18; the contract is `docs/M8.6_PLAN.md`): a driving car
+  stays on its wheels, a wreck lies on its wheels or its roof and keeps its
+  pose, the police box without shoving, the officer walks round cars, the
+  player's car is always seen, the frames measured in his scenes and fixed.
 - **M9 Platform**, the brief's M6 (`docs/M9_PLAN.md`), then Basic Launch;
   only when all of it is in and on his word that the game is good.
 - Later, by the KPIs: cop mode, ghosts, multiplayer (§8).
@@ -1815,6 +1820,95 @@ here is one fewer to translate); the platform (M9).
 - `CLAUDE.md`: the screen's budget among the fixed decisions.
 - `docs/STYLE.md`: the corners replace the entries for the popups, the
   counters and the radar's label (slice 1).
+
+## 18. M8.6 "Solid cars": what a crash looks like — set here, 2026-09-24
+
+After 0.8.5 Marcin brought six screenshots from a chase at five stars and
+after it: police cars and wrecks tipping over strangely, sinking into the
+road, standing on two wheels, hanging; a truck on top of a car with no
+stars on; a car standing on its nose; the ticket officer standing inside
+his car. His words: being surrounded at five stars is fine, but it has to
+look good, smooth and smart, "not just anyhow"; the collision of the cars,
+of the whole world, needs work; and the frames drop mid-game, even after a
+street is knocked down. The scope, in his words: the physics, the collision
+and the whole traffic's intelligence. What the fix is, is set here (he
+overrides). It sits before the platform: a portal's players judge a game
+by its first crash.
+
+### 18.1 What the screenshots show, and why (measured)
+
+The bot under a level-5 chase for 120 s (seed 42), every lent body read at
+every step:
+
+- **A driving car near the player** (a lent body) has its height held on
+  its road and does not meet the ground (ARCHITECTURE, Life), but it may
+  roll and pitch freely: any push tilts it and nothing brings it back. 18 %
+  of the driving samples were tilted over 15°, 10 % over 45°; ten cars sank
+  into the road, one by 2.5 m; two drove on upside down. The truck on the
+  green car and the blue car on its roof (screenshot 2) are such cars,
+  still driving: their paint is not a wreck's.
+- **A shaken car is stood up in one step** after 2 s from any lean under
+  45° and dropped onto its road: the pop.
+- **A wreck's box rests on any face**: 4 of 12 came to rest on a side; one
+  stood on its nose (screenshot 6).
+- **A wreck whose body is taken back** is drawn upright and moved onto its
+  lane; given a body again it starts upright there: wrecks jump.
+- **The units drive to their four places** round a stopped player in a
+  straight line and push whatever stands in the way, through the busted
+  card too: the pile at the junction.
+- **The officer walks to the door in a straight line**, through the car,
+  and stays where he stood when a unit shoves the car: inside the player's
+  car on 6.5 % of his steps (screenshot 4).
+- **The camera pulls in for walls and roofs only**: wrecks and units
+  between it and the car hide half the screen (screenshots 1, 3, 5).
+- **The frames**: the traffic and the physics in that pile cost 0.8 ms a
+  step on average on Marcin's laptop (Node); the only steps over 8 ms were
+  the city loading a new part (15–27 ms, three steps in a row). The drawing
+  has not been measured in his scenes.
+
+### 18.2 The rules
+
+1. **A driving car stays on its four wheels.** While it drives, a lent body
+   turns about the vertical only and its height stays on its road. A push
+   moves it or turns it; only a hit hard enough to shake it lets it tip.
+2. **A shaken car falls like a car**: on the ground, all axes free. It
+   drives on only once it is back on its wheels and still (level within
+   10°, under 1 m/s, near its road); leaning on a kerb or a car it is
+   rocked back; still leaning after 8 s it is a wreck. No car is stood up
+   in one step.
+3. **A wreck lies on its wheels or its roof.** A wreck at rest on a side or
+   an end is tipped over, the way a car on its side rocks, within 3 s.
+4. **A wreck keeps its pose.** Its body taken back or lent again, it lies
+   exactly as it lay; it is never moved onto a lane.
+5. **The police box without shoving.** A place round the player that a car
+   cannot stand in (a wreck, a car, a wall) is no place; a unit held up on
+   its way stops and holds instead of pushing; it goes round what stands on
+   its line; from the bust to the card's close every unit stands still;
+   after it they drive off, and one that cannot is taken away out of view.
+6. **The officer walks round cars**: out of the unit's free side, round the
+   player's car, to the driver's window or, when a car stands there, the
+   passenger's; he stays at the window when the car is shoved.
+7. **The player's car is always seen.** A car between the camera and the
+   player's car, or within 2.5 m of the camera, is drawn thinned (a
+   screen-door pattern, no sorting) while it is there.
+8. **Frames, measured before they are fixed**: his two scenes (five stars,
+   boxed; a street knocked down) on his laptop at his window size, each
+   frame split into the sim, the drawing's JavaScript and the GPU; the
+   largest cost is fixed first. No sim step spends over 8 ms loading a part
+   of the city, after the first second.
+
+### 18.3 What stays out
+
+The player's car's handling and its own crash physics (its pins stand);
+damage models and deformation; new police roles or tactics; the chase's
+balance; the traffic's density; the props' rules (M8); the platform (M9).
+
+### 18.4 What this changes elsewhere
+
+- §11: M8.6 between M8.5 and M9, set here; the platform keeps its number.
+- ARCHITECTURE, Life: a driving body turns about the vertical only (its
+  recorded deviation said nothing of roll and pitch); a released wreck keeps
+  its pose; record 31's "its lean dropped" becomes rule 2.
 
 ## References
 

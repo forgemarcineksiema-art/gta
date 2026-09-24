@@ -9,11 +9,11 @@ For any coding agent working in this repository (Cursor, Codex, Claude Code):
 2. `docs/BRIEF.md` is the project brief and is read-only.
 3. `docs/PROGRESS.md` is the session log; read the newest entry and the last
    15 commits before starting, and add your own entry before stopping.
-4. Every remaining milestone has a written contract (now `docs/M9_PLAN.md`,
-   the platform, after the M8.5 gate (`docs/M8.5_REPORT.md`, which closed
-   M8's too) and on Marcin's word; the design behind them in
-   `docs/DESIGN.md`; the finished ones `docs/M3_PLAN.md`, `M4_PLAN.md`,
-   `M5_PLAN.md`, `M5.5_PLAN.md`, `M6_PLAN.md`, `M7_PLAN.md`, `M8_PLAN.md`,
+4. Every remaining milestone has a written contract (now `docs/M8.6_PLAN.md`,
+   solid cars, then `docs/M9_PLAN.md`, the platform, after the M8.6 gate
+   and on Marcin's word; the design behind them in `docs/DESIGN.md`; the
+   finished ones `docs/M3_PLAN.md`, `M4_PLAN.md`, `M5_PLAN.md`,
+   `M5.5_PLAN.md`, `M6_PLAN.md`, `M7_PLAN.md`, `M8_PLAN.md`,
    `M8.5_PLAN.md`). The screen's
    budget in `CLAUDE.md` (a calm drive shows seven things; a new system gets
    no standing place on it) binds every milestone. A contract fixes scope,

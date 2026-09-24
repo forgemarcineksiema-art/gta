@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8.6 "Solid cars": Marcin's screenshots, measured, and the plan
+
+Marcin's six screenshots of a five-star chase: police cars and wrecks on two wheels, in the road, on a nose, a truck on a
+car, the officer inside his car; frames dropping. The chase read (the bot, level 5, 120 s, every lent body every step):
+18 % of the driving samples tilted over 15°, ten cars sunk (one by 2.5 m), two driving on their roofs (a lent body's
+height is held but its roll and pitch were free); 4 of 12 wrecks at rest on a side; the officer in the player's car on
+6.5 % of his steps; the sim 0.8 ms a step, the only steps over 8 ms the city loading a part (15–27 ms). DESIGN §18 and
+`docs/M8.6_PLAN.md` set the fix, slices 0–5 and the gate; it starts now, his notes being the word. The platform after.
+
 ## 2026-09-24 — M8.5 gate (with M8's): the numbers
 
 **Suites.** `verify:gate` green (480 tests, 192 s; smoke 59.8 fps, 3.96 MB); `game` 15/15, `heat` 10/10 (the 14:29 crash

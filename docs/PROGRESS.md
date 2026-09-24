@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8.5 slice 2: one voice
+
+Done: `ui/voice.ts` gives every event one place (the top, a pop, nowhere) and one text; the HUD asks it once per event.
+The top centre: the stars' news led by the stars (`★★★ ROADBLOCKS UP`, never LEVEL), ROADBLOCK AHEAD, HELICOPTER ON YOU,
+the suspect's car, a rival ready, the twins' new car. Gone: the evening news after a level and an escape, UNIT DOWN, a
+rival driving by, the damage news, the duel's BEATEN pop and news (its job line says it), the combo's tricks as pops
+(NEAR MISS, ONCOMING!), DODGED, FRESH WHEELS. Two pops at most (`Pops`); SKILL CHAIN is COMBO. Over the wall and the busted
+card nothing speaks: the pops go and an owed line is dropped (it was stale by the next run). Pins M8.5 2.1–2.3. Verify green.
+
 ## 2026-09-24 — M8.5 slice 1: the four corners
 
 Done: `ui/corners.ts` decides the driving screen each frame: a calm drive shows the stars, the bank, the radar, the speed

@@ -15,7 +15,7 @@ import { createPlatform, type Platform } from '../platform';
 import { Renderer } from '../render/Renderer';
 import { ACTIONS, type Action } from '../input/actions';
 import { CAR_IDS, ECONOMY, FIXED_DT, Recorder, SimWorld, clearControls, districtAt, initPhysics, type CarId, type EventLog, type RecordingJSON, TRAFFIC, PEDS, DAMAGE, SWAP } from '../sim';
-import { devTools } from '../ui/corners';
+import { devTools, screenTaken } from '../ui/corners';
 import { DebugPanel } from '../ui/debugPanel';
 import { Hud } from '../ui/hud';
 import { RunHud } from '../ui/run';
@@ -781,7 +781,7 @@ export class App {
     // intro's captions teach the same ones); under a card or a caption the hints and the news wait
     const wantsHints = now < this.hintsUntil && !this.bot && !this.sim.coldOpen.active && playing;
     const top = arrangeTop((this.jobsHud.cardShowing ? topBit('card') : 0) | (this.coldOpenHud.captionShowing ? topBit('caption') : 0)
-      | (wantsHints ? topBit('hints') : 0) | (this.hud.tickerShowing ? topBit('news') : 0), this.sim.run.state === 'door');
+      | (wantsHints ? topBit('hints') : 0) | (this.hud.tickerShowing ? topBit('news') : 0), screenTaken(this.sim.run.state));
     this.hud.setHintsVisible((top & topBit('hints')) !== 0);
     this.hud.setNewsYield(this.hud.tickerShowing && (top & topBit('news')) === 0);
     this.garageUi.update(this.sim);

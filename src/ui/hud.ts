@@ -5,12 +5,13 @@
  * a debug block, a pause overlay and the keycap hint strip. Reads sim state
  * only.
  */
-import { AgentState, BALANCE, BODY_WORDS, CHIEF, DISTRICTS, POLICE, RIVALS, districtAt, paintName, posterNumber, unpackDescriptor } from '../sim';
-import type { SimEvent, SimWorld } from '../sim';
+import { AgentState, BALANCE, POLICE, districtAt } from '../sim';
+import type { EventKind, SimEvent, SimWorld } from '../sim';
 import { BigMap } from './bigmap';
-import { DRIVE, drive, hintRows, newDriveState, newPlaceClock, readDrive, tickPlace, type KeyHints } from './corners';
+import { DRIVE, drive, hintRows, newDriveState, newPlaceClock, readDrive, screenTaken, tickPlace, type KeyHints } from './corners';
 import { Minimap } from './minimap';
 import { HeatHud } from './heat';
+import { POP_SLOTS, Pops, newSaid, speak, type VoiceContext } from './voice';
 
 export type { KeyHints } from './corners';
 
@@ -52,8 +53,6 @@ export class Hud {
   private readonly tickerLevel: HTMLElement;
   private readonly tickerText: HTMLElement;
   private tickerLeft = 0;
-  /** The news line owed (M5.5 slice 18): a heat level, -1 for an escape, 0 for none; queued behind the level's line. */
-  private newsFor = 0;
   private queuedLead = '';
   private queuedText = '';
   /** Seconds since the radio last spoke: a line at most every `DISPATCH_EVERY`. */
@@ -70,7 +69,11 @@ export class Hud {
   /** The speed camera's flash: a white overlay for `flashLeft` s. */
   private readonly flash: HTMLElement;
   private flashLeft = 0;
-  private readonly cameraLimits: number[];
+  /** What an event's words need (DESIGN.md §17.3, `voice.ts`): the hunts' counts after the frame's finds, the cameras' limits. */
+  private readonly voice: VoiceContext;
+  private readonly said = newSaid();
+  /** The wall or the busted card has the screen: nothing of the drive speaks over it. */
+  private taken = false;
   private lastDebugAt = 0;
   private lastSpeedText = '';
   private lastBoostText = '';
@@ -108,17 +111,11 @@ export class Hud {
   private lastStage = -1;
   private swapKey = 'E';
   private resetKey = 'R';
+  /** Two pops at most (DESIGN.md §17.3): `Pops` says which slot a new one takes and when each goes out. */
   private readonly popups: HTMLElement[];
-  private readonly popupLeft = [0, 0, 0, 0];
-  private popupCursor = 0;
-  /** Short screens (the CSS's 560 px): the lane between the coins and the speed holds the two newest pops (M7 gate). */
-  private readonly shortScreen: MediaQueryList | null = typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia('(max-height: 560px)') : null;
+  private readonly pops = new Pops();
   private eventSeq = 0;
-  /** The hunts' counts when this frame's events are read: a find's pop names them (the counters left the screen, §17.2). */
-  private huntFound = 0;
-  private huntTotal = 0;
-  private boards = 0;
-  private boardsTotal = 0;
+
   private lastLifeAt = 0;
   private lastLifeSeq = 0;
   private boostFlash = 0;
@@ -131,7 +128,10 @@ export class Hud {
     parent.appendChild(this.root);
     this.flash = el('div', 'hud__flash');
     this.root.appendChild(this.flash);
-    this.cameraLimits = sim.cameras ? sim.cameras.descs.map((c) => c.limitMs * 3.6) : [];
+    this.voice = {
+      jumps: 0, jumpsTotal: 0, boards: 0, boardsTotal: 0, cachesTotal: sim.caches?.total ?? 0,
+      cameraLimits: sim.cameras ? sim.cameras.descs.map((c) => c.limitMs * 3.6) : [],
+    };
     this.minimap = sim.city ? new Minimap(this.root, sim) : null;
     this.heat = new HeatHud(this.root, sim);
 
@@ -167,7 +167,7 @@ export class Hud {
     this.swap.append(this.swapKeycap, this.swapLabel, this.swapHint);
     this.root.appendChild(this.swap);
     const stack = el('div', 'hud__popups');
-    this.popups = [0, 1, 2, 3].map(() => {
+    this.popups = Array.from({ length: POP_SLOTS }, () => {
       const popup = el('div', 'hud__popup');
       stack.appendChild(popup);
       return popup;
@@ -348,110 +348,37 @@ export class Hud {
       `${peds ? `  peds ${peds.count()} hops ${peds.guaranteeHops}` : ''}  events ${eps.toFixed(1)}/s${c ? `  billboards ${c.smashedCount}/${c.total}` : ''}  slowmo ${sim.life.state.slowMo.toFixed(2)}`;
   }
 
-  private showEvent(kind: string, value: number, target = -1): void {
-    if (kind === 'heatLevel') {
-      // the level's news, one line (DESIGN.md §13.3): what the city sends now
-      const news = HEAT_NEWS[value] ?? '';
-      if (news) this.showTicker(`LEVEL ${value}`, news);
-      // then the evening news about the suspect (M5.5 slice 18): written in the frame's update, which has the sim
-      this.newsFor = value;
-      return;
-    }
-    if (kind === 'escape') this.newsFor = -1;
-    // the wanted board (M6): a rival ready is the ticker's news; a rival beaten pops big, then the news
-    if (kind === 'rivalReady') {
-      const r = RIVALS[target];
-      if (!r) return;
-      const n = posterNumber(target);
-      const where = r.turf === 'highway' ? 'THE HIGHWAY' : DISTRICTS.find((d) => d.id === r.turf)?.name ?? '';
-      this.ticker2(n > 0 ? `#${n}` : 'BOARD', `${r.name} ${r.call} · ${where}`);
-      return;
-    }
-    if (kind === 'rivalSeen') {
-      // the next rival's car driving by before they are ready (M7 slice 13): the ticker names it
-      const r = RIVALS[target];
-      if (!r) return;
-      const n = posterNumber(target);
-      this.ticker2(n > 0 ? `#${n}` : 'BOARD', `${r.name} DRIVES BY · SEE THE BOARD`);
-      return;
-    }
-    if (kind === 'damageNews') {
-      // the run's bill in a district passed a mark (M8 slice 6): the news reports the property damage
-      this.ticker2('NEWS', `PROPERTY DAMAGE IN ${DISTRICTS[target]?.name ?? 'THE CITY'} PASSES ${value.toLocaleString('en-US')}`);
-      return;
-    }
-    if (kind === 'twinSwap') {
-      // the radio calls the twins' new car (M6 slice 3): the only way to know which one to beat
-      const d = unpackDescriptor(target);
-      this.ticker2('RADIO', `THE TWINS SWAPPED · NOW IN A ${paintName(d.paint)} ${BODY_WORDS[d.body]}`);
-      return;
-    }
-    if (kind === 'rivalBeaten') {
-      const r = RIVALS[target];
-      if (r) this.ticker2('NEWS', target === CHIEF ? 'THE CHIEF LOSES HIS OWN CAR · THE BOARD IS YOURS' : `${r.name} BEATEN · A NEW NAME AT #${value} ON THE BOARD`);
-    }
-    if (kind === 'dispatch') {
-      // the radio (DESIGN.md §13.9): one line, never over a level's news, at most every few seconds
-      if (this.dispatchQuiet < DISPATCH_EVERY || this.tickerLeft > 0) return;
-      let line = '';
-      if (value === 1) line = 'ROADBLOCK AHEAD';
-      else if (value === 2) line = 'UNIT DOWN · SEND ANOTHER';
-      else if (value === 4) line = 'AIR UNIT ON SCENE';
-      else if (value === 3) {
-        const d = unpackDescriptor(target);
-        line = `SUSPECT IN A ${paintName(d.paint)} ${BODY_WORDS[d.body]}`;
-      }
-      if (!line) return;
-      this.dispatchQuiet = 0;
-      this.showTicker('DISPATCH', line);
-      return;
-    }
-    if (kind === 'camera') {
-      // the flash, then the photo's caption: the speed it caught
+  /** One event, one place, one text (DESIGN.md §17.3): `voice.ts` says where and what; this draws it. */
+  private showEvent(kind: EventKind, value: number, target = -1): void {
+    // the camera's flash is the picture, not a word: it fires with its caption
+    if (kind === 'camera' && !this.taken) {
       this.flash.classList.add('is-on');
       this.flashLeft = 0.1;
     }
-    const text = kind === 'camera' ? `FLASHED ${Math.round((this.cameraLimits[target] ?? 0) + value)} KM/H`
-      : kind === 'jump' ? `STUNT! ${value.toFixed(1)} S`
-      : kind === 'nearMiss' ? 'NEAR MISS'
-      : kind === 'nearMissOncoming' ? 'ONCOMING!'
-        : kind === 'nearMissPed' ? 'DODGED'
-          : kind === 'swap' ? 'FRESH WHEELS'
-            : kind === 'chase' ? `CHASE +${value.toLocaleString('en-US')}`
-            : kind === 'takedown' ? 'TAKEDOWN!'
-              : kind === 'takedownTraffic' ? 'TAKEDOWN! INTO TRAFFIC!'
-                : kind === 'billboard' ? (this.boardsTotal > 0 ? `BILLBOARD ${this.boards}/${this.boardsTotal}` : 'BILLBOARD!')
-                  : kind === 'escape' ? 'COPS LOST YOU'
-                    : kind === 'blown' ? 'COVER BLOWN'
-                      : kind === 'cache' ? (value > 0 ? `CACHE ${target}/30 +${value.toLocaleString('en-US')}` : `CACHE ${target}/30`)
-      : kind === 'dailyDone' ? `DAILY DONE +${value.toLocaleString('en-US')}`
-      : kind === 'skill' ? `SKILL CHAIN +${value.toLocaleString('en-US')}`
-      : kind === 'skillLost' ? 'CHAIN LOST'
-      : kind === 'hiddenCar' ? 'HIDDEN CAR FOUND · IN THE GARAGE NOW'
-      : kind === 'rivalBeaten' ? `${RIVALS[target]?.name ?? ''} BEATEN`
-      : kind === 'breaker' ? 'PURSUIT BREAKER!'
-      : kind === 'hunt' ? (target === 0
-        ? (value > 0 ? `ALL ${this.huntTotal} JUMPS +${value.toLocaleString('en-US')}` : `NEW JUMP ${this.huntFound}/${this.huntTotal}`)
-        : `ALL BILLBOARDS +${value.toLocaleString('en-US')}`)
-                        : kind === 'streak' ? `DAY ${target} STREAK +${value.toLocaleString('en-US')}`
-                          : '';
-    if (!text) return;
-    const i = this.popupCursor % this.popups.length;
-    this.popupCursor++;
+    const said = speak(kind, value, target, this.voice, this.said);
+    // nothing of the drive speaks over the wall or the busted card
+    if (said.where === 'none' || this.taken) return;
+    if (said.where === 'top') {
+      if (kind === 'dispatch') {
+        // the radio: never over another line, at most every few seconds
+        if (this.dispatchQuiet < DISPATCH_EVERY || this.tickerLeft > 0) return;
+        this.dispatchQuiet = 0;
+        this.showTicker(said.lead, said.text);
+      } else if (kind === 'heatLevel') {
+        // the stars' news takes the top at once: what the city sends from now on
+        this.showTicker(said.lead, said.text);
+      } else {
+        this.ticker2(said.lead, said.text);
+      }
+      return;
+    }
+    const i = this.pops.push(said.text);
     const popup = this.popups[i];
     if (!popup) return;
-    popup.textContent = text;
-    popup.classList.toggle('is-gain', value > 0);
-    popup.classList.toggle('is-big', kind === 'takedown' || kind === 'takedownTraffic' || kind === 'jump' || kind === 'dailyDone' || kind === 'skill' || kind === 'hiddenCar' || kind === 'rivalBeaten' || (kind === 'hunt' && value > 0) || (kind === 'cache' && value > 0));
+    popup.textContent = said.text;
+    popup.classList.toggle('is-gain', said.gain);
+    popup.classList.toggle('is-big', said.big);
     popup.classList.add('is-on');
-    this.popupLeft[i] = 1.2;
-    // on a short screen the older two go: four ran down onto the speed at 800x450 (the gate's overlap check)
-    if (this.shortScreen?.matches) {
-      for (const k of [(i + 1) % this.popups.length, (i + 2) % this.popups.length]) {
-        this.popupLeft[k] = 0;
-        this.popups[k]?.classList.remove('is-on');
-      }
-    }
   }
 
   update(sim: SimWorld, dt: number, info: HudDebugInfo | null, now: number): void {
@@ -514,10 +441,23 @@ export class Hud {
       this.swapHintOn = hint;
       this.swapHint.classList.toggle('is-on', hint);
     }
-    this.huntFound = sim.jumps?.foundCount ?? 0;
-    this.huntTotal = sim.jumps?.descs.length ?? 0;
-    this.boards = sim.collectibles?.smashedCount ?? 0;
-    this.boardsTotal = sim.collectibles?.total ?? 0;
+    const voice = this.voice;
+    voice.jumps = sim.jumps?.foundCount ?? 0;
+    voice.jumpsTotal = sim.jumps?.descs.length ?? 0;
+    voice.boards = sim.collectibles?.smashedCount ?? 0;
+    voice.boardsTotal = sim.collectibles?.total ?? 0;
+    const taken = screenTaken(sim.run.state);
+    if (taken !== this.taken) {
+      this.taken = taken;
+      if (taken) {
+        // the wall or the card takes the screen: the pops go, and a line still owed is stale by the next run
+        const out = this.pops.clear();
+        for (let i = 0; i < this.popups.length; i++) if ((out & (1 << i)) !== 0) this.popups[i]?.classList.remove('is-on');
+        this.tickerLeft = 0;
+        this.queuedText = '';
+        this.ticker.classList.remove('is-on');
+      }
+    }
     this.eventSeq = sim.events.readFrom(this.eventSeq, this.onEvent);
     // the skill chain: shown while it runs (the corners' combo bit); the window drains under it
     const skill = sim.skill;
@@ -536,13 +476,8 @@ export class Hud {
       const fill = `scaleX(${Math.max(0, Math.min(1, skill.left / BALANCE.skill.window)).toFixed(2)})`;
       if (fill !== this.lastSkillFill) { this.skillFill.style.transform = fill; this.lastSkillFill = fill; }
     }
-    for (let i = 0; i < this.popups.length; i++) {
-      const left = this.popupLeft[i] ?? 0;
-      if (left <= 0) continue;
-      const next = left - dt;
-      this.popupLeft[i] = next;
-      if (next <= 0) this.popups[i]?.classList.remove('is-on');
-    }
+    const gone = this.pops.step(dt);
+    if (gone !== 0) for (let i = 0; i < this.popups.length; i++) if ((gone & (1 << i)) !== 0) this.popups[i]?.classList.remove('is-on');
 
     if (this.flashLeft > 0) {
       this.flashLeft -= dt;
@@ -551,16 +486,6 @@ export class Hud {
     if (this.toastTimer > 0) {
       this.toastTimer -= dt;
       if (this.toastTimer <= 0) this.toast.classList.remove('is-visible');
-    }
-    if (this.newsFor !== 0) {
-      // the suspect as the news has them: the descriptor and where they are
-      const d = sim.pursuit.descriptor;
-      const what = `A ${paintName(d.paint)} ${BODY_WORDS[d.body]}`;
-      const where = districtAt(sim.probe.x, sim.probe.z).name;
-      const line = newsLine(this.newsFor, what, where);
-      if (this.newsFor < 0 && this.tickerLeft <= 0) this.showTicker('NEWS', line, 3);
-      else { this.queuedLead = 'NEWS'; this.queuedText = line; }
-      this.newsFor = 0;
     }
     if (this.tickerLeft > 0 && !this.newsYield) {
       this.tickerLeft -= dt;
@@ -600,27 +525,6 @@ export class Hud {
 
 /** Seconds between two of the radio's lines. */
 const DISPATCH_EVERY = 6;
-
-/** The ticker's line per heat level: what the city sends from now on. */
-/** The news about the suspect at each level (M5.5 slice 18; DESIGN.md §8's ticker), and after an escape (-1). */
-function newsLine(level: number, what: string, where: string): string {
-  switch (level) {
-    case 1: return `${what} SPOTTED SPEEDING IN ${where}`;
-    case 2: return `${what} TERRORIZING ${where}`;
-    case 3: return `ROADBLOCKS GO UP ACROSS ${where} · ${what} STILL AT LARGE`;
-    case 4: return `${where} IN LOCKDOWN AS ${what} RUNS RIOT`;
-    case 5: return `CITY-WIDE MANHUNT FOR ${what}`;
-    default: return `${what} GIVES POLICE THE SLIP IN ${where} · UNITS HEAD FOR DONUTS`;
-  }
-}
-
-const HEAT_NEWS: Record<number, string> = {
-  1: 'PATROLS ON YOUR TAIL',
-  2: 'INTERCEPTORS ON THE ROAD',
-  3: 'ROADBLOCKS UP',
-  4: 'HEAVY UNITS ROLLING',
-  5: 'THE CHIEF IS COMING',
-};
 
 function fmtLap(seconds: number): string {
   const m = Math.floor(seconds / 60);

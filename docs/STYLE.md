@@ -202,9 +202,13 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 - Keycaps: white rounded rectangles with dark text, always beside a one-word label.
 - Event popups (M3): a right-aligned stack above the speedo, 18 px heavy
   italic uppercase with 0.08 em tracking, skewed −10°, ink with a flat black
-  shadow; gains in accent yellow. Each shows for 1.2 s; four slots recycle in
-  order so a burst never reflows. Texts: NEAR MISS, ONCOMING!, DODGED, FRESH
-  WHEELS, BILLBOARD!, and TAKEDOWN! / TAKEDOWN! INTO TRAFFIC! at 24 px.
+  shadow; gains in accent yellow. Each shows for 1.2 s; two slots (four until
+  M8.5) recycle in order so a burst never reflows. Since M8.5 (DESIGN.md
+  §17.3, `src/ui/voice.ts`) a pop is only what pays or counts outside the
+  combo (TAKEDOWN!, BILLBOARD 13/50, FLASHED, COPS LOST YOU, COMBO +2,100,
+  DAILY DONE…); the combo's tricks, DODGED and FRESH WHEELS say nothing, and
+  nothing pops over the wall or the busted card. The ticker's lead for the
+  stars' news is the stars (`★★★ ROADBLOCKS UP`), never LEVEL.
 - Damage bar (M3): under the boost bar, only once damaged; a 120 × 8 px
   skewed track filling in ink, danger red from stage 3, and the WRECKED
   overlay (54 px title at 30 % height, a 16 px line with the countdown and the

@@ -54,9 +54,14 @@ export interface DriveState {
 /** Seconds the district's name shows after a change or a new run (GTA's rule: the radar answers where, the name is news). */
 export const PLACE_SECONDS = 4;
 
+/** Behind a shut door the wall has the screen, on the busted card the card: nothing of the drive shows or speaks. */
+export function screenTaken(run: RunState): boolean {
+  return run === 'door' || run === 'busted';
+}
+
 /** The elements that show, as a mask of `DRIVE` bits. */
 export function drive(s: DriveState): number {
-  if (s.run === 'door' || s.run === 'busted') return 0;
+  if (screenTaken(s.run)) return 0;
   let m = DRIVE.speed | DRIVE.boost;
   if (s.damage > 0) m |= DRIVE.damage;
   if (s.combo) m |= DRIVE.combo;

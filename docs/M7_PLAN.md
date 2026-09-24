@@ -161,16 +161,17 @@ export function topBit(item: TopItem): number;
 export function arrangeTop(wants: number): number; // a mask of topBits in, the ones shown out
 export function mountTop(parent: HTMLElement, items: Partial<Record<TopItem, HTMLElement>>): HTMLElement;
 
-// src/audio/score.ts
-export interface Layer { name: 'bass' | 'hats' | 'drums' | 'lead' | 'alarm'; fromHeat: number; notes: readonly Note[] }
+// src/audio/score.ts (as built, slice 2: the hats joined the drums, the calm layer is the offbeat keys)
+export interface Layer { name: 'bass' | 'keys' | 'drums' | 'lead' | 'alarm'; fromHeat: number; level: number; notes: readonly Note[] }
 export interface Note { bar: number; beat: number; length: number; pitch: number; velocity: number }
 export const SCORE: { bpm: number; bars: number; layers: readonly Layer[]; stings: Record<'busted' | 'escape' | 'door', readonly Note[]> };
 export function layerGain(layer: Layer, heat: number): number; // 0 or 1; the fade is the audio's
 
-// src/audio/Music.ts
+// src/audio/Music.ts (as built: it waits for the engine's context like the jingle does)
 export class Music {
-  constructor(ctx: AudioContext, bus: GainNode);
-  start(): Promise<void>;          // after gameplayStart; renders, then loops
+  constructor(engine: EngineAudio);
+  update(sim: SimWorld, started: boolean, dt: number): void; // renders once a second after gameplayStart, then follows the heat and the events
+  setVolume(v: number): void;      // 0..1, the settings row
   setHeat(level: number): void;    // gains over one bar; no allocation
   sting(kind: 'busted' | 'escape' | 'door'): void;
   dispose(): void;

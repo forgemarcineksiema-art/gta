@@ -7,6 +7,7 @@ import { EngineAudio } from '../audio/EngineAudio';
 import { Sfx } from '../audio/Sfx';
 import { Siren } from '../audio/Siren';
 import { Jingle } from '../audio/Jingle';
+import { Music } from '../audio/Music';
 import { Rotor } from '../audio/Rotor';
 import { InputManager } from '../input/InputManager';
 import { KeyboardDevice } from '../input/KeyboardDevice';
@@ -106,6 +107,8 @@ export class App {
   private readonly rotor: Rotor;
   /** The ice-cream truck's music box (M5.5 slice 16). */
   private readonly jingle: Jingle;
+  /** The game's own music (M7 slice 2): rendered after gameplay starts, the layers by the heat, a sting on busted, an escape, the door. */
+  private readonly music: Music;
   private readonly panel: DebugPanel | null;
   private readonly loop = new FixedStepLoop(FIXED_DT, 5);
   private readonly bot: BotDriver | TrackBot | BotPolicy | JobBot | null;
@@ -169,6 +172,7 @@ export class App {
     this.siren = new Siren(this.audio);
     this.rotor = new Rotor(this.audio);
     this.jingle = new Jingle(this.audio);
+    this.music = new Music(this.audio);
     const uiRoot = document.getElementById('ui') ?? document.body;
     this.hud = new Hud(uiRoot, sim);
     this.runHud = new RunHud(uiRoot, sim);
@@ -702,6 +706,7 @@ export class App {
     this.siren.update(this.sim, this.paused ? 0 : frameDt);
     this.rotor.update(this.sim);
     this.jingle.update(this.sim);
+    this.music.update(this.sim, this.started, frameDt);
 
     if (!this.started) {
       // the player is in control from this frame on
@@ -755,6 +760,7 @@ export class App {
   dispose(): void {
     cancelAnimationFrame(this.raf);
     this.input.dispose();
+    this.music.dispose();
     this.audio.dispose();
     this.renderer.dispose();
     this.sim.dispose();

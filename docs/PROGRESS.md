@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M7 slice 2: our own music
+
+Done: `audio/score.ts`, eight bars in A minor at 120 bpm over Am–F–C–G, written for the game: a driving octave
+bass and offbeat keys when calm, four-on-the-floor drums with a clap roll from one star, a hook with an echo from
+three, a siren figure at five; stings for busted (a slip and a sagging fall), an escape (up the chord) and the door
+(the till's chord and bell). `audio/Music.ts` renders each layer once through an `OfflineAudioContext` a second after
+gameplay starts (mono, the tail folded onto the loop's start), loops them from one start time, fades by the heat
+over a bar, ducks 6 dB under a sting; the bus sits 14 dB under the master, so the ad and the player's mute take it.
+No file, no bytes before play. Pins M7 2.1–2.4 (the pin caught a bass seventh outside A minor). Verify green (336).
+
 ## 2026-09-24 — M7 slice 1: the top of the screen
 
 Done: the job line and its card, the intro's caption, the key hints and the news stack in one column at the top

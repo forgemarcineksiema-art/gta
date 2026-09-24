@@ -157,6 +157,25 @@ export function collectSigns(sim: SimWorld, time: number, view: SignView | null,
 /** The pay shows over an open sign within this of the car (m, M8.7 D5). */
 export const PAY_RANGE = 100;
 
+/**
+ * A sign taller on screen than `from` of the screen's height folds away and is gone at `to` (M8.9 R7): driving through
+ * a ring's centre the camera passes its pole, and the face (1.52 m across) would fill the screen. Its pole folds with it.
+ */
+export const SIGN_FOLD = { from: 0.15, to: 0.2 } as const;
+
+/** A sign's share of the screen's height: its size (m) over the view's height at its depth (m) for a vertical fov (rad); 0 behind the camera. */
+export function signShare(size: number, depth: number, fovY: number): number {
+  if (depth <= 0) return 0;
+  return size / (2 * depth * Math.tan(fovY / 2));
+}
+
+/** The sign's scale for its share of the screen's height: whole up to `SIGN_FOLD.from`, gone from `SIGN_FOLD.to`. */
+export function signFold(share: number): number {
+  if (!(share > SIGN_FOLD.from)) return 1;
+  if (share >= SIGN_FOLD.to) return 0;
+  return (SIGN_FOLD.to - share) / (SIGN_FOLD.to - SIGN_FOLD.from);
+}
+
 /** The nearest open marker within `PAY_RANGE` of the car and in front of the camera, whose pay shows over its sign; null for none. */
 export function paySign(sim: SimWorld, view: SignView | null): JobDef | null {
   const jobs = sim.jobs;

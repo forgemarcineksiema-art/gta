@@ -4,7 +4,7 @@
  * change, and its core (follow a polyline, brake for what is coming) is what the
  * road bot in the city will reuse.
  */
-import type { CarId, SimWorld, TrackSample, VehicleControls } from '../sim';
+import { BALANCE, type CarId, type SimWorld, type TrackSample, type VehicleControls } from '../sim';
 import { AgentState, type Traffic } from '../sim/traffic/Traffic';
 
 export interface TrackBotTuning {
@@ -42,6 +42,12 @@ export interface TrackBotTuning {
    * the lane before a bend or a junction. 0, the default, is the road.
    */
   pavement: number;
+  /**
+   * Takes the open job rings on its path (M8.7 D12): it brakes to roll into each under the jobs' `startSpeed`, as a
+   * player does now that a ring driven through starts nothing. The cold open's scripted bot turns it on; off by
+   * default, so the other bot-driven pins keep their baseline.
+   */
+  takeRings: boolean;
 }
 
 export const DEFAULT_TRACK_BOT: TrackBotTuning = {
@@ -58,6 +64,7 @@ export const DEFAULT_TRACK_BOT: TrackBotTuning = {
   careful: false,
   unblock: false,
   pavement: 0,
+  takeRings: false,
 };
 
 /**
@@ -217,6 +224,8 @@ export class TrackBot {
       if (vHere < allowed) allowed = vHere;
       dist += 3;
     }
+    // an open ring on the way: roll into it under the start speed (M8.7 D12), braked for from far enough out
+    if (t.takeRings && sim.jobs.state === 'idle') allowed = Math.min(allowed, this.ringSpeed(sim, px, pz, yaw, t.brakeAccel));
     controls.throttle = speed < allowed - 0.5 ? 1 : 0;
     controls.brake = speed > allowed + 1.5 ? 1 : 0;
     controls.handbrake = 0;
@@ -312,6 +321,21 @@ export class TrackBot {
     // round on the far side: a car on the left is passed on the right, one dead ahead or on the right on the left
     this.pass = side < -0.3 ? -3 : 3;
     return false;
+  }
+
+  /** The fastest the bot may go now to roll into the nearest open ring ahead (in its corridor) at 60 % of the start speed. */
+  private ringSpeed(sim: SimWorld, px: number, pz: number, yaw: number, brake: number): number {
+    const fx = Math.sin(yaw), fz = Math.cos(yaw);
+    const r = BALANCE.jobs.markerRadius, roll = BALANCE.jobs.startSpeed * 0.6;
+    let allowed = Infinity;
+    for (const d of sim.jobs.defs) {
+      if (d.kind === 'fare' || !sim.jobs.open(d)) continue;
+      const dx = d.x - px, dz = d.z - pz;
+      const along = dx * fx + dz * fz;
+      if (along < -r || along > 120 || Math.abs(dx * -fz + dz * fx) > r + 3) continue;
+      allowed = Math.min(allowed, Math.sqrt(roll * roll + 2 * brake * Math.max(0, along - r)));
+    }
+    return allowed;
   }
 
   /** A car within 8 m ahead in the bot's corridor, nearly stopped: the bot is in a queue behind it. */

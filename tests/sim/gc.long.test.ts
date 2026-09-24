@@ -4,7 +4,9 @@
  * collection and few scavenges (measured at the M7 slice: none and 19), and
  * loads at most one chunk of collision a step while driving, so no step stacks
  * the streaming. A player's stutter, if any, is the renderer's (the perf run's
- * long frames at the gate). Long: a minute of sim.
+ * long frames at the gate). The bot's own reset is not driving: its teleport
+ * home loads the new place at once, by design (M8.7 gate: the bot rammed a bus
+ * queued at a busy junction and reset). Long: a minute of sim.
  */
 import { PerformanceObserver, constants } from 'node:perf_hooks';
 import { describe, expect, it } from 'vitest';
@@ -25,10 +27,10 @@ describe('garbage (long)', () => {
       const city = sim.city!;
       let most = 0;
       for (let i = 0; i < 3600; i++) {
-        const before = city.loaded;
+        const before = city.loaded, resets = bot.resets;
         bot.drive(sim, sim.controls, 1 / 60);
         sim.step();
-        most = Math.max(most, city.loaded - before);
+        if (bot.resets === resets) most = Math.max(most, city.loaded - before);
       }
       await new Promise((r) => setTimeout(r, 50));
       observer.disconnect();

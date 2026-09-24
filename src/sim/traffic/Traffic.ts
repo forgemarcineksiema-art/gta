@@ -102,6 +102,16 @@ const BLEND_BACK = 1;
 const TIP_REST = 0.3;
 /** A yielding car's tyres wear a push off at this rate (1/s): pushed at 2 m/s it stops in half a second (M8.6 gate). */
 const YIELD_GRIP = 4;
+/**
+ * Nose to nose (M8.7 gate): both under `NOSE_STOPPED` m/s is a standoff; the car going round steers out to `NOSE_CLEAR`
+ * m past the other's side (at most `NOSE_SHIFT_MAX` off its path) at `NOSE_EDGE` m/s, crawls past, and keeps going
+ * round until it is `NOSE_PAST` m (a car's length) beyond it.
+ */
+const NOSE_STOPPED = 1;
+const NOSE_CLEAR = 0.5;
+const NOSE_SHIFT_MAX = 3.5;
+const NOSE_EDGE = 0.3;
+const NOSE_PAST = 4.5;
 
 /**
  * A traffic car's centre of mass as a share of its box's height above the road (M8.6 slice 1): a sedan's sits at about
@@ -248,6 +258,9 @@ export class Traffic {
   readonly angryLeft: Float32Array;
   /** Going round this dead car (-1 none), metres of the pass left. */
   readonly passAgent: Int16Array;
+  /** Going round this car nose to nose (-1 none, M8.7 gate), and the shift across its path that takes it clear. */
+  private readonly noseAgent: Int16Array;
+  private readonly noseTo: Float32Array;
   /** Seconds a civilian has been held up by a player who is not moving on (the standoff, M5.5 gate). */
   private readonly standoff: Float32Array;
   /** Seconds left going round a stopped player on the oncoming side (the standoff with the player at its kerb, M7). */
@@ -499,6 +512,8 @@ export class Traffic {
     this.hornCool = new Float32Array(n);
     this.angryLeft = new Float32Array(n);
     this.passAgent = new Int16Array(n).fill(-1);
+    this.noseAgent = new Int16Array(n).fill(-1);
+    this.noseTo = new Float32Array(n);
     this.standoff = new Float32Array(n);
     this.roundLeft = new Float32Array(n);
     this.blendX = new Float32Array(n);
@@ -1276,6 +1291,11 @@ export class Traffic {
       const room = Math.max(0, gap - t.gapMin);
       desired = Math.min(limit, Math.sqrt(aheadSpeed * aheadSpeed + 2 * t.brake * room), room / (this.gapT[i] as number));
     }
+    // going round a car nose to nose (M8.7 gate): out beside it first, then a crawl past it
+    if ((this.noseAgent[i] as number) >= 0) {
+      desired = Math.min(desired, Math.abs((this.shift[i] as number) - (this.noseTo[i] as number)) > NOSE_CLEAR ? NOSE_EDGE : t.standoff.creep);
+      if (desired < limit) blocker = 3;
+    }
     if (desired >= limit) blocker = 0;
     if (civilian && (this.flinchLeft[i] as number) > 0) {
       desired = 0;
@@ -1585,20 +1605,54 @@ export class Traffic {
     const rz = Math.sin(yaw);
     const half = this.tuning.playerLateral;
     let gap = Infinity;
+    let nose = -1;
     this.aheadAgent[i] = -1;
     for (let j = 0; j < this.capacity; j++) {
       if (j === i || this.state[j] === AgentState.Free) continue;
       const dx = (this.x[j] as number) - x;
       const dz = (this.z[j] as number) - z;
       const along = dx * fx + dz * fz;
+      const across = dx * rx + dz * rz;
+      // going round it nose to nose: until this car is a length past it
+      if (j === this.noseAgent[i]) {
+        if (along > -NOSE_PAST && along < 14 && Math.abs(across) < 2 * half) nose = j;
+        continue;
+      }
       if (along < 2 || along > 14) continue;
-      if (Math.abs(dx * rx + dz * rz) > half) continue;
+      if (Math.abs(across) > half) continue;
       // a car standing in its kerbside bay is off every lane's corridor (M5.5 slice 17): not a car ahead
       if ((this.parkedCiv[j] === 1 && this.state[j] === AgentState.Parked) || this.passable(i, j)) continue;
+      // Nose to nose (M8.7 gate): two cars all but stopped, each in the other's corridor (a forced entry and a turner
+      // in a junction's box), waited for each other for ever and the queue behind them stood. The one that goes first
+      // steers out beside the other and crawls past; the other waits for it.
+      if (nose < 0 && this.aheadAgent[j] === i && this.goesFirst(i, j)) {
+        nose = j;
+        const need = (this.halfW[this.body[i] as number] as number) + (this.halfW[this.body[j] as number] as number) + NOSE_CLEAR;
+        const at = across + (this.shift[i] as number);
+        this.noseTo[i] = M.clamp(at + (across > 0 ? -need : need), -NOSE_SHIFT_MAX, NOSE_SHIFT_MAX);
+        continue;
+      }
       const spare = along - this.spacing(i, j);
       if (spare < gap) { gap = spare; this.aheadAgent[i] = j; }
     }
+    this.noseAgent[i] = nose;
     return gap;
+  }
+
+  /**
+   * Of two cars nose to nose, both all but stopped, whether `i` goes round `j` first: a civilian before a unit or a
+   * racer (they have their own ways round), else the one further past its lane's end, the lower number on a tie.
+   */
+  private goesFirst(i: number, j: number): boolean {
+    const st = this.state[j];
+    const li = this.lane[i] as number, lj = this.lane[j] as number;
+    if ((st !== AgentState.Kinematic && st !== AgentState.Physical) || li < 0 || lj < 0) return false;
+    if ((this.speed[i] as number) > NOSE_STOPPED || (this.speed[j] as number) > NOSE_STOPPED) return false;
+    if (this.police[i] === 1 || (this.plannerSpeed[i] as number) > 0) return false;
+    if (this.police[j] === 1 || (this.plannerSpeed[j] as number) > 0) return true;
+    const pi = (this.s[i] as number) - (this.lanes.length[li] as number);
+    const pj = (this.s[j] as number) - (this.lanes.length[lj] as number);
+    return pi > pj || (pi === pj && i < j);
   }
 
   // ---- junctions -------------------------------------------------------------------
@@ -2702,6 +2756,7 @@ export class Traffic {
     this.hornCool[i] = 0;
     this.standoff[i] = 0;
     this.roundLeft[i] = 0;
+    this.noseAgent[i] = -1;
     this.blendLeft[i] = 0;
     this.angryLeft[i] = 0;
     this.passAgent[i] = -1;
@@ -2885,7 +2940,8 @@ export class Traffic {
 
     // where across the lane it wants to be
     let target = 0;
-    if ((this.passAgent[i] as number) >= 0) target = -2 * (this.lanes.offset[this.lane[i] as number] as number);
+    if ((this.noseAgent[i] as number) >= 0) target = this.noseTo[i] as number;
+    else if ((this.passAgent[i] as number) >= 0) target = -2 * (this.lanes.offset[this.lane[i] as number] as number);
     else if ((this.flinchLeft[i]) > 0) target = t.flinch.offset;
     else if (this.hornLeft[i] > 0 && !spec.big) target = t.horn.shift;
     else if ((this.roundLeft[i]) > 0) target = -2 * (this.lanes.offset[this.lane[i] as number] as number);

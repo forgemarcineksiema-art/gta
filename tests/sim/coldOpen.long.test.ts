@@ -17,7 +17,8 @@ describe('cold open (long)', () => {
     try {
       // it backs off a car that will not move on (M6 gate: slice 9's hidden cars moved the traffic, and the bot pushed
       // a wreck it had made at walking pace for the rest of the two minutes)
-      const bot = new TrackBot('heavy', { ...CITY_BOT_TUNING, unblock: true });
+      // it rolls into the delivery's ring under the start speed (M8.7 D8, D12)
+      const bot = new TrackBot('heavy', { ...CITY_BOT_TUNING, unblock: true, takeRings: true });
       bot.setPath(co.route!.samples);
       const order: string[] = [];
       const captions: ColdOpenVerb[] = [];

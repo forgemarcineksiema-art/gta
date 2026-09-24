@@ -49,12 +49,13 @@ async function jobWorld(): Promise<{ sim: SimWorld; id: number; from: { x: numbe
 }
 
 describe('jobs', () => {
-  it('4.7 driving into the ring starts the job with its heat once; arrival pays the time bonus into the bag', async () => {
+  it('4.7 rolling into the ring starts the job with its heat once; arrival pays the time bonus into the bag', async () => {
     const { sim, id, from } = await jobWorld();
     try {
       const seq = sim.events.sequence;
       const fx = Math.sin(from.yaw), fz = Math.cos(from.yaw);
-      const t = runUntil(sim, 8, (s) => s.jobs.state === 'active', (_t, _c, s) => s.vehicle.setVelocity(fx * 10, s.vehicle.telemetry.vy, fz * 10));
+      // under the start speed (M8.7 D8: driven through faster, a ring starts nothing)
+      const t = runUntil(sim, 12, (s) => s.jobs.state === 'active', (_t, _c, s) => s.vehicle.setVelocity(fx * 4, s.vehicle.telemetry.vy, fz * 4));
       expect(t).toBeGreaterThan(0);
       expect(sim.jobs.active).toBe(id);
       expect(sim.jobs.remaining).toBeCloseTo(90, 1);
@@ -88,8 +89,10 @@ describe('jobs', () => {
         kind: 'delivery', x: from.x + fx * 85, z: from.z + fz * 85, yaw: from.yaw,
         targetX: from.x - 300, targetZ: from.z, payout: 3000, limitSeconds: 60, heat: 4,
       });
-      run(sim, 9, (_t, _c, s) => s.vehicle.setVelocity(fx * 10, s.vehicle.telemetry.vy, fz * 10));
-      run(sim, 3, (_t, c) => { c.brake = 1; });
+      // rolled into under the start speed (M8.7 D8), the first starts; the second, crossed as slowly, does nothing
+      run(sim, 22, (_t, _c, s) => s.vehicle.setVelocity(fx * 4, s.vehicle.telemetry.vy, fz * 4));
+      // braked to a stop, no further (a brake held at a standstill reverses, back into the first ring)
+      run(sim, 3, (_t, c, s) => { c.brake = s.probe.speed > 0.5 ? 1 : 0; });
       expect(sim.jobs.state).toBe('active');
       expect(sim.jobs.active).toBe(id);
       expect(count(sim, seq, 'jobStart')).toBe(1);

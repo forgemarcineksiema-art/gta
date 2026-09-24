@@ -95,6 +95,8 @@ export interface SimWorldOptions {
   save?: SaveV1;
   /** Start the cold open at boot (after the save: a save that has seen it keeps it off). */
   coldOpen?: boolean;
+  /** The next rival's car cruising their turf (M7 slice 13). Default on; the test helper turns it off. */
+  teasers?: boolean;
 }
 
 interface TrackedBody {
@@ -256,6 +258,7 @@ export class SimWorld {
     this.vehicle = new Vehicle(this.world, this.transforms, tuning, spawn.position, spawn.yaw);
     this.garage = new Garage(this);
     this.board = new Board(this);
+    this.board.teasers = opts.teasers ?? true;
     this.career = new Career(this);
     this.kit = new Kit(this);
     this.traffic = this.city ? new Traffic(this.world, this.transforms, this.city, opts.seed ?? 42, TRAFFIC, this.trafficDensity) : null;
@@ -382,7 +385,7 @@ export class SimWorld {
     this.jobs.step(this.probe, FIXED_DT);
     // after the jobs (a fare's def and a race's place are still there), before the run banks anything
     this.career.step();
-    this.board.step(this.probe);
+    this.board.step(this.probe, FIXED_DT);
     this.run.step(this.probe, FIXED_DT);
     this.ticket.step(FIXED_DT);
     this.dailies.step();

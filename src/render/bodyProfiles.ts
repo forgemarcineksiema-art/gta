@@ -606,8 +606,8 @@ export const SWEEPER: CarProfile = {
   fixed: { from: 3, to: 6, color: PALETTE.carOrange },
   parts: [
     // the two front brushes under the nose, the suction mouth between, the amber bar, the hopper's lid and stripes
-    { size: [0.62, 0.12, 0.62], at: [0.72, 0.1, 2.35], color: PALETTE.charcoal, mirror: true },
-    { size: [0.16, 0.2, 0.16], at: [0.72, 0.24, 2.35], color: PALETTE.carOrange, mirror: true },
+    { size: [0.62, 0.12, 0.62], at: [0.72, 0.1, 2.35], color: PALETTE.charcoal, mirror: true, spin: true },
+    { size: [0.16, 0.2, 0.16], at: [0.72, 0.24, 2.35], color: PALETTE.carOrange, mirror: true, spin: true },
     { size: [1.1, 0.14, 0.4], at: [0, 0.12, 1.2], color: PALETTE.ink },
     { size: [1.0, 0.1, 0.22], at: [0, 2.45, 2.2], color: PALETTE.charcoal },
     { size: [0.3, 0.12, 0.24], at: [0.3, 2.51, 2.2], color: PALETTE.cone, mirror: true },

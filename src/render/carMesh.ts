@@ -37,7 +37,14 @@ export interface CarMesh {
   /** The body's top and vertical middle in its own frame (the wreck's squash aims from the roof). */
   roofY: number;
   midY: number;
+  /** The parts that turn with the car's speed (M7 slice 13: the sweeper's brushes), each frame; render-only. */
+  spin(dt: number, speed: number): void;
+  /** Those parts, for the tests. */
+  readonly spinners: readonly THREE.Object3D[];
 }
+
+/** A turning part's rate (rad/s): still under `minSpeed` m/s, then `base` and `perSpeed` a m/s, up to `max`. */
+export const SPIN = { minSpeed: 0.5, base: 4, perSpeed: 0.5, max: 12 } as const;
 
 /** One cross-section of the body at longitudinal position z (metres, + = front). */
 export interface Section {
@@ -97,6 +104,8 @@ export interface BodyPart {
   at: readonly [number, number, number];
   color: number | 'paint' | 'dark' | 'light';
   mirror?: boolean;
+  /** Turns about its upright axis while the car moves, the mirrored one the other way (the sweeper's brushes, M7). */
+  spin?: boolean;
 }
 
 /** A long-bonnet coupe: the first car. Heights above ground, length 4.5 m, width ~1.9 m at the belt. */
@@ -583,9 +592,14 @@ export function buildCarMesh(t: VehicleTuning, profile: CarProfile = MUSCLE, col
     box(0.36, 0.035, 0.012, 0xba2338, 0, s.roof + 0.015, s.z - 0.175);
     tailLightRanges.push([lightStart, 36]);
   }
+  const turning: Array<{ geometry: THREE.BufferGeometry; x: number; y: number; z: number; dir: number }> = [];
   for (const p of profile.parts ?? []) {
     const c = p.color === 'paint' ? paint : p.color === 'dark' ? paintDark : p.color === 'light' ? paintLight : p.color;
-    for (const side of p.mirror ? [1, -1] : [1]) box(p.size[0], p.size[1], p.size[2], c, side * p.at[0], p.at[1], p.at[2]);
+    for (const side of p.mirror ? [1, -1] : [1]) {
+      // a turning part is its own mesh about its centre; the rest merges into the body
+      if (p.spin) turning.push({ geometry: coloured(new THREE.BoxGeometry(p.size[0], p.size[1], p.size[2]), c), x: side * p.at[0], y: p.at[1] - y0, z: p.at[2], dir: side });
+      else box(p.size[0], p.size[1], p.size[2], c, side * p.at[0], p.at[1], p.at[2]);
+    }
   }
   const bodyGeometry = bb.build();
   const geometry = mergeGeometries([bodyGeometry, ...extras], false);
@@ -593,6 +607,15 @@ export function buildCarMesh(t: VehicleTuning, profile: CarProfile = MUSCLE, col
   const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
   const body = new THREE.Mesh(geometry, material); body.name = 'body-and-trim'; body.castShadow = true;
   root.add(body);
+  const spinners: THREE.Object3D[] = [], spinDir: number[] = [];
+  for (const t of turning) {
+    const m = new THREE.Mesh(t.geometry, material);
+    m.name = 'spinner';
+    m.position.set(t.x, t.y, t.z);
+    root.add(m);
+    spinners.push(m);
+    spinDir.push(t.dir);
+  }
   const wheels: THREE.Object3D[] = [], wheelGeom = wheelGeometry(t, profile.wheelStyle ?? profile.name);
   for (let i = 0; i < 4; i++) {
     const g = new THREE.Group(); g.name = `wheel-${i}`;
@@ -659,7 +682,14 @@ export function buildCarMesh(t: VehicleTuning, profile: CarProfile = MUSCLE, col
     lastState = -1; // the lights repaint over the restored colours on the next update
   };
   const tones = [new THREE.Color(), new THREE.Color(), new THREE.Color()];
-  const mesh: CarMesh = { root, wheels, damageStage: 0, paint: color, roofY: bounds.max.y, midY, update(tm) {
+  const mesh: CarMesh = { root, wheels, spinners, damageStage: 0, paint: color, roofY: bounds.max.y, midY, spin(dt, speed) {
+    if (spinners.length === 0 || Math.abs(speed) < SPIN.minSpeed) return;
+    const rate = Math.min(SPIN.max, SPIN.base + Math.abs(speed) * SPIN.perSpeed);
+    for (let k = 0; k < spinners.length; k++) {
+      const obj = spinners[k] as THREE.Object3D;
+      obj.rotation.y = (obj.rotation.y + (spinDir[k] as number) * rate * dt) % (Math.PI * 2);
+    }
+  }, update(tm) {
     const state = (tm.brake > 0.1 && tm.gear > 0 ? 1 : 0) | (tm.gear === -1 ? 2 : 0);
     if (state !== lastState) {
       paintRange(tailLightRanges, state & 1 ? 0xff6972 : 0xba2338);

@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M7 slice 13: the rivals' leftovers
+
+Done: Granny Gears at three quarters of her pace (0.66, easing to 0.6 when ahead): at 0.88 she beat the careful bot
+once in three and the plain one every time; G.1 now asks the careful bot for three of three and the plain one for one
+(gate). Until the next rival is ready their car cruises their district in the traffic (`Board.tease`): placed out of
+sight 120–260 m away, flagged a rival's (never a swap), routed at every junction to lanes whose both ends are the
+district's own, named by the ticker the first time the player sees it near, removed out of sight once they are
+ready. Off in the test helper's worlds (the bot pins' traffic predates it). The sweeper's brushes turn while it moves.
+Pins M7 13.1, 13.2. Verify green (359 tests).
+
 ## 2026-09-24 — M7 slice 12: the maps and the wall
 
 Done: `cityFootprints()`: the generator's lot decisions now come from one plan (`City.plan`, the same random stream;

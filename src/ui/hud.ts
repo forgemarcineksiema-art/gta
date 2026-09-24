@@ -412,6 +412,14 @@ export class Hud {
       this.ticker2(n > 0 ? `#${n}` : 'BOARD', `${r.name} ${r.call} · ${where}`);
       return;
     }
+    if (kind === 'rivalSeen') {
+      // the next rival's car driving by before they are ready (M7 slice 13): the ticker names it
+      const r = RIVALS[target];
+      if (!r) return;
+      const n = posterNumber(target);
+      this.ticker2(n > 0 ? `#${n}` : 'BOARD', `${r.name} DRIVES BY · SEE THE BOARD`);
+      return;
+    }
     if (kind === 'twinSwap') {
       // the radio calls the twins' new car (M6 slice 3): the only way to know which one to beat
       const d = unpackDescriptor(target);

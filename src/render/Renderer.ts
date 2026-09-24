@@ -632,6 +632,8 @@ export class Renderer {
     this.signalView?.update(this.sim);
     this.breakerView?.update(this.sim);
     this.car.update(tm);
+    // the sweeper's brushes turn while it moves (M7 slice 13)
+    this.car.spin(dt, tm.speed);
     // ghost of the best lap
     if (this.sim.ghostPose(this.ghostPose)) {
       const g = this.ghostPose;

@@ -178,8 +178,11 @@ export const BALANCE = {
     pullUp: 4,
     carRange: 220,
     rematchShare: 0.25,
-    pace: [0.88, 0.9, 0.92, 0.95, 0.97, 0.99, 1.01, 1.03, 1.06, 1.1],
-    band: [[0.7, 1.15], [0.72, 1.16], [0.74, 1.18], [0.76, 1.19], [0.78, 1.2], [0.8, 1.22], [0.83, 1.24], [0.86, 1.26], [0.89, 1.28], [0.92, 1.3]] as ReadonlyArray<readonly [number, number]>,
+    // Granny Gears (#10) at three quarters of her M6 pace and easing further when ahead (M7 slice 13): at 0.88 she
+    // crossed at 50.8 s against the careful bot's 49.1 s clean run and beat it once in three, the plain bot every time;
+    // the first duel is the one a newcomer wins at the first try (the gate's G.1 measures both bots)
+    pace: [0.66, 0.9, 0.92, 0.95, 0.97, 0.99, 1.01, 1.03, 1.06, 1.1],
+    band: [[0.6, 1.15], [0.72, 1.16], [0.74, 1.18], [0.76, 1.19], [0.78, 1.2], [0.8, 1.22], [0.83, 1.24], [0.86, 1.26], [0.89, 1.28], [0.92, 1.3]] as ReadonlyArray<readonly [number, number]>,
     limitSpeed: 9,
     /**
      * A hunt (M6 slice 2): the rival starts `lead` m ahead and drives home at `pace` × their race pace for
@@ -197,6 +200,12 @@ export const BALANCE = {
     twins: { behind: 150, within: 260, ahead: 30, every: 12 },
     breakers: { reach: 10, behind: 120 },
     escort: 2,
+    /**
+     * The next rival cruising their turf while not ready (M7 slice 13): placed on a lane of their district
+     * `range` m from the player out of sight, tried every `retry` s; the ticker names them once the player is within
+     * `seen` m and looking.
+     */
+    teaser: { range: [120, 260] as readonly [number, number], retry: 5, seen: 70 },
   },
   /** The driver's kit (M6, DESIGN.md §14.4): the day's pick at this share of its price; each item's price is in `garage/kit.ts`. */
   kit: { pickShare: 0.5 },

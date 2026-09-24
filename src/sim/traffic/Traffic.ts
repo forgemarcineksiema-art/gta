@@ -813,6 +813,35 @@ export class Traffic {
   }
 
   /**
+   * A wanted board's rival cruising their turf before they are ready (M7 slice 13, the teaser): a civilian record in
+   * their body and paint on a lane, out of the player's view, driving as traffic and never a swap candidate (the
+   * rival's flag). -1 when the spot is taken or seen, or no record is free.
+   */
+  spawnTeaser(lane: number, s: number, body: BodyId, paint: number, player: PlayerProbe, near: number, cosHalf: number): number {
+    if (!this.canSpawnAt(lane, s, this.tuning.gapMin + 4)) return -1;
+    const index = BODY_INDEX[body];
+    const radius = Math.hypot(this.halfW[index] as number, this.halfL[index] as number);
+    if (!this.outOfView(this.pose.x, this.pose.z, radius, player, near, cosHalf)) return -1;
+    const agent = this.claim(player, near, cosHalf);
+    if (agent < 0) return -1;
+    this.place(agent, lane, s, index, 0, AgentState.Kinematic, paint);
+    this.rival[agent] = 1;
+    return agent;
+  }
+
+  /**
+   * A driving car's next exit chosen from outside (M7 slice 13: a teaser keeps to its turf): taken at its lane's end
+   * the way a race plan's is, its speed left its own.
+   */
+  route(agent: number, next: number): void {
+    const lane = this.lane[agent] as number;
+    if (lane < 0 || this.racer[agent] === 1 || this.police[agent] === 1 || this.state[agent] === AgentState.Free) return;
+    if (!this.lanes.outs(lane).includes(next)) return;
+    this.plannerLane[agent] = lane;
+    this.plannerNext[agent] = next;
+  }
+
+  /**
    * The player's horn (M6 slice 7): each driving civilian ahead in the player's lane within reach, heading the same
    * way, moves toward its kerb for a moment (the big ones only hold their line). Returns how many heeded it.
    */

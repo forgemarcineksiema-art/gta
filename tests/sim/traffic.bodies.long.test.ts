@@ -3,6 +3,7 @@
  * towing. The flow, lane holding and separation over a long bot drive are in
  * traffic.long.test.ts; determinism, the cost of a full pool and lent bodies in
  * traffic.pool.long.test.ts.
+ * Long (M7 slice 0): moved out of the quick verify's minute; `npm run verify:gate` runs it.
  */
 import { describe, expect, it } from 'vitest';
 import { AgentState, type Traffic } from '../../src/sim/traffic/Traffic';

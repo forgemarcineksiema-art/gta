@@ -1,5 +1,6 @@
 /**
  * Near-miss and oncoming-lane boost. Bands are wide enough for a retune of ECONOMY.
+ * Long (M7 slice 0): moved out of the quick verify's minute; `npm run verify:gate` runs it.
  */
 import { describe, expect, it } from 'vitest';
 import { ECONOMY } from '../../src/sim/economy';

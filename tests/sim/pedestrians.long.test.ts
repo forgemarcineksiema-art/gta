@@ -1,6 +1,7 @@
 /**
  * Pedestrians: on the footway, diving out of the player's way, never under the
  * car even with the dive disabled, and deterministic from the seed.
+ * Long (M7 slice 0): moved out of the quick verify's minute; `npm run verify:gate` runs it.
  */
 import { describe, expect, it } from 'vitest';
 import { CITY_BOT_TUNING, TrackBot } from '../../src/app/trackBot';

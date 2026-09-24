@@ -3,6 +3,7 @@
  * its section 3.4): a 100 km/h head-on wrecks, 60 km/h dents, a glance and a
  * prop cost nothing; a wreck cannot drive and respawns rolling on the road
  * with a clean car and its boost; hits on traffic count less.
+ * Long (M7 slice 0): moved out of the quick verify's minute; `npm run verify:gate` runs it.
  */
 import { describe, expect, it } from 'vitest';
 import { DAMAGE } from '../../src/sim/economy';

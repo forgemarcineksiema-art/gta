@@ -3,6 +3,7 @@
  * §13.4): the chain ticks from the ring in any order and never inside the
  * intro; the goal's precedence; the BORROW hint counted once per appearance;
  * a ring near every door.
+ * Long (M7 slice 0): moved out of the quick verify's minute; `npm run verify:gate` runs it.
  */
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../src/sim/balance';

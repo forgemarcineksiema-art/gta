@@ -5,6 +5,7 @@
  * where it lands (a police car there is the player's takedown, paid into the
  * bag), stands as a barrier for its time, and is gone after; the next run puts
  * it back up.
+ * Long (M7 slice 0): moved out of the quick verify's minute; `npm run verify:gate` runs it.
  */
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../src/sim/balance';

@@ -3,6 +3,7 @@
  * straights and the Crown avenue, 200 m apart at least; a flash for the
  * km/h over the limit when the car crosses the line more than 20 over, once
  * per cooldown.
+ * Long (M7 slice 0): moved out of the quick verify's minute; `npm run verify:gate` runs it.
  */
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../src/sim/balance';

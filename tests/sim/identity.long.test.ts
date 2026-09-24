@@ -4,6 +4,7 @@
  * the abandoned car, then withdraw; a police car is a disguise until a crime
  * is seen from it; the door and a swap out clear a blown cover. City, seed
  * 42, traffic on.
+ * Long (M7 slice 0): moved out of the quick verify's minute; `npm run verify:gate` runs it.
  */
 import { describe, expect, it } from 'vitest';
 import RAPIER from '@dimforge/rapier3d-compat';

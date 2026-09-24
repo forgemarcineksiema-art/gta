@@ -51,6 +51,9 @@ export default defineConfig({
       ...(process.env.BALANCE === '1' || process.env.npm_lifecycle_event === 'balance' ? [] : ['tests/sim/balance.test.ts']),
     ],
     environment: 'node',
+    // Files share their worker's module graph: Rapier's WASM initialises once a worker, not once a file (the quick set
+    // 65 → 35 s, M7 slice 0). Every world is its own SimWorld; a test that needs a fresh module is a module-level state bug.
+    isolate: false,
     testTimeout: 60000,
   },
 });

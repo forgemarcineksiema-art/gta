@@ -3,6 +3,7 @@
  * Chief, the van's shove across the road, the Chief's PIT on a straight, and
  * the Chief kept through the chase and replaced after a wreck. The body pool
  * at level 5 (7.5) is police.long.test.ts's pin, which now runs with them.
+ * Long (M7 slice 0): moved out of the quick verify's minute; `npm run verify:gate` runs it.
  */
 import { describe, expect, it } from 'vitest';
 import { PALETTE } from '../../src/sim/palette';

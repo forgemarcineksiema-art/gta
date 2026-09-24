@@ -160,7 +160,7 @@ export class Board {
       if (a >= 0 && (traffic.state[a] === AgentState.Free || traffic.body[a] !== BODY_INDEX[r.body] || traffic.rival[a] !== 1)) this.car[i] = -1;
       const wanted = this.live(i) && running?.id !== d.id && (d.x - probe.x) ** 2 + (d.z - probe.z) ** 2 <= range * range;
       if (!wanted || (this.car[i] as number) >= 0) continue;
-      const agent = traffic.spawnAtPoint(d.x, d.z, d.yaw, r.body, AgentState.Parked, r.paints[0]);
+      const agent = traffic.spawnProp(d.x, d.z, d.yaw, r.body, AgentState.Parked, r.paints[0] as number);
       if (agent < 0) continue;
       traffic.rival[agent] = 1;
       this.car[i] = agent;

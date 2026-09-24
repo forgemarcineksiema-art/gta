@@ -113,7 +113,7 @@ export class Stash {
       if (Math.hypot(probe.x - spot.x, probe.z - spot.z) > BALANCE.stash.range) continue;
       // the ice-cream truck stands on its lawn as a car left there; the others are parked in their bays like the
       // street's own parked cars (an abandoned car at a kerb has the traffic slow and swing round it)
-      this.agents[k] = traffic.spawnAtPoint(spot.x, spot.z, spot.yaw, id, k === 0 ? AgentState.Abandoned : AgentState.Parked, bodySpec(id).paints[0]);
+      this.agents[k] = traffic.spawnProp(spot.x, spot.z, spot.yaw, id, k === 0 ? AgentState.Abandoned : AgentState.Parked, bodySpec(id).paints[0] as number);
     }
   }
 

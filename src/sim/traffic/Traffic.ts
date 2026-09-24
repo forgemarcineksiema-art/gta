@@ -102,10 +102,19 @@ const POLICE_LOOK = 25;
 /** Driving cars ignore the ground; a disturbed or wrecked car is switched onto GROUPS_SOLID so it can tumble and rest. */
 const GROUPS_TRAFFIC = interactionGroups(GROUP_DEFAULT, 0xffff & ~GROUP_TERRAIN);
 const ZERO = { x: 0, y: 0, z: 0 };
+/**
+ * Records above the pool for the city's props (M7 slice 0): the stash's hidden cars and the rivals' parked cars. The
+ * spawner, the density count and the traffic's random stream never touch them, so a car standing far away moves
+ * nothing near the player.
+ */
+export const PROP_RECORDS = 16;
 
 export class Traffic {
   readonly tuning: TrafficTuning;
+  /** Every record: the pool, then the props'. */
   readonly capacity: number;
+  /** The records the traffic spawns into: the moving cars' and the kerbside bays'. */
+  readonly pool: number;
   /** A civilian standing in a kerbside bay (M5.5 slice 17): not moving traffic, not counted toward the density. */
   readonly parkedCiv: Uint8Array;
   /** The bay a parked civilian stands in, -1 otherwise. */
@@ -302,7 +311,8 @@ export class Traffic {
     this.tuning = tuning;
     // the moving traffic's records and the kerbside bays' on top
     this.parkedMax = Math.max(0, Math.round(tuning.parked.max * density));
-    this.capacity = tuning.agents + this.parkedMax;
+    this.pool = tuning.agents + this.parkedMax;
+    this.capacity = this.pool + PROP_RECORDS;
     this.target = Math.max(0, Math.min(tuning.agents, Math.round(tuning.agents * density)));
     this.lanes = new LaneTables(city.graph, tuning);
     this.nodes = city.graph.nodes;
@@ -665,7 +675,7 @@ export class Traffic {
     let agent = this.findFree();
     if (agent >= 0) return agent;
     let farthest = 0;
-    for (let i = 0; i < this.capacity; i++) {
+    for (let i = 0; i < this.pool; i++) {
       if (this.police[i] !== 0 || this.racer[i] === 1 || i === this.wanted || (this.state[i] !== AgentState.Kinematic && this.state[i] !== AgentState.Physical)) continue;
       const x = this.x[i] as number, z = this.z[i] as number;
       const r = Math.hypot(this.halfWidthOf(i), this.halfLengthOf(i));
@@ -846,6 +856,21 @@ export class Traffic {
     if (i < 0) return -1;
     this.placeAtPoint(i, x, z, yaw, BODY_INDEX[body], state, paint);
     return i;
+  }
+
+  /** A prop's stopped car at a point (M7 slice 0): on the records above the pool, -1 when all are taken. */
+  spawnProp(x: number, z: number, yaw: number, body: BodyId, state: AgentState.Abandoned | AgentState.Parked, paint: number): number {
+    for (let i = this.pool; i < this.capacity; i++) {
+      if (this.state[i] !== AgentState.Free) continue;
+      this.placeAtPoint(i, x, z, yaw, BODY_INDEX[body], state, paint);
+      return i;
+    }
+    return -1;
+  }
+
+  /** A record above the pool: a prop's, or what a swap left in one. */
+  isProp(agent: number): boolean {
+    return agent >= this.pool && agent < this.capacity;
   }
 
   /** A record gone at once (a rival's parked car when the duel starts, M6): the same free as the despawn's. */
@@ -1879,13 +1904,13 @@ export class Traffic {
   // ---- pool bookkeeping -------------------------------------------------------------
 
   private findFree(): number {
-    for (let i = 0; i < this.capacity; i++) if (this.state[i] === AgentState.Free) return i;
+    for (let i = 0; i < this.pool; i++) if (this.state[i] === AgentState.Free) return i;
     return -1;
   }
 
   private alive(): number {
     let n = 0;
-    for (let i = 0; i < this.capacity; i++) if (this.state[i] !== AgentState.Free && this.parkedCiv[i] === 0) n++;
+    for (let i = 0; i < this.pool; i++) if (this.state[i] !== AgentState.Free && this.parkedCiv[i] === 0) n++;
     return n;
   }
 

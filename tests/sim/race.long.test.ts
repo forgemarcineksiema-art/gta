@@ -3,6 +3,7 @@
  * path; starting one puts three rivals on the road just ahead; they race the
  * shortest way to the finish in the driving mode, rubber-banded to the player;
  * the player's place over the line pays 6,000 / 2,500 / 1,000, fourth fails.
+ * Long (M7 slice 0): moved out of the quick verify's minute; `npm run verify:gate` runs it.
  */
 import { describe, expect, it } from 'vitest';
 import type { SimWorld } from '../../src/sim';

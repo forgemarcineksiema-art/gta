@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M7 slice 0: the workshop
+
+Done: the quick verify's tests 105 → 39 s. Test files share their worker's modules (`isolate: false`: Rapier's WASM
+initialised once a worker, not once a file: 65 → 37 s) and twelve slow files plus four slow tests moved to the long
+set (breakers, the traffic bodies, the boost economy, the chain, pedestrians, heavies, identity, damage, races,
+covers, cameras, signals; the jobs skeleton, a takedown). Props: the stash's hidden cars and the rivals' parked cars
+take `PROP_RECORDS` (16) records above the traffic's pool (`spawnProp`); the spawner, the density count and a
+claim never touch them. Pins M7 0.1 (long: a roadster 245 m away changes nothing within 200 m of a stopped player in
+two minutes; it failed on record 12 at 0 s with the old pool spawn), 0.2. Verify green (331 tests in 39 s).
+
 ## 2026-09-24 — design talk: M7 is the polish, the platform becomes M8
 
 Marcin: the next milestone improves and fixes what the game has; the platform moves to M8 (decided). Set here (DESIGN

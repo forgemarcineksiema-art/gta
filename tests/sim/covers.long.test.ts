@@ -3,6 +3,7 @@
  * grid street's middle, clear of the doors, ramps, cameras and plazas, with no
  * street tree or lamp under it; solid, so the police cannot see in through its
  * walls or down through its roof, only along the street through its open ends.
+ * Long (M7 slice 0): moved out of the quick verify's minute; `npm run verify:gate` runs it.
  */
 import { describe, expect, it } from 'vitest';
 import type { SimWorld } from '../../src/sim';

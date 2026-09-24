@@ -4,6 +4,7 @@
  * junction wait and without a honk, and let it go on its own green; the
  * kerbside bays hold parked cars (civilian bodies that fit a bay, apart from
  * the moving traffic's count), and one alongside is a swap candidate.
+ * Long (M7 slice 0): moved out of the quick verify's minute; `npm run verify:gate` runs it.
  */
 import { describe, expect, it } from 'vitest';
 import { signalledNodes } from '../../src/sim/city/signals';

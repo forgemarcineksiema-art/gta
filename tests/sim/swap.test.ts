@@ -161,9 +161,9 @@ describe('car-swap', () => {
       sim.vehicle.setVelocity(0, 0, 0);
       run(sim, 0.5);
       const t = runUntil(sim, 20, (s) => kmh(s) >= 100, (_t, c) => { c.throttle = 1; });
-      // cars.test.ts pins the compact at 9-13 s
-      expect(t).toBeGreaterThan(8.5);
-      expect(t).toBeLessThan(13.5);
+      // cars.test.ts pins the compact at 5.6-6.5 s (the city car since M8.8 slice 2)
+      expect(t).toBeGreaterThan(5.4);
+      expect(t).toBeLessThan(6.8);
     } finally { sim.dispose(); }
   }, 60_000);
 

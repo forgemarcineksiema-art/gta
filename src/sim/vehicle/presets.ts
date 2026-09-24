@@ -19,12 +19,17 @@ export const CAR_PRESETS: Record<CarId, VehicleTuning> = {
   /** Long-bonnet rear-drive coupe: the starter car. */
   muscle: cloneTuning(DEFAULT_TUNING),
 
-  /** Small front-drive hatch: light, nimble, slow, safe. Drifts only on the handbrake. */
+  /**
+   * Small front-drive hatch, the city car (M8.8 slice 2): quicker than the muscle car to about 80 km/h, level with it
+   * at 100, slower above (short gears, a strong middle, a boxy drag); the tightest turn and the quickest to change
+   * direction. Safe: drifts only on the handbrake.
+   */
   compact: preset({
     mass: 1050,
     chassisHalfExtents: { x: 0.85, y: 0.34, z: 1.9 },
     chassisOffsetY: 0.46,
     centerOfMassY: 0.0,
+    inertiaScale: { x: 1, y: 0.85, z: 1 },
     wheelBase: 2.45,
     trackWidth: 1.5,
     wheelRadius: 0.3,
@@ -37,10 +42,12 @@ export const CAR_PRESETS: Record<CarId, VehicleTuning> = {
     maxSteerDegLow: 36,
     maxSteerDegHigh: 6,
     steerSpeedRef: 30,
-    torqueMax: 150,
+    steerRate: 7,
+    torqueMax: 212,
     redlineRpm: 6600,
-    gearRatios: [3.95, 2.87, 2.08, 1.51, 1.1, 0.87],
-    finalDrive: 4.2,
+    torqueCurve: [0.7, 0.93, 1.0, 0.92, 0.8],
+    gearRatios: [4.1, 2.9, 2.08, 1.51, 1.1, 0.8],
+    finalDrive: 4.6,
     driveFrontShare: 1,
     lsdLock: 0.2,
     brakeTorque: 4200,
@@ -51,7 +58,7 @@ export const CAR_PRESETS: Record<CarId, VehicleTuning> = {
     powerOversteer: 0,
     driftMaxAngleDeg: 30,
     driftThrottlePush: 3200,
-    drag: 1.05,
+    drag: 1.3,
     downforce: 1.2,
     boostTorqueMul: 1.35,
     boostThrust: 2000,

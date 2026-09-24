@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.8 slice 2: the compact, the city car
+
+Done: the compact is quicker than the muscle car to about 80 km/h, level at 100, slower above (212 N·m with a strong
+middle, 4.1 first, a 4.6 final drive, 0.8 overdrive, drag 1.3), and the quickest to change direction (yaw inertia ×0.85,
+steer rate 7); still front-drive, no power oversteer. On the straight: 0–60 2.43 s (muscle 2.78), 0–100 5.93 s (6.17),
+top 144 km/h (172); the turning circle at 20 km/h 4.0 m, the smallest (sports 4.8, muscle 5.1). Tuned on a scratch
+harness over eleven candidates. cars.test's compact 0–100 window moved (8.5–13 → 5.6–6.5, header note) and the swap
+and garage 4.4 pins' with it; its lap, drift and turns stand. Pins M8.8 2.2, 2.3. The city bot's lap is the gate's. Verify green.
+
 ## 2026-09-25 — M8.8 slice 1: every police car is a disguise
 
 Done: the descriptor carries `police` (a unit taken on the street, whatever its class, or the police's own bodies,

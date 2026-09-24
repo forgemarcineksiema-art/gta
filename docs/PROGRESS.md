@@ -13,7 +13,9 @@ sizes (11–20 px); moments of nine things; a radar of sixteen kinds of mark; th
 sheet over the car. Two faults of M8.7: the pay label stuck in the top-left corner (`PayLabel.show` compares with NaN),
 the camera flying through a sign. His mark 6/10, his bar "10, at least 9"; he accepted the review and the direction whole.
 Set here: `docs/M8.9_PLAN.md`, design and contract in one file, seventeen slices after M8.8's gate, slice 0 (the two
-faults) on his word before M8.8. Docs only; verify not run (no code touched).
+faults) on his word before M8.8. He approved the plan's one exception to the pace rule (a visual slice ends with its
+stills, under a minute; CLAUDE.md's Pace) and asked for the push; no work starts before his signal. Docs only; verify
+not run (no code touched).
 
 ## 2026-09-25 — M8.7 gate: 0.8.7 (M8.6's gate closed inside it)
 

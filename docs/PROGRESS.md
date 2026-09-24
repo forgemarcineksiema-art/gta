@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.8 slice 1: every police car is a disguise
+
+Done: the descriptor carries `police` (a unit taken on the street, whatever its class, or the police's own bodies,
+`policeLiveried`: the patrol car and the Chief's Cruiser; not the Fake Cruiser), and the disguise and the blown cover read
+it, not the class. A borrowed interceptor or police van keeps its colours (`Life.swap`; `PlayerCar` shows the paint a car
+came in on the road, the garage's only behind the door) and wears its class's livery with the bar lit while the disguise
+holds (`PoliceView` builds the player's livery per class). BORROW's promise now holds for every unit. Pins M8.8 1.1–1.4
+(`tests/sim/disguise.test.ts`). Verify green.
+
 ## 2026-09-25 — M8.8 slice 0: upgrades after a swap, the Chief's one car
 
 Done: a car taken on the street drives with its class's upgrades (`Life.swap` retunes with `Garage.tuningFor`, as the

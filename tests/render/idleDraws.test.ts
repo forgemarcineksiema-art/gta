@@ -31,7 +31,7 @@ describe('no draw call for nothing', () => {
     try {
       run(sim, 5);
       const scene = new THREE.Scene();
-      const police = new PoliceView(scene, sim, buildCarMesh(CAR_PRESETS.police, CAR_PROFILES.police));
+      const police = new PoliceView(scene, sim, { police: buildCarMesh(CAR_PRESETS.police, CAR_PROFILES.police) });
       police.update(1);
       const p = audit(scene);
       // four liveries of three meshes; at heat 0 the Chief's, at least, is empty

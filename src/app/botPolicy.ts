@@ -71,7 +71,7 @@ export class BotPolicy {
     else if (e.kind === 'escape') {
       if (e.target === 1) {
         this.escapesBySwap++;
-        if (this.sim?.carId === 'police') this.disguiseEscapes++;
+        if (this.sim?.pursuit.descriptor.police) this.disguiseEscapes++;
       } else {
         this.escapesByCooldown++;
       }

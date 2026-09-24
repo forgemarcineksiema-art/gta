@@ -54,7 +54,7 @@ import { PEDS, TRAFFIC } from './traffic/tuning';
 import { SimPhase, type PhaseMark } from './profile';
 import { TransformBuffer } from './transforms';
 import { CAR_PRESETS, type CarId } from './vehicle/presets';
-import type { BodyId } from './traffic/bodies';
+import { policeLiveried, type BodyId } from './traffic/bodies';
 import { cloneTuning, type VehicleTuning } from './vehicle/tuning';
 import { Vehicle } from './vehicle/Vehicle';
 import * as M from './math';
@@ -285,6 +285,7 @@ export class SimWorld {
     this.pursuit.descriptor.kind = this.carId;
     this.pursuit.descriptor.body = this.carId;
     this.pursuit.descriptor.paint = this.carPaint;
+    this.pursuit.descriptor.police = policeLiveried(this.carId);
     this.cover = this.city ? coverSites(this.city) : null;
     this.police = this.traffic ? new Police(this) : null;
     // a crime in a unit's sight pays double and makes the player wanted (DESIGN.md §13.3)
@@ -529,6 +530,7 @@ export class SimWorld {
     this.pursuit.descriptor.kind = kind;
     this.pursuit.descriptor.body = kind;
     this.pursuit.descriptor.paint = this.carPaint;
+    this.pursuit.descriptor.police = policeLiveried(kind);
     this.vehicle.tuning = cloneTuning(CAR_PRESETS[kind]);
     this.vehicle.applyTuning();
   }

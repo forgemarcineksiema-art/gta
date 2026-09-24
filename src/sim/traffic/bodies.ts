@@ -113,6 +113,14 @@ export function isShell(body: BodyId): body is CarId {
   return BODY_INDEX[body] < CAR_IDS.length;
 }
 
+/**
+ * The police's own bodies: the disguise's drive-out (M8.8 slice 1). A unit taken on the street, whatever its class, is
+ * police too (`SwapHandover.police`); the Fake Cruiser is not: the units know Frank's car.
+ */
+export function policeLiveried(body: BodyId): boolean {
+  return body === 'police' || body === 'chiefcar';
+}
+
 /** A wanted board's car (M6): won from a rival, never kept at a door or spawned. */
 export function isRivalBody(body: BodyId): body is RivalBody {
   return (RIVAL_BODIES as readonly BodyId[]).includes(body);

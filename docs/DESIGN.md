@@ -659,8 +659,9 @@ The contracts with done criteria, pins and measurements per slice are
 `docs/M4_PLAN.md` (its §5 holds update 1), `docs/M5_PLAN.md` and
 `docs/M6_PLAN.md` (the board), `docs/M7_PLAN.md` (the polish),
 `docs/M8_PLAN.md` (the chaos), `docs/M8.5_PLAN.md` (the clean screen),
-`docs/M8.6_PLAN.md` (solid cars), `docs/M8.7_PLAN.md` (the way) and
-`docs/M9_PLAN.md` (the platform); this section is the summary. Update 2 gets its contract after the first Basic
+`docs/M8.6_PLAN.md` (solid cars), `docs/M8.7_PLAN.md` (the way),
+`docs/M9_PLAN.md` (the platform) and `docs/M10_PLAN.md` (the fleet, its
+design in the same file); this section is the summary. Update 2 gets its contract after the first Basic
 Launch numbers.
 
 Revised 2026-09-22 (decided by Marcin): the game goes to Basic Launch after
@@ -740,6 +741,14 @@ both.
   time over the first quarter hour.
 - **M9 Platform**, the brief's M6 (`docs/M9_PLAN.md`), then Basic Launch;
   only when all of it is in and on his word that the game is good.
+- **M10 The fleet** (set here 2026-09-24 in a talk with Marcin; its design
+  and its contract are one document at his request, `docs/M10_PLAN.md`): a
+  job for every class, the trophies each best at one thing, every body its
+  own mass, grass and dirt with a 4×4 class, the steamroller, the monster
+  truck and the rocket trolley, the motorbike, the hovercraft and the sea,
+  the mega-ramp, then the police and the rivals on the player's car model if
+  the budget holds. After M9's Basic Launch; its first two slices may run
+  before M9 on his word.
 - Later, by the KPIs: cop mode, ghosts, multiplayer (§8).
 
 ## 12. Playtest watch list

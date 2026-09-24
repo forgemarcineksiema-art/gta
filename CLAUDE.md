@@ -9,7 +9,7 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 
 ## Session start
 
-1. Read this file, `docs/PROGRESS.md` and the current milestone contract (M8.7, `docs/M8.7_PLAN.md`: the way, with M8.6's gate closing inside its gate; then `docs/M9_PLAN.md`, the platform, only on Marcin's word; the design in `docs/DESIGN.md`, §20 first); check `git log --oneline -15`.
+1. Read this file, `docs/PROGRESS.md` and the current milestone contract (M8.7, `docs/M8.7_PLAN.md`: the way, with M8.6's gate closing inside its gate; then `docs/M9_PLAN.md`, the platform, only on Marcin's word; after the launch `docs/M10_PLAN.md`, the fleet; the design in `docs/DESIGN.md`, §20 first); check `git log --oneline -15`.
 2. Run `npm run verify` (the quick set) before touching anything and at the commit that ends a slice. `npm run verify:gate` (the long bot-driven pins included) only at a milestone gate. Nothing else per slice: see **Pace** below, and read it before every slice.
 3. Work autonomously inside the milestone. Decide, act, note assumptions in `docs/PROGRESS.md`. Stop only at a gate, before destructive/irreversible operations, to change a fixed decision from the brief, or when blocked on something only Marcin can provide.
 4. Commit small and often; never leave significant work uncommitted. Commit messages end with a `Co-Authored-By:` line naming the model that did the work (e.g. `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`).
@@ -31,6 +31,7 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 | `docs/M4_PLAN.md`, `docs/M5_PLAN.md` | The finished contracts (kept for their numbers and as-built notes). M4's §5 holds the contract for post-launch update 1. |
 | `docs/M5.5_PLAN.md` | The finished contract before it: the whole game before the platform (kept for its numbers and as-built notes). |
 | `docs/M9_PLAN.md` | The platform contract (SDK adapter, touch, mobile tier, submission), the brief's M6, after M8.6 on Marcin's word. |
+| `docs/M10_PLAN.md` | The fleet: its design and its contract in one document (Marcin's request, 2026-09-24): a job for every class, trophies each best at one thing, the 4×4 and the ground, three crazy cars, the motorbike, the hovercraft and the sea, the mega-ramp, the police and the rivals on the car model. After M9's launch; its phase A (the first hour's fixes) may run before M9 on his word. |
 | `docs/ARCHITECTURE.md` | Structure, dependency justifications, decision records. |
 | `docs/DEV.md` | Servers and ports, the build stamp, test URLs, QA hooks, the suites, scratch folders. `npm start` (4173) is the one way to play; `npm run dev` (5173) is for editing. |
 | `docs/BACKLOG.md` | Out-of-milestone ideas and non-blocking bugs, one line of context each. |

@@ -1,0 +1,918 @@
+# M10 "The fleet" — design and implementation plan
+
+Executor: the agent that starts on Marcin's word. Reviewer: Claude, at the
+gate. Director and the only tester: Marcin. This document is the milestone's
+design and its contract in one place (Marcin asked for one document,
+2026-09-24): a reason to drive every vehicle, trophies worth winning, and the
+new vehicles a player can find (the 4×4 and the ground it wins on, three
+crazy cars, the motorbike, the hovercraft and the sea, a mega-ramp), then the
+police and the rivals on the player's own car model. Written 2026-09-24
+against commit `fa9ab1c`, from a talk with Marcin that began with "list every
+vehicle in the game". About thirty days of slices, the largest milestone so
+far.
+
+**Where it sits.** After M9 (the platform) and its Basic Launch: the game
+launches first and this is its first big update (the portal re-features
+updated games, `docs/DESIGN.md` §11); the first KPI reading (M9 §1.4) orders
+it against cop mode. Phase A (slices 0–1) fixes what a new player meets in
+the first hour and depends on nothing else: on Marcin's word it runs before
+M9 as a short pass, and the milestone keeps its number and its gate.
+
+Read, in this order, before touching anything: `CLAUDE.md`, §1 of this file,
+`docs/DESIGN.md` §2.5 (identity and the disguise), §13.7, §13.8 and §13.11
+(kept cars, traffic, bodies), §14 (the board, the kit, the collection), §16
+(things with mass), §17–§20 (the screen, the words, the way),
+`docs/ARCHITECTURE.md`, `docs/PROGRESS.md` (newest first), `docs/STYLE.md`
+(Vehicles), then the rest of this file. Run `npm run verify`; green before
+the first edit.
+
+## 0. How to work on this milestone
+
+- **Language, autonomy, scope, honesty**: as in `docs/M5_PLAN.md` §0.
+- **Pace** (`CLAUDE.md`): a slice is the code, its pins, the quick verify,
+  one commit, eight lines in PROGRESS. The long pins, the suites, the perf
+  and the balance at the gate; the one exception is slice 24's perf, because
+  phase J ships or not by it.
+- **Marcin's notes come first**, each a slice ahead of the queue.
+- **Every slice ends in a build he can play.** A new vehicle is drivable by
+  `?body=<id>` (slice 4) from the slice that adds it, before its stash or its
+  price exists.
+- **Plain words in every message to him**: the car, the pancake, the bike
+  falling over; never body index, drive mode or upright controller.
+- **Every new word has its Polish in the same slice** (`src/ui/pl.ts` with
+  its gender, `tests/ui/lang.test.ts`) and its place in
+  `tests/ui/words.test.ts`.
+- **The phases run in order** (A to K), the slices inside a phase too. Phase
+  J can end at slice 24 by its own rule and the milestone still closes.
+
+## 1. The design
+
+### 1.1 What there is (measured 2026-09-24)
+
+Twenty-eight bodies on five handling presets (`src/sim/vehicle/presets.ts`).
+A body drives as its class with its own footprint and axles; seven (the box
+truck, the bus, the ice-cream truck, the party bus, the gold limo, the street
+sweeper, the hot-dog van) are stretched to their own mass with every force
+scaled; the others keep their class's mass. The traffic, the police and the
+rivals do not use this model: they are boxes steered along their lanes, lent
+a rigid body within 40 m of the player.
+
+The five classes on the playground's straight (the car pins' spawn), full
+throttle, no boost, tier 0:
+
+| Class | Mass | Drive | Torque | 0–50 | 0–60 | 0–100 | Top | 100–0 |
+|---|---|---|---|---|---|---|---|---|
+| muscle car | 1,300 kg | rear | 245 N·m | 2.15 s | 2.78 s | 6.17 s | 172 km/h | 30.0 m |
+| compact | 1,050 kg | front | 150 N·m | 2.77 s | 3.62 s | 8.87 s | 145 km/h | 26.9 m |
+| van | 2,400 kg | rear | 380 N·m | 3.00 s | 3.98 s | 10.15 s | 138 km/h | 36.5 m |
+| sports car | 1,180 kg | rear | 300 N·m | 1.82 s | 2.12 s | 4.30 s | 204 km/h | 20.5 m |
+| police car | 1,620 kg | rear | 290 N·m | 2.45 s | 3.12 s | 6.65 s | 177 km/h | 31.9 m |
+
+What the talk found, each checked in the code:
+
+1. The compact, the first purchase (24,000, the second run's door at minute
+   6.7, DESIGN §3.3), is worse than the free muscle car at every speed; it
+   only brakes shorter and turns tighter. The first new car is a step down.
+2. The upgrades are per class and "drive every body of the class" (§14.6),
+   but a swap retunes the car with `bodyTuning` (`src/sim/life/Life.ts`), not
+   `Garage.tuningFor`: a taxi taken on the street drives stock.
+3. The disguise is the class (`Pursuit.disguised`: `descriptor.kind ===
+   'police'`), not the livery. A borrowed interceptor (heat 2 and up) or
+   police van (heat 4 and up) shows BORROW and the disguise hint, then turns
+   into a plain sports car or van in the garage's paint (a shell takes the
+   garage's paint on a swap) with no disguise. The Fake Cruiser, won at #6,
+   disguises the player exactly as the police car does (120,000 and a
+   five-star escape).
+4. The Chief is two cars: an ink sports car in the chase (`Police.spawn`),
+   the Chief's Cruiser (the police shell in gold trim) in the duel and in the
+   garage.
+5. A body that is not stretched weighs its class's mass in the player's
+   hands and its own on the street: the SUV 2,400 kg against 1,900, the
+   Bubble 1,050 against 550.
+6. The trophies drive exactly as their classes: the Phantom (#1, day two) is
+   the sports car the player bought in hour two; the Bubble, "absurdly fast"
+   in §14.3, is a compact, the slowest class.
+7. Damage changes nothing in the handling until the wreck (only the spike
+   strip pulls).
+8. The whole island grips like asphalt: the ground is one collision plane;
+   grass, the Gardens' lawns and the quarters' soil are paint.
+9. Every car has the same voice: one synthesized V8 (four pulses a
+   revolution, `src/audio/EngineAudio.ts`); the bus and the Bubble sound
+   like the muscle car.
+10. The CARS page shows a car's name, paint and price, never what it is good
+    at.
+
+### 1.2 The rules (decided in the talk)
+
+- **R1. Every class has one job, and its card says it in one word**: the
+  muscle car DRIFT, the compact CITY, the van RAM, the sports car SPEED, the
+  police car DISGUISE; the new 4×4 OFF-ROAD and motorbike JAMS.
+- **R2. The car you beat is the car you get.** Each of the eleven trophies
+  is the best in the game at one thing, and the higher the poster, the bigger
+  the thing: eight by how they drive, the three with connections (Fake
+  Frank, the Mayor's Nephew, the Chief) by a police rule that already
+  exists. The card says BEST AT: …
+- **R3. A new vehicle comes with a place and a verb only it has**: the
+  monster truck drives over cars, the steamroller flattens them, the rocket
+  trolley rides a rocket, the hovercraft crosses water. The card says ONLY
+  IT: …; each is found like the hidden cars, one in each district.
+- **R4. One physics model.** The motorbike and the hovercraft are modes of
+  the car model (the four rays, the engine, the assists), not new engines;
+  every new number is in `VehicleTuning` (the dev panel) and pinned.
+- **R5. No new keys and no ability buttons**: steer, throttle, brake,
+  handbrake, boost, swap and the horn drive everything (the lowrider's hop
+  stays a look).
+- **R6. The fixed rules hold**: always in a vehicle (the rider never leaves
+  the bike; a fall is a tumble of both, upright again within 2 s), no guns
+  (hence no tank), PEGI 12 slapstick (a flattened car is a pancake whose
+  driver climbs out shaking a fist), control never taken for over 2 s,
+  keyboard first and M9's touch layer unchanged, the screen's budget (§17:
+  nothing new on the driving screen; the cards, the one message and the goal
+  line speak).
+- **R7. Every promise is a pin**: a class's job, a trophy's best thing, a
+  new vehicle's verb, measured against every other body, the new ones
+  included.
+
+### 1.3 What stays out, and why
+
+- **A helicopter the player flies.** It ends the chase (the police drive on
+  lanes); the city is built to be seen from the street (from 100 m the whole
+  island is in view, beyond the low tier's 150 draws and 250k triangles); it
+  needs new controls on keys and touch; and there is nothing to do up there.
+  The mega-ramp (slice 21) gives the flight in a car game.
+- **A tank.** No guns (brief §3); a tank that cannot shoot disappoints, and
+  it pulls the tone toward war. The steamroller (slice 11) is the
+  unstoppable thing.
+- **Boats.** A second physics model (waves, buoyancy) and new content for a
+  sea that is a ring round a 1.5 km island. The hovercraft (phase H) opens
+  the sea on the car model; real boats and police boats go to BACKLOG, to
+  follow only if the sea is played.
+- **The compact as the starter** (the brief's first car is fast and drifts,
+  brief M1) and **the compact as a getaway car that loses the police
+  faster** (the police car's job; one question, one answer).
+- **Sand**: the island has no beach. Grass and dirt only (slice 9).
+- Ability buttons and new keys (R5); cosmetics that change handling (§14.4
+  stands).
+
+## 2. Scope
+
+### 2.1 In scope (§3, slices 0–25)
+
+- **A. The first hour**: upgrades after a swap, the Chief in one car; every
+  police car a disguise (0–1).
+- **B. A job for every class**: the compact as the city car; the role on
+  the card (2–3).
+- **C. The car you beat is the car you get**: every body its own mass; the
+  eight drivers' cars; the three with connections and the rival at its car's
+  pace (4–6).
+- **D. The feel**: damage you can feel; a voice per engine (7–8).
+- **E. The ground**: grass and dirt; the 4×4 class (9–10).
+- **F. The crazy cars**: the pancake and the steamroller; the monster
+  truck; the rocket trolley (11–13).
+- **G. Two wheels**: the bike's model; the rider, the look and the sound;
+  scooters in the traffic and the bike in the catalogue; the police and the
+  bike (14–17).
+- **H. The sea**: the hovercraft; the slipways and the sea; the heat at sea
+  and a sea trial (18–20).
+- **I. The mega-ramp** (21).
+- **J. The police and the rivals on the car model**, if the budget holds
+  (22–24).
+- **K. The gate** (25).
+
+### 2.2 Out of scope
+
+§1.3; cop mode, ghosts, multiplayer; new districts or roads (the slipways
+and the mega-ramp are set pieces on existing plots); new job kinds (the sea
+trial is the time trial on a new route); any new dependency;
+`docs/BRIEF.md`; loosening any pin or budget.
+
+### 2.3 Fixed by the brief and still binding
+
+Everything in `docs/M5_PLAN.md` §1.4, and M9's platform rules (the SDK's
+gameplay events round every break the game makes; nothing here adds one).
+
+## 3. Slices
+
+### Phase A — the first hour
+
+#### Slice 0 — upgrades after a swap; the Chief's one car (0.5 day)
+
+A car taken on the street drives with its class's tiers: `Life.swap`
+retunes with `Garage.tuningFor(body)` (was `bodyTuning`), as the drive-out
+does. The Chief in a chase drives the Chief's Cruiser in its own paint:
+`Traffic.spawnPoliceAt` takes a body, `Police.spawn('chief')` places
+`chiefcar`, and the PIT test in `Police` is the sports class or the Chief
+(was the sports class); his speed, range and shove stay `POLICE.chief`.
+Reason: §14.6 promises the class's tiers in every body of the class; the
+player meets one Chief, in the car he later wins.
+
+Files: `src/sim/life/Life.ts`, `src/sim/police/Police.ts`,
+`src/sim/traffic/Traffic.ts`; tests `tests/sim/swap.test.ts`,
+`tests/sim/garage.test.ts`.
+
+Pins: M10 0.1 with the muscle class's power at tier 3, a swap into a taxi
+drives with the taxi's torque × 1.2; at tier 0 the swap's tuning equals
+`bodyTuning` bitwise; 0.2 at level 5 the Chief's record is the `chiefcar`
+body, and the police long pins that read the Chief hold.
+
+#### Slice 1 — every police car is a disguise (1 day)
+
+The descriptor carries `police` (the livery), set by a swap into a record
+with `traffic.police[i] === 1` (a patrol car, an interceptor, a police van,
+a parked cruiser) and by a drive-out in the police car or the Chief's
+Cruiser (`Garage.applyToVehicle`); `Pursuit.disguised` and `markBlown` read
+it, not the class. A borrowed unit keeps its paint (`Life.swap` takes the
+record's paint for a police record) and its livery on the player's car
+(`PoliceView` builds the player's bar and details in the class's style,
+police, sports or heavy, and rebuilds them on a swap). The Fake Cruiser is
+not police: the units know Frank's car (§14.3's disguise is his, in his
+duel). The BORROW prompt and its hint are then true for every unit. Reason:
+§2.5 says "a police-liveried car"; a prompt that promises a disguise must
+give one.
+
+Files: `src/sim/police/Pursuit.ts`, `src/sim/life/Life.ts`,
+`src/sim/garage/Garage.ts`, `src/render/police/PoliceView.ts`; tests
+`tests/sim/identity.long.test.ts` (next to 5.3), `tests/sim/garage.test.ts`.
+
+Pins: 1.1 an interceptor borrowed at heat 2 is disguised until a crime in a
+unit's sight or the dispatcher's 30 s, as 5.3's patrol car is; 1.2 the same
+for a police van at heat 4; 1.3 the borrowed car keeps the police paint; 1.4
+a drive-out in the Fake Cruiser is not disguised, in the police car and the
+Chief's Cruiser it is.
+
+### Phase B — a job for every class
+
+#### Slice 2 — the compact, the city car (1 day)
+
+New numbers for the compact: quicker than the muscle car to about 80 km/h,
+level at 100, slower above. Targets: 0–60 in 2.45 s or less (the muscle car
+2.78), 0–100 within ±0.3 s of the muscle car's, top 140–150 km/h, the
+smallest turning circle of the classes at 20 km/h, and still no power
+oversteer (it never spins on the throttle). The means: shorter gearing and
+more torque low in the curve, the lowest yaw inertia (`inertiaScale.y` about
+0.85), the quickest steering rate (7); the mass stays 1,050 kg. Reason: the
+junctions are 225 m apart (`BLOCK`), so downtown a car lives under 90 km/h;
+the first purchase becomes a different car, not a worse one, and the muscle
+car keeps the highway and the drift.
+
+Files: `src/sim/vehicle/presets.ts`; `tests/sim/cars.test.ts` (the compact's
+row, with a header note as for the six-speed change); `src/app/trackBot.ts`
+(the compact's budget, if its lap moves).
+
+Pins: 2.1 the compact's cars row at the new numbers; 2.2 its 0–60 beats the
+muscle car's by 0.3 s or more; 2.3 its turning circle at 20 km/h is the
+smallest of the classes. Measured at the gate: the city bot's lap in the
+compact and the muscle car, before and after.
+
+#### Slice 3 — the role on the card (0.5 day)
+
+Every CARS card shows its class's job under its name: DRIFT, CITY, RAM,
+SPEED, DISGUISE (POŚLIZG, MIASTO, TARAN, PRĘDKOŚĆ, PRZEBRANIE); a civilian
+body shows its class's; a trophy's BEST AT (slices 5–6) and a new vehicle's
+ONLY IT (slices 11–13, 18) take its place. One line; the card's size and the
+wall's grid unchanged at the ten screen sizes. Reason: R1; the page
+answered "how much" and never "what for".
+
+Files: `src/sim/jobs/catalog.ts` (`ROLE_WORDS` next to `CAR_WORDS`),
+`src/ui/wall/garage.ts`, `src/ui/styles.css`, `src/ui/pl.ts`; tests
+`tests/ui/wall.test.ts`, `tests/ui/words.test.ts`, `tests/ui/lang.test.ts`.
+
+Pins: 3.1 every class has one role word, in both languages; 3.2 a kept
+taxi's card shows DRIFT (its class's).
+
+### Phase C — the car you beat is the car you get
+
+#### Slice 4 — every body its own mass; any body at drive-out (1 day)
+
+`bodyTuning` scales every body that is not a shell to its own mass: the
+stretch's rule for all (`k = spec.mass / class mass` on every force in
+`STRETCHED`), and the `stretch` flag goes. A shell, and a rival on a shell
+(the Twin, the Phantom, the Fake Cruiser, the Chief's Cruiser: k = 1), is
+unchanged bitwise. `SimWorldOptions.body` and `?body=<id>` start in any body
+(the QA hook for every new vehicle, `docs/DEV.md`). A long pin measures every
+body: 0–60, 0–100, top, 100–0, the 60 km/h pulse, the skidpad's held drift
+angle, the steady skidpad speed, the damage of a 10 m/s wall hit, how long a
+full boost meter lasts; its table goes into the gate report. Reason: finding
+5; R2 and R7 need every body measured.
+
+Files: `src/sim/traffic/bodies.ts`, `src/sim/SimWorld.ts`,
+`src/app/App.ts`, `tests/sim/helpers.ts`, `tests/sim/bodies.long.test.ts`
+(new), `docs/DEV.md`.
+
+Pins: 4.1 each shell's tuning at tier 0 equals its preset bitwise (stands);
+4.2 every other body's 0–100 lies within ±10 % of its class's (the mass
+scales every force); 4.3 the Bubble drives out at 550 kg, the SUV at 1,900;
+4.4 (long) the table of every body.
+
+#### Slice 5 — the eight drivers' cars (2 days)
+
+Each gets its own numbers on its class (a `tune` block in its `BodySpec`,
+applied after the mass: engine, gearing, grip, suspension, boost, steering)
+and is the best in the game at one thing; every other body loses, the new
+vehicles of phases E to H included:
+
+| # | Car | BEST AT | Target |
+|---|---|---|---|
+| 10 | Wagon | DRIFTS | the widest held skidpad drift (40° or more); the blower's +20 % torque |
+| 9 | Pizza Hatch | AGILITY | the largest 60 km/h pulse |
+| 8 | Wrecker | TOUGHNESS | half the damage of the same wall hit (`BodySpec.armour` 2, read by `Life`'s damage; the hunt gave it twice the armour) |
+| 7 | Twin | GRIP | the highest steady skidpad speed |
+| 5 | Party Bus | RAMMING | the largest mass × top speed; its 0–100 within 10 % of the van's |
+| 4 | Lowrider | BOOST | the longest boost: a full meter lasts longest |
+| 2 | Bubble | ACCELERATION | the quickest 0–100 (3.9 s or less; the sports car 4.30), top 185 km/h or less |
+| 1 | Phantom | TOP SPEED | the highest top speed without boost (220 km/h or more) |
+
+The card says BEST AT: …, its Polish adjective agreeing with the car
+(§19, the genders in `pl.ts`). The upgrades stay per class, on top. Reason:
+R2; finding 6.
+
+Files: `src/sim/traffic/bodies.ts`, `src/sim/life/Life.ts` (the armour),
+`src/sim/jobs/catalog.ts`, `src/ui/wall/garage.ts`, `src/ui/pl.ts`; tests
+`tests/sim/bodies.long.test.ts`, `tests/sim/cars.test.ts` (a body table for
+the eight, long), `tests/ui/words.test.ts`.
+
+Pins: 5.1 (long) each car beats every other body at its thing; 5.2 (long)
+each passes the car pins in its own window (rests, 0–100 and top, brakes,
+holds a drift, the kerb and the ramp); 5.3 the card's line in both
+languages.
+
+#### Slice 6 — the three with connections; the rival at its car's pace (1 day)
+
+- **Fake Frank's cruiser, BEST AT: CLEARING THE ROAD.** Its disco bar is
+  lit: the civilians ahead pull over for it as for a lit unit
+  (`Traffic.litBehind` counts the player in it); the police know it (slice
+  1).
+- **The Mayor's Nephew's gold limo, BEST AT: GETTING BUSTED.** Busted in
+  it, the uncle pays: the bag keeps `BALANCE.prep.lawyerKeep` (three
+  quarters), as with the lawyer (`Run`); with the lawyer too it is still
+  three quarters.
+- **The Chief's Cruiser, BEST AT: DISGUISE.** Nobody reports the Chief's
+  car missing: its disguise has no dispatcher's clock (`coverLeft` does not
+  run); a crime in a unit's sight still blows it.
+- **A rival in a duel accelerates at its car's rate**: `BodySpec.aiAccel`
+  (m/s², the lane follower's acceleration for that record; 0 keeps
+  `TRAFFIC.accel`), set from the car's measured 0–60 in slice 4's table; the
+  race pace and the rubber band stay `BALANCE.board`'s.
+
+Reason: R2; the duel shows the car you will win (the Bubble leaves the
+lights first).
+
+Files: `src/sim/traffic/Traffic.ts`, `src/sim/traffic/bodies.ts`,
+`src/sim/run/Run.ts`, `src/sim/police/Pursuit.ts`, `src/sim/jobs/Race.ts`,
+`src/ui/wall/garage.ts`, `src/ui/pl.ts`; tests `tests/sim/run.test.ts`,
+`tests/sim/identity.long.test.ts`, the traffic and race pins.
+
+Pins: 6.1 a civilian with the player's fake cruiser 40 m behind on its lane
+pulls over; 6.2 busted in the limo keeps three quarters, with or without
+the lawyer; 6.3 the Chief's Cruiser's disguise holds past 30 s and blows on
+a seen crime; 6.4 from a stop the Bubble's rival reaches 60 km/h before a
+sedan's record does.
+
+### Phase D — the feel
+
+#### Slice 7 — damage you can feel (0.5 day)
+
+From stage 2 the engine gives `DAMAGE.handling.torque` of its torque (0.92
+at stage 2, 0.85 at stage 3) and the car pulls toward the side of the hit
+that raised the stage (`lateralPull`, 0.25 and 0.5 of the spike's
+`POLICE.spike.pull`); a swap, the door or a fresh car clears both, as they
+clear the damage. Reason: finding 7; the car itself says it is hurt,
+nothing new on the screen, and mild enough that control is never taken.
+
+Files: `src/sim/economy.ts` (`DAMAGE`), `src/sim/life/Life.ts`,
+`src/sim/vehicle/Vehicle.ts`; tests the life pins.
+
+Pins: 7.1 at stage 3, 100 m at 80 km/h with no steering drifts 0.5–1.5 m
+sideways; 7.2 at stage 3 the 0–100 is at most 15 % slower; 7.3 a swap clears
+both.
+
+#### Slice 8 — a voice per engine (1 day)
+
+`EngineAudio` takes a voice per body from a table (`src/audio/voices.ts`,
+new): the pulses a revolution (a V8's 4 for the muscle car and the police
+car; a four's 2 for the compact and the city hatchbacks; a six's 3 for the
+sports car; a diesel's 2 on a rattle of noise for the van, the trucks, the
+buses, the sweeper and the steamroller; a single's for the scooter and a
+twin's for the bike; a two-stroke's buzz for the Bubble; the hovercraft's
+fan, a blade tone and a hiss; the trolley's rocket, a roar of noise), the
+oscillators' mix and the filter's range; a swap crossfades 0.3 s. Each new
+vehicle's slice adds its voice. Reason: finding 9; the ear tells the class.
+
+Files: `src/audio/EngineAudio.ts`, `src/audio/voices.ts` (new); tests
+`tests/audio/voices.test.ts` (new).
+
+Pins: 8.1 every body in `BODY_IDS` has a voice; 8.2 a class's civilian
+bodies share its voice unless the table names their own.
+
+### Phase E — the ground
+
+#### Slice 9 — grass and dirt (1.5 days)
+
+A surface map (`src/sim/city/surface.ts`, new): a grid of 2 m cells over
+the island (788 × 788 bytes, about 620 kB), built with the city from its
+ground statics, the topmost over each cell deciding: asphalt (roads, kerbs,
+the paved yards, the plazas, the promenade), grass (the ground under the
+blocks, the parks, the Gardens' lawns, the parkway's verges), dirt (the
+quarters' soil). The playground reads asphalt everywhere. Each wheel reads
+its cell in O(1) and scales its grip and its rolling resistance by
+`SURFACE[kind][class]`: a road car on grass ×0.65 grip and ×4 rolling, on
+dirt ×0.75 and ×3; the 4×4 (slice 10) ×0.95 and ×1.5 on grass, ×1.0 and ×1.2
+on dirt. Skid marks draw on asphalt only; on grass and dirt the tyre smoke's
+particles come up in the ground's colour (no new effect). The traffic never
+leaves asphalt; the police and the bots are unchanged. Reason: finding 8; a
+shortcut through a park costs something, and the 4×4 gets its place.
+
+Files: `src/sim/city/surface.ts` (new), `src/sim/city/City.ts`,
+`src/sim/vehicle/Vehicle.ts`, the skid and smoke views; tests
+`tests/sim/surface.test.ts` (new).
+
+Pins: 9.1 known points read their surface (a park lot's centre grass, a
+lane asphalt, a Gardens quarter's soil dirt); 9.2 the muscle car's 0–100 on
+the park strip's lawn is at least 30 % slower than on the road; 9.3 the
+wheels' read allocates nothing (the gc pin); 9.4 the car pins on the
+playground unchanged.
+
+#### Slice 10 — the 4×4 class (1.5 days)
+
+A sixth class, `offroad` (`CAR_WORDS` 4×4, TERENÓWKA; the role OFF-ROAD,
+TEREN): about 1,950 kg, four-wheel drive (`driveFrontShare` 0.45), 360 N·m
+at a 6,000 rpm redline, a long soft suspension (rest length 0.42 m), 0.42 m
+wheels, grip 2.0 / 2.05 on asphalt, top about 160 km/h; best on grass and
+dirt (slice 9's factors). Its shell `offroad` (a boxy 4×4 on high wheels,
+`src/render/cars/carProfiles.ts`) is appended after the last body; the SUV
+and the pickup move to it (their `BodySpec.car`); the catalogue sells it at
+40,000 (between the van and the sports car; the balance's first hours gain
+it); the police never field it; the save keys the tiers by class id, so an
+old save reads the new class at [0, 0, 0] with no migration.
+`TRACK_BOT_BY_CAR` gets its budget derived from mu, mass and downforce,
+which closes BACKLOG's line on the hand-set budgets. Reason: R1; slice 9's
+ground needs a car that wins there.
+
+Files: `src/sim/vehicle/presets.ts`, `src/sim/traffic/bodies.ts`,
+`src/sim/traffic/Traffic.ts` (the class tables), `src/sim/traffic/tuning.ts`,
+`src/sim/jobs/catalog.ts`, `src/sim/balance.ts`,
+`src/render/cars/carProfiles.ts`, `src/render/cars/PlayerCar.ts`,
+`src/render/police/PoliceView.ts`, `src/audio/Sfx.ts`, `src/audio/voices.ts`,
+`src/app/trackBot.ts`, `src/ui/pl.ts`; tests `tests/sim/cars.test.ts` (its
+row), `tests/sim/garage.test.ts`, `tests/sim/save.test.ts`,
+`tests/render/bodies.test.ts`.
+
+Pins: 10.1 its cars row (0–100 7.5–9 s, top 150–170, brakes 25–40 m, the
+drift band, the kerb and the ramp); 10.2 on the lawn its 0–100 beats every
+other class's, on asphalt the muscle car beats it; 10.3 an old save loads
+with the class at tier 0 and a kept SUV as a 4×4; 10.4 §7's index traps
+pinned: a descriptor packed for a 4×4 unpacks to the 4×4, and every
+per-class table has a row for it.
+
+### Phase F — the crazy cars
+
+Each is a hidden car (`src/sim/city/stash.ts`), one in each district, found
+by a swap into it and owned for good (price 0); its card says ONLY IT: …;
+under 3,000 triangles.
+
+#### Slice 11 — the pancake and the steamroller (1.5 days)
+
+The pancake: `Traffic.flatten(agent)` wrecks a record and squashes it (the
+render draws its wreck 0.25 high and 1.1 wide and long, its pose kept as
+M8.6 keeps it), its driver climbs out shaking a fist (the pedestrians'
+`spawnAt` with the fist pose, as a swap does), and a `flatten` event plays a
+comic crunch; a flattened unit counts as a takedown. The steamroller
+(`roller`, the van class, 9,000 kg, top 35 km/h, a front drum 1.5 m across
+and 1.9 m wide): every record its drum touches is flattened, at any speed,
+a parked unit and a roadblock's cars too (a roadblock flattened counts as
+breached). Found in the Works' yard. ONLY IT: FLATTENS CARS. Reason: R3;
+the tank's fantasy without a gun (§1.3).
+
+Files: `src/sim/traffic/Traffic.ts`, `src/sim/traffic/bodies.ts`,
+`src/sim/life/Life.ts` (the contact), `src/sim/police/Roadblocks.ts`,
+`src/sim/city/stash.ts`, `src/sim/events.ts`,
+`src/render/traffic/TrafficView.ts`, `src/render/cars/bodyProfiles.ts`,
+`src/audio/Sfx.ts`, `src/audio/voices.ts`, `src/ui/pl.ts`; tests
+`tests/sim/flatten.test.ts` (new).
+
+Pins: 11.1 a sedan's record touched by the drum at 10 km/h is a flattened
+wreck, its driver out, one event; 11.2 a roadblock's car flattened breaches
+the roadblock; 11.3 the steamroller's top speed is 30–40 km/h; 11.4 its
+stash spot is clear ground in the Works' yard.
+
+#### Slice 12 — the monster truck (1.5 days)
+
+`monster` (the 4×4 class, 4,200 kg, 0.95 m wheels, 0.7 m of travel, the
+chassis' underside above 1.6 m so a car passes under it): its wheels' rays
+land on cars (they already meet everything but props, `QUERY_NOT_PROP`), so
+it climbs them; a record with one of its wheels on it for 0.2 s is flattened
+(slice 11). Found on the Gardens' park strip by the jumps. ONLY IT: DRIVES
+OVER CARS. Reason: R3; the best picture the game can put on its cover.
+
+Files: `src/sim/traffic/bodies.ts`, `src/sim/vehicle/Vehicle.ts` (the
+wheel's hit handle to the flatten), `src/sim/city/stash.ts`,
+`src/render/cars/bodyProfiles.ts`, `src/audio/voices.ts`, `src/ui/pl.ts`;
+tests `tests/sim/flatten.test.ts`.
+
+Pins: 12.1 at 30 km/h into a parked sedan it climbs (the chassis rises 0.6 m
+or more), flattens it and stays upright (upness over 0.9); 12.2 it rests
+without creeping and lands the 16° ramp (its body row); 12.3 a unit under
+its wheels is a takedown.
+
+#### Slice 13 — the rocket trolley (1 day)
+
+`trolley` (the compact class, 180 kg with its rider): almost no engine (a
+walking pace on the throttle alone); the rocket is the boost, and its meter
+refills by itself (`boostRegen`, a new tuning number, 0.25 a second here and
+0 on every other car); the steering of a brick (the lock 12° slow, 2° fast).
+Targets: on the rocket 0–100 in 4.0–4.5 s (after the Bubble) and a top of
+180–195 km/h. Its rider is a seated figure from the pedestrians' kit, reused
+by the bike (slice 15); the rocket's flame is the boost flame the kit
+colours. Found in Crown Heights. ONLY IT: RIDES A ROCKET. Reason: R3; the
+silliest thing on the island, and the highway is its road.
+
+Files: `src/sim/vehicle/tuning.ts`, `src/sim/vehicle/Vehicle.ts`,
+`src/sim/traffic/bodies.ts`, `src/sim/city/stash.ts`,
+`src/render/cars/bodyProfiles.ts`, `src/audio/voices.ts`, `src/ui/pl.ts`;
+tests `tests/sim/bodies.long.test.ts`.
+
+Pins: 13.1 on the rocket its 0–100 and top in their windows; 13.2 at 100
+km/h a full-lock pulse turns it less than any other body that reaches 100;
+13.3 its meter refills from empty in 4 s, and every other car's
+`boostRegen` is 0.
+
+### Phase G — two wheels
+
+#### Slice 14 — the bike's model (2 days)
+
+A seventh class, `moto` (MOTORBIKE, MOTOR; the role JAMS, KORKI): the car
+model in a two-wheel mode (`twoWheel` 1). The four rays sit on a 0.1 m
+track; an upright controller holds the roll at a lean target (the angle of
+the lateral acceleration, at most `leanMaxDeg` 50°; `leanGain`,
+`leanDamping`); the anti-roll is off. A fall is a tumble: a hit over
+`tumbleImpact` (9 m/s), or a lean past `tumbleDeg` (70°) under 5 m/s, drops
+the upright controller for `tumbleSeconds` (1.2 s), bike and rider as one,
+then the flip recovery rights it (within 2 s, R6). The handbrake is the rear
+brake's slide (the drift controller stands). About 290 kg with its rider, 95
+N·m at an 11,000 rpm redline, 0–100 about 4.6 s (after the Bubble and the
+sports car), top about 175 km/h. Its shell `moto` is appended after the last
+body. Reason: R1, R4; motorbike games are among the portal's most played,
+and a bike uses the whole city.
+
+Files: `src/sim/vehicle/tuning.ts`, `src/sim/vehicle/Vehicle.ts`,
+`src/sim/vehicle/presets.ts`, `src/sim/traffic/bodies.ts`, the class
+tables (§7); tests `tests/sim/bike.test.ts` (new), `tests/sim/cars.test.ts`
+(its row).
+
+Pins: 14.1 its cars row (rests upright, 0–100 4.2–5.2 s, top 165–185,
+brakes, the kerb, the 16° ramp landed upright); 14.2 in a 0.5 g turn it
+leans 25–30° and holds its line; 14.3 a slalom at 60 km/h without a fall;
+14.4 a 12 m/s wall hit tumbles it and it drives again within 2 s; 14.5 at
+rest it stands without creeping.
+
+#### Slice 15 — the rider, the look, the sound (1.5 days)
+
+The rider: slice 13's figure astride, with a helmet (under 1,500
+triangles), leaning with the bike, arms up in a tumble. The driver's kit
+travels: the topper on the helmet, the neon under the bike; spoilers and
+stances do not fit (`kit.fits`). The bike (a sport bike, under 3,000
+triangles); the camera's fit for a small body (closer and lower, as
+`CameraDirector.onSwap` fits a big one); a twin's voice. Reason: the player
+sees who rides, and a duck on a helmet is the kit's best joke.
+
+Files: `src/render/cars/bikeMesh.ts` (new), `src/render/cars/PlayerCar.ts`,
+`src/render/camera/CameraDirector.ts`, `src/sim/garage/kit.ts`,
+`src/audio/voices.ts`; STYLE (Vehicles: the bike, the rider); tests
+`tests/render/bodies.test.ts`.
+
+Pins: 15.1 the rider and the bike under their triangle budgets; 15.2 no car
+part fits the bike, and the topper seats on the helmet.
+
+#### Slice 16 — scooters in the traffic, the bike in the catalogue (1 day)
+
+A civilian `scooter` (the bike class; its own numbers: top 70 km/h, a
+delivery box) spawns at a share of 0.05 of the traffic (×2 in Crown Heights
+and on the Quay, never on the highway, `TRAFFIC.bodies`); it keeps its lane
+like any record, on a narrow footprint; a swap takes it. The catalogue's bike
+at 36,000 (after the van; the balance's first hours gain it). Reason: the
+swap's fantasy ("any vehicle you see") reaches two wheels, and the player
+tries the class before paying for it.
+
+Files: `src/sim/traffic/bodies.ts`, `src/sim/traffic/tuning.ts`,
+`src/sim/balance.ts`, `src/render/traffic/` (the scooter among the instanced
+traffic), `src/ui/pl.ts`; tests `tests/sim/swap.test.ts`,
+`tests/sim/garage.test.ts`, `tests/render/trafficMesh.test.ts`.
+
+Pins: 16.1 scooters spawn at their share by district and road (seed 42, the
+spawn pins' method); 16.2 a swap onto a scooter hands over the speed and the
+two-wheel tuning; 16.3 the bike can be bought at 36,000.
+
+#### Slice 17 — the police and the bike (1 day)
+
+The arrest boxes a bike by its footprint (the slots close in); a ram or a
+PIT on a bike is a tumble, not a wreck, unless the damage wrecks it; a
+unit's shove on a bike is `POLICE.bikeShove` (0.6) of a car's; the bots'
+policies run a bike case. Reason: the chase is the game; a bike must be
+caught, and able to get away, by the same rules as a car.
+
+Files: `src/sim/police/Police.ts`, `src/sim/police/tuning.ts`,
+`src/sim/life/Life.ts`, `src/app/botPolicy.ts`; tests
+`tests/sim/police.long.test.ts`, the bot pins.
+
+Pins: 17.1 a stopped bike is boxed and busted as a car is; 17.2 a ram at 20
+km/h tumbles it and it drives on within 2 s; 17.3 (gate, the balance) the
+busted rate on a bike at level 3 within ±25 % of the muscle car's.
+
+### Phase H — the sea
+
+#### Slice 18 — the hovercraft (1.5 days)
+
+The car model in a hover mode (`hover` 1): the four rays are the air
+cushion (their springs as today, no tyre force), with a low side drag
+(`hoverSideDrag`) and a drag along (`hoverDrag`); the fan pushes along the
+nose (`fanThrust`, scaled by the power tier); the rudder yaws it
+(`rudderTorque`, with the thrust and the speed); the handbrake spins it; the
+drift controller is off. `hover` is the 4×4 class for the tiers and the
+police, found at the Quay's south slipway (slice 19). ONLY IT: CROSSES
+WATER. On a road it slides as on ice (the joke), on water it runs. Reason:
+R3, R4; the sea on the car model (§1.3).
+
+Files: `src/sim/vehicle/tuning.ts`, `src/sim/vehicle/Vehicle.ts`,
+`src/sim/traffic/bodies.ts`, `src/render/cars/bodyProfiles.ts` (the skirt,
+the fan), `src/audio/voices.ts`, `src/ui/pl.ts`; tests
+`tests/sim/hover.test.ts` (new).
+
+Pins: 18.1 on asphalt it reaches 80 km/h with its lateral grip under 0.3 g;
+18.2 no tyre force on any surface; 18.3 a full turn at 60 km/h slides wide
+and stays upright; 18.4 at rest it hovers without creeping.
+
+#### Slice 19 — the slipways and the sea (1.5 days)
+
+Two slipways in Coral Quay's seawall, on its south and east edges clear of
+the pier: a ramp from the promenade down to the water (−0.5 m, the rendered
+sea's level). A water collider at that level in a new group, `GROUP_WATER`,
+that only the hovercraft's rays meet (`QUERY_NOT_PROP` and every other
+chassis filter exclude it); at a slipway the boundary is in a group only
+the hovercraft's chassis passes, so every other car stops at its top; the
+sea's edge, `seaLimit` (180 m out from the seawall, the big map's shallows),
+holds the hovercraft in. The radar and the full map draw the player at sea.
+Reason: the sea has to be reached somewhere, and only by the one car built
+for it.
+
+Files: `src/sim/collision.ts`, `src/sim/city/City.ts` (the slipways, the
+colliders), `src/sim/city/stash.ts`, `src/render/city/CityView.ts` (the
+ramps), `src/ui/map/minimap.ts`, `src/ui/map/bigmap.ts`; tests
+`tests/sim/sea.test.ts` (new).
+
+Pins: 19.1 the hovercraft drives down a slipway, 150 m out and back up; 19.2
+a muscle car stops at the slipway's top; 19.3 no car but the hovercraft has
+a ray that meets water; 19.4 the hovercraft cannot pass `seaLimit`.
+
+#### Slice 20 — the heat at sea; the sea trial (1 day)
+
+The units stay ashore (their lanes end at the seawall); the helicopter
+(heat 4 and up) flies over the water as it flies over everything, and the
+sea has no cover, so its light holds a hovercraft at sea until it is back
+under a roof or an overpass. A sea trial: the time trial on a route of
+buoys round the pier and along the Quay, its medals as every trial's, its
+coins as its line (§13.5), its ring at the south slipway; the way (M8.7)
+draws its route by road to the slipway, then along the buoys. Reason: the
+sea is an escape until the stars reach four, and a trial gives it a goal.
+
+Files: `src/sim/jobs/` (the trial's route), `src/sim/run/way.ts`,
+`src/sim/city/` (the buoys), `src/render/run/MarkerView.ts`,
+`src/sim/police/Helicopter.ts` (read, likely unchanged); tests
+`tests/sim/sea.test.ts`, `tests/sim/jobs.test.ts`.
+
+Pins: 20.1 at heat 3 a hovercraft beyond the units' sight escapes by the
+cooldown; 20.2 at heat 4 the helicopter keeps it seen at sea; 20.3 the sea
+trial finishes on its buoys and pays a medal; 20.4 the route to the sea
+trial's ring runs by road to the slipway, then along the buoys.
+
+### Phase I — the mega-ramp
+
+#### Slice 21 — the mega-ramp (1 day)
+
+One ramp in the Works up a gantry crane's side, launching over a street
+onto a long landing slope: about 4 s in the air, the camera's air height as
+today, 0.6 s of slow motion at the apex (the takedown's; control stays), the
+twenty-first stunt jump (the jumps' counter, 1,500 into the bag). The frame
+at the apex is measured on the low tier at the gate: its draws and
+triangles within 150 and 250k, else the ramp comes down until they are (the
+budget wins). Reason: §1.3's helicopter; the flight, in a car game.
+
+Files: `src/sim/city/jumps.ts`, `src/sim/city/City.ts`,
+`src/sim/balance.ts`, `src/render/camera/ChaseCamera.ts` (read); tests
+`tests/sim/jumps.test.ts`.
+
+Pins: 21.1 the muscle car at full boost from the run-up lands upright on
+the landing slope; 21.2 the jump counts once; 21.3 (gate) the apex frame's
+draws and triangles on the low tier.
+
+### Phase J — the police and the rivals on the car model
+
+This phase changes what a chase is made of. It ships only if slice 24's
+budget holds; the milestone closes either way.
+
+#### Slice 22 — the AI driver; the rivals on the car model (2 days)
+
+An AI driver (`src/sim/ai/Driver.ts`, new) drives a `Vehicle` along a
+record's path: it steers at a lookahead point, and its throttle and brake
+hold the plan's speed inside a lateral grip budget (the track bot's method,
+the budget derived as in slice 10). A duel's rival drives a physical car of
+its body within `physicalRadius` (40 m) of the player and hands back to its
+lane record when far, as a lent body does; a stalled car (under 1 m/s for 3
+s off its lane) goes back to its lane out of view. Reason: a rival that
+slides and crashes as the player does makes a real race, and it is the
+first step toward the police on the same model (M8.6's "solid cars"
+finished).
+
+Files: `src/sim/ai/Driver.ts` (new), `src/sim/traffic/Traffic.ts`,
+`src/sim/jobs/Race.ts`, `src/sim/board/Board.ts`; tests
+`tests/sim/driver.test.ts` (new), the race and board pins.
+
+Pins: 22.1 on the playground's track the AI driver laps within 10 % of the
+track bot in the same car; 22.2 (long) #10's race at seed 42 finishes with
+a physical rival within ±15 % of the lane rival's time; 22.3 (long) no rival
+flips at a junction in 20 races.
+
+#### Slice 23 — the police on the car model (2 days)
+
+The `physicalUnits` (4) nearest units drive physical police cars through the
+AI driver: their ram and their PIT come from the car's motion toward the
+plan's aim point (the shove accelerations retire for physical units), and
+the arrest's slots are reached by braking into them; the rest stay lane
+records. Reason: a hit is two masses, and a PIT is a car's nose on a rear
+quarter.
+
+Files: `src/sim/police/Police.ts`, `src/sim/police/tuning.ts`,
+`src/sim/ai/Driver.ts`, `src/sim/traffic/Traffic.ts`; tests the police long
+pins.
+
+Pins: 23.1 (long) the police pins (the box, the arrest, the PIT, the Chief,
+the roadblocks) hold with physical units; 23.2 (gate, the balance) the
+busted rate at level 3 within ±25 % of the lane police's.
+
+#### Slice 24 — the budget decides (0.5 day)
+
+`npm run perf` twice against the phase's start, with 4 physical units and a
+rival: the sim step p95 under 4× CPU rises by 2 ms at most and the frame
+p95 does not rise; the mobile tier keeps `physicalUnits` 0 unless M9's phone
+numbers hold with it. If it fails, `physicalUnits` and the rivals' physical
+mode ship at 0 (the code stays, pinned off) and the numbers go to BACKLOG;
+the budget is never loosened.
+
+Pins: 24.1 with `physicalUnits` 0 every pin from before the phase is
+unchanged.
+
+### Phase K — the gate
+
+#### Slice 25 — the gate
+
+`npm run verify:gate`; `perf` against M9's launch build; `game`, `heat`,
+`life`, `city`, `screens` (the CARS page with its lines, a bike, the
+hovercraft at sea, the mega-ramp's apex, at the ten sizes); `balance` (the
+first hours with the 4×4 at 40,000 and the bike at 36,000); slice 4's table
+of every body; the reading check: every card says what its car is for, in
+Polish and in English. Report `docs/M10_REPORT.md`; 0.10.0.
+
+## 4. Verification
+
+### 4.1 Headless tests
+
+About 90 new pins across §3's files; no pin loosened. The pins that must
+change, each with its reason in PROGRESS when it does: the compact's cars
+row (slice 2); the swap's tuning (slice 0); the disguise's class test
+(slice 1); pins that swap into a civilian body and read a mass-dependent
+outcome (slice 4); pins that assume five classes (slices 10, 14).
+
+### 4.2 e2e (at the gate)
+
+`game.spec.ts` gains `?body=monster` over a parked car, a bike through the
+avenue, the hovercraft down the slipway; `heat.spec.ts` a borrowed
+interceptor's disguise; `screens.spec.ts` the CARS page, the bike and the
+sea at the ten sizes; `city` and `life` unchanged.
+
+### 4.3 Performance protocol
+
+Bases: M9's launch build, `npm run perf` twice. Expected costs: a mesh per
+new body, built once; four surface reads a step; a matrix per pancake; one
+water collider; phase J the only real cost (a `Vehicle` step is about 0.14
+ms in Node, BACKLOG's M1 measurement, so four units and a rival add about
+0.7 ms). A frame p95 above the bases in both runs is a regression to fix
+before the gate.
+
+### 4.4 Budgets that must hold at the gate
+
+| Check | Limit | Where |
+|---|---|---|
+| `npm run verify:gate` | green, lint 0 warnings | tools/verify.mjs |
+| Startup bytes before gameplay-start | ≤ 8 MB target, 12 MB fail | tools/budget.mjs |
+| Time to control, 20 Mbit + CPU ×4 | ≤ 6 s | e2e/city.spec.ts |
+| Sim step p95 under 4× | < 12 ms | e2e/perf.spec.ts |
+| Frame p95 under 4×, real GPU | < 33.4 ms | e2e/perf.spec.ts |
+| Draws / tris, low tier, the mega-ramp's apex included | 150 / 250k | e2e/city.spec.ts |
+| A new body | < 3,000 triangles | tests/render/bodies.test.ts |
+| The rider | < 1,500 triangles | tests/render/bodies.test.ts |
+| The surface grid | < 1 MB | tests/sim/surface.test.ts |
+| JS heap | ≤ 250 MB | perf |
+| Save, everything filled | < 32 kB | tests/sim/save.test.ts |
+
+## 5. Records
+
+PROGRESS entries per slice; `docs/M10_REPORT.md` at the gate with slice 4's
+table; ARCHITECTURE records for a body's own mass and numbers (slice 4), the
+surface map (9), a class whose shell is not at its class's index (10), the
+two-wheel and hover modes (14, 18), the water group (19), the AI driver
+(22–23); STYLE for the new bodies, the rider, the pancake, the slipways;
+BACKLOG for boats and police boats (§1.3) and whatever phase J leaves; DEV
+for `?body=`; `docs/CRAZYGAMES.md` for the update's cover picture (the
+monster truck on a police car).
+
+## 6. Gate criteria (definition of done for M10)
+
+1. Slices 0–24 committed with their pins; phase J shipped on or off by slice
+   24's rule, its numbers quoted.
+2. `verify:gate`, `game`, `heat`, `city`, `life`, `screens`, `balance`
+   green; the images inspected; the perf A/B quoted.
+3. Every budget in §4.4 holds.
+4. Every class's job, every trophy's best thing and every new vehicle's verb
+   is pinned (R7) and read on its card in both languages.
+5. No per-frame allocation in the new paths (the surface read, the flatten,
+   the upright controller, the hover, the AI driver); layering intact; no
+   new dependency; `docs/BRIEF.md` untouched; every earlier pin unchanged
+   except those §4.1 names.
+6. Marcin's playtest notes in PROGRESS; the next step on his word.
+
+## 7. API facts and traps
+
+- `BODIES` is appended, never renumbered (the header of
+  `src/sim/traffic/bodies.ts`): a new class's shell goes after the last
+  body, so for `offroad` and `moto` the class's index is not its shell's body
+  index. Everything that assumes it must read the class through
+  `BODIES[index].car`: `isShell` (today `BODY_INDEX[body] <
+  CAR_IDS.length`), the descriptors (`src/sim/jobs/catalog.ts` packs
+  `CAR_IDS.indexOf(kind)`, `unpackDescriptor` reads `BODY_IDS`), `Jobs`
+  reading `CAR_IDS[(descriptor >>> 24) & 0xff]`, Traffic's `KINDS`,
+  `KIND_INDEX`, its per-class tables and `PLAYER_PAINT`, `PoliceView`'s
+  liveries, `Sfx`'s honk by class index, `PlayerCar.classes`, the garage's
+  tiers, `TRACK_BOT_BY_CAR`, `CAR_WORDS`, `TRAFFIC.mass` and `classPace`.
+- The wheels' rays already meet traffic bodies (`QUERY_NOT_PROP` leaves out
+  props only): the monster truck climbs cars with no new query, and the
+  water group has to be left out of that query for every other car.
+- `Life.swap` sets the paint: a shell takes the garage's paint; a police
+  record must keep its own (slice 1).
+- The dispatcher's clock is `Pursuit.coverLeft`, set by a swap and by the
+  drive-out (`Garage.applyToVehicle`).
+- Scaling to a body's mass with `STRETCHED` keeps a class's accelerations;
+  the yaw inertia grows with the footprint (`Vehicle` builds it from the
+  collider's box), so a long body turns slower, as intended.
+- `Vehicle` has four wheels by index (FR, FL, RR, RL): the bike keeps four on
+  a 0.1 m track and draws two; its anti-roll is off; the flip recovery ends
+  a tumble.
+- The hover mode: the rays' springs lift it; no tyre force along or across;
+  the throttle drives the fan; the drift controller is off.
+- `EngineAudio` has one voice: keep its nodes and change their parameters
+  per voice; a swap crossfades.
+- `Traffic.litBehind` reads the units only; the fake cruiser is the player,
+  not a record.
+- The rendered sea is a plane at −0.5 m (`CityView`); the physical edge is
+  an invisible 4 m boundary plus the visible walls (the `boundary` statics
+  in `City.ts`).
+- `PoliceView` builds the player's livery once, for the police class; it has
+  to follow the body.
+- Polish: the role words and the BEST AT lines agree with the car's gender
+  (`pl.ts`'s genders).
+- M9's touch layer drives the bike and the hovercraft with the same controls;
+  nothing here adds a control.
+
+## 8. Five-minute playtest script (for the gate report)
+
+1. `?fresh=1`, the compact at the second door: downtown, quicker than the
+   muscle car; on the highway, slower?
+2. At heat 2, borrow an interceptor: do the police drive past, and is it
+   still in police colours?
+3. `?body=bubble` off the lights; `?body=phantom` on the highway.
+4. `?body=roller` into traffic and into a roadblock; `?body=monster` over a
+   parked car.
+5. Take a scooter from the traffic; ride the bike through a jam on the
+   avenue; hit a wall: up again at once?
+6. `?body=hover` down the Quay's slipway and out to sea at heat 3, then at
+   heat 4.
+7. The mega-ramp in the Works.
+8. CARS: does every card say what its car is for.
+9. Report the vehicle you drove longest and the one you left after a minute.
+
+## 9. Knobs
+
+`VehicleTuning` (the dev panel): `twoWheel`, `leanMaxDeg`, `leanGain`,
+`leanDamping`, `tumbleImpact`, `tumbleDeg`, `tumbleSeconds`, `hover`,
+`fanThrust`, `hoverDrag`, `hoverSideDrag`, `rudderTorque`, `boostRegen`.
+`BodySpec`: `tune`, `armour`, `aiAccel`. `SURFACE`
+(`src/sim/city/surface.ts`). `DAMAGE.handling` (`src/sim/economy.ts`).
+`TRAFFIC.bodies` (the scooter's share) and the pancake's squash.
+`POLICE.bikeShove`, `physicalUnits`, `physicalRadius`. `BALANCE.prices`
+(`offroad`, `moto`). `seaLimit`. The mega-ramp in `src/sim/city/jumps.ts`.
+The voices in `src/audio/voices.ts`.
+
+## 10. Reviewer checklist (Claude, at the gate)
+
+R1–R7 honoured: a job, a best thing or a verb for every vehicle, each pinned
+and on its card; no new key; the fixed rules. §1.3 stayed out. Each trap of
+§7 handled. The pins changed only where §4.1 names them, each with its
+reason in PROGRESS. Phase J's decision quoted with its numbers.

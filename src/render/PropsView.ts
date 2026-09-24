@@ -6,7 +6,7 @@
  * grows (doubles) the rare time more of it lie at once than it holds.
  */
 import * as THREE from 'three';
-import { PROP_KINDS, PROP_TYPES, PropState, type PropKind, type SimWorld, type StaticDesc } from '../sim';
+import { PROPS, PROP_KINDS, PROP_TYPES, PropState, type PropKind, type SimWorld, type StaticDesc } from '../sim';
 import { cityGeometry } from './CityView';
 import { propStatics } from './propMesh';
 
@@ -37,8 +37,20 @@ export class PropsView {
   private readonly q = new THREE.Quaternion();
   private readonly qb = new THREE.Quaternion();
   private readonly one = new THREE.Vector3(1, 1, 1);
+  private readonly size = new THREE.Vector3();
+  private readonly upright = new THREE.Quaternion();
+  /** A broken hydrant's water: a column over each jet, its height with the jet's life (slice 5 makes it spray). */
+  private readonly columns: THREE.InstancedMesh;
 
-  constructor(private readonly scene: THREE.Scene, private readonly sim: SimWorld) {}
+  constructor(private readonly scene: THREE.Scene, private readonly sim: SimWorld) {
+    const column = new THREE.CylinderGeometry(1, 1, 1, 6).translate(0, 0.5, 0);
+    this.columns = new THREE.InstancedMesh(column, new THREE.MeshLambertMaterial({ color: 0xbfe6f5, transparent: true, opacity: 0.7 }), PROPS.jet.max);
+    this.columns.name = 'props-water';
+    this.columns.frustumCulled = false;
+    this.columns.count = 0;
+    this.columns.visible = false;
+    scene.add(this.columns);
+  }
 
   /** This frame's poses: every prop that is down, by kind; `alpha` between the last step and this one. */
   update(sim: SimWorld = this.sim, alpha = 1): void {
@@ -73,6 +85,21 @@ export class PropsView {
       km.mesh.visible = km.count > 0;
       if (km.count > 0) km.mesh.instanceMatrix.needsUpdate = true;
     }
+    let jets = 0;
+    const jet = PROPS.jet;
+    for (let j = 0; j < jet.max; j++) {
+      const left = props.jets[j * 3 + 2] as number;
+      if (left <= 0) continue;
+      // full for most of its life, sinking over its last three seconds
+      const h = 7 * Math.min(1, left / 3);
+      this.p.set(props.jets[j * 3] as number, 0, props.jets[j * 3 + 1]);
+      this.size.set(0.35, h, 0.35);
+      this.m.compose(this.p, this.upright, this.size);
+      this.columns.setMatrixAt(jets++, this.m);
+    }
+    this.columns.count = jets;
+    this.columns.visible = jets > 0;
+    if (jets > 0) this.columns.instanceMatrix.needsUpdate = true;
   }
 
   /** A kind's mesh with room for `more` instances past its count (made the first time, doubled when full). */
@@ -103,6 +130,8 @@ export class PropsView {
   }
 
   dispose(): void {
+    this.scene.remove(this.columns);
+    this.columns.dispose();
     for (const km of this.meshes) if (km) { this.scene.remove(km.mesh); km.mesh.dispose(); }
     for (const g of this.geometries) g?.dispose();
     this.material.dispose();

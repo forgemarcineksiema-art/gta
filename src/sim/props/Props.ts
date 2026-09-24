@@ -87,6 +87,8 @@ export class Props {
   bill = 0;
   /** The anchored prop that held against the car this step, -1 none. */
   held = -1;
+  /** The broken hydrants' water: x, z and seconds left per jet (0 when none), `PROPS.jet.max` of them. */
+  readonly jets = new Float32Array(PROPS.jet.max * 3);
 
   private readonly downIndex = new Int32Array(COUNT).fill(-1);
   private readonly healFor = new Float32Array(COUNT);
@@ -352,6 +354,7 @@ export class Props {
     const standing = this.state[id] === PropState.Standing;
     const o = id * 7;
     if (standing) {
+      if (PROP_KINDS[this.kind[id] as number] === 'hydrant') this.spring(this.x[id] as number, this.z[id] as number);
       const s = t.shape, half = s.kind === 'box' ? s.hy : s.halfHeight, yaw = this.yaw[id] as number;
       this.pose[o] = this.x[id] as number; this.pose[o + 1] = half; this.pose[o + 2] = this.z[id] as number;
       this.pose[o + 3] = 0; this.pose[o + 4] = Math.sin(yaw / 2); this.pose[o + 5] = 0; this.pose[o + 6] = Math.cos(yaw / 2);
@@ -461,7 +464,54 @@ export class Props {
       if (id < 0) continue;
       this.arc(a, id, dt);
     }
+    this.water(dt);
     if (this.sim.tick % HEAL_EVERY === 0) this.heal(HEAL_EVERY * dt);
+  }
+
+  /** A broken hydrant's water starts where it stood; the oldest jet gives way when all run. */
+  private spring(x: number, z: number): void {
+    let k = 0;
+    for (let j = 1; j < PROPS.jet.max; j++) if ((this.jets[j * 3 + 2] as number) < (this.jets[k * 3 + 2] as number)) k = j;
+    this.jets[k * 3] = x;
+    this.jets[k * 3 + 1] = z;
+    this.jets[k * 3 + 2] = PROPS.jet.seconds;
+  }
+
+  /**
+   * The jets: each pushes up with its thrust, at its own point (so a car over it rocks), on every car body whose
+   * underside it reaches (the car's footprint grown by the jet's radius), for the next step.
+   */
+  private water(dt: number): void {
+    const jet = PROPS.jet, impulse = jet.thrust * dt;
+    for (let j = 0; j < jet.max; j++) {
+      const left = this.jets[j * 3 + 2] as number;
+      if (left <= 0) continue;
+      this.jets[j * 3 + 2] = Math.max(0, left - dt);
+      const x = this.jets[j * 3] as number, z = this.jets[j * 3 + 1] as number;
+      const sim = this.sim, p = sim.probe, he = sim.vehicle.tuning.chassisHalfExtents;
+      if (this.over(x, z, p.x, p.z, p.yaw, he.x + jet.radius, he.z + jet.radius)) this.lift(sim.vehicle.body, x, p.y - he.y, z, impulse);
+      const traffic = sim.traffic;
+      if (!traffic) continue;
+      for (let i = 0; i < traffic.capacity; i++) {
+        const body = traffic.rigidBodyOf(i);
+        if (!body) continue;
+        const ax = traffic.x[i] as number, az = traffic.z[i] as number;
+        if (Math.abs(ax - x) > 6 || Math.abs(az - z) > 6) continue;
+        if (this.over(x, z, ax, az, traffic.yaw[i] as number, traffic.halfWidthOf(i) + jet.radius, 2.5 + jet.radius)) this.lift(body, x, 0.3, z, impulse);
+      }
+    }
+  }
+
+  /** Whether a point lies in a footprint (centre, yaw, half extents). */
+  private over(x: number, z: number, cx: number, cz: number, yaw: number, hx: number, hz: number): boolean {
+    const dx = x - cx, dz = z - cz, c = Math.cos(yaw), s = Math.sin(yaw);
+    return Math.abs(dx * c - dz * s) <= hx && Math.abs(dx * s + dz * c) <= hz;
+  }
+
+  private lift(body: RAPIER.RigidBody, x: number, y: number, z: number, impulse: number): void {
+    this.v3.x = 0; this.v3.y = impulse; this.v3.z = 0;
+    this.v3b.x = x; this.v3b.y = y; this.v3b.z = z;
+    body.applyImpulseAtPoint(this.v3, this.v3b, true);
   }
 
   /** One step of an arc: gravity, the spin; on the ground it lies flat along its way. */

@@ -7,7 +7,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { SimWorld } from '../../src/sim';
 import type { City } from '../../src/sim/city/City';
-import { PROPS_PER_CHUNK, PROP_TYPES, propFootprint, type PropDesc } from '../../src/sim/city/props';
+import { PROPS_PER_CHUNK, PROP_TYPES, propFootprint, propRadius, type PropDesc } from '../../src/sim/city/props';
 import { BLOCK, HIGHWAY_HALF, ROAD_HALF, distanceToPolyline } from '../../src/sim/city/roads';
 import { Clearances } from './clearances';
 import { createWorld } from './helpers';
@@ -49,7 +49,7 @@ describe('the street furniture\'s places (M8 slice 0)', () => {
   it('M8 0.1 every prop keeps D7\'s clearances and 0.3 m from its neighbours; the list is the same twice, its ids stable', async () => {
     expect(props.length).toBeGreaterThan(1500);
     const kinds = new Set(props.map((p) => p.kind));
-    for (const k of ['lamp', 'sapling', 'bin', 'bench'] as const) expect(kinds.has(k), k).toBe(true);
+    for (const k of ['lamp', 'sapling', 'bin', 'bench', 'hydrant', 'meter', 'newsbox', 'table', 'chair', 'shelter', 'kiosk'] as const) expect(kinds.has(k), k).toBe(true);
     // ids: the chunk's index × PROPS_PER_CHUNK + its place in the chunk's list
     for (let cz = -3; cz <= 3; cz++) for (let cx = -3; cx <= 3; cx++) {
       city.props(cx, cz).forEach((p, i) => expect(p.id).toBe(((cz + 3) * 7 + (cx + 3)) * PROPS_PER_CHUNK + i));
@@ -69,7 +69,7 @@ describe('the street furniture\'s places (M8 slice 0)', () => {
       if (clear.built(pts, p.x, p.z)) why.push(`${at}: in a static`);
     }
     // 0.3 m between two props' footprints (their bounding circles)
-    const r = (p: PropDesc): number => { const f = propFootprint(p.kind); return Math.hypot(f.hx, f.hz); };
+    const r = (p: PropDesc): number => propRadius(p.kind);
     const grid = new Map<string, PropDesc[]>();
     for (const p of props) {
       const key = `${Math.floor(p.x / 8)},${Math.floor(p.z / 8)}`;

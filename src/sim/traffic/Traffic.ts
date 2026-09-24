@@ -565,6 +565,12 @@ export class Traffic {
     return (this.agentBody[agent] as number) >= 0;
   }
 
+  /** The agent's lent body, or null (the street furniture's knocks and the hydrants' water, M8). */
+  rigidBodyOf(agent: number): RAPIER.RigidBody | null {
+    const slot = this.agentBody[agent] as number;
+    return slot < 0 ? null : this.bodies[slot] ?? null;
+  }
+
   /** Yaw rate of the agent's lent body (rad/s), 0 without a body. Tests and the review harness. */
   bodyYawRate(agent: number): number {
     const slot = this.agentBody[agent] as number;

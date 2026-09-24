@@ -16,10 +16,12 @@ const POLE = 0x686678;
 const TRUNK = 0x8b7966;
 const STAKE = PALETTE.wafer;
 const WOOD = CITY_COLORS.brick;
+/** Crown Heights' accent: the terraces' umbrellas, the newsstand's awning. */
+const CROWN = 0xf5cd75;
 
 /**
- * The models (slice 0: the lamp post, the sapling, the bin, the bench; the rest come with their slices and stand
- * in as their collider's box until then).
+ * The models (slices 0 and 3: the street's things; the districts' come with slice 4 and stand in as their
+ * collider's box until then).
  */
 const MODELS: Partial<Record<PropKind, readonly PropPart[]>> = {
   // an 8 m steel pole on a base, its arm and lit head reaching over the road
@@ -41,6 +43,60 @@ const MODELS: Partial<Record<PropKind, readonly PropPart[]>> = {
   bin: [
     cyl(0, 0.46, 0, 0.27, 0.46, CITY_COLORS.hedge),
     cyl(0, 0.95, 0, 0.3, 0.04, PALETTE.graphite),
+  ],
+  // a red hydrant: its barrel, bonnet and the two side outlets
+  hydrant: [
+    cyl(0, 0.33, 0, 0.15, 0.33, PALETTE.carRed),
+    cyl(0, 0.7, 0, 0.18, 0.06, PALETTE.carRed),
+    cyl(0, 0.8, 0, 0.07, 0.05, PALETTE.steel),
+    box(0, 0.46, 0, 0.26, 0.05, 0.05, PALETTE.steel),
+  ],
+  // a parking meter on its post
+  meter: [
+    box(0, 0.55, 0, 0.035, 0.55, 0.035, PALETTE.steel),
+    box(0, 1.24, 0, 0.1, 0.16, 0.08, PALETTE.graphite),
+    box(0, 1.28, 0.081, 0.07, 0.06, 0.004, PALETTE.glassDark),
+  ],
+  // a coin-operated newspaper box: its body, the window on the front, the lid
+  newsbox: [
+    box(0, 0.52, 0, 0.24, 0.42, 0.21, PALETTE.carBlue),
+    box(0, 0.72, 0.211, 0.17, 0.13, 0.004, PALETTE.glass),
+    box(0, 0.96, 0, 0.25, 0.03, 0.22, PALETTE.lightGrey),
+  ],
+  // a café table on its foot, the umbrella open over it
+  table: [
+    cyl(0, 0.37, 0, 0.06, 0.37, PALETTE.graphite),
+    cyl(0, 0.75, 0, 0.4, 0.02, PALETTE.carWhite),
+    box(0, 1.55, 0, 0.02, 0.8, 0.02, PALETTE.steel),
+    cyl(0, 2.3, 0, 1.1, 0.07, CROWN),
+  ],
+  // a white café chair: its seat, its back away from the table, its sides
+  chair: [
+    box(0, 0.45, 0, 0.2, 0.02, 0.2, PALETTE.carWhite),
+    box(0, 0.68, -0.19, 0.2, 0.21, 0.02, PALETTE.carWhite),
+    box(0.19, 0.22, 0, 0.015, 0.22, 0.19, PALETTE.lightGrey),
+    box(-0.19, 0.22, 0, 0.015, 0.22, 0.19, PALETTE.lightGrey),
+  ],
+  // a bus shelter open to the road: its glass back and ends, the roof, the posts, the seat, the timetable
+  shelter: [
+    box(0, 1.25, -0.56, 1.58, 1.05, 0.02, PALETTE.glass),
+    box(1.58, 1.25, -0.1, 0.02, 1.05, 0.44, PALETTE.glass),
+    box(-1.58, 1.25, -0.1, 0.02, 1.05, 0.44, PALETTE.glass),
+    box(0, 2.42, -0.02, 1.65, 0.06, 0.6, PALETTE.graphite),
+    box(1.6, 1.18, -0.58, 0.04, 1.18, 0.04, PALETTE.steel),
+    box(-1.6, 1.18, -0.58, 0.04, 1.18, 0.04, PALETTE.steel),
+    box(0, 0.45, -0.4, 1.0, 0.03, 0.14, PALETTE.steel),
+    box(-1.2, 1.35, -0.53, 0.35, 0.55, 0.01, PALETTE.carMagenta),
+  ],
+  // a newsstand: its green booth, the roof, the awning over the counter, the papers and magazines on it
+  kiosk: [
+    box(0, 1.1, 0, 1.15, 1.1, 0.75, CITY_COLORS.hedge),
+    box(0, 2.32, 0, 1.28, 0.1, 0.85, PALETTE.graphite),
+    box(0, 1.95, 0.95, 1.2, 0.04, 0.22, CROWN),
+    box(0, 0.95, 0.8, 1.05, 0.08, 0.07, PALETTE.carWhite),
+    box(-0.55, 1.35, 0.76, 0.4, 0.3, 0.02, PALETTE.carMagenta),
+    box(0.1, 1.35, 0.76, 0.2, 0.3, 0.02, PALETTE.carOrange),
+    box(0.65, 1.35, 0.76, 0.35, 0.3, 0.02, PALETTE.carBlue),
   ],
   // wooden slats on two iron frames, the seat toward the road
   bench: [

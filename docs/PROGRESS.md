@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8 slice 3: the street set
+
+Done: hydrants on any kerb line, parking meters in Crown Heights and the Works, newspaper boxes (Crown, Quay) and
+newsstands (Crown) on the frontage line, a bus shelter at the middle of some Crown streets, a café terrace in front of
+every avenue corner shop (a table with its umbrella either side of the door, two chairs each: the 2.1 m between the
+frontage line and the shop leaves no room across); their models. A broken hydrant's water runs 20 s and pushes up with
+1.2 kN at its own point on any car over it (the player's and lent bodies); a simple column until slice 5's spray.
+The shelter is 1.2 m deep and the newsstand 1.6 m so both fit their lines. Round props' neighbour spacing uses their
+radius. Pins M8 3.1–3.3. Verify green (375).
+
 ## 2026-09-24 — M8 slice 2: the trees
 
 Done: a thick tree's trunk (the parks', the front gardens', the promenade's and the plaza's palms) is a solid cylinder

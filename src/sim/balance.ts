@@ -299,4 +299,9 @@ export const PROPS = {
   cell: 8,
   /** A knocked prop's friction against the ground and the rest. */
   friction: 0.6,
+  /**
+   * A broken hydrant's water (M8 slice 3): it runs `seconds`, pushing up with `thrust` N (a hydrant's 60 L/s at
+   * 20 m/s) on any car whose underside it reaches within `radius` m; at most `max` at once (the oldest gives way).
+   */
+  jet: { seconds: 20, radius: 1.2, thrust: 1200, max: 4 },
 } as const;

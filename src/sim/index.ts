@@ -9,7 +9,7 @@ export { Pedestrians, PedPose, PedLook, PED_LOOKS, CROWD_LOOKS, STRIDE } from '.
 export { TRAFFIC, PEDS, type TrafficTuning, type PedTuning } from './traffic/tuning';
 export { Life, type LifeState } from './life/Life';
 export { ECONOMY, DAMAGE, SWAP } from './economy';
-export { BALANCE } from './balance';
+export { BALANCE, PROPS } from './balance';
 export { Heat } from './heat/Heat';
 export { Police } from './police/Police';
 export { Pursuit, type PursuitState, type Descriptor } from './police/Pursuit';

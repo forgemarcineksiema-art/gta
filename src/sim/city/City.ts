@@ -1089,6 +1089,13 @@ export class City {
         if (nearEnd) continue;
         const len = Math.hypot(b.x - a.x, b.z - a.z), dx = (b.x - a.x) / len, dz = (b.z - a.z) / len;
         const entrances = (lots.get(i) ?? []).map((lot) => ({ x: lot.pathX, z: lot.pathZ }));
+        // a café terrace in front of each of an avenue's corner shops (Crown Heights, M8 slice 3)
+        if (road.kind === 'avenue') for (const lot of lots.get(i) ?? []) {
+          if (lot.turn === 0) continue;
+          const at = this.sampleRoad(road, lot.along), nx = at.nx * lot.side, nz = at.nz * lot.side;
+          const ddx = -nz * lot.side, ddz = nx * lot.side;
+          places.push({ kind: 'terrace', x: at.x + nx * hw, z: at.z + nz * hw, dx: ddx, dz: ddz, half: lot.width, nx, nz });
+        }
         for (const side of [-1, 1] as const) {
           const startClip = joins.start[side > 0 ? 1 : 0], endClip = joins.end[side > 0 ? 1 : 0];
           const t0 = Math.max(f.cum[i] as number, startClip ? startClip.t : 0), t1 = Math.min(f.cum[i + 1] as number, endClip ? endClip.t : f.total);

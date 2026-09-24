@@ -65,8 +65,8 @@ export const PROP_TYPES: Readonly<Record<PropKind, PropType>> = {
   newsbox: { name: 'NEWSPAPER BOX', mass: 35, breakImpulse: 0, restitution: 0.3, shape: box(0.25, 0.55, 0.25), comHeight: 0.5, material: 'paper', points: 30, bill: 150, heat: 1, boost: 0.01, tall: false },
   table: { name: 'CAFÉ TABLE', mass: 20, breakImpulse: 0, restitution: 0.3, shape: cyl(0.4, 0.38), comHeight: 0.6, material: 'metal', points: 30, bill: 120, heat: 1, boost: 0.01, tall: true },
   chair: { name: 'CHAIR', mass: 6, breakImpulse: 0, restitution: 0.4, shape: box(0.22, 0.42, 0.22), comHeight: 0.45, material: 'plastic', points: 10, bill: 40, heat: 0, boost: 0.005, tall: false },
-  shelter: { name: 'BUS SHELTER', mass: 250, breakImpulse: 1500, restitution: 0.1, shape: box(1.6, 1.25, 0.7), comHeight: 1.3, material: 'glass', points: 150, bill: 2500, heat: 4, boost: 0.06, tall: true },
-  kiosk: { name: 'NEWSSTAND', mass: 400, breakImpulse: 3000, restitution: 0.1, shape: box(1.2, 1.3, 1.0), comHeight: 1.2, material: 'paper', points: 200, bill: 3000, heat: 5, boost: 0.08, tall: true },
+  shelter: { name: 'BUS SHELTER', mass: 250, breakImpulse: 1500, restitution: 0.1, shape: box(1.6, 1.25, 0.6), comHeight: 1.3, material: 'glass', points: 150, bill: 2500, heat: 4, boost: 0.06, tall: true },
+  kiosk: { name: 'NEWSSTAND', mass: 400, breakImpulse: 3000, restitution: 0.1, shape: box(1.2, 1.3, 0.8), comHeight: 1.2, material: 'paper', points: 200, bill: 3000, heat: 5, boost: 0.08, tall: true },
   pallet: { name: 'PALLET', mass: 20, breakImpulse: 0, restitution: 0.3, shape: box(0.6, 0.07, 0.5), comHeight: 0.07, material: 'wood', points: 15, bill: 30, heat: 0, boost: 0.005, tall: false },
   barrel: { name: 'BARREL', mass: 60, breakImpulse: 0, restitution: 0.3, shape: cyl(0.29, 0.44), comHeight: 0.44, material: 'metal', points: 30, bill: 100, heat: 1, boost: 0.01, tall: false },
   crate: { name: 'CRATE', mass: 30, breakImpulse: 0, restitution: 0.3, shape: box(0.4, 0.4, 0.4), comHeight: 0.4, material: 'wood', points: 20, bill: 60, heat: 0, boost: 0.01, tall: false },
@@ -91,6 +91,12 @@ export const PROP_KINDS = Object.keys(PROP_TYPES) as readonly PropKind[];
 export function propFootprint(kind: PropKind): { hx: number; hz: number } {
   const s = PROP_TYPES[kind].shape;
   return s.kind === 'box' ? { hx: s.hx, hz: s.hz } : { hx: s.radius, hz: s.radius };
+}
+
+/** The radius of a kind's footprint's bounding circle: a round one's own, a box's to its corners. */
+export function propRadius(kind: PropKind): number {
+  const s = PROP_TYPES[kind].shape;
+  return s.kind === 'box' ? Math.hypot(s.hx, s.hz) : s.radius;
 }
 
 /** The prop's height: what the shape stands up to. */
@@ -124,14 +130,14 @@ export interface FootwayRun {
   entrances: ReadonlyArray<{ x: number; z: number }>;
 }
 
-/** A place with its own things: a park's path, the promenade along the seawall. */
+/** A place with its own things: a park's path, the promenade along the seawall, a corner shop's terrace. */
 export interface PropPlace {
-  kind: 'park' | 'promenade';
+  kind: 'park' | 'promenade' | 'terrace';
   /** Its centre and the way its length runs (a park's path, the promenade's wall), and its half length. */
   x: number; z: number;
   dx: number; dz: number;
   half: number;
-  /** The way toward the side it faces: the promenade's sea (the park: either side of its path). */
+  /** The way toward the side it faces: the promenade's sea (the park: either side of its path; a terrace: from the road). */
   nx: number; nz: number;
 }
 
@@ -162,8 +168,17 @@ export const PROP_LINES = {
   entrance: 2.5,
 } as const;
 
-/** Chances of a slot's thing (slice 0: the lamp, the sapling, the bin and the bench). */
-const CHANCE = { bin: 0.3, bench: 0.12, parkBench: 0.8 } as const;
+/**
+ * Chances of a slot's thing. The kerb's odd slots: a hydrant anywhere, a parking meter in Crown Heights and the
+ * Works, else a bin; a Crown Heights run's middle odd slot may be a bus stop. The frontage's slots: a newsstand in
+ * Crown Heights, a newspaper box there and on the Quay, else a bench.
+ */
+const CHANCE = { hydrant: 0.08, meter: 0.3, bin: 0.25, shelter: 0.6, kiosk: 0.07, newsbox: 0.15, bench: 0.12, parkBench: 0.8 } as const;
+/**
+ * A café terrace (M8 slice 3): a table either side of the shop's door, this far along from it and this far from the
+ * road edge (the shop's front is 5.8 m out), a chair beside it either way.
+ */
+const TERRACE = { along: 5, out: 4.6, beside: 1.05 } as const;
 
 /**
  * A chunk's props from its own random stream: the kerb line and the frontage line of every footway run it holds,
@@ -178,7 +193,7 @@ export function chunkProps(cx: number, cz: number, ctx: PropContext): PropDesc[]
   const put = (kind: PropKind, x: number, z: number, yaw: number): boolean => {
     if (out.length >= PROPS_PER_CHUNK) return false;
     const f = propFootprint(kind);
-    const r = Math.hypot(f.hx, f.hz);
+    const r = propRadius(kind);
     for (const t of taken) if (Math.hypot(t.x - x, t.z - z) < t.r + r + PROP_LINES.apart) return false;
     if (ctx.blocked(x, z, yaw, f.hx, f.hz)) return false;
     taken.push({ x, z, r });
@@ -189,23 +204,33 @@ export function chunkProps(cx: number, cz: number, ctx: PropContext): PropDesc[]
     // facing the road: local +Z along -n
     const yaw = Math.atan2(-run.nx, -run.nz);
     const kerb = PROP_LINES.kerb;
+    const crown = run.district === 'crown', metered = crown || run.district === 'foundry';
+    // a Crown Heights street's bus stop: the odd slot nearest the run's middle, some runs
+    const stopDraw = rnd();
+    const middle = Math.round((run.along + run.length / 2) / kerb.pitch);
+    const stop = crown && run.length > 60 && stopDraw < CHANCE.shelter ? middle + (((middle % 2) + 2) % 2 === 0 ? 1 : 0) : NaN;
     for (let k = Math.ceil(run.along / kerb.pitch); k * kerb.pitch < run.along + run.length; k++) {
       const a = k * kerb.pitch - run.along;
       const chance = rnd(), jitter = (rnd() - 0.5) * 0.8;
       const phase = ((k % 4) + 4) % 4;
-      const kind: PropKind | null = phase === 0 ? 'lamp'
-        : phase === 2 ? (run.district === 'foundry' ? null : 'sapling')
-          : chance < CHANCE.bin ? 'bin' : null;
+      let kind: PropKind | null;
+      if (k === stop) kind = 'shelter';
+      else if (phase === 0) kind = 'lamp';
+      else if (phase === 2) kind = run.district === 'foundry' ? null : 'sapling';
+      else if (chance < CHANCE.hydrant) kind = 'hydrant';
+      else if (metered && chance < CHANCE.hydrant + CHANCE.meter) kind = 'meter';
+      else kind = chance < CHANCE.hydrant + (metered ? CHANCE.meter : 0) + CHANCE.bin ? 'bin' : null;
       if (!kind) continue;
-      const u = a + (kind === 'lamp' ? 0 : jitter);
+      const u = a + (kind === 'lamp' || kind === 'shelter' ? 0 : jitter);
       put(kind, run.x + run.dx * u + run.nx * kerb.offset, run.z + run.dz * u + run.nz * kerb.offset, yaw);
     }
     const front = PROP_LINES.frontage;
     for (let k = Math.ceil(run.along / front.pitch); k * front.pitch < run.along + run.length; k++) {
       const a = k * front.pitch - run.along;
       const chance = rnd(), jitter = (rnd() - 0.5) * 2;
-      if (chance >= CHANCE.bench) continue;
-      const kind: PropKind = 'bench';
+      const kiosk = crown ? CHANCE.kiosk : 0, news = crown || run.district === 'marina' ? CHANCE.newsbox : 0;
+      const kind: PropKind | null = chance < kiosk ? 'kiosk' : chance < kiosk + news ? 'newsbox' : chance < kiosk + news + CHANCE.bench ? 'bench' : null;
+      if (!kind) continue;
       const f = propFootprint(kind);
       const u = a + jitter, out2 = front.offset + f.hz;
       const x = run.x + run.dx * u + run.nx * out2, z = run.z + run.dz * u + run.nz * out2;
@@ -214,7 +239,17 @@ export function chunkProps(cx: number, cz: number, ctx: PropContext): PropDesc[]
     }
   }
   for (const place of ctx.places) {
-    if (place.kind === 'park') {
+    if (place.kind === 'terrace') {
+      // a table either side of the door, its umbrella over it; chairs beside it, and across it at some
+      for (const side of [-1, 1]) {
+        const u = side * TERRACE.along, tx = place.x + place.dx * u + place.nx * TERRACE.out, tz = place.z + place.dz * u + place.nz * TERRACE.out;
+        if (!put('table', tx, tz, Math.atan2(-place.nx, -place.nz))) continue;
+        for (const s of [-1, 1]) {
+          const cx = tx + place.dx * s * TERRACE.beside, cz = tz + place.dz * s * TERRACE.beside;
+          put('chair', cx, cz, Math.atan2(-place.dx * s, -place.dz * s));
+        }
+      }
+    } else if (place.kind === 'park') {
       // two benches beside the path, facing it, a few metres either side of the middle
       for (const side of [1, -1]) {
         const chance = rnd(), shift = (rnd() - 0.5) * 6;

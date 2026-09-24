@@ -93,15 +93,25 @@ const PROP_KEEP = { edge: 8, route: 1.6, line: 1.5, door: 2, doorOut: 0.5, rampS
  */
 function rectsOverlap(ax: number, az: number, ac: number, as: number, ahx: number, ahz: number, bx: number, bz: number, bc: number, bs: number, bhx: number, bhz: number): boolean {
   const dx = bx - ax, dz = bz - az;
-  const axes = [ac, -as, as, ac, bc, -bs, bs, bc];
-  for (let k = 0; k < 8; k += 2) {
-    const ux = axes[k] as number, uz = axes[k + 1] as number;
-    const ra = ahx * Math.abs(ac * ux - as * uz) + ahz * Math.abs(as * ux + ac * uz);
-    const rb = bhx * Math.abs(bc * ux - bs * uz) + bhz * Math.abs(bs * ux + bc * uz);
-    if (Math.abs(dx * ux + dz * uz) > ra + rb) return false;
-  }
-  return true;
+  // the four axes in the old loop's order, unrolled: the props' placement calls this thousands of times a chunk, and an
+  // array a call was the boot's garbage (M8.5 gate)
+  return !(apartOn(ac, -as, dx, dz, ac, as, ahx, ahz, bc, bs, bhx, bhz) || apartOn(as, ac, dx, dz, ac, as, ahx, ahz, bc, bs, bhx, bhz)
+    || apartOn(bc, -bs, dx, dz, ac, as, ahx, ahz, bc, bs, bhx, bhz) || apartOn(bs, bc, dx, dz, ac, as, ahx, ahz, bc, bs, bhx, bhz));
 }
+
+/** The two rectangles' shadows on the axis (ux, uz) do not meet. */
+function apartOn(ux: number, uz: number, dx: number, dz: number, ac: number, as: number, ahx: number, ahz: number, bc: number, bs: number, bhx: number, bhz: number): boolean {
+  const ra = ahx * Math.abs(ac * ux - as * uz) + ahz * Math.abs(as * ux + ac * uz);
+  const rb = bhx * Math.abs(bc * ux - bs * uz) + bhz * Math.abs(bs * ux + bc * uz);
+  return Math.abs(dx * ux + dz * uz) > ra + rb;
+}
+
+/**
+ * The props' rule reads the authored roads' segments near its chunk only (M8.5 gate): a footprint this far or more
+ * inside the chunk's reach, no wider than `PROP_REACH_CAP`, cannot have its nearest segment among the others (see
+ * `propRule`); anything else reads every segment, as before.
+ */
+const PROP_REACH_CAP = 8;
 
 /**
  * A coordinate of an edge park's tree kept out of the highway verge's billboard strip (its run-out's reach either
@@ -1141,16 +1151,31 @@ export class City {
     const ring = 3 * BLOCK;
     const band = PROP_LINES.walkers, lo = band.middle - band.half, hi = band.middle + band.half;
     // what stands above the kerb: the chunk's tall statics as rectangles turned by their yaw (the rest by their bounds)
-    const tall: Array<{ x: number; z: number; cos: number; sin: number; hx: number; hz: number }> = [];
+    const tall: Array<{ x: number; z: number; cos: number; sin: number; hx: number; hz: number; r: number }> = [];
     for (const st of chunk.statics) {
       const f = tallFootprint(st, CAR_TOP);
       if (!f) continue;
       const s = st.shape, q = st.rotation;
       if ((s.kind === 'box' || s.kind === 'gable') && q.x === 0 && q.z === 0) {
         const yaw = 2 * Math.atan2(q.y, q.w);
-        tall.push({ x: st.position.x, z: st.position.z, cos: Math.cos(yaw), sin: Math.sin(yaw), hx: s.hx, hz: s.hz });
-      } else tall.push({ x: (f.minX + f.maxX) / 2, z: (f.minZ + f.maxZ) / 2, cos: 1, sin: 0, hx: (f.maxX - f.minX) / 2, hz: (f.maxZ - f.minZ) / 2 });
+        tall.push({ x: st.position.x, z: st.position.z, cos: Math.cos(yaw), sin: Math.sin(yaw), hx: s.hx, hz: s.hz, r: Math.hypot(s.hx, s.hz) });
+      } else {
+        const hx = (f.maxX - f.minX) / 2, hz = (f.maxZ - f.minZ) / 2;
+        tall.push({ x: (f.minX + f.maxX) / 2, z: (f.minZ + f.maxZ) / 2, cos: 1, sin: 0, hx, hz, r: Math.hypot(hx, hz) });
+      }
     }
+    // each authored road's segments that come within its threshold's reach of this chunk (the same answers, read
+    // from a few segments instead of the whole road)
+    const nearSegments = corridors.map((road) => {
+      const out: number[] = [];
+      const far = reach + road.halfWidth + 4.5 + PROP_REACH_CAP + 1;
+      for (let i = 0; i + 1 < road.centre.length; i++) {
+        const a = road.centre[i] as RoadPoint, b = road.centre[i + 1] as RoadPoint;
+        if (Math.max(a.x, b.x) < x0 - far || Math.min(a.x, b.x) > x0 + far || Math.max(a.z, b.z) < z0 - far || Math.min(a.z, b.z) > z0 + far) continue;
+        out.push(i);
+      }
+      return out;
+    });
     const near = (px: number, pz: number): boolean => Math.abs(px - x0) < reach && Math.abs(pz - z0) < reach;
     const circles = rings.filter((r) => near(r.x, r.z));
     for (const site of DROP_OFF_LOTS.map((lot) => dropOffFor(lot))) {
@@ -1193,9 +1218,13 @@ export class City {
         if (walkers && !onRoute && dZ - ez < halfZ + hi && dZ + ez > halfZ + lo) return true;
       }
       // the authored roads: their carriageways and walkers' bands, the footprint's extent along the road's normal
-      for (const road of corridors) {
+      const inReach = br <= PROP_REACH_CAP && Math.abs(x - x0) <= reach && Math.abs(z - z0) <= reach;
+      for (let r = 0; r < corridors.length; r++) {
+        const road = corridors[r] as SpecialRoad, segments = nearSegments[r] as number[];
         let best = Infinity, nx = 0, nz = 0;
-        for (let i = 0; i + 1 < road.centre.length; i++) {
+        const n = inReach ? segments.length : road.centre.length - 1;
+        for (let k = 0; k < n; k++) {
+          const i = inReach ? segments[k] as number : k;
           const a = road.centre[i] as RoadPoint, b = road.centre[i + 1] as RoadPoint;
           const ddx = b.x - a.x, ddz = b.z - a.z;
           const t = Math.max(0, Math.min(1, ((x - a.x) * ddx + (z - a.z) * ddz) / (ddx * ddx + ddz * ddz || 1)));
@@ -1250,7 +1279,13 @@ export class City {
       }
       // anything built that stands above the kerb
       const m = PROP_KEEP.statics;
-      for (const t of tall) if (rectsOverlap(x, z, cos, sin, hx + m, hz + m, t.x, t.z, t.cos, t.sin, t.hx, t.hz)) return true;
+      // two rectangles whose circles do not meet do not meet (a hair's margin keeps the circle test on the safe side)
+      const cr = Math.hypot(hx + m, hz + m);
+      for (const t of tall) {
+        const tx = t.x - x, tz = t.z - z, rr = t.r + cr + 1e-6;
+        if (tx * tx + tz * tz > rr * rr) continue;
+        if (rectsOverlap(x, z, cos, sin, hx + m, hz + m, t.x, t.z, t.cos, t.sin, t.hx, t.hz)) return true;
+      }
       return false;
     };
   }

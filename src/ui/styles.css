@@ -1126,7 +1126,9 @@ kbd.key {
 .jobs__card[data-kind='order'] { border-left-color: #f45bff; }
 .jobs__card[data-kind='escape'] { border-left-color: var(--ui-accent-2); }
 .jobs__card[data-kind='chain'] { border-left-color: var(--ui-accent); }
-.jobs__card-key { display: none; margin: 4px 0 2px; }
+/* the card's keycap only while it teaches (the first order's swap): `kbd.key` shows every other keycap, so the card's
+   rule needs the card in it (the M8.5 gate found an E on every delivery's card) */
+.jobs__card .jobs__card-key { display: none; margin: 4px 0 2px; }
 .jobs__card.is-teach .jobs__card-key { display: inline-block; }
 .jobs__card.is-visible { display: flex; animation: cold-in 0.25s ease-out; }
 .jobs__card-title {

@@ -112,6 +112,8 @@ export class GarageUi {
   private readonly boardChips: HTMLElement[] = [];
   private readonly boardNext: HTMLElement;
   private readonly dailiesBody: HTMLElement;
+  /** TODAY, with the streak's day beside it (one row, not two: GOALS fits a short screen better). */
+  private readonly todayFor: HTMLElement;
   private readonly records: HTMLElement;
   private page: WallPage = 'wall';
   private level: 'pages' | 'items' = 'pages';
@@ -249,6 +251,7 @@ export class GarageUi {
     // streak, the wanted board (your place, a chip per poster, the next rival and what they want), the hunts
     const goals = this.newPage('goals');
     this.goalsNext = el('div', 'wall__next');
+    this.todayFor = el('div', 'wall__for', 'TODAY');
     this.dailiesBody = el('div', 'wall__dailies');
     this.boardYou = el('div', 'wall__for');
     const strip = el('div', 'wall__board');
@@ -261,7 +264,7 @@ export class GarageUi {
     }
     this.boardNext = el('div', 'wall__dailies wall__poster');
     this.records = el('div', 'wall__records');
-    goals.append(this.goalsNext, el('div', 'wall__for', 'TODAY'), this.dailiesBody, this.boardYou, strip, this.boardNext, this.records);
+    goals.append(this.goalsNext, this.todayFor, this.dailiesBody, this.boardYou, strip, this.boardNext, this.records);
     this.items.set('goals', []);
 
     const footer = el('div', 'wall__footer');
@@ -516,9 +519,11 @@ export class GarageUi {
     const rows: HTMLElement[] = [];
     const hunts = huntsLine(sim);
     if (hunts) rows.push(el('div', 'wall__streak wall__medals', `HUNTS: ${hunts}`));
-    // the time trials' medals (M5.5 slice 10): the best one for each, a dash for none yet
-    const trials = sim.jobs.defs.filter((j) => j.kind === 'trial');
-    if (trials.length > 0) rows.push(el('div', 'wall__streak wall__medals', `TIME TRIALS: ${trials.map((j) => MEDAL_WORDS[sim.jobs.medals.get(j.id) ?? 0] || '—').join(' · ')}`));
+    // the time trials' medals (M5.5 slice 10), counted once there is one: a row of dashes answered no question
+    const won = [0, 0, 0, 0];
+    for (const j of sim.jobs.defs) if (j.kind === 'trial') { const m = sim.jobs.medals.get(j.id) ?? 0; won[m] = (won[m] ?? 0) + 1; }
+    const medals = [3, 2, 1].filter((m) => (won[m] as number) > 0).map((m) => `${won[m]} ${MEDAL_WORDS[m]}`);
+    if (medals.length > 0) rows.push(el('div', 'wall__streak wall__medals', `TIME TRIAL MEDALS: ${medals.join(' · ')}`));
     if (sim.run.bestRun > 0) rows.push(el('div', 'wall__streak wall__medals', `BEST RUN ${money(sim.run.bestRun)}`));
     this.records.replaceChildren(...rows);
   }
@@ -534,9 +539,7 @@ export class GarageUi {
       row.append(el('span', 'wall__daily-text', text), el('span', 'wall__daily-progress', d.done[i] ? 'DONE' : d.progressText(i)), el('span', 'wall__daily-reward', `+${money(d.reward(i))}`));
       rows.push(row);
     }
-    const streak = el('div', 'wall__streak');
-    streak.textContent = d.streak.count > 0 ? `STREAK: DAY ${d.streak.count}${d.streak.topper ? ' · TOPPER ON' : ''}` : 'COME BACK TOMORROW FOR A STREAK';
-    rows.push(streak);
+    this.todayFor.textContent = d.streak.count > 0 ? `TODAY · STREAK DAY ${d.streak.count}${d.streak.topper ? ' · TOPPER ON' : ''}` : 'TODAY';
     this.dailiesBody.replaceChildren(...rows);
   }
 

@@ -69,9 +69,10 @@ test('4.7 with ads off the video buttons are absent and the cash buttons are the
   await shutDoor(page, 20_000);
   expect(await page.locator('.wall__offer.is-open').count()).toBe(0);
   expect(await page.evaluate(() => (window.__game?.platformCalls as Calls).adRequests)).toBe(0);
-  await page.locator('.wall__tab', { hasText: 'PREP' }).click();
-  expect(await page.locator('.wall__page--prep .wall__btn--cash:visible').count()).toBe(2);
-  expect(await page.locator('.wall__page--prep .wall__btn--video:visible').count()).toBe(0);
+  // the next run's boosters stand under the cars on CARS since M8.5 (DESIGN.md §17.5)
+  await page.locator('.wall__tab', { hasText: 'CARS' }).click();
+  expect(await page.locator('.wall__page--cars .wall__btn--cash:visible').count()).toBe(2);
+  expect(await page.locator('.wall__page--cars .wall__btn--video:visible').count()).toBe(0);
   expect(errors).toEqual([]);
 });
 

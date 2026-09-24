@@ -105,10 +105,15 @@ export function buildRoadMarkings(graph: RoadGraph, districtAt: (x: number, z: n
       distances.push((distances[i - 1] as number) + Math.hypot(b.x - a.x, b.z - a.z));
     }
     const total = distances[distances.length - 1] as number;
+    // the first segment whose end reaches s (the last one past the end): a binary search, the boot's hot path (M8.5 gate)
     const segmentAt = (s: number): number => {
-      let i = 0;
-      while (i + 2 < distances.length && (distances[i + 1] as number) < s) i++;
-      return i;
+      let lo = 0, hi = distances.length - 2;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if ((distances[mid + 1] as number) < s) lo = mid + 1;
+        else hi = mid;
+      }
+      return Math.max(0, lo);
     };
     const frame = (s: number, offset = 0): Frame => {
       const i = segmentAt(s);
@@ -120,8 +125,20 @@ export function buildRoadMarkings(graph: RoadGraph, districtAt: (x: number, z: n
     // A bounding circle rejects the whole footprint, not just its centre. In
     // particular a bay must never run into a diagonal road or its pavement tip.
     const others = graph.special.filter(r => r.name !== road.id);
+    // each foreign road's box: a point outside it by more than the margin is farther than the margin from its centre
+    // line, so the polyline's distance is only measured near the road (the same answer, a tenth of the boot's cost)
+    const boxes = others.map((r) => {
+      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      for (const q of r.centre) { minX = Math.min(minX, q.x); maxX = Math.max(maxX, q.x); minZ = Math.min(minZ, q.z); maxZ = Math.max(maxZ, q.z); }
+      return { minX, maxX, minZ, maxZ };
+    });
     const clear = (p: RoadPoint, radius: number): boolean => {
-      if (!others.every(r => distanceToPolyline(r.centre, p.x, p.z) > r.halfWidth + radius + 1)) return false;
+      for (let k = 0; k < others.length; k++) {
+        const r = others[k] as SpecialRoad, b = boxes[k] as { minX: number; maxX: number; minZ: number; maxZ: number };
+        const m = r.halfWidth + radius + 1;
+        if (p.x < b.minX - m || p.x > b.maxX + m || p.z < b.minZ - m || p.z > b.maxZ + m) continue;
+        if (!(distanceToPolyline(r.centre, p.x, p.z) > m)) return false;
+      }
       if (street) return true;
       const gx = Math.round(p.x / BLOCK), gz = Math.round(p.z / BLOCK);
       const half = (g: number) => Math.abs(g) === 3 ? HIGHWAY_HALF : ROAD_HALF;

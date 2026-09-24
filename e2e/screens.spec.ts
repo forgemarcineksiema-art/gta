@@ -7,6 +7,9 @@
  * a delivery's line and card, and the garage's CARS and DAILIES pages on the wall; M5.5: the goal line, a chain
  * step's card, the skill chain and the full-screen map; M6: the wall's BOARD and STYLE pages and a rival's race.
  * M7 slice 1: in every driving state no two HUD boxes intersect.
+ * M8.5 (DESIGN.md §17): a calm drive shows exactly its seven things, nothing of
+ * the drive shows over the busted card or the wall, two pops at most, the
+ * wall's four pages (TOTALS without scrolling at every size).
  * Output: screens/<state>-<w>x<h>.png. Look at them.
  */
 import { expect, test, type Page } from '@playwright/test';
@@ -34,7 +37,7 @@ test.use({ deviceScaleFactor: 1 });
  */
 async function expectNoOverlap(page: Page, state: string): Promise<void> {
   const hits = await page.evaluate(() => {
-    const selectors = ['.hud__top', '.hud__heat', '.run__bag', '.run__coins', '.hud__popup', '.hud__speedo', '.minimap', '.hud__skill', '.hud__lap', '.hud__swap', '.run__busted', '.hud__drift', '.hud__toast'];
+    const selectors = ['.hud__top', '.hud__heat', '.run__bag', '.run__coins', '.hud__popup', '.hud__speedo', '.minimap', '.hud__skill', '.hud__lap', '.hud__swap', '.run__busted', '.hud__toast'];
     const boxes: Array<{ name: string; r: DOMRect }> = [];
     for (const selector of selectors) {
       for (const e of Array.from(document.querySelectorAll<HTMLElement>(selector))) {
@@ -76,6 +79,35 @@ async function expectClearOfWall(page: Page, state: string): Promise<void> {
   expect(hits, state).toEqual([]);
 }
 
+/**
+ * The driving screen's things that show (DESIGN.md §17.2): each a box with a size, not hidden, not faded out; the
+ * radar's district name counts apart from its circle, the top column's items apart from each other.
+ */
+const DRIVING = ['.jobs__line', '.jobs__card', '.hud__hints', '.hud__ticker', '.hud__heat', '.run__bag', '.run__coins', '.minimap__canvas', '.minimap__district', '.hud__speedo', '.hud__damage', '.hud__skill', '.hud__popup', '.hud__swap', '.run__busted', '.hud__lap', '.hud__toast'];
+
+async function drivingShown(page: Page): Promise<string[]> {
+  return page.evaluate((selectors: string[]) => {
+    const out: string[] = [];
+    for (const selector of selectors) {
+      for (const e of Array.from(document.querySelectorAll<HTMLElement>(selector))) {
+        const cs = getComputedStyle(e);
+        if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) < 0.05) continue;
+        // an ancestor hidden or faded hides it too (the top column, the radar's quiet names)
+        let hidden = false;
+        for (let p = e.parentElement; p; p = p.parentElement) {
+          const ps = getComputedStyle(p);
+          if (ps.display === 'none' || ps.visibility === 'hidden' || Number(ps.opacity) < 0.05) { hidden = true; break; }
+        }
+        const r = e.getBoundingClientRect();
+        if (hidden || r.width < 1 || r.height < 1) continue;
+        out.push(selector);
+        break;
+      }
+    }
+    return out;
+  }, DRIVING);
+}
+
 for (const [w, h] of SIZES) {
   test(`hud and pause at ${w}x${h}`, async ({ page }) => {
     mkdirSync('screens', { recursive: true });
@@ -95,17 +127,13 @@ for (const [w, h] of SIZES) {
     // The life frame is polled, not set-and-shot: Life recomputes its state every step,
     // and a parked car beside a bot at 90 km/h is no swap candidate, so the companion drives the lane.
     // Visibility, not presence: every label is always in the DOM.
-    const shown = ['.hud__oncoming.is-on', '.hud__damage.is-visible', '.hud__swap.is-visible'];
+    const shown = ['.hud__damage.is-visible', '.hud__swap.is-visible'];
     await page.waitForFunction((want: string[]) => {
       const sim = window.__game?.sim;
       const traffic = sim?.traffic;
       if (!sim || !traffic) return false;
-      // Life recomputes the flag every step, before the HUD reads it: hold it on for the frame
-      (sim.life as unknown as { oncomingLane(): void }).oncomingLane = () => { sim.life.state.oncoming = true; };
-      sim.life.state.oncoming = true;
       sim.life.state.damage = 0.6;
       sim.life.state.stage = 2;
-      if (sim.collectibles) sim.collectibles.smashedCount = 12;
       if (sim.life.state.swapCandidate < 0) {
         const p = sim.vehicle.body.translation();
         const out = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };
@@ -116,8 +144,7 @@ for (const [w, h] of SIZES) {
         }
         if (best.lane >= 0 && best.dist < 14) traffic.spawnAt(best.lane, best.s, 'compact', 1, 3);
       }
-      const text = document.querySelector('.hud__collect')?.textContent ?? '';
-      return text.includes('12/50') && want.every((sel) => document.querySelector(sel) !== null);
+      return want.every((sel) => document.querySelector(sel) !== null);
     }, shown, { timeout: 30_000, polling: 100 }).catch(async () => {
       const state = await page.evaluate((want: string[]) => want.map((sel) => `${sel}: ${document.querySelector(sel) ? 'on' : 'off'}`).join(', '), shown);
       throw new Error(`life hud incomplete: ${state}`);
@@ -176,7 +203,10 @@ for (const [w, h] of SIZES) {
     await expectNoOverlap(page, `bar ${w}x${h}`);
     await page.evaluate(() => window.advanceTime?.(1800));
     await page.waitForSelector('.run__card.is-visible', { timeout: 10_000 });
+    await page.waitForTimeout(300);
     await page.screenshot({ path: `screens/busted-${w}x${h}.png` });
+    // the card has the screen: nothing of the drive shows or speaks over it (M8.5)
+    expect(await drivingShown(page), `busted ${w}x${h}`).toEqual([]);
     // the card goes, the hideout: the car stopped inside, three seconds, the wall
     // after a card the entry boxes re-arm once the car is outside them: one step on the street first
     await page.evaluate(() => { window.__game?.sim.run.closeCard(); window.advanceTime?.(50); });
@@ -188,8 +218,17 @@ for (const [w, h] of SIZES) {
       window.advanceTime(3400);
     `);
     await page.waitForSelector('.run__wall.is-visible', { timeout: 10_000 });
+    await page.waitForTimeout(300);
     await page.screenshot({ path: `screens/door-${w}x${h}.png` });
     await expectClearOfWall(page, `door ${w}x${h}`);
+    expect(await drivingShown(page), `door ${w}x${h}`).toEqual([]);
+    // TOTALS fits the wall without scrolling at every size (M8.5); four tabs
+    const totals = await page.evaluate(() => {
+      const p = document.querySelector<HTMLElement>('.run__wall-page')!;
+      return { scroll: p.scrollHeight, client: p.clientHeight, tabs: Array.from(document.querySelectorAll('.wall__tab')).map((t) => t.textContent) };
+    });
+    expect(totals.scroll, `TOTALS scrolls at ${w}x${h}`).toBeLessThanOrEqual(totals.client + 1);
+    expect(totals.tabs).toEqual(['TOTALS', 'CARS', 'STYLE', 'GOALS']);
     // the run's bill (M8): on the counts' line, which stays inside the wall's page
     expect(await page.locator('.run__counts').textContent()).toContain('CITY DAMAGE 18,400');
     const fits = await page.evaluate(() => {
@@ -206,15 +245,20 @@ for (const [w, h] of SIZES) {
     await page.waitForSelector('.wall__card.is-focus', { timeout: 10_000 });
     await page.screenshot({ path: `screens/garage-${w}x${h}.png` });
     await expectClearOfWall(page, `garage ${w}x${h}`);
-    // the day's three and the streak
-    await page.locator('.wall__tab', { hasText: 'DAILIES' }).click();
-    await page.waitForSelector('.wall__page--dailies.is-current .wall__daily', { timeout: 10_000 });
-    await page.screenshot({ path: `screens/dailies-${w}x${h}.png` });
-    // the wanted board (M6): the posters' strip and the next rival's poster
-    await page.locator('.wall__tab', { hasText: 'BOARD' }).click();
-    await page.waitForSelector('.wall__page--board.is-current .wall__chip', { timeout: 10_000 });
-    await page.screenshot({ path: `screens/board-${w}x${h}.png` });
-    await expectClearOfWall(page, `board ${w}x${h}`);
+    // down CARS (M8.5): the upgrades, then the next run's boosters, the focus brought into view
+    for (let k = 0; k < 4; k++) {
+      await page.keyboard.press('KeyW');
+      await page.evaluate(() => window.advanceTime?.(34));
+    }
+    await page.waitForSelector('.wall__page--cars.is-current .wall__btn--cash.is-focus', { timeout: 10_000 });
+    await page.screenshot({ path: `screens/boosters-${w}x${h}.png` });
+    await expectClearOfWall(page, `boosters ${w}x${h}`);
+    // GOALS (M8.5): the next goal, the day's three, the wanted board, the hunts
+    await page.locator('.wall__tab', { hasText: 'GOALS' }).click();
+    await page.waitForSelector('.wall__page--goals.is-current .wall__daily', { timeout: 10_000 });
+    await page.waitForSelector('.wall__page--goals.is-current .wall__chip', { timeout: 10_000 });
+    await page.screenshot({ path: `screens/goals-${w}x${h}.png` });
+    await expectClearOfWall(page, `goals ${w}x${h}`);
     // STYLE (M6): the paint, the car's kit and the driver's
     await page.locator('.wall__tab', { hasText: 'STYLE' }).click();
     await page.waitForSelector('.wall__page--paint.is-current .wall__kit', { timeout: 10_000 });
@@ -252,6 +296,17 @@ for (const [w, h] of SIZES) {
     await page.waitForSelector('.jobs.is-visible', { timeout: 10_000 });
     await page.screenshot({ path: `screens/goal-${w}x${h}.png` });
     await expectNoOverlap(page, `goal ${w}x${h}`);
+    // a calm drive (M8.5, DESIGN.md §17.2): once the key hints have taught and the district's name has had its seconds,
+    // the line, the stars, the bank, the radar, the speed with the boost, and the arrow in the world: the seven
+    // the frames' clock is the manual one here: 12.5 s of it and the hints have taught (their 12 s), the district's
+    // name has had its 4 s
+    await page.evaluate(() => window.advanceTime?.(12_500));
+    await page.waitForSelector('.hud__hints.is-hidden', { state: 'attached', timeout: 5_000 });
+    // the names fade over half a second of real time
+    await page.waitForTimeout(700);
+    await page.screenshot({ path: `screens/calm-${w}x${h}.png` });
+    expect(await drivingShown(page), `calm ${w}x${h}`).toEqual(['.jobs__line', '.hud__heat', '.run__coins', '.minimap__canvas', '.hud__speedo']);
+    expect(await page.evaluate(() => window.__game!.renderer.arrow.mesh.visible), `the arrow at ${w}x${h}`).toBe(true);
     // a step of the chain ticked: its card
     await page.evaluate(() => {
       const run = window.__game!.sim.run;
@@ -273,6 +328,15 @@ for (const [w, h] of SIZES) {
     await page.waitForSelector('.hud__skill.is-visible', { timeout: 10_000 });
     await page.screenshot({ path: `screens/skill-${w}x${h}.png` });
     await expectNoOverlap(page, `skill ${w}x${h}`);
+    // the combo's tricks never pop (M8.5): a burst of five pays pops two at most
+    expect(await page.locator('.hud__popup.is-on').count(), `near misses pop at ${w}x${h}`).toBe(0);
+    await page.evaluate(() => {
+      const sim = window.__game!.sim;
+      for (let k = 0; k < 5; k++) sim.events.push('chase', 100 * (k + 1), sim.probe.x, 0, sim.probe.z, -1);
+      window.advanceTime?.(50);
+    });
+    expect(await page.locator('.hud__popup.is-on').count(), `pops at ${w}x${h}`).toBe(2);
+    await expectNoOverlap(page, `pops ${w}x${h}`);
     // the full-screen map, held
     await page.keyboard.down('Tab');
     await page.evaluate(() => window.advanceTime?.(200));

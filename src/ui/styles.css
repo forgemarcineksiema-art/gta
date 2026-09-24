@@ -100,6 +100,7 @@ body {
   transform: skewX(-8deg);
   box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.6);
 }
+.hud__heat.is-hidden { opacity: 0; }
 .hud__heat-star {
   width: clamp(24px, 3.5vh, 32px);
   height: clamp(24px, 3.5vh, 32px);

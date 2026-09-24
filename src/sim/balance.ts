@@ -158,13 +158,12 @@ export const BALANCE = {
     hot: { share: 0.25, pay: 2, heatPerSecond: 0.8 },
   },
   /**
-   * The garage's catalogue (docs/M5_PLAN.md D13): cash only; the muscle car is owned from the start. The compact at
-   * 18,000 (the model's quick half, M7 slice 10): at the M6 gate's novice (7k a run of 2.4 minutes, the cold open
-   * 8k) 10,000 was the first run's door at minute 3.9, before the brief's 5–7; 18,000 is the second's, at 6.3. The
-   * van at 20,000, not 30,000 (balance script, 2026-09-23): 30,000 is a 12-minute save and breaks the first hour's
-   * something new every 3 to 10 minutes; the sports car stays the second hour's goal.
+   * The garage's catalogue (docs/M5_PLAN.md D13): cash only; the muscle car is owned from the start. Refitted at the
+   * M7 gate on its measured novice (the careful bot, 13.2k a run of 2.6 minutes at level 3; the M6 gate's 7k of 2.4):
+   * the compact at 24,000 is the second run's door after the cold open, minute 6.7 (18,000 was the first's, at 4.1,
+   * before the brief's 5–7); the van at 30,000 the fourth's, two runs a rung; the sports car stays the second hour's.
    */
-  prices: { compact: 18000, heavy: 20000, sports: 60000, police: 120000 },
+  prices: { compact: 24000, heavy: 30000, sports: 60000, police: 120000 },
   /**
    * The wanted board (M6, DESIGN.md §14.3): a rematch pays `rematchShare` of the purse (the car is won once); a
    * race duel's rival runs at `pace` × the street race's pace, rubber-banded between `band`, both by rival index
@@ -218,11 +217,11 @@ export const BALANCE = {
    */
   bodyPrices: { sedan: 12000, hatch: 9000, estate: 13000, suv: 18000, pickup: 16000, taxi: 14000, truck: 24000, bus: 30000, icecream: 0, roadster: 0, sweeper: 0, hotdog: 0 },
   /**
-   * Each upgrade tier's price, tier 1 to 3, the same for every stat and car: 15,000 / 17,000 / 21,000 (the model's
-   * quick half, M7 slice 10; 12,000 / 16,000 / 22,000 at M5.5): the tiers are the first hour's cadence between the
-   * cars, two or three runs each, so no two purchases share a door or follow at the next.
+   * Each upgrade tier's price, tier 1 to 3, the same for every stat and car: 24,000 / 26,000 / 30,000 (refitted at
+   * the M7 gate; 15,000 / 17,000 / 21,000 at slice 10, 12,000 / 16,000 / 22,000 at M5.5): the tiers are the first
+   * hour's cadence between the cars, two or three runs each, so no two purchases share a door or follow at the next.
    */
-  tierPrices: [15000, 17000, 21000],
+  tierPrices: [24000, 26000, 30000],
   /** Multipliers on the preset per tier 0..3 (D8): power × torqueMax, grip × muFront and muRear, boost × boostDrain. */
   tiers: {
     power: [1, 1.06, 1.12, 1.2],

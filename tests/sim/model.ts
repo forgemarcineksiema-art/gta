@@ -191,13 +191,14 @@ export function verdict(input: ModelInput, knobs: Knobs = BALANCE_KNOBS): Verdic
 }
 
 /**
- * The M6 gate's measured inputs (docs/PROGRESS.md, 2026-09-24; three seeds' busts over three minutes, so the rates
- * are ninths): the quick pin's and the fitting's.
+ * The M7 gate's measured inputs (docs/PROGRESS.md, 2026-09-24; three seeds' busts over three minutes, so the rates
+ * are ninths; the careful bot as the novice): the quick pin's and the fitting's. The M6 gate's were a bag of 1,157 a
+ * minute and 241 in coins, the novice 3 / 7 / 4 / 4 / 4 ninths, the skilled 5 / 3 / 7 / 1 / 3.
  */
-export const M6_GATE_INPUT: ModelInput = {
-  novice: [0, 3 / 9, 7 / 9, 4 / 9, 4 / 9, 4 / 9],
-  skilled: [0, 5 / 9, 3 / 9, 7 / 9, 1 / 9, 3 / 9],
-  bagPerMinute: 1157,
-  coinsPerMinute: 241,
+export const GATE_INPUT: ModelInput = {
+  novice: [0, 4 / 9, 3 / 9, 3 / 9, 6 / 9, 3 / 9],
+  skilled: [0, 1 / 9, 5 / 9, 5 / 9, 2 / 9, 2 / 9],
+  bagPerMinute: 3647,
+  coinsPerMinute: 150,
   jobMean: 7018,
 };

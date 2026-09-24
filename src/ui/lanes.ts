@@ -18,10 +18,11 @@ export function topBit(item: TopItem): number {
 /**
  * Of the items that want to show (a mask of `topBit`s), the ones that do: everything, except the key hints under a
  * card or a caption (the card carries its own key, the caption teaches the same ones) and the news while a card or a
- * caption is up (it waits, its clock stopped). No allocation.
+ * caption is up (it waits, its clock stopped); while the wall is up behind a shut door, the hints and the news wait
+ * too (the STYLE page fills the screen's height: the M7 gate's screens found the news over its tabs). No allocation.
  */
-export function arrangeTop(wants: number): number {
-  return wants & (BIT.card | BIT.caption) ? wants & ~(BIT.hints | BIT.news) : wants;
+export function arrangeTop(wants: number, wall = false): number {
+  return wall || wants & (BIT.card | BIT.caption) ? wants & ~(BIT.hints | BIT.news) : wants;
 }
 
 /** The column at the top centre, in the HUD's layer; the items' own elements are moved into it in `TOP_ORDER`. */

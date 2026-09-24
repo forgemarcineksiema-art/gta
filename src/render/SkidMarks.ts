@@ -84,6 +84,8 @@ export class SkidMarks {
   /** This frame's first and last quad written, for the upload. */
   private dirtyFrom = -1;
   private dirtyTo = -1;
+  /** The clock when the newest quad was laid: once it has faded the mesh is hidden, no draw call. */
+  private newest = -1e6;
 
   constructor(scene: THREE.Scene, capacity = SKID.capacity) {
     this.capacity = capacity;
@@ -123,6 +125,9 @@ export class SkidMarks {
     this.mesh = new THREE.Mesh(g, material);
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 1;
+    // nothing laid yet: no draw call (the M7 gate's A/B, a draw a frame for an empty ring)
+    this.mesh.visible = false;
+    g.setDrawRange(0, 0);
     scene.add(this.mesh);
   }
 
@@ -153,6 +158,9 @@ export class SkidMarks {
       this.last[o] = c.x; this.last[o + 1] = c.y; this.last[o + 2] = c.z;
     }
     this.upload();
+    // only the ring's written part is drawn, and nothing once the newest mark has faded
+    const visible = time - this.newest < SKID.fade;
+    if (this.mesh.visible !== visible) this.mesh.visible = visible;
   }
 
   dispose(): void {
@@ -166,6 +174,8 @@ export class SkidMarks {
     const q = this.next;
     this.next = (this.next + 1) % this.capacity;
     this.laid++;
+    this.newest = time;
+    if (this.laid <= this.capacity) this.mesh.geometry.setDrawRange(0, this.laid * 6);
     const hw = SKID.width / 2, rx = fz * hw, rz = -fx * hw, lift = SKID.lift;
     const p = this.pos, v = q * 12;
     p[v] = ax - rx; p[v + 1] = ay + lift; p[v + 2] = az - rz;

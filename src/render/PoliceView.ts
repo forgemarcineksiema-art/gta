@@ -145,6 +145,8 @@ export class PoliceView {
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     mesh.frustumCulled = false;
     mesh.count = 0;
+    // three issues a draw call for an instanced mesh of no instances: an empty one is hidden (the M7 gate's A/B)
+    mesh.visible = false;
     scene.add(mesh);
     return mesh;
   }
@@ -231,6 +233,9 @@ export class PoliceView {
       kit.details.count = kit.n;
       kit.flashing.count = kit.on;
       kit.unlit.count = kit.off;
+      if (kit.details.visible !== kit.n > 0) kit.details.visible = kit.n > 0;
+      if (kit.flashing.visible !== kit.on > 0) kit.flashing.visible = kit.on > 0;
+      if (kit.unlit.visible !== kit.off > 0) kit.unlit.visible = kit.off > 0;
       if (kit.n) kit.details.instanceMatrix.needsUpdate = true;
       if (kit.on) kit.flashing.instanceMatrix.needsUpdate = true;
       if (kit.off) kit.unlit.instanceMatrix.needsUpdate = true;

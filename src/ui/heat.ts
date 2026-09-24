@@ -20,6 +20,7 @@ export class HeatHud {
   private gainLeft = 0;
   private popLeft = 0;
   private popped = -1;
+  private away = false;
 
   constructor(parent: HTMLElement, sim: SimWorld) {
     this.root = document.createElement('div');
@@ -52,6 +53,12 @@ export class HeatHud {
   }
 
   update(sim: SimWorld, dt: number): void {
+    // behind a shut door the wall has the screen: the stars go with the bag and the coins (the M7 gate's screens)
+    const away = sim.run.state === 'door';
+    if (away !== this.away) {
+      this.away = away;
+      this.root.classList.toggle('is-hidden', away);
+    }
     const heat = sim.heat;
     if (heat.gainSerial !== this.gainSerial) {
       this.gainSerial = heat.gainSerial;

@@ -15,14 +15,17 @@ describe('the top of the screen', () => {
     expect(new Set(bits).size).toBe(5);
     expect(TOP_ORDER).toEqual(['jobLine', 'card', 'caption', 'hints', 'news']);
     const has = (mask: number, item: TopItem): boolean => (mask & topBit(item)) !== 0;
-    for (let wants = 0; wants < 32; wants++) {
-      const shown = arrangeTop(wants);
-      // nothing shows that did not want to
-      expect(shown & ~wants).toBe(0);
-      for (const item of ['jobLine', 'card', 'caption'] as const) expect(has(shown, item)).toBe(has(wants, item));
-      const covered = has(wants, 'card') || has(wants, 'caption');
-      expect(has(shown, 'hints')).toBe(has(wants, 'hints') && !covered);
-      expect(has(shown, 'news')).toBe(has(wants, 'news') && !covered);
+    for (const wall of [false, true]) {
+      for (let wants = 0; wants < 32; wants++) {
+        const shown = arrangeTop(wants, wall);
+        // nothing shows that did not want to
+        expect(shown & ~wants).toBe(0);
+        for (const item of ['jobLine', 'card', 'caption'] as const) expect(has(shown, item)).toBe(has(wants, item));
+        // the M7 gate: behind a shut door the wall has the screen, the hints and the news wait
+        const covered = wall || has(wants, 'card') || has(wants, 'caption');
+        expect(has(shown, 'hints')).toBe(has(wants, 'hints') && !covered);
+        expect(has(shown, 'news')).toBe(has(wants, 'news') && !covered);
+      }
     }
   });
 });

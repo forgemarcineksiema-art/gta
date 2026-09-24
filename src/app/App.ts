@@ -777,7 +777,7 @@ export class App {
     // intro's captions teach the same ones); under a card or a caption the hints and the news wait
     const wantsHints = now < this.hintsUntil && !this.bot && !this.sim.coldOpen.active && playing;
     const top = arrangeTop((this.jobsHud.cardShowing ? topBit('card') : 0) | (this.coldOpenHud.captionShowing ? topBit('caption') : 0)
-      | (wantsHints ? topBit('hints') : 0) | (this.hud.tickerShowing ? topBit('news') : 0));
+      | (wantsHints ? topBit('hints') : 0) | (this.hud.tickerShowing ? topBit('news') : 0), this.sim.run.state === 'door');
     this.hud.setHintsVisible((top & topBit('hints')) !== 0);
     this.hud.setNewsYield(this.hud.tickerShowing && (top & topBit('news')) === 0);
     this.garageUi.update(this.sim);

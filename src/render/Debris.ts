@@ -51,6 +51,7 @@ export class Debris {
       this.mesh.setColorAt(i, this.color);
     }
     this.mesh.instanceMatrix.needsUpdate = true;
+    this.mesh.visible = false;
     scene.add(this.mesh);
   }
 
@@ -90,8 +91,11 @@ export class Debris {
   }
 
   update(dt: number): void {
+    // pieces in flight at the frame's start, and after it: nothing in flight is no upload and no draw (the M7 gate)
+    let moved = 0, alive = 0;
     for (let i = 0; i < POOL; i++) {
       if ((this.life[i] as number) <= 0) continue;
+      moved++;
       this.life[i] = (this.life[i] as number) - dt;
       this.vy[i] = (this.vy[i] as number) - GRAVITY * dt;
       this.px[i] = (this.px[i] as number) + (this.vx[i] as number) * dt;
@@ -120,7 +124,9 @@ export class Debris {
       this.s.set((this.sx[i] as number) * fade, (this.sy[i] as number) * fade, (this.sz[i] as number) * fade);
       this.mesh.setMatrixAt(i, this.m.compose(this.p, this.q, this.s));
       if ((this.life[i] as number) <= 0) this.mesh.setMatrixAt(i, this.m.makeScale(0, 0, 0));
+      else alive++;
     }
-    this.mesh.instanceMatrix.needsUpdate = true;
+    if (moved > 0) this.mesh.instanceMatrix.needsUpdate = true;
+    if (this.mesh.visible !== alive > 0) this.mesh.visible = alive > 0;
   }
 }

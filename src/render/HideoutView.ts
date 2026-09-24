@@ -32,22 +32,26 @@ export class HideoutView {
   private boardGeometry: THREE.BufferGeometry;
   private readonly boards: THREE.Mesh[] = [];
   private boardSerial = -1;
-  /** The drop-offs' signs (M7 slice 11): poles and frames lit like the city, the panels' faces unlit, so they glow. */
-  private readonly signGeometry: THREE.BufferGeometry;
-  private readonly glowGeometry: THREE.BufferGeometry;
+  /**
+   * The drop-offs' signs (M7 slice 11): poles and frames lit like the city, the panels' faces unlit, so they glow.
+   * A pair of meshes a sign, so one out of view is culled (merged, the three cost two draws a frame everywhere).
+   */
+  private readonly signGeometries: THREE.BufferGeometry[] = [];
   private readonly glowMaterial: THREE.MeshBasicMaterial;
 
   constructor(scene: THREE.Scene, sim: SimWorld) {
     this.geometry = doorGeometry();
     this.material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
     this.glowMaterial = new THREE.MeshBasicMaterial({ vertexColors: true });
-    [this.signGeometry, this.glowGeometry] = signGeometries(sim.run.dropOffs);
-    for (const [geometry, material] of [[this.signGeometry, this.material], [this.glowGeometry, this.glowMaterial]] as const) {
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.castShadow = false;
-      mesh.receiveShadow = false;
-      mesh.matrixAutoUpdate = false;
-      scene.add(mesh);
+    for (const [frame, glow] of signGeometries(sim.run.dropOffs)) {
+      for (const [geometry, material] of [[frame, this.material], [glow, this.glowMaterial]] as const) {
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.castShadow = false;
+        mesh.receiveShadow = false;
+        mesh.matrixAutoUpdate = false;
+        scene.add(mesh);
+        this.signGeometries.push(geometry);
+      }
     }
     this.propsGeometry = propsGeometry();
     this.boardGeometry = boardGeometry(posterStates(sim.board.beaten, sim.board.next()));
@@ -102,8 +106,7 @@ export class HideoutView {
     this.geometry.dispose();
     this.propsGeometry.dispose();
     this.boardGeometry.dispose();
-    this.signGeometry.dispose();
-    this.glowGeometry.dispose();
+    for (const g of this.signGeometries) g.dispose();
     this.material.dispose();
     this.glowMaterial.dispose();
   }
@@ -111,27 +114,29 @@ export class HideoutView {
 
 /**
  * The drop-offs' signs in world space (DESIGN.md §6.5): for each, a graphite pole and a frame round the panel,
- * and, apart, the panel's lit faces: the door band's orange with a white bar across it, both faces. Two meshes for
- * all three signs.
+ * and, apart, the panel's lit faces: the door band's orange with a white bar across it, both faces. A pair a sign.
  */
-export function signGeometries(sites: readonly DropOff[]): [THREE.BufferGeometry, THREE.BufferGeometry] {
-  const frames: THREE.BufferGeometry[] = [], glows: THREE.BufferGeometry[] = [];
+export function signGeometries(sites: readonly DropOff[]): Array<[THREE.BufferGeometry, THREE.BufferGeometry]> {
   const s = HIDEOUT_SIGN;
-  for (const site of sites) {
-    const sign = hideoutSign(site);
-    const place = (g: THREE.BufferGeometry, y: number): THREE.BufferGeometry => g.rotateY(sign.yaw).translate(sign.x, y, sign.z);
-    const bottom = sign.y - s.panel / 2;
-    frames.push(paint(place(new THREE.BoxGeometry(s.pole * 2, bottom, s.pole * 2), bottom / 2), PALETTE.graphite));
-    frames.push(paint(place(new THREE.BoxGeometry(s.width + 0.4, s.panel + 0.4, s.depth), sign.y), PALETTE.graphite));
-    glows.push(paint(place(new THREE.BoxGeometry(s.width, s.panel, s.depth + 0.1), sign.y), PALETTE.carOrange));
-    glows.push(paint(place(new THREE.BoxGeometry(s.width * 0.8, s.panel * 0.16, s.depth + 0.2), sign.y), PALETTE.carWhite));
-  }
   const merge = (parts: THREE.BufferGeometry[]): THREE.BufferGeometry => {
-    const out = parts.length > 0 ? mergeGeometries(parts, false) : new THREE.BufferGeometry();
+    const out = mergeGeometries(parts, false);
     for (const p of parts) p.dispose();
     return out;
   };
-  return [merge(frames), merge(glows)];
+  return sites.map((site) => {
+    const sign = hideoutSign(site);
+    const place = (g: THREE.BufferGeometry, y: number): THREE.BufferGeometry => g.rotateY(sign.yaw).translate(sign.x, y, sign.z);
+    const bottom = sign.y - s.panel / 2;
+    const frame = merge([
+      paint(place(new THREE.BoxGeometry(s.pole * 2, bottom, s.pole * 2), bottom / 2), PALETTE.graphite),
+      paint(place(new THREE.BoxGeometry(s.width + 0.4, s.panel + 0.4, s.depth), sign.y), PALETTE.graphite),
+    ]);
+    const glow = merge([
+      paint(place(new THREE.BoxGeometry(s.width, s.panel, s.depth + 0.1), sign.y), PALETTE.carOrange),
+      paint(place(new THREE.BoxGeometry(s.width * 0.8, s.panel * 0.16, s.depth + 0.2), sign.y), PALETTE.carWhite),
+    ]);
+    return [frame, glow];
+  });
 }
 
 /** A unit-height panel from y = 0 down to y = -doorHeight, the bottom 7 % in carOrange. */

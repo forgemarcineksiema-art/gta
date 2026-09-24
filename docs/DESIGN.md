@@ -325,11 +325,12 @@ locked district. Revised around the audience.
 
 A five-minute novice run: about 3k in coins plus 8k in the bag at ×1.3 is
 13k. Cars, cash only (the prices fitted by the model's quick half, M7 slice
-10, §2.7): the compact 18,000 (the second run's door after the cold open, at
-minute 6.3, inside the brief's 5–7), the van 20,000, the sports car 60,000
+10, §2.7, refitted at the M7 gate on the careful novice's 13k a run of 2.6
+minutes): the compact 24,000 (the second run's door after the cold open, at
+minute 6.7, inside the brief's 5–7), the van 30,000, the sports car 60,000
 (the second hour's goal), the police car 120,000 plus one heat-5 escape; the
 hidden cars are found, not bought (§8). Upgrades stay three stats × three
-tiers as multipliers on the preset, 15,000 / 17,000 / 21,000 a tier, two or
+tiers as multipliers on the preset, 24,000 / 26,000 / 30,000 a tier, two or
 three runs each; looks stay cash-only and carry the descriptor; repainting at
 the hideout is the respray, free. Dailies, the
 streak and the two prep items (lawyer, fence) are in §3.4.
@@ -876,7 +877,7 @@ and clock); the run needs the same, in the run's own words.
   rule): the placement guarantees a ring within 250 m of every door.
 - **The first quarter hour is a chain**, six steps counted on the wall's
   TOTALS page and in the save (`save.chain`, a byte): 1 TAKE A JOB, 2 BANK
-  THE BAG, 3 BUY YOUR FIRST CAR (the compact, 10,000), 4 LOSE THE COPS AT
+  THE BAG, 3 BUY YOUR FIRST CAR (the compact, 24,000), 4 LOSE THE COPS AT
   LEVEL 2, 5 STEAL A CAR TO ORDER, 6 BANK 20,000 IN ONE RUN. The goal line
   shows the chain's step when it is more specific than the default (`BUY THE
   COMPACT · 1,800 TO GO` once the cash is within one run of it). Each done

@@ -208,6 +208,16 @@ export class Coins {
     this.target.set(car.x, car.y + 0.8, car.z);
     this.fly(this.flyGold, dt);
     this.fly(this.flyWhite, dt);
+    // three issues a draw call for an instanced mesh of no instances: an empty one is hidden (the M7 gate's A/B)
+    Coins.show(this.mesh);
+    Coins.show(this.spill);
+    Coins.show(this.flyGold.mesh);
+    Coins.show(this.flyWhite.mesh);
+  }
+
+  private static show(mesh: THREE.InstancedMesh): void {
+    const visible = mesh.count > 0;
+    if (mesh.visible !== visible) mesh.visible = visible;
   }
 
   /** A picked coin starts its flight where it lay; a spilled one (target -2) is white; a spill starts the burst. */

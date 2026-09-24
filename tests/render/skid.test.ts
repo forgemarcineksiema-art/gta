@@ -50,22 +50,35 @@ describe('skid marks', () => {
     } finally { sim.dispose(); }
   }, 60_000);
 
-  it('M7 4.3 the ring wraps: more marks than it holds overwrite the oldest, and nothing grows', () => {
+  it('M7 4.3 the ring wraps: more marks than it holds overwrite the oldest, and nothing grows; no draw without a live mark', () => {
     const marks = new SkidMarks(new THREE.Scene(), 8);
     const wheel = { grounded: true, isFront: false, normal: { x: 0, y: 1, z: 0 }, contact: { x: 0, y: 0, z: 0 }, slipAngle: 0.8, slipRatio: 0 };
     const fake = { vehicle: { wheels: [wheel], telemetry: { speed: 20 } } } as unknown as SimWorld;
     const geometry = marks.mesh.geometry;
     const before = (geometry.getAttribute('position').array as Float32Array).length;
-    for (let i = 0; i < 40; i++) {
+    // the M7 gate's A/B: an empty ring is no draw call, a part-filled one draws its written quads only
+    expect(marks.mesh.visible).toBe(false);
+    for (let i = 0; i < 4; i++) {
+      wheel.contact.x = i * 1.5;
+      marks.update(fake, i / 60);
+    }
+    expect(marks.mesh.visible).toBe(true);
+    expect(geometry.drawRange.count).toBe(marks.laid * 6);
+    for (let i = 4; i < 40; i++) {
       wheel.contact.x = i * 1.5;
       marks.update(fake, i / 60);
     }
     expect(marks.laid).toBeGreaterThan(8);
+    expect(geometry.drawRange.count).toBe(8 * 6);
     expect((geometry.getAttribute('position').array as Float32Array).length).toBe(before);
     // the newest mark sits where the wheel last went
     const v = { x: 0, y: 0, z: 0 };
     marks.vertex(marks.laid - 1, v);
     expect(v.x).toBeGreaterThan(50);
+    // the newest mark faded: hidden again
+    wheel.slipAngle = 0;
+    marks.update(fake, 40 / 60 + SKID.fade + 0.1);
+    expect(marks.mesh.visible).toBe(false);
     marks.dispose();
   });
 

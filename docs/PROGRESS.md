@@ -2,6 +2,45 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M7 gate: the numbers
+
+**Suites.** `verify:gate` green (431 tests, 157 s, smoke 60 fps); on the final build `verify` green (360 tests in
+46 s), `game` 14/14, `screens` 51/51 with the new wall check, `life` 4/4 (51.5 fps; red twice before at a frame p95
+of 33.4000000000015 against < 33.4), `balance` green; `heat` 10/10, `city` 5/5 (control 3.93 s; tours 89 / 204k
+low, 116 / 279k high), the boot loop 200 of 200 (p95 0.95 s). Version 0.7.0.
+
+**Fixed at the gate.** The screens' images showed the news over the wall (over BANKED and its tabs at 800x450, over
+STYLE's tabs wherever that page fills the height) and the stars over its corner at 800x450: the news now waits behind
+a shut door (`arrangeTop`'s wall), the stars hide there with the bag and the coins, and the suite checks the wall's
+states. The perf A/B's draw attribution found three draws a frame for nothing in
+0.7.0 (the drop-offs' signs merged over the city, never culled; the empty skid ring) and up to fifteen in both
+versions (instanced meshes with no instances: the police's liveries, the coins' pools, the debris): hidden while
+empty (pins M7 4.3, G.3). The prices refitted on the careful novice (below).
+
+**Perf A/B** (MX330, 4× CPU, `?quality=low`, alternating; the rows in docs/M7_REPORT.md): the protocol's first pairs
+read −6.0 / −4.6 / −5.8 fps because 0.6.0's bot queues 25 s on the northern avenue in all three (cheap frames) while
+0.7.0's traffic flows; on the same drive (the car teleported to 40 tour points: the chunks draw the same 20.5 a frame)
+and in the fair runs (no traffic: +2.7 / −0.9 / +1.1; the first 20 s: +4.0 / −5.6 / +6.3) and the final build's
+protocol (+2.5 / −1.7 / −2.1) 0.7.0 is 0.6.0's speed inside ±3, not the +2 expected. Traffic mean 1.83–1.95 ms against
+2.35–2.95 (the 1.6 not reached); frames over 50 ms after 5 s 7–22 a run (0.6.0 as many, counted alike: 10 against
+14); frame p95 33.4 against 33.3–33.4; heap 48 MB in the final runs.
+
+**Balance** (129 s): the inputs moved with the careful novice (slice 10's D8), so the prices were refitted as the plan
+asks: the compact 24,000 (18,000), the van 30,000 (20,000), the tiers 24,000 / 26,000 / 30,000 (15 / 17 / 21k); the
+multipliers stay. Its bag is 3,647 a minute against the M6 gate's 1,157: its skill chains pay 4,660 in three minutes
+at seed 42 against the plain bot's 860.
+
+```
+busted a minute (seeds 42 / 7 / 123): novice 0.44 / 0.33 / 0.33 / 0.67 / 0.33, skilled 0.11 / 0.56 / 0.56 / 0.22 / 0.22
+bag 3,647 a minute (3,087 / 4,410 / 3,443), coins 150; job mean 7,018
+expected bank a run: novice L1 8.1k  L2 12.0k  L3 13.2k  L4 13.0k  L5 11.0k (best L3)
+                     skilled L1 12.2k  L2 18.4k  L3 20.0k  L4 21.7k  L5 19.1k (best L4)
+the novice's first hour at L3 (runs of 2.6 min banking 13.2k): 6.7 compact · 12.0 tier 1 power · 14.6 kit · 17.2 heavy
+  · 22.4 tier 1 grip · 25.1 kit · 27.7 tier 2 power · 30.3 kit · 32.9 tier 1 boost · 35.5 kit · 38.1 tier 2 grip
+  · 40.8 kit · 43.4 tier 3 power · 46.0 kit · 48.6 tier 2 boost · 51.2 kit · 56.4 tier 3 grip · 59.1 kit
+three cars at minute 17.2; something to see every 5.2 / 7.9 / 2.6 / 7.9 / 5.2 / 5.2 / 5.2 / 5.2 / 5.2 / 7.8 min
+```
+
 ## 2026-09-24 — M7 gate: the long pins
 
 `verify:gate` found six long pins red on the slices' traffic. Fixed in the game: a unit passing on the oncoming side

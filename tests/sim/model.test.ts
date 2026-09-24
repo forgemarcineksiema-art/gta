@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../src/sim/balance';
-import { M6_GATE_INPUT, pooled, verdict } from './model';
+import { GATE_INPUT, pooled, verdict } from './model';
 
 /** One section of DESIGN.md, from its heading to the next of the same depth, its line breaks as spaces. */
 function section(heading: string): string {
@@ -14,14 +14,14 @@ function section(heading: string): string {
 const money = (n: number): string => n.toLocaleString('en-US');
 
 describe('the balance model (M7 slice 10)', () => {
-  it('M7 10.1 on the M6 gate\'s inputs: the skilled best door above the novice\'s, the compact at minute 5-7, gaps of 3-10, something to see every 8', () => {
+  it('M7 10.1 on the M7 gate\'s inputs: the skilled best door above the novice\'s, the compact at minute 5-7, gaps of 3-10, something to see every 8', () => {
     // the pooled rates never fall with the level
-    for (const rates of [M6_GATE_INPUT.novice, M6_GATE_INPUT.skilled]) {
+    for (const rates of [GATE_INPUT.novice, GATE_INPUT.skilled]) {
       const p = pooled(rates);
       for (let l = 2; l < p.length; l++) expect(p[l]).toBeGreaterThanOrEqual(p[l - 1] as number);
       expect(p.reduce((a, b) => a + b, 0)).toBeCloseTo(rates.reduce((a, b) => a + b, 0), 9);
     }
-    const v = verdict(M6_GATE_INPUT);
+    const v = verdict(GATE_INPUT);
     // (a) the optimum rises with skill, and the skilled bank climbs to it
     expect(v.skilledBest).toBeGreaterThanOrEqual(v.noviceBest + 1);
     expect(v.skilledRising).toBe(true);
@@ -39,8 +39,8 @@ describe('the balance model (M7 slice 10)', () => {
 
   it('M7 10.2 the fitted multipliers and prices are BALANCE\'s, and DESIGN.md §2.6 and §3.3 name them', () => {
     expect(BALANCE.multiplier).toEqual([1, 1, 1.3, 1.65, 2.6, 3]);
-    expect(BALANCE.prices).toEqual({ compact: 18000, heavy: 20000, sports: 60000, police: 120000 });
-    expect(BALANCE.tierPrices).toEqual([15000, 17000, 21000]);
+    expect(BALANCE.prices).toEqual({ compact: 24000, heavy: 30000, sports: 60000, police: 120000 });
+    expect(BALANCE.tierPrices).toEqual([24000, 26000, 30000]);
     expect(section('2.6')).toContain(BALANCE.multiplier.slice(1).map((m) => `×${m}`).join(' / '));
     const earnings = section('3.3');
     for (const price of Object.values(BALANCE.prices)) expect(earnings).toContain(money(price));

@@ -57,6 +57,25 @@ async function expectNoOverlap(page: Page, state: string): Promise<void> {
   expect(hits, state).toEqual([]);
 }
 
+/** Nothing at the top of the screen lies over the wall behind a shut door (the M7 gate: the news over STYLE's tabs, the stars over its corner). */
+async function expectClearOfWall(page: Page, state: string): Promise<void> {
+  const hits = await page.evaluate(() => {
+    const wall = document.querySelector<HTMLElement>('.run__wall.is-visible');
+    if (!wall) return ['no wall'];
+    const w = wall.getBoundingClientRect();
+    const out: string[] = [];
+    for (const e of Array.from(document.querySelectorAll<HTMLElement>('.hud__top > *, .hud__heat, .run__bag, .run__coins'))) {
+      const cs = getComputedStyle(e);
+      if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) < 0.05) continue;
+      const r = e.getBoundingClientRect();
+      if (r.width < 1 || r.height < 1) continue;
+      if (r.left < w.right - 1 && w.left < r.right - 1 && r.top < w.bottom - 1 && w.top < r.bottom - 1) out.push(e.className);
+    }
+    return out;
+  });
+  expect(hits, state).toEqual([]);
+}
+
 for (const [w, h] of SIZES) {
   test(`hud and pause at ${w}x${h}`, async ({ page }) => {
     mkdirSync('screens', { recursive: true });
@@ -170,14 +189,16 @@ for (const [w, h] of SIZES) {
     `);
     await page.waitForSelector('.run__wall.is-visible', { timeout: 10_000 });
     await page.screenshot({ path: `screens/door-${w}x${h}.png` });
+    await expectClearOfWall(page, `door ${w}x${h}`);
     // the garage: the CARS page with the compact in reach and the rest not
-    await page.evaluate(() => { window.__game!.sim.run.bank = 19000; window.advanceTime!(700); });
+    await page.evaluate(() => { window.__game!.sim.run.bank = 25000; window.advanceTime!(700); });
     for (const code of ['KeyD', 'KeyW']) {
       await page.keyboard.press(code);
       await page.evaluate(() => window.advanceTime?.(34));
     }
     await page.waitForSelector('.wall__card.is-focus', { timeout: 10_000 });
     await page.screenshot({ path: `screens/garage-${w}x${h}.png` });
+    await expectClearOfWall(page, `garage ${w}x${h}`);
     // the day's three and the streak
     await page.locator('.wall__tab', { hasText: 'DAILIES' }).click();
     await page.waitForSelector('.wall__page--dailies.is-current .wall__daily', { timeout: 10_000 });
@@ -186,10 +207,12 @@ for (const [w, h] of SIZES) {
     await page.locator('.wall__tab', { hasText: 'BOARD' }).click();
     await page.waitForSelector('.wall__page--board.is-current .wall__chip', { timeout: 10_000 });
     await page.screenshot({ path: `screens/board-${w}x${h}.png` });
+    await expectClearOfWall(page, `board ${w}x${h}`);
     // STYLE (M6): the paint, the car's kit and the driver's
     await page.locator('.wall__tab', { hasText: 'STYLE' }).click();
     await page.waitForSelector('.wall__page--paint.is-current .wall__kit', { timeout: 10_000 });
     await page.screenshot({ path: `screens/style-${w}x${h}.png` });
+    await expectClearOfWall(page, `style ${w}x${h}`);
   });
 }
 

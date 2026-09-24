@@ -24,17 +24,8 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 - The two streets the parkway runs beside have no stop line at its junctions (no room between the merge and the
   crossing street); the parkway itself gives way at the merge since M7. (M2.2)
-- The spill's twelve coins appear on the lane in one step; a scatter from the
-  wreck to their spots over half a second (the fly pool run backwards) would
-  make the burst read as one. Render only. (2026-09-23)
-- The big map (M5.5 slice 15) draws roads, district tints and landmarks but no
-  lots, parks or water: `City.generate` emits render descriptors only. A small
-  `cityFootprints()` export (park rects, block outlines, the promenade and
-  piers) would let it show blocks the way the radar shows roads. (M2)
 
 ## Rendering
-
-- The heap went 48 → 58 MB at the M6 gate (budget 250), not profiled. The likely part: the traffic builds an instanced mesh per body at load, all 28 (M6 added 14 bodies, most never spawned); building one the first time its body spawns would tell and save.
 
 - Startup at 20 Mbit + CPU ×4 is 2.7 s to control in a typical run (download
   0.9, physics 0.2, sim 0.4, renderer 0.65, first frame 0.6); a slow run of the
@@ -63,9 +54,6 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 ## UI
 
 - Keycap labels resolve through `navigator.keyboard.getLayoutMap()` only on Chromium; other browsers show `W/A/S/D` positions, which is what the brief asks for anyway. (M0)
-- North-up option for the radar once settings exist; some players prefer a map
-  that never turns. `advance()` with a fixed target heading is the whole change.
-  (with a settings page; the big map is north-up already)
 
 ## Run structure and heat (M4 candidates beyond the slice plan; docs/DESIGN.md)
 

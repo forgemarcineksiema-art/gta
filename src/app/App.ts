@@ -135,7 +135,7 @@ export class App {
   private adShowing = false;
   private readonly autoDismiss: boolean;
   /** The wall's key edges this frame, reused. */
-  private readonly nav = { left: false, right: false, confirm: false, back: false };
+  private readonly nav = { left: false, right: false, confirm: false, back: false, select: false };
   private readonly store: SaveStore;
   private saveCursor: number;
   /** `?date=YYYY-MM-DD` for tests and playtests; null reads the local clock. */
@@ -234,7 +234,7 @@ export class App {
       driveOut: () => this.driveOut(),
     };
     this.garageUi = new GarageUi(this.runHud.wall, sim, actions);
-    this.garageUi.setKeys({ left: this.input.label('steerLeft'), right: this.input.label('steerRight'), confirm: this.input.label('throttle'), back: this.input.label('brake') });
+    this.garageUi.setKeys({ left: this.input.label('steerLeft'), right: this.input.label('steerRight'), confirm: this.input.label('throttle'), back: this.input.label('brake'), select: this.input.label('handbrake') });
     this.coldOpenHud = new ColdOpenHud(uiRoot);
     this.jobsHud = new JobsHud(uiRoot);
     // the top of the screen (M7 slice 1): the job line and its card, the intro's caption, the key hints and the news in
@@ -686,6 +686,8 @@ export class App {
           this.nav.right = st.pressed.steerRight;
           this.nav.confirm = st.pressed.throttle;
           this.nav.back = st.pressed.brake;
+          // the handbrake or Enter takes a card on the wall's grid pages (M7 slice 12)
+          this.nav.select = st.pressed.handbrake || st.pressed.skip;
           this.garageUi.navigate(this.nav);
         } else {
           for (const action of DISMISS) if (st.pressed[action]) { run.closeCard(); break; }

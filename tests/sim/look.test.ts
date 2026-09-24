@@ -1,12 +1,11 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { initPhysics } from '../../src/sim';
-import { AVENUE_LANDMARKS, City, chunkCoord, districtAt } from '../../src/sim/city/City';
+import { AVENUE_LANDMARKS, City, chunkCoord, cityFootprints, districtAt } from '../../src/sim/city/City';
 import { DROP_OFF_LOTS, dropOffFor, hideoutSign } from '../../src/sim/city/cover';
 import { buildRoadMarkings } from '../../src/sim/city/markings';
-import { BLOCK, SPECIAL_ROADS, buildRoadGraph } from '../../src/sim/city/roads';
+import { BLOCK, CITY_HALF, HIGHWAY_HALF, ROAD_HALF, SPECIAL_ROADS, buildRoadGraph } from '../../src/sim/city/roads';
 import type { StaticDesc } from '../../src/sim/scene';
-
 
 /** FNV-1a over a string: the layout's fingerprint. */
 function fnv(s: string): number {
@@ -80,7 +79,7 @@ function slab(o: { x: number; y: number; z: number }, d: { x: number; y: number;
   return true;
 }
 
-describe('the city\'s look (M7 slice 11)', () => {
+describe('the city\'s look and the big map (M7 slices 11–12)', () => {
   let world: RAPIER.World, city: City;
   beforeAll(async () => { await initPhysics(); world = new RAPIER.World({ x: 0, y: -9.81, z: 0 }); city = new City(world, 42); });
   afterAll(() => world.free());
@@ -155,6 +154,32 @@ describe('the city\'s look (M7 slice 11)', () => {
       expect(near.length % 2).toBe(0);
     }
     expect(lines.filter((m) => m.color !== 0xd4d0bf && m.color !== 0x9e9b94)).toHaveLength(0);
+  });
+
+  it('M7 12.1 the big map\'s footprints: parks and blocks inside the island, the shallows outside the shore, no block on a road', () => {
+    const fp = cityFootprints(city);
+    expect(fp.blocks.length).toBeGreaterThan(100);
+    expect(fp.parks.length).toBeGreaterThan(20);
+    expect(fp.water.length).toBeGreaterThan(0);
+    for (const r of [...fp.blocks, ...fp.parks]) {
+      expect(Math.abs(r.x) + r.hx).toBeLessThanOrEqual(CITY_HALF + 1e-6);
+      expect(Math.abs(r.z) + r.hz).toBeLessThanOrEqual(CITY_HALF + 1e-6);
+    }
+    for (const poly of fp.water) for (const pt of poly) expect(Math.max(Math.abs(pt.x), Math.abs(pt.z))).toBeGreaterThanOrEqual(CITY_HALF - 1e-6);
+    for (const r of fp.blocks) {
+      // off every grid carriageway and its pavement
+      for (const [c, h] of [[r.x, r.hx], [r.z, r.hz]] as const) {
+        const line = Math.round(c / BLOCK) * BLOCK, near = Math.abs(line) === 3 * BLOCK ? HIGHWAY_HALF : ROAD_HALF;
+        expect(Math.abs(c - line) - h).toBeGreaterThanOrEqual(near + 4.5 - 1e-6);
+      }
+      // and off every authored road: its centreline's samples are all further than its half width from the block
+      for (const road of SPECIAL_ROADS) for (const pt of road.centre) {
+        const dx = Math.max(0, Math.abs(pt.x - r.x) - r.hx), dz = Math.max(0, Math.abs(pt.z - r.z) - r.hz);
+        expect(Math.hypot(dx, dz), road.name).toBeGreaterThan(road.halfWidth);
+      }
+    }
+    // the same object again: built once
+    expect(cityFootprints(city)).toBe(fp);
   });
 
   it('M7 11.3 each drop-off\'s lit sign is seen from the highway where its street meets it: a ray clear of every static', () => {

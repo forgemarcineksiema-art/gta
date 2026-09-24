@@ -135,11 +135,12 @@ test('4.10 the garage by keys alone: buy the compact and drive out in it in unde
   const starts = await page.evaluate(() => (window.__game?.platformCalls as Calls).gameplayStart);
   let presses = 0;
   const press = async (code: string): Promise<void> => { presses++; await key(page, code); };
-  // D to the cars, W into them (the compact is focused: the first car the bank can buy), W buys it
+  // D to the cars, W into them (the compact is focused: the first car the bank can buy), the handbrake buys it
+  // (M7 slice 12: on the grid pages W and S change rows)
   await press('KeyD');
   await press('KeyW');
-  await press('KeyW');
-  // back to the pages, back to the totals, W drives out
+  await press('Space');
+  // S from the first row back to the pages, S back to the totals, W drives out
   await press('KeyS');
   await press('KeyS');
   await press('KeyW');

@@ -9,7 +9,7 @@
  * Reads sim state only; the radar's paths and glyphs are shared.
  */
 import { BALANCE, BreakerState, CITY_HALF, DISTRICTS, PALETTE, type BreakerDesc, type JobKind, type SimWorld } from '../sim';
-import { LANDMARKS } from '../sim/city/City';
+import { LANDMARKS, cityFootprints } from '../sim/city/City';
 import { COVER } from '../sim/city/covers';
 import { BLOCK, HIGHWAY_HALF, OVERPASS, OVERPASS_NODES } from '../sim/city/roads';
 import {
@@ -26,6 +26,10 @@ const COVER_COLOR = 'rgba(126, 196, 214, 0.9)';
 const CAMERA_COLOR = INK;
 /** A scaffold tower that brings down on the chasers (M5.5 slice 18). */
 const BREAKER_COLOR = hex(PALETTE.carOrange);
+/** The island's ground (M7 slice 12): the built blocks a shade darker than their district, the parks green, the shallows light. */
+const BLOCK_FILL = 'rgba(28, 27, 34, 0.16)';
+const PARK_FILL = hex(PALETTE.grass);
+const SHALLOWS_FILL = 'rgba(255, 255, 255, 0.2)';
 /** The placed jobs' kinds, in the legend's order (fares have no marker: a hailer waves the taxi down). */
 const LEGEND_JOBS: ReadonlyArray<[JobKind, string]> = [
   ['delivery', 'DELIVERY'], ['order', 'STEAL TO ORDER'], ['escape', 'ESCAPE'], ['trial', 'TIME TRIAL'],
@@ -46,6 +50,8 @@ export class BigMap {
   private readonly keyHint: HTMLElement;
   /** The covered streets and the overpasses' decks as world rectangles (centre and half extents). */
   private readonly coverRects: Array<{ x: number; z: number; hx: number; hz: number }> = [];
+  /** The island's blocks, parks and shallows (`cityFootprints`), built the first time the map is shown. */
+  private ground: { blocks: Path2D; parks: Path2D; shallows: Path2D } | null = null;
   private shown = false;
   private size = 0;
   private dpr = 1;
@@ -161,6 +167,21 @@ export class BigMap {
     return box;
   }
 
+  /** The footprints as paths, once (a few hundred rectangles; the city's lot plans, not its chunks). */
+  private groundOf(sim: SimWorld): { blocks: Path2D; parks: Path2D; shallows: Path2D } | null {
+    if (this.ground || !sim.city) return this.ground;
+    const fp = cityFootprints(sim.city);
+    const g = { blocks: new Path2D(), parks: new Path2D(), shallows: new Path2D() };
+    for (const r of fp.blocks) g.blocks.rect(r.x - r.hx, r.z - r.hz, r.hx * 2, r.hz * 2);
+    for (const r of fp.parks) g.parks.rect(r.x - r.hx, r.z - r.hz, r.hx * 2, r.hz * 2);
+    for (const poly of fp.water) {
+      poly.forEach((pt, k) => (k === 0 ? g.shallows.moveTo(pt.x, pt.z) : g.shallows.lineTo(pt.x, pt.z)));
+      g.shallows.closePath();
+    }
+    this.ground = g;
+    return g;
+  }
+
   private unitDot(c: CanvasRenderingContext2D, x: number, y: number, color: string): void {
     c.fillStyle = color;
     c.strokeStyle = DARK;
@@ -191,7 +212,16 @@ export class BigMap {
     c.save();
     c.translate(size / 2, size / 2);
     c.scale(-s, -s);
+    const ground = this.groundOf(sim);
+    if (ground) { c.fillStyle = SHALLOWS_FILL; c.fill(ground.shallows); }
     fillIsland(c, paths);
+    // under the roads: the built blocks, then the parks
+    if (ground) {
+      c.fillStyle = BLOCK_FILL;
+      c.fill(ground.blocks);
+      c.fillStyle = PARK_FILL;
+      c.fill(ground.parks);
+    }
     const minW = MINIMAP.minRoadPx / s;
     const casing = (MINIMAP.casingPx * 2) / s;
     const gridW = Math.max(paths.gridWidth, minW);

@@ -9,7 +9,7 @@ import { mulberry32 } from '../random';
 import { IDENTITY_QUAT as IDENTITY_ROT, quatFromYaw, type StaticDesc } from '../scene';
 import { Architecture, CITY_COLORS, type LandmarkStyle } from './architecture';
 import { placeBillboards, type BillboardDesc } from './collectibles';
-import { DROP_OFF_LOTS, cameraSites, dropOffAt, dropOffFor, hideoutStatics, nearDoor } from './cover';
+import { DROP_OFF_LOTS, cameraSites, dropOffAt, dropOffFor, hideoutStatics, nearDoor, type DropOff } from './cover';
 import { COVER, coverStatics, insideCover, placeCovers, type CoverAvoid, type CoverDesc } from './covers';
 import { cameraStatics, placeCameras, type CameraDesc } from './cameras';
 import { jumpStatics, placeJumps, type JumpDesc } from './jumps';
@@ -49,6 +49,29 @@ interface RoadJoins {
   end: [ClipEdge | null, ClipEdge | null];
 }
 const PAVEMENT = 4.5;
+
+/** An axis-aligned rectangle of the map: centre and half extents (m). */
+export interface Rect { x: number; z: number; hx: number; hz: number }
+/** A closed polygon of the map (world x, z). */
+export type Polygon = ReadonlyArray<{ x: number; z: number }>;
+
+/** A lot's decision (M7 slice 12): what the generator builds on it, decided before anything is built. */
+type LotPlan =
+  | { ox: number; oz: number; kind: 'park'; px: number; pz: number }
+  | { ox: number; oz: number; kind: 'dropOff'; dropOff: DropOff }
+  | { ox: number; oz: number; kind: 'building'; variant: number; px: number; pz: number; w: number; depth: number; setback: number; floors: number; backlot: boolean };
+
+/** A chunk quarter: its district, whether an authored road passes it, its rectangle (pavement included) and its lots. */
+interface QuarterPlan {
+  sx: number; sz: number;
+  d: typeof DISTRICTS[number];
+  open: boolean;
+  qx: number; qz: number; hx: number; hz: number;
+  lots: LotPlan[];
+}
+
+/** The shallows round the island on the big map (m out from the seawall). */
+const SHALLOWS = 40;
 
 /**
  * A rotated footprint inside a block interior of chunk (cx, cz): clear of that chunk's and the neighbouring grid
@@ -107,6 +130,11 @@ export const AVENUE_LANDMARKS: Readonly<Record<string, LandmarkStyle>> = {
   'Garden Parkway': { district: 'marina', body: CITY_COLORS.stone, sign: PALETTE.carLime, floors: 5 },
 };
 
+/** The big map's island (M7 slice 12, docs/M7_PLAN.md §3.2): blocks, parks and the shallows. */
+export function cityFootprints(city: City): { parks: Rect[]; blocks: Rect[]; water: Polygon[] } {
+  return city.footprints();
+}
+
 export class City {
   readonly graph = buildRoadGraph();
   readonly roadMarkings = buildRoadMarkings(this.graph, districtAt);
@@ -124,6 +152,7 @@ export class City {
   /** Each authored road's frontage lots, and by segment (M7 slice 11). */
   private readonly lots = new Map<string, FrontageLot[]>();
   private readonly lotsBySegment = new Map<string, Map<number, FrontageLot[]>>();
+  private footprintCache: { parks: Rect[]; blocks: Rect[]; water: Polygon[] } | null = null;
   readonly spawns: SpawnPoint[];
   readonly active = new Map<string, { body: RAPIER.RigidBody; chunk: CityChunk }>();
   loaded = 0;
@@ -184,9 +213,94 @@ export class City {
     if (first) this.spawns.push({ name: 'loop', position: { x: first.x0, y: 1, z: first.z0 }, yaw: first.yaw0 });
   }
 
-  generate(cx: number, cz: number): CityChunk {
+  /** The authored roads near a chunk centre (their corridor overrides the grid's apron and lots), and the clearance to them. */
+  private corridorsNear(x: number, z: number): { corridors: SpecialRoad[]; roadClearance: (px: number, pz: number) => number } {
+    const corridors = this.graph.special.filter((road) => road.centre.some((pt) => Math.abs(pt.x - x) < BLOCK / 2 + road.halfWidth + 8 && Math.abs(pt.z - z) < BLOCK / 2 + road.halfWidth + 8));
+    const roadClearance = (px: number, pz: number): number => {
+      let best = Infinity;
+      for (const road of corridors) best = Math.min(best, distanceToPolyline(road.centre, px, pz) - road.halfWidth);
+      return best;
+    };
+    return { corridors, roadClearance };
+  }
+
+  /**
+   * A chunk's quarters and their lots, decided from the chunk's random stream in the generator's order: a lot is
+   * reserved for a landmark, left to an authored road's frontage, a park, a drop-off or a building.
+   */
+  private plan(cx: number, cz: number, corridors: readonly SpecialRoad[], roadClearance: (px: number, pz: number) => number): QuarterPlan[] {
     const x = cx * BLOCK, z = cz * BLOCK;
     const rnd = mulberry32(this.seed ^ Math.imul(cx + 19, 73856093) ^ Math.imul(cz + 23, 19349663));
+    const vx = Math.abs(cx) === 3 ? HIGHWAY_HALF : ROAD_HALF;
+    const vz = Math.abs(cz) === 3 ? HIGHWAY_HALF : ROAD_HALF;
+    const out: QuarterPlan[] = [];
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      const d = districtAt(x + sx * 55, z + sz * 55);
+      const hx = (BLOCK / 2 - vx) / 2, hz = (BLOCK / 2 - vz) / 2;
+      const qx = x + sx * (vx + hx), qz = z + sz * (vz + hz);
+      const open = corridors.some((road) => road.centre.some((pt) => Math.abs(pt.x - qx) < hx + road.halfWidth + 6 && Math.abs(pt.z - qz) < hz + road.halfWidth + 6));
+      const lots: LotPlan[] = [];
+      for (const ox of [40, 85]) for (const oz of [40, 85]) {
+        // Reserve authored destinations before filling ordinary parcels.
+        const landmarkOffset = d.id === 'crown' || d.id === 'foundry' ? 85 : 40;
+        if (Math.abs(cx) === 2 && Math.abs(cz) === 2 && sx === 1 && sz === 1 && ox === landmarkOffset && oz === landmarkOffset) continue;
+        // Lots whose footprint could meet an authored road's frontage row are left
+        // to that road (its buildings, trees and pavements furnish the corridor).
+        if (open && [[0, 0], [-18, -18], [18, -18], [-18, 18], [18, 18]].some(([ex, ez]) => roadClearance(x + sx * ox + (ex as number), z + sz * oz + (ez as number)) < 40)) continue;
+        const backlot = ox === 85 && oz === 85;
+        const edge = Math.abs(x + sx * ox) > 702 || Math.abs(z + sz * oz) > 702;
+        const park = edge || (backlot && d.id === 'gardens') || (backlot && rnd() < 0.35);
+        if (park) { lots.push({ ox, oz, kind: 'park', px: x + sx * ox, pz: z + sz * oz }); continue; }
+        const variant = Math.floor(rnd() * 3);
+        const dropOff = dropOffAt(cx, cz, sx, sz, ox, oz);
+        if (dropOff) { lots.push({ ox, oz, kind: 'dropOff', dropOff }); continue; }
+        const w = d.id === 'gardens' ? 7 + variant : (ox === 85 ? 15 : 10) + variant;
+        const depth = d.id === 'gardens' ? 8 + variant : (oz === 85 ? 16 : 10) + variant;
+        const setback = d.id === 'gardens' ? 6 : d.id === 'foundry' ? 7 : 1.3;
+        const px = x + sx * (ox === 40 ? vx + 4.5 + setback + w : 82);
+        const pz = z + sz * (oz === 40 ? vz + 4.5 + setback + depth : 82);
+        // Higher offices cluster around Crown Tower; the street still has a human-scale podium.
+        const centreDistance = Math.hypot(px + 365, pz + 365);
+        const floors = d.id === 'crown' ? (backlot ? 7 + Math.max(0, 5 - Math.floor(centreDistance / 100)) : 3 + variant)
+          : d.id === 'foundry' ? 1 : d.id === 'gardens' ? 2 : 3 + variant;
+        lots.push({ ox, oz, kind: 'building', variant, px, pz, w, depth, setback, floors, backlot });
+      }
+      out.push({ sx, sz, d, open, qx, qz, hx, hz, lots });
+    }
+    return out;
+  }
+
+  /**
+   * The island for the big map (M7 slice 12): the block interiors inside their pavements where no authored road
+   * passes, the parks (the park lots and the Gardens' open quarters) and the shallows round the seawall. Read from
+   * the lot plans, never from built chunks, so it costs a few hundred small decisions once.
+   */
+  footprints(): { parks: Rect[]; blocks: Rect[]; water: Polygon[] } {
+    if (this.footprintCache) return this.footprintCache;
+    const parks: Rect[] = [], blocks: Rect[] = [];
+    for (let cz = -3; cz <= 3; cz++) for (let cx = -3; cx <= 3; cx++) {
+      const { corridors, roadClearance } = this.corridorsNear(cx * BLOCK, cz * BLOCK);
+      for (const q of this.plan(cx, cz, corridors, roadClearance)) {
+        // the interior: the quarter less its two 4.5 m pavements
+        const inner = { x: q.qx + q.sx * PAVEMENT / 2, z: q.qz + q.sz * PAVEMENT / 2, hx: q.hx - PAVEMENT / 2, hz: q.hz - PAVEMENT / 2 };
+        if (!q.open) blocks.push(inner);
+        else if (q.d.id === 'gardens') parks.push(inner);
+        for (const lot of q.lots) if (lot.kind === 'park') parks.push({ x: lot.px, z: lot.pz, hx: 18, hz: 18 });
+      }
+    }
+    const h = CITY_HALF, w = SHALLOWS;
+    const water: Polygon[] = [
+      [{ x: -h - w, z: -h - w }, { x: h + w, z: -h - w }, { x: h + w, z: -h }, { x: -h - w, z: -h }],
+      [{ x: -h - w, z: h }, { x: h + w, z: h }, { x: h + w, z: h + w }, { x: -h - w, z: h + w }],
+      [{ x: -h - w, z: -h }, { x: -h, z: -h }, { x: -h, z: h }, { x: -h - w, z: h }],
+      [{ x: h, z: -h }, { x: h + w, z: -h }, { x: h + w, z: h }, { x: h, z: h }],
+    ];
+    this.footprintCache = { parks, blocks, water };
+    return this.footprintCache;
+  }
+
+  generate(cx: number, cz: number): CityChunk {
+    const x = cx * BLOCK, z = cz * BLOCK;
     const statics: StaticDesc[] = [];
     const architecture = new Architecture(statics);
     const box = architecture.box.bind(architecture);
@@ -205,12 +319,9 @@ export class City {
     for (const st of this.roadMarkings.chunks.get(`${cx},${cz}`) ?? []) if (!underOverpass(st.position.x, st.position.z, 1)) statics.push(st);
     // Authored roads that come near this chunk. Their corridor (half width plus
     // pavement) overrides the grid apron and lots, so nothing is built on them.
-    const corridors = this.graph.special.filter((road) => road.centre.some((pt) => Math.abs(pt.x - x) < BLOCK / 2 + road.halfWidth + 8 && Math.abs(pt.z - z) < BLOCK / 2 + road.halfWidth + 8));
-    const roadClearance = (px: number, pz: number): number => {
-      let best = Infinity;
-      for (const road of corridors) best = Math.min(best, distanceToPolyline(road.centre, px, pz) - road.halfWidth);
-      return best;
-    };
+    const { corridors, roadClearance } = this.corridorsNear(x, z);
+    // every lot's decision first, from the chunk's random stream (the footprints read the same plan, M7 slice 12)
+    const plans = this.plan(cx, cz, corridors, roadClearance);
     // Junction pavements of the authored roads: computed once per road, emitted by
     // the chunk that holds each piece, and their strip cuts apply to any chunk.
     const joinCuts: StripCut[] = [];
@@ -223,12 +334,9 @@ export class City {
         if (Math.abs(mx - x) < BLOCK / 2 && Math.abs(mz - z) < BLOCK / 2) architecture.prism(piece.points, 0, 0.14, piece.colour);
       }
     }
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-      const d = districtAt(x + sx * 55, z + sz * 55);
+    for (const q of plans) {
+      const { sx, sz, d, open, qx, qz, hx, hz } = q;
       const c = CITY_COLORS;
-      const hx = (BLOCK / 2 - vx) / 2, hz = (BLOCK / 2 - vz) / 2;
-      const qx = x + sx * (vx + hx), qz = z + sz * (vz + hz);
-      const open = corridors.some((road) => road.centre.some((pt) => Math.abs(pt.x - qx) < hx + road.halfWidth + 6 && Math.abs(pt.z - qz) < hz + road.halfWidth + 6));
       if (!open) {
         // The collision apron stays continuous. Visually, pavement is only 4.5 m wide;
         // the interior is gardens, courtyards or a paved industrial service yard.
@@ -273,18 +381,10 @@ export class City {
           }
         }
       }
-      for (const ox of [40, 85]) for (const oz of [40, 85]) {
-        // Reserve authored destinations before filling ordinary parcels.
-        const landmarkOffset = d.id === 'crown' || d.id === 'foundry' ? 85 : 40;
-        if (Math.abs(cx) === 2 && Math.abs(cz) === 2 && sx === 1 && sz === 1 && ox === landmarkOffset && oz === landmarkOffset) continue;
-        // Lots whose footprint could meet an authored road's frontage row are left
-        // to that road (its buildings, trees and pavements furnish the corridor).
-        if (open && [[0, 0], [-18, -18], [18, -18], [-18, 18], [18, 18]].some(([ex, ez]) => roadClearance(x + sx * ox + (ex as number), z + sz * oz + (ez as number)) < 40)) continue;
-        const backlot = ox === 85 && oz === 85;
-        const edge = Math.abs(x + sx * ox) > 702 || Math.abs(z + sz * oz) > 702;
-        const park = edge || (backlot && d.id === 'gardens') || (backlot && rnd() < 0.35);
-        if (park) {
-          const px = x + sx * ox, pz = z + sz * oz;
+      for (const lot of q.lots) {
+        const { ox } = lot;
+        if (lot.kind === 'park') {
+          const { px, pz } = lot;
           box(px, 0.16, pz, 18, 0.015, 18, PALETTE.grass, 'decor', 'top');
           box(px, 0.18, pz, 1.6, 0.01, 18, PALETTE.kerb, 'decor', 'top');
           architecture.tree(px - 7, pz, d.id === 'marina');
@@ -293,22 +393,12 @@ export class City {
           box(px + 4, 0.9, pz - 5.35, 1.4, 0.35, 0.08, c.brick);
           continue;
         }
-        const variant = Math.floor(rnd() * 3);
-        // A drop-off garage stands on this lot instead of its building (the draw above keeps the lot stream).
-        const dropOff = dropOffAt(cx, cz, sx, sz, ox, oz);
-        if (dropOff) {
-          statics.push(...hideoutStatics(dropOff));
+        // A drop-off garage stands on this lot instead of its building (the plan's draw keeps the lot stream).
+        if (lot.kind === 'dropOff') {
+          statics.push(...hideoutStatics(lot.dropOff));
           continue;
         }
-        const w = d.id === 'gardens' ? 7 + variant : (ox === 85 ? 15 : 10) + variant;
-        const depth = d.id === 'gardens' ? 8 + variant : (oz === 85 ? 16 : 10) + variant;
-        const setback = d.id === 'gardens' ? 6 : d.id === 'foundry' ? 7 : 1.3;
-        const px = x + sx * (ox === 40 ? vx + 4.5 + setback + w : 82);
-        const pz = z + sz * (oz === 40 ? vz + 4.5 + setback + depth : 82);
-        // Higher offices cluster around Crown Tower; the street still has a human-scale podium.
-        const centreDistance = Math.hypot(px + 365, pz + 365);
-        const floors = d.id === 'crown' ? (backlot ? 7 + Math.max(0, 5 - Math.floor(centreDistance / 100)) : 3 + variant)
-          : d.id === 'foundry' ? 1 : d.id === 'gardens' ? 2 : 3 + variant;
+        const { oz, variant, w, depth, setback, px, pz, floors, backlot } = lot;
         architecture.building(px, pz, w, depth, d.id, sx, sz, floors, variant, d.accent, ox === 40 || backlot, oz === 40 || backlot);
         // Paths join actual entrances to the public footway; yards are intentionally set back.
         if (ox === 40) box(x + sx * (vx + 4.5 + setback / 2), 0.17, pz, setback / 2, 0.01, 1.5, PALETTE.kerb, 'decor', 'top');

@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M7 slice 12: the maps and the wall
+
+Done: `cityFootprints()`: the generator's lot decisions now come from one plan (`City.plan`, the same random stream;
+the layout hash unchanged), so the big map draws the built blocks, the parks and the shallows under its roads from
+the plan, built the first time the map opens. The radar's north up shipped with the settings (slice 3). The wall's
+CARS and STYLE pages are grids (`ui/wallGrid.ts`): A/D along a row, W a row deeper, S a row back and from the first
+row out to the tabs; the handbrake (or Enter) takes the card, since W and S now move (the plan named no confirm key);
+the far corner of STYLE is 13 presses, not 58. game.spec's garage-by-keys case buys with the handbrake (gate).
+Pins M7 12.1, 12.2. Verify green (357 tests).
+
 ## 2026-09-24 — M7 slice 11: the city's look
 
 Done: the authored roads' frontage lots are computed once a road (`City.frontage`), so the first and last lot of each

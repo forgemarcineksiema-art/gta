@@ -6,7 +6,11 @@
  *
  * Keys through the existing actions, two levels: steer left and right move
  * between pages (or between the items of a page once inside it), throttle
- * confirms (on the totals page it drives out), brake backs out one level.
+ * confirms (on the totals page it drives out), brake backs out one level. On
+ * CARS and STYLE the cards stand in rows (M7 slice 12, `wallGrid.ts`): A and
+ * D walk a row, W goes a row deeper, S a row back and from the first row out
+ * to the tabs, and the handbrake (or Enter) takes the card; it confirms
+ * anywhere on the wall.
  * Every item is a DOM button with the same handler, so a click does what the
  * key does. The door's rewarded offer, when there is one, is answered first:
  * DOUBLE THE BAG (a video) or BANK IT, the same size, BANK IT focused.
@@ -14,6 +18,7 @@
  * Reports intents through `GarageActions` and never writes the sim; reads it
  * to draw. Rebuilds only when the garage, the bank or the totals change.
  */
+import { gridMove, gridStart, type GridMove } from './wallGrid';
 import {
   BALANCE, BODY_IDS, BODY_WORDS, CHIEF, DISTRICTS, KIT, MEDAL_WORDS, PALETTE, RIVALS, STATS, STREAK, isCarSlot, isShell, posterNumber, reqText,
   type BodyId, type CarSlot, type KitSlot, type PrepItem, type RivalDef, type SimWorld, type Stat,
@@ -41,6 +46,8 @@ export interface WallNav {
   right: boolean;
   confirm: boolean;
   back: boolean;
+  /** The handbrake or Enter: takes the focused card on a grid page, confirms elsewhere (M7 slice 12). */
+  select: boolean;
 }
 
 export type WallPage = 'wall' | 'board' | 'cars' | 'paint' | 'tune' | 'prep' | 'dailies';
@@ -76,6 +83,8 @@ export class GarageUi {
   private readonly tabs = new Map<WallPage, HTMLButtonElement>();
   private readonly pages = new Map<WallPage, HTMLElement>();
   private readonly items = new Map<WallPage, Item[]>();
+  /** The grid pages' cards by row (M7 slice 12): CARS one row, STYLE the paints then a row a kit slot. */
+  private readonly rows = new Map<WallPage, Item[][]>();
   private readonly order: WallPage[];
   private readonly offerRow: HTMLElement;
   private readonly offerDouble: HTMLButtonElement;
@@ -106,7 +115,7 @@ export class GarageUi {
   private hot: BodyId | null = null;
   private bank = -1;
   private dailySerial = -1;
-  private keys = { left: 'A', right: 'D', confirm: 'W', back: 'S' };
+  private keys = { left: 'A', right: 'D', confirm: 'W', back: 'S', select: 'SPACE' };
 
   constructor(parent: HTMLElement, private readonly sim: SimWorld, private readonly actions: GarageActions, pages: readonly WallPage[] = ['wall', 'cars', 'board', 'paint', 'tune', 'prep', 'dailies']) {
     this.order = [...pages];
@@ -169,22 +178,28 @@ export class GarageUi {
     }
     cars.append(this.carsCount, grid);
     this.items.set('cars', carItems);
+    this.rows.set('cars', [carItems]);
 
     // STYLE (M6 slice 6; PAINT before): the car's paint, then the driver's kit a row a slot
     const paint = this.newPage('paint');
     this.paintFor = el('div', 'wall__for');
     const swatches = el('div', 'wall__swatches');
     const paintItems: Item[] = [];
+    const swatchItems: Item[] = [];
+    const paintRows: Item[][] = [swatchItems];
     for (const hex of GARAGE_PAINTS) {
       const b = button('wall__swatch', '');
       b.style.setProperty('--swatch', `#${hex.toString(16).padStart(6, '0')}`);
       b.setAttribute('aria-label', `paint #${hex.toString(16)}`);
       swatches.appendChild(b);
-      paintItems.push(this.item('paint', b, () => this.actions.respray(this.sim.garage.car, hex)));
+      const it = this.item('paint', b, () => this.actions.respray(this.sim.garage.car, hex));
+      paintItems.push(it);
+      swatchItems.push(it);
     }
     paint.append(this.paintFor, swatches);
     for (const slot of STYLE_SLOTS) {
       const row = el('div', 'wall__cars wall__kit');
+      const rowItems: Item[] = [];
       for (let i = 0; i < KIT.length; i++) {
         const k = KIT[i];
         if (!k || k.slot !== slot) continue;
@@ -194,12 +209,16 @@ export class GarageUi {
         sw.style.background = `#${k.colour.toString(16).padStart(6, '0')}`;
         b.append(sw, el('span', 'wall__card-name', k.name), el('span', 'wall__card-status'));
         row.appendChild(b);
-        paintItems.push(this.item('paint', b, () => this.actions.kit(i)));
+        const it = this.item('paint', b, () => this.actions.kit(i));
+        paintItems.push(it);
+        rowItems.push(it);
         this.kitCards.push({ el: b, item: i });
       }
       paint.append(el('div', 'wall__for', SLOT_WORDS[slot]), row);
+      paintRows.push(rowItems);
     }
     this.items.set('paint', paintItems);
+    this.rows.set('paint', paintRows);
 
     // TUNE: three stats, three tiers
     const tune = this.newPage('tune');
@@ -256,7 +275,7 @@ export class GarageUi {
   }
 
   /** The keycaps the hint line names. */
-  setKeys(k: { left: string; right: string; confirm: string; back: string }): void {
+  setKeys(k: { left: string; right: string; confirm: string; back: string; select: string }): void {
     this.keys = k;
     this.hintText();
   }
@@ -316,7 +335,7 @@ export class GarageUi {
     if (this.offerOpen) {
       if (nav.left && this.rewarded) this.offerFocus = 0;
       if (nav.right) this.offerFocus = 1;
-      if (nav.confirm) this.answerOffer(this.offerFocus);
+      if (nav.confirm || nav.select) this.answerOffer(this.offerFocus);
       this.show();
       return;
     }
@@ -325,18 +344,44 @@ export class GarageUi {
       if (nav.left && i > 0) this.goPage(this.order[i - 1] as WallPage, false);
       else if (nav.right && i < this.order.length - 1) this.goPage(this.order[i + 1] as WallPage, false);
       else if (nav.back && this.page !== 'wall') this.goPage('wall', false);
-      else if (nav.confirm) {
+      else if (nav.confirm || nav.select) {
         if (this.page === 'wall') this.actions.driveOut();
         else if (this.visibleItems().length > 0) this.enterItems();
       }
+    } else if (this.rows.has(this.page)) {
+      this.gridNavigate(nav);
     } else {
       const list = this.visibleItems();
       if (nav.back) this.level = 'pages';
       else if (nav.left) this.focus = Math.max(0, this.focus - 1);
       else if (nav.right) this.focus = Math.min(list.length - 1, this.focus + 1);
-      else if (nav.confirm) list[this.focus]?.act();
+      else if (nav.confirm || nav.select) list[this.focus]?.act();
     }
     this.show();
+  }
+
+  /** A grid page's keys (M7 slice 12): the handbrake takes the card, A and D walk the row, W and S change rows. */
+  private gridNavigate(nav: WallNav): void {
+    const list = this.visibleItems();
+    if (nav.select) { list[this.focus]?.act(); return; }
+    const move: GridMove | null = nav.left ? 'left' : nav.right ? 'right' : nav.confirm ? 'deeper' : nav.back ? 'back' : null;
+    if (!move) return;
+    const rows = this.visibleRows();
+    const focused = list[this.focus];
+    let at = { row: 0, col: 0 };
+    for (let r = 0; r < rows.length; r++) {
+      const c = focused ? (rows[r] as Item[]).indexOf(focused) : -1;
+      if (c >= 0) { at = { row: r, col: c }; break; }
+    }
+    const next = gridMove(rows.map((row) => row.length), at, move);
+    if (!next) { this.level = 'pages'; return; }
+    const card = rows[next.row]?.[next.col];
+    if (card) this.focus = list.indexOf(card);
+  }
+
+  /** The grid page's rows of the cards it shows. */
+  private visibleRows(): Item[][] {
+    return (this.rows.get(this.page) ?? []).map((row) => row.filter((it) => !it.hidden));
   }
 
   update(sim: SimWorld): void {
@@ -545,6 +590,10 @@ export class GarageUi {
       this.focus = Math.max(0, k);
     } else if (this.page === 'paint') {
       this.focus = Math.max(0, GARAGE_PAINTS.indexOf(g.paintOf(g.car)));
+    } else if (this.rows.has(this.page)) {
+      const rows = this.visibleRows(), start = gridStart(rows.map((row) => row.length));
+      const card = start ? rows[start.row]?.[start.col] : undefined;
+      this.focus = card ? Math.max(0, list.indexOf(card)) : 0;
     }
     this.focus = Math.min(this.focus, Math.max(0, list.length - 1));
   }
@@ -590,6 +639,7 @@ export class GarageUi {
   private hintText(): void {
     const k = this.keys;
     const text = this.offerOpen ? `${k.left} ${k.right} CHOOSE · ${k.confirm} OK`
+      : this.level === 'items' && this.rows.has(this.page) ? `${k.left} ${k.right} PICK · ${k.confirm} ${k.back} ROWS · ${k.select} OK`
       : this.level === 'items' ? `${k.left} ${k.right} PICK · ${k.confirm} OK · ${k.back} BACK`
         : this.page === 'wall' ? `${k.right} GARAGE · ${k.confirm} DRIVE OUT`
           : `${k.left} ${k.right} PAGES · ${k.confirm} OPEN · ${k.back} TOTALS`;

@@ -4,6 +4,8 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 ## Performance / size
 
+- The JS heap with traffic is 58–65 MB against M8's own 50 MB target (0.7.0: 48; the brief's 250 holds): M8's props hold it (their arrays, the 96 debris, the prop meshes merged into the chunks' geometry). Measure where at the next perf pass. (M8.5 gate)
+- The quick `verify`'s tests run 60–63 s against the rule's 60 (M8 grew them; slice 6 promised a trim at its gate that did not come): the slowest pins into the long set. (M8.5 gate)
 - The quick `verify` runs about 95 s of tests (M5.5 gate; CLAUDE.md asks under a minute): the jobs, the traffic and the police pins grew with the slices. Next: move the pins over ~5 s each into the long set, as M5.1 did.
 - M5.5 against M5.1 under 4× CPU: fps 51–53 against 56–57 at an equal frame p95 (33.4 ms), the traffic step's mean 1.9 → 3.0 ms (the signals, the parked cars, the drivers), time to control 3.8–4.3 s against 3.3–3.4 (budget 6 s). The traffic's per-record scans are the first lever.
 

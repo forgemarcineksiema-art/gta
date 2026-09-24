@@ -9,7 +9,7 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 
 ## Session start
 
-1. Read this file, `docs/PROGRESS.md` and the current milestone contract (M8's slices done, its gate folded into M8.5's; `docs/M8.5_PLAN.md`, the clean screen, only on Marcin's word; the design in `docs/DESIGN.md`, §17 first); check `git log --oneline -15`.
+1. Read this file, `docs/PROGRESS.md` and the current milestone contract (M8.5 at its gate, `docs/M8.5_REPORT.md`, with M8's; then `docs/M9_PLAN.md`, the platform, only on Marcin's word; the design in `docs/DESIGN.md`, §17 first); check `git log --oneline -15`.
 2. Run `npm run verify` (the quick set) before touching anything and at the commit that ends a slice. `npm run verify:gate` (the long bot-driven pins included) only at a milestone gate. Nothing else per slice: see **Pace** below, and read it before every slice.
 3. Work autonomously inside the milestone. Decide, act, note assumptions in `docs/PROGRESS.md`. Stop only at a gate, before destructive/irreversible operations, to change a fixed decision from the brief, or when blocked on something only Marcin can provide.
 4. Commit small and often; never leave significant work uncommitted. Commit messages end with a `Co-Authored-By:` line naming the model that did the work (e.g. `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`).
@@ -20,11 +20,11 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 |---|---|
 | `docs/BRIEF.md` | The project brief. Read-only. |
 | `docs/PROGRESS.md` | Session log: done, decided and why, next, open problems. Holds the current milestone and the design talks; older entries are archived under `docs/history/` at each gate. |
-| `docs/history/` | Past gate reports, reviews and archived session logs (`PROGRESS_M0-M3.md`, `PROGRESS_M4.md`, `PROGRESS_M5.md`, `PROGRESS_M5.5.md`, `PROGRESS_M6.md`). |
+| `docs/history/` | Past gate reports, reviews and archived session logs (`PROGRESS_M0-M3.md`, `PROGRESS_M4.md`, `PROGRESS_M5.md`, `PROGRESS_M5.5.md`, `PROGRESS_M6.md`, `PROGRESS_M7.md`). |
 | `docs/DESIGN.md` | Design decisions on top of the brief: the run, progression, the city as a level, platform KPIs, the M4 slice order. Each section is marked decided (Marcin) or set here (mine). |
 | `docs/M7_PLAN.md` | The finished contract of the polish (DESIGN §15; `docs/M7_REPORT.md`, 0.7.0). |
-| `docs/M8_PLAN.md` | The chaos's contract (slices 0–9 and the long pins done; its gate closes inside M8.5's): the chaos (DESIGN §16): street furniture with mass, the knock decided before the physics step, each district's things, the smash as a skill-chain trick, the bill at the door. |
-| `docs/M8.5_PLAN.md` | The next contract, on his word, with M8's gate inside its own: the clean screen (DESIGN §17): seven things on a calm drive, one voice at a time, one name for each thing, the wall in four pages, a road coin in the bank. Slices in order, done criteria, pins. |
+| `docs/M8_PLAN.md` | The finished contract of the chaos (its gate closed inside M8.5's, `docs/M8.5_REPORT.md`): the chaos (DESIGN §16): street furniture with mass, the knock decided before the physics step, each district's things, the smash as a skill-chain trick, the bill at the door. |
+| `docs/M8.5_PLAN.md` | The last milestone's contract, at its gate (`docs/M8.5_REPORT.md`, 0.8.5, M8's gate inside it): the clean screen (DESIGN §17): seven things on a calm drive, one voice at a time, one name for each thing, the wall in four pages, a road coin in the bank. M9 starts only on his word. |
 | `docs/M6_PLAN.md` | The finished contract of the wanted board (DESIGN §14; kept for its numbers and as-built notes). |
 | `docs/M4_PLAN.md`, `docs/M5_PLAN.md` | The finished contracts (kept for their numbers and as-built notes). M4's §5 holds the contract for post-launch update 1. |
 | `docs/M5.5_PLAN.md` | The finished contract before it: the whole game before the platform (kept for its numbers and as-built notes). |
@@ -55,7 +55,7 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 
 Always in a vehicle, no on-foot, no guns. PEGI 12 slapstick: pedestrians always dodge, police are comic. No menu before gameplay; cold open. One seamless city. Control never taken away > 2 s. Keyboard first, touch second, input abstracted. Low-poly flat-shaded, palette in `src/sim/palette.ts`, no per-asset textures.
 
-The screen's budget (DESIGN §17, set 2026-09-24 after Marcin's review): a calm drive shows seven things (the goal line, the arrow, the stars, the bank, the radar, the speed, the boost); everything else appears on its moment and goes. A new system gets no standing place on the driving screen: it speaks through the goal line, a card, the one message at the top, a pop (two at most), the wall's GOALS page or the full map. One name for each thing (§17.4: BANK, BAG, the stars, GARAGE, COPS, COMBO), pinned by `tests/ui/words.test.ts` once M8.5 builds it.
+The screen's budget (DESIGN §17, set 2026-09-24 after Marcin's review): a calm drive shows seven things (the goal line, the arrow, the stars, the bank, the radar, the speed, the boost); everything else appears on its moment and goes. A new system gets no standing place on the driving screen: it speaks through the goal line, a card, the one message at the top, a pop (two at most), the wall's GOALS page or the full map. One name for each thing (§17.4: BANK, BAG, the stars, GARAGE, COPS, COMBO), pinned by `tests/ui/words.test.ts`.
 
 ## Budgets (`npm run budget` fails the build)
 

@@ -90,6 +90,8 @@ export class Renderer {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
   readonly camera: THREE.PerspectiveCamera;
+  private readonly lookDir = new THREE.Vector3();
+  private readonly screenPoint = new THREE.Vector3();
   readonly chase: ChaseCamera;
   readonly stats: RenderStats = { drawCalls: 0, triangles: 0, dpr: 1, width: 0, height: 0, glRenderer: '' };
   private readonly sim: SimWorld;
@@ -174,6 +176,25 @@ export class Renderer {
     // Effects (speed lines, sparks, ghost) first appear mid-drive; compiling their
     // programs lazily cost a 60 ms frame. Parallel compile off the critical path.
     void this.renderer.compileAsync(this.scene, this.camera).catch(() => undefined);
+  }
+
+  /** The camera for the signs' rules (M8.7): its position and its look along the ground. */
+  view(out: { x: number; z: number; dirX: number; dirZ: number }): void {
+    this.camera.getWorldDirection(this.lookDir);
+    out.x = this.camera.position.x;
+    out.z = this.camera.position.z;
+    out.dirX = this.lookDir.x;
+    out.dirZ = this.lookDir.z;
+  }
+
+  /** A world point on the window in CSS px; false when it is behind the camera or off the screen. */
+  toScreen(x: number, y: number, z: number, out: { x: number; y: number }): boolean {
+    const v = this.screenPoint.set(x, y, z).applyMatrix4(this.camera.matrixWorldInverse);
+    if (v.z > -this.camera.near) return false;
+    v.applyMatrix4(this.camera.projectionMatrix);
+    out.x = (v.x * 0.5 + 0.5) * this.stats.width;
+    out.y = (-v.y * 0.5 + 0.5) * this.stats.height;
+    return v.x >= -1 && v.x <= 1 && v.y >= -1 && v.y <= 1;
   }
 
   resize(): void {

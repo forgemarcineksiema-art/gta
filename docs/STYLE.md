@@ -395,6 +395,24 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   `N SKIP` underneath. A caption slides in over 0.25 s and shows only while
   its cue holds; the bottom swap prompt hides while the caption says SWAP.
   Never a modal, never over the car.
+- Job signs, M8.7 slice 3 (DESIGN §20.3 rules 5–7; `sim/glyphs.ts`,
+  `render/run/signs.ts`): every marker is a ring on the road and a round
+  sign 1.4 m across on a 3.3 m steel pole (`#6d6d78`), always turned to the
+  camera about the vertical: an ink face `#f7f3ea`, a dark rim `#160e28`
+  0.14 m wide, and its kind's pictogram in the dark, extruded 3 cm (a parcel,
+  a car key, a police light, a stopwatch, a chequered flag, a crash star, a
+  claw hammer, a taxi, the garage's house, the Chief's star, a rival's
+  poster number in bold seven-segment digits). Colour says the state and
+  nothing else: open white; the goal cyan (its rim and its ring, the sign
+  bobbing 0.12 m at 1 Hz, the ring pulsing ±16 %); closed grey `#8d8a96`
+  with a slate pictogram. A rival's sign floats over its parked car, a
+  running job's over its target, the key over the wanted car, the taxi over
+  a hailer, the house over a door the way leads to. Within 100 m the nearest
+  open sign ahead carries its pay a metre over it in the line's yellow type.
+  The maps draw the same pictogram in a badge (open ink, the goal in a cyan
+  ring, closed grey); the goal line's badge is 30 px. The kinds' colours are
+  gone everywhere (the line's words ink, the card's edge cyan, a zone's edge
+  cyan); the boost bar's fill is dim ink, since cyan is the way's.
 - Job markers, M8.7 slice 2 (DESIGN §20.3 rules 8–9): with the police on
   the player every ring is closed and drawn grey `#8d8a96` (the radar's and
   the full map's too); a job taken lights its ring in the way's cyan, growing

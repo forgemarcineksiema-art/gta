@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8.7 slice 3: the signs and the colours
+
+Done (D5–D7): `sim/glyphs.ts` holds one outline per kind (parcel, key, police light, stopwatch, chequered flag, crash
+star, claw hammer, taxi, house, star, seven-segment digits for a rival's number), drawn by the world, the maps and the
+line. `render/run/signs.ts` chooses the signs (pure, pinned) and `MarkerView` draws them instanced: a round sign turned to
+the camera on a steel pole, or floating over a rival's car, a job's target, the wanted car, a hailer, a door the way leads
+to; open white, the goal cyan and bobbing, closed grey. The nearest open sign ahead within 100 m shows its pay (a DOM
+label the app places from the camera). The line's dot became the goal's badge and TAKE A JOB its ring's name and pay
+(DELIVERY +1,200). The kinds' colours are gone; the boost bar is dim ink. Pins M8.7 3.1–3.5. Verify green; looked at the gate.
+
 ## 2026-09-24 — M8.7 slice 2: taken by choice, not in a chase
 
 Done (D8, D9, D11's ring): a ring starts its job when rolled into under 20 km/h (`startSpeed` 5.5 m/s; a rival keeps its

@@ -12,8 +12,9 @@
  */
 import {
   BALANCE, BODY_WORDS, CAR_WORDS, CHAIN_STEPS, CHIEF, MEDAL_WORDS, PLACE_WORDS, RIVALS, STEP, chainStep, copyGoal, goalFor, newGoal, paintName, posterNumber, reqText,
-  trialTimes, unpackDescriptor, type GoalKind, type JobDef, type RivalDef, type SimWorld,
+  trialTimes, unpackDescriptor, type Goal, type GoalKind, type JobDef, type RivalDef, type SimWorld,
 } from '../../sim';
+import { GLYPHS, GLYPH_ORDER, NO_GLYPH, digitSlot, glyphOf, goalGlyph, numberGlyphs, type GlyphId } from '../../sim/glyphs';
 import { num, paintedCar, t } from '../lang';
 
 const KIND_TITLE: Record<JobDef['kind'], string> = { delivery: 'DELIVERY', order: 'STEAL TO ORDER', escape: 'ESCAPE', trial: 'TIME TRIAL', race: 'STREET RACE', rage: 'TAKEDOWN RAGE', mayhem: 'MAYHEM', fare: 'FARE', duel: 'WANTED BOARD' };
@@ -21,7 +22,13 @@ const KIND_TITLE: Record<JobDef['kind'], string> = { delivery: 'DELIVERY', order
 export class JobsHud {
   readonly root: HTMLElement;
   private readonly line: HTMLElement;
-  private readonly lineDot: HTMLElement;
+  /** The goal's badge (M8.7 D7): its pictogram in the way's cyan ring; the glyph it shows (`NO_GLYPH`: none). */
+  private readonly lineBadge: HTMLElement;
+  private badgeGlyph = NO_GLYPH;
+  private goalId = -1;
+  private goalDoor = -1;
+  private readonly defOf = (id: number): JobDef | null => this.sim?.jobs.defOf(id) ?? null;
+  private sim: SimWorld | null = null;
   private readonly lineKind: HTMLElement;
   private readonly lineTime: HTMLElement;
   private readonly lineDist: HTMLElement;
@@ -66,12 +73,12 @@ export class JobsHud {
   constructor(parent: HTMLElement) {
     this.root = el('div', 'jobs');
     this.line = el('div', 'jobs__line');
-    this.lineDot = el('span', 'jobs__dot');
+    this.lineBadge = el('span', 'jobs__badge');
     this.lineKind = el('span', 'jobs__kind');
     this.lineTime = el('span', 'jobs__time');
     this.lineDist = el('span', 'jobs__dist');
     // no coin count (DESIGN.md §17.2): the coins are on the road, and a clean line's tip says itself at the end
-    this.line.append(this.lineDot, this.lineKind, this.lineTime, this.lineDist);
+    this.line.append(this.lineBadge, this.lineKind, this.lineTime, this.lineDist);
     this.card = el('div', 'jobs__card');
     this.cardTitle = el('div', 'jobs__card-title');
     this.cardSub = el('div', 'jobs__card-sub');
@@ -179,8 +186,8 @@ export class JobsHud {
     if (this.mode !== 'job') {
       this.mode = 'job';
       this.serial = -1;
-      this.lineDot.dataset['ring'] = '';
     }
+    this.setBadge(glyphOf(d));
     if (jobs.serial !== this.serial) {
       this.serial = jobs.serial;
       this.lastSeconds = -2;
@@ -241,42 +248,20 @@ export class JobsHud {
       this.line.classList.remove('is-hurry');
     }
     const who = g.rival * 16 + g.req;
-    if (g.kind !== this.goalKind || g.ring !== this.goalRing || g.amount !== this.goalAmount || who !== this.goalWho) {
+    this.sim = sim;
+    if (g.kind !== this.goalKind || g.ring !== this.goalRing || g.amount !== this.goalAmount || who !== this.goalWho
+      || g.id !== this.goalId || g.door !== this.goalDoor) {
       this.goalKind = g.kind;
       this.goalRing = g.ring;
       this.goalAmount = g.amount;
       this.goalWho = who;
-      let words = '', extra = '';
-      switch (g.kind) {
-        case 'take': words = t('TAKE A JOB'); break;
-        case 'bank': words = t('BANK IT'); break;
-        case 'lose': words = t(g.hasTarget ? 'LOSE THEM OR BANK IT' : 'LOSE THEM'); break;
-        case 'buy':
-          words = t('BUY THE {car}', { car: t(CAR_WORDS.compact) });
-          if (g.amount > 0) extra = t('{cash} TO GO', { cash: Math.round(g.amount) });
-          break;
-        case 'escape': words = t('ESCAPE THE COPS'); break;
-        case 'order': words = t('STEAL TO ORDER'); break;
-        case 'fill': words = t('FILL THE BAG'); extra = `${money(g.amount)}/${money(BALANCE.chain.bankGoal)}`; break;
-        // the wanted board (M6): the rival ready, or what they want first
-        case 'rival': {
-          const r = RIVALS[g.rival];
-          words = !r ? '' : g.rival === CHIEF ? t('FACE THE CHIEF') : t('CHALLENGE {name}', { name: t(r.name) });
-          break;
-        }
-        case 'needs': {
-          const r = RIVALS[g.rival], q = r?.reqs[g.req];
-          if (!r || !q) break;
-          words = t('#{n} NEEDS: {req}', { n: posterNumber(g.rival), req: reqText(q, t) });
-          if (q.count > 1 && q.kind !== 'bestRun') extra = `${money(Math.min(g.amount, q.count))}/${money(q.count)}`;
-          break;
-        }
-        default: break;
-      }
+      this.goalId = g.id;
+      this.goalDoor = g.door;
+      const { words, extra } = goalWords(sim, g);
       this.lineKind.textContent = words;
       this.kindText = words;
       this.lineTime.textContent = extra;
-      this.lineDot.dataset['ring'] = g.ring;
+      this.setBadge(goalGlyph(g, this.defOf));
       this.setState(g.kind === 'lose' ? 'is-lose' : 'is-goal');
     }
     const p = sim.probe;
@@ -403,6 +388,14 @@ export class JobsHud {
     this.card.classList.remove('is-teach');
   }
 
+  /** The badge's pictogram, written only when it changes; none hides it. */
+  private setBadge(glyph: number): void {
+    if (glyph === this.badgeGlyph) return;
+    this.badgeGlyph = glyph;
+    this.lineBadge.classList.toggle('is-shown', glyph !== NO_GLYPH);
+    this.lineBadge.innerHTML = glyph === NO_GLYPH ? '' : badgeMarkup(glyph);
+  }
+
   private setState(state: string): void {
     if (state === this.stateClass) return;
     if (this.stateClass) this.line.classList.remove(this.stateClass);
@@ -428,6 +421,75 @@ export class JobsHud {
 function metres(sim: SimWorld, dx: number, dz: number): number {
   const road = sim.way?.length ?? NaN;
   return Math.round((Number.isFinite(road) ? road : Math.hypot(dx, dz)) / 10) * 10;
+}
+
+/**
+ * The goal line's words and its yellow extra for a goal (DESIGN.md §13.4, M8.7 D7): a ring the way leads to by its
+ * name and its pay (DELIVERY +1,200), a step, a door, a rival. Pure; `t` says it in the screen's language.
+ */
+export function goalWords(sim: SimWorld, g: Goal): { words: string; extra: string } {
+  let words = '', extra = '';
+  switch (g.kind) {
+    case 'take': {
+      // the ring the way leads to by its name and its pay (M8.7 D7): DELIVERY +1,200
+      const d = sim.jobs.defOf(g.id);
+      if (!d) { words = t('TAKE A JOB'); break; }
+      words = t(KIND_TITLE[d.kind]);
+      extra = `+${money(d.kind === 'duel' ? sim.board.purse(d.level) : d.payout)}`;
+      break;
+    }
+    case 'bank': words = t('BANK IT'); break;
+    case 'lose': words = t(g.hasTarget ? 'LOSE THEM OR BANK IT' : 'LOSE THEM'); break;
+    case 'buy':
+      words = t('BUY THE {car}', { car: t(CAR_WORDS.compact) });
+      if (g.amount > 0) extra = t('{cash} TO GO', { cash: Math.round(g.amount) });
+      break;
+    case 'escape': words = t('ESCAPE THE COPS'); break;
+    case 'order': words = t('STEAL TO ORDER'); break;
+    case 'fill': words = t('FILL THE BAG'); extra = `${money(g.amount)}/${money(BALANCE.chain.bankGoal)}`; break;
+    // the wanted board (M6): the rival ready, or what they want first
+    case 'rival': {
+      const r = RIVALS[g.rival];
+      words = !r ? '' : g.rival === CHIEF ? t('FACE THE CHIEF') : t('CHALLENGE {name}', { name: t(r.name) });
+      break;
+    }
+    case 'needs': {
+      const r = RIVALS[g.rival], q = r?.reqs[g.req];
+      if (!r || !q) break;
+      words = t('#{n} NEEDS: {req}', { n: posterNumber(g.rival), req: reqText(q, t) });
+      if (q.count > 1 && q.kind !== 'bestRun') extra = `${money(Math.min(g.amount, q.count))}/${money(q.count)}`;
+      break;
+    }
+    default: break;
+  }
+  return { words, extra };
+}
+
+/** Each glyph's badge as inline SVG (the way's cyan ring, the ink face, the pictogram), made once. */
+const BADGES = new Map<number, string>();
+export function badgeMarkup(glyph: number): string {
+  const made = BADGES.get(glyph);
+  if (made) return made;
+  const ids: readonly GlyphId[] = glyph >= 0 ? [GLYPH_ORDER[glyph] as GlyphId] : numberGlyphs(-glyph);
+  let paths = '';
+  ids.forEach((id, k) => {
+    const slot = digitSlot(k, ids.length);
+    for (const shape of GLYPHS[id]) {
+      let d = '';
+      for (const pts of [shape.outer, ...(shape.holes ?? [])]) {
+        for (let i = 0; i < pts.length; i += 2) {
+          d += `${i === 0 ? 'M' : 'L'}${(slot.cx + ((pts[i] as number) - 0.5) * slot.sx).toFixed(3)} ${(pts[i + 1] as number).toFixed(3)}`;
+        }
+        d += 'Z';
+      }
+      paths += `<path d="${d}" fill-rule="evenodd"/>`;
+    }
+  });
+  const svg = '<svg class="jobs__badge-svg" viewBox="-0.25 -0.25 1.5 1.5" aria-hidden="true">'
+    + '<circle class="jobs__badge-rim" cx="0.5" cy="0.5" r="0.72"/><circle class="jobs__badge-face" cx="0.5" cy="0.5" r="0.6"/>'
+    + `<g class="jobs__badge-glyph" transform="translate(0.1 0.1) scale(0.8)">${paths}</g></svg>`;
+  BADGES.set(glyph, svg);
+  return svg;
 }
 
 function clock(seconds: number): string {

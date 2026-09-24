@@ -5,18 +5,21 @@
  * Repaints at most every `MINIMAP.repaintMs` and never while nothing moved, so
  * a parked or paused game costs no canvas work. The maths is in `minimapModel`.
  */
-import { BALANCE, CITY_HALF, DISTRICTS, PALETTE, districtAt, type SimWorld } from '../../sim';
+import { BALANCE, CITY_HALF, DISTRICTS, PALETTE, districtAt, type JobDef, type SimWorld } from '../../sim';
 import { LANDMARKS } from '../../sim/city/City';
+import { GLYPHS, GLYPH_ORDER, NO_GLYPH, digitSlot, glyphOf, goalGlyph, numberGlyphs, type GlyphId } from '../../sim/glyphs';
 import { labelAria, relabel, t } from '../lang';
 import { MINIMAP, advance, buildRoadLayers, clampToRim, drawInShare, project, routeStop, yawFromQuat, type MinimapState, type Vec2 } from './minimapModel';
 
 export type MarkerKind = 'tower' | 'tank' | 'glasshouse' | 'hotel' | 'garage' | 'job' | 'cache' | 'camera' | 'breaker';
-/** A point of interest on the map. `local` markers show only inside the circle (the job rings: sixteen chevrons on the rim would be noise). */
-export interface MinimapMarker { x: number; z: number; kind: MarkerKind; color: string; yaw?: number; local?: boolean }
+/**
+ * A point of interest on the map. `local` markers show only inside the circle (the job rings: sixteen chevrons on the
+ * rim would be noise). A job's ring is a badge: its `glyph` (`sim/glyphs.ts`) and its `state` (0 open, 2 closed).
+ */
+export interface MinimapMarker { x: number; z: number; kind: MarkerKind; color: string; yaw?: number; local?: boolean; glyph?: number; state?: number }
 
-/** The job rings by kind (the marker's own colours, docs/STYLE.md). */
+/** A street race's rivals on the maps (the job rings have no colour of their own since M8.7: a badge by state). */
 export const RIVAL = hex(PALETTE.carLime);
-export const JOB_COLORS = { delivery: hex(PALETTE.carOrange), order: hex(PALETTE.carMagenta), escape: hex(PALETTE.policeBlue), trial: hex(PALETTE.coin), race: hex(PALETTE.carLime), rage: hex(PALETTE.carRed), mayhem: hex(PALETTE.carWhite), fare: hex(PALETTE.coin), duel: hex(PALETTE.carBlue) } as const;
 
 export const FONT = "'Segoe UI', 'Helvetica Neue', Arial, system-ui, sans-serif";
 export const INK = '#f7f3ea';
@@ -31,8 +34,9 @@ export const SEARCH_EDGE = 'rgba(59, 130, 246, 0.7)';
 export const LOOP = '#ffe9a8';
 /** The way's cyan (DESIGN.md §20.3 rule 6): the route and the goal's ring, and nothing else on the maps. */
 export const ROUTE = '#2bd1ff';
-/** A closed ring's grey: the police on the player (M8.7 D9). */
+/** A closed ring's grey: the police on the player (M8.7 D9); its pictogram's slate. */
 export const CLOSED = '#8d8a96';
+export const SLATE = '#4a4a55';
 export const GRID = 'rgba(247, 243, 234, 0.85)';
 const RIM = 'rgba(255, 210, 63, 0.45)';
 const PANEL = 0x160e28;
@@ -197,20 +201,53 @@ export function drawGlyph(c: CanvasRenderingContext2D, kind: MarkerKind, x: numb
   }
 }
 
-/** The goal's badge (M8.7 D3): an ink disc in a cyan ring with a dark edge; slice 3 puts the kind's outline in it. */
-export function drawGoalBadge(c: CanvasRenderingContext2D, x: number, y: number, r: number): void {
+/** A rival's poster number's digits by the number (0..10), made once. */
+const NUMBERS: readonly (readonly GlyphId[])[] = Array.from({ length: 11 }, (_, n) => numberGlyphs(n));
+
+/** A glyph (`sim/glyphs.ts`: an index, or minus a rival's number) filled `size` px across round (x, y), each shape even-odd. */
+export function drawOutline(c: CanvasRenderingContext2D, glyph: number, x: number, y: number, size: number, color: string): void {
+  if (glyph === NO_GLYPH) return;
+  c.fillStyle = color;
+  const ids = glyph >= 0 ? null : NUMBERS[Math.min(-glyph, 10)];
+  const count = ids ? ids.length : 1;
+  for (let k = 0; k < count; k++) {
+    const id = ids ? ids[k] as GlyphId : GLYPH_ORDER[glyph] as GlyphId;
+    const slot = digitSlot(k, count);
+    for (const shape of GLYPHS[id]) {
+      c.beginPath();
+      for (const pts of [shape.outer, ...(shape.holes ?? [])]) {
+        for (let i = 0; i < pts.length; i += 2) {
+          const px = x + (slot.cx + ((pts[i] as number) - 0.5) * slot.sx - 0.5) * size, py = y + ((pts[i + 1] as number) - 0.5) * size;
+          if (i === 0) c.moveTo(px, py);
+          else c.lineTo(px, py);
+        }
+        c.closePath();
+      }
+      c.fill('evenodd');
+    }
+  }
+}
+
+/**
+ * A job's badge on the maps (M8.7 D5–D6): a disc with its pictogram. Open: ink with a dark edge; the goal (1): in a
+ * cyan ring with a dark edge outside it; closed (2): grey, its pictogram slate.
+ */
+export function drawBadge(c: CanvasRenderingContext2D, glyph: number, x: number, y: number, r: number, state: number): void {
   c.beginPath();
   c.arc(x, y, r, 0, Math.PI * 2);
-  c.fillStyle = INK;
+  c.fillStyle = state === 2 ? CLOSED : INK;
   c.fill();
-  c.lineWidth = 3;
-  c.strokeStyle = ROUTE;
+  c.lineWidth = state === 1 ? 3 : 1.5;
+  c.strokeStyle = state === 1 ? ROUTE : DARK;
   c.stroke();
-  c.beginPath();
-  c.arc(x, y, r + 2, 0, Math.PI * 2);
-  c.lineWidth = 1.5;
-  c.strokeStyle = DARK;
-  c.stroke();
+  if (state === 1) {
+    c.beginPath();
+    c.arc(x, y, r + 2, 0, Math.PI * 2);
+    c.lineWidth = 1.5;
+    c.strokeStyle = DARK;
+    c.stroke();
+  }
+  drawOutline(c, glyph, x, y, r * 1.35, state === 2 ? SLATE : DARK);
 }
 
 /** The player's arrow at a screen point, turned `angle` from screen up. */
@@ -259,6 +296,8 @@ export class Minimap {
   /** The landmarks and drop-offs; idle job markers are appended when the jobs change. */
   private base: readonly MinimapMarker[];
   private jobSerial = -1;
+  /** A def by id for the goal's badge (bound once). */
+  private readonly defOf = (id: number): JobDef | null => this.sim?.jobs.defOf(id) ?? null;
   /** The police on the player when the rings were last listed (they are drawn grey, closed). */
   private closedRings = false;
   private cacheSerial = -1;
@@ -404,7 +443,7 @@ export class Minimap {
         this.markers = [...this.base, ...dots];
       } else {
         const live = jobs.state === 'idle' ? jobs.defs.filter((d) => jobs.shown(d)) : [];
-        this.markers = [...this.base, ...dots, ...live.map((d): MinimapMarker => ({ x: d.x, z: d.z, kind: 'job', color: closed ? CLOSED : JOB_COLORS[d.kind], local: true }))];
+        this.markers = [...this.base, ...dots, ...live.map((d): MinimapMarker => ({ x: d.x, z: d.z, kind: 'job', color: '', local: true, glyph: glyphOf(d), state: closed ? 2 : 0 }))];
       }
       this.dirty = true;
     }
@@ -511,7 +550,7 @@ export class Minimap {
       c.beginPath();
       c.arc(zoneJob.x, zoneJob.z, BALANCE.jobs.zone.radius, 0, Math.PI * 2);
       c.lineWidth = 3 / s;
-      c.strokeStyle = JOB_COLORS[zoneJob.kind];
+      c.strokeStyle = ROUTE;
       c.stroke();
     }
     // the search: where they last saw you, growing as they look (get away from it)
@@ -551,7 +590,8 @@ export class Minimap {
       project(this.tmp, m.x, m.z, x, z, h, s, px, py);
       if (m.local && (this.tmp.x - ccx) ** 2 + (this.tmp.y - ccy) ** 2 > rimR * rimR) continue;
       const clamped = clampToRim(this.tmp, px, py, this.tmp.x, this.tmp.y, ccx, ccy, rimR);
-      drawGlyph(c, m.kind, this.tmp.x, this.tmp.y, clamped ? MINIMAP.glyphPx * 0.75 : MINIMAP.glyphPx, m.color);
+      if (m.kind === 'job') drawBadge(c, m.glyph ?? 0, this.tmp.x, this.tmp.y, MINIMAP.goalPx * 0.85, m.state ?? 0);
+      else drawGlyph(c, m.kind, this.tmp.x, this.tmp.y, clamped ? MINIMAP.glyphPx * 0.75 : MINIMAP.glyphPx, m.color);
       if (clamped) this.chevron(this.tmp.x, this.tmp.y, Math.atan2(this.tmp.x - px, py - this.tmp.y), m.color);
     }
 
@@ -559,7 +599,7 @@ export class Minimap {
     if (way && way.goal.hasTarget) {
       project(this.tmp, way.goal.x, way.goal.z, x, z, h, s, px, py);
       const clamped = clampToRim(this.tmp, px, py, this.tmp.x, this.tmp.y, ccx, ccy, rimR);
-      drawGoalBadge(c, this.tmp.x, this.tmp.y, MINIMAP.goalPx);
+      drawBadge(c, goalGlyph(way.goal, this.defOf), this.tmp.x, this.tmp.y, MINIMAP.goalPx, 1);
       if (clamped) this.chevron(this.tmp.x, this.tmp.y, Math.atan2(this.tmp.x - px, py - this.tmp.y), ROUTE);
     }
 

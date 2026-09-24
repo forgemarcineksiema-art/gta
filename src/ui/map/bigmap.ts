@@ -11,10 +11,11 @@
 import { BALANCE, BreakerState, CITY_HALF, DISTRICTS, PALETTE, type BreakerDesc, type JobKind, type SimWorld } from '../../sim';
 import { LANDMARKS, cityFootprints } from '../../sim/city/City';
 import { COVER } from '../../sim/city/covers';
+import { KIND_GLYPH, glyphIndex, glyphOf, goalGlyph } from '../../sim/glyphs';
 import { BLOCK, HIGHWAY_HALF, OVERPASS, OVERPASS_NODES } from '../../sim/city/roads';
 import {
-  CACHE_COLOR, CLOSED, DARK, FONT, GLYPH_KINDS, GRID, INK, JOB_COLORS, LOOP, ACCENT, RIVAL, ROUTE, SEARCH_EDGE, SEARCH_FILL, UNIT_BEAT, UNIT_LIT, WATER,
-  drawArrow, drawGlyph, drawGoalBadge, drawHeli, fillIsland, hex, type MapPaths, type MarkerKind,
+  CACHE_COLOR, DARK, FONT, GLYPH_KINDS, GRID, INK, LOOP, ACCENT, RIVAL, ROUTE, SEARCH_EDGE, SEARCH_FILL, UNIT_BEAT, UNIT_LIT, WATER,
+  drawArrow, drawBadge, drawGlyph, drawHeli, fillIsland, hex, type MapPaths, type MarkerKind,
 } from './minimap';
 import { label, labelAria, relabel, t } from '../lang';
 import { MINIMAP, bigMapProject, bigMapScale, yawFromQuat, type Vec2 } from './minimapModel';
@@ -189,7 +190,8 @@ export class BigMap {
       box.appendChild(row);
     };
     item('YOU', (c) => drawArrow(c, 9, 9, 0, 7));
-    for (const [kind, word] of LEGEND_JOBS) item(word, (c) => drawGlyph(c, 'job', 9, 9, GLYPH, JOB_COLORS[kind]));
+    // the job kinds by their pictograms (M8.7: no kind has a colour of its own)
+    for (const [kind, word] of LEGEND_JOBS) item(word, (c) => drawBadge(c, glyphIndex(KIND_GLYPH[kind]), 9, 9, 8, 0));
     item('GARAGE', (c) => drawGlyph(c, 'garage', 9, 9, GLYPH, hex(PALETTE.carOrange)));
     item('CACHE', (c) => drawGlyph(c, 'cache', 9, 9, GLYPH * 1.4, CACHE_COLOR));
     item('SPEED CAMERA', (c) => drawGlyph(c, 'camera', 9, 9, GLYPH, CAMERA_COLOR));
@@ -293,7 +295,7 @@ export class BigMap {
       c.beginPath();
       c.arc(running.x, running.z, BALANCE.jobs.zone.radius, 0, Math.PI * 2);
       c.lineWidth = 3 / s;
-      c.strokeStyle = JOB_COLORS[running.kind];
+      c.strokeStyle = ROUTE;
       c.stroke();
     }
     // the search: where they last saw you, growing as they look
@@ -357,14 +359,18 @@ export class BigMap {
       }
     }
     if (!running && jobs.state === 'idle') {
-      // grey while the police are on the player: closed (M8.7 D9)
+      // each ring by its pictogram, grey while the police are on the player: closed (M8.7 D9)
       const closed = pursuit.state !== 'idle' && !sim.coldOpen.active;
-      for (const d of jobs.defs) if (jobs.shown(d)) this.glyphAt('job', d.x, d.z, s, GLYPH, closed ? CLOSED : JOB_COLORS[d.kind]);
+      for (const d of jobs.defs) {
+        if (!jobs.shown(d)) continue;
+        const p = this.at(d.x, d.z, s);
+        drawBadge(c, glyphOf(d), p.x, p.y, GLYPH * 1.05, closed ? 2 : 0);
+      }
     }
     // the goal's badge: where the route ends
     if (way && way.goal.hasTarget) {
       const g = this.at(way.goal.x, way.goal.z, s);
-      drawGoalBadge(c, g.x, g.y, GLYPH * 1.1);
+      drawBadge(c, goalGlyph(way.goal, (id: number) => jobs.defOf(id)), g.x, g.y, GLYPH * 1.3, 1);
     }
     // the pursuit's units, lit in a chase; a race's rivals; the helicopter
     const police = sim.police, traffic = sim.traffic;

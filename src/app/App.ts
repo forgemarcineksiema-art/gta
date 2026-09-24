@@ -21,6 +21,8 @@ import { Hud } from '../ui/hud/hud';
 import { RunHud } from '../ui/hud/run';
 import { ColdOpenHud } from '../ui/hud/coldOpen';
 import { JobsHud } from '../ui/hud/jobs';
+import { PayLabel } from '../ui/hud/pay';
+import { SIGN_Y, payOf, paySign, type SignView } from '../render/run/signs';
 import { arrangeTop, mountTop, topBit } from '../ui/hud/lanes';
 import { SettingsUi } from '../ui/settings';
 import { BootWatch } from './bootWatch';
@@ -106,6 +108,10 @@ export class App {
   private readonly runHud: RunHud;
   private readonly coldOpenHud: ColdOpenHud;
   private readonly jobsHud: JobsHud;
+  /** The pay over the nearest open sign (M8.7 D5), placed from the camera each frame. */
+  private readonly payLabel: PayLabel;
+  private readonly signView: SignView = { x: 0, z: 0, dirX: 0, dirZ: 1 };
+  private readonly payAt = { x: 0, y: 0 };
   private readonly garageUi: GarageUi;
   private readonly audio: EngineAudio;
   private readonly sfx: Sfx;
@@ -249,6 +255,7 @@ export class App {
     this.garageUi = new GarageUi(this.runHud.wall, sim, actions);
     this.coldOpenHud = new ColdOpenHud(uiRoot);
     this.jobsHud = new JobsHud(uiRoot);
+    this.payLabel = new PayLabel(uiRoot);
     // the top of the screen (M7 slice 1): the job line and its card, the intro's caption, the key hints and the news in
     // one column, so none is drawn over another
     mountTop(uiRoot, { jobLine: this.jobsHud.root, caption: this.coldOpenHud.root, hints: this.hud.hintsElement, news: this.hud.tickerElement });
@@ -683,6 +690,7 @@ export class App {
     this.garageUi.relabel();
     this.coldOpenHud.relabel();
     this.jobsHud.relabel();
+    this.payLabel.relabel();
     this.settingsUi.relabel();
   }
 
@@ -830,6 +838,11 @@ export class App {
     this.runHud.update(this.sim, frameDt);
     this.coldOpenHud.update(this.sim);
     this.jobsHud.update(this.sim, frameDt);
+    // the pay over the nearest open sign ahead, a metre over its face (M8.7 D5)
+    this.renderer.view(this.signView);
+    const paid = playing && !this.bot ? paySign(this.sim, this.signView) : null;
+    if (paid && this.renderer.toScreen(paid.x, SIGN_Y + 1.05, paid.z, this.payAt)) this.payLabel.show(this.payAt.x, this.payAt.y, payOf(this.sim, paid));
+    else this.payLabel.hide();
     // the top of the screen (M7 slice 1): the hints are for driving (behind a shut door the wall has the keys, the
     // intro's captions teach the same ones); under a card or a caption the hints and the news wait
     const wantsHints = now < this.hintsUntil && !this.bot && !this.sim.coldOpen.active && playing;

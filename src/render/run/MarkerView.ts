@@ -1,113 +1,146 @@
 /**
- * Job markers (docs/STYLE.md, markers; docs/M5_PLAN.md slices 1–2): a flat
- * ring on the road with a beacon post at its centre, coloured by kind
- * (delivery `carOrange`, order `carMagenta`, escape `policeBlue`), unlit so it
- * reads in the towers' shade, pulsing ±8 % in scale. All the generator's
- * markers are resident as two instanced meshes (rings, beacons): sixteen
- * instances cost two draw calls, and `count` is the live number so hidden
- * slots are not submitted.
+ * Job markers and their signs (docs/STYLE.md, markers; docs/M5_PLAN.md slices 1–2; M8.7 slice 3, DESIGN.md §20.3
+ * rules 5–6): draws what `signs.ts` chooses. A flat ring on the road where a job is taken; a round sign 1.4 m
+ * across, always turned to the camera, its face, its rim and its kind's pictogram (`sim/glyphs.ts`, extruded 3 cm),
+ * on a steel pole or floating over a car, a walker or a door; a zone job's edge in the way's cyan; a taken ring lit
+ * cyan for `FLASH` s. Unlit, like signals: they read in the towers' shade.
  *
- * While a job runs the other markers hide; its target gets a ring and a
- * beacon that pulse harder, and an order's wanted car carries a ring under it
- * while it is within `ringRange` and in front of the camera. With the police
- * on the player the markers are closed and drawn grey (M8.7 D9); a job taken
- * lights its ring cyan for `FLASH` s (D8). Reads sim state only; no allocation
- * per frame.
+ * All instanced: the rings, the poles, the faces, the rims, and one mesh per pictogram, hidden while none is drawn
+ * (four draw calls and one per pictogram in sight). Reads sim state only; no allocation per frame.
  */
 import * as THREE from 'three';
-import { BALANCE, FIXED_DT, PALETTE, type JobDef, type SimWorld } from '../../sim';
+import { BALANCE, FIXED_DT, type SimWorld } from '../../sim';
+import { GLYPHS, GLYPH_ORDER, digitSlot, glyphIndex, numberGlyphs, type GlyphShape } from '../../sim/glyphs';
+import { SIGN_COLORS, SIGN_Y, collectSigns, newRingList, newSignList, type SignView } from './signs';
 
-const PULSE_HZ = 1.2;
-const PULSE = 0.08;
-const TARGET_PULSE = 0.16;
-/** A closed marker's grey (M8.7 D9) and the way's cyan a taken ring lights in for `FLASH` s, growing by `FLASH_GROW` (D8). */
-const CLOSED = 0x8d8a96;
-const TAKEN = 0x2bd1ff;
+/** The way's cyan a taken ring lights in for `FLASH` s, growing by `FLASH_GROW` (M8.7 D8); a zone's edge wears it too. */
+const CYAN = 0x2bd1ff;
 const FLASH = 0.4;
 const FLASH_GROW = 0.35;
+/** The sign: its face's radius, the rim's inner radius and its reach past the face, the pictogram's square, its depth (m). */
+const RADIUS = 0.7;
+const RIM_IN = 0.62;
+const RIM_OUT = 0.76;
+const GLYPH_SIZE = 0.84;
+const DEPTH = 0.03;
+const POLE = 0x6d6d78;
 
-export const KIND_COLORS: Record<JobDef['kind'], number> = {
-  delivery: PALETTE.carOrange,
-  order: PALETTE.carMagenta,
-  escape: PALETTE.policeBlue,
-  // the time trial follows a coin line: the coin's gold
-  trial: PALETTE.coin,
-  // the street race: the racing lime
-  race: PALETTE.carLime,
-  // the zones: rage red, mayhem white
-  rage: PALETTE.carRed,
-  mayhem: PALETTE.carWhite,
-  // a wanted board's rival (M6): the cyan no other ring wears
-  duel: PALETTE.carBlue,
-  // a fare's mark: the taxi's yellow
-  fare: PALETTE.coin,
-};
+/** A state's colours, the open ones for anything unknown. */
+function stateColours(state: number): { face: number; rim: number; glyph: number; ring: number } {
+  return (SIGN_COLORS[state] ?? SIGN_COLORS[0]) as { face: number; rim: number; glyph: number; ring: number };
+}
+
+/** A glyph's shapes, the unit square (y down) centred on the sign, y up, standing just in front of its face. */
+function glyphGeometry(shapes: readonly GlyphShape[]): THREE.BufferGeometry {
+  const at = (pts: readonly number[]): THREE.Vector2[] => {
+    const out: THREE.Vector2[] = [];
+    for (let i = 0; i < pts.length; i += 2) out.push(new THREE.Vector2(((pts[i] as number) - 0.5) * GLYPH_SIZE, (0.5 - (pts[i + 1] as number)) * GLYPH_SIZE));
+    return out;
+  };
+  const list = shapes.map((s) => {
+    const shape = new THREE.Shape(at(s.outer));
+    for (const h of s.holes ?? []) shape.holes.push(new THREE.Path(at(h)));
+    return shape;
+  });
+  return new THREE.ExtrudeGeometry(list, { depth: DEPTH, bevelEnabled: false, curveSegments: 1 }).translate(0, 0, 0.012);
+}
+
+function instanced(geometry: THREE.BufferGeometry, material: THREE.Material, capacity: number, scene: THREE.Scene, colours: boolean): THREE.InstancedMesh {
+  const mesh = new THREE.InstancedMesh(geometry, material, capacity);
+  mesh.castShadow = false;
+  mesh.receiveShadow = false;
+  mesh.frustumCulled = false;
+  mesh.count = 0;
+  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  // allocate the colour attribute up front
+  if (colours) for (let i = 0; i < capacity; i++) mesh.setColorAt(i, new THREE.Color(0xffffff));
+  scene.add(mesh);
+  return mesh;
+}
 
 export class MarkerView {
   private readonly rings: THREE.InstancedMesh;
-  private readonly beacons: THREE.InstancedMesh;
-  private readonly ringGeometry: THREE.BufferGeometry;
-  private readonly beaconGeometry: THREE.BufferGeometry;
+  private readonly poles: THREE.InstancedMesh;
+  private readonly faces: THREE.InstancedMesh;
+  private readonly rims: THREE.InstancedMesh;
+  private readonly glyphs: THREE.InstancedMesh[];
+  private readonly glyphCount: Int32Array;
+  private readonly geometries: THREE.BufferGeometry[] = [];
   private readonly material: THREE.MeshBasicMaterial;
-  private readonly capacity: number;
-  private serial = -1;
-  /** Idle markers shown (the first `idleCount` instances). */
-  private idleCount = 0;
-  private readonly idleX: Float32Array;
-  private readonly idleZ: Float32Array;
-  /** The ring's scale per idle marker (a rival's is wider). */
-  private readonly idleScale: Float32Array;
-  private readonly color = new THREE.Color();
-  private readonly m = new THREE.Matrix4();
-  private readonly q = new THREE.Quaternion();
-  private readonly p = new THREE.Vector3();
-  private readonly s = new THREE.Vector3();
-  private readonly t = { x: 0, z: 0 };
-  private targetKind: JobDef['kind'] = 'delivery';
-  /** The police on the player at the last rebuild (the markers closed); the jobs' state last frame; the taken ring's flash. */
-  private closed = false;
+  private readonly poleMaterial: THREE.MeshBasicMaterial;
+  private readonly signs;
+  private readonly ringList;
+  /** A zone job's edge on the ground (M5.5 slice 12): a thin ring its radius round the marker. */
+  private readonly zone: THREE.Mesh;
+  /** The jobs' state last frame, and the taken ring's flash. */
   private lastState = '';
   private flashX = 0;
   private flashZ = 0;
   private flashUntil = -1;
-  /** A zone job's edge on the ground (M5.5 slice 12): a thin ring its radius round the marker. */
-  private readonly zone: THREE.Mesh;
+  /** Each digit's place on a sign, by the number's length (1 or 2) and the digit; a rival's number's digits (0..10). */
+  private readonly digitLocal: THREE.Matrix4[][];
+  private readonly numbers: number[][];
+  private readonly view: SignView = { x: 0, z: 0, dirX: 0, dirZ: 1 };
+  private sim: SimWorld | null = null;
+  private alpha = 0;
+  private readonly color = new THREE.Color();
+  private readonly m = new THREE.Matrix4();
+  private readonly md = new THREE.Matrix4();
+  private readonly q = new THREE.Quaternion();
+  private readonly qIdentity = new THREE.Quaternion();
+  private readonly up = new THREE.Vector3(0, 1, 0);
+  private readonly p = new THREE.Vector3();
+  private readonly s = new THREE.Vector3();
+  private readonly dir = new THREE.Vector3();
+  private readonly carAt = (agent: number, out: { x: number; z: number }): boolean => {
+    const sim = this.sim, traffic = sim?.traffic;
+    if (!sim || !traffic) return false;
+    const slot = traffic.slot[agent] as number, tb = sim.transforms, a = this.alpha;
+    out.x = (tb.prevPos[slot * 3] as number) + ((tb.currPos[slot * 3] as number) - (tb.prevPos[slot * 3] as number)) * a;
+    out.z = (tb.prevPos[slot * 3 + 2] as number) + ((tb.currPos[slot * 3 + 2] as number) - (tb.prevPos[slot * 3 + 2] as number)) * a;
+    return true;
+  };
 
   constructor(scene: THREE.Scene, sim: SimWorld, private readonly camera: THREE.Camera | null = null) {
+    const capacity = Math.max(8, sim.jobs.defs.length + 8);
+    this.signs = newSignList(capacity);
+    this.ringList = newRingList(capacity);
     const r = BALANCE.jobs.markerRadius;
-    this.ringGeometry = new THREE.RingGeometry(r - 0.45, r, 24).rotateX(-Math.PI / 2).translate(0, 0.08, 0);
-    const h = BALANCE.jobs.beaconHeight;
-    this.beaconGeometry = new THREE.CylinderGeometry(0.18, 0.18, h, 6).translate(0, h / 2, 0);
+    const ringGeometry = new THREE.RingGeometry(r - 0.45, r, 24).rotateX(-Math.PI / 2).translate(0, 0.08, 0);
+    const poleGeometry = new THREE.CylinderGeometry(0.07, 0.07, SIGN_Y, 6).translate(0, SIGN_Y / 2, 0);
+    const faceGeometry = new THREE.CircleGeometry(RADIUS, 24);
+    const rimGeometry = new THREE.RingGeometry(RIM_IN, RIM_OUT, 24).translate(0, 0, 0.006);
+    this.geometries.push(ringGeometry, poleGeometry, faceGeometry, rimGeometry);
     this.material = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    this.poleMaterial = new THREE.MeshBasicMaterial({ color: POLE });
+    this.rings = instanced(ringGeometry, this.material, capacity + 1, scene, true);
+    this.poles = instanced(poleGeometry, this.poleMaterial, capacity, scene, false);
+    this.faces = instanced(faceGeometry, this.material, capacity, scene, true);
+    this.rims = instanced(rimGeometry, this.material, capacity, scene, true);
+    this.glyphs = GLYPH_ORDER.map((id) => {
+      const g = glyphGeometry(GLYPHS[id]);
+      this.geometries.push(g);
+      // a digit can stand twice on one sign (10)
+      return instanced(g, this.material, id.startsWith('d') ? capacity * 2 : capacity, scene, true);
+    });
+    this.glyphCount = new Int32Array(GLYPH_ORDER.length);
+    this.numbers = Array.from({ length: 11 }, (_, n) => numberGlyphs(n).map(glyphIndex));
+    this.digitLocal = [1, 2].map((count) => Array.from({ length: count }, (_, i) => {
+      const slot = digitSlot(i, count);
+      return new THREE.Matrix4().makeTranslation((slot.cx - 0.5) * GLYPH_SIZE, 0, 0).multiply(new THREE.Matrix4().makeScale(slot.sx, 1, 1));
+    }));
     this.zone = new THREE.Mesh(new THREE.RingGeometry(0.985, 1, 128).rotateX(-Math.PI / 2).translate(0, 0.09, 0),
-      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, depthWrite: false }));
+      new THREE.MeshBasicMaterial({ color: CYAN, transparent: true, opacity: 0.7, depthWrite: false }));
     this.zone.visible = false;
     this.zone.frustumCulled = false;
     scene.add(this.zone);
-    // every def, plus the running job's target and the wanted car
-    // and a fare's hailer, and a few fares' defs over the placed ones
-    this.capacity = Math.max(4, sim.jobs.defs.length + 6);
-    this.idleX = new Float32Array(this.capacity);
-    this.idleZ = new Float32Array(this.capacity);
-    this.idleScale = new Float32Array(this.capacity).fill(1);
-    this.rings = new THREE.InstancedMesh(this.ringGeometry, this.material, this.capacity);
-    this.beacons = new THREE.InstancedMesh(this.beaconGeometry, this.material, this.capacity);
-    for (const mesh of [this.rings, this.beacons]) {
-      mesh.castShadow = false;
-      mesh.receiveShadow = false;
-      mesh.frustumCulled = false;
-      mesh.count = 0;
-      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      // allocate the colour attribute up front
-      for (let i = 0; i < this.capacity; i++) mesh.setColorAt(i, this.color.setHex(PALETTE.carOrange));
-      scene.add(mesh);
-    }
   }
 
   update(sim: SimWorld, alpha: number): void {
     const jobs = sim.jobs;
-    const closed = sim.pursuit.state !== 'idle' && !sim.coldOpen.active;
-    if (jobs.serial !== this.serial || closed !== this.closed) this.rebuild(sim);
+    this.sim = sim;
+    this.alpha = alpha;
+    const time = sim.time + alpha * FIXED_DT;
     // a job taken: its ring lights up where it was
     if (this.lastState === 'idle' && jobs.state !== 'idle') {
       const d = jobs.defOf(jobs.active);
@@ -118,119 +151,109 @@ export class MarkerView {
       }
     }
     this.lastState = jobs.state;
-    const phase = Math.sin((sim.time + alpha * FIXED_DT) * PULSE_HZ * Math.PI * 2);
-    const pulse = 1 + PULSE * phase;
+    const cam = this.camera;
+    let view: SignView | null = null;
+    if (cam) {
+      cam.getWorldDirection(this.dir);
+      this.view.x = cam.position.x;
+      this.view.z = cam.position.z;
+      this.view.dirX = this.dir.x;
+      this.view.dirZ = this.dir.z;
+      view = this.view;
+    }
+    const signs = this.signs, rings = this.ringList;
+    collectSigns(sim, time, view, this.carAt, signs, rings);
+
+    // the rings on the road, and the one just taken
     let n = 0;
-    for (let i = 0; i < this.idleCount; i++) {
-      this.put(this.rings, n, this.idleX[i] as number, this.idleZ[i] as number, pulse * (this.idleScale[i] as number), 1);
-      this.put(this.beacons, n, this.idleX[i] as number, this.idleZ[i] as number, 1, 1);
+    for (let i = 0; i < rings.count; i++) {
+      this.put(this.rings, n, rings.x[i] as number, 0, rings.z[i] as number, rings.scale[i] as number, this.qIdentity);
+      this.rings.setColorAt(n, this.color.setHex(stateColours(rings.state[i] as number).ring));
       n++;
     }
-    let beacons = n;
+    const flash = this.flashUntil - sim.time;
+    if (flash > 0) {
+      this.put(this.rings, n, this.flashX, 0, this.flashZ, 1 + FLASH_GROW * (1 - flash / FLASH), this.qIdentity);
+      this.rings.setColorAt(n, this.color.setHex(CYAN));
+      n++;
+    }
+    this.finish(this.rings, n);
+
+    // a zone job's edge
     const running = jobs.running;
     const zone = running !== null && jobs.state === 'active' && (running.kind === 'rage' || running.kind === 'mayhem');
     if (this.zone.visible !== zone) this.zone.visible = zone;
     if (zone && running) {
       this.zone.position.set(running.x, 0, running.z);
       this.zone.scale.setScalar(BALANCE.jobs.zone.radius);
-      (this.zone.material as THREE.MeshBasicMaterial).color.setHex(KIND_COLORS[running.kind]);
     }
-    if (running && jobs.state === 'active' && !zone && jobs.target(this.t)) {
-      // the drop-off, the fence, the finish: where to stop (instance 0, tinted at the rebuild); none for an escape
-      this.put(this.rings, n, this.t.x, this.t.z, 1 + TARGET_PULSE * phase, 1);
-      this.put(this.beacons, beacons, this.t.x, this.t.z, 1, 1);
-      n++;
-      beacons++;
-    } else if (running && jobs.state === 'hunting' && jobs.wantedAgent >= 0 && this.wantedPose(sim, jobs.wantedAgent, alpha)) {
-      this.put(this.rings, n, this.t.x, this.t.z, 0.8 + 0.1 * phase, 1);
-      n++;
+
+    // the signs: each turned to the camera about the vertical
+    this.glyphCount.fill(0);
+    let poles = 0;
+    for (let i = 0; i < signs.count; i++) {
+      const x = signs.x[i] as number, y = signs.y[i] as number, z = signs.z[i] as number;
+      const colours = stateColours(signs.state[i] as number);
+      const yaw = cam ? Math.atan2(cam.position.x - x, cam.position.z - z) : 0;
+      this.q.setFromAxisAngle(this.up, yaw);
+      this.put(this.faces, i, x, y, z, 1, this.q);
+      this.faces.setColorAt(i, this.color.setHex(colours.face));
+      this.rims.setMatrixAt(i, this.m);
+      this.rims.setColorAt(i, this.color.setHex(colours.rim));
+      if (signs.pole[i] === 1) this.put(this.poles, poles++, x, 0, z, 1, this.qIdentity);
+      const glyph = signs.glyph[i] as number;
+      this.color.setHex(colours.glyph);
+      if (glyph >= 0) {
+        this.put(this.glyphs[glyph] as THREE.InstancedMesh, this.glyphCount[glyph] as number, x, y, z, 1, this.q);
+        (this.glyphs[glyph] as THREE.InstancedMesh).setColorAt(this.glyphCount[glyph] as number, this.color);
+        this.glyphCount[glyph] = (this.glyphCount[glyph] as number) + 1;
+      } else {
+        // a rival's poster number: its digits side by side
+        const digits = this.numbers[Math.min(-glyph, 10)] as number[];
+        const places = this.digitLocal[Math.min(digits.length, 2) - 1] as THREE.Matrix4[];
+        this.p.set(x, y, z);
+        this.s.set(1, 1, 1);
+        this.m.compose(this.p, this.q, this.s);
+        for (let k = 0; k < digits.length && k < 2; k++) {
+          const g = digits[k] as number;
+          const mesh = this.glyphs[g] as THREE.InstancedMesh;
+          const at = this.glyphCount[g] as number;
+          if (at >= mesh.instanceMatrix.count) continue;
+          this.md.multiplyMatrices(this.m, places[k] as THREE.Matrix4);
+          mesh.setMatrixAt(at, this.md);
+          mesh.setColorAt(at, this.color);
+          this.glyphCount[g] = at + 1;
+        }
+      }
     }
-    // the ring just taken, lit and growing for its moment (instance n takes the cyan)
-    const flash = this.flashUntil - sim.time;
-    if (flash > 0 && n < this.capacity) {
-      this.put(this.rings, n, this.flashX, this.flashZ, 1 + FLASH_GROW * (1 - flash / FLASH), 1);
-      this.rings.setColorAt(n, this.color.setHex(TAKEN));
-      if (this.rings.instanceColor) this.rings.instanceColor.needsUpdate = true;
-      n++;
-    }
-    // a pedestrian hailing the taxi (M5.5 slice 13): a yellow beacon over them
-    const hailer = sim.fares.hailer, peds = sim.peds;
-    if (hailer >= 0 && peds && beacons < this.capacity) {
-      this.put(this.beacons, beacons, peds.x[hailer] as number, peds.z[hailer] as number, 1, 1);
-      this.beacons.setColorAt(beacons, this.color.setHex(PALETTE.coin));
-      if (this.beacons.instanceColor) this.beacons.instanceColor.needsUpdate = true;
-      beacons++;
-    }
-    if (this.rings.count !== n) this.rings.count = n;
-    if (this.beacons.count !== beacons) this.beacons.count = beacons;
-    if (n > 0) this.rings.instanceMatrix.needsUpdate = true;
-    if (beacons > 0) this.beacons.instanceMatrix.needsUpdate = true;
+    this.finish(this.faces, signs.count);
+    this.finish(this.rims, signs.count);
+    this.finish(this.poles, poles);
+    for (let g = 0; g < this.glyphs.length; g++) this.finish(this.glyphs[g] as THREE.InstancedMesh, this.glyphCount[g] as number);
   }
 
   dispose(): void {
-    this.ringGeometry.dispose();
-    this.beaconGeometry.dispose();
+    for (const g of this.geometries) g.dispose();
     this.material.dispose();
-    this.rings.dispose();
-    this.beacons.dispose();
+    this.poleMaterial.dispose();
+    for (const mesh of [this.rings, this.poles, this.faces, this.rims, ...this.glyphs]) mesh.dispose();
   }
 
-  /** The idle set changed: the shown markers in their kind's colour (grey while closed), or none while a job runs. */
-  private rebuild(sim: SimWorld): void {
-    const jobs = sim.jobs;
-    this.serial = jobs.serial;
-    this.closed = sim.pursuit.state !== 'idle' && !sim.coldOpen.active;
-    this.idleCount = 0;
-    if (jobs.state === 'idle') {
-      for (const d of jobs.defs) {
-        if (!jobs.shown(d) || this.idleCount >= this.capacity - 3) continue;
-        this.idleX[this.idleCount] = d.x;
-        this.idleZ[this.idleCount] = d.z;
-        // a rival's ring is wider: it circles the car parked at the kerb (M6)
-        this.idleScale[this.idleCount] = d.kind === 'duel' ? BALANCE.board.ringRadius / BALANCE.jobs.markerRadius : 1;
-        this.tint(this.idleCount, this.closed ? CLOSED : KIND_COLORS[d.kind]);
-        this.idleCount++;
-      }
+  /** A mesh's count for this frame; hidden while it draws nothing (no draw call). */
+  private finish(mesh: THREE.InstancedMesh, count: number): void {
+    if (mesh.count !== count) mesh.count = count;
+    const show = count > 0;
+    if (mesh.visible !== show) mesh.visible = show;
+    if (show) {
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
-    const running = jobs.running;
-    if (running) this.targetKind = running.kind;
-    this.tint(this.idleCount, KIND_COLORS[this.targetKind]);
   }
 
-  private tint(i: number, hex: number): void {
-    this.color.setHex(hex);
-    this.rings.setColorAt(i, this.color);
-    this.beacons.setColorAt(i, this.color);
-    if (this.rings.instanceColor) this.rings.instanceColor.needsUpdate = true;
-    if (this.beacons.instanceColor) this.beacons.instanceColor.needsUpdate = true;
-  }
-
-  private put(mesh: THREE.InstancedMesh, i: number, x: number, z: number, scale: number, height: number): void {
-    this.p.set(x, 0, z);
-    this.s.set(scale, height, scale);
-    this.m.compose(this.p, this.q, this.s);
+  private put(mesh: THREE.InstancedMesh, i: number, x: number, y: number, z: number, scale: number, q: THREE.Quaternion): void {
+    this.p.set(x, y, z);
+    this.s.set(scale, 1, scale);
+    this.m.compose(this.p, q, this.s);
     mesh.setMatrixAt(i, this.m);
-  }
-
-  /** The wanted car's interpolated position, when it is close enough and in front of the camera. */
-  private wantedPose(sim: SimWorld, agent: number, alpha: number): boolean {
-    const traffic = sim.traffic;
-    if (!traffic) return false;
-    const slot = traffic.slot[agent] as number;
-    const tb = sim.transforms;
-    const x = (tb.prevPos[slot * 3] as number) + ((tb.currPos[slot * 3] as number) - (tb.prevPos[slot * 3] as number)) * alpha;
-    const z = (tb.prevPos[slot * 3 + 2] as number) + ((tb.currPos[slot * 3 + 2] as number) - (tb.prevPos[slot * 3 + 2] as number)) * alpha;
-    const p = sim.probe;
-    const range = BALANCE.jobs.order.ringRange;
-    if ((x - p.x) ** 2 + (z - p.z) ** 2 > range * range) return false;
-    const cam = this.camera;
-    if (cam) {
-      // in front of the camera: the ring is a sighting aid, not a radar
-      cam.getWorldDirection(this.p);
-      if ((x - cam.position.x) * this.p.x + (z - cam.position.z) * this.p.z < 0) return false;
-    }
-    this.t.x = x;
-    this.t.z = z;
-    return true;
   }
 }

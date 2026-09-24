@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8.7 slice 0: the goal holds, the way
+
+Done (D1, D2, ARCHITECTURE 99): `run/way.ts` keeps the goal the line names and its route. A forward pass from the car's
+lane every 0.5 s gives the rings' and doors' road distances; the pick holds unless another is under 0.6 of its distance and
+150 m nearer. A reverse pass from the goal's lanes gives every lane its way on, laid on a goal or job-phase change and after
+a moving goal's 10 m; the line's metres are the route's. Pins M8.7 0.1–0.6: forty route-following drives changed the goal
+once, never back (the straight line: 25 times); at 15 of 53 places the road's nearest ring is not the line's; the field
+equals a plain Dijkstra for 28 rings over 210 lanes; a delivery's route is at most 60 m longer than its limit's lane path.
+Jobs 1.8 and the chain's 2.3 read the way. The arrow aims at the held goal until slice 1. Verify green.
+
 ## 2026-09-24 — the way: M8.7 planned from Marcin's notes on guidance
 
 Marcin: the arrow is unintuitive, the radar's dots say nothing, the road says nothing, at a job there is "only some

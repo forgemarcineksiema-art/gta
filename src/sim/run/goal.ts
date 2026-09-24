@@ -1,11 +1,13 @@
 /**
  * The goal line (docs/DESIGN.md §13.4, M5.5 slice 2): one line that says what
- * to do next and one point the arrow shows, always. Precedence: the running
+ * to do next and one point the route leads to, always. Precedence: the running
  * job (its own line and target); the police on you (LOSE THEM, and the
  * nearest door while the bag holds something); the first undone step of the
  * first quarter hour's chain when it says more than the default; a bag above
  * the door threshold (BANK IT, the nearest door); else the nearest ring (TAKE
- * A JOB). Pure over the world's state; writes into the caller's object.
+ * A JOB). Which ring and which door is the chooser's (M8.7 D1): the way's
+ * road distances with its hold, or the straight line when there is no way.
+ * Pure over the world's state; writes into the caller's object.
  */
 import { BALANCE } from '../balance';
 import { RIVALS, type Req, type RivalDef } from '../board/rivals';
@@ -28,6 +30,17 @@ export interface Goal {
   /** 'rival' and 'needs': the rival (`RIVALS` index) and, for 'needs', the requirement's index. */
   rival: number;
   req: number;
+  /** The job def the point is (a ring, or the running job's), -1 for none; the drop-off whose door it is, -1 for none. */
+  id: number;
+  door: number;
+}
+
+/** How the goal picks its ring and its door (M8.7 D1). Each writes the point, the ring's kind and the id or the door. */
+export interface GoalChooser {
+  /** The ring of a kind (or any, '') to go to; false when none is open. */
+  ring(sim: SimWorld, kind: JobKind | '', out: Goal): boolean;
+  /** The door to bank at; false on a map without one. */
+  door(sim: SimWorld, out: Goal): boolean;
 }
 
 /** The chain's six steps in order, bits 0..5 of `Run.chain`, as the wall and the cards say them. */
@@ -39,7 +52,21 @@ export const STEP = { take: 0, bank: 1, car: 2, escape: 3, order: 4, big: 5 } as
 export const CHAIN_ALL = (1 << CHAIN_STEPS.length) - 1;
 
 export function newGoal(): Goal {
-  return { kind: 'none', hasTarget: false, x: 0, z: 0, amount: 0, ring: '', rival: -1, req: -1 };
+  return { kind: 'none', hasTarget: false, x: 0, z: 0, amount: 0, ring: '', rival: -1, req: -1, id: -1, door: -1 };
+}
+
+/** Every field of `from` into `to`. */
+export function copyGoal(from: Goal, to: Goal): void {
+  to.kind = from.kind;
+  to.hasTarget = from.hasTarget;
+  to.x = from.x;
+  to.z = from.z;
+  to.amount = from.amount;
+  to.ring = from.ring;
+  to.rival = from.rival;
+  to.req = from.req;
+  to.id = from.id;
+  to.door = from.door;
 }
 
 /** The ring a requirement is met at, for the arrow: '' for none (a count with no place, like billboards). */
@@ -52,7 +79,7 @@ const REQ_RING: Partial<Record<Req['kind'], JobKind>> = {
  * requirements are met, else their first open one with the arrow on the nearest ring where it is met (the
  * nearest job for a best run; none for a count with no place).
  */
-function boardGoal(sim: SimWorld, out: Goal): boolean {
+function boardGoal(sim: SimWorld, out: Goal, choose: GoalChooser): boolean {
   const board = sim.board;
   const i = board.next();
   if (i < 0) return false;
@@ -66,6 +93,7 @@ function boardGoal(sim: SimWorld, out: Goal): boolean {
       out.x = d.x;
       out.z = d.z;
       out.ring = 'duel';
+      out.id = d.id;
       out.hasTarget = true;
       return true;
     }
@@ -78,8 +106,8 @@ function boardGoal(sim: SimWorld, out: Goal): boolean {
   out.req = r;
   out.amount = board.have(want);
   const ring = REQ_RING[want.kind];
-  if (ring) out.hasTarget = nearestRing(sim, ring, out);
-  else if (want.kind === 'bestRun') out.hasTarget = nearestRing(sim, '', out);
+  if (ring) out.hasTarget = choose.ring(sim, ring, out);
+  else if (want.kind === 'bestRun') out.hasTarget = choose.ring(sim, '', out);
   return true;
 }
 
@@ -89,7 +117,7 @@ export function chainStep(chain: number): number {
   return -1;
 }
 
-/** The nearest live ring (of a kind, or any): writes the point and its kind; false when there is none. */
+/** The nearest live ring by straight line (of a kind, or any): writes the point, its kind and its id; false when there is none. */
 function nearestRing(sim: SimWorld, kind: JobKind | '', out: Goal): boolean {
   const jobs = sim.jobs;
   const p = sim.probe;
@@ -103,11 +131,13 @@ function nearestRing(sim: SimWorld, kind: JobKind | '', out: Goal): boolean {
     out.x = d.x;
     out.z = d.z;
     out.ring = d.kind;
+    out.id = d.id;
+    out.door = -1;
   }
   return best < Infinity;
 }
 
-/** The nearest drop-off's door; false on a map without one. */
+/** The nearest drop-off's door by straight line; false on a map without one. */
 function nearestDoor(sim: SimWorld, out: Goal): boolean {
   const p = sim.probe;
   const doors = sim.run.dropOffs;
@@ -120,28 +150,36 @@ function nearestDoor(sim: SimWorld, out: Goal): boolean {
     best = dist;
     out.x = door.x;
     out.z = door.z;
+    out.door = i;
   }
   out.ring = '';
+  out.id = -1;
   return best < Infinity;
 }
 
-export function goalFor(sim: SimWorld, out: Goal): void {
+/** The straight line's choice, where there is no way (the test track, a sim without roads). */
+export const NEAREST: GoalChooser = { ring: nearestRing, door: nearestDoor };
+
+export function goalFor(sim: SimWorld, out: Goal, choose: GoalChooser = NEAREST): void {
   out.kind = 'none';
   out.hasTarget = false;
   out.amount = 0;
   out.ring = '';
   out.rival = -1;
   out.req = -1;
+  out.id = -1;
+  out.door = -1;
   const jobs = sim.jobs;
   if (jobs.running) {
     out.kind = 'job';
+    out.id = jobs.active;
     out.hasTarget = jobs.target(out);
     return;
   }
   const run = sim.run;
   if (sim.pursuit.state !== 'idle') {
     out.kind = 'lose';
-    if (run.bag > 0) out.hasTarget = nearestDoor(sim, out);
+    if (run.bag > 0) out.hasTarget = choose.door(sim, out);
     return;
   }
   const c = BALANCE.chain;
@@ -149,7 +187,7 @@ export function goalFor(sim: SimWorld, out: Goal): void {
     case STEP.bank:
       if (run.bag > 0) {
         out.kind = 'bank';
-        out.hasTarget = nearestDoor(sim, out);
+        out.hasTarget = choose.door(sim, out);
         return;
       }
       break;
@@ -157,26 +195,26 @@ export function goalFor(sim: SimWorld, out: Goal): void {
       const price = BALANCE.prices.compact;
       if (run.bank >= price) {
         out.kind = 'buy';
-        out.hasTarget = nearestDoor(sim, out);
+        out.hasTarget = choose.door(sim, out);
         return;
       }
       if (run.bank >= price * c.buyShare) {
         out.kind = 'buy';
         out.amount = price - run.bank;
-        out.hasTarget = nearestRing(sim, '', out);
+        out.hasTarget = choose.ring(sim, '', out);
         return;
       }
       break;
     }
     case STEP.escape:
-      if (nearestRing(sim, 'escape', out)) {
+      if (choose.ring(sim, 'escape', out)) {
         out.kind = 'escape';
         out.hasTarget = true;
         return;
       }
       break;
     case STEP.order:
-      if (nearestRing(sim, 'order', out)) {
+      if (choose.ring(sim, 'order', out)) {
         out.kind = 'order';
         out.hasTarget = true;
         return;
@@ -185,23 +223,23 @@ export function goalFor(sim: SimWorld, out: Goal): void {
     case STEP.big:
       if (run.bag >= c.bankGoal) {
         out.kind = 'bank';
-        out.hasTarget = nearestDoor(sim, out);
+        out.hasTarget = choose.door(sim, out);
         return;
       }
       out.kind = 'fill';
       out.amount = run.bag;
-      out.hasTarget = nearestRing(sim, '', out);
+      out.hasTarget = choose.ring(sim, '', out);
       return;
     default:
       break;
   }
   if (run.bag > BALANCE.offer.doorThreshold && run.dropOffs.length > 0) {
     out.kind = 'bank';
-    out.hasTarget = nearestDoor(sim, out);
+    out.hasTarget = choose.door(sim, out);
     return;
   }
-  if (chainStep(run.chain) < 0 && boardGoal(sim, out)) return;
-  if (nearestRing(sim, '', out)) {
+  if (chainStep(run.chain) < 0 && boardGoal(sim, out, choose)) return;
+  if (choose.ring(sim, '', out)) {
     out.kind = 'take';
     out.hasTarget = true;
   }

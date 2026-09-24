@@ -310,17 +310,19 @@ export class Jobs {
   }
 
   /**
-   * Between jobs (DESIGN.md §4): the nearest live marker by straight line, or
-   * the nearest drop-off's door once the bag is above the door offer's
-   * threshold. False while a job runs or there is nothing to point at.
+   * Between jobs (DESIGN.md §4, §20): the goal line's point, the way's held
+   * goal (the nearest ring by road, or a door once the bag is above the door
+   * offer's threshold); without a way, the straight line's. False while a job
+   * runs or there is nothing to point at.
    */
   idleTarget(out: { x: number; z: number }): boolean {
     if (this.state === 'hunting' || this.state === 'active') return false;
-    // the goal line's point (DESIGN.md §13.4): the chain's step, the door with a bag worth banking, the nearest ring
-    goalFor(this.sim, this.goal);
-    if (!this.goal.hasTarget) return false;
-    out.x = this.goal.x;
-    out.z = this.goal.z;
+    const way = this.sim.way;
+    const g = way ? way.goal : this.goal;
+    if (!way) goalFor(this.sim, this.goal);
+    if (!g.hasTarget) return false;
+    out.x = g.x;
+    out.z = g.z;
     return true;
   }
 

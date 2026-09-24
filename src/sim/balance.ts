@@ -244,6 +244,14 @@ export const BALANCE = {
   /** The door's rewarded offer: above `doorThreshold` in the bag the video doubles it (`doorMultiplier`); the idle arrow turns to the doors above it too. */
   offer: { doorThreshold: 8000, doorMultiplier: 2 },
   /**
+   * The way (docs/M8.7_PLAN.md D1–D2, DESIGN.md §20.3 rules 2–3): the goal's ring or door is read again every
+   * `repick` s and held unless another is under `switchShare` of its road distance and `switchGain` m nearer; a ring
+   * or a point is reached from the lanes within `reach` m of it; a goal that moves is laid again once it has moved
+   * `moveReplan` m and `movingReplan` s have passed; the route's points are rebuilt every `routeEvery` s, at least
+   * `pointGap` m apart along a lane.
+   */
+  way: { repick: 0.5, switchShare: 0.6, switchGain: 150, reach: 25, moveReplan: 10, movingReplan: 1, routeEvery: 0.25, pointGap: 15 },
+  /**
    * Daily challenge rewards by template weight, and the streak's cash for day 1..7 (day 7 on repeats); `police` is
    * the share of each fixed site list the date mans (roadblock chokepoints, parked-patrol junctions, cameras).
    */

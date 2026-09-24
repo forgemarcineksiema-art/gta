@@ -11,7 +11,7 @@
  * the player's language (`lang.ts`, DESIGN.md §19).
  */
 import {
-  BALANCE, BODY_WORDS, CAR_WORDS, CHAIN_STEPS, CHIEF, MEDAL_WORDS, PLACE_WORDS, RIVALS, STEP, chainStep, goalFor, newGoal, paintName, posterNumber, reqText,
+  BALANCE, BODY_WORDS, CAR_WORDS, CHAIN_STEPS, CHIEF, MEDAL_WORDS, PLACE_WORDS, RIVALS, STEP, chainStep, copyGoal, goalFor, newGoal, paintName, posterNumber, reqText,
   trialTimes, unpackDescriptor, type GoalKind, type JobDef, type RivalDef, type SimWorld,
 } from '../../sim';
 import { num, paintedCar, t } from '../lang';
@@ -119,7 +119,11 @@ export class JobsHud {
     const d = jobs.defOf(jobs.active);
     const playing = !sim.coldOpen.active && (run.state === 'running' || run.state === 'closing');
     const jobLine = playing && d !== null && jobs.state !== 'idle';
-    if (playing && !jobLine) goalFor(sim, this.goal);
+    if (playing && !jobLine) {
+      // the way's held goal (M8.7 D1); without a way, the straight line's
+      if (sim.way) copyGoal(sim.way.goal, this.goal);
+      else goalFor(sim, this.goal);
+    }
     else this.goal.kind = 'none';
     const visible = jobLine || (playing && this.goal.kind !== 'none');
     if (visible !== this.visible) {
@@ -220,7 +224,7 @@ export class JobsHud {
       this.line.classList.toggle('is-hurry', seconds >= 0 && seconds <= 10);
     }
     const p = sim.probe;
-    const dist = jobs.target(this.point) ? Math.round(Math.hypot(this.point.x - p.x, this.point.z - p.z) / 10) * 10 : -1;
+    const dist = jobs.target(this.point) ? metres(sim, this.point.x - p.x, this.point.z - p.z) : -1;
     if (dist !== this.lastDist) {
       this.lastDist = dist;
       this.lineDist.textContent = dist >= 0 ? `${num(dist)} m` : '';
@@ -276,7 +280,7 @@ export class JobsHud {
       this.setState(g.kind === 'lose' ? 'is-lose' : 'is-goal');
     }
     const p = sim.probe;
-    const dist = g.hasTarget ? Math.round(Math.hypot(g.x - p.x, g.z - p.z) / 10) * 10 : -1;
+    const dist = g.hasTarget ? metres(sim, g.x - p.x, g.z - p.z) : -1;
     if (dist !== this.lastDist) {
       this.lastDist = dist;
       this.lineDist.textContent = dist >= 0 ? `${num(dist)} m` : '';
@@ -418,6 +422,12 @@ export class JobsHud {
       this.card.classList.add('is-visible');
     }
   }
+}
+
+/** The line's distance to the goal, to 10 m: by road along the way's route (M8.7 D2), else the straight line (dx, dz). */
+function metres(sim: SimWorld, dx: number, dz: number): number {
+  const road = sim.way?.length ?? NaN;
+  return Math.round((Number.isFinite(road) ? road : Math.hypot(dx, dz)) / 10) * 10;
 }
 
 function clock(seconds: number): string {

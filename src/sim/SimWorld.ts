@@ -30,6 +30,7 @@ import { Police } from './police/Police';
 import { Pursuit } from './police/Pursuit';
 import { ColdOpen, coldOpenRoute, coldOpenSpots } from './run/ColdOpen';
 import { Run } from './run/Run';
+import { Way } from './run/way';
 import { Skill } from './run/Skill';
 import { TicketOfficer } from './police/Ticket';
 import { DONUT_SHOP, DonutShop } from './police/Donuts';
@@ -160,6 +161,8 @@ export class SimWorld {
   readonly donuts: DonutShop | null;
   /** The first run's script; inactive until `start()`. */
   readonly coldOpen: ColdOpen;
+  /** The goal the line names and the route to it (M8.7 D1–D2); null off the city. */
+  readonly way: Way | null;
   /** The catalogue, paint, upgrades and prep: the wall's pages (M5 slice 4). */
   readonly garage: Garage;
   /** The pause screen's settings (M7 slice 3), carried for the save; nothing in the sim reads them. */
@@ -301,6 +304,7 @@ export class SimWorld {
     this.coldOpen = new ColdOpen(this);
     this.dailies = new Dailies(this);
     this.caches = this.coins ? new Caches(this) : null;
+    this.way = this.city && this.traffic ? new Way(this, this.city.graph, this.traffic.lanes) : null;
     if (this.city) {
       // what the street furniture keeps out of (M8 D7): every job's ring and its end, the stash's cars, the
       // breakers' towers, the donut shop; the cold open's route, the first time a chunk near it asks, with the things
@@ -425,6 +429,8 @@ export class SimWorld {
     this.ticket.step(FIXED_DT);
     this.dailies.step();
     this.coldOpen.postStep(FIXED_DT);
+    // last: the goal reads the step's jobs, chase, run and board
+    this.way?.step(FIXED_DT);
     for (const t of this.tracked) {
       const p = t.body.translation(this.scratchPos);
       const r = t.body.rotation(this.scratchRot);

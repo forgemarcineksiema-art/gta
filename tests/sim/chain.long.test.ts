@@ -170,13 +170,20 @@ describe('the chain and the goal line', () => {
       goalFor(sim, g);
       expect(g.kind).toBe('job');
       expect([g.x, g.z]).toEqual([d.targetX, d.targetZ]);
-      // and the arrow follows the goal between jobs
+      // and the arrow follows the way's goal between jobs (M8.7 D1: an escape ring, held, nearest by road)
       sim.jobs.abandon();
       r.chain = bit(STEP.take) | bit(STEP.bank) | bit(STEP.car);
+      // out of the delivery's ring first, or the step starts it again
+      const spawn = sim.spawns[0]!;
+      sim.city?.sync(spawn.position.x, spawn.position.z, true);
+      sim.vehicle.teleport(spawn.position, spawn.yaw);
+      sim.step();
       const t = { x: 0, z: 0, idle: false };
       expect(sim.jobs.arrowTarget(t)).toBe(true);
       expect(t.idle).toBe(true);
-      expect([t.x, t.z]).toEqual([nearestRing(sim, 'escape').x, nearestRing(sim, 'escape').z]);
+      expect(sim.way!.goal.kind).toBe('escape');
+      expect(sim.way!.goal.ring).toBe('escape');
+      expect([t.x, t.z]).toEqual([sim.way!.goal.x, sim.way!.goal.z]);
     } finally { sim.dispose(); }
   }, 60_000);
 

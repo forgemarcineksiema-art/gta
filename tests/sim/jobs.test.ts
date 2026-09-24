@@ -197,19 +197,23 @@ describe('jobs (M5 slice 1)', () => {
     } finally { sim.dispose(); }
   });
 
-  it('1.8 idle: the nearest marker; above the door threshold the nearest door; during a job its target', async () => {
+  it('1.8 idle: the goal of the way, the ring nearest by road (M8.7 D1); above the door threshold a door; during a job its target', async () => {
     const sim = await placedWorld();
     try {
-      const p = sim.probe;
       run(sim, 0.1);
+      const way = sim.way!;
       const t = { x: 0, z: 0, idle: false };
       expect(sim.jobs.arrowTarget(t)).toBe(true);
       expect(t.idle).toBe(true);
-      const nearest = [...sim.jobs.defs].sort((u, v) => Math.hypot(u.x - p.x, u.z - p.z) - Math.hypot(v.x - p.x, v.z - p.z))[0]!;
+      const live = sim.jobs.defs.filter((d) => d.kind !== 'fare' && sim.jobs.live(d));
+      const nearest = live.reduce((a, b) => (way.ringDistance(b.id) < way.ringDistance(a.id) ? b : a));
+      expect(way.goal.id).toBe(nearest.id);
       expect([t.x, t.z]).toEqual([nearest.x, nearest.z]);
       sim.run.bag = BALANCE.offer.doorThreshold + 1;
+      run(sim, 0.1);
       expect(sim.jobs.idleTarget(t)).toBe(true);
-      const door = [...sim.run.dropOffs].sort((u, v) => Math.hypot(u.door.x - p.x, u.door.z - p.z) - Math.hypot(v.door.x - p.x, v.door.z - p.z))[0]!.door;
+      expect(way.goal.kind).toBe('bank');
+      const door = sim.run.dropOffs[way.goal.door]!.door;
       expect([t.x, t.z]).toEqual([door.x, door.z]);
       const d = firstDelivery(sim);
       drop(sim, d.x, d.z);

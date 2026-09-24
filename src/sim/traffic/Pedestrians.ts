@@ -5,7 +5,8 @@
  * block corners and never crossing a carriageway. A car whose predicted path
  * sweeps over a pedestrian makes it dive sideways, get up and walk on; if a
  * car centre still comes within `guaranteeDistance`, the pedestrian hops
- * clear, so "can never be hit" holds by construction (PEGI 12 slapstick).
+ * clear, so "can never be hit" holds by construction (PEGI 12 slapstick). A flying prop (M8 D6) is dodged the same
+ * way, and its bound swept over the coming step makes the hop: a knocked bench touches nobody.
  * `Fist` is the pose of a driver whose car the player has just taken.
  */
 import { districtAt, type City } from '../city/City';
@@ -16,6 +17,7 @@ import { CITY_COLORS, PED_COLORS, PED_TINTS } from '../palette';
 import { mulberry32 } from '../random';
 import type { Quat } from '../scene';
 import type { TransformBuffer } from '../transforms';
+import { PropState, type Props } from '../props/Props';
 import { AgentState, type PlayerProbe, type Traffic } from './Traffic';
 import type { LanePose, LaneProjection } from './lanes';
 import { PEDS, type PedTuning } from './tuning';
@@ -39,6 +41,8 @@ const PAVEMENT_HALF = 2.25;
 const RETURN_SPEED = 1.5;
 /** Look-ahead applies to cars faster than this, m/s. */
 const CAR_MIN_SPEED = 3;
+/** A flying prop whose bound's bottom is higher than this passes over the walkers (m). */
+const HEAD_HEIGHT = 1.9;
 
 export class Pedestrians {
   readonly tuning: PedTuning;
@@ -318,7 +322,7 @@ export class Pedestrians {
     return false;
   }
 
-  step(player: PlayerProbe, traffic: Traffic | null, dt: number, events: EventLog): void {
+  step(player: PlayerProbe, traffic: Traffic | null, dt: number, events: EventLog, props: Props | null = null): void {
     this.time += dt;
     this.dodgesThisStep = 0;
     this.despawn(player);
@@ -357,6 +361,26 @@ export class Pedestrians {
         const speed = traffic.speed[a] as number;
         this.guarantee(traffic.x[a] as number, traffic.z[a] as number, Math.sin(yaw) * speed, Math.cos(yaw) * speed, yaw, traffic.halfWidthOf(a), traffic.halfLengthOf(a));
       }
+    }
+    if (props) this.fromProps(props, player, dt, events);
+  }
+
+  /**
+   * The street furniture in flight (M8 D6): walkers dodge a flying or ballistic prop like a car, and the guarantee
+   * holds against its bound swept over the coming step (this step's knocks included: the props step before them).
+   */
+  private fromProps(props: Props, player: PlayerProbe, dt: number, events: EventLog): void {
+    for (let k = 0; k < props.downCount; k++) {
+      const id = props.down[k] as number, st = props.state[id];
+      if (st !== PropState.Flying && st !== PropState.Ballistic) continue;
+      const o = id * 7, r = props.boundOf(id);
+      if ((props.pose[o + 1] as number) - r > HEAD_HEIGHT) continue;
+      const x = props.pose[o] as number, z = props.pose[o + 2] as number;
+      const vx = props.flight[id * 2] as number, vz = props.flight[id * 2 + 1] as number;
+      if (this.dodgeEnabled) this.dodgeFrom(x, z, vx, vz, false, player, events);
+      const speed = Math.sqrt(vx * vx + vz * vz), travel = speed * dt;
+      const yaw = speed > 1e-6 ? Math.atan2(vx, vz) : 0;
+      this.guarantee(x + vx * dt / 2, z + vz * dt / 2, vx, vz, yaw, r, r + travel / 2);
     }
   }
 

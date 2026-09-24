@@ -17,7 +17,7 @@
  * and keeps that right until it has left the node, so nothing deadlocks.
  */
 import RAPIER from '@dimforge/rapier3d-compat';
-import { GROUP_DEFAULT, GROUP_TERRAIN, GROUPS_SOLID, interactionGroups } from '../collision';
+import { GROUP_DEFAULT, GROUP_PROP, GROUP_TERRAIN, GROUPS_SOLID, interactionGroups } from '../collision';
 import type { City } from '../city/City';
 import { BLOCK, type RoadNode } from '../city/roads';
 import type { EventLog } from '../events';
@@ -326,8 +326,10 @@ export class Traffic {
   private readonly onTrafficPair = (other: RAPIER.Collider): void => {
     const parent = other.parent();
     const fixed = parent === null || parent.isFixed();
-    // The ground and kerbs support the car every step. Only a chassis, a wall or another car counts.
+    // The ground and kerbs support the car every step. Only a chassis, a wall or another car counts; a knocked
+    // prop's body never dents a car (M8 D6), a post that holds is a wall
     if (fixed && other.restitution() < 0.99) return;
+    if (!fixed && ((other.collisionGroups() >>> 16) & GROUP_PROP) !== 0) return;
     const col = this.currentCol;
     if (!col) return;
     this.pairSum = 0;
@@ -547,6 +549,11 @@ export class Traffic {
 
   halfLengthOf(agent: number): number {
     return this.halfL[this.body[agent] as number] as number;
+  }
+
+  /** The agent's mass (kg): its body's (the street furniture's rule, M8). */
+  massOf(agent: number): number {
+    return this.massOfBody(this.body[agent] as number);
   }
 
   /** Kg: the body's, or the traffic tuning's class mass for the player's shells. */

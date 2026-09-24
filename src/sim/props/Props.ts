@@ -14,6 +14,10 @@
  * not simulated, knocked again by anything that drives over it (D3). With the pool empty it flies a ballistic arc.
  * A lying prop far from the player for a minute stands again (D4). Nothing here is saved.
  *
+ * Everyone else knocks by the same rule (D6, M8 slice 7): a lent body (a civilian shoved loose, a police unit) with
+ * its own mass, the Δv on its body, nothing paid; a car on its lane near the player ploughs the lying props aside,
+ * never slowed. A flying prop's ground velocity is kept for the walkers' dodge (`flight`).
+ *
  * `step` runs after the controls, before `world.step`; `afterPhysics` after it. No allocation per step: a knock
  * makes its collider (one creation per knock, never per step).
  */
@@ -22,6 +26,7 @@ import { PROPS } from '../balance';
 import { GROUPS_PROP } from '../collision';
 import { CITY_HALF } from '../city/roads';
 import { PROP_KINDS, PROP_TYPES, PROPS_PER_CHUNK, type PropType } from '../city/props';
+import { AgentState, type Traffic } from '../traffic/Traffic';
 import type { SimWorld } from '../SimWorld';
 
 export enum PropState { Standing = 0, Flying = 1, Lying = 2, Ballistic = 3 }
@@ -64,6 +69,11 @@ const GRAVITY = 9.81;
 /** A body that falls under this (the sea past the seawall) lies there. */
 const LOST_Y = -5;
 const HEAL_EVERY = 30;
+/** Each kind's bound: the radius of the sphere round its middle that holds it however it tumbles (m). */
+const BOUND = Float32Array.from(PROP_KINDS, (k) => {
+  const s = PROP_TYPES[k].shape;
+  return s.kind === 'box' ? Math.hypot(s.hx, s.hy, s.hz) : Math.hypot(s.radius, s.halfHeight);
+});
 
 export class Props {
   /** By id. */
@@ -90,6 +100,8 @@ export class Props {
   heldClosing = 0;
   /** The broken hydrants' water: x, z and seconds left per jet (0 when none), `PROPS.jet.max` of them. */
   readonly jets = new Float32Array(PROPS.jet.max * 3);
+  /** A flying prop's ground velocity (x, z by id): its launch, then each step's; the walkers dodge by it. */
+  readonly flight = new Float32Array(COUNT * 2);
 
   private readonly downIndex = new Int32Array(COUNT).fill(-1);
   private readonly healFor = new Float32Array(COUNT);
@@ -135,8 +147,8 @@ export class Props {
   /** The knocker's velocity change from this step's knocks (x, z). */
   private dvx = 0;
   private dvz = 0;
-  /** The footprint the sweep reads: x, z, bottom, yaw, vx, vz, half width, half length, the step. */
-  private readonly knocker = new Float64Array(9);
+  /** The footprint the sweep reads: x, z, bottom, yaw, vx, vz, half width, half length, the step, lying props only (1). */
+  private readonly knocker = new Float64Array(10);
 
   constructor(private readonly sim: SimWorld) {
     this.cells = Math.ceil((2 * CITY_HALF + 2 * PROPS.cell) / PROPS.cell);
@@ -180,6 +192,12 @@ export class Props {
   /** An anchored prop's post while its chunk is loaded (tests), or null. */
   postOf(id: number): RAPIER.Collider | null {
     return this.posts[id] ?? null;
+  }
+
+  /** The radius round its middle that holds it however it tumbles (m); 0 for an id never loaded. */
+  boundOf(id: number): number {
+    const k = this.kind[id] as number;
+    return k === 255 ? 0 : BOUND[k] as number;
   }
 
   typeOf(id: number): PropType | null {
@@ -230,7 +248,7 @@ export class Props {
 
   // ---- the contact ---------------------------------------------------------------------------------
 
-  /** After the controls, before `world.step`: the player's footprint swept over the step, its knocks and holds. */
+  /** After the controls, before `world.step`: the player's footprint swept over the step, its knocks and holds; then everyone else's. */
   step(dt: number): void {
     this.held = -1;
     this.heldClosing = 0;
@@ -238,12 +256,75 @@ export class Props {
     if (!sim.city) return;
     // the player's footprint and motion as the world already read them this step (no read of the body unless it meets something)
     const v = sim.vehicle, p = sim.probe, he = v.tuning.chassisHalfExtents, k = this.knocker;
-    k[0] = p.x; k[1] = p.z; k[2] = p.y - he.y; k[3] = p.yaw; k[4] = p.vx; k[5] = p.vz; k[6] = he.x; k[7] = he.z; k[8] = dt;
+    k[0] = p.x; k[1] = p.z; k[2] = p.y - he.y; k[3] = p.yaw; k[4] = p.vx; k[5] = p.vz; k[6] = he.x; k[7] = he.z; k[8] = dt; k[9] = 0;
     this.sweep();
-    if (this.hitCount === 0) return;
-    v.body.linvel(this.vel);
-    this.resolve(this.vel.x, this.vel.z, v.tuning.mass);
-    if (this.dvx !== 0 || this.dvz !== 0) v.setVelocity(this.vel.x + this.dvx, this.vel.y, this.vel.z + this.dvz);
+    if (this.hitCount > 0) {
+      v.body.linvel(this.vel);
+      this.resolve(this.vel.x, this.vel.z, v.tuning.mass, -1);
+      if (this.dvx !== 0 || this.dvz !== 0) v.setVelocity(this.vel.x + this.dvx, this.vel.y, this.vel.z + this.dvz);
+    }
+    if (sim.traffic) this.others(sim.traffic, dt);
+  }
+
+  /**
+   * Everyone else near the player (D6): a lent body's footprint swept at its body's velocity (a parked car's record
+   * keeps a stale speed), and what it meets knocked by the rule with its own mass, the Δv on its body; a car on its
+   * lane (a record, no body) sweeps at its lane speed and ploughs the lying props aside.
+   */
+  private others(traffic: Traffic, dt: number): void {
+    const p = this.sim.probe, k = this.knocker, r2 = PROPS.pushRadius * PROPS.pushRadius;
+    const lying = this.downCount > 0;
+    for (let a = 0; a < traffic.capacity; a++) {
+      const st = traffic.state[a];
+      if (st === AgentState.Free) continue;
+      const body = traffic.rigidBodyOf(a);
+      if (!body && (!lying || st !== AgentState.Kinematic)) continue;
+      const x = traffic.x[a] as number, z = traffic.z[a] as number;
+      if ((x - p.x) * (x - p.x) + (z - p.z) * (z - p.z) > r2) continue;
+      const yaw = traffic.yaw[a] as number;
+      let vx: number, vz: number;
+      if (body) {
+        body.linvel(this.vel);
+        vx = this.vel.x; vz = this.vel.z;
+      } else {
+        const speed = traffic.speed[a] as number;
+        vx = Math.sin(yaw) * speed; vz = Math.cos(yaw) * speed;
+      }
+      if (vx * vx + vz * vz < PROPS.looseMin * PROPS.looseMin) continue;
+      k[0] = x; k[1] = z; k[2] = traffic.y[a] as number; k[3] = yaw; k[4] = vx; k[5] = vz;
+      k[6] = traffic.halfWidthOf(a); k[7] = traffic.halfLengthOf(a); k[8] = dt; k[9] = body ? 0 : 1;
+      this.sweep();
+      if (this.hitCount === 0) continue;
+      const mass = traffic.massOf(a);
+      if (!body) {
+        this.plough(x, z, vx, vz, mass, a);
+        continue;
+      }
+      this.resolve(vx, vz, mass, a);
+      if (this.dvx !== 0 || this.dvz !== 0) {
+        this.vel.x += this.dvx;
+        this.vel.z += this.dvz;
+        body.setLinvel(this.vel, true);
+      }
+    }
+  }
+
+  /**
+   * A car on its lane meets lying props: each goes aside, to the side of the car's line it lies on (`ploughSide` as
+   * much aside as ahead), by the loose rule at the car's closing speed along that way; the car never slows.
+   */
+  private plough(x: number, z: number, vx: number, vz: number, mass: number, by: number): void {
+    const speed = Math.sqrt(vx * vx + vz * vz), fx = vx / speed, fz = vz / speed, aside = PROPS.ploughSide;
+    for (let h = 0; h < this.hitCount; h++) {
+      const id = this.hitId[h] as number;
+      // the car's right is (fz, -fx)
+      const side = ((this.capX[id] as number) - x) * fz - ((this.capZ[id] as number) - z) * fx >= 0 ? 1 : -1;
+      let nx = fz * side * aside + fx, nz = -fx * side * aside + fz;
+      const l = Math.sqrt(nx * nx + nz * nz);
+      nx /= l; nz /= l;
+      const closing = vx * nx + vz * nz;
+      this.knock(id, mass, closing, nx, nz, vx - closing * nx, vz - closing * nz, by);
+    }
   }
 
   /**
@@ -256,6 +337,7 @@ export class Props {
     const k0 = this.knocker;
     const px = k0[0] as number, pz = k0[1] as number, bottom = k0[2] as number, yaw = k0[3] as number;
     const vx = k0[4] as number, vz = k0[5] as number, hx = k0[6] as number, hz = k0[7] as number, dt = k0[8] as number;
+    const lyingOnly = k0[9] === 1;
     const cos = Math.cos(yaw), sin = Math.sin(yaw);
     // the motion of a still point in the car's frame over the step (local +X is (cos, -sin), local +Z (sin, cos))
     const mx = -(vx * cos - vz * sin) * dt, mz = -(vx * sin + vz * cos) * dt;
@@ -267,8 +349,9 @@ export class Props {
       for (let id = this.cellHead[cz * this.cells + cx] as number; id >= 0; id = this.cellNext[id] as number) {
         // an airborne car over a prop
         if (bottom > (this.top[id] as number) + 0.5) continue;
-        const half = this.capHalf[id] as number;
         const lying = this.state[id] === PropState.Lying;
+        if (lyingOnly && !lying) continue;
+        const half = this.capHalf[id] as number;
         const r = lying ? Math.max(this.capR[id] as number, LYING_RADIUS) : this.capR[id] as number;
         const n = half > 0 ? 1 + Math.ceil(2 * half / (lying ? LYING_SPACING : Math.max(0.2, 2 * r))) : 1;
         let bestT = 2, bestNx = 0, bestNz = 0;
@@ -314,17 +397,17 @@ export class Props {
   }
 
   /**
-   * The hit list knocked in order at the knocker's velocity (x, z) and mass: each at the closing speed left after the
-   * ones before. Leaves the knocker's velocity change in `dvx`, `dvz`.
+   * The hit list knocked in order at the knocker's velocity (x, z) and mass, by the player (-1) or a traffic record:
+   * each at the closing speed left after the ones before. Leaves the knocker's velocity change in `dvx`, `dvz`.
    */
-  private resolve(vx: number, vz: number, mass: number): void {
+  private resolve(vx: number, vz: number, mass: number, by: number): void {
     this.dvx = 0;
     this.dvz = 0;
     for (let h = 0; h < this.hitCount; h++) {
       const id = this.hitId[h] as number, nx = this.hitNx[h] as number, nz = this.hitNz[h] as number;
       const cvx = vx + this.dvx, cvz = vz + this.dvz;
       const closing = cvx * nx + cvz * nz;
-      const dv = this.knock(id, mass, closing, nx, nz, cvx - closing * nx, cvz - closing * nz);
+      const dv = this.knock(id, mass, closing, nx, nz, cvx - closing * nx, cvz - closing * nz, by);
       this.dvx -= dv * nx;
       this.dvz -= dv * nz;
     }
@@ -350,6 +433,23 @@ export class Props {
     }
     this.launch(id, t, j, nx, nz, tvx, tvz, by);
     return (j + base) / carMass;
+  }
+
+  /** Test hook: a standing prop laid flat at a point as if it had flown there (a lying prop in a lane, M8 slice 7). */
+  drop(id: number, x: number, z: number, yaw: number): void {
+    const t = this.typeOf(id);
+    if (!t || this.state[id] !== PropState.Standing) return;
+    const o = id * 7;
+    this.pose[o] = x; this.pose[o + 1] = 0; this.pose[o + 2] = z;
+    this.pose[o + 3] = 0; this.pose[o + 4] = Math.sin(yaw / 2); this.pose[o + 5] = 0; this.pose[o + 6] = Math.cos(yaw / 2);
+    this.posts[id]?.setEnabled(false);
+    this.healFor[id] = 0;
+    this.addDown(id);
+    this.gridRemove(id);
+    this.layFlat(id, t, Math.sin(yaw), Math.cos(yaw));
+    for (let k = 0; k < 7; k++) this.prev[o + k] = this.pose[o + k] as number;
+    this.lie(id, t);
+    this.serial++;
   }
 
   /** The prop leaves: its post down, off the grid, onto a pool body or an arc; the smash counted once, the player's paid. */
@@ -381,6 +481,8 @@ export class Props {
     const vx = speed * Math.cos(slope) * nx + PROPS.tangential * tvx;
     const vy = speed * Math.sin(slope);
     const vz = speed * Math.cos(slope) * nz + PROPS.tangential * tvz;
+    this.flight[id * 2] = vx;
+    this.flight[id * 2 + 1] = vz;
     // the spin: the bumper's lever about the centre of mass (a tall post folds its top toward the car); a lying one slides
     const lever = standing ? PROPS.contactHeight - t.comHeight : 0;
     const w = lever * j / this.inertia(t);
@@ -458,6 +560,8 @@ export class Props {
       const dx = this.pos.x - (this.prev[o] as number), dy = this.pos.y - (this.prev[o + 1] as number), dz = this.pos.z - (this.prev[o + 2] as number);
       const dot = Math.abs(this.rot.x * (this.prev[o + 3] as number) + this.rot.y * (this.prev[o + 4] as number) + this.rot.z * (this.prev[o + 5] as number) + this.rot.w * (this.prev[o + 6] as number));
       const speed = Math.sqrt(dx * dx + dy * dy + dz * dz) / dt, spin = 2 * Math.acos(Math.min(1, dot)) / dt;
+      this.flight[id * 2] = dx / dt;
+      this.flight[id * 2 + 1] = dz / dt;
       const still = speed < PROPS.settleSpeed && spin < PROPS.settleSpin;
       this.settleFor[k] = still ? (this.settleFor[k] as number) + dt : 0;
       this.flightFor[k] = (this.flightFor[k] as number) + dt;

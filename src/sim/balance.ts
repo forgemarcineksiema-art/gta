@@ -305,6 +305,12 @@ export const PROPS = {
   /** A knocked prop's friction against the ground and the rest. */
   friction: 0.6,
   /**
+   * Everyone else (M8 slice 7, D6): the cars on their lanes plough lying props aside within `pushRadius` m of the
+   * player (beyond it nobody sees a car pass through one), each prop sent `ploughSide` times as much aside as ahead.
+   */
+  pushRadius: 200,
+  ploughSide: 2,
+  /**
    * A broken hydrant's water (M8 slice 3): it runs `seconds`, pushing up with `thrust` N (a hydrant's 60 L/s at
    * 20 m/s) on any car whose underside it reaches within `radius` m; at most `max` at once (the oldest gives way).
    */

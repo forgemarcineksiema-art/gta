@@ -380,11 +380,12 @@ export class SimWorld {
       this.traffic.step(probe, FIXED_DT, this.events);
     }
     this.mark?.(SimPhase.Traffic);
-    if (this.traffic) this.peds?.step(this.probe, this.traffic, FIXED_DT, this.events);
-    this.mark?.(SimPhase.Peds);
-    // the street furniture's contacts, decided before the solver (M8 D1)
+    // the street furniture's contacts, decided before the solver (M8 D1): the player's, then everyone else's (D6)
     this.props?.step(FIXED_DT);
     this.mark?.(SimPhase.Props);
+    // the walkers after the knocks: a prop sent flying this step is dodged before it moves
+    if (this.traffic) this.peds?.step(this.probe, this.traffic, FIXED_DT, this.events, this.props);
+    this.mark?.(SimPhase.Peds);
     this.world.step();
     this.mark?.(SimPhase.Physics);
     this.props?.afterPhysics(FIXED_DT);

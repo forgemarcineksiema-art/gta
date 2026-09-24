@@ -157,11 +157,13 @@ describe('the knock (M8 slice 1)', () => {
       for (const entry of city.active.values()) for (const p of city.props(entry.chunk.x, entry.chunk.z)) if (ids.length < 30) ids.push(p.id);
       expect(ids).toHaveLength(30);
       let most = 0, arcs = 0;
+      // the heat held at nothing: thirty smashes would bring the police, and their own knocks (M8 slice 7) are pinned there
       for (let i = 0; i < 120; i++) {
         if (i % 4 === 0) {
           const id = ids[i / 4]!;
           props.knock(id, 1400, 25, Math.sin(i), Math.cos(i), 0, 0);
         }
+        sim.heat.set(0);
         sim.step();
         most = Math.max(most, props.bodiesInUse);
         arcs = Math.max(arcs, props.arcsInUse);
@@ -169,7 +171,7 @@ describe('the knock (M8 slice 1)', () => {
       expect(most).toBeLessThanOrEqual(16);
       expect(arcs).toBeGreaterThan(0);
       for (const id of ids) expect(props.state[id]).not.toBe(PropState.Standing);
-      run(sim, 10);
+      run(sim, 10, (_t, _c, w) => { w.heat.set(0); });
       for (const id of ids) expect(props.state[id], `prop ${id}`).toBe(PropState.Lying);
       expect(props.bodiesInUse).toBe(0);
       expect(props.arcsInUse).toBe(0);
@@ -223,8 +225,10 @@ describe('the knock (M8 slice 1)', () => {
       const onLine: number[] = [];
       let slowest = Infinity, holds = 0, fromZ = Infinity, toZ = -Infinity;
       const lv = { x: 0, y: 0, z: 0 };
+      // the heat held at nothing: a chasing unit would knock the line's things too (M8 slice 7's pins)
       for (let i = 0; i < 60 * 30 && bot.pathLeft > 20; i++) {
         bot.drive(sim, sim.controls, FIXED_DT);
+        sim.heat.set(0);
         sim.step();
         const p = sim.vehicle.body.translation();
         const speed = Math.hypot(sim.vehicle.body.linvel(lv).x, lv.z);

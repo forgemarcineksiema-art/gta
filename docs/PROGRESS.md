@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8 slice 7: everyone else
+
+Done: a lent body (a civilian shoved loose, a police unit) knocks by the rule with its own mass, swept at its body's
+velocity, the Δv on its body, nothing paid; a car on its lane within 200 m of the player ploughs lying props aside
+(twice as much aside as ahead, the loose rule at its speed, never slowed). The walkers step after the knocks and dodge
+a flying prop like a car; the guarantee holds against its bound swept over the step. A knocked prop's body never dents
+a car (a post that holds is still a wall). Pins M8 7.1–7.4 (7.1 drives a cruiser's body along a terrace's row; the test
+hook `Props.drop` lays a prop in a lane for 7.2). Pins 1.3 and 1.4 hold the heat at zero: their smashes now bring the
+police, whose knocks are 7.1's. Verify green.
+
 ## 2026-09-24 — M8 slice 6: the pay
 
 Done: a smash is a chain trick (`Trick.Smash`): the thing's points, its name as the chain's word; smashes within 0.5 s

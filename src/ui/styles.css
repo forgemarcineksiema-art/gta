@@ -617,6 +617,49 @@ body {
   text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
 }
 .hud__pause-sound.is-muted .hud__pause-sound-state { color: var(--ui-danger); }
+/* the settings on the pause screen (M7 slice 3): W/S a row, A/D its value, all clickable */
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 18px;
+  pointer-events: auto;
+}
+.settings__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: var(--ui-ink);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
+}
+.settings__row.is-focus { border-color: var(--ui-accent); background: rgba(0, 0, 0, 0.25); }
+.settings__name { width: 96px; color: var(--ui-ink-dim); }
+.settings__row.is-focus .settings__name { color: var(--ui-accent); }
+.settings__step {
+  font: 900 18px/1 var(--font-display);
+  color: var(--ui-ink);
+  background: rgba(247, 243, 234, 0.1);
+  border: none;
+  border-radius: 4px;
+  padding: 2px 10px;
+  cursor: pointer;
+}
+.settings__step:hover { background: rgba(255, 210, 63, 0.35); }
+.settings__value { min-width: 104px; text-align: center; font-style: italic; }
+.settings__value.is-volume {
+  border-radius: 3px;
+  background: linear-gradient(90deg, rgba(255, 210, 63, 0.55) var(--fill), rgba(247, 243, 234, 0.12) var(--fill));
+}
+@media (max-height: 560px) {
+  .settings { margin-top: 8px; gap: 2px; }
+  .settings__row { padding: 2px 8px; font-size: 13px; }
+}
 .hud__pause-build {
   margin-top: 28px;
   font-size: 12px;

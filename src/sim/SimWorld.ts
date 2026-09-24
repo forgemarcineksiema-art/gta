@@ -56,6 +56,7 @@ import type { BodyId } from './traffic/bodies';
 import { cloneTuning, type VehicleTuning } from './vehicle/tuning';
 import { Vehicle } from './vehicle/Vehicle';
 import * as M from './math';
+import { DEFAULT_SETTINGS, type Settings } from './settings';
 
 export const FIXED_DT = 1 / 60;
 export const FIXED_HZ = 60;
@@ -155,6 +156,8 @@ export class SimWorld {
   readonly coldOpen: ColdOpen;
   /** The catalogue, paint, upgrades and prep: the wall's pages (M5 slice 4). */
   readonly garage: Garage;
+  /** The pause screen's settings (M7 slice 3), carried for the save; nothing in the sim reads them. */
+  readonly settings: Settings = { ...DEFAULT_SETTINGS };
   /** The wanted board (M6): the rivals beaten, the next one's requirements, their duels' rings. */
   readonly board: Board;
   /** Lifetime counts the board's requirements read (M6). */

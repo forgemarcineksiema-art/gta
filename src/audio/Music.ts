@@ -53,7 +53,7 @@ export class Music {
     if (this.state !== 'idle' || !started || !this.engine.ready) return;
     this.wait -= dt;
     if (this.wait > 0) return;
-    const out = this.engine.output;
+    const out = this.engine.musicOutput;
     if (!out) return;
     this.state = 'rendering';
     void this.start(out).catch((e: unknown) => {
@@ -63,9 +63,9 @@ export class Music {
     });
   }
 
-  /** The music's share of the mix, 0–1 (the settings row, slice 3). */
+  /** The music's share of the mix, a gain (the settings' MUSIC row, slice 3). */
   setVolume(v: number): void {
-    this.volume = Math.max(0, Math.min(1, v));
+    this.volume = Math.max(0, v);
     if (this.bus) this.bus.gain.setTargetAtTime(BUS_LEVEL * this.volume, this.bus.context.currentTime, 0.05);
   }
 

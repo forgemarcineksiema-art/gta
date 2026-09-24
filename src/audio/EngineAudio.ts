@@ -13,6 +13,9 @@ const GESTURES = ['keydown', 'pointerdown', 'touchstart', 'touchend', 'click'] a
 export class EngineAudio {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  /** Everything but the music, under the master (M7 slice 3: the settings' EFFECTS row). */
+  private effects: GainNode | null = null;
+  private effectsLevel = 1;
   /** The whole mix's low-pass, open unless something muffles it (the helicopter overhead). */
   private muffler: BiquadFilterNode | null = null;
   private muffled = 0;
@@ -53,9 +56,20 @@ export class EngineAudio {
     this.muffler.frequency.setTargetAtTime(20000 * Math.pow(600 / 20000, a), this.ctx.currentTime, 0.15);
   }
 
-  /** Master gain. Effects connect here so the ad-mute hook silences them too. */
+  /** The effects' bus, under the master: every sound but the music connects here, so both mutes take it. */
   get output(): GainNode | null {
+    return this.effects;
+  }
+
+  /** The master itself, for the music's own bus (M7 slice 3): the ad and the player's mute take it too. */
+  get musicOutput(): GainNode | null {
     return this.master;
+  }
+
+  /** The effects' share of the mix, a gain (the settings' EFFECTS row). */
+  setEffectsVolume(gain: number): void {
+    this.effectsLevel = Math.max(0, gain);
+    if (this.effects && this.ctx) this.effects.gain.setTargetAtTime(this.effectsLevel, this.ctx.currentTime, 0.05);
   }
 
   /** Create or resume the context. Must run inside a user gesture the first time. */
@@ -79,6 +93,9 @@ export class EngineAudio {
     this.muffler.type = 'lowpass';
     this.muffler.frequency.value = 20000;
     this.master.connect(this.muffler).connect(ctx.destination);
+    this.effects = ctx.createGain();
+    this.effects.gain.value = this.effectsLevel;
+    this.effects.connect(this.master);
 
     // engine: saw + square an octave down + sub sine, through a lowpass driven by load
     this.engineFilter = ctx.createBiquadFilter();
@@ -87,7 +104,7 @@ export class EngineAudio {
     this.engineFilter.Q.value = 1.2;
     this.engineGain = ctx.createGain();
     this.engineGain.gain.value = 0;
-    this.engineFilter.connect(this.engineGain).connect(this.master);
+    this.engineFilter.connect(this.engineGain).connect(this.effects);
 
     this.oscA = ctx.createOscillator();
     this.oscA.type = 'sawtooth';
@@ -126,7 +143,7 @@ export class EngineAudio {
     this.windFilter.Q.value = 0.5;
     this.windGain = ctx.createGain();
     this.windGain.gain.value = 0;
-    noise.connect(this.windFilter).connect(this.windGain).connect(this.master);
+    noise.connect(this.windFilter).connect(this.windGain).connect(this.effects);
 
     // skid
     this.skidFilter = ctx.createBiquadFilter();
@@ -135,7 +152,7 @@ export class EngineAudio {
     this.skidFilter.Q.value = 2.5;
     this.skidGain = ctx.createGain();
     this.skidGain.gain.value = 0;
-    noise.connect(this.skidFilter).connect(this.skidGain).connect(this.master);
+    noise.connect(this.skidFilter).connect(this.skidGain).connect(this.effects);
 
     // body: a low thump on impact, a metallic grind while scraping a wall
     const crashFilter = ctx.createBiquadFilter();
@@ -143,14 +160,14 @@ export class EngineAudio {
     crashFilter.frequency.value = 260;
     this.crashGain = ctx.createGain();
     this.crashGain.gain.value = 0;
-    noise.connect(crashFilter).connect(this.crashGain).connect(this.master);
+    noise.connect(crashFilter).connect(this.crashGain).connect(this.effects);
     this.scrapeFilter = ctx.createBiquadFilter();
     this.scrapeFilter.type = 'bandpass';
     this.scrapeFilter.frequency.value = 2600;
     this.scrapeFilter.Q.value = 1.2;
     this.scrapeGain = ctx.createGain();
     this.scrapeGain.gain.value = 0;
-    noise.connect(this.scrapeFilter).connect(this.scrapeGain).connect(this.master);
+    noise.connect(this.scrapeFilter).connect(this.scrapeGain).connect(this.effects);
   }
 
   update(tm: VehicleTelemetry, dt: number): void {

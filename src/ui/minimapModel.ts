@@ -92,12 +92,13 @@ export function yawFromQuat(qx: number, qy: number, qz: number, qw: number): num
  * Eases the map heading toward the direction of travel and the zoom toward the
  * speed. The map follows the velocity (what the chase camera does, so a drift
  * shows the car sideways) whenever the car moves and is not reversing;
- * otherwise the car's yaw. `snap` lands both at once (first frame, teleports).
+ * otherwise the car's yaw; `northUp` holds it at north. `snap` lands both at once (first frame, teleports).
  */
-export function advance(state: MinimapState, dt: number, carYaw: number, vx: number, vz: number, forwardSpeed: number, snap = false): void {
+export function advance(state: MinimapState, dt: number, carYaw: number, vx: number, vz: number, forwardSpeed: number, snap = false, northUp = false): void {
   const speed = Math.hypot(vx, vz);
   const moving = speed > MINIMAP.forwardMinSpeed && forwardSpeed > -MINIMAP.forwardMinSpeed;
-  const target = moving ? Math.atan2(vx, vz) : carYaw;
+  // north up (the settings' RADAR row, M7 slice 3): the map never turns and the arrow does
+  const target = northUp ? 0 : moving ? Math.atan2(vx, vz) : carYaw;
   const kmh = speed * 3.6;
   const zoom = Math.min(1, Math.max(0, kmh / MINIMAP.zoomTopKmh));
   const radiusTarget = MINIMAP.radiusMinM + (MINIMAP.radiusMaxM - MINIMAP.radiusMinM) * zoom;

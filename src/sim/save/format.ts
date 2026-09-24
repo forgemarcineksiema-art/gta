@@ -15,8 +15,9 @@ import { HIDDEN_CARS } from '../city/stash';
 import type { SimWorld } from '../SimWorld';
 import { BODY_IDS, type BodyId } from '../traffic/bodies';
 import { CAR_IDS, type CarId } from '../vehicle/presets';
+import { DEFAULT_SETTINGS, QUALITY_SETTINGS, type Settings } from '../settings';
 
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 export type Tiers = [number, number, number];
 
@@ -66,7 +67,7 @@ export interface SaveCareer {
 }
 
 export interface SaveDoc {
-  v: 3;
+  v: 4;
   /** The cold open was shown (started, completed or skipped): never again for this profile. */
   seen: boolean;
   bank: number;
@@ -108,6 +109,8 @@ export interface SaveDoc {
   /** The wanted board (M6 slice 1): the rivals beaten as bits (bit 10 the Chief). */
   board: { beaten: number };
   career: SaveCareer;
+  /** The pause screen's settings (M7 slice 3): the volumes, the quality, the radar. */
+  settings: Settings;
 }
 
 /** The current document's type under the name the app and the tests used since M5. */
@@ -115,7 +118,7 @@ export type SaveV1 = SaveDoc;
 
 function defaults(): SaveDoc {
   return {
-    v: 3,
+    v: 4,
     seen: false,
     bank: 0,
     coins: 0,
@@ -140,6 +143,7 @@ function defaults(): SaveDoc {
     kit: { owned: '', on: [-1, -1, -1, -1, -1] },
     board: { beaten: 0 },
     career: { races: 0, zones: 0, fares: 0, hotFares: 0, orders: 0, takedowns: 0, caches: 0, escapes: [0, 0, 0, 0, 0] },
+    settings: { ...DEFAULT_SETTINGS },
   };
 }
 
@@ -203,6 +207,7 @@ export function serialize(save: SaveDoc): string {
       races: c.races, zones: c.zones, fares: c.fares, hotFares: c.hotFares, orders: c.orders, takedowns: c.takedowns, caches: c.caches,
       escapes: [c.escapes[0], c.escapes[1], c.escapes[2], c.escapes[3], c.escapes[4]],
     },
+    settings: { music: save.settings.music, effects: save.settings.effects, quality: save.settings.quality, radarNorth: save.settings.radarNorth },
   });
 }
 
@@ -248,6 +253,8 @@ const MIGRATIONS: Record<number, (raw: Record<string, unknown>) => Record<string
     delete out['drive'];
     return out;
   },
+  // M7: the settings; an M6 save starts on the defaults
+  3: (raw) => ({ ...raw, v: 4, settings: { ...DEFAULT_SETTINGS } }),
 };
 
 /** Walks the table from the document's version to `SAVE_VERSION`, then keeps every valid field. Unknown or newer versions give the defaults. */
@@ -336,6 +343,15 @@ function sanitize(raw: Record<string, unknown>): SaveDoc {
     orders: count(cr['orders']), takedowns: count(cr['takedowns']), caches: count(cr['caches']),
     escapes: [count(esc[0]), count(esc[1]), count(esc[2]), count(esc[3]), count(esc[4])],
   };
+  const st = isRecord(raw['settings']) ? raw['settings'] : {};
+  const step = (x: unknown, d: number): number => (typeof x === 'number' && Number.isInteger(x) && x >= 0 && x <= 10 ? x : d);
+  const quality = st['quality'];
+  out.settings = {
+    music: step(st['music'], DEFAULT_SETTINGS.music),
+    effects: step(st['effects'], DEFAULT_SETTINGS.effects),
+    quality: QUALITY_SETTINGS.find((q) => q === quality) ?? DEFAULT_SETTINGS.quality,
+    radarNorth: bool(st['radarNorth'], DEFAULT_SETTINGS.radarNorth),
+  };
   return out;
 }
 
@@ -346,7 +362,7 @@ function sanitize(raw: Record<string, unknown>): SaveDoc {
  */
 export function collect(sim: SimWorld, into: SaveDoc): void {
   const run = sim.run, garage = sim.garage, dailies = sim.dailies;
-  into.v = 3;
+  into.v = 4;
   // shown once per profile: a cold open that has started counts, so a reload mid-way never repeats it
   into.seen = sim.coldOpen.seen || sim.coldOpen.active;
   into.bank = run.bank;
@@ -412,6 +428,8 @@ export function collect(sim: SimWorld, into: SaveDoc): void {
   out.races = c.races; out.zones = c.zones; out.fares = c.fares; out.hotFares = c.hotFares;
   out.orders = c.orders; out.takedowns = c.takedowns; out.caches = c.caches;
   for (let i = 0; i < 5; i++) out.escapes[i] = c.escapes[i] as number;
+  const st = sim.settings, so = into.settings;
+  so.music = st.music; so.effects = st.effects; so.quality = st.quality; so.radarNorth = st.radarNorth;
 }
 
 /** A document into a freshly built world, once, before the first step: the garage car is driven out at once. */
@@ -467,6 +485,7 @@ export function apply(sim: SimWorld, save: SaveDoc): void {
   career.races = cr.races; career.zones = cr.zones; career.fares = cr.fares; career.hotFares = cr.hotFares;
   career.orders = cr.orders; career.takedowns = cr.takedowns; career.caches = cr.caches;
   for (let i = 0; i < 5; i++) career.escapes[i] = cr.escapes[i] as number;
+  Object.assign(sim.settings, save.settings);
   garage.serial++;
   garage.applyToVehicle();
   const c = sim.collectibles;

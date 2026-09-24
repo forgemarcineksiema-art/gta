@@ -22,7 +22,7 @@ function filled(smashedIds: number[]): SaveV1 {
   const ramps = new Uint8Array(20);
   for (const k of [1, 7, 19]) ramps[k] = 1;
   return {
-    v: 3,
+    v: 4,
     seen: true,
     bank: 123456,
     coins: 7890,
@@ -47,6 +47,7 @@ function filled(smashedIds: number[]): SaveV1 {
     kit: { owned: '', on: [-1, -1, -1, -1, -1] },
     board: { beaten: 0 },
     career: { races: 0, zones: 0, fares: 0, hotFares: 0, orders: 0, takedowns: 0, caches: 0, escapes: [0, 0, 0, 0, 0] },
+    settings: { music: 3, effects: 8, quality: 'low', radarNorth: true },
   };
 }
 
@@ -161,7 +162,8 @@ describe('save format', () => {
       chain: 63, medals: '32', hidden: 'icecream', drive: 'icecream',
     };
     const save = migrate(v2);
-    expect(save.v).toBe(3);
+    // through v3 to the current version (M7: v4 adds the settings)
+    expect(save.v).toBe(SAVE_VERSION);
     expect(save.owned).toEqual(['muscle', 'compact', 'sports', 'icecream']);
     expect(save.car).toBe('icecream');
     expect(save.paint).toEqual({ compact: PALETTE.carBlack });
@@ -178,6 +180,19 @@ describe('save format', () => {
     // the reserved fields start empty
     expect(save.board).toEqual({ beaten: 0 });
     expect(save.kit.on).toEqual([-1, -1, -1, -1, -1]);
+  });
+
+  it('M7 3.1 an M6 document (v3) migrates to v4 with the default settings; a broken setting falls back alone', () => {
+    const v3: Record<string, unknown> = { ...(JSON.parse(serialize(filled([4]))) as Record<string, unknown>), v: 3 };
+    delete v3['settings'];
+    const save = migrate(v3);
+    expect(save.v).toBe(4);
+    expect(save.settings).toEqual({ music: 7, effects: 10, quality: 'auto', radarNorth: false });
+    expect(save.bank).toBe(123456);
+    const bad = parse(JSON.stringify({ ...filled([]), settings: { music: 11, effects: 4, quality: 'ultra', radarNorth: 'yes' } }));
+    expect(bad.settings).toEqual({ music: 7, effects: 4, quality: 'auto', radarNorth: false });
+    const good = parse(serialize(filled([])));
+    expect(good.settings).toEqual({ music: 3, effects: 8, quality: 'low', radarNorth: true });
   });
 
   it('M6 G.2 everything M6 can hold (every car owned, painted and fitted, the whole kit, the board beaten, a long career) round-trips under the size guard', () => {

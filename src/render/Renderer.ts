@@ -95,7 +95,9 @@ export class Renderer {
   private qualityTotal = 0;
   private qualityCooldown = 3;
   private resolutionScale = 1;
-  private readonly qualityLocked: boolean;
+  private qualityLocked: boolean;
+  /** `?quality=` fixed the tier: the settings row leaves it. */
+  private readonly qualityFixed: boolean;
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
   readonly camera: THREE.PerspectiveCamera;
@@ -171,6 +173,7 @@ export class Renderer {
   constructor(canvas: HTMLCanvasElement, sim: SimWorld, quality?: QualityTier) {
     this.sim = sim;
     this.qualityLocked = quality !== undefined;
+    this.qualityFixed = quality !== undefined;
     this.quality = quality ?? 'low';
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', stencil: false });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -824,6 +827,18 @@ export class Renderer {
     this.roadblockView?.dispose();
     this.rampView?.dispose();
     this.renderer.dispose();
+  }
+
+  /**
+   * The settings' QUALITY row (M7 slice 3): AUTO lets the frame cost choose, LOW and HIGH hold that tier. A tier the
+   * URL fixed (`?quality=`, the tests) stays.
+   */
+  setQualityMode(mode: 'auto' | QualityTier): void {
+    if (this.qualityFixed) return;
+    this.qualityLocked = mode !== 'auto';
+    if (mode !== 'auto' && mode !== this.quality) this.setQuality(mode);
+    this.qualityCooldown = 3;
+    this.qualityElapsed = 0; this.qualityFrames = 0; this.qualityTotal = 0;
   }
 
   private setQuality(tier: QualityTier): void {

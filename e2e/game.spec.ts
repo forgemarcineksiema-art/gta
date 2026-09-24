@@ -303,3 +303,28 @@ test('M6 7.1e the horn on H: one horn a press, carrying the horn worn', async ({
   expect(horns).toBe(1);
   expect(errors).toEqual([]);
 });
+
+test('M7 3.4e the settings on the pause screen: W/S a row, A/D its value, saved with the profile', async ({ page }) => {
+  const errors = watch(page);
+  await boot(page, '');
+  await key(page, 'KeyP');
+  await expect(page.locator('.settings')).toBeVisible();
+  // MUSIC is the first row: one step up
+  await key(page, 'KeyD');
+  // down to the RADAR row: north up
+  await key(page, 'KeyS');
+  await key(page, 'KeyS');
+  await key(page, 'KeyS');
+  await key(page, 'KeyD');
+  await expect(page.locator('.settings__row.is-focus .settings__value')).toHaveText('NORTH UP');
+  const settings = await page.evaluate(async () => {
+    const g = window.__game!;
+    await g.save.flush(g.sim);
+    return { ...g.sim.settings, saved: (JSON.parse(localStorage.getItem('save') ?? '{}') as { settings?: unknown }).settings };
+  });
+  expect(settings.music).toBe(8);
+  expect(settings.radarNorth).toBe(true);
+  expect(settings.saved).toEqual({ music: 8, effects: 10, quality: 'auto', radarNorth: true });
+  await key(page, 'KeyP');
+  expect(errors).toEqual([]);
+});

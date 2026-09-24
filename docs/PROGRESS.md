@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M7 slice 3: the settings row
+
+Done: the pause screen gains MUSIC and EFFECTS (0–10, the music at 7), QUALITY (AUTO, LOW, HIGH) and RADAR
+(TURNS, NORTH UP): W/S a row, A/D its value, every value clickable; M still mutes all. The audio splits into an
+effects bus and the music's under the master (both mutes take both); a step is 3 dB. QUALITY holds a tier or lets
+the frame cost choose (`?quality=` still wins); north up holds the radar at north and turns the arrow. The world
+carries `settings` for the save, version 4 (a v3 document migrates to the defaults; a broken field falls back
+alone). Pins M7 3.1–3.3 (the v2 migration pin now ends at the current version); game.spec's settings case runs at
+the gate. Verify green (339 tests).
+
 ## 2026-09-24 — M7 slice 2: our own music
 
 Done: `audio/score.ts`, eight bars in A minor at 120 bpm over Am–F–C–G, written for the game: a driving octave

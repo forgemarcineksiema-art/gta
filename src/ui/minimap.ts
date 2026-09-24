@@ -250,6 +250,8 @@ export class Minimap {
   private size = 0;
   private dpr = 1;
   private primed = false;
+  /** The settings' RADAR row (M7 slice 3): north up instead of the way the car goes. */
+  northUp = false;
   private measure = true;
   private dirty = true;
   private lastX = 0;
@@ -325,7 +327,7 @@ export class Minimap {
     this.primed = true;
     this.lastX = x;
     this.lastZ = z;
-    advance(this.state, dt, yaw, tm.vx, tm.vz, tm.speed, snap);
+    advance(this.state, dt, yaw, tm.vx, tm.vz, tm.speed, snap, this.northUp);
     const jobs = sim.jobs;
     const caches = sim.caches;
     const cacheSerial = caches ? caches.serial : 0;

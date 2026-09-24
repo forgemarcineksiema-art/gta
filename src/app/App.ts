@@ -21,6 +21,7 @@ import { RunHud } from '../ui/run';
 import { ColdOpenHud } from '../ui/coldOpen';
 import { JobsHud } from '../ui/jobs';
 import { arrangeTop, mountTop, topBit } from '../ui/lanes';
+import { SettingsUi } from '../ui/settings';
 import { GarageUi, type GarageActions } from '../ui/garage';
 import { routeToDropOff } from './doorRoute';
 import { BotDriver } from './bot';
@@ -32,7 +33,7 @@ import { FixedStepLoop } from './loop';
 import { PerfProbe, heapMb } from './perf';
 import { SimProfile } from './simProfile';
 import { SaveStore } from './save';
-import { BALANCE, CHAIN_ALL, POLICE, defaultSave, type SaveV1, type SimEvent } from '../sim';
+import { BALANCE, CHAIN_ALL, POLICE, defaultSave, volumeGain, type SaveV1, type SimEvent } from '../sim';
 
 /** Filled during `App.boot`; copied into the handle for `?dev` and the startup gate. */
 const bootTimings: Record<string, number> = {};
@@ -109,6 +110,8 @@ export class App {
   private readonly jingle: Jingle;
   /** The game's own music (M7 slice 2): rendered after gameplay starts, the layers by the heat, a sting on busted, an escape, the door. */
   private readonly music: Music;
+  /** The pause screen's settings (M7 slice 3). */
+  private readonly settingsUi: SettingsUi;
   private readonly panel: DebugPanel | null;
   private readonly loop = new FixedStepLoop(FIXED_DT, 5);
   private readonly bot: BotDriver | TrackBot | BotPolicy | JobBot | null;
@@ -176,6 +179,12 @@ export class App {
     const uiRoot = document.getElementById('ui') ?? document.body;
     this.hud = new Hud(uiRoot, sim);
     this.runHud = new RunHud(uiRoot, sim);
+    // the settings (M7 slice 3): on the pause screen above the build stamp, applied now and on every change
+    const pause = this.hud.pauseElement;
+    this.settingsUi = new SettingsUi(pause, sim.settings, () => { this.applySettings(); this.store.markDirty(); });
+    const stamp = pause.querySelector('.hud__pause-build');
+    if (stamp) pause.insertBefore(this.settingsUi.root, stamp);
+    this.applySettings();
     this.runHud.setKeys({ any: this.input.label('throttle') });
     // the garage on the wall: App is the one caller of Garage and of the rewarded ads (docs/M5_PLAN.md §3.3)
     const actions: GarageActions = {
@@ -587,6 +596,15 @@ export class App {
     });
   }
 
+  /** The settings into the mix, the renderer and the radar (M7 slice 3). */
+  private applySettings(): void {
+    const s = this.sim.settings;
+    this.music.setVolume(volumeGain(s.music));
+    this.audio.setEffectsVolume(volumeGain(s.effects));
+    this.renderer.setQualityMode(s.quality);
+    this.hud.setRadarNorth(s.radarNorth);
+  }
+
   private toggleUserPause(): void {
     this.userPaused = !this.userPaused;
     this.hud.setPaused(this.paused, 'user');
@@ -611,6 +629,9 @@ export class App {
     this.input.update();
     const st = this.input.state;
     if (st.pressed.pause) this.toggleUserPause();
+    else if (this.userPaused && !this.adShowing) {
+      this.settingsUi.navigate({ up: st.pressed.throttle, down: st.pressed.brake, left: st.pressed.steerLeft, right: st.pressed.steerRight });
+    }
     if (st.pressed.debug && this.panel) {
       const v = this.panel.toggle();
       this.hud.setDebugVisible(v);

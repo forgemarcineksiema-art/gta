@@ -309,6 +309,16 @@ export class Hud {
     this.hints.classList.toggle('is-hidden', !v);
   }
 
+  /** The radar north up, or turning with the car (the settings' RADAR row, M7 slice 3). */
+  setRadarNorth(v: boolean): void {
+    if (this.minimap) this.minimap.northUp = v;
+  }
+
+  /** The pause screen, for the settings rows (M7 slice 3). */
+  get pauseElement(): HTMLElement {
+    return this.pause;
+  }
+
   /** The key hints' and the news' own elements, for the top of the screen's column (M7 slice 1). */
   get hintsElement(): HTMLElement {
     return this.hints;

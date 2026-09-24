@@ -20,9 +20,14 @@ load: the loading brackets only wrap the city). What M8.8 hands over
 the hovercraft included, so the touch layer maps nothing new), the scooters
 in the traffic the mobile tier thins, `physicalUnits` for the mobile tier to
 set (0 until its phones hold the budget), and the cover's picture (the
-monster truck on a police car).
+monster truck on a police car). What M8.9 hands over (`docs/M8.9_PLAN.md`):
+the HUD in rem on one scale (the touch buttons take the same scale), the
+corners with the speed as a round gauge mirroring the radar (the touch layer
+places the radar as this plan says), one colour for one meaning (a
+touch button's colour follows the table), the fonts in the build, and the
+gate's frames for the cover and the screenshots.
 
-Executor: the agent that starts after the M8.8 gate, on Marcin's word.
+Executor: the agent that starts after the M8.9 gate, on Marcin's word.
 Reviewer: Claude, at the gate. Director, tester on real devices and the one
 who submits: Marcin. This document is the milestone contract: what to build,
 in which order, with which numbers, and what "done" means; each fixed

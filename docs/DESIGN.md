@@ -660,7 +660,8 @@ The contracts with done criteria, pins and measurements per slice are
 `docs/M6_PLAN.md` (the board), `docs/M7_PLAN.md` (the polish),
 `docs/M8_PLAN.md` (the chaos), `docs/M8.5_PLAN.md` (the clean screen),
 `docs/M8.6_PLAN.md` (solid cars), `docs/M8.7_PLAN.md` (the way),
-`docs/M8.8_PLAN.md` (the fleet, its design in the same file) and
+`docs/M8.8_PLAN.md` (the fleet, its design in the same file),
+`docs/M8.9_PLAN.md` (the look, its design in the same file) and
 `docs/M9_PLAN.md` (the platform); this section is the summary. Update 2 gets its contract after the first Basic
 Launch numbers.
 
@@ -747,6 +748,15 @@ both.
   trolley, the motorbike, the hovercraft and the sea, the mega-ramp, then the
   police and the rivals on the player's car model if the budget holds. On
   his word after M8.7's gate.
+- **M8.9 The look** (set here 2026-09-25 after a review of every screen,
+  which Marcin accepted whole with his bar: six out of ten, "it must be ten,
+  at least nine"; its design and its contract are one document,
+  `docs/M8.9_PLAN.md`): the world at a real golden hour and lit at dusk, one
+  colour for one meaning, one typeface in two styles, a HUD that scales with
+  the screen, one message at a time, a radar that answers three questions,
+  signs that read from afar and never block, the garage as a showroom with
+  a picture on every card. After M8.8's gate, before the platform; its slice
+  0 (two faults of M8.7) on his word before M8.8.
 - **M9 Platform**, the brief's M6 (`docs/M9_PLAN.md`), then Basic Launch;
   only when all of it is in and on his word that the game is good.
 - Later, by the KPIs: cop mode, ghosts, multiplayer (§8).

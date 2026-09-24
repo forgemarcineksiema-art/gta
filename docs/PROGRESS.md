@@ -2,6 +2,19 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.9 "The look" planned (a review of every screen with Marcin)
+
+Marcin opened a talk on the UI, the UX and the style: look at everything first. Every state captured in Polish at
+800×450, 1280×720 and 1920×1080 (the intro step by step, every job kind, chases at three and five stars, busted, the
+door's pages and offer, the full map, the pause; scratch in `output/ui-review/`, the twelve-frame sheet
+`_przeglad-ui.png`) and measured: the world's mean saturation 0.18–0.21 with 2–5 % strong pixels, the sun 1.8 at 51°
+over a fill of 1.35; the HUD's words on the sky at 1.1–2.3:1 against it; yellow and cyan with many meanings; fixed pixel
+sizes (11–20 px); moments of nine things; a radar of sixteen kinds of mark; the bag without its glyph; the garage a text
+sheet over the car. Two faults of M8.7: the pay label stuck in the top-left corner (`PayLabel.show` compares with NaN),
+the camera flying through a sign. His mark 6/10, his bar "10, at least 9"; he accepted the review and the direction whole.
+Set here: `docs/M8.9_PLAN.md`, design and contract in one file, seventeen slices after M8.8's gate, slice 0 (the two
+faults) on his word before M8.8. Docs only; verify not run (no code touched).
+
 ## 2026-09-25 — M8.7 gate: 0.8.7 (M8.6's gate closed inside it)
 
 Report `docs/M8.7_REPORT.md`. `verify:gate` 525 of 526 on the final tree: the city tour's 120 s timeout at 134 s under

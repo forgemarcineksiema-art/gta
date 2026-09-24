@@ -9,7 +9,7 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 
 ## Session start
 
-1. Read this file, `docs/PROGRESS.md` and the current milestone contract (M8.7's gate closed at 0.8.7, `docs/M8.7_REPORT.md`; next `docs/M8.8_PLAN.md`, the fleet (its design and contract in one file), on Marcin's word; then `docs/M9_PLAN.md`, the platform, only on his word; the design in `docs/DESIGN.md`, §20 first); check `git log --oneline -15`.
+1. Read this file, `docs/PROGRESS.md` and the current milestone contract (M8.7's gate closed at 0.8.7, `docs/M8.7_REPORT.md`; next `docs/M8.8_PLAN.md`, the fleet (its design and contract in one file), on Marcin's word; then `docs/M8.9_PLAN.md`, the look (the same form; its slice 0, two faults of M8.7, on his word before M8.8); then `docs/M9_PLAN.md`, the platform, only on his word; the design in `docs/DESIGN.md`, §20 first); check `git log --oneline -15`.
 2. Run `npm run verify` (the quick set) before touching anything and at the commit that ends a slice. `npm run verify:gate` (the long bot-driven pins included) only at a milestone gate. Nothing else per slice: see **Pace** below, and read it before every slice.
 3. Work autonomously inside the milestone. Decide, act, note assumptions in `docs/PROGRESS.md`. Stop only at a gate, before destructive/irreversible operations, to change a fixed decision from the brief, or when blocked on something only Marcin can provide.
 4. Commit small and often; never leave significant work uncommitted. Commit messages end with a `Co-Authored-By:` line naming the model that did the work (e.g. `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`).
@@ -31,7 +31,8 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 | `docs/M4_PLAN.md`, `docs/M5_PLAN.md` | The finished contracts (kept for their numbers and as-built notes). M4's §5 holds the contract for post-launch update 1. |
 | `docs/M5.5_PLAN.md` | The finished contract before it: the whole game before the platform (kept for its numbers and as-built notes). |
 | `docs/M8.8_PLAN.md` | The fleet: its design and its contract in one document (Marcin's request, 2026-09-24): a job for every class, trophies each best at one thing, the 4×4 and the ground, three crazy cars, the motorbike, the hovercraft and the sea, the mega-ramp, the police and the rivals on the car model. After M8.7's gate and before the platform (Marcin, 2026-09-25). |
-| `docs/M9_PLAN.md` | The platform contract (SDK adapter, touch, mobile tier, submission), the brief's M6, after M8.8's gate on Marcin's word. |
+| `docs/M8.9_PLAN.md` | The look: its design and its contract in one document, from a review of every screen that Marcin accepted with his bar (6/10 now, 9 at least): the world at a real golden hour and lit at dusk, one colour for one meaning, one typeface in two styles, a HUD that scales with the screen, one message at a time, a radar that answers three questions, signs that read from afar and never block, the garage as a showroom. After M8.8's gate; its slice 0 before M8.8. |
+| `docs/M9_PLAN.md` | The platform contract (SDK adapter, touch, mobile tier, submission), the brief's M6, after M8.9's gate on Marcin's word. |
 | `docs/ARCHITECTURE.md` | Structure, dependency justifications, decision records. |
 | `docs/DEV.md` | Servers and ports, the build stamp, test URLs, QA hooks, the suites, scratch folders. `npm start` (4173) is the one way to play; `npm run dev` (5173) is for editing. |
 | `docs/BACKLOG.md` | Out-of-milestone ideas and non-blocking bugs, one line of context each. |
@@ -60,6 +61,8 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 Always in a vehicle, no on-foot, no guns. PEGI 12 slapstick: pedestrians always dodge, police are comic. No menu before gameplay; cold open. One seamless city. Control never taken away > 2 s. Keyboard first, touch second, input abstracted. Low-poly flat-shaded, palette in `src/sim/palette.ts`, no per-asset textures.
 
 The screen's budget (DESIGN §17, set 2026-09-24 after Marcin's review): a calm drive shows six things (the goal line, the stars, the bank, the radar, the speed, the boost); everything else appears on its moment and goes. No arrow (Marcin, 2026-09-24, DESIGN §20; it leaves with M8.7 slice 1): what now is the goal line, where is the route on the radar, what is it is the sign over the ring, one answer each. A new system gets no standing place on the driving screen: it speaks through the goal line, a card, the one message at the top, a pop (two at most), the wall's GOALS page or the full map. One name for each thing (§17.4: BANK, BAG, the stars, GARAGE, COPS, COMBO), pinned by `tests/ui/words.test.ts`; in Polish (§19: BANK, ŁUP, GWIAZDKI, GARAŻ, GLINY, KOMBO), pinned by `tests/ui/lang.test.ts`.
+
+One colour, one meaning (Marcin accepted 2026-09-25, `docs/M8.9_PLAN.md` R1): yellow is money, cyan is the way, red is trouble, blue is the police, ink is everything else, grey is closed. M8.9 builds the table and its pin; until then new screen work keeps yellow and cyan to those two meanings.
 
 ## Budgets (`npm run budget` fails the build)
 

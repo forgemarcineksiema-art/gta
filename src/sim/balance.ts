@@ -88,7 +88,12 @@ export const BALANCE = {
   skill: {
     nearMiss: 100, oncomingMiss: 200, oncoming: 50, driftPerSecond: 100, airPerSecond: 150, perTrickCap: 300,
     minSpeed: 8, driftTrick: 1, airMin: 0.3, airTrick: 0.5, multEvery: 3, maxMult: 5, window: 4, crashImpact: 5,
+    // M8 slice 6: smashes within `smashGroup` s of the group's first count as one trick (their points all add); an
+    // anchored prop that holds against the car at `holdCrash` m/s or more loses the chain, as a wall does
+    smashGroup: 0.5, holdCrash: 2,
   },
+  /** The run's property damage per district that the news reports (M8 slice 6): the bill passing each of these. */
+  damageNews: [10_000, 50_000],
   /** The hunts (M5.5 slice 14): the last of the twenty jumps and the last of the fifty billboards pay the set's reward into the bank. */
   hunts: { jumps: 20000, billboards: 30000 },
   /** Hidden cars (M5.5 slice 16): the stashed car is placed when the player comes within `range` m of its spot. */

@@ -214,7 +214,9 @@ export class RunHud {
     this.wallFirst.classList.toggle('is-visible', next !== '');
     this.wallSentence.classList.toggle('is-visible', (run.chain & (1 << STEP.escape)) === 0);
     const c = run.counts;
-    this.wallCounts.textContent = `${plural(c.takedowns, 'TAKEDOWN')} · ${plural(c.escapes, 'ESCAPE')} · ${plural(c.billboards, 'BILLBOARD')} · ${plural(c.coins, 'COIN')}`;
+    // the street furniture's bill (M8 slice 6): the city's, never the player's money, so not in yellow
+    const damage = c.damage > 0 ? ` · CITY\u00a0DAMAGE\u00a0${money(c.damage)}` : '';
+    this.wallCounts.textContent = `${plural(c.takedowns, 'TAKEDOWN')} · ${plural(c.escapes, 'ESCAPE')} · ${plural(c.billboards, 'BILLBOARD')} · ${plural(c.coins, 'COIN')}${damage}`;
     // the poster: the police remember the car, not the driver (the identity rule, taught without a line of text)
     const d = sim.pursuit.descriptor;
     this.wantedSwatch.style.background = `#${d.paint.toString(16).padStart(6, '0')}`;

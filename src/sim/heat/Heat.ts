@@ -22,6 +22,8 @@ export class Heat {
   gainSerial = 0;
   /** Whether a crime read this step is in a unit's sight; the world wires it to `Police.crimeSeen`. */
   seen: () => boolean = () => false;
+  /** A smashed prop's points of heat by its id (M8 slice 6); the world wires it to the catalogue. */
+  propHeat: (id: number) => number = () => 0;
   /** The player's speed at the contact (the faster car is at fault); the world wires it to the probe. */
   playerSpeed: () => number = () => Infinity;
   private lastLevel = 0;
@@ -106,6 +108,9 @@ export class Heat {
       this.add(this.traffic?.police[event.target] ? heat.policeTakedown : heat.trafficTakedown, this.seen());
     } else if (kind === 'billboard') {
       this.add(heat.billboard, this.seen());
+    } else if (kind === 'smash') {
+      // breaking public property (M8 slice 6): the thing's points, doubled in a unit's sight; a chasing unit's is not a crime
+      if (event.value > 0) this.add(this.propHeat(event.target), this.seen());
     } else if (kind === 'camera') {
       this.add(heat.camera, this.seen());
     } else if (kind === 'roadblock') {

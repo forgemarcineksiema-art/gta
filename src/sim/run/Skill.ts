@@ -7,15 +7,19 @@
  * When the window runs out it banks: the points × the multiplier into the bag,
  * through a `skill` event the run reads. A wall hit at `crashImpact` m/s or
  * more, a wreck or busted loses it (`skillLost`); pulling into a door banks it
- * at once, before the door banks the bag. No allocation per step.
+ * at once, before the door banks the bag. A smash of the street furniture is a trick too (M8 slice 6): the thing's
+ * points and its name as the chain's word; smashes within `smashGroup` s of their group's first count as one trick
+ * toward the multiplier, all their points added; an anchored thing that holds against the car loses the chain as a
+ * wall does. No allocation per step.
  */
 import { BALANCE } from '../balance';
+import { PROP_KINDS, PROP_TYPES } from '../city/props';
 import type { SimEvent } from '../events';
 import type { SimWorld } from '../SimWorld';
 
 /** The last trick, for the HUD's word. */
-export enum Trick { None = -1, NearMiss = 0, OncomingMiss = 1, Oncoming = 2, Drift = 3, Air = 4 }
-export const TRICK_WORDS: readonly string[] = ['NEAR MISS', 'ONCOMING MISS', 'ONCOMING', 'DRIFT', 'AIR'];
+export enum Trick { None = -1, NearMiss = 0, OncomingMiss = 1, Oncoming = 2, Drift = 3, Air = 4, Smash = 5 }
+export const TRICK_WORDS: readonly string[] = ['NEAR MISS', 'ONCOMING MISS', 'ONCOMING', 'DRIFT', 'AIR', 'SMASH'];
 
 export class Skill {
   /** The running chain's points before the multiplier, and its tricks; both 0 with no chain. */
@@ -23,8 +27,9 @@ export class Skill {
   tricks = 0;
   /** Seconds before the chain banks. */
   left = 0;
-  /** The last trick. `serial` bumps on every trick, bank and loss: the HUD redraws on it. */
+  /** The last trick and its word (a smash's is the thing's name). `serial` bumps on every trick, bank and loss: the HUD redraws on it. */
   last: Trick = Trick.None;
+  word = '';
   serial = 0;
   /** How the last chain ended: what it paid, or what it would have paid when lost. */
   lastPay = 0;
@@ -37,6 +42,9 @@ export class Skill {
   private flight = 0;
   private lose = false;
   private cursor: number;
+  /** The chain's clock (s) and when the current group of smashes began (-Infinity: none). */
+  private clock = 0;
+  private smashGroupAt = -Infinity;
 
   constructor(private readonly sim: SimWorld) {
     this.cursor = sim.events.sequence;
@@ -56,10 +64,13 @@ export class Skill {
   /** After the jumps, before the run: this step's tricks, the window, the bank or the loss. */
   step(dt: number): void {
     const sim = this.sim, s = BALANCE.skill, tm = sim.vehicle.telemetry;
+    this.clock += dt;
     this.cursor = sim.events.readFrom(this.cursor, this.onEvent);
     const run = sim.run.state;
-    // a wall hit hard, a wreck, busted: the chain is gone
+    // a wall hit hard, a lamp post that held, a wreck, busted: the chain is gone
     if (sim.life.hitKind === 'wall' && tm.impact >= s.crashImpact) this.lose = true;
+    const props = sim.props;
+    if (props && props.held >= 0 && props.heldClosing >= s.holdCrash) this.lose = true;
     if (this.lose || run === 'busted') {
       this.lose = false;
       this.end(false);
@@ -106,10 +117,28 @@ export class Skill {
     if (this.left <= 0) this.end(true);
   }
 
-  private trick(kind: Trick, points: number): void {
+  private trick(kind: Trick, points: number, word = TRICK_WORDS[kind] ?? ''): void {
     this.points += points;
     this.tricks++;
     this.last = kind;
+    this.word = word;
+    this.left = BALANCE.skill.window;
+    this.serial++;
+  }
+
+  /** A smash: its points always; a trick toward the multiplier only when it opens a group. */
+  private smash(id: number): void {
+    const k = this.sim.props?.kind[id] ?? 255;
+    if (k === 255) return;
+    const t = PROP_TYPES[PROP_KINDS[k] as keyof typeof PROP_TYPES];
+    if (this.clock - this.smashGroupAt >= BALANCE.skill.smashGroup) {
+      this.smashGroupAt = this.clock;
+      this.trick(Trick.Smash, t.points, t.name);
+      return;
+    }
+    this.points += t.points;
+    this.last = Trick.Smash;
+    this.word = t.name;
     this.left = BALANCE.skill.window;
     this.serial++;
   }
@@ -127,6 +156,8 @@ export class Skill {
     this.tricks = 0;
     this.left = 0;
     this.last = Trick.None;
+    this.word = '';
+    this.smashGroupAt = -Infinity;
     this.serial++;
   }
 
@@ -144,6 +175,10 @@ export class Skill {
         break;
       case 'wrecked':
         this.lose = true;
+        break;
+      case 'smash':
+        // the player's (a bill), never a chasing unit's
+        if (e.value > 0) this.smash(e.target);
         break;
       default:
         break;

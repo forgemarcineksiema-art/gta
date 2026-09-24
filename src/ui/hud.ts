@@ -2,7 +2,7 @@
  * In-game HUD: plain DOM over the canvas. Speedometer, boost bar, drift readout,
  * a debug block, a pause overlay and the keycap hint strip. Reads sim state only.
  */
-import { AgentState, BALANCE, BODY_WORDS, CHIEF, DISTRICTS, POLICE, RIVALS, TRICK_WORDS, districtAt, paintName, posterNumber, unpackDescriptor } from '../sim';
+import { AgentState, BALANCE, BODY_WORDS, CHIEF, DISTRICTS, POLICE, RIVALS, districtAt, paintName, posterNumber, unpackDescriptor } from '../sim';
 import type { SimEvent, SimWorld } from '../sim';
 import { BigMap } from './bigmap';
 import { Minimap } from './minimap';
@@ -422,6 +422,11 @@ export class Hud {
       this.ticker2(n > 0 ? `#${n}` : 'BOARD', `${r.name} DRIVES BY · SEE THE BOARD`);
       return;
     }
+    if (kind === 'damageNews') {
+      // the run's bill in a district passed a mark (M8 slice 6): the news reports the property damage
+      this.ticker2('NEWS', `PROPERTY DAMAGE IN ${DISTRICTS[target]?.name ?? 'THE CITY'} PASSES ${value.toLocaleString('en-US')}`);
+      return;
+    }
     if (kind === 'twinSwap') {
       // the radio calls the twins' new car (M6 slice 3): the only way to know which one to beat
       const d = unpackDescriptor(target);
@@ -588,7 +593,7 @@ export class Hud {
       if (skill.serial !== this.skillSerial || shown !== this.skillShown) {
         if (skill.serial !== this.skillSerial) {
           this.skillMult.textContent = `×${skill.multiplier}`;
-          this.skillWord.textContent = TRICK_WORDS[skill.last] ?? '';
+          this.skillWord.textContent = skill.word;
           this.skill.classList.toggle('is-max', skill.multiplier >= BALANCE.skill.maxMult);
         }
         this.skillSerial = skill.serial;

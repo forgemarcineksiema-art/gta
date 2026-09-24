@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8 slice 6: the pay
+
+Done: a smash is a chain trick (`Trick.Smash`): the thing's points, its name as the chain's word; smashes within 0.5 s
+of their group's first make one trick toward the multiplier (all their points add); an anchored thing that holds
+against the car at 2 m/s or more loses the chain. The player's smash fills the boost by the kind and is a crime by its
+heat (×2 in a unit's sight); anyone else's knock pays nothing. The run counts the smashes and the bill: `CITY DAMAGE`
+after the counts on the door's wall, never the bag or the bank; the ticker's news when a district's bill passes 10,000
+and 50,000. Pins M8 6.1–6.4 (a terrace is six pieces: 6.1 knocks it and the four things nearest). Verify green; its
+tests took 82 s, over the minute: trimmed at the gate.
+
 ## 2026-09-24 — M8 slice 5: the spectacle
 
 Done: a smashed prop throws its material's debris from where it stood, with the knock's way: glass shards, paper

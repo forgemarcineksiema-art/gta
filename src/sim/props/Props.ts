@@ -85,8 +85,9 @@ export class Props {
   /** This run's smashes and their bill. */
   smashed = 0;
   bill = 0;
-  /** The anchored prop that held against the car this step, -1 none. */
+  /** The anchored prop that held against the player's car this step (-1 none), and at what closing speed. */
   held = -1;
+  heldClosing = 0;
   /** The broken hydrants' water: x, z and seconds left per jet (0 when none), `PROPS.jet.max` of them. */
   readonly jets = new Float32Array(PROPS.jet.max * 3);
 
@@ -232,6 +233,7 @@ export class Props {
   /** After the controls, before `world.step`: the player's footprint swept over the step, its knocks and holds. */
   step(dt: number): void {
     this.held = -1;
+    this.heldClosing = 0;
     const sim = this.sim;
     if (!sim.city) return;
     // the player's footprint and motion as the world already read them this step (no read of the body unless it meets something)
@@ -329,10 +331,11 @@ export class Props {
   }
 
   /**
-   * A knock at a closing speed along the unit normal (car to prop), with the car's velocity across the contact:
-   * the car's speed lost along the normal (m/s), 0 when nothing went (too slow, or it held).
+   * A knock at a closing speed along the unit normal (car to prop), with the car's velocity across the contact, by
+   * the player (`by` -1) or a traffic record: the car's speed lost along the normal (m/s), 0 when nothing went (too
+   * slow, or it held). Only the player's knocks pay (the boost, the bill) and count.
    */
-  knock(id: number, carMass: number, closing: number, nx: number, nz: number, tvx: number, tvz: number): number {
+  knock(id: number, carMass: number, closing: number, nx: number, nz: number, tvx: number, tvz: number, by = -1): number {
     const t = this.typeOf(id);
     const st = this.state[id];
     if (!t || (st !== PropState.Standing && st !== PropState.Lying)) return 0;
@@ -342,15 +345,15 @@ export class Props {
     // a lying prop is loose; a standing anchored one holds below its base's strength (its post is the wall)
     const base = lying ? 0 : t.breakImpulse;
     if (base > 0 && j < base) {
-      this.held = id;
+      if (by < 0) { this.held = id; this.heldClosing = closing; }
       return 0;
     }
-    this.launch(id, t, j, nx, nz, tvx, tvz);
+    this.launch(id, t, j, nx, nz, tvx, tvz, by);
     return (j + base) / carMass;
   }
 
-  /** The prop leaves: its post down, off the grid, onto a pool body or an arc; the smash counted once. */
-  private launch(id: number, t: PropType, j: number, nx: number, nz: number, tvx: number, tvz: number): void {
+  /** The prop leaves: its post down, off the grid, onto a pool body or an arc; the smash counted once, the player's paid. */
+  private launch(id: number, t: PropType, j: number, nx: number, nz: number, tvx: number, tvz: number, by: number): void {
     const standing = this.state[id] === PropState.Standing;
     const o = id * 7;
     if (standing) {
@@ -361,9 +364,15 @@ export class Props {
       this.posts[id]?.setEnabled(false);
       this.healFor[id] = 0;
       this.addDown(id);
-      this.smashed++;
-      this.bill += t.bill;
-      this.sim.events.push('smash', t.bill, this.x[id] as number, half, this.z[id] as number, id);
+      const player = by < 0;
+      if (player) {
+        this.smashed++;
+        this.bill += t.bill;
+        // the brief's boost earned by risk: a little per smash, by weight
+        const v = this.sim.vehicle;
+        v.boostMeter = Math.min(1, v.boostMeter + t.boost);
+      }
+      this.sim.events.push('smash', player ? t.bill : 0, this.x[id] as number, half, this.z[id] as number, id);
     }
     for (let k = 0; k < 7; k++) this.prev[o + k] = this.pose[o + k] as number;
     this.gridRemove(id);

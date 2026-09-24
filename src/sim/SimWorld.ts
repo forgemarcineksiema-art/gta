@@ -284,6 +284,7 @@ export class SimWorld {
     this.police = this.traffic ? new Police(this) : null;
     // a crime in a unit's sight pays double and makes the player wanted (DESIGN.md §13.3)
     this.heat.seen = () => this.police?.crimeSeen() ?? false;
+    this.heat.propHeat = (id) => this.props?.typeOf(id)?.heat ?? 0;
     this.heat.playerSpeed = () => this.probe.speed;
     this.roadblocks = this.traffic && this.cover ? new Roadblocks(this, this.cover.chokepoints) : null;
     this.cameras = this.cover ? new Cameras(this.cover.cameraSites, this.cover.daily.cameras) : null;

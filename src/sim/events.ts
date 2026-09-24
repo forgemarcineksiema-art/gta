@@ -38,8 +38,10 @@ export type EventKind =
   | 'twinSwap'
   // the player's horn (M6 slice 7): value = the cars that pulled aside, target = the kit's horn worn (-1 the class's own)
   | 'horn'
-  // a standing prop knocked down (M8): value = its bill, target = its id
-  | 'smash';
+  // a standing prop knocked down (M8): value = its bill when the player knocked it (0 for anyone else), target = its id
+  | 'smash'
+  // the run's property damage in a district passed a mark (M8 slice 6): value = the mark, target = the district's index
+  | 'damageNews';
 
 export interface SimEvent {
   kind: EventKind;

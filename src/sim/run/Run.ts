@@ -33,6 +33,9 @@ export interface RunCounts {
   escapes: number;
   billboards: number;
   coins: number;
+  /** The street furniture smashed (M8 slice 6), and its bill: the run's CITY DAMAGE, never the player's money. */
+  smashes: number;
+  damage: number;
 }
 
 export class Run {
@@ -89,7 +92,9 @@ export class Run {
   lastFence = false;
   /** Bumps when the last door's totals change after the door shut (the double). */
   lastSerial = 0;
-  readonly counts: RunCounts = { takedowns: 0, escapes: 0, billboards: 0, coins: 0 };
+  readonly counts: RunCounts = { takedowns: 0, escapes: 0, billboards: 0, coins: 0, smashes: 0, damage: 0 };
+  /** The run's damage by district (`DISTRICTS` order), for the news. */
+  readonly damageIn = new Float64Array(4);
   /** Hideout first; empty on the playground. */
   readonly dropOffs: readonly DropOff[];
 
@@ -387,6 +392,11 @@ export class Run {
     this.counts.escapes = 0;
     this.counts.billboards = 0;
     this.counts.coins = 0;
+    this.counts.smashes = 0;
+    this.counts.damage = 0;
+    this.damageIn.fill(0);
+    const props = this.sim.props;
+    if (props) { props.smashed = 0; props.bill = 0; }
   }
 
   /** The chain's steps from the ring, at the door too (the bank, the purchases); never the intro's own events. */
@@ -432,6 +442,16 @@ export class Run {
         this.bag += bag.billboard;
         this.counts.billboards++;
         break;
+      case 'smash': {
+        // the player's smash (a bill): counted and priced, never paid into the bag or the bank
+        if (e.value <= 0) break;
+        this.counts.smashes++;
+        this.counts.damage += e.value;
+        const d = (e.z >= 0 ? 2 : 0) + (e.x >= 0 ? 1 : 0), before = this.damageIn[d] as number, after = before + e.value;
+        this.damageIn[d] = after;
+        for (const mark of BALANCE.damageNews) if (before < mark && after >= mark) this.sim.events.push('damageNews', mark, e.x, 0, e.z, d);
+        break;
+      }
       case 'camera':
         // value: km/h over the limit
         this.bag += Math.round(bag.camera + bag.cameraPerKmh * e.value);

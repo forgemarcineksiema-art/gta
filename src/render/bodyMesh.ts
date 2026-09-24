@@ -29,12 +29,26 @@ export function paintMaskMaterial(): THREE.MeshLambertMaterial {
   const chunk = THREE.ShaderChunk.color_vertex.replace('vColor.rgb *= instanceColor.rgb;', 'vColor.rgb *= mix( vec3( 1.0 ), instanceColor.rgb, paintMask );');
   material.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute float paintMask;')
-      .replace('#include <color_vertex>', chunk);
+      .replace('#include <common>', '#include <common>\nattribute float paintMask;\nattribute float aFade;\nvarying float vFade;')
+      .replace('#include <color_vertex>', `${chunk}\nvFade = aFade;`);
+    // a car in the camera's way through a screen door (M8.6 D9, render/fade.ts): a 4×4 ordered pattern keeps `vFade`
+    // of its pixels and discards the rest; no blending, so no sorting and no extra draw call
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\nvarying float vFade;\n${SCREEN_DOOR}`)
+      .replace('void main() {', 'void main() {\n  if ( vFade < 0.999 && vFade <= screenDoor() ) discard;');
   };
-  material.customProgramCacheKey = () => 'traffic-paint-mask';
+  material.customProgramCacheKey = () => 'traffic-paint-mask-fade';
   return material;
 }
+
+/** The 4×4 Bayer threshold under this fragment, in (0, 1). */
+const SCREEN_DOOR = `
+const float BAYER[16] = float[16]( 0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0 );
+float screenDoor() {
+  int x = int( mod( gl_FragCoord.x, 4.0 ) );
+  int y = int( mod( gl_FragCoord.y, 4.0 ) );
+  return ( BAYER[ x + y * 4 ] + 0.5 ) / 16.0;
+}`;
 
 export function buildBodyGeometry(profile: CarProfile, t: VehicleTuning): THREE.BufferGeometry {
   const b = new Builder();

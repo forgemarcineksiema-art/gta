@@ -614,10 +614,11 @@ export class Renderer {
     this.syncTopper();
     this.syncKit();
     this.applyTransforms(alpha);
-    this.trafficView?.update(this.sim.transforms, alpha);
+    // the camera where the last frame left it and the car where this one puts it: a car between them is thinned
+    this.trafficView?.update(this.sim.transforms, alpha, dt, this.camera.position, this.car.root.position);
     this.pedView?.update(this.sim.transforms, alpha);
     this.propsView?.update(this.sim, alpha, this.elapsed);
-    this.policeView.update(alpha);
+    this.policeView.update(alpha, this.trafficView?.fade ?? null);
     this.heliView?.update(dt);
     const tm = this.sim.vehicle.telemetry;
     const carPos = this.car.root.position;

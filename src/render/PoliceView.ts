@@ -151,7 +151,8 @@ export class PoliceView {
     return mesh;
   }
 
-  update(alpha: number): void {
+  /** `fade` is the traffic's (M8.6 D9): a car thinned in the camera's way shows no livery, bar or lenses. */
+  update(alpha: number, fade: Float32Array | null = null): void {
     const sim = this.sim, traffic = sim.traffic;
     const stage = sim.life.state.stage;
     if (sim.carId === 'police' && stage !== this.playerStage) {
@@ -196,6 +197,7 @@ export class PoliceView {
     // Wrecks retain their livery even after leaving the active unit list.
     for (let i = 0; i < traffic.capacity; i++) {
       if (!traffic.police[i] || traffic.state[i] === AgentState.Free) continue;
+      if (fade && (fade[i] as number) < 0.6) continue;
       const kit = i === sim.police?.chief ? this.chiefKit : this.kitOf[traffic.kindOf(i)];
       if (!kit || kit.n >= kit.packed.length) continue;
       const slot = traffic.slot[i] as number, p = slot * 3, r = slot * 4;

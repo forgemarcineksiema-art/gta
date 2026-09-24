@@ -10,8 +10,10 @@
 import * as THREE from 'three';
 import { BODY_IDS, BODY_INDEX, PALETTE, bodyTuning, type TransformBuffer } from '../sim';
 import { AgentState, type Traffic } from '../sim/traffic/Traffic';
+import { BODIES } from '../sim/traffic/bodies';
 import { BODY_PROFILES } from './bodyProfiles';
 import { buildBodyGeometry, paintMaskMaterial } from './bodyMesh';
+import { FADE, blocks, fadeTarget, stepFade } from './fade';
 
 export class TrafficView {
   private readonly meshes: Array<THREE.InstancedMesh | null>;
@@ -27,10 +29,13 @@ export class TrafficView {
   private paintSerial = -1;
   /** Seconds of frames drawn (the lowrider's hop). */
   private clock = 0;
+  /** Per record: how much of the car is drawn (M8.6 D9), 1 whole, `FADE.floor` thinned in the camera's way. */
+  readonly fade: Float32Array;
 
   constructor(private readonly scene: THREE.Scene, private readonly traffic: Traffic, private readonly civilians = true) {
     this.material = paintMaskMaterial();
     this.packed = BODY_IDS.map(() => new Int16Array(traffic.capacity).fill(-1));
+    this.fade = new Float32Array(traffic.capacity).fill(1);
     this.counts = new Int32Array(BODY_IDS.length);
     this.wrote = new Uint8Array(BODY_IDS.length);
     this.meshes = BODY_IDS.map(() => null);
@@ -41,7 +46,10 @@ export class TrafficView {
     const built = this.meshes[b];
     if (built) return built;
     const id = BODY_IDS[b] as (typeof BODY_IDS)[number];
-    const mesh = new THREE.InstancedMesh(buildBodyGeometry(BODY_PROFILES[id], bodyTuning(id)), this.material, this.traffic.capacity);
+    const geometry = buildBodyGeometry(BODY_PROFILES[id], bodyTuning(id));
+    // what is drawn of each instance (M8.6 D9): the material's screen door reads it
+    geometry.setAttribute('aFade', new THREE.InstancedBufferAttribute(new Float32Array(this.traffic.capacity).fill(1), 1));
+    const mesh = new THREE.InstancedMesh(geometry, this.material, this.traffic.capacity);
     mesh.name = `traffic-${id}`;
     mesh.frustumCulled = false;
     mesh.castShadow = true;
@@ -60,7 +68,11 @@ export class TrafficView {
     return n;
   }
 
-  update(transforms: TransformBuffer, alpha: number): void {
+  /**
+   * `eye` is the camera and `target` the player's car: a car whose box meets the line between them, or within
+   * `FADE.near` of the camera, is thinned (M8.6 D9).
+   */
+  update(transforms: TransformBuffer, alpha: number, dt = 1 / 60, eye: THREE.Vector3 | null = null, target: THREE.Vector3 | null = null): void {
     const traffic = this.traffic;
     this.clock += 1 / 60;
     const repaint = traffic.paintSerial !== this.paintSerial;
@@ -91,6 +103,15 @@ export class TrafficView {
       // Neon Niko's lowrider hops on its hydraulics while it waits (M6)
       if (b === LOWRIDER) this.scratchP.y += lowriderBounce(this.clock, traffic.speed[i] as number, i);
       mesh.setMatrixAt(n, this.scratchM.compose(this.scratchP, this.scratchQ, this.scratchS));
+      let fade = 1;
+      if (eye && target) {
+        const p = this.scratchP, q = this.scratchQ, spec = BODIES[b] as (typeof BODIES)[number];
+        const inWay = blocks(eye.x, eye.y, eye.z, target.x, target.y + 0.6, target.z, p.x, p.y, p.z, q.x, q.y, q.z, q.w,
+          spec.halfWidth, spec.stretch ? 1.15 : 0.75, spec.halfLength, FADE.grow);
+        fade = stepFade(this.fade[i] as number, fadeTarget(inWay, Math.hypot(p.x - eye.x, p.y + 0.7 - eye.y, p.z - eye.z)), dt);
+      }
+      this.fade[i] = fade;
+      (mesh.geometry.getAttribute('aFade') as THREE.InstancedBufferAttribute).setX(n, fade);
       if (repaint || pack[n] !== i) {
         const wrecked = traffic.state[i] === AgentState.Wrecked;
         this.color.setHex(wrecked ? PALETTE.charcoal : traffic.police[i] ? PALETTE.policeWhite : (traffic.paint[i] as number));
@@ -114,6 +135,7 @@ export class TrafficView {
       mesh.count = n;
       if (!visible) continue;
       mesh.instanceMatrix.needsUpdate = true;
+      (mesh.geometry.getAttribute('aFade') as THREE.InstancedBufferAttribute).needsUpdate = true;
       if (this.wrote[b] === 1 && mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
     this.paintSerial = traffic.paintSerial;

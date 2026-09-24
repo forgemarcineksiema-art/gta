@@ -2,6 +2,14 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8.6 slice 4: the car is always seen
+
+Done: a traffic car, a unit or a wreck between the camera and the player's car, or within 2.5 m of the camera, is drawn
+thinned to a quarter through a 4×4 screen door in 0.15 s, and back when clear (D9); no blending, so no sorting and no
+draw call more; a thinned police car drops its bar and livery. The choice is `render/fade.ts`, pinned by M8.6 4.1–4.3
+(on the line and a wreck on its side across it: thinned; a metre clear, behind the camera or past the car: whole). The
+look is for the gate (not looked at per slice). Verify green (smoke: the shader compiles, no console error).
+
 ## 2026-09-24 — M8.6 slice 3: the officer walks round
 
 Done: the officer steps out of the unit's clear door, writes at the driver's window unless a car stands at it (the

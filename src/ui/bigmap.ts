@@ -36,6 +36,16 @@ const LEGEND_JOBS: ReadonlyArray<[JobKind, string]> = [
   ['race', 'STREET RACE'], ['rage', 'TAKEDOWN RAGE'], ['mayhem', 'MAYHEM'], ['duel', 'RIVAL'],
 ];
 
+/** BILLBOARDS 12/50 · JUMPS 3/20 · CACHES 4/30: the hunts the map shows (the day's caches only when drawn). */
+export function huntsLine(sim: SimWorld): string {
+  const parts: string[] = [];
+  const c = sim.collectibles, j = sim.jumps, k = sim.caches;
+  if (c) parts.push(`BILLBOARDS ${c.smashedCount}/${c.total}`);
+  if (j) parts.push(`JUMPS ${j.foundCount}/${j.descs.length}`);
+  if (k && k.today.length > 0) parts.push(`CACHES ${k.count}/${k.total}`);
+  return parts.join(' · ');
+}
+
 function el(tag: string, className: string, text = ''): HTMLElement {
   const e = document.createElement(tag);
   e.className = className;
@@ -48,6 +58,9 @@ export class BigMap {
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
   private readonly keyHint: HTMLElement;
+  /** The three hunts' counts (DESIGN.md §17.2): off the driving screen, here and on the wall's GOALS page. */
+  private readonly hunts: HTMLElement;
+  private huntsText = '';
   /** The covered streets and the overpasses' decks as world rectangles (centre and half extents). */
   private readonly coverRects: Array<{ x: number; z: number; hx: number; hz: number }> = [];
   /** The island's blocks, parks and shallows (`cityFootprints`), built the first time the map is shown. */
@@ -65,7 +78,8 @@ export class BigMap {
     this.root = el('div', 'bigmap');
     const head = el('div', 'bigmap__head');
     this.keyHint = el('span', 'bigmap__hint', 'HOLD TAB');
-    head.append(el('span', 'bigmap__title', 'MAP'), this.keyHint);
+    this.hunts = el('span', 'bigmap__hunts');
+    head.append(el('span', 'bigmap__title', 'MAP'), this.keyHint, this.hunts);
     this.canvas = document.createElement('canvas');
     this.canvas.className = 'bigmap__canvas';
     this.canvas.setAttribute('role', 'img');
@@ -124,6 +138,12 @@ export class BigMap {
     if (this.size <= 0 || now - this.lastPaint < REPAINT_MS) return;
     this.lastPaint = now;
     this.paint(sim);
+    // at the repaint's cadence: a string only while the map is held
+    const text = huntsLine(sim);
+    if (text !== this.huntsText) {
+      this.huntsText = text;
+      this.hunts.textContent = text;
+    }
   }
 
   private resize(cssPx: number): void {

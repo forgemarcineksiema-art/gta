@@ -52,9 +52,9 @@ export class HeatHud {
     this.update(sim, 0);
   }
 
-  update(sim: SimWorld, dt: number): void {
-    // behind a shut door the wall has the screen: the stars go with the bag and the coins (the M7 gate's screens)
-    const away = sim.run.state === 'door';
+  /** `shown` is the corners' stars bit (DESIGN.md §17.2): off behind a shut door, on the busted card and on the test track. */
+  update(sim: SimWorld, dt: number, shown = true): void {
+    const away = !shown;
     if (away !== this.away) {
       this.away = away;
       this.root.classList.toggle('is-hidden', away);

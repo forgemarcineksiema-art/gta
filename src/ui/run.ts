@@ -7,6 +7,7 @@
  */
 import { CHAIN_STEPS, RIVALS, STEP, chainStep, posterNumber, reqText, type CarId, type RunState, type SimWorld } from '../sim';
 import { BALANCE } from '../sim/balance';
+import { DRIVE, drive, newDriveState, readDrive } from './corners';
 
 const TWEEN_SECONDS = 0.3;
 /** The coin counter's pop: on for the first half, off for the second, so a line's coins pulse one by one. */
@@ -54,6 +55,9 @@ export class RunHud {
   private lastBar = -1;
   private barVisible = false;
   private state: RunState = 'running';
+  /** The corners (DESIGN.md §17.2): the bag from its first money, its × from ×1.3, the bank while driving. */
+  private readonly driveState = newDriveState();
+  private mask = -1;
 
   constructor(parent: HTMLElement, sim: SimWorld) {
     this.root = el('div', 'run');
@@ -108,6 +112,14 @@ export class RunHud {
 
   update(sim: SimWorld, dt: number): void {
     const run = sim.run;
+    const m = drive(readDrive(sim, 0, this.driveState));
+    if (m !== this.mask) {
+      this.mask = m;
+      // hidden, never removed: the bag keeps its place so the bank under it never jumps
+      this.bag.classList.toggle('is-hidden', (m & DRIVE.bag) === 0);
+      this.mult.classList.toggle('is-hidden', (m & DRIVE.mult) === 0);
+      this.bankRow.classList.toggle('is-hidden', (m & DRIVE.bank) === 0);
+    }
     // the bag counts up over 0.3 s to its new value
     if (run.bag !== this.toBag) {
       this.fromBag = this.shownBag;
@@ -143,11 +155,11 @@ export class RunHud {
       const flash = this.capFlashLeft > 0;
       if (flash !== this.capFlash) { this.capFlash = flash; this.bankRow.classList.toggle('is-cap', flash); }
     }
-    const m = run.multiplier;
-    if (m !== this.lastMult) {
-      this.mult.textContent = `×${m}`;
+    const mult = run.multiplier;
+    if (mult !== this.lastMult) {
+      this.mult.textContent = `×${mult}`;
       if (this.lastMult >= 0) this.popLeft = TWEEN_SECONDS;
-      this.lastMult = m;
+      this.lastMult = mult;
     }
     if (this.popLeft > 0) {
       this.popLeft -= dt;
@@ -179,8 +191,6 @@ export class RunHud {
       if (run.state === 'door') this.fillWall(sim);
       this.card.classList.toggle('is-visible', run.state === 'busted');
       this.wall.classList.toggle('is-visible', run.state === 'door');
-      this.bag.classList.toggle('is-hidden', run.state === 'busted' || run.state === 'door');
-      this.bankRow.classList.toggle('is-hidden', run.state === 'busted' || run.state === 'door');
     }
   }
 

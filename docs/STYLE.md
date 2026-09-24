@@ -211,7 +211,17 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   reset key) at stage 4.
 - Swap prompt (M3): a keycap and SWAP in accent cyan at 18 px, centred above
   the speedo, only while a car is within reach; never a button.
-- Billboard counter (M3): BILLBOARDS n/50 under the damage bar, 16 px heavy
+- The corners (M8.5, DESIGN.md §17.2; `src/ui/corners.ts` decides): a calm
+  drive shows seven things, the goal line and the arrow (top centre), the
+  stars and the bank (top right), the radar (bottom left), the speed and
+  the boost (bottom right). The bag shows from its first money and its ×
+  from ×1.3; the damage once dented; the combo top left while it runs; the
+  district's and landmark's names over the radar fade in for four seconds
+  on a change and at a new run. No gear, no ONCOMING, no drift readout, no
+  standing counters: a find pops with its count (BILLBOARD 13/50, NEW JUMP
+  4/20, CACHE 5/30) and the full map's head carries the three. Behind a
+  shut door and on the busted card the driving screen goes whole.
+- Billboard counter (M3, off the screen since M8.5): BILLBOARDS n/50 under the damage bar, 16 px heavy
   italic, accent yellow when complete. Under it the day's caches (M5.5): CACHES n/30 in the same
   type, accent yellow at thirty; each cache is a gold dot inside the radar's
   circle until found.
@@ -335,9 +345,9 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   the lead word in danger red (`LEVEL 2` · `INTERCEPTORS ON THE ROAD`), 2 s;
   the job line and the key hints hide meanwhile, the intro's captions
   outrank it. The dispatch lines of the police pass join it.
-- The coin counter under it, smaller, in ink with the coin glyph: white
-  means safe; it pops once per coin and the number flashes the accent on a
-  cap. Coins are `coin` gold (`#ffd23f`, the accent's value: the glyph and
+- The bank under it (the coin counter until M8.5: a road coin lands in the
+  bank), smaller, in ink with the coin glyph: white means safe; it pops once
+  per coin and the number flashes the accent on a cap. Coins are `coin` gold (`#ffd23f`, the accent's value: the glyph and
   the coin are one thing, and the one palette colour the HUD shares),
   octagonal prisms a metre across and 16 cm thick on edge at bonnet height,
   lit from within (emissive 0.35) so they never go dark in shadow, spinning

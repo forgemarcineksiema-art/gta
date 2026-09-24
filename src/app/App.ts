@@ -15,6 +15,7 @@ import { createPlatform, type Platform } from '../platform';
 import { Renderer } from '../render/Renderer';
 import { ACTIONS, type Action } from '../input/actions';
 import { CAR_IDS, ECONOMY, FIXED_DT, Recorder, SimWorld, clearControls, districtAt, initPhysics, type CarId, type EventLog, type RecordingJSON, TRAFFIC, PEDS, DAMAGE, SWAP } from '../sim';
+import { devTools } from '../ui/corners';
 import { DebugPanel } from '../ui/debugPanel';
 import { Hud } from '../ui/hud';
 import { RunHud } from '../ui/run';
@@ -243,6 +244,8 @@ export class App {
     // one column, so none is drawn over another
     mountTop(uiRoot, { jobLine: this.jobsHud.root, caption: this.coldOpenHud.root, hints: this.hud.hintsElement, news: this.hud.tickerElement });
     this.jobsHud.setSwapKey(this.input.label('swap'));
+    // the developer's panel and its key only with ?dev=1 (DESIGN.md §17.2, M8.5 D9): no hint names it otherwise
+    const dev = devTools(params);
     this.coldOpenHud.setKeys({
       throttle: this.input.label('throttle'),
       steerLeft: this.input.label('steerLeft'),
@@ -262,7 +265,7 @@ export class App {
       reset: this.input.label('reset'),
       pause: this.input.label('pause'),
       camera: this.input.label('camera'),
-      debug: this.input.label('debug'),
+      debug: dev ? this.input.label('debug') : '',
       swap: this.input.label('swap'),
       map: this.input.label('map'),
       horn: this.input.label('horn'),
@@ -270,8 +273,7 @@ export class App {
     this.hintsUntil = performance.now() + 12000;
     this.hud.setSound(this.input.label('mute'), this.audio.isUserMuted);
 
-    const dev = params.get('dev') === '1';
-    this.panel = new DebugPanel(uiRoot, sim, {
+    this.panel = !dev ? null : new DebugPanel(uiRoot, sim, {
       spawnAt: (name) => sim.spawnAt(name),
       refillBoost: () => (sim.vehicle.boostMeter = 1),
       onVehicleChange: () => sim.vehicle.applyTuning(),
@@ -320,7 +322,7 @@ export class App {
       },
     });
     this.hud.setDebugVisible(dev);
-    if (dev) this.panel.setVisible(true);
+    this.panel?.setVisible(true);
 
     const botParam = params.get('bot');
     const doorBot = botParam === 'door' && sim.city !== null;

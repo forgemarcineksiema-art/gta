@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8.5 slice 1: the four corners
+
+Done: `ui/corners.ts` decides the driving screen each frame: a calm drive shows the stars, the bank, the radar, the speed
+and the boost (with the goal line and the arrow, seven; fourteen before); the bag from its first money and its × from
+×1.3 (its place kept, so the bank never moves); the district's names for 4 s on a change and at a new run; the damage
+once dented, the combo while it runs; nothing of it behind a shut door or on the busted card (the radar stops painting).
+Gone: the gear (the debug block keeps it), ONCOMING, the drift readout, the three counters (a billboard's pop carries its
+count, the full map's head all three), the job line's coin count. The tuning panel and its hint only with `?dev=1`. Pins
+M8.5 1.1–1.5; STYLE's corners. The screens suite still reads the removed elements: it changes at the gate. Verify green.
+
 ## 2026-09-24 — M8.5 slice 0: one bank
 
 Marcin: "Wykonaj". Done: a road coin lands in the bank the moment it is picked (a spilled coin still in the bag);

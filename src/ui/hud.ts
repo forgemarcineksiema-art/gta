@@ -1,12 +1,18 @@
 /**
- * In-game HUD: plain DOM over the canvas. Speedometer, boost bar, drift readout,
- * a debug block, a pause overlay and the keycap hint strip. Reads sim state only.
+ * In-game HUD: plain DOM over the canvas. The corners of the driving screen
+ * (DESIGN.md §17.2; `corners.ts` decides what shows): the stars, the radar,
+ * the speed with the boost and the damage, the combo; the pops, the ticker,
+ * a debug block, a pause overlay and the keycap hint strip. Reads sim state
+ * only.
  */
 import { AgentState, BALANCE, BODY_WORDS, CHIEF, DISTRICTS, POLICE, RIVALS, districtAt, paintName, posterNumber, unpackDescriptor } from '../sim';
 import type { SimEvent, SimWorld } from '../sim';
 import { BigMap } from './bigmap';
+import { DRIVE, drive, hintRows, newDriveState, newPlaceClock, readDrive, tickPlace, type KeyHints } from './corners';
 import { Minimap } from './minimap';
 import { HeatHud } from './heat';
+
+export type { KeyHints } from './corners';
 
 export interface HudDebugInfo {
   fps: number;
@@ -22,34 +28,17 @@ export interface HudDebugInfo {
   saveBytes: number;
 }
 
-export interface KeyHints {
-  throttle: string;
-  brake: string;
-  steerLeft: string;
-  steerRight: string;
-  handbrake: string;
-  boost: string;
-  reset: string;
-  pause: string;
-  camera: string;
-  debug: string;
-  swap: string;
-  map: string;
-  horn: string;
-}
-
 export class Hud {
   private readonly minimap: Minimap | null;
   /** The full-screen map (M5.5 slice 15), held on a key; the radar's paths. */
   private readonly bigMap: BigMap | null;
   private readonly heat: HeatHud;
   readonly root: HTMLElement;
+  /** The car's corner, bottom right: the speed, the boost, the damage. */
+  private readonly speedo: HTMLElement;
   private readonly speed: HTMLElement;
-  private readonly gear: HTMLElement;
   private readonly boostFill: HTMLElement;
   private readonly boostWrap: HTMLElement;
-  private readonly drift: HTMLElement;
-  private readonly driftAngle: HTMLElement;
   private readonly debug: HTMLElement;
   private readonly pause: HTMLElement;
   /** The pause screen names the mute key and the sound's state. */
@@ -85,32 +74,22 @@ export class Hud {
   private lastDebugAt = 0;
   private lastSpeedText = '';
   private lastBoostText = '';
-  private lastDriftText = '';
   private frameIndex = 0;
-  private lastGearText = '';
-  private readonly oncoming: HTMLElement;
   private readonly damageWrap: HTMLElement;
-  private readonly collect: HTMLElement;
-  private readonly collectValue: HTMLElement;
-  private lastSmashed = -1;
-  /** The hunt's ramps found (M5.5 slice 14), under the billboards. */
-  private readonly jumps: HTMLElement;
-  private readonly jumpsValue: HTMLElement;
-  private lastFound = -1;
   /** The skill chain (M5.5 slice 14): the multiplier, the points, the last trick, the window draining. */
   private readonly skill: HTMLElement;
   private readonly skillMult: HTMLElement;
   private readonly skillPoints: HTMLElement;
   private readonly skillWord: HTMLElement;
   private readonly skillFill: HTMLElement;
-  private skillOn = false;
   private skillSerial = -1;
   private skillShown = -1;
   private lastSkillFill = '';
-  /** The day's caches under the billboards (M5.5). */
-  private readonly caches: HTMLElement;
-  private readonly cachesValue: HTMLElement;
-  private cachesSerial = -1;
+  /** The corners' state and mask (M8.5 slice 1): what shows this frame; the DOM is written when a bit changes. */
+  private readonly driveState = newDriveState();
+  private mask = -1;
+  /** The district the car is in, and seconds since it changed or a new run started: its name shows for a while. */
+  private readonly place = newPlaceClock();
   private readonly damageFill: HTMLElement;
   private readonly wrecked: HTMLElement;
   private readonly wreckedSub: HTMLElement;
@@ -135,9 +114,11 @@ export class Hud {
   /** Short screens (the CSS's 560 px): the lane between the coins and the speed holds the two newest pops (M7 gate). */
   private readonly shortScreen: MediaQueryList | null = typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia('(max-height: 560px)') : null;
   private eventSeq = 0;
-  /** The hunt's count when this frame's events are read: the popup names it. */
+  /** The hunts' counts when this frame's events are read: a find's pop names them (the counters left the screen, §17.2). */
   private huntFound = 0;
   private huntTotal = 0;
+  private boards = 0;
+  private boardsTotal = 0;
   private lastLifeAt = 0;
   private lastLifeSeq = 0;
   private boostFlash = 0;
@@ -154,11 +135,12 @@ export class Hud {
     this.minimap = sim.city ? new Minimap(this.root, sim) : null;
     this.heat = new HeatHud(this.root, sim);
 
-    const speedo = el('div', 'hud__speedo');
+    // the car's corner (DESIGN.md §17.2): no gear (the box is automatic; the debug block keeps it), no counters (a
+    // find pops with its count), no ONCOMING (the combo's word says it)
+    this.speedo = el('div', 'hud__speedo');
     const speedRow = el('div', 'hud__speed-row');
-    this.gear = el('div', 'hud__gear', '1');
     this.speed = el('div', 'hud__speed', '0');
-    speedRow.append(this.gear, this.speed);
+    speedRow.append(this.speed);
     const unit = el('div', 'hud__unit', 'km/h');
     this.boostWrap = el('div', 'hud__boost');
     const boostLabel = el('div', 'hud__boost-label', 'BOOST');
@@ -166,28 +148,14 @@ export class Hud {
     this.boostFill = el('div', 'hud__boost-fill');
     boostTrack.appendChild(this.boostFill);
     this.boostWrap.append(boostLabel, boostTrack);
-    speedo.append(speedRow, unit, this.boostWrap);
+    this.speedo.append(speedRow, unit, this.boostWrap);
     this.damageWrap = el('div', 'hud__damage');
     const damageTrack = el('div', 'hud__damage-track');
     this.damageFill = el('div', 'hud__damage-fill');
     damageTrack.appendChild(this.damageFill);
     this.damageWrap.append(el('div', 'hud__damage-label', 'DAMAGE'), damageTrack);
-    speedo.append(this.damageWrap);
-    this.collect = el('div', 'hud__collect');
-    this.collectValue = el('span', 'hud__collect-value', '0/50');
-    this.collect.append(el('span', 'hud__collect-label', 'BILLBOARDS'), this.collectValue);
-    speedo.append(this.collect);
-    this.jumps = el('div', 'hud__collect');
-    this.jumpsValue = el('span', 'hud__collect-value', '0/20');
-    this.jumps.append(el('span', 'hud__collect-label', 'JUMPS'), this.jumpsValue);
-    speedo.append(this.jumps);
-    this.caches = el('div', 'hud__collect hud__collect--caches');
-    this.cachesValue = el('span', 'hud__collect-value', '0/30');
-    this.caches.append(el('span', 'hud__collect-label', 'CACHES'), this.cachesValue);
-    speedo.append(this.caches);
-    this.oncoming = el('div', 'hud__oncoming', 'ONCOMING');
-    speedo.prepend(this.oncoming);
-    this.root.appendChild(speedo);
+    this.speedo.append(this.damageWrap);
+    this.root.appendChild(this.speedo);
     this.wrecked = el('div', 'hud__wrecked');
     this.wreckedSub = el('div', 'hud__wrecked-sub', '');
     this.wrecked.append(el('div', 'hud__wrecked-title', 'WRECKED'), this.wreckedSub);
@@ -218,10 +186,6 @@ export class Hud {
     this.skill.append(skillRow, skillTrack);
     this.root.appendChild(this.skill);
 
-    this.drift = el('div', 'hud__drift');
-    this.driftAngle = el('div', 'hud__drift-angle', '');
-    this.drift.append(el('div', 'hud__drift-label', 'DRIFT'), this.driftAngle);
-    this.root.appendChild(this.drift);
 
     this.debug = el('pre', 'hud__debug');
     this.root.appendChild(this.debug);
@@ -269,23 +233,12 @@ export class Hud {
 
   setHints(k: KeyHints): void {
     this.hints.replaceChildren();
-    const row = (keys: string[], label: string) => {
-      const r = el('div', 'hud__hint');
-      for (const key of keys) r.appendChild(el('kbd', 'key', key));
-      r.appendChild(el('span', 'hud__hint-label', label));
-      return r;
-    };
-    this.hints.append(
-      row([k.throttle, k.steerLeft, k.brake, k.steerRight], 'drive'),
-      row([k.handbrake], 'drift (or brake + turn)'),
-      row([k.boost], 'boost'),
-      row([k.reset], 'reset'),
-      row([k.camera], 'camera'),
-      row([k.map], 'map (hold)'),
-      row([k.horn], 'horn'),
-      row([k.pause], 'pause'),
-      row([k.debug], 'tuning'),
-    );
+    for (const r of hintRows(k)) {
+      const row = el('div', 'hud__hint');
+      for (const key of r.keys) row.appendChild(el('kbd', 'key', key));
+      row.appendChild(el('span', 'hud__hint-label', r.label));
+      this.hints.appendChild(row);
+    }
     const sub = this.pause.querySelector('.hud__pause-sub');
     if (sub) sub.textContent = `press ${k.pause} to continue`;
     this.swapKey = k.swap;
@@ -467,7 +420,7 @@ export class Hud {
             : kind === 'chase' ? `CHASE +${value.toLocaleString('en-US')}`
             : kind === 'takedown' ? 'TAKEDOWN!'
               : kind === 'takedownTraffic' ? 'TAKEDOWN! INTO TRAFFIC!'
-                : kind === 'billboard' ? 'BILLBOARD!'
+                : kind === 'billboard' ? (this.boardsTotal > 0 ? `BILLBOARD ${this.boards}/${this.boardsTotal}` : 'BILLBOARD!')
                   : kind === 'escape' ? 'COPS LOST YOU'
                     : kind === 'blown' ? 'COVER BLOWN'
                       : kind === 'cache' ? (value > 0 ? `CACHE ${target}/30 +${value.toLocaleString('en-US')}` : `CACHE ${target}/30`)
@@ -505,20 +458,26 @@ export class Hud {
     // Every DOM write here costs style, layout and paint on the main thread. The
     // radar paints its own canvas at its own cadence, off the layout path.
     this.frameIndex++;
+    // the corners (DESIGN.md §17.2): one mask for the frame; the district's name has its own clock
+    const placeAge = tickPlace(this.place, sim.city ? districtAt(sim.probe.x, sim.probe.z) : null, sim.run.state, dt);
+    const m = drive(readDrive(sim, placeAge, this.driveState));
+    if (m !== this.mask) {
+      this.mask = m;
+      this.speedo.classList.toggle('is-hidden', (m & DRIVE.speed) === 0);
+      this.damageWrap.classList.toggle('is-visible', (m & DRIVE.damage) !== 0);
+      this.skill.classList.toggle('is-visible', (m & DRIVE.combo) !== 0);
+      this.minimap?.setVisible((m & DRIVE.radar) !== 0);
+      this.minimap?.setPlaceVisible((m & DRIVE.place) !== 0);
+    }
     this.bigMap?.update(sim, now);
     this.minimap?.update(sim, dt, now);
-    this.heat.update(sim, dt);
+    this.heat.update(sim, dt, (m & DRIVE.stars) !== 0);
     const tm = sim.vehicle.telemetry;
     const kmh = Math.round(Math.abs(tm.speedKmh));
     const speedText = String(kmh);
     if (speedText !== this.lastSpeedText) {
       this.speed.textContent = speedText;
       this.lastSpeedText = speedText;
-    }
-    const gearText = tm.gear === -1 ? 'R' : String(tm.gear);
-    if (gearText !== this.lastGearText) {
-      this.gear.textContent = gearText;
-      this.lastGearText = gearText;
     }
     const boostText = `scaleX(${tm.boost.toFixed(3)})`;
     if (boostText !== this.lastBoostText) { this.boostFill.style.transform = boostText; this.lastBoostText = boostText; }
@@ -528,35 +487,12 @@ export class Hud {
     this.lastMeter = tm.boost;
     if (this.boostFlash > 0) this.boostFlash -= dt;
     this.boostWrap.classList.toggle('is-gain', this.boostFlash > 0);
-    this.oncoming.classList.toggle('is-on', sim.life.state.oncoming);
-    const caches = sim.caches;
-    if (caches && caches.serial !== this.cachesSerial) {
-      this.cachesSerial = caches.serial;
-      this.cachesValue.textContent = `${caches.count}/${caches.total}`;
-      this.caches.classList.toggle('is-visible', caches.today.length > 0);
-      this.caches.classList.toggle('is-done', caches.count >= caches.total);
-    }
-    const c = sim.collectibles;
-    if (c && c.smashedCount !== this.lastSmashed) {
-      this.lastSmashed = c.smashedCount;
-      this.collectValue.textContent = `${c.smashedCount}/${c.total}`;
-      this.collect.classList.add('is-visible');
-      this.collect.classList.toggle('is-done', c.smashedCount >= c.total);
-    }
-    const jumps = sim.jumps;
-    if (jumps && jumps.foundCount !== this.lastFound) {
-      this.lastFound = jumps.foundCount;
-      this.jumpsValue.textContent = `${jumps.foundCount}/${jumps.descs.length}`;
-      this.jumps.classList.add('is-visible');
-      this.jumps.classList.toggle('is-done', jumps.foundCount >= jumps.descs.length);
-    }
     const life = sim.life.state;
     const damageText = `scaleX(${life.damage.toFixed(3)})`;
     if (damageText !== this.lastDamageText) { this.damageFill.style.transform = damageText; this.lastDamageText = damageText; }
     if (life.stage !== this.lastStage || life.wrecked !== this.lastWrecked) {
       this.lastStage = life.stage;
       this.lastWrecked = life.wrecked;
-      this.damageWrap.classList.toggle('is-visible', life.damage > 0);
       this.damageWrap.classList.toggle('is-danger', life.stage >= 3);
       this.damageWrap.classList.toggle('is-wrecked', life.stage >= 4);
       this.wrecked.classList.toggle('is-visible', life.wrecked);
@@ -580,15 +516,12 @@ export class Hud {
     }
     this.huntFound = sim.jumps?.foundCount ?? 0;
     this.huntTotal = sim.jumps?.descs.length ?? 0;
+    this.boards = sim.collectibles?.smashedCount ?? 0;
+    this.boardsTotal = sim.collectibles?.total ?? 0;
     this.eventSeq = sim.events.readFrom(this.eventSeq, this.onEvent);
-    // the skill chain: shown while it runs; the window drains under it
+    // the skill chain: shown while it runs (the corners' combo bit); the window drains under it
     const skill = sim.skill;
-    const chainOn = skill.points > 0;
-    if (chainOn !== this.skillOn) {
-      this.skillOn = chainOn;
-      this.skill.classList.toggle('is-visible', chainOn);
-    }
-    if (chainOn) {
+    if ((m & DRIVE.combo) !== 0) {
       const shown = Math.round(skill.points);
       if (skill.serial !== this.skillSerial || shown !== this.skillShown) {
         if (skill.serial !== this.skillSerial) {
@@ -609,11 +542,6 @@ export class Hud {
       const next = left - dt;
       this.popupLeft[i] = next;
       if (next <= 0) this.popups[i]?.classList.remove('is-on');
-    }
-    this.drift.classList.toggle('is-visible', tm.drifting);
-    if (tm.drifting) {
-      const driftText = `${Math.abs(Math.round(tm.driftAngleDeg))}°  ${tm.driftTime.toFixed(1)}s  ${Math.round(tm.driftDistance)}m`;
-      if (driftText !== this.lastDriftText) { this.driftAngle.textContent = driftText; this.lastDriftText = driftText; }
     }
 
     if (this.flashLeft > 0) {

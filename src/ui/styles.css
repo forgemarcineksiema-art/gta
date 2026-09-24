@@ -46,6 +46,10 @@
   text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
   margin-bottom: 6px;
 }
+/* the corners (DESIGN.md §17.2): the radar goes behind a door; the names fade after a few seconds, the circle stays put */
+.minimap.is-hidden { display: none; }
+.minimap__district, .minimap__landmark { transition: opacity 0.5s ease-out; }
+.minimap.is-quiet .minimap__district, .minimap.is-quiet .minimap__landmark { opacity: 0; }
 .minimap__canvas {
   display: block;
   width: 100%;
@@ -242,12 +246,8 @@ body {
   color: var(--ui-ink-dim);
   margin-top: 6px;
 }
-.hud__gear {
-  font-size: clamp(24px, 4vh, 38px);
-  font-weight: 900;
-  font-style: italic;
-  color: var(--ui-accent);
-}
+/* the corners (DESIGN.md §17.2): off the screen behind a shut door and on the busted card */
+.hud__speedo.is-hidden { display: none; }
 .hud__boost {
   margin-top: 12px;
   display: flex;
@@ -291,16 +291,7 @@ body {
 .hud__boost.is-gain .hud__boost-fill {
   filter: brightness(1.6);
 }
-.hud__oncoming {
-  font-size: 16px;
-  font-weight: 800;
-  letter-spacing: 0.16em;
-  color: var(--ui-accent);
-  opacity: 0;
-  transform: skewX(-10deg);
-  text-shadow: 2px 3px 0 #000;
-}
-.hud__oncoming.is-on { opacity: 1; }
+
 /* the pops (a streak, a tip, a bounty): a lane under the bag and the coins, never over the speed (M7 slice 1) */
 .hud__popups {
   position: absolute;
@@ -335,28 +326,6 @@ body {
 .hud__popup.is-big { font-size: 24px; }
 
 /* damage bar under the boost bar: appears with the first dent, red from stage 3, pulsing when wrecked */
-.hud__collect {
-  display: none;
-  align-items: baseline;
-  gap: 8px;
-  margin-top: 4px;
-}
-.hud__collect.is-visible { display: flex; }
-.hud__collect-label {
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  color: var(--ui-ink-dim);
-}
-.hud__collect-value {
-  font-size: 16px;
-  font-weight: 900;
-  font-style: italic;
-  color: var(--ui-ink);
-  text-shadow: 2px 2px 0 #000;
-}
-.hud__collect.is-done .hud__collect-value { color: var(--ui-accent); }
-
 .hud__damage {
   display: none;
   align-items: center;
@@ -496,31 +465,6 @@ body {
   transform-origin: left center;
 }
 
-/* drift readout, bottom centre */
-.hud__drift {
-  position: absolute;
-  left: 50%;
-  bottom: calc(28px + var(--safe-bottom));
-  transform: translateX(-50%) skewX(-8deg);
-  display: none;
-  align-items: baseline;
-  gap: 10px;
-  font-weight: 900;
-  font-style: italic;
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
-}
-.hud__drift.is-visible {
-  display: flex;
-}
-.hud__drift-label {
-  font-size: clamp(18px, 3vh, 26px);
-  color: var(--ui-accent);
-  letter-spacing: 0.18em;
-}
-.hud__drift-angle {
-  font-size: clamp(16px, 2.6vh, 22px);
-  font-variant-numeric: tabular-nums;
-}
 
 /* lap timer, top left (below the debug block when both show) */
 .hud__lap {
@@ -881,6 +825,8 @@ kbd.key {
   transition: transform 0.15s;
 }
 .run__mult.is-pop { transform: scale(1.5); }
+/* no ×1 (DESIGN.md §17.2): the × arrives with the first level that multiplies */
+.run__mult.is-hidden { display: none; }
 .run__coins {
   position: absolute;
   top: calc(120px + var(--safe-top));
@@ -1168,7 +1114,7 @@ kbd.key {
 .jobs__time:empty, .jobs__dist:empty { display: none; }
 .jobs__dist { font-size: 16px; color: var(--ui-ink); }
 .jobs__dist::before { content: '· '; color: var(--ui-ink-dim); }
-.jobs__coins { font-size: 16px; color: var(--ui-accent); font-variant-numeric: tabular-nums; }
+
 /* the goal line (M5.5): a dot in the colour of the ring the arrow points at; LOSE THEM in danger red */
 .jobs__dot { display: none; width: 12px; height: 12px; border-radius: 50%; border: 2px solid #000; align-self: center; }
 .jobs__dot[data-ring='delivery'] { display: inline-block; background: #ff9f1c; }
@@ -1179,8 +1125,7 @@ kbd.key {
 .jobs__line.is-duel .jobs__kind { color: #2bd1ff; }
 .jobs__card[data-kind='duel'] { border-left-color: #2bd1ff; }
 .jobs__line.is-lose .jobs__kind { color: var(--ui-danger); }
-.jobs__coins:empty { display: none; }
-.jobs__coins::before { content: '· '; color: var(--ui-ink-dim); }
+
 .jobs__line.is-hurry .jobs__time { color: var(--ui-danger); }
 .jobs__line.is-order .jobs__kind { color: #f45bff; }
 .jobs__line.is-escape .jobs__kind { color: var(--ui-accent-2); }
@@ -1586,6 +1531,14 @@ kbd.key {
   font-weight: 800;
   letter-spacing: 0.14em;
   color: var(--ui-ink-dim);
+}
+.bigmap__hunts {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--ui-ink);
+  text-shadow: 2px 2px 0 #000;
 }
 .bigmap__body {
   display: flex;

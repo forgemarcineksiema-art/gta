@@ -23,8 +23,6 @@ export class JobsHud {
   private readonly lineKind: HTMLElement;
   private readonly lineTime: HTMLElement;
   private readonly lineDist: HTMLElement;
-  /** The route's coins taken of laid (M5.5): `12/48`. */
-  private readonly lineCoins: HTMLElement;
   private readonly card: HTMLElement;
   private readonly cardTitle: HTMLElement;
   private readonly cardSub: HTMLElement;
@@ -43,7 +41,6 @@ export class JobsHud {
   /** The running zone's count and out-of-zone flag last shown. */
   private zoneCount = -1;
   private zoneOut = false;
-  private lastRoute = -1;
   private visible = false;
   private kindText = '';
   /** A class set on the line for the state: is-order, is-escape, is-done, is-failed, is-goal, is-lose. */
@@ -68,8 +65,8 @@ export class JobsHud {
     this.lineKind = el('span', 'jobs__kind');
     this.lineTime = el('span', 'jobs__time');
     this.lineDist = el('span', 'jobs__dist');
-    this.lineCoins = el('span', 'jobs__coins');
-    this.line.append(this.lineDot, this.lineKind, this.lineTime, this.lineDist, this.lineCoins);
+    // no coin count (DESIGN.md §17.2): the coins are on the road, and a clean line's tip says itself at the end
+    this.line.append(this.lineDot, this.lineKind, this.lineTime, this.lineDist);
     this.card = el('div', 'jobs__card');
     this.cardTitle = el('div', 'jobs__card-title');
     this.cardSub = el('div', 'jobs__card-sub');
@@ -160,7 +157,6 @@ export class JobsHud {
     if (this.mode !== 'job') {
       this.mode = 'job';
       this.serial = -1;
-      this.lastRoute = -1;
       this.lineDot.dataset['ring'] = '';
     }
     if (jobs.serial !== this.serial) {
@@ -211,12 +207,6 @@ export class JobsHud {
       this.lastDist = dist;
       this.lineDist.textContent = dist >= 0 ? `${dist.toLocaleString('en-US')} m` : '';
     }
-    const coins = sim.coins;
-    const route = coins && coins.routeTotal > 0 ? coins.routePicked * 1024 + coins.routeTotal : -1;
-    if (route !== this.lastRoute) {
-      this.lastRoute = route;
-      this.lineCoins.textContent = coins && route >= 0 ? `${coins.routePicked}/${coins.routeTotal}` : '';
-    }
   }
 
   /** The goal line: its words when the kind, the ring or the amount change, the distance when it moves 10 m. */
@@ -226,7 +216,6 @@ export class JobsHud {
       this.mode = 'goal';
       this.goalKind = 'none';
       this.lastDist = -2;
-      this.lineCoins.textContent = '';
       this.line.classList.remove('is-hurry');
     }
     const who = g.rival * 16 + g.req;
@@ -327,8 +316,6 @@ export class JobsHud {
     if (jobs.state === 'done' || jobs.state === 'failed') {
       this.lineTime.textContent = '';
       this.lineDist.textContent = '';
-      this.lineCoins.textContent = '';
-      this.lastRoute = -1;
     }
   }
 

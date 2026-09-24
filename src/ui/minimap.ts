@@ -263,6 +263,9 @@ export class Minimap {
   private paintedRadius = Infinity;
   private lastPaint = -Infinity;
   private district = '';
+  /** The corners' radar and place bits (DESIGN.md §17.2): the circle off the screen behind a door, the names on their moment. */
+  private shown = true;
+  private placeShown = true;
   private readonly onResize = (): void => { this.measure = true; };
 
   constructor(parent: HTMLElement, sim: SimWorld) {
@@ -308,9 +311,28 @@ export class Minimap {
     this.wrap.remove();
   }
 
+  /** Behind a shut door and on the busted card the radar goes, and nothing is painted meanwhile. */
+  setVisible(v: boolean): void {
+    if (v === this.shown) return;
+    this.shown = v;
+    this.wrap.classList.toggle('is-hidden', !v);
+    if (v) {
+      this.measure = true;
+      this.dirty = true;
+    }
+  }
+
+  /** The district's and the landmark's names over the circle: shown for a few seconds on a change, then faded (the circle stays put). */
+  setPlaceVisible(v: boolean): void {
+    if (v === this.placeShown) return;
+    this.placeShown = v;
+    this.wrap.classList.toggle('is-quiet', !v);
+  }
+
   /** Call every frame; paints at most every `repaintMs` and only when something moved. */
   update(sim: SimWorld, dt: number, now: number): void {
     this.sim = sim;
+    if (!this.shown) return;
     // units move on their own: while any is on the map the radar repaints at its own cadence
     if (sim.police && sim.police.count > 0) this.dirty = true;
     if (this.measure) {

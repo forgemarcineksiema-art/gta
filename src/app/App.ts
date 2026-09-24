@@ -328,9 +328,11 @@ export class App {
     const policy = (botParam === 'novice' || botParam === 'skilled') && sim.city !== null ? botParam : null;
     const jobBot = botParam === 'job' && sim.city !== null;
     const botOn = botParam === '1' || botParam === 'track' || doorBot || policy !== null || jobBot;
+    // `pavement=8.2`: the road bot on the kerb line along the straights (M8: the chaos run's measurement)
+    const pavement = Number(params.get('pavement') ?? '0') || 0;
     this.bot = jobBot ? new JobBot(sim.carId)
       : policy ? new BotPolicy(policy, new TrackBot(sim.carId, CITY_BOT_TUNING))
-      : botOn && sim.city ? new TrackBot(sim.carId, CITY_BOT_TUNING)
+      : botOn && sim.city ? new TrackBot(sim.carId, { ...CITY_BOT_TUNING, pavement })
         : botParam === 'track' ? new TrackBot(this.sim.carId) : botOn ? new BotDriver(Number(params.get('seed') ?? '42')) : null;
     // the drive to the hideout: the road bot on a path of its own (slice 3a's e2e and measurement)
     const hideout = sim.run.dropOffs[0];

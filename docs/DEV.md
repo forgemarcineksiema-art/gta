@@ -59,6 +59,7 @@ do not change with the calendar.
 | `/?spawn=track&dev=1` | the test track: lap timer, best-lap ghost, telemetry graph, save recording / load ghost in the panel |
 | `/?bot=track&spawn=track` | the track autopilot (its lap time is the tuning benchmark) |
 | `/?bot=1&seed=42&duration=60` | autopilot with the perf probe (`window.__perf`) |
+| `/?bot=1&pavement=8.2` | the road bot on the kerb line along the straights, knocking the street furniture (M8's chaos run) |
 | `/?bot=door&spawn=crown` | the road bot drives to the hideout and parks; the door shuts behind it |
 | `/?bot=skilled&heat=2` | the road bot as a skilled player: swaps out of sight, turns away while searched, boosts (`bot=novice`: the plain road bot) |
 | `/?manual=1` | deterministic stepping for browser QA: `window.advanceTime(ms)` |

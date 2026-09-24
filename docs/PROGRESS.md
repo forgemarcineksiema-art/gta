@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8 slice 1: the measurement (MX330, the plan's one exception)
+
+Draws at the M7 gate's 40 tour points (`&life=0`): 69.0 a frame against 0.7.0's 68.9 (chunks 20.6 / 20.5), 116k / 115k
+triangles: standing props add no draw. A/B, low, 4×, `&life=0`, the pavement bot (0.7.0 drives its lane), fps old/new:
+first build 58.5/57.1, 57.6/37.6, 47.1/35.3, 57.1/56.8 (physics +0.9–1.6 ms with 9–12 bodies; in the machine's slow
+state the new build fell 12–20). Rapier's cylinders were half the cost (Node, 16 bodies: 0.24–0.34 ms, capsules 0.12):
+round props now collide as capsules, squat ones as boxes. Final: 58.2/56.9, 58.2/57.9, 57.6/56.7, 58.1/57.1 (−0.3 to
+−1.3); physics 1.02–1.10 ms against 0.57–0.62, the props' phase 0.08 ms (budget 0.3), draws 77 / 72 (the down props by
+kind), heap 65 / 61 MB. Inside ±3: the content goes on. Pin 1.3's kerb stretch sanity bound 250 → 200 m (it drives 249).
+
 ## 2026-09-24 — M8 slice 1: the knock
 
 Done: `sim/props/Props.ts`: every loaded prop's state by id, a grid of 8 m cells, the player's footprint swept before

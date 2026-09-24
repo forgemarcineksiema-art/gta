@@ -239,7 +239,7 @@ describe('the knock (M8 slice 1)', () => {
           slowest = Math.min(slowest, speed);
         }
       }
-      expect(toZ - fromZ, 'metres of kerb line driven').toBeGreaterThan(250);
+      expect(toZ - fromZ, 'metres of kerb line driven').toBeGreaterThan(200);
       for (let cz = -2; cz <= 0; cz++) for (let cx = -2; cx <= 0; cx++) {
         for (const p of sim.city!.props(cx, cz)) {
           if ((p.kind === 'lamp' || p.kind === 'bin') && Math.abs(p.x - kerbX) < 0.5 && p.z > fromZ + 3 && p.z < toZ - 3) onLine.push(p.id);

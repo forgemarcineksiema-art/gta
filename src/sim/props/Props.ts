@@ -38,6 +38,17 @@ export function carSpeedLoss(carMass: number, t: PropType, closing: number): num
   return (j + t.breakImpulse) / carMass;
 }
 
+/**
+ * A prop's collider (a post and a flying body): a round kind taller than it is wide as a capsule, a squat one as a
+ * box, a box as itself. Rapier's cylinder contacts cost twice the capsule's (M8 slice 1's measurement); a capsule
+ * stands on its hemisphere's point, meets a car along its side exactly and rolls on its side like a cylinder.
+ */
+export function propCollider(t: PropType): RAPIER.ColliderDesc {
+  const s = t.shape;
+  if (s.kind === 'box') return RAPIER.ColliderDesc.cuboid(s.hx, s.hy, s.hz);
+  return s.halfHeight >= 1.25 * s.radius ? RAPIER.ColliderDesc.capsule(s.halfHeight - s.radius, s.radius) : RAPIER.ColliderDesc.cuboid(s.radius, s.halfHeight, s.radius);
+}
+
 /** Every prop id of the island. */
 const COUNT = 49 * PROPS_PER_CHUNK;
 /** Arcs flown at once beyond the pool; past them a knocked prop falls where it stood. */
@@ -198,7 +209,7 @@ export class Props {
       const t = this.typeOf(id);
       if (!t || t.breakImpulse <= 0) continue;
       const s = t.shape, half = s.kind === 'box' ? s.hy : s.halfHeight, yaw = this.yaw[id] as number;
-      const desc = s.kind === 'box' ? RAPIER.ColliderDesc.cuboid(s.hx, s.hy, s.hz) : RAPIER.ColliderDesc.cylinder(s.halfHeight, s.radius);
+      const desc = propCollider(t);
       desc.setTranslation(this.x[id] as number, half, this.z[id] as number)
         .setRotation({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) })
         .setFriction(1).setRestitution(1).setCollisionGroups(GROUPS_PROP)
@@ -387,7 +398,7 @@ export class Props {
   private fly(slot: number, id: number, t: PropType, vx: number, vy: number, vz: number, wx: number, wz: number): void {
     const body = this.bodies[slot] as RAPIER.RigidBody, o = id * 7, s = t.shape;
     const half = s.kind === 'box' ? s.hy : s.halfHeight;
-    const desc = s.kind === 'box' ? RAPIER.ColliderDesc.cuboid(s.hx, s.hy, s.hz) : RAPIER.ColliderDesc.cylinder(s.halfHeight, s.radius);
+    const desc = propCollider(t);
     const inertia = this.inertia(t), axial = s.kind === 'box' ? t.mass * (s.hx * s.hx + s.hz * s.hz) / 3 : t.mass * s.radius * s.radius / 2;
     this.v3.x = 0; this.v3.y = t.comHeight - half; this.v3.z = 0;
     this.v3b.x = inertia; this.v3b.y = axial; this.v3b.z = inertia;

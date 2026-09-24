@@ -38,6 +38,16 @@ export class Music {
 
   constructor(private readonly engine: EngineAudio) {}
 
+  /** Where the music is (e2e: silent before gameplay starts, playing a second on). */
+  get status(): 'idle' | 'rendering' | 'playing' {
+    return this.state;
+  }
+
+  /** The music bus's gain now (e2e: the MUSIC row turns it down); -1 before the render. */
+  get level(): number {
+    return this.bus ? this.bus.gain.value : -1;
+  }
+
   /** Each frame: render once after gameplay starts, then follow the heat and play the stings of this frame's events. */
   update(sim: SimWorld, started: boolean, dt: number): void {
     if (this.cursor < 0) this.cursor = sim.events.sequence;

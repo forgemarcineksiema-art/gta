@@ -24,6 +24,8 @@ describe('traffic (long)', () => {
         for (let a = 0; a < traffic.capacity; a++) {
           // civilians: a police unit chasing the bot (M5.5's beat sees it speed) runs its plan's speed by design
           if (traffic.state[a] !== AgentState.Kinematic || traffic.police[a] === 1) continue;
+          // M7 gate: a shoved car rejoining its lane blends back over a second (slice 8) instead of jumping 3 m in a step
+          if (traffic.blending(a)) continue;
           const lane = traffic.lane[a] as number;
           traffic.lanes.positionAt(lane, traffic.s[a] as number, traffic.laneOffset[a] as number, pose, traffic.next[a]);
           // M5.5: a driver's shift across the lane (a flinch, a pull-over, a pass, a lane change easing over)
@@ -58,7 +60,12 @@ describe('traffic (long)', () => {
             const dz = (traffic.z[i] as number) - (traffic.z[j] as number);
             const dist = Math.hypot(dx, dz);
             if (dist < minAny) minAny = dist;
-            if (traffic.lane[i] === traffic.lane[j] && dist < minSame) minSame = dist;
+            // the lane's spacing binds cars that overlap across it (the unstick's own test): a pull-over for a siren and
+            // the standoff going round (M7 slice 8) put two cars of one lane side by side by design; minAny bounds them
+            const yaw = traffic.yaw[i] as number;
+            const across = Math.abs(dx * -Math.cos(yaw) + dz * Math.sin(yaw));
+            const overlap = across <= traffic.halfWidthOf(i) + traffic.halfWidthOf(j) + 0.3;
+            if (traffic.lane[i] === traffic.lane[j] && overlap && dist < minSame) minSame = dist;
           }
         }
       }

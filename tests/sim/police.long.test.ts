@@ -66,8 +66,15 @@ describe('police patrols (long)', () => {
       let maxPoliceBodies = 0;
       let minAlive = Infinity;
       let minCivilians = Infinity;
+      // the roster read over the run, not at its last step (M7 gate): a bust in the last seconds reads the refill
+      let samples = 0, full = 0, rightInterceptors = 0, bustedAt = -Infinity;
+      const heliPlace = level >= POLICE.heli.fromLevel ? 1 : 0;
       try {
         for (let tick = 0; tick < 45 * 60; tick++) {
+          // the probe is a level (M7 gate): the beat saw the bot's crimes and took it from level 2 to 3 at 25 s, and a
+          // bust ends the run; the heat is put back and the card closed, as the balance's capture probe does
+          if (sim.run.state === 'busted') { sim.run.closeCard(); bustedAt = sim.time; }
+          if (sim.heat.points !== level * 20) sim.heat.set(level * 20);
           bot.drive(sim, sim.controls, 1 / 60);
           sim.step();
           maxPoliceBodies = Math.max(maxPoliceBodies, traffic.policeBodies());
@@ -81,16 +88,22 @@ describe('police patrols (long)', () => {
             minCivilians = Math.min(minCivilians, civilians);
           }
           expect(police.count).toBeLessThanOrEqual(POLICE.budget[level] as number);
+          // after the first 5 s and outside the 8 s a bust's refill takes, the roster is the level's
+          if (sim.time > 5 && sim.time - bustedAt > 8) {
+            samples++;
+            // the helicopter keeps one of the budget's places from its level on (M5.5 slice 9); a parked patrol or a
+            // roadblock's car that joins the chase (M4 slice 6, `enlist`) may take that place back
+            if (police.count >= (POLICE.budget[level] as number) - heliPlace) full++;
+            let interceptors = 0;
+            // the Chief (level 5, slice 7) drives the sports body but is not one of the level's interceptors
+            for (const agent of police.units) if (agent >= 0 && agent !== police.chief && traffic.kindOf(agent) === 'sports') interceptors++;
+            if (interceptors === POLICE.interceptors[level]) rightInterceptors++;
+          }
         }
-        let interceptors = 0;
-        // the Chief (level 5, slice 7) drives the sports body but is not one of the level's interceptors
-        for (const agent of police.units) if (agent >= 0 && agent !== police.chief && traffic.kindOf(agent) === 'sports') interceptors++;
-        console.log(`[police] level ${level}: ${police.count} units, ${interceptors} interceptors, ${maxPoliceBodies} police bodies, ${minAlive} cars alive at the worst moment`);
-        // the helicopter keeps one of the budget's places from its level on (M5.5 slice 9); a parked patrol or a
-        // roadblock's car that joins the chase (M4 slice 6, `enlist`) may take that place back
-        expect(police.count).toBeGreaterThanOrEqual((POLICE.budget[level] as number) - (level >= POLICE.heli.fromLevel ? 1 : 0));
-        expect(police.count).toBeLessThanOrEqual(POLICE.budget[level] as number);
-        expect(interceptors).toBe(POLICE.interceptors[level] as number);
+        console.log(`[police] level ${level}: ${police.count} units at the end, the roster full ${(full / samples * 100).toFixed(0)} % and its interceptors ${(rightInterceptors / samples * 100).toFixed(0)} % of ${samples} steps, ${maxPoliceBodies} police bodies, ${minAlive} cars alive at the worst moment`);
+        expect(samples).toBeGreaterThan(20 * 60);
+        expect(full / samples).toBeGreaterThanOrEqual(0.8);
+        expect(rightInterceptors / samples).toBeGreaterThanOrEqual(0.8);
         // The pursuit borrows from the traffic; it never owns the pool and never empties the street.
         expect(maxPoliceBodies).toBeLessThanOrEqual(TRAFFIC.policeBodies);
         expect(minAlive).toBeGreaterThan(20);

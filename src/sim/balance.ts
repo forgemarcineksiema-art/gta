@@ -178,10 +178,11 @@ export const BALANCE = {
     pullUp: 4,
     carRange: 220,
     rematchShare: 0.25,
-    // Granny Gears (#10) at three quarters of her M6 pace and easing further when ahead (M7 slice 13): at 0.88 she
-    // crossed at 50.8 s against the careful bot's 49.1 s clean run and beat it once in three, the plain bot every time;
-    // the first duel is the one a newcomer wins at the first try (the gate's G.1 measures both bots)
-    pace: [0.66, 0.9, 0.92, 0.95, 0.97, 0.99, 1.01, 1.03, 1.06, 1.1],
+    // Granny Gears (#10) at half her M6 pace and easing further when ahead (M7 slice 13 and gate): at 0.88 she beat the
+    // careful bot once in three and the plain bot every time; at 0.66 still the plain bot (its 1,158 m in 90-100 s behind
+    // the traffic it never passes); at 0.45 the plain bot wins two in three, the careful bot three (G.1). The first duel
+    // is the one a newcomer wins at the first try
+    pace: [0.45, 0.9, 0.92, 0.95, 0.97, 0.99, 1.01, 1.03, 1.06, 1.1],
     band: [[0.6, 1.15], [0.72, 1.16], [0.74, 1.18], [0.76, 1.19], [0.78, 1.2], [0.8, 1.22], [0.83, 1.24], [0.86, 1.26], [0.89, 1.28], [0.92, 1.3]] as ReadonlyArray<readonly [number, number]>,
     limitSpeed: 9,
     /**

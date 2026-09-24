@@ -329,3 +329,23 @@ test('M7 3.4e the settings on the pause screen: W/S a row, A/D its value, saved 
   await key(page, 'KeyP');
   expect(errors).toEqual([]);
 });
+
+test('M7 2.5e the music: silent until gameplay has started, then rendered and playing; the MUSIC row turns it down', async ({ page }) => {
+  const errors = watch(page);
+  await boot(page, '');
+  // nothing rendered at the start: the music waits a second after gameplayStart and for the audio to be allowed
+  expect(await page.evaluate(() => window.__game!.music.status)).toBe('idle');
+  await key(page, 'KeyW');
+  await page.evaluate(() => window.advanceTime?.(1500));
+  await page.waitForFunction(() => { window.advanceTime?.(100); return window.__game?.music.status === 'playing'; }, null, { timeout: 15_000, polling: 200 });
+  const before = await page.evaluate(() => window.__game!.music.level);
+  expect(before).toBeGreaterThan(0);
+  // the pause screen's MUSIC row, three steps down
+  await key(page, 'KeyP');
+  for (let i = 0; i < 3; i++) await key(page, 'KeyA');
+  await page.waitForTimeout(400);
+  const after = await page.evaluate(() => window.__game!.music.level);
+  expect(after).toBeLessThan(before);
+  await key(page, 'KeyP');
+  expect(errors).toEqual([]);
+});

@@ -97,7 +97,9 @@ describe('traffic pool (long)', () => {
             if ((prevLane[i] as number) >= 0 && prevLane[i] !== lane) laneChanges++;
             // progress: a lent car with nothing in front of it and no reservation to wait for keeps moving along its path
             const s = traffic.s[i] as number;
-            const stalled = Math.abs(s - (lastS[i] as number)) < 0.02 && traffic.waiting(i) === 0 && traffic.blocker[i] === 0;
+            // (a unit on a chase plan drives at the player, not along its path, as for the heading above: the M7 gate's
+            // timeline had one ramming the bot from 4 m for 5 s with its path's distance still)
+            const stalled = !chasing && Math.abs(s - (lastS[i] as number)) < 0.02 && traffic.waiting(i) === 0 && traffic.blocker[i] === 0;
             if (stalled) {
               atEnd[i] = (atEnd[i] as number) + 1 / 60;
               maxAtEnd = Math.max(maxAtEnd, atEnd[i] as number);

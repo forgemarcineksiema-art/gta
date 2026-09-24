@@ -103,6 +103,8 @@ const POLICE_ACCEL = 1.5;
 /** A unit on a chase goes round a car this much slower (m/s) within this reach (m) (POLICE.mode). */
 const POLICE_SLOWER_BY = 3;
 const POLICE_LOOK = 25;
+/** A pass on the oncoming side ends this far before its lane's end, and starts only with room to end there (M7 gate). */
+const PASS_CLEAR_OF_JUNCTION = 20;
 /** A chasing unit's inside line through a turn (M7 slice 9): metres in from the traffic's curve, and from how far out. */
 const POLICE_CORNER = 1.6;
 const POLICE_CORNER_LEAD = 14;
@@ -934,6 +936,11 @@ export class Traffic {
       return i;
     }
     return -1;
+  }
+
+  /** A shoved car rejoining its lane over a second after its body was returned (M7 slice 8): off its lane pose by design. */
+  blending(agent: number): boolean {
+    return (this.blendLeft[agent] as number) > 0;
   }
 
   /** A record above the pool: a prop's, or what a swap left in one. */
@@ -2512,7 +2519,9 @@ export class Traffic {
         const pass = this.passAgent[i] as number;
         if (pass >= 0) {
           this.passLeft[i] = (this.passLeft[i] as number) - (this.speed[i] as number) * dt;
-          if ((this.passLeft[i]) <= 0 || this.state[pass] === AgentState.Free) this.passAgent[i] = -1;
+          // back on its side before the junction (M7 gate: a unit still out on the oncoming side took its U-turn
+          // from there and swept across the front of the car it passed)
+          if ((this.passLeft[i]) <= 0 || this.state[pass] === AgentState.Free || s > len - PASS_CLEAR_OF_JUNCTION) this.passAgent[i] = -1;
         } else {
           const lead = this.leaderAgent[i] as number;
           if (lead >= 0 && this.police[lead] === 0 && this.lane[lead] === lane) {
@@ -2523,7 +2532,7 @@ export class Traffic {
               if (par >= 0) {
                 const sp = s * (this.lanes.length[par] as number) / len;
                 if ((this.next[i] as number) < 0 && this.laneClear(par, sp, (this.speed[i] as number) * 0.8 + 8)) this.changeLane(i, par, sp);
-              } else if (rev >= 0 && this.oncomingClear(rev, (this.lanes.length[rev] as number) - s, 60)) {
+              } else if (rev >= 0 && s + gapL + 15 < len - PASS_CLEAR_OF_JUNCTION && this.oncomingClear(rev, (this.lanes.length[rev] as number) - s, 60)) {
                 this.passAgent[i] = lead;
                 this.passLeft[i] = gapL + 15;
               }

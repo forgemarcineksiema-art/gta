@@ -72,6 +72,8 @@ export interface GameHandle {
   adShowing: boolean;
   /** The save store (e2e: bytes, writes, the flush). */
   save: SaveStore;
+  /** The game's own music (M7 gate e2e: when it starts, its level). */
+  music: Music;
 }
 
 declare global {
@@ -354,6 +356,7 @@ export class App {
       audio: this.audio,
       adShowing: false,
       save: store,
+      music: this.music,
     };
     window.__game = this.handle;
     window.render_game_to_text = () => {

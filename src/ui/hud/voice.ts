@@ -27,6 +27,8 @@ export const WHERE: Record<EventKind, Where> = {
   rivalBeaten: 'none', rivalSeen: 'none', damageNews: 'none',
   // what changes what you do: the top centre
   heatLevel: 'top', dispatch: 'top', rivalReady: 'top', twinSwap: 'top',
+  // how a job is taken, while the sim says it teaches (M8.7 D8)
+  ringPass: 'top',
   // what pays or counts outside the combo: a pop
   takedown: 'pop', takedownTraffic: 'pop', billboard: 'pop', escape: 'pop', camera: 'pop', jump: 'pop',
   dailyDone: 'pop', streak: 'pop', blown: 'pop', cache: 'pop', chase: 'pop', skill: 'pop', skillLost: 'pop',
@@ -104,6 +106,7 @@ export function speak(kind: EventKind, value: number, target: number, ctx: Voice
       out.text = t('THE TWINS SWAPPED · NOW IN A {car}', { car: paintedCar(paintName(d.paint), BODY_WORDS[d.body]) });
       break;
     }
+    case 'ringPass': out.lead = t('JOB'); out.text = t('SLOW DOWN IN THE RING'); break;
     case 'takedown': out.text = t('TAKEDOWN!'); out.big = true; break;
     case 'takedownTraffic': out.text = t('TAKEDOWN! INTO TRAFFIC!'); out.big = true; break;
     case 'billboard': out.text = ctx.boardsTotal > 0 ? t('BILLBOARD {n}/{of}', { n: ctx.boards, of: ctx.boardsTotal }) : t('BILLBOARD!'); break;

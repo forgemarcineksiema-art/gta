@@ -254,7 +254,7 @@ export class Way implements GoalChooser {
       for (let i = 0; i < defs.length; i++) {
         const d = defs[i] as JobDef;
         if (d.id !== this.heldId) continue;
-        if (jobs.live(d) && (kind === '' || d.kind === kind)) held = i;
+        if (jobs.shown(d) && (kind === '' || d.kind === kind)) held = i;
         break;
       }
     }
@@ -263,7 +263,7 @@ export class Way implements GoalChooser {
     let best = -1, bestD = Infinity, heldD = Infinity, near = -1, nearD = Infinity;
     for (let i = 0; i < defs.length; i++) {
       const d = defs[i] as JobDef;
-      if (d.kind === 'fare' || !jobs.live(d) || (kind !== '' && d.kind !== kind)) continue;
+      if (d.kind === 'fare' || !jobs.shown(d) || (kind !== '' && d.kind !== kind)) continue;
       const line = (d.x - p.x) ** 2 + (d.z - p.z) ** 2;
       if (line < nearD) { nearD = line; near = i; }
       const road = this.ringDistance(d.id);

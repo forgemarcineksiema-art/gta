@@ -9,8 +9,10 @@
  *
  * While a job runs the other markers hide; its target gets a ring and a
  * beacon that pulse harder, and an order's wanted car carries a ring under it
- * while it is within `ringRange` and in front of the camera. Reads sim state
- * only; no allocation per frame.
+ * while it is within `ringRange` and in front of the camera. With the police
+ * on the player the markers are closed and drawn grey (M8.7 D9); a job taken
+ * lights its ring cyan for `FLASH` s (D8). Reads sim state only; no allocation
+ * per frame.
  */
 import * as THREE from 'three';
 import { BALANCE, FIXED_DT, PALETTE, type JobDef, type SimWorld } from '../../sim';
@@ -18,6 +20,11 @@ import { BALANCE, FIXED_DT, PALETTE, type JobDef, type SimWorld } from '../../si
 const PULSE_HZ = 1.2;
 const PULSE = 0.08;
 const TARGET_PULSE = 0.16;
+/** A closed marker's grey (M8.7 D9) and the way's cyan a taken ring lights in for `FLASH` s, growing by `FLASH_GROW` (D8). */
+const CLOSED = 0x8d8a96;
+const TAKEN = 0x2bd1ff;
+const FLASH = 0.4;
+const FLASH_GROW = 0.35;
 
 export const KIND_COLORS: Record<JobDef['kind'], number> = {
   delivery: PALETTE.carOrange,
@@ -57,6 +64,12 @@ export class MarkerView {
   private readonly s = new THREE.Vector3();
   private readonly t = { x: 0, z: 0 };
   private targetKind: JobDef['kind'] = 'delivery';
+  /** The police on the player at the last rebuild (the markers closed); the jobs' state last frame; the taken ring's flash. */
+  private closed = false;
+  private lastState = '';
+  private flashX = 0;
+  private flashZ = 0;
+  private flashUntil = -1;
   /** A zone job's edge on the ground (M5.5 slice 12): a thin ring its radius round the marker. */
   private readonly zone: THREE.Mesh;
 
@@ -93,7 +106,18 @@ export class MarkerView {
 
   update(sim: SimWorld, alpha: number): void {
     const jobs = sim.jobs;
-    if (jobs.serial !== this.serial) this.rebuild(sim);
+    const closed = sim.pursuit.state !== 'idle' && !sim.coldOpen.active;
+    if (jobs.serial !== this.serial || closed !== this.closed) this.rebuild(sim);
+    // a job taken: its ring lights up where it was
+    if (this.lastState === 'idle' && jobs.state !== 'idle') {
+      const d = jobs.defOf(jobs.active);
+      if (d && d.kind !== 'fare') {
+        this.flashX = d.x;
+        this.flashZ = d.z;
+        this.flashUntil = sim.time + FLASH;
+      }
+    }
+    this.lastState = jobs.state;
     const phase = Math.sin((sim.time + alpha * FIXED_DT) * PULSE_HZ * Math.PI * 2);
     const pulse = 1 + PULSE * phase;
     let n = 0;
@@ -121,6 +145,14 @@ export class MarkerView {
       this.put(this.rings, n, this.t.x, this.t.z, 0.8 + 0.1 * phase, 1);
       n++;
     }
+    // the ring just taken, lit and growing for its moment (instance n takes the cyan)
+    const flash = this.flashUntil - sim.time;
+    if (flash > 0 && n < this.capacity) {
+      this.put(this.rings, n, this.flashX, this.flashZ, 1 + FLASH_GROW * (1 - flash / FLASH), 1);
+      this.rings.setColorAt(n, this.color.setHex(TAKEN));
+      if (this.rings.instanceColor) this.rings.instanceColor.needsUpdate = true;
+      n++;
+    }
     // a pedestrian hailing the taxi (M5.5 slice 13): a yellow beacon over them
     const hailer = sim.fares.hailer, peds = sim.peds;
     if (hailer >= 0 && peds && beacons < this.capacity) {
@@ -143,19 +175,20 @@ export class MarkerView {
     this.beacons.dispose();
   }
 
-  /** The idle set changed: the live markers in their kind's colour, or none while a job runs. */
+  /** The idle set changed: the shown markers in their kind's colour (grey while closed), or none while a job runs. */
   private rebuild(sim: SimWorld): void {
     const jobs = sim.jobs;
     this.serial = jobs.serial;
+    this.closed = sim.pursuit.state !== 'idle' && !sim.coldOpen.active;
     this.idleCount = 0;
     if (jobs.state === 'idle') {
       for (const d of jobs.defs) {
-        if (!jobs.live(d) || this.idleCount >= this.capacity - 2) continue;
+        if (!jobs.shown(d) || this.idleCount >= this.capacity - 3) continue;
         this.idleX[this.idleCount] = d.x;
         this.idleZ[this.idleCount] = d.z;
         // a rival's ring is wider: it circles the car parked at the kerb (M6)
         this.idleScale[this.idleCount] = d.kind === 'duel' ? BALANCE.board.ringRadius / BALANCE.jobs.markerRadius : 1;
-        this.tint(this.idleCount, KIND_COLORS[d.kind]);
+        this.tint(this.idleCount, this.closed ? CLOSED : KIND_COLORS[d.kind]);
         this.idleCount++;
       }
     }

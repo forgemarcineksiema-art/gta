@@ -395,6 +395,11 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   `N SKIP` underneath. A caption slides in over 0.25 s and shows only while
   its cue holds; the bottom swap prompt hides while the caption says SWAP.
   Never a modal, never over the car.
+- Job markers, M8.7 slice 2 (DESIGN §20.3 rules 8–9): with the police on
+  the player every ring is closed and drawn grey `#8d8a96` (the radar's and
+  the full map's too); a job taken lights its ring in the way's cyan, growing
+  35 % over 0.4 s, with the start's two-note chime. The cold open's pickup
+  caption reads PICK UP THE PACKAGE · SLOW DOWN IN THE RING.
 - Job markers (M5): a flat ring (4 m radius, 24 segments) on the corner
   apron with a 3 m beacon post, unlit so it reads in the towers' shade,
   pulsing ±8 % in scale, in the kind's colour: a delivery `carOrange`, a

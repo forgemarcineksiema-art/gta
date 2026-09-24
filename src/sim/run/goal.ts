@@ -124,7 +124,7 @@ function nearestRing(sim: SimWorld, kind: JobKind | '', out: Goal): boolean {
   let best = Infinity;
   for (let i = 0; i < jobs.defs.length; i++) {
     const d = jobs.defs[i];
-    if (!d || !jobs.live(d) || (kind !== '' && d.kind !== kind)) continue;
+    if (!d || !jobs.shown(d) || (kind !== '' && d.kind !== kind)) continue;
     const dist = (d.x - p.x) ** 2 + (d.z - p.z) ** 2;
     if (dist >= best) continue;
     best = dist;

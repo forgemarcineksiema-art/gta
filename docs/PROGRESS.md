@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8.7 slice 2: taken by choice, not in a chase
+
+Done (D8, D9, D11's ring): a ring starts its job when rolled into under 20 km/h (`startSpeed` 5.5 m/s; a rival keeps its
+pull-up); driven through faster nothing starts, and the pass says SLOW DOWN IN THE RING (ZLECENIE · ZWOLNIJ W KÓŁKU) at
+the top while the first job is to come, then on the session's first three passes (`ringPass`, the sim decides). The start
+is the existing `jobStart` (its two-note chime; the plan's new `jobTaken` was not needed) and lights the ring cyan for
+0.4 s. `Jobs.live` became `shown`; `open` adds: nothing opens with the police on the player (fares do not hail), grey on
+the road and the maps, the cold open's ring excepted; its caption reads PICK UP THE PACKAGE · SLOW DOWN IN THE RING. Pins
+M8.7 2.1–2.4; the way's 0.6 calls the chase off between deliveries. No bot starts a job by driving in. Verify green.
+
 ## 2026-09-24 — M8.7 slice 1: the route on the radar, no arrow
 
 Done (D3, D4, D11's route): the radar draws the way's route, a 5 px cyan line on a dark edge over the roads and under the

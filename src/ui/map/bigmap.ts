@@ -13,7 +13,7 @@ import { LANDMARKS, cityFootprints } from '../../sim/city/City';
 import { COVER } from '../../sim/city/covers';
 import { BLOCK, HIGHWAY_HALF, OVERPASS, OVERPASS_NODES } from '../../sim/city/roads';
 import {
-  CACHE_COLOR, DARK, FONT, GLYPH_KINDS, GRID, INK, JOB_COLORS, LOOP, ACCENT, RIVAL, ROUTE, SEARCH_EDGE, SEARCH_FILL, UNIT_BEAT, UNIT_LIT, WATER,
+  CACHE_COLOR, CLOSED, DARK, FONT, GLYPH_KINDS, GRID, INK, JOB_COLORS, LOOP, ACCENT, RIVAL, ROUTE, SEARCH_EDGE, SEARCH_FILL, UNIT_BEAT, UNIT_LIT, WATER,
   drawArrow, drawGlyph, drawGoalBadge, drawHeli, fillIsland, hex, type MapPaths, type MarkerKind,
 } from './minimap';
 import { label, labelAria, relabel, t } from '../lang';
@@ -357,7 +357,9 @@ export class BigMap {
       }
     }
     if (!running && jobs.state === 'idle') {
-      for (const d of jobs.defs) if (jobs.live(d)) this.glyphAt('job', d.x, d.z, s, GLYPH, JOB_COLORS[d.kind]);
+      // grey while the police are on the player: closed (M8.7 D9)
+      const closed = pursuit.state !== 'idle' && !sim.coldOpen.active;
+      for (const d of jobs.defs) if (jobs.shown(d)) this.glyphAt('job', d.x, d.z, s, GLYPH, closed ? CLOSED : JOB_COLORS[d.kind]);
     }
     // the goal's badge: where the route ends
     if (way && way.goal.hasTarget) {

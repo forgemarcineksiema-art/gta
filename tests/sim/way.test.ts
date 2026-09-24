@@ -50,7 +50,7 @@ function roadFrom(sim: SimWorld, from: number, s: number): (lane: number, at: nu
 function roadToRings(sim: SimWorld, lane: number, s: number): Map<number, number> {
   const way = sim.way!, road = roadFrom(sim, lane, s), out = new Map<number, number>();
   for (const d of sim.jobs.defs) {
-    if (d.kind === 'fare' || !sim.jobs.live(d)) continue;
+    if (d.kind === 'fare' || !sim.jobs.shown(d)) continue;
     const r = way.reachOfRing(d.id)!;
     let best = Infinity;
     for (let k = 0; k < r.count; k++) best = Math.min(best, road(r.lanes[k] as number, r.s[k] as number) + (r.leg[k] as number));
@@ -81,7 +81,7 @@ describe('the way', () => {
           // the old rule over the same drive: the nearest live ring by straight line
           let near = -1, nearD = Infinity;
           for (const d of sim.jobs.defs) {
-            if (d.kind === 'fare' || !sim.jobs.live(d)) continue;
+            if (d.kind === 'fare' || !sim.jobs.shown(d)) continue;
             const dd = (d.x - sim.probe.x) ** 2 + (d.z - sim.probe.z) ** 2;
             if (dd < nearD) { nearD = dd; near = d.id; }
           }
@@ -140,7 +140,7 @@ describe('the way', () => {
       const way = sim.way!, lanes = sim.traffic!.lanes, graph = sim.city!.graph, n = lanes.laneCount;
       let rings = 0;
       for (const d of sim.jobs.defs) {
-        if (d.kind === 'fare' || !sim.jobs.live(d)) continue;
+        if (d.kind === 'fare' || !sim.jobs.shown(d)) continue;
         const r = way.reachOfRing(d.id)!;
         // the probe on the ring's own lane at the ring: nothing is nearer
         onLane(sim, r.lanes[0] as number, r.s[0] as number);
@@ -253,8 +253,10 @@ describe('the way', () => {
       let worst = 0, n = 0;
       for (const d of sim.jobs.defs) {
         if (d.kind !== 'delivery') continue;
-        // the last one dropped before the car leaves its ring, so it does not start again
+        // the last one dropped before the car leaves its ring, so it does not start again; its stars' chase called
+        // off, or the next ring would stay closed (M8.7 D9)
         sim.jobs.abandon();
+        sim.pursuit.reset();
         city.sync(d.x, d.z, true);
         sim.vehicle.teleport({ x: d.x, y: 0.8, z: d.z }, d.yaw);
         run(sim, 0.3);

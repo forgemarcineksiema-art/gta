@@ -21,7 +21,7 @@ function nearestDoor(sim: SimWorld): { x: number; z: number } {
 
 function nearestRing(sim: SimWorld, kind = ''): { x: number; z: number } {
   const p = sim.probe;
-  return [...sim.jobs.defs].filter((d) => sim.jobs.live(d) && (kind === '' || d.kind === kind))
+  return [...sim.jobs.defs].filter((d) => sim.jobs.shown(d) && (kind === '' || d.kind === kind))
     .sort((u, v) => Math.hypot(u.x - p.x, u.z - p.z) - Math.hypot(v.x - p.x, v.z - p.z))[0]!;
 }
 

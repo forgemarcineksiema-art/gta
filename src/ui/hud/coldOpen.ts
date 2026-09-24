@@ -24,7 +24,8 @@ const WORDS: Record<ColdOpenVerb, string> = {
   boost: 'BOOST',
   smash: 'SMASH THE BILLBOARD',
   takedown: 'RAM THEM INTO A WALL',
-  deliver: 'PICK UP THE PACKAGE',
+  // a job is taken by rolling in (M8.7 D8, D11)
+  deliver: 'PICK UP THE PACKAGE · SLOW DOWN IN THE RING',
   escape: 'GET IT TO THE GARAGE',
 };
 

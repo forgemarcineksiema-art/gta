@@ -31,6 +31,8 @@ export const SEARCH_EDGE = 'rgba(59, 130, 246, 0.7)';
 export const LOOP = '#ffe9a8';
 /** The way's cyan (DESIGN.md §20.3 rule 6): the route and the goal's ring, and nothing else on the maps. */
 export const ROUTE = '#2bd1ff';
+/** A closed ring's grey: the police on the player (M8.7 D9). */
+export const CLOSED = '#8d8a96';
 export const GRID = 'rgba(247, 243, 234, 0.85)';
 const RIM = 'rgba(255, 210, 63, 0.45)';
 const PANEL = 0x160e28;
@@ -257,6 +259,8 @@ export class Minimap {
   /** The landmarks and drop-offs; idle job markers are appended when the jobs change. */
   private base: readonly MinimapMarker[];
   private jobSerial = -1;
+  /** The police on the player when the rings were last listed (they are drawn grey, closed). */
+  private closedRings = false;
   private cacheSerial = -1;
   private sim: SimWorld | null = null;
   /** The way's route last seen (its serial, when it changed, its length) and where the draw-in stops (M8.7 D3). */
@@ -380,7 +384,9 @@ export class Minimap {
     const jobs = sim.jobs;
     const caches = sim.caches;
     const cacheSerial = caches ? caches.serial : 0;
-    if (jobs.serial !== this.jobSerial || cacheSerial !== this.cacheSerial) {
+    const closed = sim.pursuit.state !== 'idle' && !sim.coldOpen.active;
+    if (jobs.serial !== this.jobSerial || cacheSerial !== this.cacheSerial || closed !== this.closedRings) {
+      this.closedRings = closed;
       // the live rings while no job runs (inside the circle only; the goal's badge is the way's); the day's caches
       // still to find as gold dots inside the circle (M5.5)
       this.jobSerial = jobs.serial;
@@ -397,8 +403,8 @@ export class Minimap {
       if (running) {
         this.markers = [...this.base, ...dots];
       } else {
-        const live = jobs.state === 'idle' ? jobs.defs.filter((d) => jobs.live(d)) : [];
-        this.markers = [...this.base, ...dots, ...live.map((d): MinimapMarker => ({ x: d.x, z: d.z, kind: 'job', color: JOB_COLORS[d.kind], local: true }))];
+        const live = jobs.state === 'idle' ? jobs.defs.filter((d) => jobs.shown(d)) : [];
+        this.markers = [...this.base, ...dots, ...live.map((d): MinimapMarker => ({ x: d.x, z: d.z, kind: 'job', color: closed ? CLOSED : JOB_COLORS[d.kind], local: true }))];
       }
       this.dirty = true;
     }

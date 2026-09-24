@@ -78,11 +78,11 @@ describe('the wanted board', () => {
       const b = sim.board, jobs = sim.jobs;
       sim.police!.dispatching = false;
       expect(b.next()).toBe(0);
-      expect(jobs.live(ring(sim, 0))).toBe(false);
+      expect(jobs.shown(ring(sim, 0))).toBe(false);
       // the board follows the chain: its six steps open Granny Gears
       sim.run.chain = CHAIN_ALL;
-      expect(jobs.live(ring(sim, 0))).toBe(true);
-      expect(jobs.live(ring(sim, 1))).toBe(false);
+      expect(jobs.shown(ring(sim, 0))).toBe(true);
+      expect(jobs.shown(ring(sim, 1))).toBe(false);
       // near her bay, her car stands parked in it
       const d = ring(sim, 0);
       pullUp(sim, d);
@@ -99,11 +99,11 @@ describe('the wanted board', () => {
       expect(jobs.state).toBe('idle');
       b.win(0);
       expect(b.next()).toBe(1);
-      expect(jobs.live(ring(sim, 0))).toBe(true);
-      expect(jobs.live(ring(sim, 1))).toBe(false);
+      expect(jobs.shown(ring(sim, 0))).toBe(true);
+      expect(jobs.shown(ring(sim, 1))).toBe(false);
       sim.career.races = 1;
       sim.jobs.medals.set(trialIds(sim)[0] as number, 3);
-      expect(jobs.live(ring(sim, 1))).toBe(true);
+      expect(jobs.shown(ring(sim, 1))).toBe(true);
     } finally { sim.dispose(); }
   }, 60_000);
 
@@ -172,7 +172,7 @@ describe('the wanted board', () => {
         expect(sim.board.beaten).toBe(0);
         run(sim, BALANCE.jobs.holdSeconds + 0.1);
         expect(sim.jobs.state).toBe('idle');
-        expect(sim.jobs.live(d)).toBe(true);
+        expect(sim.jobs.shown(d)).toBe(true);
         // away and back: the ring re-arms once the car has left it
         const x = d.x + 40 * Math.sin(d.yaw), z = d.z + 40 * Math.cos(d.yaw);
         sim.vehicle.teleport({ x, y: 0.8, z }, d.yaw);

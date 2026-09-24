@@ -113,6 +113,9 @@ export const BALANCE = {
   jobs: {
     // nearDoor: the placement's first picks are a ring within this of every door (the first goal after a door, DESIGN §13.4)
     markerRadius: 4, beaconHeight: 3, timeBonus: 0.5, holdSeconds: 2, cardSeconds: 1.5, markerMinGap: 60, nearDoor: 250,
+    // startSpeed (M8.7 D8): a ring starts its job when rolled into under it (m/s, 20 km/h); the rule is taught on the
+    // first ring while the chain's first step is open and on the session's first `teachPasses` passes too fast
+    startSpeed: 5.5, teachPasses: 3,
     counts: { delivery: 6, order: 6, escape: 4, trial: 4, race: 4, rage: 2, mayhem: 2 },
     // payoutPerKm 9,000 (balance script, 2026-09-23; the plan's 4,000 paid every placed delivery the 5,000 floor on
     // their 0.55–1.27 km paths): now 5,000–11,400, DESIGN.md §3.3's 5–12k

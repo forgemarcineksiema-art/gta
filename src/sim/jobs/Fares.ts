@@ -54,7 +54,8 @@ export class Fares {
     }
     // out of the taxi the chain is over; busy (another job, a fare's result on the line), it waits
     if (sim.carBody !== 'taxi') { this.chain = 0; this.carry = 0; }
-    if (!peds || sim.carBody !== 'taxi' || sim.jobs.state !== 'idle' || sim.coldOpen.active) {
+    // nobody hails a taxi with the police on it (M8.7 D9)
+    if (!peds || sim.carBody !== 'taxi' || sim.jobs.state !== 'idle' || sim.coldOpen.active || sim.pursuit.state !== 'idle') {
       this.dropHailer();
       return;
     }

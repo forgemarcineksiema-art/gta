@@ -1,8 +1,10 @@
 /**
  * Jobs (docs/M5_PLAN.md §3.3, slices 1–3; the M4 skeleton extended, nothing
- * renamed). A marker is a ring on the ground; driving into it starts its job.
- * One job at a time: markers do nothing while one runs (D6), and the door and
- * busted abandon it silently.
+ * renamed). A marker is a ring on the ground; rolling into it under
+ * `startSpeed` starts its job (M8.7 D8: driven through faster, nothing but a
+ * `ringPass` while it teaches). One job at a time: markers do nothing while
+ * one runs (D6), nor while the police are on the player (M8.7 D9), and the
+ * door and busted abandon it silently.
  *
  * - delivery: the clock starts at once, the job's heat is added once;
  *   arriving within the ring radius of the drop-off pays
@@ -87,6 +89,9 @@ export class Jobs {
   private found = false;
   /** A marker the car was inside when its job ended: it re-arms once the car has left its ring. */
   private rearm = -1;
+  /** The ring being driven through too fast (M8.7 D8), until the car leaves it; the passes taught this session. */
+  private passing = -1;
+  private taught = 0;
   private cursor: number;
   /** An `escape` event was read this step. */
   private escaped = false;
@@ -128,11 +133,16 @@ export class Jobs {
     return this.state === 'hunting' || this.state === 'active' ? this.defOf(this.active) : null;
   }
 
-  /** A marker the player can start now: idle, and during the cold open only its own; a rival's ring while the board says so (M6). */
-  live(d: JobDef): boolean {
+  /** A marker that is there: during the cold open only its own; a rival's ring while the board says so (M6). */
+  shown(d: JobDef): boolean {
     const co = this.sim.coldOpen;
     if (co.active) return d.id === co.job;
     return d.id !== co.job && (d.kind !== 'duel' || this.sim.board.live(d.level));
+  }
+
+  /** A marker the player can start now (M8.7 D9): shown, and not while the police are on the player; the cold open's own in its chase too. */
+  open(d: JobDef): boolean {
+    return this.shown(d) && (this.sim.pursuit.state === 'idle' || this.sim.coldOpen.active);
   }
 
   step(probe: PlayerProbe, dt: number): void {
@@ -148,6 +158,10 @@ export class Jobs {
     if (this.rearm >= 0) {
       const d = this.defOf(this.rearm);
       if (!d || (d.x - probe.x) ** 2 + (d.z - probe.z) ** 2 > r * r) this.rearm = -1;
+    }
+    if (this.passing >= 0) {
+      const d = this.defOf(this.passing);
+      if (!d || (d.x - probe.x) ** 2 + (d.z - probe.z) ** 2 > r * r) this.passing = -1;
     }
     if (this.state === 'done' || this.state === 'failed') {
       this.hold -= dt;
@@ -166,7 +180,19 @@ export class Jobs {
         const duel = d.kind === 'duel';
         const rr = duel ? BALANCE.board.ringRadius : r;
         if (d.id === this.rearm || (d.x - probe.x) ** 2 + (d.z - probe.z) ** 2 > rr * rr) continue;
-        if ((duel && probe.speed > BALANCE.board.pullUp) || !this.live(d)) continue;
+        if (!this.open(d)) continue;
+        if (probe.speed > (duel ? BALANCE.board.pullUp : BALANCE.jobs.startSpeed)) {
+          // driven through (M8.7 D8): nothing starts; the first ring while the chain's first step is open, and the
+          // session's first few passes, teach the rule
+          if (!duel && d.id !== this.passing) {
+            this.passing = d.id;
+            if ((this.sim.run.chain & 1) === 0 || this.taught < BALANCE.jobs.teachPasses) {
+              this.taught++;
+              this.sim.events.push('ringPass', 0, d.x, 0, d.z, d.id);
+            }
+          }
+          continue;
+        }
         this.start(d);
         return;
       }

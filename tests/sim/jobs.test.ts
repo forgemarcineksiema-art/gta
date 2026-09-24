@@ -201,7 +201,7 @@ describe('jobs (M5 slice 1)', () => {
       run(sim, 0.1);
       const way = sim.way!;
       expect(way.goal.kind).toBe('take');
-      const live = sim.jobs.defs.filter((d) => d.kind !== 'fare' && sim.jobs.live(d));
+      const live = sim.jobs.defs.filter((d) => d.kind !== 'fare' && sim.jobs.shown(d));
       const nearest = live.reduce((a, b) => (way.ringDistance(b.id) < way.ringDistance(a.id) ? b : a));
       expect(way.goal.id).toBe(nearest.id);
       expect([way.goal.x, way.goal.z]).toEqual([nearest.x, nearest.z]);
@@ -297,4 +297,105 @@ describe('jobs (M5.5 slice 1)', () => {
       expect(sim.run.bag - bag2).toBeLessThan(d.payout * (1 + BALANCE.jobs.timeBonus) + 1);
     } finally { sim.dispose(); }
   }, 60_000);
+});
+
+/** A probe standing in a def's ring at `speed` m/s (the jobs read the probe only). */
+function inRing(sim: SimWorld, d: JobDef, speed: number): SimWorld['probe'] {
+  return { ...sim.probe, x: d.x, z: d.z, speed, vx: 0, vz: speed };
+}
+
+/** The events of a kind pushed since `from`. */
+function pushed(sim: SimWorld, from: number, kind: EventKind): number {
+  let n = 0;
+  sim.events.readFrom(from, (e) => { if (e.kind === kind) n++; });
+  return n;
+}
+
+describe('a job taken by choice (M8.7 slice 2)', () => {
+  it('M8.7 2.1 a ring driven through at 60 km/h starts nothing', async () => {
+    const sim = await placedWorld();
+    try {
+      run(sim, 0.1);
+      const d = firstDelivery(sim), seq = sim.events.sequence;
+      for (let i = 0; i < 30; i++) sim.jobs.step(inRing(sim, d, 60 / 3.6), 1 / 60);
+      expect(sim.jobs.state).toBe('idle');
+      expect(pushed(sim, seq, 'jobStart')).toBe(0);
+    } finally { sim.dispose(); }
+  });
+
+  it('M8.7 2.2 rolled into at 15 km/h it starts at once and says so (jobStart: the chime, the ring lit)', async () => {
+    const sim = await placedWorld();
+    try {
+      run(sim, 0.1);
+      const d = firstDelivery(sim), seq = sim.events.sequence;
+      sim.jobs.step(inRing(sim, d, 15 / 3.6), 1 / 60);
+      expect(sim.jobs.state).toBe('active');
+      expect(sim.jobs.active).toBe(d.id);
+      expect(pushed(sim, seq, 'jobStart')).toBe(1);
+    } finally { sim.dispose(); }
+  });
+
+  it('M8.7 2.3 with the police on the player and no job running nothing opens: a ring, a rival; the cold open ring does', async () => {
+    const sim = await placedWorld();
+    try {
+      run(sim, 0.1);
+      const jobs = sim.jobs, d = firstDelivery(sim);
+      sim.pursuit.force();
+      expect(jobs.shown(d)).toBe(true);
+      expect(jobs.open(d)).toBe(false);
+      for (let i = 0; i < 10; i++) jobs.step(inRing(sim, d, 0), 1 / 60);
+      expect(jobs.state).toBe('idle');
+      sim.run.chain = (1 << 6) - 1;
+      const rival = jobs.defs.find((j) => j.kind === 'duel' && jobs.shown(j)) as JobDef;
+      expect(rival).toBeDefined();
+      expect(jobs.open(rival)).toBe(false);
+      for (let i = 0; i < 10; i++) jobs.step(inRing(sim, rival, 0), 1 / 60);
+      expect(jobs.state).toBe('idle');
+      sim.pursuit.reset();
+      expect(jobs.open(d)).toBe(true);
+    } finally { sim.dispose(); }
+    const co = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 0, record: false });
+    try {
+      co.coldOpen.start();
+      run(co, 0.2);
+      co.pursuit.force();
+      const d = co.jobs.defOf(co.coldOpen.job) as JobDef;
+      expect(co.jobs.open(d)).toBe(true);
+      co.jobs.step(inRing(co, d, 0), 1 / 60);
+      expect(co.jobs.active).toBe(d.id);
+    } finally { co.dispose(); }
+  }, 60_000);
+
+  it('M8.7 2.4 a ring driven through teaches SLOW DOWN IN THE RING while the first job is to come, then the first three times of a session only', async () => {
+    const sim = await placedWorld();
+    try {
+      run(sim, 0.1);
+      const rings = sim.jobs.defs.filter((j) => j.kind !== 'duel' && sim.jobs.open(j)).slice(0, 6);
+      const passAll = (): number => {
+        const seq = sim.events.sequence;
+        for (const d of rings) {
+          sim.jobs.step(inRing(sim, d, 20), 1 / 60);
+          sim.jobs.step(inRing(sim, d, 20), 1 / 60);
+          // out of it, so the next pass is a new one
+          sim.jobs.step({ ...sim.probe, x: d.x + 50, z: d.z + 50, speed: 20 }, 1 / 60);
+        }
+        return pushed(sim, seq, 'ringPass');
+      };
+      // the chain's first step open: every pass, once each
+      expect(passAll()).toBe(rings.length);
+      expect(sim.jobs.state).toBe('idle');
+    } finally { sim.dispose(); }
+    const taken = await placedWorld();
+    try {
+      run(taken, 0.1);
+      taken.run.chain = 1;
+      const rings = taken.jobs.defs.filter((j) => j.kind !== 'duel' && taken.jobs.open(j)).slice(0, 6);
+      const seq = taken.events.sequence;
+      for (const d of rings) {
+        taken.jobs.step(inRing(taken, d, 20), 1 / 60);
+        taken.jobs.step({ ...taken.probe, x: d.x + 50, z: d.z + 50, speed: 20 }, 1 / 60);
+      }
+      expect(pushed(taken, seq, 'ringPass')).toBe(BALANCE.jobs.teachPasses);
+    } finally { taken.dispose(); }
+  });
 });

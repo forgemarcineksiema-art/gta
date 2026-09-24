@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M7 slice 4: skid marks and the spill's burst
+
+Done: `render/SkidMarks.ts`: a rear wheel sliding past 8° of slip angle or 0.25 of slip ratio above 3 m/s (a front
+only when locked) lays a dark strip on the ground under its contact, darker the harder it slides, fading over 30 s
+by its age in the shader; one mesh, a ring of 2,048 quads, only the new quads uploaded. Deviation from the plan: the
+marks lie on any flat ground, grass included (a churned track reads right; the render has no surface query). The
+spill's twelve coins now fly out of the wreck to their places on an arc, 20 ms apart. Pins M7 4.1–4.4 (a skidpad
+drift marks, the run up to it does not). Verify green (343 tests).
+
 ## 2026-09-24 — M7 slice 3: the settings row
 
 Done: the pause screen gains MUSIC and EFFECTS (0–10, the music at 7), QUALITY (AUTO, LOW, HIGH) and RADAR

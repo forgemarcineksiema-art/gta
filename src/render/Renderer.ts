@@ -26,6 +26,7 @@ import { HeliView } from './HeliView';
 import { Billboards } from './Billboards';
 import { Debris } from './Debris';
 import { Smoke } from './Smoke';
+import { SkidMarks } from './SkidMarks';
 import { HideoutView } from './HideoutView';
 import { Coins } from './Coins';
 import { MarkerView } from './MarkerView';
@@ -121,6 +122,9 @@ export class Renderer {
   private readonly sparks: Sparks;
   private readonly debris: Debris;
   private readonly smoke = new Smoke();
+  /** The tyres' marks on the ground (M7 slice 4), and the clock they fade by (stopped while paused). */
+  private readonly skid: SkidMarks;
+  private elapsed = 0;
   private eventSeq = 0;
   /** The garage's serial last applied to the player's meshes (the resprays). */
   private garageSerial = -1;
@@ -306,6 +310,7 @@ export class Renderer {
     this.scene.add(this.sparks.heads);
     this.debris = new Debris(this.scene);
     this.scene.add(this.smoke.object);
+    this.skid = new SkidMarks(this.scene);
     this.wreckSmokeAcc = new Float32Array(sim.traffic?.capacity ?? 1);
 
     this.resize();
@@ -648,6 +653,8 @@ export class Renderer {
     this.car.setDamage(this.sim.life.state.stage);
     this.emitSmoke(dt);
     this.emitTyreSmoke(dt);
+    this.elapsed += dt;
+    this.skid.update(this.sim, this.elapsed);
     if (this.billboards && this.sim.collectibles) this.billboards.update(this.sim.collectibles);
     this.debris.update(dt);
     this.smoke.update(dt);
@@ -819,6 +826,7 @@ export class Renderer {
   }
 
   dispose(): void {
+    this.skid.dispose();
     this.cityView?.dispose();
     this.policeView.dispose();
     this.hideoutView?.dispose();

@@ -24,6 +24,23 @@ const CAP_SCALE = 1.5;
 const SPILL_SCALE = 1.7;
 const FLY_SECONDS = 0.16;
 const FLY_POOL = 16;
+/**
+ * The spill's burst (M7 slice 4): the coins fly out of the wreck to their places on the lane, one after another
+ * (`BURST_STAGGER` s apart), each in `BURST_FLIGHT` s on an arc `BURST_ARC` m high.
+ */
+export const BURST_STAGGER = 0.02;
+export const BURST_FLIGHT = 0.28;
+export const BURST_ARC = 2.2;
+
+/** Where the `k`-th spilled coin is `elapsed` s into the burst, from the wreck (ox, oz) to its place (sx, sz). */
+export function burstPoint(ox: number, oz: number, sx: number, sz: number, k: number, elapsed: number, out: { x: number; y: number; z: number }): { x: number; y: number; z: number } {
+  const u = Math.max(0, Math.min(1, (elapsed - k * BURST_STAGGER) / BURST_FLIGHT));
+  const e = 1 - (1 - u) * (1 - u);
+  out.x = ox + (sx - ox) * e;
+  out.z = oz + (sz - oz) * e;
+  out.y = COIN_HEIGHT + BURST_ARC * 4 * u * (1 - u);
+  return out;
+}
 
 /** An octagonal prism on edge, its axis along z: 16 side triangles and two six-triangle caps, flat normals. */
 function coinGeometry(radius: number, thickness: number): THREE.BufferGeometry {
@@ -87,6 +104,11 @@ export class Coins {
   private readonly q = new THREE.Quaternion();
   private readonly s = new THREE.Vector3(1, 1, 1);
   private readonly target = new THREE.Vector3();
+  /** The spill's burst: seconds into it (-1 none) and the wreck it flies out of. */
+  private burst = -1;
+  private burstX = 0;
+  private burstZ = 0;
+  private readonly bp = { x: 0, y: 0, z: 0 };
 
   constructor(scene: THREE.Scene) {
     const geometry = coinGeometry(RADIUS, THICKNESS);
@@ -160,26 +182,42 @@ export class Coins {
       this.pickedSeen = coins.pickedCount;
       this.removePicked(coins);
     }
-    if (coins.spillSerial !== this.spillSerial) {
+    // the events first: a spill this frame starts its burst before the coins are packed
+    this.eventSeq = sim.events.readFrom(this.eventSeq, this.onEvent);
+    const bursting = this.burst >= 0;
+    if (bursting) this.burst += dt;
+    if (coins.spillSerial !== this.spillSerial || bursting) {
       this.spillSerial = coins.spillSerial;
+      const flying = this.burst >= 0 && this.burst < BURST_STAGGER * coins.spillTtl.length + BURST_FLIGHT;
+      if (!flying) this.burst = -1;
       let n = 0;
       this.s.set(SPILL_SCALE, SPILL_SCALE, SPILL_SCALE);
       for (let k = 0; k < coins.spillTtl.length; k++) {
         if ((coins.spillTtl[k] as number) <= 0) continue;
-        this.p.set(coins.spillX[k] as number, COIN_HEIGHT, coins.spillZ[k]);
+        if (flying) {
+          const b = burstPoint(this.burstX, this.burstZ, coins.spillX[k] as number, coins.spillZ[k] as number, k, this.burst, this.bp);
+          this.p.set(b.x, b.y, b.z);
+        } else {
+          this.p.set(coins.spillX[k] as number, COIN_HEIGHT, coins.spillZ[k]);
+        }
         this.spill.setMatrixAt(n++, this.m.compose(this.p, this.q, this.s));
       }
       this.spill.count = n;
       this.spill.instanceMatrix.needsUpdate = true;
     }
-    this.eventSeq = sim.events.readFrom(this.eventSeq, this.onEvent);
     this.target.set(car.x, car.y + 0.8, car.z);
     this.fly(this.flyGold, dt);
     this.fly(this.flyWhite, dt);
   }
 
-  /** A picked coin starts its flight where it lay; a spilled one (target -2) is white. */
+  /** A picked coin starts its flight where it lay; a spilled one (target -2) is white; a spill starts the burst. */
   private handleEvent(e: SimEvent): void {
+    if (e.kind === 'spill') {
+      this.burst = 0;
+      this.burstX = e.x;
+      this.burstZ = e.z;
+      return;
+    }
     if (e.kind !== 'coin') return;
     const pool = e.target === -2 ? this.flyWhite : this.flyGold;
     const scale = e.target === -2 ? SPILL_SCALE : e.value >= BALANCE.coin.cap ? CAP_SCALE : 1;

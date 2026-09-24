@@ -12,9 +12,8 @@ it wins two of three, the careful bot three). Re-pinned, each with its reason in
 car blending back (slice 8, `Traffic.blending`); the same-lane spacing binds cars that overlap across the lane (a
 pull-over and the standoff put two side by side by design); the police roster pin holds its level (the beat's
 crimes took it from 2 to 3) and reads the roster over the run, not at its last step (a bust at 41 s read the
-refill); the lent bodies' stall check skips a unit on a chase (it drives at the player, as for the heading); G.1
-asks three of three of the careful bot and one of the plain. Tried and dropped: braking chasing units for U-turns
-(it cost the Chief his PIT). `verify:gate` green: 431 tests (159 s), smoke 60 fps.
+refill); G.1 asks three of three of the careful bot and one of the plain. Tried and dropped: braking chasing units
+for U-turns (it cost the Chief his PIT). `verify:gate` green: 431 tests (159 s), smoke 60 fps.
 
 ## 2026-09-24 — M7 slice 13: the rivals' leftovers
 

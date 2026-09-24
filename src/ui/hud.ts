@@ -132,6 +132,8 @@ export class Hud {
   private readonly popups: HTMLElement[];
   private readonly popupLeft = [0, 0, 0, 0];
   private popupCursor = 0;
+  /** Short screens (the CSS's 560 px): the lane between the coins and the speed holds the two newest pops (M7 gate). */
+  private readonly shortScreen: MediaQueryList | null = typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia('(max-height: 560px)') : null;
   private eventSeq = 0;
   /** The hunt's count when this frame's events are read: the popup names it. */
   private huntFound = 0;
@@ -485,6 +487,13 @@ export class Hud {
     popup.classList.toggle('is-big', kind === 'takedown' || kind === 'takedownTraffic' || kind === 'jump' || kind === 'dailyDone' || kind === 'skill' || kind === 'hiddenCar' || kind === 'rivalBeaten' || (kind === 'hunt' && value > 0) || (kind === 'cache' && value > 0));
     popup.classList.add('is-on');
     this.popupLeft[i] = 1.2;
+    // on a short screen the older two go: four ran down onto the speed at 800x450 (the gate's overlap check)
+    if (this.shortScreen?.matches) {
+      for (const k of [(i + 1) % this.popups.length, (i + 2) % this.popups.length]) {
+        this.popupLeft[k] = 0;
+        this.popups[k]?.classList.remove('is-on');
+      }
+    }
   }
 
   update(sim: SimWorld, dt: number, info: HudDebugInfo | null, now: number): void {

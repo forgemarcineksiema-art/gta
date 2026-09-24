@@ -164,7 +164,7 @@ built at load).
   not reproduced (alone, then a full rerun). Watch for it.
 - **The heap is 10 MB up** (58 MB against 48; budget 250), not profiled.
 - **Not done inside the slices** (BACKLOG): a rival cruising their turf as a
-  teaser before their duel; the day's pick as the rewarded offer (M7
+  teaser before their duel; the day's pick as the rewarded offer (M8
   slice 4); the sweeper's brushes spinning.
 - **No music bed**: still needs Marcin's yes on the file, its source and its
   licence.
@@ -181,3 +181,9 @@ each committed; the rest to BACKLOG). Then M7, the platform
 (`docs/M7_PLAN.md`: the SDK adapter, touch, the mobile tier, the
 submission; the day's pick becomes the rewarded offer there), only on his
 word.
+
+Revised 2026-09-24 (Marcin): a milestone that improves and fixes what the
+game has goes in first. M7 is now the polish (`docs/M7_PLAN.md`, DESIGN
+§15: every recorded issue a player can meet, worked off, with our own music,
+a settings row, skid marks and a screen where nothing overlaps); the
+platform is M8 (`docs/M8_PLAN.md`). Both on his word.

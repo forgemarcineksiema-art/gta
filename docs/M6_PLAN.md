@@ -5,8 +5,9 @@ Reviewer: Claude, at the gate. Director and the only tester: Marcin. This
 document is the milestone contract for the wanted board (`docs/DESIGN.md`
 §14): what to build, in which order, with which numbers, and what "done"
 means. Written 2026-09-23 against commit `11b4441`. Until that day `M6`
-named the platform milestone; its contract is now `docs/M7_PLAN.md`, and
-older docs that say M6 for the platform mean M7.
+named the platform milestone; its contract is now `docs/M8_PLAN.md` (M7
+from 2026-09-23, M8 since 2026-09-24, when M7 became the polish), and older
+docs that say M6 or M7 for the platform mean M8.
 
 Read, in this order, before touching anything: `CLAUDE.md`, `docs/BRIEF.md`
 (§2, §3, §4, §10), `docs/DESIGN.md` §14 in full and §1, §2.2, §2.5, §13.4,
@@ -53,7 +54,7 @@ Read, in this order, before touching anything: `CLAUDE.md`, `docs/BRIEF.md`
 
 ### 1.2 Out of scope
 
-M7's platform work (the SDK, touch, the mobile tier, the ads' real path; the
+M8's platform work (the SDK, touch, the mobile tier, the ads' real path; the
 day's pick stays cash-only here); cop mode, ghosts, multiplayer; new
 districts or roads; a music track without Marcin's yes on the file; any new
 dependency; changes to `docs/BRIEF.md`; any change to `VehicleTuning`
@@ -101,7 +102,7 @@ stays class and paint (DESIGN §2.5); the handling pins.
 
 D7. **No random item is sold: the day's pick is one known item a day at
 half price.** Reason: PEGI 12 and the brief rule out gambling; the brief's
-"daily cosmetic crate" (§7) is kept as a known item, and M7 makes it the
+"daily cosmetic crate" (§7) is kept as a known item, and M8 makes it the
 rewarded offer.
 
 D8. **A rival's car is a body on a class, appended to `BODIES` with a spawn
@@ -449,7 +450,7 @@ green and the images inspected; `npm run perf` A/B against
 PROGRESS; package `0.6.0`; `docs/M6_REPORT.md` per `CLAUDE.md`; ARCHITECTURE
 records (D4, D5, D8, D9, D11); STYLE (the rivals' cars, the kit, the
 posters); DEV (`?board=`, `?kit=all`); BACKLOG; PROGRESS entries older than
-M5.5 archived. Then Marcin plays, and M7 starts only on his word.
+M5.5 archived. Then Marcin plays, and M8 starts only on his word.
 
 ## 5. Verification
 
@@ -512,7 +513,7 @@ reachable goals") from the board.
 5. No per-frame allocation in `Duel.step`, `Career.read`, `Board`'s reads,
    the horn's scan; layering intact; no new dependency; `docs/BRIEF.md`
    untouched; every M1–M5.5 pin unchanged except those named in §5.1.
-6. Marcin's playtest notes on the build in PROGRESS; M7 starts on his word.
+6. Marcin's playtest notes on the build in PROGRESS; M8 starts on his word.
 
 ## 8. API facts and traps
 

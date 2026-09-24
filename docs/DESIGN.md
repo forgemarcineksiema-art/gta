@@ -608,7 +608,7 @@ onto the front page.
   on a navigation button, mute on `adStarted`, no reward on `adError`.
 - **Discovery** is the title, the cover and the tags: car, police chase, open
   world, driving, 3D. The description leads with the fantasy in one line.
-- **Mobile** is M7 (the brief's M6): touch, the mobile tier, under 20 MB
+- **Mobile** is M8 (the brief's M6): touch, the mobile tier, under 20 MB
   (3.8 MB today) for the mobile homepage.
 
 ## 10. Engineering constraints
@@ -630,8 +630,8 @@ onto the front page.
 
 The contracts with done criteria, pins and measurements per slice are
 `docs/M4_PLAN.md` (its §5 holds update 1), `docs/M5_PLAN.md` and
-`docs/M6_PLAN.md` (the board) and `docs/M7_PLAN.md` (the platform); this
-section is the summary. Update 2 gets its contract
+`docs/M6_PLAN.md` (the board), `docs/M7_PLAN.md` (the polish) and
+`docs/M8_PLAN.md` (the platform); this section is the summary. Update 2 gets its contract
 after the first Basic Launch numbers.
 
 Revised 2026-09-22 (decided by Marcin): the game goes to Basic Launch after
@@ -682,7 +682,12 @@ both.
   wanted board of ten rivals and the Chief, their duels and their cars, the
   garage keeping bodies, the driver's kit and the car's kit, three more
   hidden cars. On his word after the M5.5 playtest.
-- **M7 Platform**, the brief's M6 (`docs/M7_PLAN.md`), then Basic Launch;
+- **M7 Polish** (decided by Marcin 2026-09-24 that the next milestone
+  improves and fixes what the game has; what goes in, §15, set here; the
+  contract is `docs/M7_PLAN.md`): the recorded issues a player can meet,
+  worked off, plus our own music, a settings row, skid marks and the
+  screen's lanes. On his word after the M6 playtest.
+- **M8 Platform**, the brief's M6 (`docs/M8_PLAN.md`), then Basic Launch;
   only when all of it is in and on his word that the game is good.
 - Later, by the KPIs: cop mode, ghosts, multiplayer (§8).
 
@@ -745,8 +750,8 @@ is `docs/M5.5_PLAN.md`.
 
 ### 13.1 The decision — decided
 
-**M6 (the platform, the submission; M7 since 2026-09-23, §14) starts only
-when the game plays well.**
+**M6 (the platform, the submission; M7 since 2026-09-23, §14, and M8
+since 2026-09-24, §15) starts only when the game plays well.**
 Basic Launch is not a beta: the platform reads the three KPIs from the first
 day and a game that is not good gets its verdict in a week; updates during
 Basic Launch continue, they do not rescue a bad first week. So a polish
@@ -1155,8 +1160,9 @@ behaviour (§13.8) rides on these bodies.
 ## 14. M6 "The board": rivals, their cars, your style — set here, 2026-09-23
 
 Marcin, after the M5.5 gate: a new M6 before the platform, the platform
-becoming M7 (decided). What M6 is, is my idea (set here; he overrides).
-The contract is `docs/M6_PLAN.md`; the platform's is `docs/M7_PLAN.md`.
+becoming M7 (decided; M8 since 2026-09-24, §15). What M6 is, is my idea (set
+here; he overrides). The contract is `docs/M6_PLAN.md`; the platform's is
+`docs/M8_PLAN.md`.
 
 ### 14.1 What is missing after M5.5
 
@@ -1271,7 +1277,7 @@ works this way. **The car's kit belongs to a car in the garage**: the paint
   the upgrade tiers (eight of its ten purchases today are stat tiers, which
   nobody sees).
 - **The day's pick**: one kit item a day by the date seed at half price on
-  the STYLE page; in M7 the same item free for a rewarded ad, the half
+  the STYLE page; in M8 the same item free for a rewarded ad, the half
   price as the equal alternative. That is the brief's "daily cosmetic
   crate" (§7) without the randomness: PEGI 12 and the brief rule out
   gambling, and a crate you cannot see into is one.
@@ -1310,7 +1316,7 @@ comes with it.
   something visible to buy every few minutes.
 - **Day-1**: a rival nearly beaten, a car nearly won, #2's forty caches,
   the day's pick.
-- **Conversion**: the first minute does not change; M7's cover brief gets a
+- **Conversion**: the first minute does not change; M8's cover brief gets a
   cast (a party bus, a granny's wagon, a duck on a roof).
 - **Cost**: fourteen bodies (M5.5 built eight in one slice), two duel
   formats on the race and the takedown, eight twists on systems that exist,
@@ -1320,13 +1326,123 @@ comes with it.
 ### 14.8 What this section changes elsewhere
 
 - §11: M6 is the board; the platform (the brief's M6) is M7 (decided by
-  Marcin, 2026-09-23).
+  Marcin, 2026-09-23; M8 since 2026-09-24, §15).
 - §3.3's car list (Hatch, Van, Coupe, Muscle Pro, GT) is superseded by the
   bodies of §14.6.
 - `docs/BACKLOG.md`: the garage keeps classes and SELL / KEEP at a fence
   are scheduled (M6 slice 0).
 - The brief's v1 items it closes: visual customization (paint, wheels,
   toppers) and the eight vehicles (twenty-eight).
+
+## 15. M7 "Polish": the same game, finished — set here, 2026-09-24
+
+Marcin, after the M6 gate: the next milestone improves and fixes what the
+game already has, and the platform becomes M8 (decided). What goes in and
+in which order is set here (he overrides). The contract is
+`docs/M7_PLAN.md`; the platform's is `docs/M8_PLAN.md`.
+
+### 15.1 The bar
+
+Nothing new to do: no rival, activity, district or mode. The bar is what a
+player on a weak laptop meets in the first minutes, put as five tests:
+
+1. **It loads every time**, and gives control inside 5 s.
+2. **Nothing on screen covers anything else**, at any of the ten sizes.
+3. **It never stutters**: no frame over 50 ms once driving, and the frame
+   rate where the brief asks for it.
+4. **It sounds alive**: music under the engine that rises with the heat.
+5. **Every promise the rules make holds**: the first car in five to seven
+   minutes (the brief), the bet at the door paying a good driver more, a
+   first rival beaten at the first or second try, civilians and police
+   that never stand nose to nose with the player for good.
+
+### 15.2 What goes in: the recorded issues, worked off
+
+Every issue a player can meet that the M5.5 and M6 gate reports and the
+backlog record is worked off here and not carried again (Marcin at the M1
+gate: a known-issues list is for working off). By test:
+
+- **Loads**: the page stuck at LOADING once in 51 loads at the M6 gate.
+- **Covers**: the top of the screen holds four things with no rule between
+  them (the job line, the news ticker, the key hints, the intro's
+  captions); in the intro's first second the level news prints across
+  "W A S D DRIVE"; a job's card lands on the hints; the streak's pop sits
+  on the speed.
+- **Stutters**: about 2.5 MB of garbage a second and 20–30 ms collections;
+  chunk building in the first second (55–95 ms frames); the quality
+  switch's hitch; the traffic step at 2.4 ms under 4× CPU, the largest
+  share of the step; the heap 10 MB up with every body's mesh built at
+  load; the trees' shadow cost.
+- **Sound**: no music at all. The brief's v1 asks for it once play has
+  started; the licensed-file route has waited since M5 for a file.
+- **Promises**: the economy model red on (a) (a good driver's best door is
+  no higher than a beginner's) and (b) (the first car at minute 3.8); the
+  standoff's civilian pulling toward the player's side; the plain junctions
+  forced through after 9 s about once a minute; a shoved car snapping back
+  onto its lane; police taking corners like traffic; level 4 catching less
+  than levels 2–3; Granny Gears beaten by the careful bot two times in
+  three and by the plain one not at all.
+- **The city's leftovers**: avenues that read as generated (no corner
+  shops, no building that stands out), the parkway's stop line 112 m from
+  its merge, flat road paint, no hideout sign seen from the highway, the
+  big map without blocks, parks or water, the spill's coins appearing in
+  one step, the sweeper's brushes standing still, a rival never seen before
+  their duel, and the wall's keys walking the STYLE page's 59 cards in one
+  line.
+
+### 15.3 Mine, added — set here
+
+- **Our own music.** Synthesized in the browser like the engine and the
+  hidden cars' tunes: no file, no licence question, no bytes to load. One
+  groove in layers that the heat adds (bass and hats at heat 0, drums from
+  1, a lead from 3, an alarm figure at 5), a sting for busted, the escape
+  and the door. It is rendered once after gameplay starts into loops that
+  play in sync, so playing it allocates nothing; the levels fade in over a
+  bar. It sits 14 dB under the master, like the file it replaces.
+- **A settings row on the pause screen**: music, effects, quality (auto,
+  low, high), the radar (turning or north up). Saved. Still no menu before
+  play (brief §3).
+- **Skid marks.** A drift, a hard stop or a burnout leaves dark marks on the
+  asphalt where the tyres were, fading after 30 s. Anchored in the world,
+  the drift's own trace rather than a screen effect: Marcin's rule for
+  effects is grounded and deliberate.
+- **The screen's lanes.** The top centre is one lane with a priority: the
+  intro's caption, then a job's card, then the job line, then the news. The
+  key hints leave the top for the bottom centre; the pops (streak, tips,
+  bounties) get their own lane under the bag.
+- **The first rival is beaten at the first or second try.** Granny's pace
+  is set so the plain bot beats her at least once in three and the careful
+  bot every time: the board's first step teaches that rivals can be beaten.
+- **Far props leave the traffic alone.** The hidden cars and the rivals'
+  parked cars take records outside the traffic's pool, are not counted in
+  its density and draw none of its random numbers, so adding one far away
+  moves nothing near the player. The M5.5 and M6 gates each lost hours to
+  bot tests flipped by such moves.
+
+### 15.4 What stays out
+
+New content of any kind; the platform (M8: the SDK, touch, the mobile tier,
+the ads, the day's pick as a rewarded offer); cop mode, ghosts,
+multiplayer; the multi-storey car park; the test bots' own limits that no
+player meets (race #23's reset loop, the naive hunter's U-turn, the bot at
+roadblocks: recorded, no date); the handling presets, unless Marcin's notes
+ask.
+
+### 15.5 Order
+
+His notes on 0.6.0 come first, each one a slice ahead of the rest. Then in
+the order a player meets things: the workshop (the quick verify under a
+minute, the far props), the screen, the sound, the settings, the skid
+marks, the stutters, the frame budget, the boot, the civilians, the police,
+the money, the city's look, the maps and the wall, the rivals' leftovers,
+the gate. Version 0.7.0, save version 4.
+
+### 15.6 What this changes elsewhere
+
+- §11: M7 is the polish, M8 the platform (decided by Marcin, 2026-09-24).
+- The platform plan is `docs/M8_PLAN.md`; its perf bases become the M7
+  gate's.
+- The backlog lines M7 takes leave `docs/BACKLOG.md` as each ships.
 
 ## References
 

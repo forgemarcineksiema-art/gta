@@ -2,6 +2,17 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — design talk: M7 is the polish, the platform becomes M8
+
+Marcin: the next milestone improves and fixes what the game has; the platform moves to M8 (decided). Set here (DESIGN
+§15): nothing new to do; the bar is five tests a player applies in the first minutes (it loads every time, nothing
+covers anything, it never stutters, it sounds alive, every promise the rules make holds); every recorded issue a
+player can meet (the M5.5 and M6 reports, the backlog's play items) worked off; mine added: our own synthesized
+music that climbs with the heat, a settings row on the pause screen, skid marks, one rule for the top of the screen
+(the intro's first second prints the level news across the key hints today), the first rival beatable at the first
+try, far parked cars kept out of the traffic. Contract `docs/M7_PLAN.md` (slices 0–14); `docs/M7_PLAN.md` renamed
+`docs/M8_PLAN.md`. Verify green before the edits (374 tests). Next: his 0.6.0 notes, then M7 on his word.
+
 ## 2026-09-24 — M6 gate: the numbers
 
 **Verify.** `verify:gate` green: 399 tests with the long pins (215 s), lint 0, build, smoke 59.9 fps, startup 3.88 MB;

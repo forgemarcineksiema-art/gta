@@ -10,8 +10,8 @@ For any coding agent working in this repository (Cursor, Codex, Claude Code):
 3. `docs/PROGRESS.md` is the session log; read the newest entry and the last
    15 commits before starting, and add your own entry before stopping.
 4. Every remaining milestone has a written contract (now `docs/M6_PLAN.md`,
-   the wanted board, at its gate; then `docs/M7_PLAN.md`, the platform; the
-   design behind them in `docs/DESIGN.md`; the finished ones
+   the wanted board, at its gate; then `docs/M7_PLAN.md`, the polish, and
+   `docs/M8_PLAN.md`, the platform; the design behind them in `docs/DESIGN.md`; the finished ones
    `docs/M3_PLAN.md`, `M4_PLAN.md`, `M5_PLAN.md`, `M5.5_PLAN.md`). A contract fixes scope,
    decisions, numbers, tests and the gate; work through its slices in order
    and stop only where it says to stop.

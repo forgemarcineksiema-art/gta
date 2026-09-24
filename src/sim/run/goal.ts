@@ -155,14 +155,14 @@ export function goalFor(sim: SimWorld, out: Goal): void {
       break;
     case STEP.car: {
       const price = BALANCE.prices.compact;
-      if (run.funds >= price) {
+      if (run.bank >= price) {
         out.kind = 'buy';
         out.hasTarget = nearestDoor(sim, out);
         return;
       }
-      if (run.funds >= price * c.buyShare) {
+      if (run.bank >= price * c.buyShare) {
         out.kind = 'buy';
-        out.amount = price - run.funds;
+        out.amount = price - run.bank;
         out.hasTarget = nearestRing(sim, '', out);
         return;
       }

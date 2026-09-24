@@ -199,7 +199,7 @@ export class Kit {
     if (this.has(i)) return 'owned';
     if (k.price <= 0 || !this.fits(i, this.sim.garage.car)) return 'locked';
     const price = this.priceOf(i);
-    if (this.sim.run.funds < price) return 'cash';
+    if (this.sim.run.bank < price) return 'cash';
     this.sim.run.spend(price);
     this.owned[i] = 1;
     if (isCarSlot(k.slot)) this.fit(i, this.sim.garage.car);

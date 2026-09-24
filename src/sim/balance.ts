@@ -237,7 +237,7 @@ export const BALANCE = {
   prep: { lawyer: 5000, lawyerKeep: 0.75, fence: 8000, fenceBonus: 0.5 },
   /**
    * The first quarter hour's chain (docs/DESIGN.md §13.4): step 6 banks `bankGoal` in one run, step 4 escapes from
-   * `escapeLevel`; the goal line names the first car once the funds reach `buyShare` of its price; the BORROW
+   * `escapeLevel`; the goal line names the first car once the bank reaches `buyShare` of its price; the BORROW
    * prompt's second line shows the first `hintTimes` times.
    */
   chain: { bankGoal: 20000, escapeLevel: 2, buyShare: 0.6, hintTimes: 3 },

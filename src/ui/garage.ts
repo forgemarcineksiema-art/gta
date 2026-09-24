@@ -266,7 +266,7 @@ export class GarageUi {
     this.hint = el('div', 'wall__hint');
     const bank = el('div', 'wall__bank');
     this.bankValue = el('span', 'wall__bank-value', '0');
-    bank.append(el('span', 'wall__bank-label', 'CASH'), this.bankValue);
+    bank.append(el('span', 'wall__bank-label', 'BANK'), this.bankValue);
     this.driveButton = button('wall__drive', 'DRIVE OUT');
     this.driveButton.addEventListener('click', () => { if (!this.offerOpen) this.actions.driveOut(); });
     footer.append(this.hint, bank, this.driveButton);
@@ -387,7 +387,7 @@ export class GarageUi {
   update(sim: SimWorld): void {
     if (!this.isOpen) return;
     const g = sim.garage;
-    const funds = sim.run.funds;
+    const funds = sim.run.bank;
     if (g.serial + sim.kit.serial * 4096 === this.garageSerial && funds === this.bank && sim.dailies.serial === this.dailySerial && sim.run.hot === this.hot) return;
     this.hot = sim.run.hot;
     this.garageSerial = g.serial + sim.kit.serial * 4096;

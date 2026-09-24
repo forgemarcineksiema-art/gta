@@ -17,7 +17,7 @@ import { BODY_IDS, type BodyId } from '../traffic/bodies';
 import { CAR_IDS, type CarId } from '../vehicle/presets';
 import { DEFAULT_SETTINGS, QUALITY_SETTINGS, type Settings } from '../settings';
 
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 
 export type Tiers = [number, number, number];
 
@@ -69,11 +69,11 @@ export interface SaveCareer {
 }
 
 export interface SaveDoc {
-  v: 5;
+  v: 6;
   /** The cold open was shown (started, completed or skipped): never again for this profile. */
   seen: boolean;
+  /** Everything the player owns in money: the road coins are in it since v6 (M8.5 D1). */
   bank: number;
-  coins: number;
   /** The garage car: what boot and every drive-out put the player in (M6: a body, any owned car). */
   car: BodyId;
   /** Always contains 'muscle'. The catalogue's, the kept, the found and the won, in `BODY_IDS` order. */
@@ -120,10 +120,9 @@ export type SaveV1 = SaveDoc;
 
 function defaults(): SaveDoc {
   return {
-    v: 5,
+    v: 6,
     seen: false,
     bank: 0,
-    coins: 0,
     car: 'muscle',
     owned: ['muscle'],
     paint: {},
@@ -184,7 +183,6 @@ export function serialize(save: SaveDoc): string {
     v: save.v,
     seen: save.seen,
     bank: save.bank,
-    coins: save.coins,
     car: save.car,
     owned: BODY_IDS.filter((id) => save.owned.includes(id)),
     paint,
@@ -259,6 +257,12 @@ const MIGRATIONS: Record<number, (raw: Record<string, unknown>) => Record<string
   3: (raw) => ({ ...raw, v: 4, settings: { ...DEFAULT_SETTINGS } }),
   // M8: the career's smashed things; an M7 save starts at none (the sanitizer's 0)
   4: (raw) => ({ ...raw, v: 5 }),
+  // M8.5: one purse; the road coins' pool folds into the bank (a broken field adds nothing)
+  5: (raw) => {
+    const out: Record<string, unknown> = { ...raw, v: 6, bank: amount(raw['bank']) + amount(raw['coins']) };
+    delete out['coins'];
+    return out;
+  },
 };
 
 /** Walks the table from the document's version to `SAVE_VERSION`, then keeps every valid field. Unknown or newer versions give the defaults. */
@@ -280,7 +284,6 @@ function sanitize(raw: Record<string, unknown>): SaveDoc {
   const out = defaults();
   out.seen = bool(raw['seen'], false);
   out.bank = amount(raw['bank']);
-  out.coins = amount(raw['coins']);
   const owned = Array.isArray(raw['owned']) ? raw['owned'] : [];
   out.owned = BODY_IDS.filter((id) => id === 'muscle' || owned.includes(id));
   const car = raw['car'];
@@ -367,11 +370,10 @@ function sanitize(raw: Record<string, unknown>): SaveDoc {
  */
 export function collect(sim: SimWorld, into: SaveDoc): void {
   const run = sim.run, garage = sim.garage, dailies = sim.dailies;
-  into.v = 5;
+  into.v = 6;
   // shown once per profile: a cold open that has started counts, so a reload mid-way never repeats it
   into.seen = sim.coldOpen.seen || sim.coldOpen.active;
   into.bank = run.bank;
-  into.coins = run.coins;
   into.bestRun = run.bestRun;
   into.runs = run.runs;
   into.playSeconds = run.playSeconds;
@@ -443,7 +445,6 @@ export function apply(sim: SimWorld, save: SaveDoc): void {
   const run = sim.run, garage = sim.garage, dailies = sim.dailies;
   sim.coldOpen.seen = save.seen;
   run.bank = save.bank;
-  run.coins = save.coins;
   run.bestRun = save.bestRun;
   run.runs = save.runs;
   run.playSeconds = save.playSeconds;

@@ -38,7 +38,7 @@ import { describe, expect, it } from 'vitest';
 import { BotPolicy, type PolicyName } from '../../src/app/botPolicy';
 import { CITY_BOT_TUNING, TrackBot, type TrackBotTuning } from '../../src/app/trackBot';
 import { BALANCE } from '../../src/sim/balance';
-import type { SimWorld } from '../../src/sim';
+import type { SimEvent, SimWorld } from '../../src/sim';
 import { createWorld, run, runUntil } from './helpers';
 import { best, COLD_OPEN, evTable, LEVELS, pooled, verdict, type ModelInput } from './model';
 
@@ -97,7 +97,12 @@ async function earnings(seed: number): Promise<{ bag: number; coins: number; job
     const bot = new BotPolicy('novice', new TrackBot(sim.carId, BOT.novice));
     let bag = 0;
     let last = 0;
+    // the road coins' money from the ring (M8.5: they land in the bank with everything else)
+    let coins = 0;
+    let cursor = sim.events.sequence;
+    const onCoin = (e: SimEvent): void => { if (e.kind === 'coin' && e.target !== -2) coins += e.value; };
     run(sim, SECONDS, (_t, c, s) => {
+      cursor = s.events.readFrom(cursor, onCoin);
       // the bag keeps what it earned even across a card or a door
       if (s.run.bag > last) bag += s.run.bag - last;
       last = s.run.bag;
@@ -108,7 +113,8 @@ async function earnings(seed: number): Promise<{ bag: number; coins: number; job
     // the repeatable jobs: a duel (M6) pays its purse once, one rival at a time behind the board's requirements
     const jobs = sim.jobs.defs.filter((d) => d.kind !== 'escape' && d.kind !== 'duel');
     const jobMean = jobs.reduce((n, d) => n + d.payout, 0) / jobs.length;
-    return { bag: bag / (SECONDS / 60), coins: sim.run.coins / (SECONDS / 60), jobMean };
+    sim.events.readFrom(cursor, onCoin);
+    return { bag: bag / (SECONDS / 60), coins: coins / (SECONDS / 60), jobMean };
   } finally { sim.dispose(); }
 }
 

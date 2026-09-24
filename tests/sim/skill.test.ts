@@ -22,6 +22,13 @@ function values(sim: SimWorld, kind: string, from: number): number[] {
   return out;
 }
 
+/** The road coins picked since `from`: in the bank with the rest since M8.5 (a spilled coin is the bag's). */
+function roadCoins(sim: SimWorld, from: number): number {
+  let n = 0;
+  sim.events.readFrom(from, (e) => { if (e.kind === 'coin' && e.target !== -2) n += e.value; });
+  return n;
+}
+
 function nearMisses(sim: SimWorld, n: number): void {
   for (let k = 0; k < n; k++) sim.events.push('nearMiss', 0, sim.probe.x, 0, sim.probe.z, -1);
   run(sim, 1 / 60);
@@ -147,7 +154,7 @@ describe('hunts', () => {
       run(sim, 2 / 60);
       expect(c.smashedCount).toBe(c.total);
       expect(values(sim, 'hunt', seq)).toEqual([BALANCE.hunts.billboards]);
-      expect(sim.run.bank - bank).toBe(BALANCE.hunts.billboards);
+      expect(sim.run.bank - bank - roadCoins(sim, seq)).toBe(BALANCE.hunts.billboards);
 
       // nineteen ramps found: the jump off the first one (the 6.14 launch) completes the set
       for (let i = 1; i < jumps.descs.length; i++) jumps.found[i] = 1;
@@ -167,7 +174,7 @@ describe('hunts', () => {
       });
       expect(values(sim, 'hunt', seq)).toEqual([BALANCE.hunts.jumps]);
       expect(jumps.foundCount).toBe(jumps.descs.length);
-      expect(sim.run.bank - bank).toBe(BALANCE.hunts.jumps);
+      expect(sim.run.bank - bank - roadCoins(sim, seq)).toBe(BALANCE.hunts.jumps);
 
       // the save: the ramps found come back
       const doc = defaultSave();

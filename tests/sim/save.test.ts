@@ -2,7 +2,8 @@
  * The save format (docs/M5_PLAN.md slice 0): the round trip and its stable
  * string, parsing that never throws, the v0 migration, the size guard with
  * everything filled, and collect / apply against a world. Version 3 (M6 slice
- * 0): the garage keeps bodies, the M6 fields are reserved.
+ * 0): the garage keeps bodies, the M6 fields are reserved. Version 6 (M8.5
+ * slice 0): the road coins' pool folds into the bank.
  */
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../src/sim/balance';
@@ -22,10 +23,9 @@ function filled(smashedIds: number[]): SaveV1 {
   const ramps = new Uint8Array(20);
   for (const k of [1, 7, 19]) ramps[k] = 1;
   return {
-    v: 5,
+    v: 6,
     seen: true,
     bank: 123456,
-    coins: 7890,
     car: 'sports',
     owned: ['muscle', 'compact', 'heavy', 'sports', 'police', 'taxi', 'icecream'],
     paint: { muscle: PALETTE.carLime, compact: PALETTE.carBlack, sports: PALETTE.carMagenta, taxi: PALETTE.coin },
@@ -95,7 +95,8 @@ describe('save format', () => {
     expect(save.v).toBe(SAVE_VERSION);
     expect(save.owned).toEqual(['muscle', 'compact']);
     expect(save.car).toBe('compact');
-    expect(save.bank).toBe(5000);
+    // v6 folds the coins into the bank
+    expect(save.bank).toBe(5120);
     expect(save.seen).toBe(true);
     expect(parse(JSON.stringify({ bank: 10 })).owned).toEqual(['muscle']);
     // garbage fields fall back one by one
@@ -126,7 +127,6 @@ describe('save format', () => {
       expect(sim.collectibles!.smashedCount).toBe(smashed.length);
       for (const id of smashed) expect(sim.collectibles!.smashed[id]).toBe(1);
       expect(sim.run.bank).toBe(123456);
-      expect(sim.run.coins).toBe(7890);
       expect(sim.coldOpen.seen).toBe(true);
       expect(sim.pursuit.descriptor.kind).toBe('sports');
       expect(sim.pursuit.descriptor.paint).toBe(PALETTE.carMagenta);
@@ -144,7 +144,8 @@ describe('save format', () => {
     const v1 = { v: 1, bank: 777, coins: 12, seen: true, owned: ['muscle', 'compact'], car: 'compact', smashed: '' };
     const save = migrate(v1);
     expect(save.v).toBe(SAVE_VERSION);
-    expect(save.bank).toBe(777);
+    // the coins folded in at v6
+    expect(save.bank).toBe(789);
     expect(save.caches).toEqual({ date: '', found: '' });
     expect(save.chain).toBe(0);
     expect(save.borrowHints).toBe(0);
@@ -171,7 +172,8 @@ describe('save format', () => {
     expect(save.streak.topper).toBe(true);
     expect(save.chain).toBe(63);
     expect(save.medals).toBe('32');
-    expect(save.bank).toBe(4321);
+    // the coins folded in at v6
+    expect(save.bank).toBe(4376);
     expect('hidden' in save).toBe(false);
     // a class driven out stays the car; a found car not driven out is owned all the same
     const b = migrate({ ...v2, drive: '' });
@@ -186,13 +188,27 @@ describe('save format', () => {
     const v3: Record<string, unknown> = { ...(JSON.parse(serialize(filled([4]))) as Record<string, unknown>), v: 3 };
     delete v3['settings'];
     const save = migrate(v3);
-    expect(save.v).toBe(5);
+    expect(save.v).toBe(SAVE_VERSION);
     expect(save.settings).toEqual({ music: 7, effects: 10, quality: 'auto', radarNorth: false });
     expect(save.bank).toBe(123456);
     const bad = parse(JSON.stringify({ ...filled([]), settings: { music: 11, effects: 4, quality: 'ultra', radarNorth: 'yes' } }));
     expect(bad.settings).toEqual({ music: 7, effects: 4, quality: 'auto', radarNorth: false });
     const good = parse(serialize(filled([])));
     expect(good.settings).toEqual({ music: 3, effects: 8, quality: 'low', radarNorth: true });
+  });
+
+  it('M8.5 0.2 an M8 document (v5) folds its coins into the bank; v6 writes no coins and reads back equal', () => {
+    const v5: Record<string, unknown> = { ...(JSON.parse(serialize(filled([4]))) as Record<string, unknown>), v: 5, bank: 1_000, coins: 7_890 };
+    const save = migrate(v5);
+    expect(save.v).toBe(6);
+    expect(save.bank).toBe(8_890);
+    expect('coins' in save).toBe(false);
+    const text = serialize(save);
+    expect(text).not.toContain('"coins"');
+    expect(parse(text)).toEqual(save);
+    // a broken pool adds nothing; a broken bank keeps the pool
+    expect(migrate({ ...v5, coins: -5 }).bank).toBe(1_000);
+    expect(migrate({ ...v5, bank: 'lots' }).bank).toBe(7_890);
   });
 
   it('M6 G.2 everything M6 can hold (every car owned, painted and fitted, the whole kit, the board beaten, a long career) round-trips under the size guard', () => {

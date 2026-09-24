@@ -1,6 +1,7 @@
 /**
  * The run on the HUD (docs/STYLE.md, the run HUD): the bag under the stars
- * with the multiplier the run is earning, the busted bar while it fills, the
+ * with the multiplier the run is earning, the bank under it (the road coins
+ * land in it, M8.5 D1), the busted bar while it fills, the
  * busted card and the wall of totals behind a shut door. Yellow is money that
  * is not yours yet. DOM writes only on change; reads sim state only.
  */
@@ -17,9 +18,9 @@ export class RunHud {
   private readonly bag: HTMLElement;
   private readonly bagValue: HTMLElement;
   private readonly mult: HTMLElement;
-  private readonly coinRow: HTMLElement;
-  private readonly coinValue: HTMLElement;
-  private lastCoins = -1;
+  private readonly bankRow: HTMLElement;
+  private readonly bankValue: HTMLElement;
+  private lastBank = -1;
   private coinPopLeft = 0;
   private capFlashLeft = 0;
   private coinPop = false;
@@ -61,10 +62,10 @@ export class RunHud {
     this.mult = el('span', 'run__mult', '×1');
     this.bag.append(this.bagValue, this.mult);
     this.bag.setAttribute('aria-label', 'Bag');
-    // coins under the bag, white: they are the player's the moment they are picked
-    this.coinRow = el('div', 'run__coins');
-    this.coinValue = el('span', 'run__coins-value', '0');
-    this.coinRow.append(el('span', 'run__coin-glyph'), this.coinValue);
+    // the bank under the bag, white, with the coin: a road coin is in it the moment it is picked
+    this.bankRow = el('div', 'run__coins');
+    this.bankValue = el('span', 'run__coins-value', '0');
+    this.bankRow.append(el('span', 'run__coin-glyph'), this.bankValue);
     // the busted bar is the officer's ticket book (M5.5 slice 18): three lines written as it fills
     this.bar = el('div', 'run__busted');
     const pad = el('div', 'run__ticket');
@@ -93,10 +94,10 @@ export class RunHud {
     this.wallSentence = el('div', 'run__sentence', 'CRIMES FILL THE BAG · THE POLICE MULTIPLY IT · THE DOOR BANKS IT');
     page.append(el('div', 'run__title', 'BANKED'), this.wallLines, this.wallSentence, this.wallFirst, this.wallCounts, this.wanted);
     this.wall.append(page);
-    this.root.append(this.bag, this.coinRow, this.bar, this.card, this.wall);
+    this.root.append(this.bag, this.bankRow, this.bar, this.card, this.wall);
     parent.appendChild(this.root);
     this.bag.classList.toggle('is-visible', sim.city !== null);
-    this.coinRow.classList.toggle('is-visible', sim.city !== null);
+    this.bankRow.classList.toggle('is-visible', sim.city !== null);
     this.update(sim, 0);
   }
 
@@ -123,23 +124,24 @@ export class RunHud {
       this.bagValue.textContent = money(shown);
       this.lastBagShown = shown;
     }
-    if (run.coins !== this.lastCoins) {
-      this.coinValue.textContent = money(run.coins);
-      if (this.lastCoins >= 0) {
+    if (run.bank !== this.lastBank) {
+      this.bankValue.textContent = money(run.bank);
+      // money in pops the number (a coin, a line's cap flashes); money spent behind the door does not
+      if (this.lastBank >= 0 && run.bank > this.lastBank) {
         this.coinPopLeft = COIN_POP_SECONDS;
-        if (run.coins - this.lastCoins >= BALANCE.coin.cap) this.capFlashLeft = CAP_FLASH_SECONDS;
+        if (run.bank - this.lastBank >= BALANCE.coin.cap) this.capFlashLeft = CAP_FLASH_SECONDS;
       }
-      this.lastCoins = run.coins;
+      this.lastBank = run.bank;
     }
     if (this.coinPopLeft > 0 || this.coinPop) {
       this.coinPopLeft = Math.max(0, this.coinPopLeft - dt);
       const pop = this.coinPopLeft > COIN_POP_SECONDS / 2;
-      if (pop !== this.coinPop) { this.coinPop = pop; this.coinRow.classList.toggle('is-pop', pop); }
+      if (pop !== this.coinPop) { this.coinPop = pop; this.bankRow.classList.toggle('is-pop', pop); }
     }
     if (this.capFlashLeft > 0 || this.capFlash) {
       this.capFlashLeft = Math.max(0, this.capFlashLeft - dt);
       const flash = this.capFlashLeft > 0;
-      if (flash !== this.capFlash) { this.capFlash = flash; this.coinRow.classList.toggle('is-cap', flash); }
+      if (flash !== this.capFlash) { this.capFlash = flash; this.bankRow.classList.toggle('is-cap', flash); }
     }
     const m = run.multiplier;
     if (m !== this.lastMult) {
@@ -178,7 +180,7 @@ export class RunHud {
       this.card.classList.toggle('is-visible', run.state === 'busted');
       this.wall.classList.toggle('is-visible', run.state === 'door');
       this.bag.classList.toggle('is-hidden', run.state === 'busted' || run.state === 'door');
-      this.coinRow.classList.toggle('is-hidden', run.state === 'busted' || run.state === 'door');
+      this.bankRow.classList.toggle('is-hidden', run.state === 'busted' || run.state === 'door');
     }
   }
 
@@ -206,7 +208,7 @@ export class RunHud {
     const step = chainStep(run.chain);
     const noCar = !sim.garage.owned.has('compact');
     const price = BALANCE.prices.compact;
-    const firstCar = run.funds >= price ? `FIRST NEW CAR: ${money(price)} · IT IS YOURS IN CARS` : `FIRST NEW CAR: ${money(price)} · YOU HAVE ${money(run.funds)}`;
+    const firstCar = run.bank >= price ? `FIRST NEW CAR: ${money(price)} · IT IS YOURS IN CARS` : `FIRST NEW CAR: ${money(price)} · YOU HAVE ${money(run.bank)}`;
     const next = step >= 0 && step <= STEP.car && noCar ? firstCar
       : step >= 0 ? `NEXT: ${CHAIN_STEPS[step] ?? ''} · STEP ${step + 1} OF ${CHAIN_STEPS.length}`
         : noCar ? firstCar : boardLine(sim);

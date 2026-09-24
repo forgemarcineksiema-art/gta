@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M8.5 slice 0: one bank
+
+Marcin: "Wykonaj". Done: a road coin lands in the bank the moment it is picked (a spilled coin still in the bag);
+`Run.coins` and `Run.funds` are gone, every price checks the bank; save v6 folds a stored pool into the bank. The HUD's
+white number with the coin is the bank, the wall's footer says BANK (was CASH): the wall's BANK and the footer are one
+number. Pins M8.5 0.1–0.3; moved: coins 3.9 and 3.12 (the bank), the save's version and the migrations' banks (the
+coins folded in), caches 1.6 and hunts 14.5 (a cap and a gate coin now land in the bank), long game 9.1 (the version);
+the balance counts the road coins from the event ring. ARCHITECTURE 88. Verify green.
+
 ## 2026-09-24 — design talk: the clean screen (M8.5) before the platform
 
 Marcin brought a review of the screen ("too dense for a child": fourteen things on a calm drive, seven tabs on the

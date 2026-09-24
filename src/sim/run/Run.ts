@@ -42,10 +42,8 @@ export class Run {
   state: RunState = 'running';
   /** At risk until a door. */
   bag = 0;
-  /** Safe. */
+  /** Safe: the doors' banked bags, the fines kept, the dailies, and every road coin the moment it is picked (M8.5 D1). */
   bank = 0;
-  /** Picked up on the road: the player's at once, never at risk (slice 3b). */
-  coins = 0;
   /** The highest heat level at which the pursuit was active this run (D3): what the door multiplies by. */
   maxHeat = 0;
   /** 0..1 while the door closes. */
@@ -189,20 +187,10 @@ export class Run {
     this.startRun();
   }
 
-  /**
-   * What the garage can spend: the bank and the coins (DESIGN.md §3.3 counts both toward the first car; the
-   * pools stay apart, D14: coins never enter the bank).
-   */
-  get funds(): number {
-    return this.bank + this.coins;
-  }
-
-  /** The garage takes from the bank first, then the coins; false (and nothing taken) when both hold less. */
+  /** The garage takes from the bank; false (and nothing taken) when it holds less. */
   spend(amount: number): boolean {
-    if (!(amount >= 0) || this.funds < amount) return false;
-    const fromBank = Math.min(this.bank, amount);
-    this.bank -= fromBank;
-    this.coins -= amount - fromBank;
+    if (!(amount >= 0) || this.bank < amount) return false;
+    this.bank -= amount;
     return true;
   }
 
@@ -495,10 +483,10 @@ export class Run {
         this.bank += e.value;
         break;
       case 'coin':
-        // a spilled coin (target -2) was the bag's and goes back into it; a road coin is the player's for good
+        // a spilled coin (target -2) was the bag's and goes back into it; a road coin is the player's for good, in the bank
         if (e.target === -2) this.bag += e.value;
         else {
-          this.coins += e.value;
+          this.bank += e.value;
           this.counts.coins++;
         }
         break;

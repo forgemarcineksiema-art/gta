@@ -8,7 +8,7 @@ import type { SimWorld } from '../../src/sim';
 import { RIVALS, reqText } from '../../src/sim/board/rivals';
 import { PROP_TYPES, type PropDesc, type PropKind } from '../../src/sim/city/props';
 import { DAILY_TEMPLATES } from '../../src/sim/dailies/Dailies';
-import { collect, defaultSave, migrate, parse, serialize, versionOf } from '../../src/sim/save/format';
+import { SAVE_VERSION, collect, defaultSave, migrate, parse, serialize, versionOf } from '../../src/sim/save/format';
 import { createWorld, run } from './helpers';
 
 function standing(sim: SimWorld, kind: PropKind): PropDesc[] {
@@ -23,18 +23,18 @@ function smash(sim: SimWorld, p: PropDesc, player = true): void {
 }
 
 describe('the long game (M8 slice 9)', () => {
-  it('M8 9.1 a v4 save migrates to v5 with nothing smashed; the career\'s count round-trips through a world', async () => {
+  it('M8 9.1 a v4 save migrates (to v5, and on to the current version) with nothing smashed; the career\'s count round-trips through a world', async () => {
     const v4: Record<string, unknown> = { ...(JSON.parse(serialize(defaultSave())) as Record<string, unknown>), v: 4 };
     const career = { ...(v4['career'] as Record<string, unknown>) };
     delete career['smashed'];
     v4['career'] = career;
     const migrated = migrate(v4);
-    expect(migrated.v).toBe(5);
+    expect(migrated.v).toBe(SAVE_VERSION);
     expect(migrated.career.smashed).toBe(0);
     const doc = defaultSave();
     doc.career.smashed = 1234;
     const text = serialize(doc);
-    expect(versionOf(text)).toBe(5);
+    expect(versionOf(text)).toBe(SAVE_VERSION);
     expect(parse(text)).toEqual(doc);
     const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false, save: doc });
     try {

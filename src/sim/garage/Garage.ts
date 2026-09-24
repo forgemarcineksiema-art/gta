@@ -4,8 +4,8 @@
  * catalogue's five, any civilian body brought home and kept, the hidden cars
  * found), the paint per car, three upgrade stats in three tiers per class (a
  * tier on the muscle class drives every muscle-class body), the two prep
- * items, and the police car's unlock. Cash only: the bank and the coins
- * (`Run.funds`). Upgrades are multipliers on the body's tuning applied at
+ * items, and the police car's unlock. Cash only: the bank (`Run.bank`, the
+ * road coins in it since M8.5). Upgrades are multipliers on the body's tuning applied at
  * drive-out, tier 0 equal to it bitwise, so every handling pin stands and
  * `CAR_PRESETS` is never edited.
  *
@@ -79,7 +79,7 @@ export class Garage {
   canBuy(body: BodyId): BuyResult {
     if (this.owned.has(body)) return 'owned';
     if (!isShell(body) || (body === 'police' && !this.policeUnlocked)) return 'locked';
-    return this.sim.run.funds >= this.price(body) ? 'ok' : 'cash';
+    return this.sim.run.bank >= this.price(body) ? 'ok' : 'cash';
   }
 
   /** Takes the price from the bank on 'ok' and pushes 'purchase' (value: the price, target: the body's index). */
@@ -109,7 +109,7 @@ export class Garage {
     if (this.owned.has(body)) return 'owned';
     if ((body === 'police' && !this.policeUnlocked) || isRivalBody(body)) return 'locked';
     const price = this.keepPrice(body);
-    if (this.sim.run.funds < price) return 'cash';
+    if (this.sim.run.bank < price) return 'cash';
     this.sim.run.spend(price);
     this.own(body, paint);
     this.car = body;
@@ -152,7 +152,7 @@ export class Garage {
     if (!this.owned.has(body)) return 'locked';
     const price = this.tierPrice(body, stat);
     if (!Number.isFinite(price)) return 'owned';
-    if (this.sim.run.funds < price) return 'cash';
+    if (this.sim.run.bank < price) return 'cash';
     this.sim.run.spend(price);
     const tiers = this.tiers[this.classOf(body)];
     const i = STATS.indexOf(stat);
@@ -166,7 +166,7 @@ export class Garage {
   buyPrep(item: PrepItem): BuyResult {
     if (this.prep[item]) return 'owned';
     const price = BALANCE.prep[item];
-    if (this.sim.run.funds < price) return 'cash';
+    if (this.sim.run.bank < price) return 'cash';
     this.sim.run.spend(price);
     this.prep[item] = true;
     this.serial++;

@@ -63,7 +63,9 @@ describe('coins', () => {
       expect(sim.coins!.pickedCount - before).toBe(runCoins.length);
       for (const e of runCoins) expect(sim.coins!.picked[e.id]).toBe(1);
       expect(sim.coins!.routePicked).toBe(runCoins.length);
-      expect(sim.run.coins).toBe(worth);
+      // in the bank the moment they are picked (M8.5 D1), counted one by one for the wall and the dailies
+      expect(sim.run.bank).toBe(worth);
+      expect(sim.run.counts.coins).toBe(runCoins.length);
       expect(sim.run.bag).toBe(0);
       driveStraight(sim, { x, z, yaw }, 0, startS, endS);
       expect(sim.coins!.pickedCount - before).toBe(runCoins.length);
@@ -135,7 +137,7 @@ describe('coins', () => {
     } finally { sim.dispose(); }
   }, 60_000);
 
-  it('3.12 coins survive busted: the fine takes half the bag and none of the coins', async () => {
+  it('3.12 coins survive busted: the fine takes half the bag and none of the bank the coins are in', async () => {
     const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false, heat: 20 });
     sim.police!.dispatching = false;
     try {
@@ -147,11 +149,10 @@ describe('coins', () => {
       sim.vehicle.teleport({ x: px, y: 0.8, z: pz }, site.yaw);
       for (const across of [3.5, -3.5]) (sim.traffic as Traffic).spawnParkedPolice(px - fz * across, pz + fx * across, site.yaw, 'police');
       sim.run.bag = 4_000;
-      sim.run.coins = 730;
+      sim.run.bank = 730;
       run(sim, 3.5);
       expect(sim.run.state).toBe('busted');
-      expect(sim.run.coins).toBe(730);
-      expect(sim.run.bank).toBe(2_000);
+      expect(sim.run.bank).toBe(730 + 2_000);
     } finally { sim.dispose(); }
   }, 60_000);
 });

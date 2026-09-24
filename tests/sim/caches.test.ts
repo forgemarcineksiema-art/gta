@@ -64,18 +64,20 @@ describe('caches', () => {
       const coins = sim.coins!;
       const bank = sim.run.bank;
       const seq = sim.events.sequence;
+      // each cap is a coin worth `cacheCap`, in the bank the moment it is picked (M8.5); the bonuses come on top
+      const cap = BALANCE.coin.cacheCap;
       for (let k = 0; k < 9; k++) coins.take(capId(sim, k), sim.events);
       run(sim, 0.1);
       expect(caches.count).toBe(9);
-      expect(sim.run.bank).toBe(bank);
+      expect(sim.run.bank).toBe(bank + 9 * cap);
       coins.take(capId(sim, 9), sim.events);
       run(sim, 0.1);
       expect(caches.count).toBe(10);
-      expect(sim.run.bank).toBe(bank + (C.bonus[0] as number));
+      expect(sim.run.bank).toBe(bank + 10 * cap + (C.bonus[0] as number));
       for (let k = 10; k < 30; k++) coins.take(capId(sim, k), sim.events);
       run(sim, 0.1);
       expect(caches.count).toBe(30);
-      expect(sim.run.bank).toBe(bank + (C.bonus[0] as number) + (C.bonus[1] as number) + (C.bonus[2] as number));
+      expect(sim.run.bank).toBe(bank + 30 * cap + (C.bonus[0] as number) + (C.bonus[1] as number) + (C.bonus[2] as number));
       let events = 0, bonuses = 0;
       sim.events.readFrom(seq, (e) => { if (e.kind === 'cache') { events++; if (e.value > 0) bonuses++; } });
       expect(events).toBe(30);

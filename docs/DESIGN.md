@@ -746,8 +746,9 @@ both.
   the trophies each best at one thing, every body its own mass, grass and
   dirt with a 4×4 class, the steamroller, the monster truck and the rocket
   trolley, the motorbike, the hovercraft and the sea, the mega-ramp, then the
-  police and the rivals on the player's car model if the budget holds. On
-  his word after M8.7's gate.
+  police and the rivals on the player's car model if the budget holds.
+  Beside M8.9, each in its own worktree (Marcin, 2026-09-25; `CLAUDE.md`,
+  Two milestones at once).
 - **M8.9 The look** (set here 2026-09-25 after a review of every screen,
   which Marcin accepted whole with his bar: six out of ten, "it must be ten,
   at least nine"; its design and its contract are one document,
@@ -755,8 +756,9 @@ both.
   colour for one meaning, one typeface in two styles, a HUD that scales with
   the screen, one message at a time, a radar that answers three questions,
   signs that read from afar and never block, the garage as a showroom with
-  a picture on every card. After M8.8's gate, before the platform; its slice
-  0 (two faults of M8.7) on his word before M8.8.
+  a picture on every card. Beside M8.8, before the platform (Marcin,
+  2026-09-25; `CLAUDE.md`, Two milestones at once); its slice 0 (two faults
+  of M8.7) first.
 - **M9 Platform**, the brief's M6 (`docs/M9_PLAN.md`), then Basic Launch;
   only when all of it is in and on his word that the game is good.
 - Later, by the KPIs: cop mode, ghosts, multiplayer (§8).

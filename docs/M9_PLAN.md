@@ -27,7 +27,8 @@ places the radar as this plan says), one colour for one meaning (a
 touch button's colour follows the table), the fonts in the build, and the
 gate's frames for the cover and the screenshots.
 
-Executor: the agent that starts after the M8.9 gate, on Marcin's word.
+Executor: the agent that starts after the M8.8 and M8.9 gates (the two run
+side by side, `CLAUDE.md`), on Marcin's word.
 Reviewer: Claude, at the gate. Director, tester on real devices and the one
 who submits: Marcin. This document is the milestone contract: what to build,
 in which order, with which numbers, and what "done" means; each fixed

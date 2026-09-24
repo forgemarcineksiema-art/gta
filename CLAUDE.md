@@ -9,10 +9,28 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 
 ## Session start
 
-1. Read this file, `docs/PROGRESS.md` and the current milestone contract (M8.7's gate closed at 0.8.7, `docs/M8.7_REPORT.md`; next `docs/M8.8_PLAN.md`, the fleet (its design and contract in one file), on Marcin's word; then `docs/M8.9_PLAN.md`, the look (the same form; its slice 0, two faults of M8.7, on his word before M8.8); then `docs/M9_PLAN.md`, the platform, only on his word; the design in `docs/DESIGN.md`, §20 first); check `git log --oneline -15`.
+1. Read this file, `docs/PROGRESS.md` and your milestone's contract. Two run at once (see **Two milestones at once** below): `docs/M8.8_PLAN.md`, the fleet, and `docs/M8.9_PLAN.md`, the look (each its design and contract in one file; M8.9's slice 0, two faults of M8.7, first); then `docs/M9_PLAN.md`, the platform, after both gates, only on Marcin's word; the design in `docs/DESIGN.md`, §20 first. M8.7's gate closed at 0.8.7 (`docs/M8.7_REPORT.md`). Check `git log --oneline -15`.
 2. Run `npm run verify` (the quick set) before touching anything and at the commit that ends a slice. `npm run verify:gate` (the long bot-driven pins included) only at a milestone gate. Nothing else per slice: see **Pace** below, and read it before every slice.
 3. Work autonomously inside the milestone. Decide, act, note assumptions in `docs/PROGRESS.md`. Stop only at a gate, before destructive/irreversible operations, to change a fixed decision from the brief, or when blocked on something only Marcin can provide.
 4. Commit small and often; never leave significant work uncommitted. Commit messages end with a `Co-Authored-By:` line naming the model that did the work (e.g. `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`).
+
+## Two milestones at once (Marcin, 2026-09-25)
+
+M8.8 "The fleet" (`docs/M8.8_PLAN.md`) and M8.9 "The look" (`docs/M8.9_PLAN.md`) are built at the same time, each by its own session in its own git worktree and branch; M9 starts after both gates. Where either plan says it waits for the other's gate, this section decides: they run side by side, and the handovers of rule 4 replace the waiting.
+
+| | M8.8 the fleet | M8.9 the look |
+|---|---|---|
+| Session | "Pojazdy w grze" | "UI/UX i style" |
+| Branch | `m8.8-fleet` (worktree `.claude/worktrees/m8.8-fleet`) | `m8.9-ui` (its own worktree) |
+| Owns | the sim (vehicles, bodies, traffic, police, the ground and the sea, jobs), the cars' and the traffic's meshes, the engine voices | how the screen and the world look: `src/ui/` (styles, HUD, wall, maps), the light, the sky, the city's colours, the signs' look, the showroom and its pictures |
+
+1. **Nobody works in the main folder** (`C:\Games\Nowy folder (6)`): it holds `main` for the merges and Marcin's `npm start`. Each session works in its own worktree (`npm ci` there once) and never `cd`s into the other's.
+2. **A slice reaches main whole**: commit on the branch; `git merge main` into the branch and resolve there; `npm run verify` green; then `git -C "C:\Games\Nowy folder (6)" merge --ff-only <branch>`. If the fast-forward fails (the other got there first) or git reports `index.lock`, merge main again and repeat. No `git add -A`; no push without Marcin's word.
+3. **Shared files are added to, not rewritten**: `src/ui/pl.ts`, `tests/ui/words.test.ts`, `tests/ui/lang.test.ts`, `src/sim/palette.ts`, `src/sim/glyphs.ts`, `docs/PROGRESS.md` (entries at the top, newest first), `docs/BACKLOG.md`, `docs/STYLE.md`; a conflict keeps both sides. Before a slice that touches a file the other also changes (`src/ui/wall/garage.ts`, `src/ui/map/*`, `src/render/cars/PlayerCar.ts`, `src/render/cars/bodyMesh.ts`, `src/render/camera/CameraDirector.ts`, `src/render/run/MarkerView.ts`, `src/render/city/CityView.ts`, `src/app/App.ts`, `src/audio/Sfx.ts`), merge main in first.
+4. **Handovers.** The fleet's screen work is content: its card lines (a class's job, BEST AT, ONLY IT; the words from `src/sim/jobs/catalog.ts`), the player at sea on the maps and the sea trial's route go through what M8.9 has on main (its colours, scale, radar, showroom); where M8.9's slice for that place is not in yet, the fleet builds its sim side and leaves the drawing until it is. The look dresses what is on main when its slice runs: its pictures cover every body in `BODIES` (its pin 14.1), so a body the fleet adds after that slice brings its picture, and its light covers the ground and the sea that are there.
+5. **The save's version**: a slice that needs a new one takes the number after the one on main.
+6. **Servers, measurements, gates.** 4173 is Marcin's game (`npm start`). Playwright reuses whatever answers on 4173 (`reuseExistingServer`), so a session runs an e2e suite, M8.9's stills included, only on its own port (M8.9's slice 1 takes it from an environment variable) or with 4173 free; otherwise it measures another build. The perf, the e2e suites, the look gate, the balance and a gate run only when Marcin says the other session is idle, the gates one at a time. M8.7's unrun perf A/B, e2e suites and balance (its report) fall to the first gate. Each gate's perf is an A/B against 0.8.7 (`52db2bc`), and against the other's gate build if that closed first. A gate sets `package.json` to its own version unless a higher one is on main.
+7. **CLAUDE.md** is edited by the fleet's session only; the look's session passes its lines (its gate's colour table and typeface) to Marcin, who hands them over.
 
 ## Where things live
 
@@ -30,9 +48,9 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 | `docs/M6_PLAN.md` | The finished contract of the wanted board (DESIGN §14; kept for its numbers and as-built notes). |
 | `docs/M4_PLAN.md`, `docs/M5_PLAN.md` | The finished contracts (kept for their numbers and as-built notes). M4's §5 holds the contract for post-launch update 1. |
 | `docs/M5.5_PLAN.md` | The finished contract before it: the whole game before the platform (kept for its numbers and as-built notes). |
-| `docs/M8.8_PLAN.md` | The fleet: its design and its contract in one document (Marcin's request, 2026-09-24): a job for every class, trophies each best at one thing, the 4×4 and the ground, three crazy cars, the motorbike, the hovercraft and the sea, the mega-ramp, the police and the rivals on the car model. After M8.7's gate and before the platform (Marcin, 2026-09-25). |
-| `docs/M8.9_PLAN.md` | The look: its design and its contract in one document, from a review of every screen that Marcin accepted with his bar (6/10 now, 9 at least): the world at a real golden hour and lit at dusk, one colour for one meaning, one typeface in two styles, a HUD that scales with the screen, one message at a time, a radar that answers three questions, signs that read from afar and never block, the garage as a showroom. After M8.8's gate; its slice 0 before M8.8. |
-| `docs/M9_PLAN.md` | The platform contract (SDK adapter, touch, mobile tier, submission), the brief's M6, after M8.9's gate on Marcin's word. |
+| `docs/M8.8_PLAN.md` | The fleet: its design and its contract in one document (Marcin's request, 2026-09-24): a job for every class, trophies each best at one thing, the 4×4 and the ground, three crazy cars, the motorbike, the hovercraft and the sea, the mega-ramp, the police and the rivals on the car model. Beside M8.9 and before the platform (Marcin, 2026-09-25; **Two milestones at once**). |
+| `docs/M8.9_PLAN.md` | The look: its design and its contract in one document, from a review of every screen that Marcin accepted with his bar (6/10 now, 9 at least): the world at a real golden hour and lit at dusk, one colour for one meaning, one typeface in two styles, a HUD that scales with the screen, one message at a time, a radar that answers three questions, signs that read from afar and never block, the garage as a showroom. Beside M8.8 (Marcin, 2026-09-25; **Two milestones at once**); its slice 0 first. |
+| `docs/M9_PLAN.md` | The platform contract (SDK adapter, touch, mobile tier, submission), the brief's M6, after the M8.8 and M8.9 gates on Marcin's word. |
 | `docs/ARCHITECTURE.md` | Structure, dependency justifications, decision records. |
 | `docs/DEV.md` | Servers and ports, the build stamp, test URLs, QA hooks, the suites, scratch folders. `npm start` (4173) is the one way to play; `npm run dev` (5173) is for editing. |
 | `docs/BACKLOG.md` | Out-of-milestone ideas and non-blocking bugs, one line of context each. |

@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — two milestones at once: M8.8 beside M8.9 (Marcin)
+
+Marcin runs M8.8 (the fleet; session "Pojazdy w grze", branch `m8.8-fleet`) and M8.9 (the look; "UI/UX i style",
+`m8.9-ui`) at the same time, each in its own worktree; M9 after both gates. The rules are CLAUDE.md's new section: nobody
+works in the main folder; a slice reaches main by merging main in, verify, then `merge --ff-only`; shared files are added
+to; the fleet's screen work goes through M8.9's look, and M8.9's pictures cover every body. Found: Playwright reuses
+whatever answers on 4173, so an e2e run beside Marcin's game measures main's build. M8.8's plan follows (its gate runs
+M8.7's unrun perf A/B, e2e and balance if M8.9's has not; its perf is an A/B against 0.8.7); DESIGN §11 and M9's header
+say side by side, M9 after both. Docs only.
+
 ## 2026-09-25 — M8.9 "The look" planned (a review of every screen with Marcin)
 
 Marcin opened a talk on the UI, the UX and the style: look at everything first. Every state captured in Polish at

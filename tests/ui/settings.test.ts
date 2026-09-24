@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { volumeGain } from '../../src/sim';
-import { advance, type MinimapState } from '../../src/ui/minimapModel';
+import { advance, type MinimapState } from '../../src/ui/map/minimapModel';
 
 describe('the settings', () => {
   it('M7 3.2 a volume step maps to a gain on a dB curve: 10 is 0 dB, 3 dB a step, 0 is silence', () => {

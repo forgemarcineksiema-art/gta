@@ -97,7 +97,7 @@ As built in M5 (docs/M5_REPORT.md; read before slice 0):
   there is no offer and at the busted card; none at the session's first door.
   `adsAvailable('rewarded')` hides every video button: the SDK adapter must
   return false there when `hasAdblock()` is true (CRAZYGAMES.md A12).
-- The wall is `ui/garage.ts`: every item is already a DOM button with the
+- The wall is `ui/wall/garage.ts`: every item is already a DOM button with the
   key's handler and the panel takes pointer events, so touch gets the
   garage by tapping; the driving controls are the touch work.
 - The screens spec shoots ten states (hud, pause, life, bar, busted, door,
@@ -223,7 +223,7 @@ src/platform/index.ts              createPlatform(): the ladder of D1; exports t
 src/main.ts                        the sitelock gate before App.boot; the blank page path
 src/input/touchModel.ts            TouchLayout, layout(w, h, safe), steerValue(x, originX, w), hitTest(layout, x, y): Control | null
 src/input/TouchDevice.ts           pointer events → raw actions; one pointer per control; label() → ''
-src/ui/touch.ts                    the control layer DOM (zones and buttons), safe-area padding, show/hide rules, the swap prompt as a button
+src/ui/hud/touch.ts                the control layer DOM (zones and buttons), safe-area padding, show/hide rules, the swap prompt as a button
 src/ui/rotate.ts                   the portrait overlay
 src/ui/styles.css                  touch layer, rotate overlay, safe-area padding on HUD edges, radar top-left on touch
 src/render/quality.ts              QUALITY.mobile, the resolution floor per tier; Renderer.ts the tier from device type
@@ -338,7 +338,7 @@ export class TouchDevice implements InputDevice {
 ```
 
 ```ts
-// src/ui/touch.ts
+// src/ui/hud/touch.ts
 export class TouchLayer { constructor(parent: HTMLElement, input: InputManager); show(): void; hide(): void; readonly visible: boolean; layout(): TouchLayout; update(sim: SimWorld): void /* the swap prompt button follows Life.swapCandidate */ }
 // src/ui/rotate.ts
 export class RotateOverlay { constructor(parent: HTMLElement, onChange: (portrait: boolean) => void); dispose(): void }
@@ -474,9 +474,9 @@ Acceptance: verify green; the checklist's counts per status in PROGRESS
 
 ### Slice 2 — touch controls (2.5 days)
 
-Files: `src/input/touchModel.ts`, `TouchDevice.ts`, `src/ui/touch.ts`,
-`styles.css`, `App.ts`, `ui/hud.ts` (keycaps hidden on touch, the swap
-prompt as the button), `ui/minimap.ts` (position), `tests/input/touch.test.ts`,
+Files: `src/input/touchModel.ts`, `TouchDevice.ts`, `src/ui/hud/touch.ts`,
+`styles.css`, `App.ts`, `ui/hud/hud.ts` (keycaps hidden on touch, the swap
+prompt as the button), `ui/map/minimap.ts` (position), `tests/input/touch.test.ts`,
 `e2e/mobile.spec.ts`.
 
 Behaviour:
@@ -583,7 +583,7 @@ from what the proxy showed (512 or 0), with the numbers.
 
 ### Slice 4 — ads and data through the real adapter (1 day)
 
-Files: `App.ts`, `ui/run.ts`, `ui/garage.ts`, `e2e/platform.spec.ts`,
+Files: `App.ts`, `ui/hud/run.ts`, `ui/wall/garage.ts`, `e2e/platform.spec.ts`,
 `docs/SUBMISSION.md` (the QA log starts here).
 
 Behaviour: the M5 flows unchanged in logic, exercised through

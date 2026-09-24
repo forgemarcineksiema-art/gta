@@ -9,8 +9,8 @@
  * Pure: the HUD asks `speak` once per event and draws what it says; `Pops`
  * is the side stack's model (two at most, the newest over the oldest's slot).
  */
-import { BODY_WORDS, DISTRICTS, RIVALS, paintName, posterNumber, unpackDescriptor, type EventKind } from '../sim';
-import { fixed, paintedCar, t } from './lang';
+import { BODY_WORDS, DISTRICTS, RIVALS, paintName, posterNumber, unpackDescriptor, type EventKind } from '../../sim';
+import { fixed, paintedCar, t } from '../lang';
 
 export type Where = 'top' | 'pop' | 'none';
 

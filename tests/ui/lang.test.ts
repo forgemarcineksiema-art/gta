@@ -17,13 +17,13 @@ import { DAILY_TEMPLATES } from '../../src/sim/dailies/Dailies';
 import { PAINT_NAMES } from '../../src/sim/jobs/catalog';
 import { fixed, num, paintedCar, polishForm, setLang, t } from '../../src/ui/lang';
 import { PL, PL_GENDER, PL_PAINT } from '../../src/ui/pl';
-import { countsLine, doorLines } from '../../src/ui/totals';
-import { newSaid, speak } from '../../src/ui/voice';
+import { countsLine, doorLines } from '../../src/ui/hud/totals';
+import { newSaid, speak } from '../../src/ui/hud/voice';
 
 const ROOT = new URL('../../', import.meta.url);
 const read = (file: string): string => readFileSync(new URL(file, ROOT), 'utf8');
 /** The screen's code: the UI but the dictionary itself and the developer's tools, and the app's words. */
-const UI = readdirSync(new URL('src/ui/', ROOT)).filter((f) => f.endsWith('.ts') && !['pl.ts', 'lang.ts', 'debugPanel.ts', 'telemetryGraph.ts'].includes(f)).map((f) => `src/ui/${f}`);
+const UI = readdirSync(new URL('src/ui/', ROOT), { recursive: true, encoding: 'utf8' }).map((f) => f.replaceAll('\\', '/')).filter((f) => f.endsWith('.ts') && !['pl.ts', 'lang.ts', 'dev/debugPanel.ts', 'dev/telemetryGraph.ts'].includes(f)).map((f) => `src/ui/${f}`);
 const CODE = [...UI, 'src/app/App.ts', 'src/app/bootWatch.ts', 'src/main.ts', 'src/sim/board/rivals.ts', 'src/sim/dailies/Dailies.ts'];
 const LITERAL = String.raw`('(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*")`;
 const NBSP = String.fromCharCode(0xa0);

@@ -13,8 +13,8 @@
 import {
   BALANCE, BODY_WORDS, CAR_WORDS, CHAIN_STEPS, CHIEF, MEDAL_WORDS, PLACE_WORDS, RIVALS, STEP, chainStep, goalFor, newGoal, paintName, posterNumber, reqText,
   trialTimes, unpackDescriptor, type GoalKind, type JobDef, type RivalDef, type SimWorld,
-} from '../sim';
-import { num, paintedCar, t } from './lang';
+} from '../../sim';
+import { num, paintedCar, t } from '../lang';
 
 const KIND_TITLE: Record<JobDef['kind'], string> = { delivery: 'DELIVERY', order: 'STEAL TO ORDER', escape: 'ESCAPE', trial: 'TIME TRIAL', race: 'STREET RACE', rage: 'TAKEDOWN RAGE', mayhem: 'MAYHEM', fare: 'FARE', duel: 'WANTED BOARD' };
 

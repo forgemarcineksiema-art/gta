@@ -1,4 +1,4 @@
-import type { SimWorld } from '../sim';
+import type { SimWorld } from '../../sim';
 
 /**
  * Heat persists after escape; only the active pursuit makes the filled stars

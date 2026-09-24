@@ -4,7 +4,7 @@
  * and the rim clamp for markers out of range. No DOM and no physics import, so
  * it runs in Node tests. The painter (`minimap.ts`) draws what this computes.
  */
-import { HIGHWAY_HALF, ROAD_HALF, type RoadGraph, type RoadPoint } from '../sim/city/roads';
+import { HIGHWAY_HALF, ROAD_HALF, type RoadGraph, type RoadPoint } from '../../sim/city/roads';
 
 export const MINIMAP = {
   /** Visible world radius in metres at rest and at `zoomTopKmh`. */

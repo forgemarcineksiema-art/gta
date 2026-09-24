@@ -6,7 +6,7 @@
  * caption; the column's order is fixed.
  */
 import { describe, expect, it } from 'vitest';
-import { TOP_ORDER, arrangeTop, topBit, type TopItem } from '../../src/ui/lanes';
+import { TOP_ORDER, arrangeTop, topBit, type TopItem } from '../../src/ui/hud/lanes';
 
 describe('the top of the screen', () => {
   it('M7 1.1 every combination: the job line, a card and a caption always show; the hints and the news wait under a card or a caption', () => {

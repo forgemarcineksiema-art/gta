@@ -6,9 +6,9 @@
  */
 import { describe, expect, it } from 'vitest';
 import { PALETTE, RIVALS, packDescriptor, type EventKind } from '../../src/sim';
-import { screenTaken } from '../../src/ui/corners';
-import { arrangeTop, topBit } from '../../src/ui/lanes';
-import { POP_SECONDS, POP_SLOTS, Pops, WHERE, newSaid, speak, type VoiceContext } from '../../src/ui/voice';
+import { screenTaken } from '../../src/ui/hud/corners';
+import { arrangeTop, topBit } from '../../src/ui/hud/lanes';
+import { POP_SECONDS, POP_SLOTS, Pops, WHERE, newSaid, speak, type VoiceContext } from '../../src/ui/hud/voice';
 
 const CTX: VoiceContext = { jumps: 4, jumpsTotal: 20, boards: 13, boardsTotal: 50, cachesTotal: 30, cameraLimits: [50, 80] };
 const SUSPECT = packDescriptor('muscle', PALETTE.carRed);

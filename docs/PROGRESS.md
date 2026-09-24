@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — the screen's code in folders
+
+Marcin: "continue with the ui". Decided here (ARCHITECTURE 98): `hud/` (the driving screen, nine files), `map/` (radar,
+full map), `wall/` (the garage's wall), `dev/` (tuning panel, traces); the root keeps lang, pl, styles and the pause
+screen's settings, so every path CLAUDE.md names stands. 17 files moved with `git mv`, imports rewritten in app and tests,
+ui paths in the living docs; M9's touch layer planned into `hud/`. The words pins (M8.5 4.1, PL 1) listed `src/ui/` flat:
+now recursive, the same 19 and 16 files read. No code changed. Verify green (build, smoke and budget on a copy of the
+commit, port 4174: `npm start` serves this checkout's dist).
+
 ## 2026-09-24 — Polish, the default language (Marcin's word)
 
 Done (DESIGN §19): every word on the screen goes through `t()` (`ui/lang.ts`), `ui/pl.ts` holds 455 Polish texts keyed by

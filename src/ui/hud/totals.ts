@@ -6,9 +6,9 @@
  * `run.ts` and `garage.ts` draw what these build, in the player's language
  * (`lang.ts`, DESIGN.md §19).
  */
-import { BALANCE } from '../sim/balance';
-import { CHAIN_STEPS, RIVALS, STEP, chainStep, posterNumber, reqText, type RunCounts, type SimWorld } from '../sim';
-import { num, t } from './lang';
+import { BALANCE } from '../../sim/balance';
+import { CHAIN_STEPS, RIVALS, STEP, chainStep, posterNumber, reqText, type RunCounts, type SimWorld } from '../../sim';
+import { num, t } from '../lang';
 
 export interface Line {
   label: string;

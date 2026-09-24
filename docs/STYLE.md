@@ -204,7 +204,7 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   italic uppercase with 0.08 em tracking, skewed −10°, ink with a flat black
   shadow; gains in accent yellow. Each shows for 1.2 s; two slots (four until
   M8.5) recycle in order so a burst never reflows. Since M8.5 (DESIGN.md
-  §17.3, `src/ui/voice.ts`) a pop is only what pays or counts outside the
+  §17.3, `src/ui/hud/voice.ts`) a pop is only what pays or counts outside the
   combo (TAKEDOWN!, BILLBOARD 13/50, FLASHED, COPS LOST YOU, COMBO +2,100,
   DAILY DONE…); the combo's tricks, DODGED and FRESH WHEELS say nothing, and
   nothing pops over the wall or the busted card. The ticker's lead for the
@@ -215,7 +215,7 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   reset key) at stage 4.
 - Swap prompt (M3): a keycap and SWAP in accent cyan at 18 px, centred above
   the speedo, only while a car is within reach; never a button.
-- The corners (M8.5, DESIGN.md §17.2; `src/ui/corners.ts` decides): a calm
+- The corners (M8.5, DESIGN.md §17.2; `src/ui/hud/corners.ts` decides): a calm
   drive shows seven things, the goal line and the arrow (top centre), the
   stars and the bank (top right), the radar (bottom left), the speed and
   the boost (bottom right). The bag shows from its first money and its ×
@@ -240,7 +240,7 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   clamp to the rim with a chevron when out of range: this is the compass cue for
   places the street canyons hide. No text inside the circle but the rotating N;
   the district and landmark names sit above it at 12 px. Flat drop shadow, no
-  glow. Numbers in `MINIMAP` (`src/ui/minimapModel.ts`).
+  glow. Numbers in `MINIMAP` (`src/ui/map/minimapModel.ts`).
 
 ## Traffic and pedestrians (M3)
 
@@ -368,7 +368,7 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   values right-aligned and the one that counts in yellow, one line of run
   counts in 16 px that wraps only at its separators, and a keycap with ANY
   KEY. The swap prompt hides while either is up. Since M8.5 (DESIGN.md
-  §17.5, `src/ui/totals.ts`) the wall says BANKED (GARAGE for an empty bag)
+  §17.5, `src/ui/hud/totals.ts`) the wall says BANKED (GARAGE for an empty bag)
   with a NEW BEST tag in accent cyan when it is one, then one line of sums
   (`BAG 32,500 ×2.6` … `+84,500`), the sentence while it teaches, the next
   goal and the counts; the busted card `BAG 48,750 · YOU KEEP HALF` …
@@ -423,7 +423,7 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   the limit at 14 px dim (`1:15 · FASTER PAYS MORE`, `4:00 FROM THE SWAP ·
   NO SCRATCHES`, `LOSE THEM`).
 - The wall behind the door is one panel at every drop-off: a row of tabs
-  (since M8.5 four: TOTALS, CARS, STYLE, GOALS, `src/ui/wallPages.ts`; CARS
+  (since M8.5 four: TOTALS, CARS, STYLE, GOALS, `src/ui/wall/wallPages.ts`; CARS
   carries TUNE's rows and PREP's under the cars, GOALS the day's three, the
   board and the hunts; the current tab on accent
   yellow), one page at a time, and a footer with the key hint, BANK in

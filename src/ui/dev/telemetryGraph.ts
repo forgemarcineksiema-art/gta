@@ -3,7 +3,7 @@
  * g, tyre slip, steering, throttle and brake. Ten seconds of history from a ring
  * buffer, redrawn a few times a second. Dev-only; reads sim telemetry only.
  */
-import type { VehicleTelemetry } from '../sim';
+import type { VehicleTelemetry } from '../../sim';
 
 const HISTORY = 600; // ticks (10 s at 60 Hz)
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { KIT } from '../../src/sim/garage/kit';
-import { STYLE_SLOTS, GARAGE_PAINTS } from '../../src/ui/garage';
-import { gridMove, gridStart, type GridMove, type GridPos } from '../../src/ui/wallGrid';
+import { STYLE_SLOTS, GARAGE_PAINTS } from '../../src/ui/wall/garage';
+import { gridMove, gridStart, type GridMove, type GridPos } from '../../src/ui/wall/wallGrid';
 
 /** Every card reached from the first by the keys, and whether S from the first row leaves the page. */
 function walk(rows: number[]): { reached: Set<string>; leaves: boolean } {

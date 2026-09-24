@@ -7,8 +7,8 @@
 import { describe, expect, it } from 'vitest';
 import type { SimWorld } from '../../src/sim';
 import { BALANCE } from '../../src/sim/balance';
-import { cardLines, countsLine, doorLines } from '../../src/ui/totals';
-import { PAGE_TITLES, WALL_ACTIONS, WALL_PAGES, pageOf } from '../../src/ui/wallPages';
+import { cardLines, countsLine, doorLines } from '../../src/ui/hud/totals';
+import { PAGE_TITLES, WALL_ACTIONS, WALL_PAGES, pageOf } from '../../src/ui/wall/wallPages';
 import { createWorld, run, runUntil } from '../sim/helpers';
 
 /** Into the hideout with `bag` at heat 0: the door shuts and banks it. */

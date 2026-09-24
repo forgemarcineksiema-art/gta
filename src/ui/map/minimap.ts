@@ -5,9 +5,9 @@
  * Repaints at most every `MINIMAP.repaintMs` and never while nothing moved, so
  * a parked or paused game costs no canvas work. The maths is in `minimapModel`.
  */
-import { BALANCE, CITY_HALF, DISTRICTS, PALETTE, districtAt, type SimWorld } from '../sim';
-import { LANDMARKS } from '../sim/city/City';
-import { labelAria, relabel, t } from './lang';
+import { BALANCE, CITY_HALF, DISTRICTS, PALETTE, districtAt, type SimWorld } from '../../sim';
+import { LANDMARKS } from '../../sim/city/City';
+import { labelAria, relabel, t } from '../lang';
 import { MINIMAP, advance, buildRoadLayers, clampToRim, project, yawFromQuat, type MinimapState, type Vec2 } from './minimapModel';
 
 export type MarkerKind = 'tower' | 'tank' | 'glasshouse' | 'hotel' | 'garage' | 'job' | 'cache' | 'camera' | 'breaker';

@@ -8,15 +8,15 @@
  * repaints at most every `REPAINT_MS` while shown and costs nothing hidden.
  * Reads sim state only; the radar's paths and glyphs are shared.
  */
-import { BALANCE, BreakerState, CITY_HALF, DISTRICTS, PALETTE, type BreakerDesc, type JobKind, type SimWorld } from '../sim';
-import { LANDMARKS, cityFootprints } from '../sim/city/City';
-import { COVER } from '../sim/city/covers';
-import { BLOCK, HIGHWAY_HALF, OVERPASS, OVERPASS_NODES } from '../sim/city/roads';
+import { BALANCE, BreakerState, CITY_HALF, DISTRICTS, PALETTE, type BreakerDesc, type JobKind, type SimWorld } from '../../sim';
+import { LANDMARKS, cityFootprints } from '../../sim/city/City';
+import { COVER } from '../../sim/city/covers';
+import { BLOCK, HIGHWAY_HALF, OVERPASS, OVERPASS_NODES } from '../../sim/city/roads';
 import {
   CACHE_COLOR, DARK, FONT, GLYPH_KINDS, GRID, INK, JOB_COLORS, LOOP, ACCENT, RIVAL, SEARCH_EDGE, SEARCH_FILL, UNIT_BEAT, UNIT_LIT, WATER,
   drawArrow, drawGlyph, drawHeli, fillIsland, hex, type MapPaths, type MarkerKind,
 } from './minimap';
-import { label, labelAria, relabel, t } from './lang';
+import { label, labelAria, relabel, t } from '../lang';
 import { MINIMAP, bigMapProject, bigMapScale, yawFromQuat, type Vec2 } from './minimapModel';
 
 /** Repaint cadence while shown, ms: the units move, the map need not be smoother than the radar. */

@@ -5,13 +5,13 @@
  * a debug block, a pause overlay and the keycap hint strip. Reads sim state
  * only.
  */
-import { AgentState, BALANCE, POLICE, districtAt } from '../sim';
-import type { EventKind, SimEvent, SimWorld } from '../sim';
-import { BigMap } from './bigmap';
+import { AgentState, BALANCE, POLICE, districtAt } from '../../sim';
+import type { EventKind, SimEvent, SimWorld } from '../../sim';
+import { BigMap } from '../map/bigmap';
 import { DRIVE, drive, hintRows, newDriveState, newPlaceClock, readDrive, screenTaken, tickPlace, type KeyHints } from './corners';
-import { Minimap } from './minimap';
+import { Minimap } from '../map/minimap';
 import { HeatHud } from './heat';
-import { label, num, relabel, t } from './lang';
+import { label, num, relabel, t } from '../lang';
 import { POP_SLOTS, Pops, newSaid, speak, type VoiceContext } from './voice';
 
 export type { KeyHints } from './corners';

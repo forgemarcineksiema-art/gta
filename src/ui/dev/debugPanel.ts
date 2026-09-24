@@ -4,7 +4,7 @@
  * patch" copies only the values that differ from the defaults, ready to paste
  * into src/sim/vehicle/tuning.ts.
  */
-import { DEFAULT_TUNING, type SimWorld, type VehicleTelemetry } from '../sim';
+import { DEFAULT_TUNING, type SimWorld, type VehicleTelemetry } from '../../sim';
 import { TelemetryGraph } from './telemetryGraph';
 
 type Leaf = { path: string; get: () => number; set: (v: number) => void; def: number };

@@ -5,10 +5,10 @@
  * busted card and the wall of totals behind a shut door. Yellow is money that
  * is not yours yet. DOM writes only on change; reads sim state only.
  */
-import { STEP, type RunState, type SimWorld } from '../sim';
-import { BALANCE } from '../sim/balance';
+import { STEP, type RunState, type SimWorld } from '../../sim';
+import { BALANCE } from '../../sim/balance';
 import { DRIVE, drive, newDriveState, readDrive } from './corners';
-import { label, labelAria, num, relabel, t } from './lang';
+import { label, labelAria, num, relabel, t } from '../lang';
 import { cardLines, countsLine, doorLines, nextLine, type Line } from './totals';
 
 const TWEEN_SECONDS = 0.3;

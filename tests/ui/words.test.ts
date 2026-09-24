@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 import { DAILY_TEMPLATES } from '../../src/sim/dailies/Dailies';
 
 const ROOT = new URL('../../', import.meta.url);
-const UI = readdirSync(new URL('src/ui/', ROOT)).filter((f) => f.endsWith('.ts') && f !== 'pl.ts').map((f) => `src/ui/${f}`);
+const UI = readdirSync(new URL('src/ui/', ROOT), { recursive: true, encoding: 'utf8' }).map((f) => f.replaceAll('\\', '/')).filter((f) => f.endsWith('.ts') && f !== 'pl.ts').map((f) => `src/ui/${f}`);
 const TABLES = ['src/sim/dailies/Dailies.ts', 'src/sim/board/rivals.ts', 'src/sim/run/goal.ts', 'src/sim/jobs/catalog.ts'];
 
 /** §17.4's never-words as they would stand on the screen. */

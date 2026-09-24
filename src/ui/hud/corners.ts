@@ -17,8 +17,8 @@
  * a bit changes. No allocation per frame (`readDrive` fills the caller's
  * object).
  */
-import type { RunState, SimWorld } from '../sim';
-import { t } from './lang';
+import type { RunState, SimWorld } from '../../sim';
+import { t } from '../lang';
 
 /** The driving screen's elements this module decides, a bit each. */
 export const DRIVE = {

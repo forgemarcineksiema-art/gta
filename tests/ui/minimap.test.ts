@@ -5,7 +5,7 @@
  */
 import { describe, expect, test } from 'vitest';
 import { buildRoadGraph } from '../../src/sim/city/roads';
-import { MINIMAP, advance, bigMapProject, bigMapScale, buildRoadLayers, clampToRim, project, wrapAngle, type MinimapState, type Vec2 } from '../../src/ui/minimapModel';
+import { MINIMAP, advance, bigMapProject, bigMapScale, buildRoadLayers, clampToRim, project, wrapAngle, type MinimapState, type Vec2 } from '../../src/ui/map/minimapModel';
 import { CITY_HALF } from '../../src/sim/city/roads';
 
 describe('minimap model', () => {

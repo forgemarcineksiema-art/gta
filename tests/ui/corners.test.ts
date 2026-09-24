@@ -7,7 +7,7 @@
  * hints and the developer's panel only with `?dev=1`.
  */
 import { describe, expect, it } from 'vitest';
-import { DRIVE, PLACE_SECONDS, devTools, drive, driveNames, hintRows, newDriveState, newPlaceClock, tickPlace, type DriveState, type KeyHints } from '../../src/ui/corners';
+import { DRIVE, PLACE_SECONDS, devTools, drive, driveNames, hintRows, newDriveState, newPlaceClock, tickPlace, type DriveState, type KeyHints } from '../../src/ui/hud/corners';
 
 /** A city drive with nothing happening, long after the last district change. */
 function calm(over: Partial<DriveState> = {}): DriveState {

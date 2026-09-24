@@ -5,8 +5,8 @@
  * built once; a frame only toggles a class when the caption changes.
  * Reads sim state only.
  */
-import type { ColdOpenVerb, SimWorld } from '../sim';
-import { label, relabel, t } from './lang';
+import type { ColdOpenVerb, SimWorld } from '../../sim';
+import { label, relabel, t } from '../lang';
 
 export interface ColdOpenKeys {
   throttle: string;

@@ -21,9 +21,9 @@
  * to draw. Rebuilds only when the garage, the bank or the totals change. Every
  * word in the player's language (`lang.ts`, DESIGN.md §19).
  */
-import { huntsLine } from './bigmap';
-import { label, labelAria, num, relabel, t } from './lang';
-import { nextLine } from './totals';
+import { huntsLine } from '../map/bigmap';
+import { label, labelAria, num, relabel, t } from '../lang';
+import { nextLine } from '../hud/totals';
 import { gridMove, gridStart, type GridMove } from './wallGrid';
 import { PAGE_TITLES, WALL_PAGES, pageOf, type WallPage } from './wallPages';
 
@@ -31,7 +31,7 @@ export type { WallPage } from './wallPages';
 import {
   BALANCE, BODY_IDS, BODY_WORDS, CHIEF, DISTRICTS, KIT, MEDAL_WORDS, PALETTE, RIVALS, STATS, STREAK, isCarSlot, isShell, posterNumber, reqText,
   type BodyId, type CarSlot, type KitSlot, type PrepItem, type RivalDef, type SimWorld, type Stat,
-} from '../sim';
+} from '../../sim';
 
 export interface GarageActions {
   buy(car: BodyId): void;

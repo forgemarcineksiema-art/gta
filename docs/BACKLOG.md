@@ -22,16 +22,8 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 ## City / world
 
-- Frontage rows now vary width and variant by index and fill the corners, but a
-  long avenue still reads as generated; shops turning the corner and one
-  authored "special" building per avenue would break the rhythm for good. (M2.2)
-- The parkway joins its junctions tangentially, so its crossing and stop line
-  are 112 m from the node, where the road has finally separated from the
-  street; a give-way line at the actual merge would say more to the player.
-  The two streets it runs beside have no stop line at that end at all. (M2.2)
-- Paint is flat colour with one wear tone; no re-painted patches, no per-block
-  wear variation. Cheap to add as a second `paint` underlay once the flicker
-  capture shows it does not shimmer. (M2.2)
+- The two streets the parkway runs beside have no stop line at its junctions (no room between the merge and the
+  crossing street); the parkway itself gives way at the merge since M7. (M2.2)
 - The spill's twelve coins appear on the lane in one step; a scatter from the
   wreck to their spots over half a second (the fly pool run backwards) would
   make the burst read as one. Render only. (2026-09-23)
@@ -105,6 +97,6 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 ## City v2 (after the M4 run loop works; docs/DESIGN.md §5–6)
 
-- A lit hideout sign visible from the highway (the garages have an orange band over the door and a radar glyph); drop-off approaches with a second, longer way in. (M4/M5)
+- Drop-off approaches with a second, longer way in (the lit signs over the streets shipped in M7). (M4/M5)
 - The music bed (M5 slice 8): one CC0 loop fetched after `gameplayStart()` through the master gain at -14 dB; needs Marcin's yes on the exact file, source and licence before anything is downloaded (docs/ASSETS.md).
 - The naive hunter (`order.long.test.ts`) loses the wanted car where its re-plan routes through a U-turn (M5.5 gate: orders #10 and #16 not reached in 240 s, 4 of 6): a hunter aiming at the car's next junction would make the order e2e and the measurement faster.

@@ -120,6 +120,8 @@ describe('road paint and usable parallel parking', () => {
     }
     expect(Object.fromEntries(perRoad)).toEqual({ 'Crown Diagonal West': 8, 'Crown Diagonal North': 8, 'Garden Parkway': 12, 'Quay Sweep': 16 });
     for (const a of plan.approaches.filter(a => special.has(a.road))) {
+      // the parkway's tangential joins give way at the merge instead (M7 slice 11, pin 11.2)
+      if (special.get(a.road)?.kind === 'parkway') { expect(a.stop).toBeNull(); expect(a.giveWay).not.toBeNull(); continue; }
       expect(a.stop).not.toBeNull();
       if (a.crossing !== null) expect(a.stop).toBe(a.crossing + 5);
     }

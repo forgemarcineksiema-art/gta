@@ -24,14 +24,48 @@ export interface ParkingBay {
 type RoadKind = 'street' | SpecialRoad['kind'] | 'highway';
 interface Road { id: string; kind: RoadKind; points: RoadPoint[]; halfWidth: number; district: string }
 interface Frame extends RoadPoint { tx: number; tz: number }
-/** One approach to a junction, in metres from the node: where the centreline has left the other arms, the crossing centre, the stop line. */
-export interface Approach { road: string; end: boolean; exit: number; crossing: number | null; stop: number | null }
+/**
+ * One approach to a junction, in metres from the node: where the centreline has left the other arms, the crossing
+ * centre, the stop line. A tangential join (the parkway, M7 slice 11) has no stop line: `merge` is where its approach
+ * half has left the other arm, `giveWay` its double broken line's first row.
+ */
+export interface Approach { road: string; end: boolean; exit: number; crossing: number | null; stop: number | null; merge: number | null; giveWay: number | null }
 interface Run { s0: number; s1: number; segment: number; offset: number; width: number; color: number; tag: string }
 
 /** Highway lane dashes: 4 m of paint every 12 m. */
 const LANE_DASH = 12;
 /** Longest merged paint box; keeps every box inside one chunk's neighbourhood. */
 const RUN_MAX = 12;
+/** The give-way line: dashes 0.6 m across with 0.3 m gaps, 0.2 m deep, two rows 0.45 m apart, from 0.3 m off the centreline. */
+const GIVE_WAY = { dash: 0.6, gap: 0.3, depth: 0.2, rows: 0.45, inner: 0.3 } as const;
+/** Worn patches (M7 slice 11): a road's paint wears in stretches of this many metres, about one in four. */
+const WEAR_STRETCH = 36;
+
+/** The dash centres of a give-way row across a half of `halfWidth`, 0.6 m short of its edge. */
+function giveWayDashes(halfWidth: number): number[] {
+  const out: number[] = [];
+  for (let o = GIVE_WAY.inner + GIVE_WAY.dash / 2; o + GIVE_WAY.dash / 2 <= halfWidth - 0.6 + 1e-9; o += GIVE_WAY.dash + GIVE_WAY.gap) out.push(o);
+  return out;
+}
+
+/** A road's wear seed from its id (FNV-1a). */
+function wearSeed(id: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < id.length; i++) { h ^= id.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return h >>> 0;
+}
+
+/** Whether a road's paint is worn in stretch `k` (junction paint asks with its own keys). */
+function wornAt(seed: number, k: number): boolean {
+  let h = Math.imul(seed ^ Math.imul(k, 0x9e3779b1), 0x85ebca6b);
+  h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16;
+  return (h >>> 0) % 4 === 0;
+}
+
+/** The worn tone of a line colour; anything else (the parking's) keeps its colour. */
+export function wornTone(color: number): number {
+  return color === PALETTE.roadWhite ? PALETTE.roadWhiteWorn : color === PALETTE.roadYellow ? PALETTE.roadYellowWorn : color;
+}
 
 /** The perimeter as one closed centreline: four straights joined by quarter circles about the inner kerb corners. */
 export function highwayLoop(): RoadPoint[] {
@@ -106,10 +140,12 @@ export function buildRoadMarkings(graph: RoadGraph, districtAt: (x: number, z: n
       return st;
     };
     const runs = new Map<string, Run>();
+    const wear = wearSeed(road.id);
     const flush = (run: Run) => {
       const a = frame(run.s0, run.offset), b = frame(run.s1, run.offset);
       const distance = Math.hypot(b.x - a.x, b.z - a.z);
-      const st = architecture.box((a.x + b.x) / 2, 0.063, (a.z + b.z) / 2, run.width / 2, 0.001, distance / 2, run.color, run.tag, 'top');
+      const color = wornAt(wear, Math.floor(run.s0 / WEAR_STRETCH)) ? wornTone(run.color) : run.color;
+      const st = architecture.box((a.x + b.x) / 2, 0.063, (a.z + b.z) / 2, run.width / 2, 0.001, distance / 2, color, run.tag, 'top');
       st.rotation = quatFromYaw(Math.atan2(b.x - a.x, b.z - a.z));
     };
     // Consecutive clear strokes of one line merge into a box of at most RUN_MAX;
@@ -162,12 +198,31 @@ export function buildRoadMarkings(graph: RoadGraph, districtAt: (x: number, z: n
         const s = fromNode(end, d), side = end ? 1 : -1;
         if ([1, (0.7 + stopOuter) / 2, stopOuter - 0.3].every(o => clear(frame(s, side * o), 2.5))) { stop = d; break; }
       }
-      const result = { road: road.id, end, exit, crossing, stop };
+      // The parkway joins both junctions tangentially (M7 slice 11): its stop line stood 112 m out, where the whole
+      // road had left the street. It gives way instead where its approach half meets the other arm: the merge is
+      // where that half (the centreline and its kerb-side edge) has left the junction cross, the double broken
+      // line the first place past it where every dash is clear of the street.
+      let merge: number | null = null, giveWay: number | null = null;
+      if (road.kind === 'parkway') {
+        const side = end ? 1 : -1, dashes = giveWayDashes(road.halfWidth);
+        let edge = exit;
+        for (let d = 0; d < 160; d += 0.5) {
+          const p = frame(fromNode(end, d), side * road.halfWidth);
+          if (Math.abs(p.x - node.x) >= vx && Math.abs(p.z - node.z) >= vz) { edge = d; break; }
+        }
+        merge = Math.max(exit, edge);
+        const radius = Math.hypot(GIVE_WAY.dash, GIVE_WAY.depth) / 2;
+        for (let d = merge; d <= merge + 5 && giveWay === null; d += 0.5) {
+          if (dashes.every(o => clear(frame(fromNode(end, d), side * o), radius) && clear(frame(fromNode(end, d + GIVE_WAY.rows), side * o), radius))) giveWay = d;
+        }
+        stop = null;
+      }
+      const result = { road: road.id, end, exit, crossing, stop, merge, giveWay };
       allApproaches.push(result);
       return result;
     };
     const approaches = highway ? null : [approach(false), approach(true)];
-    const margin = (a: Approach) => (a.stop ?? a.exit + 4) + 5;
+    const margin = (a: Approach) => (a.stop ?? (a.giveWay === null ? a.exit + 4 : a.giveWay + GIVE_WAY.rows)) + 5;
     const start = approaches ? margin(approaches[0] as Approach) : 0;
     const finish = approaches ? total - margin(approaches[1] as Approach) : total;
 
@@ -200,10 +255,17 @@ export function buildRoadMarkings(graph: RoadGraph, districtAt: (x: number, z: n
     for (const end of [false, true]) {
       if (!approaches) break;
       const ap = approaches[end ? 1 : 0] as Approach, node = nodeOf(end), sign = end ? 1 : -1, side = sign;
-      if (ap.crossing !== null) for (const o of stripes) rect(fromNode(end, ap.crossing), o, 1.6, 3.5, PALETTE.roadWhite, 'paint-crosswalk', 110);
+      // a junction's paint wears as one: about one approach in four
+      const white = wornAt(wear, -1 - (end ? 1 : 0)) ? PALETTE.roadWhiteWorn : PALETTE.roadWhite;
+      if (ap.crossing !== null) for (const o of stripes) rect(fromNode(end, ap.crossing), o, 1.6, 3.5, white, 'paint-crosswalk', 110);
+      if (ap.giveWay !== null) {
+        for (const row of [0, GIVE_WAY.rows]) for (const o of giveWayDashes(road.halfWidth)) {
+          rect(fromNode(end, ap.giveWay + row), side * o, GIVE_WAY.dash, GIVE_WAY.depth, white, 'paint-giveway', 75);
+        }
+      }
       if (ap.stop === null) continue;
       const s = fromNode(end, ap.stop);
-      rect(s, side * (0.7 + stopOuter) / 2, stopOuter - 0.7, 0.5, PALETTE.roadWhite, 'paint-stop', 75);
+      rect(s, side * (0.7 + stopOuter) / 2, stopOuter - 0.7, 0.5, white, 'paint-stop', 75);
       // Arrows describe the single broad lane: straight on through a crossroads,
       // left or right at the perimeter. An authored road merges at an angle, so
       // its options are the wedge's, and it gets none.
@@ -215,16 +277,16 @@ export function buildRoadMarkings(graph: RoadGraph, districtAt: (x: number, z: n
       const arrow = s - sign * 10;
       if (!clear(frame(arrow, side * 4.5), 2.6)) continue;
       if (canContinue) {
-        rect(arrow - sign * 0.5, side * 4.5, 0.45, 3.6, PALETTE.roadWhite, 'paint-arrow', 100);
+        rect(arrow - sign * 0.5, side * 4.5, 0.45, 3.6, white, 'paint-arrow', 100);
         for (const wing of [-1, 1]) rect(arrow + sign * 1.1, side * 4.5 + wing * 0.55, 0.45, 1.65,
-          PALETTE.roadWhite, 'paint-arrow', 100, PALETTE.asphalt, 0.064, wing * sign * Math.PI / 4);
+          white, 'paint-arrow', 100, PALETTE.asphalt, 0.064, wing * sign * Math.PI / 4);
       } else {
         const bar = arrow + sign * 0.6;
-        rect(arrow - sign * 0.6, side * 4.5, 0.45, 2.4, PALETTE.roadWhite, 'paint-arrow', 100);
-        rect(bar, side * 4.5, 2.9, 0.45, PALETTE.roadWhite, 'paint-arrow', 100);
+        rect(arrow - sign * 0.6, side * 4.5, 0.45, 2.4, white, 'paint-arrow', 100);
+        rect(bar, side * 4.5, 2.9, 0.45, white, 'paint-arrow', 100);
         // A box rotated by t has its length along cos(t)*along - sin(t)*across.
         for (const w of [-1, 1]) for (const u of [-1, 1]) rect(bar + u * 0.45, side * 4.5 + w * 1.25, 0.45, 1.27,
-          PALETTE.roadWhite, 'paint-arrow', 100, PALETTE.asphalt, 0.064, Math.atan2(w, u));
+          white, 'paint-arrow', 100, PALETTE.asphalt, 0.064, Math.atan2(w, u));
       }
     }
 

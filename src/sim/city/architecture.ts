@@ -3,6 +3,31 @@ import { IDENTITY_QUAT, quatFromYaw, type StaticDesc, type BoxFace } from '../sc
 import { CITY_COLORS, PALETTE } from '../palette';
 export { CITY_COLORS } from '../palette';
 
+/** A building's variations (M7 slice 11). */
+export interface BuildingOptions {
+  /** A shop's ground floor on every street face, a house's too, its fascia in the accent: the corner shops. */
+  shop?: boolean;
+  /** The body colour instead of the district's: a landmark's. */
+  body?: number;
+  /** The face pair that takes the quay's loggias when both are street faces (default x). */
+  loggiaAxis?: 'x' | 'z';
+}
+
+/** A landmark's own things (M7 slice 11): its colour and its sign's, and how much taller than its street. */
+export interface LandmarkStyle {
+  body: number;
+  sign: number;
+  floors: number;
+  /** The district style the building is drawn in (the parkway's is an apartment block among the houses). */
+  district: string;
+}
+
+/** A building's wall height over its plinth: the ground floor (a works shed's, a house's, anyone else's) and 3.1 m a floor. */
+export function buildingHeight(district: string, floors: number, shop = false): number {
+  const ground = district === 'foundry' ? 5.4 : district === 'gardens' && !shop ? 2.9 : 3.8;
+  return ground + (floors - 1) * 3.1;
+}
+
 export class Architecture {
   constructor(readonly statics: StaticDesc[]) {}
 
@@ -100,6 +125,38 @@ export class Architecture {
     this.rotateFrom(start, x, z, yaw);
   }
 
+  /**
+   * A corner shop (M7 slice 11): the lot's building with its side face toward the junction (local +X when `turn`
+   * is 1, -X when -1) a street face too, and a shop's ground floor on both, so the ground floor turns the corner.
+   * The collider is the lot's, unchanged.
+   */
+  rotatedCornerShop(x: number, z: number, yaw: number, hx: number, hz: number, district: string, floors: number, variant: number, accent: number, turn: number): void {
+    const start = this.statics.length;
+    this.building(0, 0, hx, hz, district, -turn, 1, floors, variant, accent, true, true, { shop: true, loggiaAxis: 'z' });
+    this.rotateFrom(start, x, z, yaw);
+  }
+
+  /**
+   * An avenue's landmark (M7 slice 11): on the lot's footprint a building of its own kind, taller, in its own
+   * colour, with a lit sign on the roof facing the road and bands of the sign's colour up the street face's
+   * corners. Everything it adds starts over 5 m, clear of the street level the billboards and the cars use.
+   */
+  rotatedLandmark(x: number, z: number, yaw: number, hx: number, hz: number, style: LandmarkStyle, accent: number): void {
+    const start = this.statics.length;
+    this.building(0, 0, hx, hz, style.district, 1, 1, style.floors, 1, accent, false, true, { body: style.body });
+    const top = buildingHeight(style.district, style.floors) + 0.14;
+    // the corner bands: from over the ground floor to the cornice, proud of the street face
+    for (const side of [-1, 1]) this.box(side * (hx - 0.45), (5.2 + top) / 2, -hz - 0.15, 0.45, (top - 5.2) / 2, 0.15, style.sign);
+    // the roof sign: two posts and a framed panel at the street edge of the roof, facing the road
+    const w = Math.min(hx * 0.8, 7), bottom = top + 1.3, h = 3.2;
+    for (const side of [-1, 1]) this.box(side * (w - 0.8), top + 0.7, -hz + 1.2, 0.15, 0.7, 0.15, CITY_COLORS.roof);
+    this.box(0, bottom + h / 2, -hz + 1.35, w + 0.25, h / 2 + 0.25, 0.12, CITY_COLORS.trim);
+    this.box(0, bottom + h / 2, -hz + 1.15, w, h / 2, 0.12, style.sign, 'sign');
+    // its letters as three bars of the building's colour: a sign, not a board
+    for (const bar of [-1, 0, 1]) this.box(bar * w * 0.55, bottom + h / 2, -hz + 1.02, w * 0.18, h * 0.22, 0.02, style.body, 'decor', 'z-');
+    this.rotateFrom(start, x, z, yaw);
+  }
+
   /** Move every static generated since `start` (built about the origin) to (x, z) facing `yaw`. */
   rotateFrom(start: number, x: number, z: number, yaw: number): void {
     const cos = Math.cos(yaw), sin = Math.sin(yaw), rot = quatFromYaw(yaw);
@@ -116,15 +173,17 @@ export class Architecture {
    * and spandrels. Openings are actual voids in that outer shell; glazing lives
    * behind it. No window or balcony is pasted onto an unbroken outer box.
    */
-  building(x: number, z: number, hx: number, hz: number, district: string, sx: number, sz: number, floors: number, variant: number, accent: number, streetX = true, streetZ = true): void {
+  building(x: number, z: number, hx: number, hz: number, district: string, sx: number, sz: number, floors: number, variant: number, accent: number, streetX = true, streetZ = true, opts: BuildingOptions = {}): void {
     const c = CITY_COLORS;
     const industrial = district === 'foundry', house = district === 'gardens';
     const marina = district === 'marina', office = district === 'crown';
-    const ground = industrial ? 5.4 : house ? 2.9 : 3.8;
-    const height = ground + (floors - 1) * 3.1;
+    // a corner shop in the gardens has a shop's ground floor under a house's upper floors
+    const houseGround = house && !opts.shop;
+    const ground = industrial ? 5.4 : houseGround ? 2.9 : 3.8;
+    const height = buildingHeight(district, floors, opts.shop);
     const colors = office ? [c.stone, c.lavender, c.chalk] : industrial ? [c.brick, c.stone, c.yard] : house ? [c.chalk, c.mint, c.peach] : [c.peach, c.chalk, c.mint];
-    const body = colors[variant % colors.length] as number;
-    const loggiaAxis = streetX ? 'x' : 'z';
+    const body = opts.body ?? colors[variant % colors.length] ?? c.stone;
+    const loggiaAxis = opts.loggiaAxis ?? (streetX ? 'x' : 'z');
     const loggia = marina && variant !== 1;
     const shellDepth = loggia ? 1.45 : 0.38;
     this.statics.push({ shape: { kind: 'box', hx, hy: height / 2, hz }, position: { x, y: height / 2 + 0.14, z },
@@ -219,13 +278,13 @@ export class Architecture {
       }
 
       // Ground floor: a small set of planned bays, with a centred entrance.
-      const entryWidth = house ? 1.1 : 1.8;
+      const entryWidth = houseGround ? 1.1 : 1.8;
       const groundOpenings = [
-        { u: -span * 0.56, width: industrial ? span * 0.55 : house ? 1.8 : span * 0.55, bottom: industrial ? 0.2 : house ? 1.05 : 0.65, top: industrial ? 4.35 : house ? 2.35 : 3.05 },
+        { u: -span * 0.56, width: industrial ? span * 0.55 : houseGround ? 1.8 : span * 0.55, bottom: industrial ? 0.2 : houseGround ? 1.05 : 0.65, top: industrial ? 4.35 : houseGround ? 2.35 : 3.05 },
         { u: 0, width: entryWidth, bottom: 0.2, top: 2.5 },
-        { u: span * 0.56, width: industrial ? span * 0.55 : house ? 1.8 : span * 0.55, bottom: industrial ? 0.2 : house ? 1.05 : 0.65, top: industrial ? 4.35 : house ? 2.35 : 3.05 },
+        { u: span * 0.56, width: industrial ? span * 0.55 : houseGround ? 1.8 : span * 0.55, bottom: industrial ? 0.2 : houseGround ? 1.05 : 0.65, top: industrial ? 4.35 : houseGround ? 2.35 : 3.05 },
       ];
-      row(0.14, ground + 0.14, groundOpenings, -shellDepth + 0.03, industrial ? c.brick : house ? body : c.stone);
+      row(0.14, ground + 0.14, groundOpenings, -shellDepth + 0.03, industrial ? c.brick : houseGround ? body : c.stone);
       if (industrial) {
         // Roller shutters are recessed into the loading openings; canopy covers a service bay.
         for (const u of [-span * 0.56, span * 0.56]) {
@@ -234,8 +293,9 @@ export class Architecture {
         }
         solid(-span * 0.56, 4.55, span * 0.32, 0.12, 1.6, -0.2, accent);
       } else {
-        solid(0, 2.68, house ? 0.9 : 1.35, 0.12, house ? 0.9 : 1.2, -0.1, house ? c.trim : accent);
-        if (!house) solid(0, ground - 0.1, span + 0.08, 0.12, 0.25, -0.12, c.trim);
+        solid(0, 2.68, houseGround ? 0.9 : 1.35, 0.12, houseGround ? 0.9 : 1.2, -0.1, houseGround ? c.trim : accent);
+        // a shop's fascia over its windows is the accent: the corner shop reads from both streets
+        if (!houseGround) solid(0, ground - 0.1, span + 0.08, 0.12, 0.25, -0.12, opts.shop ? accent : c.trim);
       }
 
       for (let floor = 1; floor < floors; floor++) {

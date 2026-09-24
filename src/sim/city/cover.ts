@@ -307,6 +307,35 @@ export function cameraSites(graph: RoadGraph): CameraSite[] {
   return out;
 }
 
+/**
+ * A drop-off's lit sign (M7 slice 11, DESIGN.md §6.5): a pole on the pavement `kerb` m in from the kerb, `beside`
+ * m across from the door's centre (negative: to the left as one drives in; the billboards at the three doors stand
+ * to the right), and on it at `height` a panel `width` × `panel` m whose faces look up and down the street, so a
+ * driver on the highway sees it at the street's mouth. Drawn by the renderer (HideoutView): no collider, and the
+ * chunk's statics (the billboards' clear ground) are not touched.
+ */
+export const HIDEOUT_SIGN = { height: 11, width: 6, panel: 3, depth: 0.4, kerb: 1.2, beside: -9, pole: 0.14 } as const;
+
+export interface HideoutSign {
+  /** The pole's foot on the pavement. */
+  poleX: number;
+  poleZ: number;
+  /** The panel's centre; `yaw` turns the panel's thin axis along the street (quatFromYaw's convention). */
+  x: number;
+  y: number;
+  z: number;
+  yaw: number;
+}
+
+export function hideoutSign(site: DropOff): HideoutSign {
+  const fx = Math.sin(site.yaw), fz = Math.cos(site.yaw);
+  // right of the inward axis: the street's direction past the door
+  const rx = -fz, rz = fx;
+  const along = -GARAGE.depth / 2 - (site.lot.setback + 4.5 - HIDEOUT_SIGN.kerb);
+  const x = site.x + fx * along + rx * HIDEOUT_SIGN.beside, z = site.z + fz * along + rz * HIDEOUT_SIGN.beside;
+  return { poleX: x, poleZ: z, x, y: HIDEOUT_SIGN.height, z, yaw: Math.atan2(rx, rz) };
+}
+
 /** Along (inward) and across coordinates of a world point in a drop-off's frame. */
 export function toDropOff(site: DropOff, x: number, z: number, out: { along: number; across: number }): { along: number; across: number } {
   const fx = Math.sin(site.yaw), fz = Math.cos(site.yaw);

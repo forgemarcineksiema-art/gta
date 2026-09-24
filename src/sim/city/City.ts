@@ -7,7 +7,7 @@ import { BALANCE } from '../balance';
 import type { SpawnPoint } from '../playground';
 import { mulberry32 } from '../random';
 import { IDENTITY_QUAT as IDENTITY_ROT, quatFromYaw, type StaticDesc } from '../scene';
-import { Architecture, CITY_COLORS } from './architecture';
+import { Architecture, CITY_COLORS, type LandmarkStyle } from './architecture';
 import { placeBillboards, type BillboardDesc } from './collectibles';
 import { DROP_OFF_LOTS, cameraSites, dropOffAt, dropOffFor, hideoutStatics, nearDoor } from './cover';
 import { COVER, coverStatics, insideCover, placeCovers, type CoverAvoid, type CoverDesc } from './covers';
@@ -50,6 +50,63 @@ interface RoadJoins {
 }
 const PAVEMENT = 4.5;
 
+/**
+ * A rotated footprint inside a block interior of chunk (cx, cz): clear of that chunk's and the neighbouring grid
+ * streets' pavements, and of the island's edge.
+ */
+function lotClear(cx: number, cz: number, px: number, pz: number, yaw: number, hx: number, hz: number): boolean {
+  const x = cx * BLOCK, z = cz * BLOCK;
+  const vx = Math.abs(cx) === 3 ? HIGHWAY_HALF : ROAD_HALF, vz = Math.abs(cz) === 3 ? HIGHWAY_HALF : ROAD_HALF;
+  const cos = Math.cos(yaw), sin = Math.sin(yaw);
+  for (const [lx, lz] of [[-hx, -hz], [hx, -hz], [-hx, hz], [hx, hz]] as const) {
+    const wx = px + cos * lx + sin * lz, wz = pz - sin * lx + cos * lz;
+    const dx = Math.abs(wx - x), dz = Math.abs(wz - z);
+    if (Math.min(dx, BLOCK - dx) < vx + 5 || Math.min(dz, BLOCK - dz) < vz + 5) return false;
+    if (Math.abs(wx) > CITY_HALF - 8 || Math.abs(wz) > CITY_HALF - 8) return false;
+  }
+  return true;
+}
+
+/** An authored road's frontage row: the district style, a lot's half size, the gap and setback, floors, accent. */
+interface Frontage { district: string; hx: number; hz: number; gap: number; setback: number; floors: number; accent: number }
+function frontageOf(road: SpecialRoad): Frontage | null {
+  return road.kind === 'avenue' ? { district: 'crown', hx: 10, hz: 10, gap: 3, setback: 1.3, floors: 4, accent: 0xf5cd75 }
+    : road.kind === 'quay' ? { district: 'marina', hx: 12, hz: 9, gap: 5, setback: 1.3, floors: 4, accent: 0x67c9ce }
+    : road.kind === 'parkway' ? { district: 'gardens', hx: 8, hz: 8, gap: 8, setback: 6, floors: 2, accent: 0x8bb583 } : null;
+}
+
+/**
+ * A lot of an authored road's frontage row (M7 slice 11): a road's are computed once, in the order the chunks
+ * emit them, so a lot knows its place in the row: the first and last on each side are corner shops, the one
+ * nearest the middle its landmark.
+ */
+export interface FrontageLot {
+  /** The centreline segment whose chunk emits it. */
+  segment: number;
+  /** Metres along the road from its first junction; the side (1 right of the road's direction, -1 left). */
+  along: number;
+  side: number;
+  px: number; pz: number; yaw: number;
+  width: number; depth: number; floors: number; variant: number;
+  /** The entrance path's centre, between the door and the pavement. */
+  pathX: number; pathZ: number;
+  /** A corner lot's side face toward its junction: 1 its local +X, -1 its -X; 0 not a corner. */
+  turn: number;
+  landmark: boolean;
+}
+
+/**
+ * One landmark per avenue (M7 slice 11): a building of its own kind on the frontage lot nearest the road's middle,
+ * so each reads as a place: its body and its sign's colour and its floors, by road.
+ */
+export const AVENUE_LANDMARKS: Readonly<Record<string, LandmarkStyle>> = {
+  'Crown Diagonal West': { district: 'crown', body: CITY_COLORS.brick, sign: PALETTE.carMagenta, floors: 14 },
+  'Crown Diagonal North': { district: 'crown', body: CITY_COLORS.mint, sign: PALETTE.carGold, floors: 12 },
+  'Quay Sweep': { district: 'marina', body: CITY_COLORS.lavender, sign: PALETTE.carOrange, floors: 9 },
+  // among the parkway's houses, an apartment block
+  'Garden Parkway': { district: 'marina', body: CITY_COLORS.stone, sign: PALETTE.carLime, floors: 5 },
+};
+
 export class City {
   readonly graph = buildRoadGraph();
   readonly roadMarkings = buildRoadMarkings(this.graph, districtAt);
@@ -64,6 +121,9 @@ export class City {
   private readonly chunkCache = new Map<string, CityChunk>();
   private readonly frames = new Map<string, { cum: number[]; nx: number[]; nz: number[]; total: number }>();
   private readonly joins = new Map<string, RoadJoins>();
+  /** Each authored road's frontage lots, and by segment (M7 slice 11). */
+  private readonly lots = new Map<string, FrontageLot[]>();
+  private readonly lotsBySegment = new Map<string, Map<number, FrontageLot[]>>();
   readonly spawns: SpawnPoint[];
   readonly active = new Map<string, { body: RAPIER.RigidBody; chunk: CityChunk }>();
   loaded = 0;
@@ -438,24 +498,9 @@ export class City {
     };
     const c = CITY_COLORS;
     const paving = road.kind === 'service' ? c.yard : road.kind === 'parkway' ? PALETTE.grass : PALETTE.kerb;
-    // Frontage: buildings face the authored road, spaced along it, both sides.
-    const frontage = road.kind === 'avenue' ? { district: 'crown', hx: 10, hz: 10, gap: 3, setback: 1.3, floors: 4, accent: 0xf5cd75 }
-      : road.kind === 'quay' ? { district: 'marina', hx: 12, hz: 9, gap: 5, setback: 1.3, floors: 4, accent: 0x67c9ce }
-      : road.kind === 'parkway' ? { district: 'gardens', hx: 8, hz: 8, gap: 8, setback: 6, floors: 2, accent: 0x8bb583 } : null;
-    const vx = Math.abs(cx) === 3 ? HIGHWAY_HALF : ROAD_HALF, vz = Math.abs(cz) === 3 ? HIGHWAY_HALF : ROAD_HALF;
-    const footprintClear = (px: number, pz: number, yaw: number, hx: number, hz: number): boolean => {
-      const cos = Math.cos(yaw), sin = Math.sin(yaw);
-      for (const [lx, lz] of [[-hx, -hz], [hx, -hz], [-hx, hz], [hx, hz]] as const) {
-        const wx = px + cos * lx + sin * lz, wz = pz - sin * lx + cos * lz;
-        // Inside a block interior: clear of this and the neighbouring grid streets' pavements.
-        const dx = Math.abs(wx - x), dz = Math.abs(wz - z);
-        if (Math.min(dx, BLOCK - dx) < vx + 5 || Math.min(dz, BLOCK - dz) < vz + 5) return false;
-        if (Math.abs(wx) > CITY_HALF - 8 || Math.abs(wz) > CITY_HALF - 8) return false;
-      }
-      return true;
-    };
-    const pitch = frontage ? 2 * frontage.hx + frontage.gap : Infinity;
-    const fronts = [{ side: 1, next: 40 }, { side: -1, next: 40 + pitch / 2 }];
+    const footprintClear = (px: number, pz: number, yaw: number, hx: number, hz: number): boolean => lotClear(cx, cz, px, pz, yaw, hx, hz);
+    // Frontage: buildings face the authored road, spaced along it, both sides (the lots computed once a road).
+    const lots = this.frontageBySegment(road);
     let along = 0, nextTree = 13, nextLamp = 30, nextYard = 45;
     for (let i = 0; i + 1 < road.centre.length; i++) {
       const a = road.centre[i] as RoadPoint, b = road.centre[i + 1] as RoadPoint;
@@ -496,27 +541,7 @@ export class City {
           }
           nextTree += 27;
         }
-        for (const front of fronts) while (frontage && front.next < along) {
-          if (front.next >= startAlong) {
-            const ts = (front.next - startAlong) / len, index = Math.round(front.next / pitch), side = front.side;
-            const ox = nx * side, oz = nz * side;
-            const yaw = Math.atan2(ox, oz), variant = (index * 7 + (side > 0 ? 0 : 1)) % 3;
-            const depth = frontage.hz + (variant === 1 ? 1 : 0), width = frontage.hx + (variant === 2 ? 1 : 0) + ((index * 3 + (side > 0 ? 1 : 0)) % 3) - 1;
-            const centre = hw + 4.5 + frontage.setback + depth;
-            const px = a.x + dx * ts + ox * centre, pz = a.z + dz * ts + oz * centre;
-            // Corners fill up to the grid pavement; the footprint check is the real limit.
-            if (!nearJunction(px, pz, ROAD_HALF + 8 + width) && footprintClear(px, pz, yaw, width + 1.5, depth + 1.5)) {
-              // Crown's avenue climbs toward the tower junction; the quay alternates heights.
-              const floors = road.kind === 'avenue' ? 4 + Math.round(6 * Math.max(0, 1 - Math.hypot(px + 450, pz + 450) / 330))
-                : road.kind === 'quay' ? ([3, 4, 6, 4, 5][index % 5] as number) : frontage.floors + (variant === 1 ? 1 : 0);
-              architecture.rotatedBuilding(px, pz, yaw, width, depth, frontage.district, floors, variant, frontage.accent);
-              // Entrance path from the door to the road's pavement.
-              const path = box(a.x + dx * ts + ox * (hw + 4.5 + frontage.setback / 2), 0.17, a.z + dz * ts + oz * (hw + 4.5 + frontage.setback / 2), 1.5, 0.01, frontage.setback / 2, PALETTE.kerb, 'decor', 'top');
-              path.rotation = quatFromYaw(yaw);
-            }
-          }
-          front.next += pitch;
-        }
+        for (const lot of lots.get(i) ?? []) this.frontageBuilding(road, lot, architecture);
         while (road.kind === 'service' && nextYard < along) {
           if (nextYard >= startAlong) {
             const t = (nextYard - startAlong) / len, k = Math.round(nextYard / 30), side = k % 2 ? -1 : 1;
@@ -561,6 +586,99 @@ export class City {
         }
       }
     }
+  }
+
+  /**
+   * An authored road's frontage lots (M7 slice 11), computed once, in the order the chunks emit them: every
+   * `pitch` m on both sides from 40 m, off the segments near a junction, where the footprint clears the grid's
+   * pavements (the chunk that emits the segment decides, as it always did). Then the first and last lot of each
+   * side turn a face toward their junction, and the lot nearest the middle is the road's landmark.
+   */
+  frontage(road: SpecialRoad): readonly FrontageLot[] {
+    const cached = this.lots.get(road.name);
+    if (cached) return cached;
+    const lots: FrontageLot[] = [];
+    const f = frontageOf(road);
+    if (f) {
+      const hw = road.halfWidth;
+      const a0 = road.centre[0] as RoadPoint, a1 = road.centre[road.centre.length - 1] as RoadPoint;
+      const nearJunction = (px: number, pz: number, margin: number) =>
+        Math.max(Math.abs(px - a0.x), Math.abs(pz - a0.z)) < margin || Math.max(Math.abs(px - a1.x), Math.abs(pz - a1.z)) < margin;
+      const pitch = 2 * f.hx + f.gap;
+      const fronts = [{ side: 1, next: 40 }, { side: -1, next: 40 + pitch / 2 }];
+      let along = 0;
+      for (let i = 0; i + 1 < road.centre.length; i++) {
+        const a = road.centre[i] as RoadPoint, b = road.centre[i + 1] as RoadPoint;
+        const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz);
+        const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
+        const nx = -dz / len, nz = dx / len;
+        const startAlong = along;
+        along += len;
+        // the chunk holding the segment's midpoint emits it (one on a chunk border belongs to none)
+        const cx = Math.round(mx / BLOCK), cz = Math.round(mz / BLOCK);
+        if (Math.abs(mx - cx * BLOCK) >= BLOCK / 2 || Math.abs(mz - cz * BLOCK) >= BLOCK / 2) continue;
+        if (nearJunction(mx, mz, ROAD_HALF + 12)) continue;
+        for (const front of fronts) while (front.next < along) {
+          if (front.next >= startAlong) {
+            const ts = (front.next - startAlong) / len, index = Math.round(front.next / pitch), side = front.side;
+            const ox = nx * side, oz = nz * side;
+            const yaw = Math.atan2(ox, oz), variant = (index * 7 + (side > 0 ? 0 : 1)) % 3;
+            const depth = f.hz + (variant === 1 ? 1 : 0), width = f.hx + (variant === 2 ? 1 : 0) + ((index * 3 + (side > 0 ? 1 : 0)) % 3) - 1;
+            const centre = hw + 4.5 + f.setback + depth;
+            const px = a.x + dx * ts + ox * centre, pz = a.z + dz * ts + oz * centre;
+            // Corners fill up to the grid pavement; the footprint check is the real limit.
+            if (!nearJunction(px, pz, ROAD_HALF + 8 + width) && lotClear(cx, cz, px, pz, yaw, width + 1.5, depth + 1.5)) {
+              // Crown's avenue climbs toward the tower junction; the quay alternates heights.
+              const floors = road.kind === 'avenue' ? 4 + Math.round(6 * Math.max(0, 1 - Math.hypot(px + 450, pz + 450) / 330))
+                : road.kind === 'quay' ? ([3, 4, 6, 4, 5][index % 5] as number) : f.floors + (variant === 1 ? 1 : 0);
+              const path = hw + 4.5 + f.setback / 2;
+              lots.push({ segment: i, along: front.next, side, px, pz, yaw, width, depth, floors, variant,
+                pathX: a.x + dx * ts + ox * path, pathZ: a.z + dz * ts + oz * path, turn: 0, landmark: false });
+            }
+          }
+          front.next += pitch;
+        }
+      }
+      // local +X is the road's direction on its right-hand side (side 1) and against it on the left
+      for (const side of [1, -1]) {
+        const row = lots.filter((l) => l.side === side);
+        const first = row[0], last = row[row.length - 1];
+        if (first) first.turn = first === last && first.along > along / 2 ? side : -side;
+        if (last && last !== first) last.turn = side;
+      }
+      let middle: FrontageLot | null = null;
+      for (const lot of lots) if (lot.turn === 0 && (!middle || Math.abs(lot.along - along / 2) < Math.abs(middle.along - along / 2))) middle = lot;
+      if (middle && AVENUE_LANDMARKS[road.name]) middle.landmark = true;
+    }
+    this.lots.set(road.name, lots);
+    return lots;
+  }
+
+  private frontageBySegment(road: SpecialRoad): Map<number, FrontageLot[]> {
+    let map = this.lotsBySegment.get(road.name);
+    if (!map) {
+      map = new Map();
+      for (const lot of this.frontage(road)) {
+        const list = map.get(lot.segment) ?? [];
+        list.push(lot);
+        map.set(lot.segment, list);
+      }
+      this.lotsBySegment.set(road.name, map);
+    }
+    return map;
+  }
+
+  /** One frontage lot's building (the road's landmark, a corner shop or the row's own) and its entrance path. */
+  private frontageBuilding(road: SpecialRoad, lot: FrontageLot, architecture: Architecture): void {
+    const f = frontageOf(road);
+    if (!f) return;
+    const landmark = lot.landmark ? AVENUE_LANDMARKS[road.name] : undefined;
+    if (landmark) architecture.rotatedLandmark(lot.px, lot.pz, lot.yaw, lot.width, lot.depth, landmark, f.accent);
+    else if (lot.turn !== 0) architecture.rotatedCornerShop(lot.px, lot.pz, lot.yaw, lot.width, lot.depth, f.district, lot.floors, lot.variant, f.accent, lot.turn);
+    else architecture.rotatedBuilding(lot.px, lot.pz, lot.yaw, lot.width, lot.depth, f.district, lot.floors, lot.variant, f.accent);
+    // Entrance path from the door to the road's pavement.
+    const path = architecture.box(lot.pathX, 0.17, lot.pathZ, 1.5, 0.01, f.setback / 2, PALETTE.kerb, 'decor', 'top');
+    path.rotation = quatFromYaw(lot.yaw);
   }
 
   /** Cumulative lengths and averaged right normals of an authored road's centreline. */

@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-24 — M7 slice 11: the city's look
+
+Done: the authored roads' frontage lots are computed once a road (`City.frontage`), so the first and last lot of each
+side are corner shops (a shop's ground floor on the road and on the junction side, the fascia in the accent) and the
+lot nearest each avenue's middle is its landmark (taller, its own colour, a lit roof sign, corner bands; four roads).
+The parkway gives way at its merges (a double broken line 0–2.5 m past it) instead of a stop line 112 m out; a
+quarter of the road paint is worn in 36 m stretches; each drop-off has a lit sign on an 11 m pole, seen up its street
+from the ring (the plan's "nearest deck" sees it over two blocks of buildings; the street's mouth is where a driver
+looks). Colliders, billboards and coins unchanged (hashed). Pins M7 11.1–11.3. Verify green (355 tests).
+
 ## 2026-09-24 — M7 slice 10: the money
 
 Done: `tests/sim/model.ts`, the EV table and the first hour, pure; the balance script measures and calls it, its

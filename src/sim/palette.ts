@@ -7,6 +7,8 @@ export const PALETTE = {
   asphaltLight: 0x4a4a58, asphaltBay: 0x5a5969,
   laneMark: 0xf2e9d8,
   roadWhite: 0xd4d0bf, roadYellow: 0xe6bb63,
+  /** Worn patches of the same paint (M7 slice 11): each a third of the way to the asphalt. */
+  roadWhiteWorn: 0x9e9b94, roadYellowWorn: 0xaa8d59,
   kerb: 0xc9c3b3,
   concrete: 0x9a938a,
   sand: 0xd9b57a,

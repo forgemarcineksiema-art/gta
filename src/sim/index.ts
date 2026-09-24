@@ -35,7 +35,7 @@ export { Career } from './board/Career';
 export { RIVALS, CHIEF, posterNumber, reqText, type RivalDef, type Req, type ReqKind, type DuelFormat, type Twist, type Turf } from './board/rivals';
 export { Dailies } from './dailies/Dailies';
 export { SAVE_VERSION, DEFAULT_SAVE, defaultSave, serialize, parse, migrate, collect, apply, versionOf, type SaveV1 } from './save/format';
-export { coverSites, dropOffFor, hideoutStatics, toDropOff, DROP_OFF_LOTS, GARAGE, type DropOff, type DropOffLot, type DoorPose, type CoverSites, type Chokepoint, type ParkedJunction, type CameraSite } from './city/cover';
+export { coverSites, dropOffFor, hideoutSign, hideoutStatics, toDropOff, DROP_OFF_LOTS, GARAGE, HIDEOUT_SIGN, type HideoutSign, type DropOff, type DropOffLot, type DoorPose, type CoverSites, type Chokepoint, type ParkedJunction, type CameraSite } from './city/cover';
 export { POLICE, type PoliceTuning } from './police/tuning';
 export { PALETTE, PED_TINTS, PED_COLORS } from './palette';
 export { STRAIGHT, type SpawnPoint } from './playground';

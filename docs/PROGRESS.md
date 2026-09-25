@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.8 slice 23: the police on the car model
+
+Done: on a chase, a box or an arrest the `POLICE.physicalUnits` (4) units nearest the player within 80 m drive physical
+cars of their bodies (`AiCars`, four more cars in its pool; given back past 110 m or when it is over): along their
+plan's lanes at its speed, or straight at its aim point (`Traffic.planAim`: a ram's, a PIT's, a box slot braked into
+and held on the handbrake); the shove accelerations retire for them, a hit is two masses, sensed as a lent body's.
+Police's and the takedowns' "has a body" is now `solid` (a lent body or a car). Decided: under the busted card the units
+keep their cars and stand (given back as the card closes, or the lane blend moves them). Pin M8.8 23.3 (`driver.test.ts`);
+23.1 (the police long pins, now with physical units) and 23.2 (the balance at level 3) at the gate.
+
 ## 2026-09-25 — M8.8 slice 22: the AI driver; the rivals on the car model
 
 Done: `ai/Driver.ts`, the track bot's method in the sim (pursuit at a lookahead point, the corner-speed plan inside a

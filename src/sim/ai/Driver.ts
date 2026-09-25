@@ -1,8 +1,9 @@
 /**
  * The AI driver (M8.8 slice 22): drives a `Vehicle` along a path of samples the way the track bot drives the player's
  * (its method, in the sim): pure pursuit at a point `look` m ahead, and a speed plan that keeps to the slowest of the
- * corner speeds ahead (`latAccel` of grip) reachable at its braking, capped by the plan's own speed. No allocation per
- * step.
+ * corner speeds ahead (`latAccel` of grip) reachable at its braking, capped by the plan's own speed. Or straight at a
+ * point (slice 23: a unit's ram, its PIT, its slot in a box), at a speed, braking to stop there when it is a place to
+ * stop at. No allocation per step.
  */
 import * as M from '../math';
 import { createControls, type VehicleControls } from '../controls';
@@ -38,6 +39,12 @@ export class Driver {
   idx = 0;
   private path: readonly TrackSample[] = [];
   private loop = false;
+  /** Driving at a point instead of along the path: the point, the speed, and whether to stop there. */
+  private aiming = false;
+  private aimX = 0;
+  private aimZ = 0;
+  private aimSpeed = 0;
+  private arrive = false;
   private readonly pos = { x: 0, y: 0, z: 0 };
   private readonly rot = { x: 0, y: 0, z: 0, w: 1 };
 
@@ -48,6 +55,19 @@ export class Driver {
     this.path = samples;
     this.loop = loop;
     this.idx = 0;
+  }
+
+  /** Drives at a point from now on, at `speed` m/s, braking to stop there when `arrive`; `follow` goes back to the path. */
+  aim(x: number, z: number, speed: number, arrive: boolean): void {
+    this.aiming = true;
+    this.aimX = x;
+    this.aimZ = z;
+    this.aimSpeed = speed;
+    this.arrive = arrive;
+  }
+
+  follow(): void {
+    this.aiming = false;
   }
 
   /** Metres of an open path left ahead of the car. */
@@ -62,6 +82,7 @@ export class Driver {
   /** The controls for one step of `vehicle` along the path. */
   drive(vehicle: Vehicle): VehicleControls {
     const c = this.controls, t = this.tuning, S = this.path, m = S.length;
+    if (this.aiming) return this.driveAt(vehicle);
     if (m < 2) {
       c.throttle = 0;
       c.brake = 1;
@@ -95,10 +116,36 @@ export class Driver {
       dist += 3;
     }
     if (!this.loop) allowed = Math.min(allowed, Math.sqrt(2 * t.brakeAccel * this.left));
+    return this.pedals(allowed, speed);
+  }
+
+  /** Straight at the aim point: steered at it, at its speed, stopping on it when it is a place to stop at. */
+  private driveAt(vehicle: Vehicle): VehicleControls {
+    const c = this.controls, t = this.tuning;
+    const p = vehicle.body.translation(this.pos), yaw = M.yawOf(vehicle.body.rotation(this.rot));
+    const speed = Math.max(0, vehicle.telemetry.speed);
+    const dx = this.aimX - p.x, dz = this.aimZ - p.z, d = Math.hypot(dx, dz);
+    let a = Math.atan2(dx, dz) - yaw;
+    while (a > Math.PI) a -= Math.PI * 2;
+    while (a < -Math.PI) a += Math.PI * 2;
+    c.steer = Math.max(-1, Math.min(1, -a * t.steerGain));
+    const allowed = this.arrive ? Math.min(this.aimSpeed, Math.sqrt(2 * t.brakeAccel * Math.max(0, d - 1))) : this.aimSpeed;
+    return this.pedals(allowed, speed);
+  }
+
+  /** The pedals for a speed: on under it, the brake well over it; a hold is the brake to a stop, then the handbrake (the brake held at a standstill would reverse). */
+  private pedals(allowed: number, speed: number): VehicleControls {
+    const c = this.controls;
+    c.boost = 0;
+    if (allowed < 0.5) {
+      c.throttle = 0;
+      c.brake = speed > 0.5 ? 1 : 0;
+      c.handbrake = 1;
+      return c;
+    }
     c.throttle = speed < allowed - 0.5 ? 1 : 0;
     c.brake = speed > allowed + 1.5 ? 1 : 0;
     c.handbrake = 0;
-    c.boost = 0;
     return c;
   }
 }

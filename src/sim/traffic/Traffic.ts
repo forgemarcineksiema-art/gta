@@ -646,6 +646,25 @@ export class Traffic {
     return (this.agentBody[agent] as number) >= 0;
   }
 
+  /** A body in the world: a lent one, or an AI car's (M8.8 slices 22–23): what can ram, box and be hit. */
+  solid(agent: number): boolean {
+    return (this.agentBody[agent] as number) >= 0 || this.puppet[agent] === 1;
+  }
+
+  /** A police plan's aim (M8.8 slice 23, an AI car's to drive): the point, its speed, whether it is a place to stop at. */
+  planAim(agent: number, out: { x: number; z: number; speed: number; free: boolean }): boolean {
+    out.x = this.ramX[agent] as number;
+    out.z = this.ramZ[agent] as number;
+    out.speed = this.ramSpeed[agent] as number;
+    out.free = this.freeSteer[agent] === 1;
+    return out.speed > 0 || out.free;
+  }
+
+  /** The exit a plan has chosen off the lane, -1 for none (M8.8 slice 23). */
+  planNext(agent: number): number {
+    return this.plannerNext[agent] as number;
+  }
+
   /** The agent's lent body, or null (the street furniture's knocks and the hydrants' water, M8). */
   rigidBodyOf(agent: number): RAPIER.RigidBody | null {
     const slot = this.agentBody[agent] as number;
@@ -667,6 +686,10 @@ export class Traffic {
 
   /** World-up component of the lent body's up axis (1 level, 0 on its side, -1 on its roof); 1 without a body. */
   upOf(agent: number): number {
+    if (this.puppet[agent] === 1) {
+      const k = agent * 4, qx = this.puppetQ[k] as number, qz = this.puppetQ[k + 2] as number;
+      return 1 - 2 * (qx * qx + qz * qz);
+    }
     const slot = this.agentBody[agent] as number;
     if (slot < 0) return 1;
     const r = (this.bodies[slot] as RAPIER.RigidBody).rotation(this.rot);
@@ -2188,8 +2211,16 @@ export class Traffic {
     }
   }
 
+  /** An AI car's hits on its record (M8.8 slice 23): the contact impulses by kind, the damage and the wreck, as a lent body's. */
+  sensePuppet(i: number, col: RAPIER.Collider): void {
+    if (this.puppet[i] === 1) this.sense(i, col);
+  }
+
   private senseImpact(i: number): void {
-    const col = this.bodyCollider[this.agentBody[i] as number] as RAPIER.Collider;
+    this.sense(i, this.bodyCollider[this.agentBody[i] as number] as RAPIER.Collider);
+  }
+
+  private sense(i: number, col: RAPIER.Collider): void {
     this.contactSum = 0;
     this.playerSum = 0;
     this.wallSum = 0;
@@ -2214,7 +2245,7 @@ export class Traffic {
       this.justWrecked[i] = 1;
       return;
     }
-    if (dv > t.disturbedImpact * armour) {
+    if (dv > t.disturbedImpact * armour && this.puppet[i] !== 1) {
       if (st !== AgentState.Disturbed) this.loosen(i);
       this.state[i] = AgentState.Disturbed;
       this.disturbedFor[i] = this.tuning.disturbedTime;
@@ -2336,6 +2367,13 @@ export class Traffic {
   /** The agent is a wreck from now on: a stopped obstacle until it despawns. */
   wreck(i: number): void {
     if (this.state[i] === AgentState.Wrecked) return;
+    if (this.puppet[i] === 1) {
+      // an AI car's record lies where the car came to grief, as its body left it (M8.8 slice 23)
+      const k = i * 4;
+      for (let c = 0; c < 4; c++) this.poseQ[k + c] = this.puppetQ[k + c] as number;
+      this.posed[i] = 1;
+      this.unpuppet(i);
+    }
     this.loosen(i);
     this.state[i] = AgentState.Wrecked;
     this.wreckedFor[i] = 0;

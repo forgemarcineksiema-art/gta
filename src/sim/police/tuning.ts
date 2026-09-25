@@ -43,6 +43,11 @@ export interface PoliceTuning {
   pitSideOffset: number;
   /** A ram's or a PIT's shove on a bike, a share of a car's (M8.8 slice 17): 290 kg under a car's push would fly. */
   bikeShove: number;
+  /**
+   * The units nearest the player on a chase that drive physical police cars (M8.8 slice 23, `ai/AiCars.ts`): their rams
+   * and PITs the cars' own motion at the plan's aim point, the arrest's slots braked into; the rest stay lane records.
+   */
+  physicalUnits: number;
   /** Boxed in: `units` live police cars within `range` m while the player is under `speed` m/s fills the bar in `seconds`; moving drains it. */
   busted: { units: number; range: number; speed: number; seconds: number; drainPerSecond: number };
   /**
@@ -162,6 +167,7 @@ export const POLICE: PoliceTuning = {
   pitSideOffset: 1.1,
   patrolRecycle: 260,
   bikeShove: 0.6,
+  physicalUnits: 4,
   busted: { units: 2, range: 7, speed: 1.39, seconds: 3, drainPerSecond: 0.7 },
   box: { seconds: 5, range: 8, approach: 20, maxSeconds: 15, detourSpeed: 10 },
   disguise: { seconds: 30 },

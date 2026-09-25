@@ -1,13 +1,17 @@
 /**
  * The AI driver (M8.8 slice 22): the track bot's method in the sim, driving any `Vehicle` along a path; a duel's race
  * rival near the player drives a physical car of its body with it, handed back to its lane when far. Its race against
- * the lane rival and the flips at junctions are the long pins (driver.long.test.ts).
+ * the lane rival and the flips at junctions are the long pins (driver.long.test.ts). Slice 23: on a chase the units
+ * nearest the player drive physical police cars; the police long pins (23.1) run with them.
  */
 import { describe, expect, it } from 'vitest';
 import { TrackBot } from '../../src/app/trackBot';
 import { Driver } from '../../src/sim/ai/Driver';
 import { AI } from '../../src/sim/ai/AiCars';
+import { POLICE } from '../../src/sim/police/tuning';
 import { CHAIN_ALL } from '../../src/sim/run/goal';
+import { TRAFFIC } from '../../src/sim/traffic/tuning';
+import type { Traffic } from '../../src/sim/traffic/Traffic';
 import { createWorld, run } from './helpers';
 
 describe('M8.8 slice 22: the AI driver', () => {
@@ -69,6 +73,50 @@ describe('M8.8 slice 22: the AI driver', () => {
       run(sim, 0.5);
       expect(traffic.puppet[agent]).toBe(0);
       expect(sim.ai!.carOf(agent)).toBeNull();
+    } finally { sim.dispose(); }
+  }, 60_000);
+
+  it('M8.8 23.3 on a chase the units nearest the player drive physical cars, no more than physicalUnits; the box closes; after the card they are lane records', async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false, heat: 100 });
+    try {
+      sim.police!.dispatching = false;
+      const traffic = sim.traffic as Traffic;
+      // the player stopped on a straight street at s = 100, five units coming up behind it
+      let lane = -1;
+      for (let i = 0; i < traffic.lanes.laneCount && lane < 0; i++) {
+        if ((traffic.lanes.limit[i] as number) === TRAFFIC.speedStreet && (traffic.lanes.length[i] as number) >= 150
+          && sim.city!.graph.lanes[i]!.points.length === 2) lane = i;
+      }
+      const at = { x: 0, z: 0, yaw: 0 };
+      traffic.lanes.positionAt(lane, 100, 0, at);
+      sim.city?.sync(at.x, at.z, true);
+      sim.vehicle.teleport({ x: at.x, y: 0.9, z: at.z }, at.yaw);
+      sim.vehicle.setVelocity(0, 0, 0);
+      run(sim, 1.5, (_t, c, s) => { c.handbrake = 1; s.pursuit.force(); });
+      const units: number[] = [];
+      for (const s of [72, 62, 52, 42, 32]) {
+        const unit = traffic.spawnPoliceAt(lane, s, 'police', sim.probe, 0, -1, 4, -1, true);
+        expect(sim.police!.enlist(unit)).toBeGreaterThanOrEqual(0);
+        units.push(unit);
+      }
+      let most = 0, nearest = 0;
+      for (let k = 0; k < 12 * 60 && sim.run.state !== 'busted'; k++) {
+        sim.controls.handbrake = 1;
+        sim.pursuit.force();
+        sim.step();
+        most = Math.max(most, units.filter((u) => traffic.puppet[u] === 1).length);
+        if (traffic.puppet[units[0]!] === 1) nearest++;
+      }
+      console.log(`[police] physical units: at most ${most} of ${units.length}, the nearest physical ${(nearest / 60).toFixed(1)} s`);
+      expect(most).toBeGreaterThan(0);
+      expect(most).toBeLessThanOrEqual(POLICE.physicalUnits);
+      expect(nearest).toBeGreaterThan(60);
+      expect(sim.run.state).toBe('busted');
+      // the card closed, the chase over: every car parked, every unit a lane record again
+      sim.run.closeCard();
+      run(sim, 3, (_t, c) => { c.throttle = 0.5; });
+      expect(sim.ai!.busy).toBe(0);
+      expect(units.filter((u) => traffic.puppet[u] === 1).length).toBe(0);
     } finally { sim.dispose(); }
   }, 60_000);
 });

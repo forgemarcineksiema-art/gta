@@ -164,7 +164,8 @@ export class Life {
         wall = !other;
         flipped = false;
       } else {
-        if (!traffic.hasBody(i)) continue;
+        // a lent body, or an AI car's (M8.8 slice 23)
+        if (!traffic.solid(i)) continue;
         wall = (traffic.wallDv[i] as number) >= deltaV;
         other = (traffic.trafficDv[i] as number) >= deltaV;
         flipped = traffic.upOf(i) < 0.3;

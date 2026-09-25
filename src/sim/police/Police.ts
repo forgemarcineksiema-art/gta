@@ -312,7 +312,7 @@ export class Police {
       }
       this.count++;
       this.ramCooldown[u] = Math.max(0, (this.ramCooldown[u] as number) - dt);
-      if (this.rammed[u] === 1 && traffic.hasBody(agent) && (traffic.playerDv[agent] as number) >= t.ramContactDv && this.ramCooldown[u] === 0) {
+      if (this.rammed[u] === 1 && traffic.solid(agent) && (traffic.playerDv[agent] as number) >= t.ramContactDv && this.ramCooldown[u] === 0) {
         this.ramsReceived++;
         this.ramCooldown[u] = t.ramCooldown;
         // a ram or a PIT on a bike knocks it down (M8.8 slice 17): a tumble, not a wreck, unless the damage wrecks it
@@ -491,7 +491,7 @@ export class Police {
       const dz = player.z - (traffic.z[agent] as number);
       const gap = Math.hypot(dx, dz);
       const slot = this.slotOf[u] as number;
-      if (arresting && traffic.hasBody(agent) && gap < a.range) {
+      if (arresting && traffic.solid(agent) && gap < a.range) {
         // one not dealt yet (it came on duty since the last deal) waits on the first standby place and is dealt next
         // step (M8.6 D6): it used to ram the stopped car at its class's speed meanwhile
         if (slot < 0) this.slotLeft = 0;
@@ -729,7 +729,7 @@ export class Police {
       const slot = this.slotOf[u] as number;
       const gap = Math.hypot(b.x - (traffic.x[agent] as number), b.z - (traffic.z[agent] as number));
       // by the lanes until the car is in the same street, then straight into a slot round it
-      if (slot >= 0 && traffic.hasBody(agent) && gap < t.box.approach) this.driveToSlot(agent, slot, b, t.box.range, t.box.detourSpeed);
+      if (slot >= 0 && traffic.solid(agent) && gap < t.box.approach) this.driveToSlot(agent, slot, b, t.box.range, t.box.detourSpeed);
       else traffic.setPolicePlan(agent, this.routeExit(agent, CHASE), t.chaseSpeed);
     }
   }
@@ -741,7 +741,7 @@ export class Police {
     for (let u = 0; u < this.units.length; u++) {
       const agent = this.units[u] as number;
       const lane = agent >= 0 ? traffic.lane[agent] as number : -1;
-      if (lane < 0 || !traffic.hasBody(agent)) continue;
+      if (lane < 0 || !traffic.solid(agent)) continue;
       if (Math.hypot(b.x - (traffic.x[agent] as number), b.z - (traffic.z[agent] as number)) > this.tuning.box.approach) continue;
       traffic.lanes.project(lane, b.x, b.z, this.projection);
       traffic.lanes.positionAt(lane, Math.min(traffic.lanes.length[lane] as number, this.projection.s + LEAVE_PAST), 0, this.pose);
@@ -757,7 +757,7 @@ export class Police {
     const tx = this.leaveX[u] as number, tz = this.leaveZ[u] as number;
     const left = (this.leaving[u] as number) - dt;
     this.leaving[u] = left;
-    if (left <= 0 || !traffic.hasBody(agent) || Math.hypot(tx - (traffic.x[agent] as number), tz - (traffic.z[agent] as number)) < LEAVE_REACHED) {
+    if (left <= 0 || !traffic.solid(agent) || Math.hypot(tx - (traffic.x[agent] as number), tz - (traffic.z[agent] as number)) < LEAVE_REACHED) {
       this.leaving[u] = 0;
       return;
     }
@@ -807,7 +807,7 @@ export class Police {
       // a car in a police livery the law takes for its own (Fake Frank, M6) counts as one
       if (traffic.police[i] !== 1 && traffic.badge[i] !== 1) continue;
       this.copSpeedMax[i] = Math.max(traffic.speed[i] as number, (this.copSpeedMax[i] as number) * 0.8);
-      if (!idle || cool > 0 || !traffic.hasBody(i)) continue;
+      if (!idle || cool > 0 || !traffic.solid(i)) continue;
       const state = traffic.state[i];
       if (state === AgentState.Wrecked || state === AgentState.Free) continue;
       if ((traffic.playerDv[i] as number) < t.assaultDv) continue;
@@ -913,7 +913,7 @@ export class Police {
       let best = -1, bestCost = Infinity;
       for (let u = 0; u < this.units.length; u++) {
         const agent = this.units[u] as number;
-        if (agent < 0 || !traffic.hasBody(agent) || this.withdrawing[u] === 1) continue;
+        if (agent < 0 || !traffic.solid(agent) || this.withdrawing[u] === 1) continue;
         const current = held[u] as number;
         if (current >= 0 && current < k) continue;
         const d = Math.hypot((traffic.x[agent] as number) - (this.slotX[k] as number), (traffic.z[agent] as number) - (this.slotZ[k] as number));
@@ -928,7 +928,7 @@ export class Police {
     let standby = 0;
     for (let u = 0; u < this.units.length; u++) {
       const agent = this.units[u] as number;
-      if (agent < 0 || !traffic.hasBody(agent) || ((held[u] as number) >= 0 && (held[u] as number) < SLOTS)) continue;
+      if (agent < 0 || !traffic.solid(agent) || ((held[u] as number) >= 0 && (held[u] as number) < SLOTS)) continue;
       held[u] = SLOTS + standby;
       standby++;
     }

@@ -97,6 +97,8 @@ npm run look         # M8.9: the look's states and the four districts at 1280x72
                      # (saturation, the facades' band, the sky behind the HUD, clipping) and the HUD's (texts under 13 px, the top
                      # centre) on the console and in numbers.json; LOOK_STATES=calm,sign picks states (a slice's stills: -g stills),
                      # LOOK_SIZES=all adds 800x450 and 1920x1080, LOOK_GATE=1 asserts M8.9's targets (the gate's run only)
+npm run atlas        # M8.10: the island drawn from above as the sim builds it (tests/atlas, ATLAS=1, then tools/atlas.html
+                     # headless) -> output/atlas/island.png (the island, its names) and placed.png (what stands where), ~15 s
 ```
 
 The whole-map check is accelerated fixed-step driving with sampled rendering;

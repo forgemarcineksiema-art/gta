@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.10 slice 1: the atlas
+
+Done: `npm run atlas` draws the island as the sim knows it: `tests/atlas/island.test.ts` (ATLAS=1, out of the quick set
+as the balance is) writes `output/atlas/island.js` (the coast and its parts, the ground's height every 8 m, the
+districts every 25 m, the roads, the places, what stands where, the glyphs); `tools/atlas.html` draws it in the
+sketches' style; `tools/atlas.mjs` saves `island.png` and `placed.png` in about 15 s. Today it shows the plan: the main
+roads only; the districts' streets, blocks and buildings join its dump in their slices. Looked at once: the names off
+the places, the four landmarks drawn. DEV names it.
+
 ## 2026-09-25 — M8.10 slice 0: the plan as data
 
 Done: `src/sim/island/plan.ts` holds the sketches' island as data: the coast (a closed curve through 49 points, its parts

@@ -49,6 +49,8 @@ export default defineConfig({
       ...configDefaults.exclude,
       ...(process.env.LONG === '1' ? [] : ['tests/**/*.long.test.ts']),
       ...(process.env.BALANCE === '1' || process.env.npm_lifecycle_event === 'balance' ? [] : ['tests/sim/balance.test.ts']),
+      // The atlas's dump (M8.10) writes the island for `npm run atlas` (ATLAS=1); it pins nothing.
+      ...(process.env.ATLAS === '1' ? [] : ['tests/atlas/**']),
     ],
     environment: 'node',
     // Files share their worker's module graph: Rapier's WASM initialises once a worker, not once a file (the quick set

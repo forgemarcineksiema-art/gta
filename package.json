@@ -26,6 +26,7 @@
     "boot": "playwright test e2e/boot.spec.ts",
     "balance": "vitest run tests/sim/balance.test.ts --reporter=verbose",
     "bake:jobs": "vitest run tests/sim/jobs.test.ts -t \"1.1 placement\"",
+    "atlas": "node tools/atlas.mjs",
     "verify": "node tools/verify.mjs",
     "verify:gate": "node tools/verify.mjs --gate",
     "test:long": "node tools/verify.mjs test --gate"

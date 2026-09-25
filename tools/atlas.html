@@ -1,0 +1,277 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Atlas</title><style>html,body{margin:0;background:#150f26}canvas{display:block}</style></head>
+<body><canvas id="atlas"></canvas>
+<script src="../output/atlas/island.js"></script>
+<script>
+// The island's atlas (M8.10 slice 1, tools/atlas.mjs): the sim's dump drawn from above, 1 px a metre, north up.
+// `?mode=island` the island and its names; `?mode=placed` what stands where. Reads window.ATLAS only.
+const A = window.ATLAS;
+const MODE = new URLSearchParams(location.search).get('mode') || 'island';
+const B = A.bounds, MW = B.x1 - B.x0, MH = B.z1 - B.z0, PANEL = 560;
+const cv = document.getElementById('atlas');
+cv.width = MW + PANEL; cv.height = MH;
+const g = cv.getContext('2d');
+const FONT = "'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
+const X = (x) => x - B.x0, Y = (z) => z - B.z0;
+let seed = 7;
+const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+const rgb = (c, k = 1) => `rgb(${Math.min(255, c[0] * k) | 0},${Math.min(255, c[1] * k) | 0},${Math.min(255, c[2] * k) | 0})`;
+function trace(pts, closed) { g.beginPath(); g.moveTo(X(pts[0][0]), Y(pts[0][1])); for (let i = 1; i < pts.length; i++) g.lineTo(X(pts[i][0]), Y(pts[i][1])); if (closed) g.closePath(); }
+function inPoly(x, z, poly) { let inside = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) inside = !inside; } return inside; }
+const inBasin = (x, z) => x > A.basin.x0 && x < A.basin.x1 && z > A.basin.z0 && z < A.basin.z1;
+const onLand = (x, z) => (inPoly(x, z, A.coast) && !inBasin(x, z)) || inPoly(x, z, A.causeway) || inPoly(x, z, A.islet);
+const H = A.heights;
+function height(x, z) {
+  const fi = (x - B.x0) / H.cell, fj = (z - B.z0) / H.cell, i = Math.max(0, Math.min(H.nx - 2, Math.floor(fi))), j = Math.max(0, Math.min(H.nz - 2, Math.floor(fj)));
+  const u = fi - i, v = fj - j, at = (a, b) => Math.max(0, H.values[b * H.nx + a]);
+  return at(i, j) * (1 - u) * (1 - v) + at(i + 1, j) * u * (1 - v) + at(i, j + 1) * (1 - u) * v + at(i + 1, j + 1) * u * v;
+}
+const DISTRICTS = {
+  crown: { name: 'KORONNE WZGÓRZA', color: '#b497d6' }, foundry: { name: 'HUTA ZACHÓD', color: '#d98768' },
+  gardens: { name: 'PALMOWE OGRODY', color: '#e7bd87' }, marina: { name: 'KORALOWE NABRZEŻE', color: '#eaa7ab' },
+};
+const road = (id) => A.roads.find((r) => r.id === id);
+const P = A.places;
+
+// ---------- the sea, the land, the ground
+function drawBase() {
+  const gr = g.createRadialGradient(X(0), Y(0), 500, X(0), Y(0), 1500);
+  gr.addColorStop(0, '#2a86a6'); gr.addColorStop(1, '#16506a'); g.fillStyle = gr; g.fillRect(0, 0, MW, MH);
+  g.lineJoin = 'round';
+  for (const [w, c] of [[200, 'rgba(70,170,200,0.25)'], [120, 'rgba(80,185,210,0.35)'], [60, 'rgba(95,200,220,0.45)'], [26, 'rgba(140,220,230,0.5)']]) for (const shape of [A.coast, A.causeway, A.islet]) { trace(shape, true); g.lineWidth = shape === A.coast ? w : w * 0.7; g.strokeStyle = c; g.stroke(); }
+  trace(A.bay, true); g.fillStyle = 'rgba(110,215,220,0.45)'; g.fill();
+  seed = 11;
+  for (let i = 0; i < 170; i++) {
+    const x = 380 + rnd() * 720, z = 300 + rnd() * 480;
+    if (onLand(x, z) || (x > 460 && x < 660 && z < 470)) continue;
+    let near = false; for (const p of A.bay) if (Math.hypot(p[0] - x, p[1] - z) < 90) near = true; for (const p of A.islet) if (Math.hypot(p[0] - x, p[1] - z) < 60) near = true;
+    if (!near) continue;
+    g.save(); g.translate(X(x), Y(z)); g.rotate(rnd() * 3); g.beginPath(); g.ellipse(0, 0, 4 + rnd() * 9, 3 + rnd() * 6, 0, 0, 7);
+    g.fillStyle = ['#ff8a7a', '#ffb36b', '#f472b6', '#ffa3c4', '#ff7b5c'][i % 5]; g.globalAlpha = 0.8; g.fill(); g.restore();
+  }
+  // the land: its height as colour and light
+  g.save(); trace(A.coast, true); g.fillStyle = '#8fa878'; g.fill(); g.clip();
+  const bands = [[0, '#90a978'], [6, '#93aa73'], [12, '#9daa6e'], [20, '#aaa96b'], [30, '#b9a86c'], [40, '#c7ab73'], [48, '#d5b47f']].map(([h, c]) => [h, hex(c)]);
+  for (let j = 0; j < H.nz - 1; j++) for (let i = 0; i < H.nx - 1; i++) {
+    const h = H.values[j * H.nx + i]; if (h < 0) continue;
+    let c = bands[0][1]; for (const [bh, bc] of bands) if (h >= bh) c = bc;
+    const hx = Math.max(0, H.values[j * H.nx + i + 1]), hz = Math.max(0, H.values[(j + 1) * H.nx + i]);
+    const k = Math.max(0.78, Math.min(1.16, 1 - ((hx - h) / H.cell + (hz - h) / H.cell) * 1.6));
+    g.fillStyle = rgb(c, k); g.fillRect(X(B.x0 + i * H.cell), Y(B.z0 + j * H.cell), H.cell + 0.6, H.cell + 0.6);
+  }
+  // the districts' light washes, round each district's middle
+  const D = A.districts, sums = D.ids.map(() => [0, 0, 0]);
+  for (let j = 0; j < D.nz; j++) for (let i = 0; i < D.nx; i++) { const d = D.values[j * D.nx + i]; if (d < 0) continue; sums[d][0] += B.x0 + i * D.cell; sums[d][1] += B.z0 + j * D.cell; sums[d][2]++; }
+  A.middles = {};
+  D.ids.forEach((id, k) => {
+    const [sx, sz, n] = sums[k], x = sx / n, z = sz / n, r = 430, w = g.createRadialGradient(X(x), Y(z), 0, X(x), Y(z), r), [cr, cg, cb] = hex(DISTRICTS[id].color);
+    A.middles[id] = [x, z];
+    w.addColorStop(0, `rgba(${cr},${cg},${cb},0.26)`); w.addColorStop(1, `rgba(${cr},${cg},${cb},0)`); g.fillStyle = w; g.fillRect(X(x - r), Y(z - r), 2 * r, 2 * r);
+  });
+  // the port's basin and its quays
+  g.fillStyle = '#2f8fb0'; g.fillRect(X(A.basin.x0), Y(A.basin.z0), A.basin.x1 - A.basin.x0, A.basin.z1 - A.basin.z0);
+  g.lineWidth = 5; g.strokeStyle = '#d8d2c4'; g.beginPath(); g.moveTo(X(A.basin.x0), Y(A.basin.z0)); g.lineTo(X(A.basin.x0), Y(A.basin.z1)); g.lineTo(X(A.basin.x1), Y(A.basin.z1)); g.lineTo(X(A.basin.x1), Y(A.basin.z0)); g.stroke();
+  // beaches, golf, quarry, parks
+  g.lineCap = 'round';
+  for (const b of P.beaches) { trace(b.points, false); g.lineWidth = b.width; g.strokeStyle = '#e6c98f'; g.stroke(); }
+  trace(P.golf, true); g.fillStyle = '#a6c77c'; g.fill();
+  const q = P.quarry, qc = q.reduce((a, p) => [a[0] + p[0] / q.length, a[1] + p[1] / q.length], [0, 0]);
+  for (const [k, c] of [[1, '#b8966c'], [0.72, '#a88660'], [0.45, '#967653'], [0.2, '#86694a']]) { trace(q.map(([x, z]) => [qc[0] + (x - qc[0]) * k, qc[1] + (z - qc[1]) * k]), true); g.fillStyle = c; g.fill(); g.lineWidth = 1.5; g.strokeStyle = 'rgba(60,40,20,0.4)'; g.stroke(); }
+  g.beginPath(); g.arc(X(P.botanicGarden.x), Y(P.botanicGarden.z), P.botanicGarden.r, 0, 7); g.fillStyle = '#7fa769'; g.fill();
+  seed = 5;
+  for (let i = 0; i < 90; i++) { const a = rnd() * 6.283, r = 70 + rnd() * 80; g.beginPath(); g.arc(X(P.botanicGarden.x + Math.cos(a) * r), Y(P.botanicGarden.z + Math.sin(a) * r), 5 + rnd() * 5, 0, 7); g.fillStyle = i % 3 ? '#5c8a4c' : '#4f7d44'; g.fill(); }
+  g.beginPath(); g.arc(X(P.summitPlaza.x), Y(P.summitPlaza.z), P.summitPlaza.r, 0, 7); g.fillStyle = '#ddd3c0'; g.fill();
+  g.beginPath(); g.arc(X(P.circusIsland.x), Y(P.circusIsland.z), P.circusIsland.r, 0, 7); g.fillStyle = '#7fa769'; g.fill();
+  // contours every 10 m
+  g.lineWidth = 1.2; g.strokeStyle = 'rgba(70,58,40,0.35)';
+  for (const lv of [10, 20, 30, 40, 50]) {
+    g.beginPath();
+    for (let j = 0; j < H.nz - 1; j++) for (let i = 0; i < H.nx - 1; i++) {
+      const v = (a, b) => H.values[b * H.nx + a], a = v(i, j), b = v(i + 1, j), d = v(i, j + 1), e = v(i + 1, j + 1);
+      if (a < 0 || b < 0 || d < 0 || e < 0) continue;
+      const x = B.x0 + i * H.cell, z = B.z0 + j * H.cell, c = H.cell, pts = [];
+      const edge = (h1, h2, x1, z1, x2, z2) => { if ((h1 - lv) * (h2 - lv) < 0) { const t = (lv - h1) / (h2 - h1); pts.push([x1 + (x2 - x1) * t, z1 + (z2 - z1) * t]); } };
+      edge(a, b, x, z, x + c, z); edge(b, e, x + c, z, x + c, z + c); edge(e, d, x + c, z + c, x, z + c); edge(d, a, x, z + c, x, z);
+      if (pts.length >= 2) { g.moveTo(X(pts[0][0]), Y(pts[0][1])); g.lineTo(X(pts[1][0]), Y(pts[1][1])); }
+    }
+    g.stroke();
+  }
+  // the canal, the rails, the container yards, the buildings of their own
+  trace(P.canal, false); g.lineCap = 'butt'; g.lineWidth = P.canalWidth; g.strokeStyle = '#8f887f'; g.stroke(); g.lineWidth = P.canalWidth - 8; g.strokeStyle = '#b9b2a6'; g.stroke(); g.lineWidth = 4; g.strokeStyle = '#4aa3c4'; g.stroke();
+  const rails = (a, b) => { g.beginPath(); g.moveTo(X(a[0]), Y(a[1])); g.lineTo(X(b[0]), Y(b[1])); g.lineWidth = 3; g.strokeStyle = '#4a4552'; g.stroke(); const l = Math.hypot(b[0] - a[0], b[1] - a[1]); for (let d = 0; d < l; d += 8) { g.fillStyle = '#4a4552'; g.fillRect(X(a[0] + (b[0] - a[0]) * d / l) - 0.8, Y(a[1] + (b[1] - a[1]) * d / l) - 4, 1.6, 8); } };
+  rails(P.railway[0], P.railway[1]); for (const dz of [-26, -13, 13]) rails([P.railYard.x0, -515 + dz], [P.railYard.x1, -515 + dz]);
+  seed = 9;
+  for (const y of P.containerYards) for (let z = y.z0; z < y.z1; z += 9) for (let x = y.x0; x < y.x1; x += 15) {
+    if (rnd() < 0.18 || !onLand(x + 6, z + 3)) continue;
+    g.fillStyle = ['#e5533d', '#2b6cb0', '#f0a93b', '#3d9970', '#8e5bb5', '#d8d2c4'][(rnd() * 6) | 0]; g.fillRect(X(x), Y(z), 12.5, 6);
+  }
+  for (const [r, fill] of [[P.carPark, '#9d98a8'], [P.headquarters, '#2b4fb5'], [P.donutShop, '#ef8fbe']]) { g.fillStyle = 'rgba(30,22,40,0.3)'; g.fillRect(X(r.x0) + 5, Y(r.z0) + 7, r.x1 - r.x0, r.z1 - r.z0); g.fillStyle = fill; g.fillRect(X(r.x0), Y(r.z0), r.x1 - r.x0, r.z1 - r.z0); g.lineWidth = 1.5; g.strokeStyle = '#1a1330'; g.strokeRect(X(r.x0), Y(r.z0), r.x1 - r.x0, r.z1 - r.z0); }
+  g.restore();
+  // the causeway and the islet
+  trace(A.causeway, true); g.fillStyle = '#9db57c'; g.fill(); g.lineWidth = 4; g.strokeStyle = '#d8d2c4'; g.stroke();
+  const rw = P.runway; g.fillStyle = '#4a4a58'; g.fillRect(X(rw.x0), Y(rw.z0), rw.x1 - rw.x0, rw.z1 - rw.z0);
+  g.fillStyle = '#f7f3ea'; for (let z = rw.z0 + 20; z < rw.z1 - 20; z += 34) g.fillRect(X((rw.x0 + rw.x1) / 2) - 1, Y(z), 2.5, 16);
+  for (const hg of P.hangars) { g.fillStyle = '#9aa6b4'; g.fillRect(X(hg.x0), Y(hg.z0), hg.x1 - hg.x0, hg.z1 - hg.z0); g.strokeStyle = '#1a1330'; g.lineWidth = 1.2; g.strokeRect(X(hg.x0), Y(hg.z0), hg.x1 - hg.x0, hg.z1 - hg.z0); }
+  g.beginPath(); g.arc(X(P.controlTower.x), Y(P.controlTower.z), 9, 0, 7); g.fillStyle = '#f7f3ea'; g.fill(); g.stroke();
+  g.fillStyle = '#e5533d'; g.fillRect(X(P.megaRamp.x) - 17, Y(P.megaRamp.z) - 14, 34, 28); g.strokeRect(X(P.megaRamp.x) - 17, Y(P.megaRamp.z) - 14, 34, 28);
+  trace(A.islet, true); g.fillStyle = '#e6c98f'; g.fill();
+  // the coast's edges
+  const part = (from, to) => A.coast.filter((_, i) => { const s = A.coastSpan[i]; return from <= to ? s >= from && s <= to : s >= from || s <= to; });
+  for (const p of A.coastParts) {
+    if (p.kind === 'cliff') {
+      const pts = [...A.coast.filter((_, i) => A.coastSpan[i] >= p.from), ...A.coast.filter((_, i) => A.coastSpan[i] <= p.to)];
+      trace(pts, false); g.lineWidth = 9; g.strokeStyle = '#5b4d45'; g.stroke();
+      for (let i = 0; i + 1 < pts.length; i += 2) { const [ax, az] = pts[i], [bx, bz] = pts[i + 1], l = Math.hypot(bx - ax, bz - az) || 1, nx = (bz - az) / l, nz = -(bx - ax) / l; g.beginPath(); g.moveTo(X(ax), Y(az)); g.lineTo(X(ax - nx * 16), Y(az - nz * 16)); g.lineWidth = 2; g.strokeStyle = 'rgba(80,66,58,0.7)'; g.stroke(); }
+    } else if (p.kind === 'quay' || p.kind === 'bay') { const pts = part(p.from, p.to); trace(pts, false); g.lineWidth = 5; g.strokeStyle = '#d8d2c4'; g.stroke(); }
+  }
+  // the roads: the tunnel under, the streets, the avenues, the highway over
+  for (const r of A.roads) if (r.span === 'tunnel') { trace(r.pts, false); g.save(); g.setLineDash([18, 12]); g.lineCap = 'butt'; g.lineWidth = 20; g.strokeStyle = 'rgba(42,36,56,0.6)'; g.stroke(); g.lineWidth = 11; g.strokeStyle = 'rgba(255,233,168,0.9)'; g.stroke(); g.restore(); }
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  const STY = { dirt: [8, '#6f5438', 5, '#a4835c'], street: [9, '#5b5566', 5.5, '#ece6d8'], serpentine: [9, '#5b5566', 5.5, '#ece6d8'], taxiway: [11, '#3a3a46', 7, '#6a6a78'], avenue: [14, '#4a4558', 9.5, '#f7f3ea'], ramp: [10, '#2a2438', 6, '#ffe9a8'] };
+  for (const pass of [0, 1]) for (const cls of ['dirt', 'street', 'serpentine', 'taxiway', 'avenue', 'ramp']) for (const r of A.roads) {
+    if (r.cls !== cls || r.span === 'tunnel') continue;
+    const [cw, cc, fw, fc] = STY[cls]; trace(r.pts, false); g.lineWidth = pass ? fw : cw; g.strokeStyle = pass ? fc : cc; g.stroke();
+  }
+  // palms along Palm Avenue, the beach road, the Quay's front and the beaches
+  const palm = (x, z, r = 5.5) => { g.save(); g.translate(X(x), Y(z)); g.beginPath(); for (let k = 0; k < 10; k++) { const a = k / 10 * 6.283, rr = k % 2 ? r * 0.4 : r; g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } g.closePath(); g.fillStyle = '#3f8f5a'; g.fill(); g.restore(); };
+  const palmsAlong = (pts, step, off, sides) => { let acc = 0; for (let i = 0; i + 1 < pts.length; i++) { const [ax, az] = pts[i], [bx, bz] = pts[i + 1], l = Math.hypot(bx - ax, bz - az); acc += l; if (acc < step) continue; acc = 0; const ux = (bx - ax) / l, uz = (bz - az) / l; for (const s of sides) { const x = ax - uz * s * off, z = az + ux * s * off; if (onLand(x, z)) palm(x, z); } } };
+  palmsAlong(road('palm-avenue').pts, 18, 12, [-1, 1]); palmsAlong(road('beach-road').pts, 16, 12, [1]); palmsAlong(road('quay-sweep').pts, 20, 12, [1]);
+  for (const b of P.beaches) palmsAlong(b.points, 34, 0, [1]);
+  // the highway and its bridges
+  for (const r of A.roads) {
+    if (r.cls !== 'highway' || r.span === 'tunnel') continue;
+    if (r.span === 'bridge' || r.span === 'viaduct') {
+      const [a, b] = [r.pts[0], r.pts[r.pts.length - 1]], l = Math.hypot(b[0] - a[0], b[1] - a[1]), ux = (b[0] - a[0]) / l, uz = (b[1] - a[1]) / l;
+      g.save(); g.lineCap = 'butt';
+      trace([[a[0] + 8, a[1] + 11], [b[0] + 8, b[1] + 11]], false); g.lineWidth = 22; g.strokeStyle = 'rgba(10,30,45,0.35)'; g.stroke();
+      for (let d = 20; d < l - 10; d += 46) { g.fillStyle = '#3a3346'; g.fillRect(X(a[0] + ux * d) - 5, Y(a[1] + uz * d) - 5, 10, 10); }
+      trace(r.pts, false); g.lineWidth = 24; g.strokeStyle = '#2a2438'; g.stroke(); g.lineWidth = 17; g.strokeStyle = '#ffe9a8'; g.stroke(); g.restore();
+      continue;
+    }
+    trace(r.pts, false); g.lineWidth = 24; g.strokeStyle = '#2a2438'; g.stroke(); g.lineWidth = 17; g.strokeStyle = '#ffe9a8'; g.stroke(); g.lineWidth = 1.6; g.strokeStyle = '#d9b86a'; g.stroke();
+  }
+  for (const r of A.roads) if (r.span === 'tunnel') for (const q of [r.pts[0], r.pts[r.pts.length - 1]]) { g.beginPath(); g.arc(X(q[0]), Y(q[1]), 15, 0, 7); g.fillStyle = '#2a2438'; g.fill(); g.beginPath(); g.arc(X(q[0]), Y(q[1]), 8, 0, 7); g.fillStyle = '#0d0a16'; g.fill(); }
+  // the stadium, the marina, the pleasure pier, the lighthouse, the duck
+  const st = P.stadium;
+  g.beginPath(); g.ellipse(X(st.x), Y(st.z), st.rx, st.rz, 0, 0, 7); g.fillStyle = '#b9b2c6'; g.fill(); g.lineWidth = 1.5; g.strokeStyle = '#1a1330'; g.stroke();
+  g.beginPath(); g.ellipse(X(st.x), Y(st.z), st.rx - 16, st.rz - 15, 0, 0, 7); g.fillStyle = '#4a4a58'; g.fill();
+  g.beginPath(); g.ellipse(X(st.x), Y(st.z), st.rx - 38, st.rz - 35, 0, 0, 7); g.fillStyle = '#7fbf6a'; g.fill();
+  g.lineCap = 'butt';
+  for (const x of P.marinaPiers) { g.fillStyle = '#c9b89a'; g.fillRect(X(x) - 2.5, Y(372), 5, 92); }
+  const pp = P.pleasurePier; g.fillStyle = '#c9b89a'; g.fillRect(X(pp.x0), Y(pp.z0), pp.x1 - pp.x0, pp.z1 - pp.z0);
+  g.beginPath(); g.arc(X(P.ferrisWheel.x), Y(P.ferrisWheel.z), 20, 0, 7); g.lineWidth = 3; g.strokeStyle = '#f7f3ea'; g.stroke();
+  g.beginPath(); g.arc(X(P.lighthouse.x), Y(P.lighthouse.z), 10, 0, 7); g.fillStyle = '#f7f3ea'; g.fill(); g.lineWidth = 4; g.strokeStyle = '#e8384f'; g.stroke();
+  g.beginPath(); g.ellipse(X(P.duck.x), Y(P.duck.z), 17, 12, 0, 0, 7); g.fillStyle = '#ffd23f'; g.fill(); g.beginPath(); g.arc(X(P.duck.x + 12), Y(P.duck.z - 8), 7.5, 0, 7); g.fill();
+}
+
+// ---------- words and marks
+function text(str, x, z, size, o = {}) {
+  g.save(); g.translate(X(x), Y(z)); if (o.rot) g.rotate(o.rot);
+  g.font = `${o.weight || 800} ${size}px ${FONT}`; if (o.spacing) g.letterSpacing = o.spacing + 'px';
+  g.textAlign = o.align || 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+  if (o.outline !== 0) { g.lineWidth = o.outline || Math.max(4, size * 0.24); g.strokeStyle = 'rgba(20,14,34,0.88)'; g.strokeText(str, 0, 0); }
+  g.fillStyle = o.fill || '#f7f3ea'; g.fillText(str, 0, 0); g.restore();
+}
+function glyph(id, px, py, size, color) {
+  const shapes = A.glyphs[id]; if (!shapes) return;
+  g.beginPath(); for (const sh of shapes) for (const ring of [sh.outer, ...(sh.holes || [])]) { g.moveTo(px + (ring[0] - 0.5) * size, py + (ring[1] - 0.5) * size); for (let k = 2; k < ring.length; k += 2) g.lineTo(px + (ring[k] - 0.5) * size, py + (ring[k + 1] - 0.5) * size); g.closePath(); }
+  g.fillStyle = color; g.fill('evenodd');
+}
+const KIND = {
+  delivery: ['DOSTAWA', '#39b8ff', '#fff'], order: ['KRADZIEŻ NA ZAMÓWIENIE', '#a879ff', '#fff'], escape: ['UCIECZKA', '#ff4a4a', '#fff'],
+  trial: ['JAZDA NA CZAS', '#27d99a', '#10202a'], race: ['WYŚCIG ULICZNY', '#f4f4f4', '#10202a'], rage: ['SZAŁ ELIMINACJI', '#ff8a1f', '#fff'],
+  mayhem: ['ROZRÓBA', '#b8f03a', '#10202a'], duel: ['RYWALE I KOMENDANT', '#ffd23f', '#10202a'],
+};
+function jobIcon(kind, px, py, r, n) {
+  const [, col, ink] = KIND[kind];
+  g.beginPath(); g.arc(px, py, r, 0, 7); g.fillStyle = col; g.fill(); g.lineWidth = 3; g.strokeStyle = '#150f26'; g.stroke();
+  if (kind !== 'duel') glyph(A.kindGlyph[kind], px, py, r * 1.5, ink);
+  else if (n > 0) { g.font = `900 ${r * 1.15}px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = ink; g.fillText(String(n), px, py + 1); }
+  else glyph('star', px, py, r * 1.55, ink);
+}
+function mark(kind, px, py, r) {
+  g.save(); g.lineWidth = 2; g.strokeStyle = '#1a1330';
+  if (kind === 'garage') { g.beginPath(); g.moveTo(px, py - r); g.lineTo(px + r, py - r * 0.2); g.lineTo(px + r, py + r * 0.85); g.lineTo(px - r, py + r * 0.85); g.lineTo(px - r, py - r * 0.2); g.closePath(); g.fillStyle = '#ffcf3a'; g.fill(); g.stroke(); }
+  if (kind === 'jump') { g.beginPath(); g.moveTo(px + r * 1.2, py); g.lineTo(px - r * 0.8, py - r * 0.9); g.lineTo(px - r * 0.3, py); g.lineTo(px - r * 0.8, py + r * 0.9); g.closePath(); g.fillStyle = '#ff7a1a'; g.fill(); g.strokeStyle = '#fff'; g.stroke(); }
+  if (kind === 'camera') { g.fillStyle = '#f7f3ea'; g.fillRect(px - r, py - r * 0.7, 2 * r, 1.4 * r); g.strokeRect(px - r, py - r * 0.7, 2 * r, 1.4 * r); g.beginPath(); g.arc(px, py, r * 0.4, 0, 7); g.fillStyle = '#e8384f'; g.fill(); }
+  if (kind === 'breaker') { g.beginPath(); g.moveTo(px, py - r * 1.1); g.lineTo(px + r, py + r * 0.8); g.lineTo(px - r, py + r * 0.8); g.closePath(); g.fillStyle = '#ffb02e'; g.fill(); g.stroke(); }
+  if (kind === 'cover') { g.fillStyle = 'rgba(126,196,214,0.8)'; g.fillRect(px - r, py - r * 0.6, 2 * r, 1.2 * r); g.strokeStyle = '#9fe3f2'; g.strokeRect(px - r, py - r * 0.6, 2 * r, 1.2 * r); }
+  if (kind === 'roadblock') for (let k = 0; k < 4; k++) { g.fillStyle = k % 2 ? '#f7f3ea' : '#1d4ed8'; g.fillRect(px - 2 * r + k * r, py - r * 0.6, r, 1.2 * r); }
+  if (kind === 'fuel' || kind === 'repair' || kind === 'paint') { g.beginPath(); g.arc(px, py, r, 0, 7); g.fillStyle = { fuel: '#3ecf8e', repair: '#ff9f1c', paint: '#f45bff' }[kind]; g.fill(); g.stroke(); }
+  if (kind === 'hidden' || kind === 'find') { g.beginPath(); g.arc(px, py, r, 0, 7); g.fillStyle = kind === 'hidden' ? '#ff5fc8' : '#7c4dff'; g.fill(); g.strokeStyle = '#fff'; g.stroke(); glyph('key', px, py, r * 1.4, '#fff'); }
+  if (kind === 'slipway') { g.fillStyle = '#9fe3f2'; g.fillRect(px - r * 0.5, py - r, r, 2 * r); g.strokeRect(px - r * 0.5, py - r, r, 2 * r); }
+  g.restore();
+}
+
+/** The district names off the places at the districts' middles (the summit, the botanic garden, the hotel). */
+const NAME_SHIFT = { crown: [30, 210], foundry: [0, -60], gardens: [150, 280], marina: [-110, -190] };
+function landmark(kind, x, z) {
+  const px = X(x), py = Y(z);
+  g.save(); g.lineWidth = 3; g.strokeStyle = '#1a1330';
+  if (kind === 'tower') { g.fillStyle = '#e9dcc0'; g.fillRect(px - 16, py - 16, 32, 32); g.strokeRect(px - 16, py - 16, 32, 32); g.fillStyle = '#f5cd75'; g.fillRect(px - 9, py - 9, 18, 18); }
+  if (kind === 'works') { g.beginPath(); g.arc(px, py, 20, 0, 7); g.fillStyle = '#d98768'; g.fill(); g.lineWidth = 5; g.strokeStyle = '#5daeb5'; g.stroke(); g.beginPath(); g.arc(px + 32, py - 30, 6, 0, 7); g.fillStyle = '#9b5b45'; g.fill(); }
+  if (kind === 'glass') { g.beginPath(); g.arc(px, py, 26, 0, 7); g.fillStyle = 'rgba(159,216,255,0.95)'; g.fill(); g.stroke(); for (let k = 0; k < 6; k++) { g.beginPath(); g.moveTo(px, py); g.lineTo(px + Math.cos(k) * 26, py + Math.sin(k) * 26); g.lineWidth = 1.5; g.stroke(); } }
+  if (kind === 'hotel') { g.fillStyle = '#eaa7ab'; g.fillRect(px - 36, py - 16, 72, 32); g.strokeRect(px - 36, py - 16, 72, 32); g.font = `900 20px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#1a1330'; g.fillText('H', px, py + 1); }
+  if (kind === 'crane') { g.lineWidth = 2; g.fillStyle = '#ff9f1c'; g.fillRect(px - 4, py - 26, 8, 40); g.strokeRect(px - 4, py - 26, 8, 40); }
+  g.restore();
+}
+function drawIslandWords() {
+  landmark('tower', P.towerTop.x, P.towerTop.z); landmark('works', P.waterworks.x, P.waterworks.z); landmark('glass', P.glasshouse.x, P.glasshouse.z); landmark('hotel', P.hotel.x, P.hotel.z);
+  for (const [x, z] of P.cranes) landmark('crane', x, z);
+  for (const [id, [x, z]] of Object.entries(A.middles)) text(DISTRICTS[id].name, x + NAME_SHIFT[id][0], z + NAME_SHIFT[id][1], 46, { weight: 900, spacing: 5, fill: DISTRICTS[id].color, outline: 10 });
+  for (const gr of A.placed.garages) mark('garage', X(gr.at[0]), Y(gr.at[1]), 12);
+  const place = (s, x, z, o = {}) => text(s, x, z, o.size || 19, { weight: 800, ...o });
+  place('Wieża Koronna · szczyt', P.towerTop.x, P.towerTop.z - 100, { fill: '#f5cd75' });
+  place('Wodociągi', P.waterworks.x, P.waterworks.z + 40, { fill: '#9fe3f2' });
+  place('Palmiarnia · ogród botaniczny', P.glasshouse.x, P.glasshouse.z + 40, { fill: '#e9f7e0' });
+  place('Hotel Koral', P.hotel.x, P.hotel.z - 44, { size: 18, fill: '#ffd1d8' });
+  place('STADION', P.stadium.x, P.stadium.z, { size: 17 });
+  place('kamieniołom', -700, -512, { size: 16, fill: '#fff0d8' });
+  place('lotnisko', P.runway.x0 - 20, P.runway.z0 + 250, { size: 16, rot: -1.5708 });
+  place('wysepka', 1034, 420, { size: 15, fill: '#fff3b0' });
+  place('OBWODNICA', -150, 698, { size: 13, spacing: 3, fill: '#2a2438', outline: 0, weight: 900 });
+}
+
+function drawPlaced() {
+  g.fillStyle = 'rgba(18,12,34,0.5)'; g.fillRect(0, 0, MW, MH);
+  for (const [id, [x, z]] of Object.entries(A.middles)) text(DISTRICTS[id].name, x + NAME_SHIFT[id][0], z + NAME_SHIFT[id][1], 34, { weight: 900, spacing: 3, fill: DISTRICTS[id].color, outline: 8 });
+  const L = A.placed;
+  for (const c of L.covers) mark('cover', X(c.at[0]), Y(c.at[1]), 14);
+  for (const r of L.roadblocks) mark('roadblock', X(r[0]), Y(r[1]), 8);
+  for (let i = 0; i < L.buoys.length; i += 2) { const [x, z] = L.buoys[i]; if (onLand(x, z)) continue; g.beginPath(); g.arc(X(x), Y(z), 4, 0, 7); g.fillStyle = '#ff8a1f'; g.fill(); }
+  trace(L.firstMinute, false); g.save(); g.lineWidth = 7; g.strokeStyle = 'rgba(255,255,255,0.9)'; g.setLineDash([2, 10]); g.lineCap = 'round'; g.stroke(); g.restore();
+  for (const b of L.breakers) mark('breaker', X(b.at[0]), Y(b.at[1]), 11);
+  for (const c of L.cameras) mark('camera', X(c[0]), Y(c[1]), 10);
+  for (const j of L.jumps) mark('jump', X(j.at[0]), Y(j.at[1]), j.kind === 'mega' ? 16 : 11);
+  for (const j of L.jobs) if (j.to) { g.save(); g.setLineDash([8, 7]); g.lineWidth = 2.5; g.strokeStyle = KIND[j.kind][1]; g.globalAlpha = 0.7; trace([j.at, j.to], false); g.stroke(); g.restore(); }
+  for (const j of L.jobs) jobIcon(j.kind, X(j.at[0]), Y(j.at[1]), 13);
+  for (const r of L.rivals) jobIcon('duel', X(r.at[0]), Y(r.at[1]), 13, r.rival >= 10 ? 0 : 10 - r.rival);
+  for (const s of L.services) mark(s.kind, X(s.at[0]), Y(s.at[1]), 12);
+  for (const [car, at] of Object.entries(L.stash)) mark(['roller', 'monster', 'trolley', 'hover'].includes(car) ? 'find' : 'hidden', X(at[0]), Y(at[1]), 12);
+  for (const s of L.slipways) mark('slipway', X(s.at[0]), Y(s.at[1]), 12);
+  for (const gr of L.garages) mark('garage', X(gr.at[0]), Y(gr.at[1]), 15);
+  L.firstMinuteSteps.forEach((s, i) => { g.beginPath(); g.arc(X(s.at[0]) + 20, Y(s.at[1]) - 20, 11, 0, 7); g.fillStyle = '#fff'; g.fill(); text(String(i + 1), s.at[0] + 20, s.at[1] - 19, 14, { weight: 900, fill: '#1a1330', outline: 0 }); });
+}
+
+function drawPanel() {
+  const L = MW; g.fillStyle = '#150f26'; g.fillRect(L, 0, PANEL, MH);
+  let y = 70;
+  const t = (s, size, o = {}) => { g.save(); g.font = `${o.weight || 700} ${size}px ${FONT}`; g.fillStyle = o.fill || '#f7f3ea'; g.textAlign = o.align || 'left'; g.fillText(s, o.align === 'right' ? L + PANEL - 36 : L + 40, y); g.restore(); };
+  t(MODE === 'placed' ? 'CO GDZIE STOI' : 'WYSPA', 56, { weight: 900 }); y += 40;
+  t('atlas: wyspa taka, jak ją buduje symulacja', 20, { weight: 700, fill: '#e5b6a5' }); y += 36;
+  t(`ląd ${(A.area.island / 1e6).toFixed(2).replace('.', ',')} km² + grobla i wysepka ${(A.area.extra / 1e6).toFixed(2).replace('.', ',')} km²`, 18, { weight: 600, fill: '#8d83ad' }); y += 44;
+  const L2 = A.placed;
+  const rows = MODE === 'placed'
+    ? [['pierścienie zleceń', L2.jobs.length], ['rywale i Komendant', L2.rivals.length], ['garaże', L2.garages.length], ['skocznie', L2.jumps.length], ['fotoradary', L2.cameras.length], ['osłony', L2.covers.length], ['rusztowania i sterty', L2.breakers.length], ['miejsca blokad', L2.roadblocks.length], ['stacje, warsztaty, lakiernie', L2.services.length], ['ukryte auta i znaleziska', Object.keys(L2.stash).length]]
+    : [['drogi planu', A.roads.length], ['garaże', L2.garages.length]];
+  for (const [label, n] of rows) { t(label, 19, { weight: 600 }); t(String(n), 19, { weight: 800, fill: '#ffd23f', align: 'right' }); y += 30; }
+}
+
+drawBase();
+if (MODE === 'placed') drawPlaced(); else drawIslandWords();
+drawPanel();
+const bx = X(B.x0 + 30), by = Y(B.z1 - 25); g.fillStyle = '#f7f3ea'; g.fillRect(bx, by, 500, 4); text('500 m', B.x0 + 280, B.z1 - 48, 20, { weight: 800 });
+window.ATLAS_DONE = true;
+</script>
+</body></html>

@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.9 slice 3: the city lit at dusk, with depth
+
+Done (R9): `render/city/glow.ts` gives the city's one material a `cityLook` attribute (a byte of glow, a byte of
+"facade") and a hook chained after the road paint's: after the light and before the fog it adds a warm glow and shades a
+facade by its height. A quarter of the upper windows lit (the draw is the window's place to the decimetre, so the same
+city lights the same windows), six in ten shop windows, the lamp heads (a `glow` part of the lamp prop; a knocked lamp
+goes dark); the facades 0.8 at the ground to 1 at 12 m, times a contact band of 0.7 in the lowest 0.4 m. No vertex, draw
+or light added. Stills: the lit windows and shop fronts read at 1280×720; the districts' numbers as slice 2's. Pins M8.9
+3.1–3.4. Verify green.
+
 ## 2026-09-25 — M8.9 slice 2: the golden hour
 
 Done (R8): the sun at 32° on its old bearing (was 51°; at the plan's 25° the streets sat in shade and read as night),

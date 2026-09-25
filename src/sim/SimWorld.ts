@@ -408,6 +408,7 @@ export class SimWorld {
       }
       this.island.sync(pos.x, pos.z);
       this.island.prefetch(pos.x, pos.z);
+      this.island.step(FIXED_DT);
     }
     this.transforms.swap();
     this.respawned = false;

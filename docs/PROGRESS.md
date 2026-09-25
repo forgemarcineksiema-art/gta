@@ -2,6 +2,17 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.10 slices 8–12: the districts' places, merged
+
+Done: five agents built the places side by side in their worktrees, merged here (each slice's as-built note in its
+plan section): Crown (the tower on its plaza, the car park with its roof jump, the HQ, the hideout, the quarry's
+benches, the serpentine banked), the Works (the dry canal with decks over it, the railway and its freight train with
+barriers, the cranes, the container mazes, the Waterworks, the scrapyard), the Gardens (the Glasshouse's terrace, the
+golf, the dunes, the boardwalk, 10 back-garden shortcuts with 58 fence panels as props, pin 10.2), the Quay (the piers
+and the gap jump, the pleasure pier's wheel, the lighthouse, the hotel, the stadium's oval, the reef, the duck), the
+airfield (the runway, hangars, tower, the mega-ramp to the islet). Open: the south passages under the highway dip
+under the sea; the traffic does not stop at the crossings yet; jumps, covers and garages wait for slices 14–15.
+
 ## 2026-09-25 — M8.10 slice 16: fuel, repair, paint
 
 Done: the drive-throughs (`island/services.ts`): three fuel stations (a canopy over two pump islands; a full boost,

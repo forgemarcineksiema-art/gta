@@ -44,7 +44,9 @@ describe('M8.10 slice 7a: the lots and the buildings', () => {
     const count: Record<string, number> = {};
     for (const l of island.fill.lots) count[l.district] = (count[l.district] ?? 0) + 1;
     console.log('7.3', JSON.stringify(count));
-    expect(count.crown ?? 0).toBeGreaterThan(100);
+    // (Crown's 104 before its places; the car park, the HQ, the hideout, the landing block, the arcade and the Works'
+    // west shed stand on seven of those lots now: 97)
+    expect(count.crown ?? 0).toBeGreaterThan(90);
     expect(count.foundry ?? 0).toBeGreaterThan(20);
     expect(count.gardens ?? 0).toBeGreaterThan(80);
     expect(count.marina ?? 0).toBeGreaterThan(40);

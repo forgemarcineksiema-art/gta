@@ -23,6 +23,9 @@ const STEP = CHUNK / (GRID - 1);
 const COLUMNS = 12;
 /** A triangle across a cut is at most this many grid steps wide, so the cut follows its line. */
 const CUT_SIZE = 2;
+/** A chunk's ground over the budget (pin 3.1: under 2,400 triangles) is built again with its open ground's allowances this much coarser. */
+const DENSE = 2399;
+const COARSER = 1.6;
 /** How far past a road's carriageway its bank over the water is drawn before it is cut (m). */
 const BANK = SHOULDER + 3;
 /** A wall face hangs from the cut's edge to under the sea's floor at a steep shore's foot (m). */
@@ -176,29 +179,39 @@ export class GroundView {
     return false;
   }
 
-  /** The chunk's mesh from its points: each point's allowance, the RTIN, the cut and its faces, the colours. */
+  /**
+   * The chunk's mesh from its points: each point's allowance, the RTIN, the cut and its faces, the colours. A chunk
+   * where the places' shapes pile up (a canal's end by a highway's rise and the sea) over the budget, `DENSE`, is built
+   * again with its open ground `COARSER` (its roads, pavements and places' surfaces as tight): the budget holds.
+   */
   private mesh(r: Reading): ChunkMesh {
     const n = GRID * GRID;
     for (let k = 0; k < n; k++) {
       const h = r.h[k] as number, road = r.road[k] as number;
-      let a: number, b: number;
-      if ((r.cut[k] as number) < -3) a = b = 1e6;
-      // under a road's strip or a paved place's slab (4 cm over the ground, 3.5 the slabs) or a place's own surface
-      // (the Gardens' paths and golf, 5 cm over): never over it
-      else if (road < 0 || r.surface[k] === ASPHALT || ((r.laid[k] as number) & LAID) !== 0) { a = 0.036; b = 0.6; }
-      else if (road < SHOULDER + 1) { a = 0.1; b = 0.3; }
-      else if (h < SEA.level - 0.6) a = b = 3;
-      else if (Math.abs(h - SEA.level) < 0.6) a = b = 0.08;
-      else a = b = 0.3;
-      this.above[k] = a;
-      this.below[k] = b;
       // (the botanic garden's lawn its own green; under a place's surface the grass's, which its edges show)
       this.tint[k] = ((r.laid[k] as number) & LAWN) !== 0 && h > SEA.level ? ISLAND_COLORS.lawn : cornerColour(((r.laid[k] as number) & LAID) !== 0 ? GRASS : (r.surface[k] as number), road, h);
     }
-    this.rtin.update(r.h, this.above, this.below, r.cut, CUT_SIZE);
-    this.tris = 0;
     const x0 = CHUNK_X0 + r.i * CHUNK, z0 = CHUNK_Z0 + r.j * CHUNK;
-    this.rtin.extract((ax, ay, bx, by, cx, cy) => this.triangle(r, x0, z0, ay * GRID + ax, by * GRID + bx, cy * GRID + cx));
+    for (const loose of [1, COARSER]) {
+      for (let k = 0; k < n; k++) {
+        const h = r.h[k] as number, road = r.road[k] as number;
+        let a: number, b: number;
+        if ((r.cut[k] as number) < -3) a = b = 1e6;
+        // under a road's strip or a paved place's slab (4 cm over the ground, 3.5 the slabs) or a place's own surface
+        // (the Gardens' paths and golf, 5 cm over): never over it
+        else if (road < 0 || r.surface[k] === ASPHALT || ((r.laid[k] as number) & LAID) !== 0) { a = 0.036; b = 0.6; }
+        else if (road < SHOULDER + 1) { a = 0.1; b = 0.3; }
+        else if (h < SEA.level - 0.6) a = b = 3 * loose;
+        else if (Math.abs(h - SEA.level) < 0.6) a = b = 0.08 * loose;
+        else a = b = 0.3 * loose;
+        this.above[k] = a;
+        this.below[k] = b;
+      }
+      this.rtin.update(r.h, this.above, this.below, r.cut, CUT_SIZE);
+      this.tris = 0;
+      this.rtin.extract((ax, ay, bx, by, cx, cy) => this.triangle(r, x0, z0, ay * GRID + ax, by * GRID + bx, cy * GRID + cx));
+      if (this.tris <= DENSE) break;
+    }
     return { positions: this.pos.slice(0, this.tris * 9), colors: this.col.slice(0, this.tris * 9), triangles: this.tris };
   }
 

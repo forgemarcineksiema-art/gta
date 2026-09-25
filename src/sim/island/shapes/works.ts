@@ -7,7 +7,7 @@
  * into it. The Waterworks' and the scrapyard's pads are levelled. Reads the plan only; a read allocates nothing.
  */
 import type { P2 } from '../geom';
-import { GARAGES, PLACES, naturalHeight, onLand } from '../plan';
+import { CAUSEWAY, GARAGES, PLACES, naturalHeight, onLand } from '../plan';
 
 /**
  * The canal (m): its top's half width (the plan's), its floor's half width, its depth under the banks, its floor's least
@@ -19,6 +19,8 @@ export const CANAL = { half: PLACES.canalWidth / 2, floorHalf: PLACES.canalWidth
 /** The embankment: the land within `PLATEAU` of the canal raised whole, falling back to the hills over `FALL` (m). */
 const PLATEAU = 45;
 const FALL = 200;
+/** The embankment keeps off the airfield's causeway (M8.10 slice 12's runway), faded in over this far past it (m). */
+const AIRFIELD_CLEAR = 20;
 /** The Waterworks' pad (m): levelled within `r`, blended back over `blend`. */
 export const WATERWORKS_PAD = { r: 36, blend: 16 } as const;
 /**
@@ -183,7 +185,9 @@ function lift(x: number, z: number): number {
   if (x < l.x0 || x > l.x1 || z < l.z0 || z > l.z1) return 0;
   nearest(x, z);
   if (near.d >= PLATEAU + FALL) return 0;
-  return tableAt(raise, near.s) * (near.d <= PLATEAU ? 1 : smooth01(1 - (near.d - PLATEAU) / FALL));
+  // none on the airfield's causeway across the water (its runway level), faded in over `AIRFIELD_CLEAR` m past it
+  const c = CAUSEWAY, off = Math.hypot(Math.max(c.x0 - x, 0, x - c.x1), Math.max(c.z0 - z, 0, z - c.z1));
+  return tableAt(raise, near.s) * (near.d <= PLATEAU ? 1 : smooth01(1 - (near.d - PLATEAU) / FALL)) * smooth01(off / AIRFIELD_CLEAR);
 }
 
 /** The Waterworks' pad's and the scrapyard's levels: the embanked hills at their middles. */

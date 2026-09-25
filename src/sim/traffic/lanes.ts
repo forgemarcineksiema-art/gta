@@ -33,6 +33,8 @@ export interface PathProjection extends LaneProjection {
   switched: boolean;
 }
 
+/** A lane's road heights on the island are read every this far along it or less (m): the drawn surface's give. */
+const Y_STEP = 2;
 /** Two junction movements conflict when their curves come within this distance, m. */
 const CONFLICT_DISTANCE = 5;
 
@@ -42,6 +44,8 @@ interface Connection {
   /** The road's height at the lane's end and at the next one's start (the grid's 0; the island's hills). */
   y0: number;
   y1: number;
+  /** The road's surface under each of its points (the island's, `roadAt`), or null (the grid's: from `y0` to `y1`). */
+  ys: Float32Array | null;
   cum: Float32Array;
   length: number;
 }
@@ -63,6 +67,12 @@ export class LaneTables {
   private readonly connections = new Map<number, Connection>();
   private readonly conflictCache = new Map<number, boolean>();
   private readonly scratch: LanePose = { x: 0, z: 0, yaw: 0 };
+  /**
+   * Each lane's road heights on its line every `Y_STEP` m or less (the island's drawn surface, `roadAt`, worked out when
+   * the lane is first read), or null: the grid's lanes and the highway's (its decks and tunnel off the ground) keep their
+   * points' heights.
+   */
+  private readonly ys: Array<Float32Array | null>;
   private readonly scratchProj: LaneProjection = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };
 
   /**
@@ -82,6 +92,7 @@ export class LaneTables {
     this.midZ = new Float32Array(this.laneCount);
     this.uturnOf = new Int16Array(this.laneCount);
     this.cumStart = new Int32Array(this.laneCount);
+    this.ys = new Array<Float32Array | null>(this.laneCount).fill(null);
     let points = 0;
     for (let i = 0; i < this.laneCount; i++) points += (graph.lanes[i] as Lane).points.length;
     this.cum = new Float32Array(points);
@@ -318,9 +329,39 @@ export class LaneTables {
     const z = a.z + (b.z - a.z) * t;
     const yaw = Math.atan2(b.x - a.x, b.z - a.z);
     applyOffset(x, z, yaw, offset, out);
+    const ys = this.roadAt && !(this.graph.lanes[lane] as Lane).highway ? this.heights(lane) : null;
+    if (ys) {
+      // on the island's drawn road: between its heights on the lane's line
+      const step = (this.length[lane] as number) / (ys.length - 1) || 1;
+      const u = Math.max(0, Math.min(ys.length - 1, s / step)), k = Math.min(ys.length - 2, Math.floor(u));
+      const y0 = ys[k] as number, y1 = ys[k + 1] as number;
+      out.y = y0 + (y1 - y0) * (u - k);
+      out.grade = (y1 - y0) / step;
+      return;
+    }
     const ya = a.y ?? 0, yb = b.y ?? 0;
     out.y = ya + (yb - ya) * t;
     out.grade = (yb - ya) / span;
+  }
+
+  /** A lane's road heights on its line (`ys`), worked out the first time it is read. */
+  private heights(lane: number): Float32Array {
+    const known = this.ys[lane];
+    if (known) return known;
+    const lanePts = (this.graph.lanes[lane] as Lane).points, base = this.cumStart[lane] as number, count = this.pointCount[lane] as number;
+    const len = this.length[lane] as number, n = Math.max(2, Math.ceil(len / Y_STEP) + 1), ys = new Float32Array(n);
+    const roadAt = this.roadAt as (x: number, z: number) => number;
+    let seg = 0;
+    for (let k = 0; k < n; k++) {
+      const s = (len * k) / (n - 1);
+      while (seg + 2 < count && (this.cum[base + seg + 1] as number) < s) seg++;
+      const a = lanePts[seg] as RoadPoint, b = lanePts[seg + 1] as RoadPoint;
+      const c0 = this.cum[base + seg] as number, c1 = this.cum[base + seg + 1] as number;
+      const t = Math.max(0, Math.min(1, (s - c0) / (c1 - c0 || 1)));
+      ys[k] = roadAt(a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t);
+    }
+    this.ys[lane] = ys;
+    return ys;
   }
 
   /** The road's height `s` m along a lane (its end's past its ends, on the junction curves: the grid's 0). */
@@ -345,10 +386,16 @@ export class LaneTables {
     out.x = x0 + (x1 - x0) * t;
     out.z = z0 + (z1 - z0) * t;
     out.yaw = Math.atan2(x1 - x0, z1 - z0);
-    // across the junction on its road's surface (the island's), else from the one lane's height to the other's (the
-    // grid's flat at 0)
+    // across the junction on its road's surface (the island's, under its points), else from the one lane's height to
+    // the other's (the grid's flat at 0)
+    if (conn.ys) {
+      const y0 = conn.ys[seg] as number, y1 = conn.ys[seg + 1] as number;
+      out.y = y0 + (y1 - y0) * t;
+      out.grade = (y1 - y0) / (c1 - c0 || 1);
+      return;
+    }
     const f = conn.length > 0 ? Math.max(0, Math.min(1, s / conn.length)) : 0;
-    out.y = this.roadAt ? this.roadAt(out.x, out.z) : conn.y0 + (conn.y1 - conn.y0) * f;
+    out.y = conn.y0 + (conn.y1 - conn.y0) * f;
     out.grade = conn.length > 0 ? (conn.y1 - conn.y0) / conn.length : 0;
   }
 
@@ -388,7 +435,12 @@ export class LaneTables {
         cum[i] = (cum[i - 1] as number) + Math.hypot(dx, dz);
       }
     }
-    const conn: Connection = { pts, cum, length: cum[SAMPLES] as number, y0: a.points[a.points.length - 1]?.y ?? 0, y1: b.points[0]?.y ?? 0 };
+    let ys: Float32Array | null = null;
+    if (this.roadAt) {
+      ys = new Float32Array(SAMPLES + 1);
+      for (let i = 0; i <= SAMPLES; i++) ys[i] = this.roadAt(pts[i * 2] as number, pts[i * 2 + 1] as number);
+    }
+    const conn: Connection = { pts, cum, length: cum[SAMPLES] as number, y0: a.points[a.points.length - 1]?.y ?? 0, y1: b.points[0]?.y ?? 0, ys };
     this.connections.set(key, conn);
     return conn;
   }

@@ -782,13 +782,14 @@ export class Ground {
       }
       near.give[i] = give;
     }
-    // the roads' heights blended by weight and nearness (no step where two roads' surfaces meet), then the hill's
+    // the roads' heights blended by weight and nearness (no step where two roads' surfaces meet), then the hill's as far
+    // as no road covers the point (a road giving way hands its weight to the other road, never to the hill under it)
     let sum = 0, weight = 0, most = 0;
     for (let i = 0; i < count; i++) {
       const w = (near.w[i] as number) * (near.give[i] as number), k = w / ((near.d[i] as number) + 2);
       sum += k * (near.h[i] as number);
       weight += k;
-      most = Math.max(most, w);
+      most = Math.max(most, near.w[i] as number);
     }
     return weight > 0 ? h + (sum / weight - h) * most : h;
   }

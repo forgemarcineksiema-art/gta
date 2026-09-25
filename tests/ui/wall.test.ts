@@ -4,8 +4,15 @@
  * them; TOTALS' one line of sums and the busted card's; NEW BEST only when a
  * run beats every run before it.
  */
+import { readFileSync } from 'node:fs';
+import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import type { SimWorld } from '../../src/sim';
+import { KIT_INDEX, RIVALS, type SimWorld } from '../../src/sim';
+import { GLYPHS } from '../../src/sim/glyphs';
+import { carLook, newLook, newPreview } from '../../src/sim/garage/look';
+import { PlayerCar } from '../../src/render/cars/PlayerCar';
+import { ThumbQueue } from '../../src/render/cars/thumbs';
+import { goalsModel } from '../../src/ui/wall/goals';
 import { BALANCE } from '../../src/sim/balance';
 import { BEST_AT, ROLE_WORDS, cardLine } from '../../src/sim/jobs/catalog';
 import { CAR_IDS } from '../../src/sim/vehicle/presets';
@@ -131,5 +138,75 @@ describe('M8.8 slice 3: what a car is for', () => {
       expect(carLine('monster')).toBe('TYLKO ON: JEŹDZI PO AUTACH');
       expect(carLine('trolley')).toBe('TYLKO ON: JEŹDZI NA RAKIECIE');
     } finally { setLang('en'); }
+  });
+});
+
+describe('the preview and GOALS in pictures (M8.9 slice 15)', () => {
+  it('M8.9 15.1 a preview, then a leave, restores the car exactly: its look and its drawn paint', async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
+    try {
+      const before = carLook(sim, null, newLook());
+      const p = newPreview();
+      // a topper and a paint looked at: on the car while focused
+      p.item = KIT_INDEX['crown'] as number;
+      expect(carLook(sim, p, newLook()).items.topper).toBe(p.item);
+      p.item = -1;
+      p.paint = 0x123456;
+      expect(carLook(sim, p, newLook()).paint).toBe(0x123456);
+      // left: what it wears, exactly
+      p.paint = -1;
+      expect(carLook(sim, p, newLook())).toEqual(before);
+      // drawn: the car's mesh takes the look and gives it back
+      const car = new PlayerCar(new THREE.Scene(), sim);
+      car.sync();
+      const paint = car.mesh.paint;
+      const look = carLook(sim, null, newLook());
+      look.paint = 0x123456;
+      car.setLook(look);
+      car.sync();
+      expect(car.mesh.paint).toBe(0x123456);
+      car.setLook(null);
+      car.sync();
+      expect(car.mesh.paint).toBe(paint);
+      // a car part that does not fit the car is not shown on it
+      expect(sim.kit.worn('topper')).toBe(before.items.topper);
+    } finally { sim.dispose(); }
+  });
+
+  it('M8.9 15.2 a buy after a preview keeps it: what the car shows is what it now wears', async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
+    try {
+      const item = KIT_INDEX['duck'] as number;
+      const p = newPreview();
+      p.item = item;
+      expect(carLook(sim, p, newLook()).items.topper).toBe(item);
+      sim.run.bank = 100_000;
+      expect(sim.kit.buy(item)).toBe('ok');
+      // the focus leaves: the duck stays on the roof
+      expect(carLook(sim, null, newLook()).items.topper).toBe(item);
+      expect(carLook(sim, p, newLook())).toEqual(carLook(sim, null, newLook()));
+    } finally { sim.dispose(); }
+  });
+
+  it('M8.9 15.3 GOALS\u2019 rows are the pictures\u2019 model: the rivals as their cars, the day with its bars, the hunts with their glyphs', async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
+    try {
+      sim.board.beaten = 0b11;
+      const m = goalsModel(sim);
+      const cells = new ThumbQueue();
+      expect(m.board.length).toBe(RIVALS.length);
+      for (const r of m.board) expect(cells.cellOf(r.picture), r.picture).toBeGreaterThanOrEqual(0);
+      expect(m.board.slice(0, 3).map((r) => r.state)).toEqual(['beaten', 'beaten', 'next']);
+      expect(m.board[m.board.length - 1]?.label).toBe('\u2605');
+      for (const d of m.dailies) {
+        expect(d.share).toBeGreaterThanOrEqual(0);
+        expect(d.share).toBeLessThanOrEqual(1);
+      }
+      expect(m.hunts.map((h) => h.glyph)).toEqual(['board', 'ramp', 'coin']);
+      for (const h of m.hunts) expect(GLYPHS[h.glyph].length).toBeGreaterThan(0);
+      // the page draws from the model
+      const garage = readFileSync(new URL('../../src/ui/wall/garage.ts', import.meta.url), 'utf8');
+      expect((garage.match(/goalsModel\(sim\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    } finally { sim.dispose(); }
   });
 });

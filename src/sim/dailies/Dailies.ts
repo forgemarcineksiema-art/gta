@@ -130,6 +130,15 @@ export class Dailies {
   }
 
   /** Slot i's cash. */
+  /** Slot i's progress as a share, 0..1: the wall's bar (M8.9 R10). */
+  share(i: number): number {
+    const t = this.template(i);
+    if (!t) return 0;
+    if (this.done[i]) return 1;
+    if (t.threshold) return 0;
+    return Math.max(0, Math.min(1, (this.progress[i] ?? 0) / t.target));
+  }
+
   reward(i: number): number {
     const t = this.template(i);
     return t ? (BALANCE.dailies.rewards[t.weight] ?? 0) : 0;

@@ -12,6 +12,16 @@ one (the traffic's rider mesh, built with the first), a parked or left one stand
 bike after the 4×4 (straight after the van the 4×4 waited 10.5 min, past the 10.1 pin's 10). Pins M8.8 16.1
 (`bodies.test`), 16.2 (`swap.test`), 16.3 (`garage.test`); M7 6.2 counts the couriers' mesh.
 
+## 2026-09-25 — M8.9 slice 15: the preview; GOALS in pictures
+
+Done (R10): a focused card on STYLE shows on the car in the room (`sim/garage/look.ts`: the look is the car's paint and
+kit with the focused paint or item in its place, drawn only; `PlayerCar.setLook`): paint, wheels, a spoiler, the stance,
+a topper, neon; a flame or smoke puffs for 1 s; a horn sounds once (`Sfx.horn`); a spoiler, a flame or smoke turns the
+turntable to show the tail. Leaving shows what the car wears again; buying makes it so. GOALS in pictures
+(`ui/wall/goals.ts`): the day's three with a bar each (`Dailies.share`), the board as the rivals' cars from the atlas
+(the beaten ticked, the next framed), the hunts as counters with their glyphs (`board`, `ramp`, `coin`), the best run.
+The look suite shoots `preview` and `goals`. Pins M8.9 15.1–15.3. Stills and verify green.
+
 ## 2026-09-25 — M8.9 slice 14: the pictures
 
 Done (R10): `render/cars/thumbs.ts` draws an atlas of 160×100 cells, one per body and per kit item, at the session's

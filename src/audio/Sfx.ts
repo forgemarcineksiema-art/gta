@@ -90,6 +90,12 @@ export class Sfx {
     this.seq = sim.events.readFrom(this.seq, this.play);
   }
 
+  /** A horn looked at on the wall (M8.9 R10): sounded once, as the car's horn would. */
+  horn(item: number): void {
+    const master = this.engine.ready ? this.engine.output : null;
+    if (master) this.playerHorn(master.context, master, item);
+  }
+
   /** One enveloped oscillator note `delay` s from now. */
   private note(ctx: BaseAudioContext, master: AudioNode, freq: number, delay: number, dur: number, peak: number, type: OscillatorType): void {
     const t = ctx.currentTime + delay;

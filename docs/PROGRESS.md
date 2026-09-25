@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.8 slice 20: the heat at sea; the sea trial
+
+Done: at sea the units stay ashore and a hovercraft out of their sight escapes by the cooldown; from four stars the
+helicopter holds it (nothing needed changing: the sea is nobody's cover). The sea trial: a trial def with a `route`,
+ten buoys (red floats, drawn by the edge chunks) from its ring at the south slipway's top round the island's corner and
+the east pier to a finish off the east slipway, a kilometre; each buoy counts within 25 m in order, the finish only
+after the last (a shortcut does not finish); coins buoy to buoy; its ring shown only to a hovercraft; the way by road to
+the ring, then by the buoys. On the water the skirt bites (`hoverWaterGrip` 4 across), and the rudders get a third of
+their air from the idling fan, so it turns from rest. Pins M8.8 20.1–20.4 (`sea.test.ts`).
+
 ## 2026-09-25 — M8.8 slice 19: the slipways and the sea
 
 Done: the sea's surface at −0.5 m (`GROUP_WATER`, nothing collides with it), met by the hovercraft's rays alone

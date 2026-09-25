@@ -156,7 +156,12 @@ export interface VehicleTuning {
   /** The cushion's drag on the ground: along the nose and across it, N per m/s (the side's is split between bow and stern). */
   hoverDrag: number;
   hoverSideDrag: number;
-  /** The rudders' yaw at full lock in full air: the fan's or the speed's (`rudderSpeedRef` m/s is full), N·m; twice on the handbrake. */
+  /** On the sea the skirt bites: its drag across is this many times the ground's (M8.8 slice 20: on water it runs). */
+  hoverWaterGrip: number;
+  /**
+   * The rudders' yaw at full lock in full air: the fan's or the speed's (`rudderSpeedRef` m/s is full), a third of it with
+   * the fan idling (M8.8 slice 20: it turns from rest), N·m; twice on the handbrake.
+   */
   rudderTorque: number;
   rudderSpeedRef: number;
   /** Off the road (M8.8 slice 9): on grass and on dirt, the tyres' grip and their rolling resistance, factors on asphalt's. */
@@ -370,6 +375,7 @@ export const DEFAULT_TUNING: VehicleTuning = {
   fanThrust: 0,
   hoverDrag: 0,
   hoverSideDrag: 0,
+  hoverWaterGrip: 1,
   rudderTorque: 0,
   rudderSpeedRef: 15,
   // a lawn costs a road car a third on its 0–100 (the muscle car 8.3 s, was 6.2); dirt about a fifth

@@ -38,7 +38,7 @@ export const STASH_SPOTS: Readonly<Record<GroundCar, { x: number; z: number; yaw
   roller: { x: 318, z: -466, yaw: -Math.PI / 2 },
   monster: { x: -737.5, z: 505, yaw: 0 },
   trolley: { x: -346, z: -346, yaw: Math.PI / 4 },
-  hover: { x: 497, z: 781, yaw: 0 },
+  hover: { x: 486, z: 779.5, yaw: 0 },
 };
 
 /** The district each of the others waits in, in a kerbside bay (city/City.ts ids). */

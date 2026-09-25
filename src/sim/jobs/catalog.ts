@@ -32,6 +32,11 @@ export interface JobDef {
   limitSeconds: number;
   /** Heat added once at the start (an escape sets its level instead). */
   heat: number;
+  /**
+   * A sea trial's buoys, in order (M8.8 slice 20): each counts when passed within `SEA_TRIAL.reach` m, the finish only
+   * after the last; its coins run buoy to buoy. Its ring is shown only to a hovercraft.
+   */
+  route?: ReadonlyArray<{ x: number; z: number }>;
 }
 
 /** The classes an order can ask for: the civilian bodies (a cruiser is update 2's job). */

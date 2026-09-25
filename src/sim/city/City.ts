@@ -20,7 +20,7 @@ import { signalPoles, signalledNodes } from './signals';
 import { BLOCK, CITY_HALF, HIGHWAY_HALF, HIGHWAY_LANE_OFFSETS, OVERPASS_NODES, ROAD_HALF, buildCityRoute, buildRoadGraph, distanceToPolyline, highwayHeightAt, projectOnLane, underOverpass, type Lane, type RoadPoint, type SpecialRoad } from './roads';
 import { overpassStatics } from './overpass';
 import { SurfaceMap } from './surface';
-import { SEA, SLIPWAY, SLIPWAYS, slipwayGaps, slipwayStatics, wallPieces } from './sea';
+import { SEA, SEA_TRIAL, SLIPWAY, SLIPWAYS, buoyStatics, slipwayGaps, slipwayStatics, wallPieces } from './sea';
 
 export const DISTRICTS = [
   { id: 'crown', name: 'CROWN HEIGHTS', color: 0xb497d6, accent: ACCENTS.crown, landmark: 'Crown Tower' },
@@ -573,6 +573,8 @@ export class City {
       }
     }
     for (const s of SLIPWAYS) if (chunkCoord(s.x) === cx && chunkCoord(s.z) === cz) statics.push(...slipwayStatics(s));
+    // the sea trial's buoys (M8.8 slice 20), each drawn by the edge chunk nearest it
+    for (const b of SEA_TRIAL.buoys) if (chunkCoord(b.x) === cx && chunkCoord(b.z) === cz) statics.push(...buoyStatics(b));
     // the covered streets' and the overpasses' boxes, each in the chunk holding its centre
     for (const st of this.coverBoxes) if (chunkCoord(st.position.x) === cx && chunkCoord(st.position.z) === cz) statics.push(st);
     for (const st of this.overpassBoxes) if (chunkCoord(st.position.x) === cx && chunkCoord(st.position.z) === cz) statics.push(st);

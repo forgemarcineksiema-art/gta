@@ -74,7 +74,9 @@ describe('jobs (M5 slice 1)', () => {
   it('1.1 placement: 39 defs (6/6/4/4/4/2/2 and the eleven rivals), deterministic, off the carriageway, 60 m apart, deliveries at least 400 m by path', async () => {
     const sim = await placedWorld();
     try {
-      const defs = sim.jobs.defs;
+      // the generator's: the sea trial (M8.8 slice 20) is authored, placed after them
+      const defs = sim.jobs.defs.filter((d) => !d.route);
+      expect(sim.jobs.defs.length - defs.length).toBe(1);
       // the four time trials (M5.5 slice 10), the four street races (slice 11), two rage and two mayhem zones (12);
       // the wanted board's eleven (M6 slice 1: the ten rivals and the Chief, each waiting at a kerbside bay)
       expect(defs.length).toBe(39);

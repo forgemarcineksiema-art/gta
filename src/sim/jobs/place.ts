@@ -27,6 +27,7 @@ import { coverSites, nearDoor, type DropOff } from '../city/cover';
 import { alongLane, laneChain } from '../city/route';
 import { BLOCK, HIGHWAY_HALF, ROAD_HALF, distanceToPolyline, type Lane } from '../city/roads';
 import { mulberry32 } from '../random';
+import { SEA_TRIAL, SLIPWAYS, slipwayTop, type Slipway } from '../city/sea';
 import type { LaneTables } from '../traffic/lanes';
 import { BAKED_JOBS } from './baked';
 import { ORDER_KINDS, orderPaints, packDescriptor, type JobDef, type JobKind } from './catalog';
@@ -204,6 +205,24 @@ export function fenceTargets(city: City): JobTarget[] {
  * The seed's jobs: the baked table for the shipping seed, so the boot does not generate the chunks the
  * placement checks (M5.1; jobs 1.1 fails when it drifts from `placeJobs`), else placed here.
  */
+/**
+ * The sea trial (M8.8 slice 20): its ring at the south slipway's top, its buoys and its finish off the east slipway
+ * (`SEA_TRIAL`); timed and paid as every trial, its bronze limit the line's length at the bronze speed.
+ */
+export function seaTrial(): Omit<JobDef, 'id'> {
+  const top = slipwayTop(SLIPWAYS[0] as Slipway), tr = BALANCE.jobs.trial;
+  const line = [top, ...SEA_TRIAL.buoys, SEA_TRIAL.finish];
+  let length = 0;
+  for (let k = 1; k < line.length; k++) {
+    const a = line[k - 1] as { x: number; z: number }, b = line[k] as { x: number; z: number };
+    length += Math.hypot(b.x - a.x, b.z - a.z);
+  }
+  return {
+    kind: 'trial', x: top.x, z: top.z, yaw: 0, targetX: SEA_TRIAL.finish.x, targetZ: SEA_TRIAL.finish.z, level: 0, descriptor: -1,
+    payout: tr.pay[2] as number, limitSeconds: Math.round(length / (tr.speeds[0] as number)), heat: 0, route: SEA_TRIAL.buoys,
+  };
+}
+
 export function jobsFor(city: City, seed: number, lanes: LaneTables): JobDef[] {
   const baked = BAKED_JOBS[seed];
   return baked ? baked.map((d) => ({ ...d })) : placeJobs(city, seed, lanes);

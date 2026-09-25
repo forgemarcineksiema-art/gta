@@ -37,7 +37,7 @@ import { TicketOfficer } from './police/Ticket';
 import { DONUT_SHOP, DonutShop } from './police/Donuts';
 import { Jobs } from './jobs/Jobs';
 import { Fares } from './jobs/Fares';
-import { jobsFor } from './jobs/place';
+import { jobsFor, seaTrial } from './jobs/place';
 import { Garage } from './garage/Garage';
 import { Board } from './board/Board';
 import { Kit } from './garage/kit';
@@ -302,6 +302,8 @@ export class SimWorld {
     this.jumps = this.city ? new Jumps(this, this.city.jumps) : null;
     // the generator's sixteen markers (docs/M5_PLAN.md D4); the cold open adds its own as id 0
     this.jobs = new Jobs(this, this.city && this.traffic ? jobsFor(this.city, opts.seed ?? 42, this.traffic.lanes) : []);
+    // the sea trial (M8.8 slice 20), after the generator's, before the way learns the rings
+    if (this.city && this.traffic) this.jobs.add(seaTrial());
     this.fares = new Fares(this, this.events);
     this.skill = new Skill(this);
     this.stash = new Stash(this);

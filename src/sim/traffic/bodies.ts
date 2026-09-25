@@ -203,6 +203,7 @@ const CRAZY = {
     t.fanThrust = 5000;
     t.hoverDrag = 130;
     t.hoverSideDrag = 100;
+    t.hoverWaterGrip = 4;
     t.rudderTorque = 4500;
     t.rudderSpeedRef = 15;
   },

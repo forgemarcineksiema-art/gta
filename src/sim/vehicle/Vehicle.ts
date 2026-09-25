@@ -19,7 +19,7 @@
  * rotation about +Y turns the nose to the left, so "steer right" rotates by -steer.
  */
 import RAPIER from '@dimforge/rapier3d-compat';
-import { GROUPS_CHASSIS_FLIPPED, GROUPS_CHASSIS_UPRIGHT, GROUPS_HOVER_FLIPPED, GROUPS_HOVER_UPRIGHT, QUERY_HOVER, QUERY_NOT_PROP } from '../collision';
+import { GROUP_WATER, GROUPS_CHASSIS_FLIPPED, GROUPS_CHASSIS_UPRIGHT, GROUPS_HOVER_FLIPPED, GROUPS_HOVER_UPRIGHT, QUERY_HOVER, QUERY_NOT_PROP } from '../collision';
 import type { VehicleControls } from '../controls';
 import * as M from '../math';
 import type { Vec3 } from '../math';
@@ -71,6 +71,8 @@ export interface WheelState {
   surface: SurfaceKind;
   /** The collider its ray stands on (a car's, under the monster truck's wheels: M8.8 slice 12), -1 in the air. */
   hitHandle: number;
+  /** Its ray stands on the sea (M8.8 slice 20: the hovercraft's cushion). */
+  water: boolean;
   /** The ray's length to its contact last step (m; the whole ray in the air): the climb's memory. */
   rayD: number;
   /** Transform slot for the renderer. */
@@ -335,6 +337,7 @@ export class Vehicle {
         spin: 0,
         surface: ASPHALT,
         hitHandle: -1,
+        water: false,
         rayD: 0,
         slot: transforms.allocate(),
       });
@@ -500,12 +503,14 @@ export class Vehicle {
         w.normal.y = hit.normal.y;
         w.normal.z = hit.normal.z;
         w.hitHandle = hit.collider.handle;
+        w.water = hover && ((hit.collider.collisionGroups() >>> 16) & GROUP_WATER) !== 0;
         if (M.dot(w.normal, s.up) < 0) M.scale(w.normal, w.normal, -1);
       } else {
         w.grounded = false;
         w.compression = 0;
         w.load = 0;
         w.hitHandle = -1;
+        w.water = false;
         w.rayD = rayLen;
         M.addScaled(w.center, s.point, s.rayDir, t.suspensionRestLength);
         M.copy(w.contact, w.center);
@@ -911,18 +916,23 @@ export class Vehicle {
       M.scale(s.force, s.fwd, push);
       M.add(s.fSum, s.fSum, s.force);
       if (grounded > 0) {
-        // the skirt drags on the ground: along the nose at the middle, across it half at the bow and half at the stern
+        // the skirt drags on the ground: along the nose at the middle, across it half at the bow and half at the stern;
+        // on the sea it bites (`hoverWaterGrip`), so there it runs where on a road it slides
+        let wet = 0;
+        for (const w of this.wheels) if (w.grounded && w.water) wet++;
+        const side = t.hoverSideDrag * (1 + (t.hoverWaterGrip - 1) * wet / grounded);
         M.scale(s.force, s.fwd, -t.hoverDrag * forwardSpeed);
         M.add(s.fSum, s.fSum, s.force);
         for (let end = 1; end >= -1; end -= 2) {
           M.addScaled(s.point, s.pos, s.fwd, end * t.wheelBase * 0.5);
           velAt(s.point, s.b);
-          M.scale(s.force, s.right, -0.5 * t.hoverSideDrag * M.dot(s.b, s.right));
+          M.scale(s.force, s.right, -0.5 * side * M.dot(s.b, s.right));
           forceAt(s.force, s.point);
         }
       }
-      // the rudders in the fan's wash or the airflow of the speed; + steer (right) turns the nose right
-      const air = M.clamp01(Math.max(fanPedal, absFwd / t.rudderSpeedRef));
+      // the rudders in the fan's wash or the airflow of the speed, a third of it from the fan idling (so it turns from
+      // rest); + steer (right) turns the nose right
+      const air = M.clamp01(Math.max(0.3, fanPedal, absFwd / t.rudderSpeedRef));
       const yaw = -this.steerRaw * t.rudderTorque * air * (handbrake ? 2 : 1);
       M.scale(s.force, s.up, yaw);
       M.add(s.tSum, s.tSum, s.force);

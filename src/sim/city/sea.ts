@@ -4,7 +4,7 @@
  * edges clear of the piers. At a slipway the island's boundary is a gate every chassis but the hovercraft's stops at.
  */
 import { PALETTE } from '../palette';
-import type { StaticDesc } from '../scene';
+import { IDENTITY_QUAT, type StaticDesc } from '../scene';
 import { CITY_HALF } from './roads';
 
 /** The sea's surface (the rendered sea's height) and how far out from the seawall it holds the hovercraft, m. */
@@ -72,4 +72,32 @@ export function slipwayStatics(s: Slipway): StaticDesc[] {
   const ramp = box(along ? w.width / 2 : length / 2, half, along ? length / 2 : w.width / 2, 0, 0, PALETTE.kerb, 'kerb');
   const kerbs = [-1, 1].map((side) => box(along ? 0.2 : length / 2, 0.35, along ? length / 2 : 0.2, side * (w.width / 2 + 0.2), half + 0.35, PALETTE.lightGrey, 'decor'));
   return [ramp, ...kerbs];
+}
+
+/**
+ * The sea trial (M8.8 slice 20): from its ring at the south slipway's top out past the first buoy, east along the
+ * Quay's south shore, round the island's corner in two bends, north along the east shore and round the east pier's end,
+ * to a finish off the east slipway: a kilometre with no turn sharper than 60° after the first. Each buoy counts when
+ * passed within `reach` m, in order; the finish only after the last.
+ */
+export const SEA_TRIAL = {
+  buoys: [
+    { x: 497, z: 815 }, { x: 620, z: 835 }, { x: 740, z: 845 }, { x: 830, z: 855 }, { x: 875, z: 800 },
+    { x: 880, z: 700 }, { x: 870, z: 560 }, { x: 895, z: 450 }, { x: 895, z: 350 }, { x: 850, z: 290 },
+  ],
+  finish: { x: 812, z: 255 },
+  reach: 25,
+} as const;
+
+/** A buoy: a red float with a white band and a mast, on the sea's surface, drawn only (a hull goes through it). */
+export function buoyStatics(b: { x: number; z: number }): StaticDesc[] {
+  const at = (y: number, radius: number, halfHeight: number, color: number): StaticDesc => ({
+    shape: { kind: 'cylinder', radius, halfHeight }, position: { x: b.x, y, z: b.z }, rotation: IDENTITY_QUAT, color, tag: 'decor',
+  });
+  return [
+    at(SEA.level + 0.35, 0.7, 0.45, PALETTE.carRed),
+    at(SEA.level + 0.85, 0.72, 0.1, PALETTE.carWhite),
+    at(SEA.level + 1.6, 0.08, 0.7, PALETTE.lightGrey),
+    at(SEA.level + 2.35, 0.25, 0.1, PALETTE.carRed),
+  ];
 }

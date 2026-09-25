@@ -13,8 +13,9 @@ import { BALANCE } from '../../src/sim/balance';
 import { collect, apply, defaultSave } from '../../src/sim/save/format';
 import { createWorld, run } from './helpers';
 
+/** The road's trials: the sea trial (M8.8 slice 20) runs by its buoys, pinned in sea.test.ts. */
 function trials(sim: SimWorld): JobDef[] {
-  return sim.jobs.defs.filter((d) => d.kind === 'trial');
+  return sim.jobs.defs.filter((d) => d.kind === 'trial' && !d.route);
 }
 
 /** Into the marker's ring, stopped: the job starts. */

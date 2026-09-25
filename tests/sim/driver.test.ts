@@ -119,4 +119,48 @@ describe('M8.8 slice 22: the AI driver', () => {
       expect(units.filter((u) => traffic.puppet[u] === 1).length).toBe(0);
     } finally { sim.dispose(); }
   }, 60_000);
+
+  it('M8.8 24.1 the switch off (`physicalUnits` 0, `AI.pool` 0): no car in the pool, a duel\'s rival and a chase\'s units stay lane records', async () => {
+    const units0 = POLICE.physicalUnits, pool0 = AI.pool;
+    POLICE.physicalUnits = 0;
+    AI.pool = 0;
+    try {
+      const sim = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 0, record: false });
+      try {
+        // no Vehicle made: the physics world is the one from before the AI drove
+        expect(sim.ai!.cars.length).toBe(0);
+        sim.run.chain = CHAIN_ALL;
+        const d = sim.jobs.defs.find((k) => k.kind === 'duel' && k.level === 0)!;
+        const lx = Math.cos(d.yaw), lz = -Math.sin(d.yaw);
+        sim.city?.sync(d.x - lx * 3, d.z - lz * 3, true);
+        sim.vehicle.teleport({ x: d.x - lx * 3, y: 0.8, z: d.z - lz * 3 }, d.yaw);
+        sim.vehicle.setVelocity(0, 0, 0);
+        run(sim, 0.3);
+        const traffic = sim.traffic!, agent = sim.jobs.race.rivals[0]!;
+        expect(agent).toBeGreaterThanOrEqual(0);
+        let puppets = 0;
+        // the player on the rival's tail, then through a chase at three stars
+        run(sim, 3, (_t, _c, s) => {
+          const yaw = traffic.yaw[agent] as number, fx = Math.sin(yaw), fz = Math.cos(yaw), v = traffic.speed[agent] as number;
+          s.vehicle.teleport({ x: (traffic.x[agent] as number) - fx * 20, y: (traffic.y[agent] as number) + 0.8, z: (traffic.z[agent] as number) - fz * 20 }, yaw);
+          s.vehicle.setVelocity(fx * v, 0, fz * v);
+          for (let i = 0; i < traffic.capacity; i++) if (traffic.puppet[i] === 1) puppets++;
+        });
+        sim.heat.set(60);
+        run(sim, 6, (_t, _c, s) => {
+          const yaw = traffic.yaw[agent] as number, fx = Math.sin(yaw), fz = Math.cos(yaw), v = traffic.speed[agent] as number;
+          s.vehicle.teleport({ x: (traffic.x[agent] as number) - fx * 20, y: (traffic.y[agent] as number) + 0.8, z: (traffic.z[agent] as number) - fz * 20 }, yaw);
+          s.vehicle.setVelocity(fx * v, 0, fz * v);
+          s.pursuit.force();
+          for (let i = 0; i < traffic.capacity; i++) if (traffic.puppet[i] === 1) puppets++;
+        });
+        expect(sim.police!.units.some((u) => u >= 0)).toBe(true);
+        expect(puppets).toBe(0);
+        expect(sim.ai!.busy).toBe(0);
+      } finally { sim.dispose(); }
+    } finally {
+      POLICE.physicalUnits = units0;
+      AI.pool = pool0;
+    }
+  }, 60_000);
 });

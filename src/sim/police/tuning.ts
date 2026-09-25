@@ -46,6 +46,7 @@ export interface PoliceTuning {
   /**
    * The units nearest the player on a chase that drive physical police cars (M8.8 slice 23, `ai/AiCars.ts`): their rams
    * and PITs the cars' own motion at the plan's aim point, the arrest's slots braked into; the rest stay lane records.
+   * Read when the world is built; 0 (with `AI.pool` 0) is slice 24's switch, every unit a lane record as before.
    */
   physicalUnits: number;
   /** Boxed in: `units` live police cars within `range` m while the player is under `speed` m/s fills the bar in `seconds`; moving drains it. */

@@ -24,8 +24,24 @@ import { Vehicle } from '../vehicle/Vehicle';
 import type { VehicleTuning } from '../vehicle/tuning';
 import { Driver } from './Driver';
 
-export const AI = {
-  /** Cars kept for a race's rivals (the twins' two); the units' are `POLICE.physicalUnits` more. */
+export interface AiTuning {
+  pool: number;
+  physicalRadius: number;
+  releaseRadius: number;
+  unitRadius: number;
+  unitRelease: number;
+  stallSpeed: number;
+  stallSeconds: number;
+  offLane: number;
+  pathLeft: number;
+}
+
+export const AI: AiTuning = {
+  /**
+   * Cars kept for a race's rivals (the twins' two); the units' are `POLICE.physicalUnits` more. Both read when the world
+   * is built; both 0 is slice 24's switch (the budget's): no car in the pool, every rival and unit a lane record, the
+   * world as it was before the AI drove.
+   */
   pool: 2,
   /** A rival nearer the player than this is taken over; one further than `releaseRadius` given back, m. */
   physicalRadius: 40,
@@ -39,7 +55,7 @@ export const AI = {
   offLane: 4,
   /** A path is rebuilt when less than this is left of it, m. */
   pathLeft: 60,
-} as const;
+};
 
 /** Where a parked car waits, switched off. */
 const PARK = { x: 0, y: -200, z: 0 };
@@ -73,12 +89,16 @@ export class AiCars {
   private readonly up = { x: 0, y: 0, z: 0 };
   private readonly at = { s: 0, lateral: 0 };
   private readonly aim = { x: 0, z: 0, speed: 0, free: false };
-  /** This step's nearest chasing units and their distances, nearest first. */
-  private readonly near = new Int16Array(POLICE.physicalUnits);
-  private readonly nearD = new Float32Array(POLICE.physicalUnits);
+  /** The cars kept for rivals (the pool's first), and this step's nearest chasing units with their distances, nearest first. */
+  private readonly rivals: number;
+  private readonly near: Int16Array;
+  private readonly nearD: Float32Array;
   private nearCount = 0;
 
   constructor(private readonly sim: SimWorld) {
+    this.rivals = AI.pool;
+    this.near = new Int16Array(POLICE.physicalUnits);
+    this.nearD = new Float32Array(POLICE.physicalUnits);
     for (let k = 0; k < AI.pool + POLICE.physicalUnits; k++) {
       const vehicle = new Vehicle(sim.world, sim.transforms, bodyTuning('muscle'), PARK, 0);
       vehicle.body.setEnabled(false);
@@ -187,7 +207,7 @@ export class AiCars {
   private nearest(probe: PlayerProbe, traffic: Traffic, chase: boolean): void {
     this.nearCount = 0;
     const police = this.sim.police;
-    if (!chase || !police) return;
+    if (!chase || !police || this.near.length === 0) return;
     for (let u = 0; u < police.units.length; u++) {
       const a = police.units[u] as number;
       if (a < 0) continue;
@@ -215,7 +235,7 @@ export class AiCars {
 
   private take(agent: number, role: 'rival' | 'unit', traffic: Traffic): void {
     let car: AiCar | null = null;
-    for (let k = role === 'rival' ? 0 : AI.pool; k < (role === 'rival' ? AI.pool : this.cars.length); k++) {
+    for (let k = role === 'rival' ? 0 : this.rivals; k < (role === 'rival' ? this.rivals : this.cars.length); k++) {
       const c = this.cars[k] as AiCar;
       if (c.agent < 0) { car = c; break; }
     }

@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.8 slice 24: the budget's switch
+
+Done: the switch the budget decides with: `POLICE.physicalUnits` and `AI.pool` (now settable, read when the world is
+built) both 0 make no car in the AI pool, so the physics world is the one from before the AI drove, and every rival and
+unit stays a lane record. Pin M8.8 24.1 (`driver.test.ts`; it fails with the switch on). Decided: the decision itself,
+`npm run perf` twice against the phase's start (`dca86e1`) with four physical units and a rival (sim step p95 under 4×
+CPU up by 2 ms at most, frame p95 not up), is taken at the gate (the pace rule); if it fails both knobs ship at 0, the
+numbers to BACKLOG.
+
 ## 2026-09-25 — M8.8 slice 23: the police on the car model
 
 Done: on a chase, a box or an arrest the `POLICE.physicalUnits` (4) units nearest the player within 80 m drive physical

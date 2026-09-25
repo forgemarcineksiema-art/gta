@@ -229,11 +229,11 @@ export class Police {
   private playerSpeedMax = 0;
 
   constructor(sim: SimWorld) {
-    this.heli = new Helicopter(sim.world, sim.events);
-    if (!sim.traffic || !sim.city) throw new Error('Police requires city traffic');
+    if (!sim.traffic) throw new Error('Police requires traffic');
+    this.heli = new Helicopter(sim.world, sim.events, sim.traffic.streets.half);
     this.sim = sim;
     this.traffic = sim.traffic;
-    this.graph = sim.city.graph;
+    this.graph = sim.traffic.streets.graph;
     this.units = new Int16Array(Math.max(...this.tuning.budget));
     this.units.fill(-1);
     this.seen = new Uint8Array(this.units.length);

@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.10 slice 13: traffic, walkers, police on the island
+
+Done: the traffic, the walkers and the police read a street map (`traffic/streets.ts`: the grid's city as before, the
+island's in `island/streetMap.ts`): its lanes, its 1,061 kerbside bays (parked cars nose up their slopes), lights at
+the avenues' junctions (the crossing ways green in turn by the way each arrives, the poles at each way's kerb), the
+junctions' curves on the road's surface, the walkers on the pavements' tops, the cars' count by lane length (9.7 a km of
+lane, the grid's 9.9; up to 80 on the island). Every flat-ground spot in them moved to the map's height (a swap on a
+hill included). Pins 13.0; 13.1–13.3 long (life.long.test.ts). Next: roadblocks, parked patrols, the donut shop with
+the garages (slice 14).
+
 ## 2026-09-25 — M8.10 slice 7b: the props, and the places' frame
 
 Done: the street furniture on the island by the grid's own rules (`chunkProps`) along the pavements' footway runs and

@@ -4,6 +4,12 @@ import type { BodyWeights } from './bodies';
 
 export interface TrafficTuning {
   agents: number;
+  /**
+   * Where the map counts by the length of lane round the player (the island, M8.10 slice 13): the moving cars a km of
+   * lane within `despawn` m (the grid's own at its centre, measured), at most `agentsByKm`, the pool's size there.
+   */
+  perKm: number;
+  agentsByKm: number;
   physicsBodies: number;
   spawnMin: number;
   spawnMax: number;
@@ -175,6 +181,8 @@ export interface PedTuning {
 
 export const TRAFFIC: TrafficTuning = {
   agents: 48,
+  perKm: 9.9,
+  agentsByKm: 80,
   physicsBodies: 16,
   spawnMin: 150,
   spawnMax: 300,

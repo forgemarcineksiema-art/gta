@@ -14,6 +14,7 @@ import { GROUP_DEFAULT, interactionGroups } from './collision';
 const SOLID_ONLY = interactionGroups(0xffff, GROUP_DEFAULT);
 import { City, type PropRing } from './city/City';
 import { Island, PLUMB_TILT } from './island/Island';
+import { islandStreets } from './island/streetMap';
 import { coverSites, type CoverSites } from './city/cover';
 import { Roadblocks } from './police/Roadblocks';
 import { Cameras } from './city/cameras';
@@ -53,6 +54,7 @@ import { LapTimer, type LapState, type TrackDef } from './track';
 import { Pedestrians } from './traffic/Pedestrians';
 import { Props } from './props/Props';
 import { Traffic, type PlayerProbe } from './traffic/Traffic';
+import { cityStreets } from './traffic/streets';
 import { PEDS, TRAFFIC } from './traffic/tuning';
 import { SimPhase, type PhaseMark } from './profile';
 import { TransformBuffer } from './transforms';
@@ -294,8 +296,10 @@ export class SimWorld {
     this.board.teasers = opts.teasers ?? true;
     this.career = new Career(this);
     this.kit = new Kit(this);
-    this.traffic = this.city ? new Traffic(this.world, this.transforms, this.city, opts.seed ?? 42, TRAFFIC, this.trafficDensity) : null;
-    this.peds = this.city && this.traffic ? new Pedestrians(this.transforms, this.city, this.traffic.lanes, opts.seed ?? 42, PEDS, this.pedsDensity) : null;
+    // the traffic and the walkers on the grid's streets or the island's (M8.10 slice 13)
+    const streets = this.city ? cityStreets(this.city) : this.island ? islandStreets(this.island) : null;
+    this.traffic = streets ? new Traffic(this.world, this.transforms, streets, opts.seed ?? 42, TRAFFIC, this.trafficDensity) : null;
+    this.peds = streets && this.traffic ? new Pedestrians(this.transforms, streets, this.traffic.lanes, opts.seed ?? 42, PEDS, this.pedsDensity) : null;
     this.collectibles = this.city ? new Collectibles(this.city) : null;
     this.coins = this.city && this.traffic ? new Coins(this.city, this.traffic.lanes) : null;
     this.life = new Life(this, opts.damage ?? this.city !== null);

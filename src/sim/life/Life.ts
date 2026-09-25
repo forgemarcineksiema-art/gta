@@ -458,8 +458,11 @@ export class Life {
     // the class's upgrades drive every body of the class (DESIGN.md §14.6), a car taken on the street too (M8.8 slice 0)
     v.tuning = this.sim.garage.tuningFor(h.body);
     v.applyTuning();
+    // as high over the taken car's road as the player's car was over its own (the grid's flat: the same height); `p`
+    // is `proj`, read before it is moved
+    const over = p.y - traffic.streets.groundAt(p.x, p.z);
     this.proj.x = h.x;
-    this.proj.y = p.y;
+    this.proj.y = h.y - 0.03 + over;
     this.proj.z = h.z;
     v.teleport(this.proj, h.yaw);
     v.setVelocity(h.vx, 0, h.vz);

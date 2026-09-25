@@ -18,8 +18,7 @@
  */
 import RAPIER from '@dimforge/rapier3d-compat';
 import { GROUP_DEFAULT, GROUP_PROP, GROUP_TERRAIN, GROUPS_SOLID, interactionGroups } from '../collision';
-import type { City } from '../city/City';
-import { BLOCK, type RoadNode } from '../city/roads';
+import type { RoadNode, RoadPoint } from '../city/roads';
 import type { EventLog } from '../events';
 import * as M from '../math';
 import { PALETTE } from '../palette';
@@ -28,11 +27,10 @@ import type { Quat } from '../scene';
 import type { TransformBuffer } from '../transforms';
 import { BALANCE } from '../balance';
 import { CAR_IDS, type CarId } from '../vehicle/presets';
-import { districtAt } from '../city/City';
 import { BODIES, BODY_IDS, BODY_INDEX, CIVILIAN_PAINTS, bodySpec, pickBody, policeLiveried, type BodyId, type RoadKind } from './bodies';
 import type { ParkingBay } from '../city/markings';
-import { SIGNAL, signalledNodes } from '../city/signals';
 import { LaneTables, type LanePose, type PathProjection } from './lanes';
+import type { StreetMap } from './streets';
 import { TRAFFIC, type TrafficTuning } from './tuning';
 
 /**
@@ -299,6 +297,11 @@ export class Traffic {
 
   private readonly transforms: TransformBuffer;
   private readonly target: number;
+  /** The moving cars' records (the pool less the parked ones'). */
+  private readonly moving: number;
+  /** The lanes' length round the player (km) and the steps until it is read again (a map that counts by it). */
+  private laneKm = 0;
+  private kmClock = 0;
   private readonly passLeft: Float32Array;
   private readonly stuck: Float32Array;
   private readonly laneCool: Float32Array;
@@ -401,17 +404,20 @@ export class Traffic {
     else if (this.colliderAgent.has(other.handle)) this.trafficSum += this.pairSum;
   };
 
-  constructor(world: RAPIER.World, transforms: TransformBuffer, city: City, seed: number, tuning: TrafficTuning = TRAFFIC, density = 1) {
+  constructor(world: RAPIER.World, transforms: TransformBuffer, readonly streets: StreetMap, seed: number, tuning: TrafficTuning = TRAFFIC, density = 1) {
     this.world = world;
     this.transforms = transforms;
     this.tuning = tuning;
+    const graph = streets.graph;
     // the moving traffic's records and the kerbside bays' on top
     this.parkedMax = Math.max(0, Math.round(tuning.parked.max * density));
-    this.pool = tuning.agents + this.parkedMax;
+    // the moving cars' records: the grid's fixed count; a map counting by lane (the island's) its own at most
+    this.moving = streets.byKm ? tuning.agentsByKm : tuning.agents;
+    this.pool = this.moving + this.parkedMax;
     this.capacity = this.pool + PROP_RECORDS;
-    this.target = Math.max(0, Math.min(tuning.agents, Math.round(tuning.agents * density)));
-    this.lanes = new LaneTables(city.graph, tuning);
-    this.nodes = city.graph.nodes;
+    this.target = Math.max(0, Math.min(this.moving, Math.round(this.moving * density)));
+    this.lanes = new LaneTables(graph, tuning, (lane) => streets.kind(lane), streets.roadAt);
+    this.nodes = graph.nodes;
     this.rng = mulberry32(seed ^ 0x7a11);
     const n = this.capacity;
     this.state = new Uint8Array(n);
@@ -463,21 +469,16 @@ export class Traffic {
     this.laneFill = new Uint8Array(this.lanes.laneCount);
     this.laneIndex = new Int16Array(this.lanes.laneCount * MAX_ON_LANE);
     this.nodeHolders = new Int32Array(this.nodes.length * HOLDERS);
-    // the lights: the downtown crossings, off the highway and the authored roads
+    // the lights: the grid's downtown crossings, the island's avenues' junctions (the map's), a green wave across them
     this.signalOffset = new Float32Array(this.nodes.length).fill(-1);
-    for (const id of signalledNodes(city.graph)) {
-      const node = this.nodes[id] as RoadNode;
-      const gx = Math.round(node.x / BLOCK), gz = Math.round(node.z / BLOCK);
-      this.signalOffset[id] = (gx + gz + 2 * SIGNAL.within) * tuning.signals.offset;
+    for (const id of streets.signals) {
+      this.signalOffset[id] = streets.signalStep(id) * tuning.signals.offset;
       this.signalNodes.push(id);
     }
     this.laneAxis = new Uint8Array(this.lanes.laneCount);
-    for (const l of city.graph.lanes) {
-      const pts = l.points, a = pts[pts.length - 2], b = pts[pts.length - 1];
-      if (a && b) this.laneAxis[l.id] = Math.abs(b.x - a.x) >= Math.abs(b.z - a.z) ? 0 : 1;
-    }
+    for (const l of graph.lanes) this.laneAxis[l.id] = streets.signalAxis(l);
     // the bays: which hold a car, and which car, by the seed alone (the spawner's dice are left alone)
-    this.bays = city.roadMarkings.parking;
+    this.bays = streets.bays;
     const nb = this.bays.length;
     this.bayUsed = new Uint8Array(nb);
     this.bayBody = new Uint8Array(nb);
@@ -487,7 +488,7 @@ export class Traffic {
     for (let b = 0; b < nb; b++) {
       const bay = this.bays[b] as ParkingBay;
       this.bayUsed[b] = dice() < tuning.parked.share ? 1 : 0;
-      let id: BodyId = pickBody(dice(), districtAt(bay.x, bay.z).id, 'street', tuning.bodies);
+      let id: BodyId = pickBody(dice(), streets.district(bay.x, bay.z), 'street', tuning.bodies);
       // a 7 m bay: no bus, no box truck
       if (id === 'bus' || id === 'truck') id = 'sedan';
       this.bayBody[b] = BODY_INDEX[id];
@@ -544,7 +545,7 @@ export class Traffic {
     this.laneCool = new Float32Array(n);
     this.leaderAgent = new Int16Array(n).fill(-1);
     this.aheadAgent = new Int16Array(n).fill(-1);
-    const graphLanes = city.graph.lanes;
+    const graphLanes = graph.lanes;
     this.parallel = new Int16Array(graphLanes.length).fill(-1);
     this.reverse = new Int16Array(graphLanes.length).fill(-1);
     for (const lane of graphLanes) {
@@ -1025,7 +1026,7 @@ export class Traffic {
     if (this.puppet[agent] !== 1) return;
     this.unpuppet(agent);
     this.state[agent] = AgentState.Kinematic;
-    this.y[agent] = 0;
+    this.y[agent] = this.streets.groundAt(this.x[agent] as number, this.z[agent] as number);
     const lane = this.lane[agent] as number;
     if (lane < 0) return;
     const x0 = this.x[agent] as number, z0 = this.z[agent] as number, yaw0 = this.yaw[agent] as number;
@@ -1211,11 +1212,14 @@ export class Traffic {
     this.justWrecked[i] = 0;
     this.lastPlayerContactTick[i] = -100000;
     this.paintSerial++;
-    this.y[i] = 0;
+    // on the ground where it stands (the grid's 0; a bay on the island's hill, nose up or down its slope)
+    const fx = Math.sin(yaw) * 2, fz = Math.cos(yaw) * 2;
+    this.y[i] = this.streets.groundAt(x, z);
+    this.grade[i] = (this.streets.groundAt(x + fx, z + fz) - this.streets.groundAt(x - fx, z - fz)) / 4;
     this.posed[i] = 0;
     this.tipFor[i] = 0;
     const q = M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, yaw);
-    this.transforms.writeBoth(this.slot[i] as number, x, 0.03, z, q.x, q.y, q.z, q.w);
+    this.transforms.writeBoth(this.slot[i] as number, x, (this.y[i]) + 0.03, z, q.x, q.y, q.z, q.w);
   }
 
   /**
@@ -1228,7 +1232,8 @@ export class Traffic {
     const yaw = this.yaw[agent] as number;
     out.x = this.x[agent] as number;
     out.z = this.z[agent] as number;
-    out.y = 0.03;
+    // its road's height where it is (the grid's 0; the island's hill, a deck)
+    out.y = (this.y[agent] as number) + 0.03;
     out.yaw = yaw;
     out.kind = this.kindOf(agent);
     out.body = this.bodyOf(agent);
@@ -1276,8 +1281,11 @@ export class Traffic {
     this.paintSerial++;
     this.posed[agent] = 0;
     this.tipFor[agent] = 0;
+    // the old car on the ground where the player left it
+    this.y[agent] = this.streets.groundAt(oldPose.x, oldPose.z);
+    this.grade[agent] = 0;
     const q = M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, oldPose.yaw);
-    this.transforms.writeBoth(this.slot[agent] as number, oldPose.x, 0.03, oldPose.z, q.x, q.y, q.z, q.w);
+    this.transforms.writeBoth(this.slot[agent] as number, oldPose.x, (this.y[agent]) + 0.03, oldPose.z, q.x, q.y, q.z, q.w);
   }
 
   clearAround(x: number, z: number, radius: number): void {
@@ -2561,9 +2569,12 @@ export class Traffic {
     this.x[i] = this.pose.x;
     this.z[i] = this.pose.z;
     this.yaw[i] = this.pose.yaw;
+    // at its lane's height from its first frame (the grid's 0)
+    this.y[i] = this.pose.y ?? 0;
+    this.grade[i] = this.pose.grade ?? 0;
     this.paintSerial++;
     const q = M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, this.pose.yaw);
-    this.transforms.writeBoth(this.slot[i] as number, this.pose.x, 0.03, this.pose.z, q.x, q.y, q.z, q.w);
+    this.transforms.writeBoth(this.slot[i] as number, this.pose.x, (this.y[i]) + 0.03, this.pose.z, q.x, q.y, q.z, q.w);
   }
 
   private free(i: number): void {
@@ -2623,9 +2634,32 @@ export class Traffic {
   }
 
   private spawn(player: PlayerProbe): void {
-    for (let n = 0; n < 4 && this.alive() < this.target * this.densityScale; n++) {
+    const target = this.targetNear(player) * this.densityScale;
+    for (let n = 0; n < 4 && this.alive() < target; n++) {
       if (!this.trySpawn(player)) return;
     }
+  }
+
+  /**
+   * The moving cars wanted round the player: the grid's fixed count; on a map that counts by lane (the island's),
+   * `perKm` for each km of lane within `despawn` m, at most the fixed count (the length read again each second).
+   */
+  private targetNear(player: PlayerProbe): number {
+    if (!this.streets.byKm) return this.target;
+    if (--this.kmClock <= 0) {
+      this.kmClock = 60;
+      const r2 = this.tuning.despawn * this.tuning.despawn;
+      let metres = 0;
+      for (const l of this.streets.graph.lanes) {
+        const pts = l.points;
+        for (let k = 0; k + 1 < pts.length; k++) {
+          const a = pts[k] as RoadPoint, b = pts[k + 1] as RoadPoint, mx = (a.x + b.x) / 2 - player.x, mz = (a.z + b.z) / 2 - player.z;
+          if (mx * mx + mz * mz < r2) metres += Math.hypot(b.x - a.x, b.z - a.z);
+        }
+      }
+      this.laneKm = metres / 1000;
+    }
+    return Math.min(this.target, Math.round(this.laneKm * this.tuning.perKm * (this.target / this.moving)));
   }
 
   private trySpawn(player: PlayerProbe): boolean {
@@ -2642,7 +2676,7 @@ export class Traffic {
       const len = lanes.length[lane] as number;
       const s = this.rng() * len;
       // the city's own cars (DESIGN.md §13.11): buses on the avenues, trucks in the Works, taxis round the tower
-      const id = pickBody(this.rng(), districtAt(lanes.midX[lane] as number, lanes.midZ[lane] as number).id, this.roadKind(lane), t.bodies);
+      const id = pickBody(this.rng(), this.streets.district(lanes.midX[lane] as number, lanes.midZ[lane] as number), this.roadKind(lane), t.bodies);
       const body = BODY_INDEX[id];
       const spec = BODIES[body] as (typeof BODIES)[number];
       const extra = Math.max(0, spec.halfLength - CAR_GAP / 2);

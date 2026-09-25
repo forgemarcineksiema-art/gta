@@ -3,6 +3,7 @@
  * Built once from the road graph. Connection samples are cached on first use.
  */
 import type { Lane, RoadGraph, RoadPoint } from '../city/roads';
+import type { RoadKind } from './bodies';
 import type { TrafficTuning } from './tuning';
 
 const SAMPLES = 24;
@@ -38,6 +39,9 @@ const CONFLICT_DISTANCE = 5;
 interface Connection {
   /** x, z pairs, SAMPLES + 1 points from the lane end to the next lane start. */
   pts: Float32Array;
+  /** The road's height at the lane's end and at the next one's start (the grid's 0; the island's hills). */
+  y0: number;
+  y1: number;
   cum: Float32Array;
   length: number;
 }
@@ -61,7 +65,12 @@ export class LaneTables {
   private readonly scratch: LanePose = { x: 0, z: 0, yaw: 0 };
   private readonly scratchProj: LaneProjection = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };
 
-  constructor(graph: RoadGraph, tuning: TrafficTuning) {
+  /**
+   * `kindOf`: a lane's road's kind by the map (the island's classes), else the graph's own rule (the grid's roads).
+   * `roadAt`: the road's surface across a junction (the island's hills), else straight from the one lane's height to
+   * the other's (the grid's 0).
+   */
+  constructor(graph: RoadGraph, tuning: TrafficTuning, kindOf: (lane: Lane) => RoadKind | null = () => null, private readonly roadAt: ((x: number, z: number) => number) | null = null) {
     this.graph = graph;
     this.laneCount = graph.lanes.length;
     this.pointCount = new Int16Array(this.laneCount);
@@ -89,7 +98,8 @@ export class LaneTables {
         this.cum[base + p] = (this.cum[base + p - 1] as number) + Math.hypot(b.x - a.x, b.z - a.z);
       }
       this.length[i] = this.cum[base + lane.points.length - 1] as number;
-      this.limit[i] = limitFor(lane, graph, tuning);
+      const kind = kindOf(lane);
+      this.limit[i] = kind ? KIND_LIMIT[kind](tuning) : limitFor(lane, graph, tuning);
       this.offset[i] = lane.offset;
       this.toNode[i] = lane.to;
       this.sample(i, (this.length[i] as number) * 0.5, 0, this.scratch);
@@ -313,11 +323,10 @@ export class LaneTables {
     out.grade = (yb - ya) / span;
   }
 
-  /** The road's height `s` m along a lane (0 past its end, on the junction curves). */
+  /** The road's height `s` m along a lane (its end's past its ends, on the junction curves: the grid's 0). */
   heightAt(lane: number, s: number): number {
     const len = this.length[lane] as number;
-    if (s > len || s < 0) return 0;
-    this.sample(lane, s, 0, this.scratch);
+    this.sample(lane, Math.max(0, Math.min(len, s)), 0, this.scratch);
     return this.scratch.y ?? 0;
   }
 
@@ -336,9 +345,11 @@ export class LaneTables {
     out.x = x0 + (x1 - x0) * t;
     out.z = z0 + (z1 - z0) * t;
     out.yaw = Math.atan2(x1 - x0, z1 - z0);
-    // the junctions are on the ground
-    out.y = 0;
-    out.grade = 0;
+    // across the junction on its road's surface (the island's), else from the one lane's height to the other's (the
+    // grid's flat at 0)
+    const f = conn.length > 0 ? Math.max(0, Math.min(1, s / conn.length)) : 0;
+    out.y = this.roadAt ? this.roadAt(out.x, out.z) : conn.y0 + (conn.y1 - conn.y0) * f;
+    out.grade = conn.length > 0 ? (conn.y1 - conn.y0) / conn.length : 0;
   }
 
   /**
@@ -377,7 +388,7 @@ export class LaneTables {
         cum[i] = (cum[i - 1] as number) + Math.hypot(dx, dz);
       }
     }
-    const conn: Connection = { pts, cum, length: cum[SAMPLES] as number };
+    const conn: Connection = { pts, cum, length: cum[SAMPLES] as number, y0: a.points[a.points.length - 1]?.y ?? 0, y1: b.points[0]?.y ?? 0 };
     this.connections.set(key, conn);
     return conn;
   }
@@ -389,6 +400,12 @@ function applyOffset(x: number, z: number, yaw: number, offset: number, out: Lan
   out.z = z + Math.sin(yaw) * offset;
   out.yaw = yaw;
 }
+
+/** Each road kind's limit from the tuning. */
+const KIND_LIMIT: Readonly<Record<RoadKind, (t: TrafficTuning) => number>> = {
+  highway: (t) => t.speedHighway, avenue: (t) => t.speedAvenue, parkway: (t) => t.speedParkway,
+  quay: (t) => t.speedQuay, service: (t) => t.speedService, street: (t) => t.speedStreet,
+};
 
 function limitFor(lane: Lane, graph: RoadGraph, tuning: TrafficTuning): number {
   if (lane.highway) return tuning.speedHighway;

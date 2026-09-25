@@ -168,7 +168,7 @@ export class Renderer {
     this.thumbs = sim.run.dropOffs.length > 0 ? new Thumbs(this.renderer, sim) : null;
     this.markerView = new MarkerView(this.scene, sim, this.camera);
     this.roadblockView = sim.roadblocks ? new RoadblockView(this.scene) : null;
-    this.signalView = sim.city && sim.traffic ? new SignalView(this.scene, sim) : null;
+    this.signalView = sim.traffic ? new SignalView(this.scene, sim) : null;
     this.breakerView = sim.breakers ? new BreakerView(this.scene, sim.breakers.descs.length) : null;
     if (sim.donuts) this.scene.add(buildDonutShop());
     this.rampView = sim.jumps ? new RampView(this.scene, sim) : null;

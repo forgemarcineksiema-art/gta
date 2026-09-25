@@ -39,7 +39,8 @@ export class Helicopter {
   private sweep = 0;
   private readonly ray = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
 
-  constructor(private readonly world: RAPIER.World, private readonly events: EventLog, private readonly tuning: PoliceTuning = POLICE) {}
+  /** `half`: the map's half side, the farthest out it comes in from (the grid's city, the island). */
+  constructor(private readonly world: RAPIER.World, private readonly events: EventLog, private readonly half: number = CITY_HALF, private readonly tuning: PoliceTuning = POLICE) {}
 
   /**
    * One step. `chasing`: a pursuit is on (detected, active or lost); `known`: somebody saw the player last
@@ -104,7 +105,7 @@ export class Helicopter {
   private arrive(player: PlayerProbe): void {
     const h = this.tuning.heli;
     const r = Math.hypot(player.x, player.z) || 1;
-    const out = Math.min(CITY_HALF, r + h.arriveFrom) / r;
+    const out = Math.min(this.half, r + h.arriveFrom) / r;
     this.x = player.x * out;
     this.z = player.z * out;
     if (r < 1) { this.x = h.arriveFrom; this.z = 0; }

@@ -186,16 +186,15 @@ export class Roadblocks {
   /** The way the road goes on: straight through, the same highway lane if there is one, else the gentlest turn. */
   private onward(lane: number): number {
     const lanes = this.traffic.lanes;
-    const city = this.sim.city;
-    if (!city) return -1;
-    const from = city.graph.lanes[lane] as Lane;
+    const graph = this.traffic.streets.graph;
+    const from = graph.lanes[lane] as Lane;
     const uturn = lanes.uturn(lane);
     let best = -1, bestCost = Infinity;
     const outs = lanes.outs(lane);
     for (let i = 0; i < outs.length; i++) {
       const out = outs[i] as number;
       if (out === uturn) continue;
-      const to = city.graph.lanes[out] as Lane;
+      const to = graph.lanes[out] as Lane;
       const cost = Math.abs(lanes.headingChange(lane, out)) + (to.highway === from.highway ? 0 : 1) + (to.offset === from.offset ? 0 : 0.2);
       if (cost < bestCost) { bestCost = cost; best = out; }
     }

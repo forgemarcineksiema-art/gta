@@ -9,7 +9,6 @@
  * way, and its bound swept over the coming step makes the hop: a knocked bench touches nobody.
  * `Fist` is the pose of a driver whose car the player has just taken.
  */
-import { districtAt, type City } from '../city/City';
 import type { RoadGraph } from '../city/roads';
 import type { EventLog } from '../events';
 import * as M from '../math';
@@ -20,6 +19,7 @@ import type { TransformBuffer } from '../transforms';
 import { PropState, type Props } from '../props/Props';
 import { AgentState, type PlayerProbe, type Traffic } from './Traffic';
 import type { LanePose, LaneProjection } from './lanes';
+import type { StreetMap } from './streets';
 import { PEDS, type PedTuning } from './tuning';
 
 export enum PedPose { Walk = 0, Dive = 1, GetUp = 2, Fist = 3, Hail = 4, Approach = 5, Ticket = 6 }
@@ -35,8 +35,6 @@ export const STRIDE = 1.4;
 /** Chance to turn round at a corner instead of continuing round the block. */
 const TURN_AROUND = 0.3;
 const CORNER_REACH = 40;
-/** Half width of the footway strip, m; the path runs down its middle. */
-const PAVEMENT_HALF = 2.25;
 /** A pedestrian off its line (after a dive) walks back onto it at this rate on top of its walk, m/s. */
 const RETURN_SPEED = 1.5;
 /** Look-ahead applies to cars faster than this, m/s. */
@@ -97,10 +95,10 @@ export class Pedestrians {
   private readonly q3: Quat = { x: 0, y: 0, z: 0, w: 1 };
   private time = 0;
 
-  constructor(transforms: TransformBuffer, city: City, lanes: Traffic['lanes'], seed: number, tuning: PedTuning = PEDS, density = 1) {
+  constructor(transforms: TransformBuffer, private readonly streets: StreetMap, lanes: Traffic['lanes'], seed: number, tuning: PedTuning = PEDS, density = 1) {
     this.transforms = transforms;
     this.tuning = tuning;
-    this.graph = city.graph;
+    this.graph = streets.graph;
     this.lanes = lanes;
     this.capacity = tuning.count;
     this.target = Math.max(0, Math.min(this.capacity, Math.round(tuning.count * density)));
@@ -155,29 +153,10 @@ export class Pedestrians {
     for (let i = 0; i < n; i++) transforms.writeBoth(this.slot[i] as number, 0, -50, 0, 0, 0, 0, 1);
   }
 
-  /** Metres right of the lane polyline to the middle of its footway; NaN on the highway's outer side. */
+  /** Metres right of the lane polyline to the middle of its footway (the map's); NaN where it has none. */
   private pavementOffset(lane: number): number {
     const l = this.graph.lanes[lane];
-    if (!l) return NaN;
-    let roadHalf = 12;
-    let laneOffset = 4.5;
-    if (l.highway) {
-      roadHalf = 19;
-      laneOffset = 6;
-      // only the side that faces the island: the outer verge is parkland
-      const mid = l.points[l.points.length >> 1] ?? l.points[0];
-      if (!mid) return NaN;
-      const rx = -Math.cos(l.yaw);
-      const rz = Math.sin(l.yaw);
-      if (rx * -mid.x + rz * -mid.z <= 0) return NaN;
-    } else if (l.special) {
-      for (const road of this.graph.special) {
-        if (road.name !== l.special) continue;
-        roadHalf = road.halfWidth;
-        laneOffset = Math.min(4.5, road.halfWidth - 3.5);
-      }
-    }
-    return roadHalf + PAVEMENT_HALF - laneOffset;
+    return l ? this.streets.footway(l) : NaN;
   }
 
   count(): number {
@@ -297,7 +276,7 @@ export class Pedestrians {
 
   /** A silhouette and clothes for where the pedestrian stands: the district's shares and palette. */
   private dress(i: number): void {
-    const district = districtAt(this.x[i] as number, this.z[i] as number).id;
+    const district = this.streets.district(this.x[i] as number, this.z[i] as number);
     const shares = this.tuning.looks[district] ?? [0.25, 0.25, 0.25, 0.25];
     let u = this.rng() * (shares[0] + shares[1] + shares[2] + shares[3]), look = 0;
     while (look < CROWD_LOOKS - 1 && u >= (shares[look] as number)) { u -= shares[look] as number; look++; }
@@ -414,6 +393,8 @@ export class Pedestrians {
       M.quatMul(this.q3, this.q3, this.q2);
     }
     const q = this.q3;
+    // on the footway's top where the walker is (the grid's 0; the island's pavements on its hills)
+    y += this.streets.footAt(this.x[i] as number, this.z[i] as number);
     if (both) tb.writeBoth(slot, this.x[i] as number, y, this.z[i] as number, q.x, q.y, q.z, q.w);
     else tb.write(slot, this.x[i] as number, y, this.z[i] as number, q.x, q.y, q.z, q.w);
   }

@@ -6,12 +6,13 @@
  * the summit as the one landmark for now. Reads the sim's island, never writes it.
  */
 import * as THREE from 'three';
-import { ISLAND_COLORS, PALETTE, SEA } from '../../sim';
+import { ISLAND_COLORS, PALETTE, PROP_KINDS, PropState, SEA, type PropKind, type Props, type StaticDesc } from '../../sim';
 import { APRON, type CoastKind } from '../../sim/island/ground';
-import { CHUNK, CHUNKS_X, CHUNK_X0, CHUNK_Z0, type Island } from '../../sim/island/Island';
+import { CHUNK, CHUNKS_X, CHUNKS_Z, CHUNK_X0, CHUNK_Z0, Island } from '../../sim/island/Island';
 import { DECK, type Piece } from '../../sim/island/structures';
 import { PLACES } from '../../sim/island/plan';
-import { cityGeometry } from '../city/CityView';
+import { cityGeometry, type PropRanges } from '../city/CityView';
+import { propStatics } from '../props/propMesh';
 import { lightCity } from '../city/glow';
 import { fadeRoadPaint } from '../city/roadPaint';
 import { QUALITY, type QualityTier } from '../quality';
@@ -23,6 +24,8 @@ const PAVE_LIFT = 0.035;
 const PAVE_CELL = 8;
 /** The chunks within this of the car are built at the start; the rest a few columns a frame (m). */
 const SNAP_REACH = 400;
+/** The standing props are drawn in the chunks whose middles are within this of the car (m). */
+const PROP_SIGHT = 420;
 /** The coast's things (m): bollards along a quay, a parapet's height and thickness, boulders along the rocks. */
 const BOLLARD = { every: 10, radius: 0.22, height: 0.7, inset: 0.35 } as const;
 const PARAPET = { height: 0.9, half: 0.3, inset: 0.35 } as const;
@@ -37,6 +40,10 @@ export class IslandView {
   private readonly buildingChunks = new Map<number, THREE.Mesh>();
   /** The places that move (slices 8–12). */
   private readonly views: PlaceView[];
+  /** The standing props' meshes by chunk (slice 7b), and the props' serial they show. */
+  private readonly propChunks = new Map<number, THREE.Mesh>();
+  private readonly propMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  private propSerial = -1;
 
   constructor(scene: THREE.Scene, private readonly island: Island) {
     scene.add(this.group);
@@ -55,9 +62,68 @@ export class IslandView {
     this.views = placeViews(this.group, island);
   }
 
-  /** The places that move, each frame (`alpha` the fixed step's fraction, `dt` the frame's seconds). */
-  update(alpha: number, dt: number): void {
+  /**
+   * Each frame: the places that move (`alpha` the fixed step's fraction, `dt` the frame's seconds); the standing props
+   * near (x, z), a chunk's built a frame, a knocked one's pieces collapsed and a healed one's rebuilt (slice 7b).
+   */
+  update(alpha: number, dt: number, props: Props | null = null, x = 0, z = 0): void {
     for (const v of this.views) v.update?.(alpha, dt);
+    if (!props) return;
+    let built = false;
+    for (let j = 0; j < CHUNKS_Z; j++) for (let i = 0; i < CHUNKS_X; i++) {
+      const k = Island.chunkIndex(i, j), d = Math.hypot(CHUNK_X0 + (i + 0.5) * CHUNK - x, CHUNK_Z0 + (j + 0.5) * CHUNK - z);
+      const mesh = this.propChunks.get(k);
+      if (mesh) { mesh.visible = d < PROP_SIGHT; continue; }
+      if (built || d >= PROP_SIGHT) continue;
+      const list: StaticDesc[] = [];
+      for (const p of this.island.props(k)) {
+        const from = list.length, y = this.island.standAt(p.x, p.z);
+        propStatics(p, list);
+        for (let s = from; s < list.length; s++) (list[s] as StaticDesc).position.y += y;
+      }
+      const m = new THREE.Mesh(cityGeometry(list), this.propMaterial);
+      m.castShadow = true;
+      m.receiveShadow = true;
+      m.matrixAutoUpdate = false;
+      this.propChunks.set(k, m);
+      this.group.add(m);
+      this.applyProps(m.geometry, props);
+      built = true;
+    }
+    if (props.serial !== this.propSerial) {
+      this.propSerial = props.serial;
+      for (const m of this.propChunks.values()) this.applyProps(m.geometry, props);
+    }
+  }
+
+  /** A chunk's standing props as the sim has them: a knocked one's range collapsed, one standing again rebuilt (as the grid's). */
+  private applyProps(geometry: THREE.BufferGeometry, props: Props): void {
+    const ranges = geometry.userData['props'] as PropRanges | undefined;
+    if (!ranges || ranges.ids.length === 0) return;
+    let shown = geometry.userData['collapsed'] as Uint8Array | undefined;
+    if (!shown) { shown = new Uint8Array(ranges.ids.length); geometry.userData['collapsed'] = shown; }
+    const attr = geometry.getAttribute('position') as THREE.BufferAttribute, pos = attr.array as Float32Array;
+    let dirty = false;
+    for (let k = 0; k < ranges.ids.length; k++) {
+      const id = ranges.ids[k] as number, want = props.kind[id] !== 255 && props.state[id] !== PropState.Standing ? 1 : 0;
+      if (want === shown[k]) continue;
+      const start = ranges.start[k] as number, count = ranges.count[k] as number;
+      if (want) {
+        const x0 = pos[start * 3] as number, y0 = pos[start * 3 + 1] as number, z0 = pos[start * 3 + 2] as number;
+        for (let v = start; v < start + count; v++) { pos[v * 3] = x0; pos[v * 3 + 1] = y0; pos[v * 3 + 2] = z0; }
+      } else {
+        const pieces: StaticDesc[] = [];
+        propStatics({ id, kind: PROP_KINDS[props.kind[id] as number] as PropKind, x: props.x[id] as number, z: props.z[id] as number, yaw: props.yaw[id] as number }, pieces);
+        for (const st of pieces) st.position.y += props.base[id] as number;
+        const rebuilt = cityGeometry(pieces), src = rebuilt.getAttribute('position').array as Float32Array;
+        pos.set(src.subarray(0, Math.min(src.length, count * 3)), start * 3);
+        rebuilt.dispose();
+      }
+      shown[k] = want;
+      attr.addUpdateRange(start * 3, count * 3);
+      dirty = true;
+    }
+    if (dirty) attr.needsUpdate = true;
   }
 
   /** Build the ground's chunks within sight of (x, z), a few columns a frame (the near ones at once when `snap`). */

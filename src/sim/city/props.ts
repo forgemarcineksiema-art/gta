@@ -209,11 +209,10 @@ export const MARKET = { start: 13, pitch: 4, units: 12, crate: 6.6, table: 8.8, 
 /**
  * A chunk's props from its own random stream: the kerb line and the frontage line of every footway run it holds,
  * then its places. Each slot draws its numbers before it is tested, so a slot that cannot stand never moves the
- * ones after it. Ids in emission order.
+ * ones after it. Ids in emission order, from the chunk's `index` (the grid's by default; the island's its own).
  */
-export function chunkProps(cx: number, cz: number, ctx: PropContext): PropDesc[] {
+export function chunkProps(cx: number, cz: number, ctx: PropContext, index = (cz + 3) * 7 + (cx + 3)): PropDesc[] {
   const rnd = mulberry32(ctx.seed ^ 0x51ab3e ^ Math.imul(cx + 41, 668265263) ^ Math.imul(cz + 47, 374761393));
-  const index = (cz + 3) * 7 + (cx + 3);
   const out: PropDesc[] = [];
   const taken: Array<{ x: number; z: number; r: number }> = [];
   const put = (kind: PropKind, x: number, z: number, yaw: number, onRoute?: 'loose' | 'solid'): boolean => {

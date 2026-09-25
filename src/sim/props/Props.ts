@@ -25,7 +25,8 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { PROPS } from '../balance';
 import { GROUPS_PROP } from '../collision';
 import { CITY_HALF } from '../city/roads';
-import { PROP_KINDS, PROP_TYPES, PROPS_PER_CHUNK, type PropType } from '../city/props';
+import { CHUNKS_X, CHUNKS_Z, CHUNK_X0, CHUNK_Z0 } from '../island/Island';
+import { PROP_KINDS, PROP_TYPES, PROPS_PER_CHUNK, type PropDesc, type PropType } from '../city/props';
 import { AgentState, type Traffic } from '../traffic/Traffic';
 import type { SimWorld } from '../SimWorld';
 
@@ -54,8 +55,12 @@ export function propCollider(t: PropType): RAPIER.ColliderDesc {
   return s.halfHeight >= 1.25 * s.radius ? RAPIER.ColliderDesc.capsule(s.halfHeight - s.radius, s.radius) : RAPIER.ColliderDesc.cuboid(s.radius, s.halfHeight, s.radius);
 }
 
-/** Every prop id of the island. */
-const COUNT = 49 * PROPS_PER_CHUNK;
+/** The chunks the props' ids run over: the island's or the grid's, whichever is more. */
+const CHUNKS = Math.max(49, CHUNKS_X * CHUNKS_Z);
+/** Every prop id of the map. */
+const COUNT = CHUNKS * PROPS_PER_CHUNK;
+/** The contact grid's half extent: the island's chunks' (the grid's square fits inside). */
+const HALF = Math.max(CITY_HALF, -CHUNK_X0, -CHUNK_Z0);
 /** Arcs flown at once beyond the pool; past them a knocked prop falls where it stood. */
 const BALLISTIC = 128;
 /** Hits one sweep keeps, the nearest first. */
@@ -83,10 +88,11 @@ export class Props {
   readonly prev = new Float32Array(COUNT * 7);
   /** Each id's kind (its index in `PROP_KINDS`), 255 until its chunk has been loaded once. */
   readonly kind = new Uint8Array(COUNT).fill(255);
-  /** Where each stands and the way it faces. */
+  /** Where each stands and the way it faces; its foot's height (the grid's 0, on the island its pavement's or ground's). */
   readonly x = new Float32Array(COUNT);
   readonly z = new Float32Array(COUNT);
   readonly yaw = new Float32Array(COUNT);
+  readonly base = new Float32Array(COUNT);
   /** The ids not standing, in the order they went down. */
   readonly down = new Int32Array(COUNT);
   downCount = 0;
@@ -106,7 +112,7 @@ export class Props {
   private readonly downIndex = new Int32Array(COUNT).fill(-1);
   private readonly healFor = new Float32Array(COUNT);
   /** Each chunk's prop count, -1 before it was loaded once. */
-  private readonly chunkCount = new Int16Array(49).fill(-1);
+  private readonly chunkCount = new Int16Array(CHUNKS).fill(-1);
   /** An anchored prop's post while its chunk is in the physics ring. */
   private readonly posts: Array<RAPIER.Collider | null> = new Array<RAPIER.Collider | null>(COUNT).fill(null);
   /** The footprint on the ground: a centre, a unit axis, half its length, its radius; and its top. */
@@ -151,7 +157,7 @@ export class Props {
   private readonly knocker = new Float64Array(10);
 
   constructor(private readonly sim: SimWorld) {
-    this.cells = Math.ceil((2 * CITY_HALF + 2 * PROPS.cell) / PROPS.cell);
+    this.cells = Math.ceil((2 * HALF + 2 * PROPS.cell) / PROPS.cell);
     this.cellHead = new Int32Array(this.cells * this.cells).fill(-1);
     const n = PROPS.pool;
     this.bodyProp = new Int32Array(n).fill(-1);
@@ -164,9 +170,22 @@ export class Props {
     }
     const city = sim.city;
     if (city) {
-      city.onLoad = (cx, cz, body) => this.load(cx, cz, body);
-      city.onUnload = (cx, cz) => this.unload(cx, cz);
+      city.onLoad = (cx, cz, body) => this.load((cz + 3) * 7 + (cx + 3), () => city.props(cx, cz), body);
+      city.onUnload = (cx, cz) => this.unload((cz + 3) * 7 + (cx + 3));
     }
+    // the island's chunks (M8.10 slice 7b): its own index, each prop at its pavement's or ground's height
+    const island = sim.island;
+    if (island) {
+      island.onPropsLoad = (index) => this.load(index, () => island.props(index), null);
+      island.onPropsUnload = (index) => this.unload(index);
+      // the ring the start already loaded
+      for (const index of island.active.keys()) this.load(index, () => island.props(index), null);
+    }
+  }
+
+  /** The ground's height under a lying or falling prop: the island's, the grid's 0. */
+  private groundAt(x: number, z: number): number {
+    return this.sim.island ? this.sim.island.heightAt(x, z) : 0;
   }
 
   /** Pool bodies carrying a prop now. */
@@ -207,19 +226,21 @@ export class Props {
 
   // ---- the chunks ---------------------------------------------------------------------------------
 
-  /** The physics ring loaded a chunk: its props known from now on, the anchored ones' posts on its fixed body. */
-  private load(cx: number, cz: number, body: RAPIER.RigidBody): void {
-    const city = this.sim.city;
-    if (!city) return;
-    const index = (cz + 3) * 7 + (cx + 3);
+  /**
+   * The physics ring loaded a chunk (by its index): its props known from now on, the anchored ones' posts on its fixed
+   * body (the grid's) or standing alone (the island's).
+   */
+  private load(index: number, props: () => readonly PropDesc[], body: RAPIER.RigidBody | null): void {
     if ((this.chunkCount[index] as number) < 0) {
-      const list = city.props(cx, cz);
+      const list = props();
       this.chunkCount[index] = list.length;
+      const island = this.sim.island;
       for (const p of list) {
         this.kind[p.id] = PROP_KINDS.indexOf(p.kind);
         this.x[p.id] = p.x;
         this.z[p.id] = p.z;
         this.yaw[p.id] = p.yaw;
+        this.base[p.id] = island ? island.standAt(p.x, p.z) : 0;
         this.state[p.id] = PropState.Standing;
         this.standingFootprint(p.id);
         this.gridInsert(p.id);
@@ -231,19 +252,22 @@ export class Props {
       if (!t || t.breakImpulse <= 0) continue;
       const s = t.shape, half = s.kind === 'box' ? s.hy : s.halfHeight, yaw = this.yaw[id] as number;
       const desc = propCollider(t);
-      desc.setTranslation(this.x[id] as number, half, this.z[id] as number)
+      desc.setTranslation(this.x[id] as number, (this.base[id] as number) + half, this.z[id] as number)
         .setRotation({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) })
         .setFriction(1).setRestitution(1).setCollisionGroups(GROUPS_PROP)
         .setEnabled(this.state[id] === PropState.Standing);
-      this.posts[id] = this.sim.world.createCollider(desc, body);
+      this.posts[id] = body ? this.sim.world.createCollider(desc, body) : this.sim.world.createCollider(desc);
     }
   }
 
-  /** The ring dropped a chunk: its posts went with its fixed body. */
-  private unload(cx: number, cz: number): void {
-    const index = (cz + 3) * 7 + (cx + 3);
+  /** The ring dropped a chunk: its posts went with its fixed body (the grid's), or go now (the island's). */
+  private unload(index: number): void {
     const first = index * PROPS_PER_CHUNK, count = Math.max(0, this.chunkCount[index] as number);
-    for (let id = first; id < first + count; id++) this.posts[id] = null;
+    for (let id = first; id < first + count; id++) {
+      const post = this.posts[id];
+      if (post && !this.sim.city) this.sim.world.removeCollider(post, false);
+      this.posts[id] = null;
+    }
   }
 
   // ---- the contact ---------------------------------------------------------------------------------
@@ -253,7 +277,7 @@ export class Props {
     this.held = -1;
     this.heldClosing = 0;
     const sim = this.sim;
-    if (!sim.city) return;
+    if (!sim.city && !sim.island) return;
     // the player's footprint and motion as the world already read them this step (no read of the body unless it meets something)
     const v = sim.vehicle, p = sim.probe, he = v.tuning.chassisHalfExtents, k = this.knocker;
     k[0] = p.x; k[1] = p.z; k[2] = p.y - he.y; k[3] = p.yaw; k[4] = p.vx; k[5] = p.vz; k[6] = he.x; k[7] = he.z; k[8] = dt; k[9] = 0;
@@ -342,7 +366,7 @@ export class Props {
     // the motion of a still point in the car's frame over the step (local +X is (cos, -sin), local +Z (sin, cos))
     const mx = -(vx * cos - vz * sin) * dt, mz = -(vx * sin + vz * cos) * dt;
     const reach = Math.sqrt(hx * hx + hz * hz) + Math.sqrt(vx * vx + vz * vz) * dt + REACH;
-    const last = this.cells - 1, off = CITY_HALF + PROPS.cell;
+    const last = this.cells - 1, off = HALF + PROPS.cell;
     const c0x = Math.max(0, Math.min(last, Math.floor((px - reach + off) / PROPS.cell))), c1x = Math.max(0, Math.min(last, Math.floor((px + reach + off) / PROPS.cell)));
     const c0z = Math.max(0, Math.min(last, Math.floor((pz - reach + off) / PROPS.cell))), c1z = Math.max(0, Math.min(last, Math.floor((pz + reach + off) / PROPS.cell)));
     for (let cz = c0z; cz <= c1z; cz++) for (let cx = c0x; cx <= c1x; cx++) {
@@ -440,7 +464,7 @@ export class Props {
     const t = this.typeOf(id);
     if (!t || this.state[id] !== PropState.Standing) return;
     const o = id * 7;
-    this.pose[o] = x; this.pose[o + 1] = 0; this.pose[o + 2] = z;
+    this.pose[o] = x; this.pose[o + 1] = this.groundAt(x, z); this.pose[o + 2] = z;
     this.pose[o + 3] = 0; this.pose[o + 4] = Math.sin(yaw / 2); this.pose[o + 5] = 0; this.pose[o + 6] = Math.cos(yaw / 2);
     this.posts[id]?.setEnabled(false);
     this.healFor[id] = 0;
@@ -459,7 +483,7 @@ export class Props {
     if (standing) {
       if (PROP_KINDS[this.kind[id] as number] === 'hydrant') this.spring(this.x[id] as number, this.z[id] as number);
       const s = t.shape, half = s.kind === 'box' ? s.hy : s.halfHeight, yaw = this.yaw[id] as number;
-      this.pose[o] = this.x[id] as number; this.pose[o + 1] = half; this.pose[o + 2] = this.z[id] as number;
+      this.pose[o] = this.x[id] as number; this.pose[o + 1] = (this.base[id] as number) + half; this.pose[o + 2] = this.z[id] as number;
       this.pose[o + 3] = 0; this.pose[o + 4] = Math.sin(yaw / 2); this.pose[o + 5] = 0; this.pose[o + 6] = Math.cos(yaw / 2);
       this.posts[id]?.setEnabled(false);
       this.healFor[id] = 0;
@@ -472,7 +496,7 @@ export class Props {
         const v = this.sim.vehicle;
         v.boostMeter = Math.min(1, v.boostMeter + t.boost);
       }
-      this.sim.events.push('smash', player ? t.bill : 0, this.x[id] as number, half, this.z[id] as number, id);
+      this.sim.events.push('smash', player ? t.bill : 0, this.x[id] as number, (this.base[id] as number) + half, this.z[id] as number, id);
     }
     for (let k = 0; k < 7; k++) this.prev[o + k] = this.pose[o + k] as number;
     this.gridRemove(id);
@@ -546,7 +570,7 @@ export class Props {
 
   /** After `world.step`: the bodies read back and settled, the arcs flown, the far ones healed. */
   afterPhysics(dt: number): void {
-    if (!this.sim.city) return;
+    if (!this.sim.city && !this.sim.island) return;
     for (let k = 0; k < this.bodyProp.length; k++) {
       const id = this.bodyProp[k] as number;
       if (id < 0) continue;
@@ -610,7 +634,7 @@ export class Props {
         if (!body) continue;
         const ax = traffic.x[i] as number, az = traffic.z[i] as number;
         if (Math.abs(ax - x) > 6 || Math.abs(az - z) > 6) continue;
-        if (this.over(x, z, ax, az, traffic.yaw[i] as number, traffic.halfWidthOf(i) + jet.radius, 2.5 + jet.radius)) this.lift(body, x, 0.3, z, impulse);
+        if (this.over(x, z, ax, az, traffic.yaw[i] as number, traffic.halfWidthOf(i) + jet.radius, 2.5 + jet.radius)) this.lift(body, x, (traffic.y[i] as number) + 0.3, z, impulse);
       }
     }
   }
@@ -650,7 +674,7 @@ export class Props {
     const l = Math.sqrt(nx * nx + ny * ny + nz * nz + nw * nw) || 1;
     nx /= l; ny /= l; nz /= l; nw /= l;
     this.pose[o + 3] = nx; this.pose[o + 4] = ny; this.pose[o + 5] = nz; this.pose[o + 6] = nw;
-    if (vy < 0 && (this.pose[o + 1] as number) <= this.restHeight(t)) {
+    if (vy < 0 && (this.pose[o + 1] as number) <= this.groundAt(this.pose[o], this.pose[o + 2] as number) + this.restHeight(t)) {
       this.arcProp[a] = -1;
       this.layFlat(id, t, vx, vz);
       this.lie(id, t);
@@ -707,7 +731,8 @@ export class Props {
     this.capDz[id] = lh > 1e-6 ? az / lh : 0;
     this.capHalf[id] = half * lh;
     this.capR[id] = long === 0 ? Math.max(hy, hz) : long === 1 ? Math.max(hx, hz) : Math.max(hx, hy);
-    this.top[id] = 2 * Math.max(0, this.pose[o + 1] as number);
+    const ground = this.groundAt(this.pose[o] as number, this.pose[o + 2] as number);
+    this.top[id] = ground + 2 * Math.max(0, (this.pose[o + 1] as number) - ground);
     this.gridInsert(id);
   }
 
@@ -755,7 +780,7 @@ export class Props {
     else if (m00 > m11 && m00 > m22) { const k = 2 * Math.sqrt(1 + m00 - m11 - m22); w = (m21 - m12) / k; x = 0.25 * k; y = (m01 + m10) / k; z = (m02 + m20) / k; }
     else if (m11 > m22) { const k = 2 * Math.sqrt(1 + m11 - m00 - m22); w = (m02 - m20) / k; x = (m01 + m10) / k; y = 0.25 * k; z = (m12 + m21) / k; }
     else { const k = 2 * Math.sqrt(1 + m22 - m00 - m11); w = (m10 - m01) / k; x = (m02 + m20) / k; y = (m12 + m21) / k; z = 0.25 * k; }
-    this.pose[o + 1] = S === 0 ? e0 : S === 1 ? e1 : e2;
+    this.pose[o + 1] = this.groundAt(this.pose[o] as number, this.pose[o + 2] as number) + (S === 0 ? e0 : S === 1 ? e1 : e2);
     this.pose[o + 3] = x; this.pose[o + 4] = y; this.pose[o + 5] = z; this.pose[o + 6] = w;
   }
 
@@ -773,13 +798,13 @@ export class Props {
       this.capDz[id] = alongX ? -Math.sin(yaw) : Math.cos(yaw);
       this.capHalf[id] = Math.abs(s.hx - s.hz);
       this.capR[id] = Math.min(s.hx, s.hz);
-      this.top[id] = 2 * s.hy;
+      this.top[id] = (this.base[id] as number) + 2 * s.hy;
     } else {
       this.capDx[id] = 1;
       this.capDz[id] = 0;
       this.capHalf[id] = 0;
       this.capR[id] = s.radius;
-      this.top[id] = 2 * s.halfHeight;
+      this.top[id] = (this.base[id] as number) + 2 * s.halfHeight;
     }
   }
 
@@ -826,7 +851,7 @@ export class Props {
   }
 
   private cellCoord(v: number): number {
-    return Math.max(0, Math.min(this.cells - 1, Math.floor((v + CITY_HALF + PROPS.cell) / PROPS.cell)));
+    return Math.max(0, Math.min(this.cells - 1, Math.floor((v + HALF + PROPS.cell) / PROPS.cell)));
   }
 
   private gridInsert(id: number): void {

@@ -358,7 +358,7 @@ export class SimWorld {
       }, this.jobs.defs.filter((d) => d.kind === 'mayhem').map((d) => ({ x: d.x, z: d.z })));
     }
     // before the first sync: the ring's chunks bring their props' posts
-    this.props = this.city ? new Props(this) : null;
+    this.props = this.city || this.island ? new Props(this) : null;
     this.city?.sync(spawn.position.x, spawn.position.z, true);
     if (opts.save) {
       applySave(this, opts.save);
@@ -421,7 +421,8 @@ export class SimWorld {
     this.controls.reset = false;
     this.controls.swap = false;
     this.mark?.(SimPhase.Vehicle);
-    if (this.traffic) {
+    // the player's state as the step's systems read it (the island's props too, without traffic yet: M8.10 slice 7b)
+    if (this.traffic || this.props) {
       const pos = this.vehicle.body.translation(this.scratchPos);
       const rot = this.vehicle.body.rotation(this.scratchRot);
       const tm = this.vehicle.telemetry;
@@ -436,6 +437,9 @@ export class SimWorld {
       probe.speed = Math.hypot(tm.vx, tm.vz);
       probe.halfWidth = he.x;
       probe.halfLength = he.z;
+    }
+    if (this.traffic) {
+      const probe = this.probe;
       this.traffic.playerColliderHandle = this.vehicle.collider.handle;
       this.police?.preStep(probe, FIXED_DT);
       // the streets thin as the chase grows (DESIGN.md §13.8)

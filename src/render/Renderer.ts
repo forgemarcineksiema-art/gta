@@ -284,7 +284,7 @@ export class Renderer {
     this.lastCarPos.copy(carPos);
     this.cityView?.sync(carPos.x, carPos.z, this.quality, snap);
     this.islandView?.sync(carPos.x, carPos.z, this.quality, snap);
-    this.islandView?.update(alpha, dt);
+    this.islandView?.update(alpha, dt, sim.props, carPos.x, carPos.z);
     if (this.cityView && dt > 0 && dt <= 0.25) this.adaptQuality(dt);
     this.carVel.set(tm.vx, tm.vy, tm.vz);
 

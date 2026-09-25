@@ -12,11 +12,13 @@ import type { SurfaceReader } from '../city/surface';
 import type { RoadPoint } from '../city/roads';
 import type { TrackDef, TrackSample } from '../track';
 import type { P2 } from './geom';
-import { FOOT, Ground, HALF_WIDTH, type CoastKind } from './ground';
+import { GRASS } from '../city/surface';
+import { PROP_LINES, chunkProps, type PropDesc, type PropPlace } from '../city/props';
+import { FOOT, Ground, HALF_WIDTH, type CoastKind, type GroundProbe } from './ground';
 import { buildNetwork } from './network';
 import { DECK, structures, type Piece, type Structure } from './structures';
 import { PAVEMENT, roadSurfaces, type RoadSurfaces } from './surfaces';
-import { fillIsland, type IslandFill } from './fill';
+import { fillIsland, inLot, type IslandFill } from './fill';
 import { buildPlaces, type Place } from './places';
 import { BOUNDS, CIRCUS, highwayLoop } from './plan';
 
@@ -42,6 +44,11 @@ const WALL = { height: 4, half: 0.5, piece: 24, shallows: 6 } as const;
 export const PLUMB_TILT = 1e-4;
 /** The heights of the chunks round the physics ring are worked out ahead, this many columns a step (126 heights each). */
 export const PREFETCH_COLUMNS = 4;
+/** The props' random stream's seed (the grid's world seed's role). */
+const PROP_SEED = 42;
+/** A Works lot's setback (fill.ts's rule) and the grid's pavement's width, which the grid's yards are laid from (m). */
+const FOUNDRY_SETBACK = 7;
+const GRID_PAVEMENT = 4.5;
 
 export class Island {
   readonly ground = new Ground();
@@ -64,6 +71,12 @@ export class Island {
   readonly active = new Map<number, RAPIER.Collider>();
   /** Each physics chunk's kerbs, buildings and trunks, with its height field. */
   private readonly chunkColliders = new Map<number, RAPIER.Collider[]>();
+  /** The props' runtime's hooks (M8.10 slice 7b): a chunk's props known and its posts made as it loads; its posts freed. */
+  onPropsLoad: ((index: number) => void) | null = null;
+  onPropsUnload: ((index: number) => void) | null = null;
+  private readonly propLists = new Map<number, PropDesc[]>();
+  private readonly junctionReaches = new Map<object, number>();
+  private readonly probeScratch: GroundProbe = { h: 0, steep: 0, steepKind: -1, road: Infinity, surface: GRASS };
   loaded = 0;
   unloaded = 0;
   /** Chunks whose heights were worked out when the ring needed them, not ahead (the start's ring, or a prefetch late). */
@@ -109,6 +122,74 @@ export class Island {
     for (const p of this.places) p.step?.(dt);
   }
 
+  /**
+   * A chunk's props (M8.10 slice 7b), by its index: the grid's rules (`chunkProps`) along the footway runs that start in
+   * it, their frontage lines kept clear of the doors of the lots behind them; worked out once, when first asked.
+   */
+  props(index: number): PropDesc[] {
+    let list = this.propLists.get(index);
+    if (list) return list;
+    const i = index % CHUNKS_X, j = Math.floor(index / CHUNKS_X);
+    const x0 = CHUNK_X0 + i * CHUNK, z0 = CHUNK_Z0 + j * CHUNK;
+    const runs = this.surfaces.footways.filter((r) => r.x >= x0 && r.x < x0 + CHUNK && r.z >= z0 && r.z < z0 + CHUNK).map((r) => {
+      // a lot's door: its street face's middle, where its path meets the footway
+      const entrances = this.fill.lots.filter((l) => Math.hypot(l.x - r.x, l.z - r.z) < r.length + 60).map((l) => ({ x: l.x - Math.sin(l.yaw) * l.hz, z: l.z - Math.cos(l.yaw) * l.hz }))
+        .filter((e) => { const u = (e.x - r.x) * r.dx + (e.z - r.z) * r.dz, v = (e.x - r.x) * r.nx + (e.z - r.z) * r.nz; return u >= 0 && u <= r.length && v > 0 && v < PAVEMENT + 8; });
+      return { ...r, entrances };
+    });
+    // a Works shed's front is a yard (its barrels, pallets, crates, tyres), as the grid's: its place at the road's edge
+    // in front of the lot, set back as the grid's wider pavement had it
+    const places: PropPlace[] = this.fill.lots.filter((l) => l.district === 'foundry').flatMap((l): PropPlace[] => {
+      const fx = Math.sin(l.yaw), fz = Math.cos(l.yaw), back = l.hz + FOUNDRY_SETBACK + PAVEMENT + GRID_PAVEMENT - PAVEMENT;
+      const x = l.x - fx * back, z = l.z - fz * back;
+      return x >= x0 && x < x0 + CHUNK && z >= z0 && z < z0 + CHUNK ? [{ kind: 'yard', x, z, dx: Math.cos(l.yaw), dz: -Math.sin(l.yaw), half: l.hx, nx: fx, nz: fz }] : [];
+    });
+    list = chunkProps(i, j, { seed: PROP_SEED, runs, places, blocked: (x, z, yaw, hx, hz) => this.propBlocked(x, z, yaw, hx, hz) }, index);
+    this.propLists.set(index, list);
+    return list;
+  }
+
+  /** Where a prop stands: on its pavement (the top of the kerb's slab the wheels ride there) or on the ground past it. */
+  standAt(x: number, z: number): number {
+    const [i, j] = Island.chunkOf(x, z);
+    // where two pieces overlap (a bend's outer side), the higher: what a wheel or a ray meets first
+    let top = -Infinity;
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+      for (const p of this.surfaces.kerbs.get(Island.chunkIndex(i + di, j + dj)) ?? []) {
+        const dx = x - p.x, dz = z - p.z, s = Math.sin(p.yaw), c = Math.cos(p.yaw);
+        const along = dx * s + dz * c, across = dx * c - dz * s;
+        if (Math.abs(across) <= PAVEMENT / 2 && Math.abs(along) <= p.length / 2 + 0.2) top = Math.max(top, p.y + Math.tan(p.pitch) * along);
+      }
+    }
+    return Number.isFinite(top) ? top : this.ground.surfaceHeight(x, z);
+  }
+
+  /**
+   * Whether a prop's footprint (its middle, the way its +Z faces, half extents) stands where nothing may: a
+   * carriageway, a junction, a lot, the water, or the walkers' band down the pavement.
+   */
+  private propBlocked(x: number, z: number, yaw: number, hx: number, hz: number): boolean {
+    const c = Math.cos(yaw), s = Math.sin(yaw), p = this.probeScratch;
+    for (const [a, b] of [[0, 0], [-1, -1], [1, -1], [1, 1], [-1, 1]] as const) {
+      const px = x + c * hx * a + s * hz * b, pz = z - s * hx * a + c * hz * b;
+      if (!this.ground.onLand(px, pz) || this.ground.nearOtherRoad(px, pz, -1, 0.2)) return true;
+      this.ground.probe(px, pz, p);
+      if (p.road > PROP_LINES.walkers.middle - PROP_LINES.walkers.half && p.road < PROP_LINES.walkers.middle + PROP_LINES.walkers.half) return true;
+    }
+    for (const jn of this.surfaces.junctions) if (Math.hypot(jn.x - x, jn.z - z) < this.junctionReach(jn)) return true;
+    return this.fill.lots.some((l) => Math.hypot(l.x - x, l.z - z) < Math.hypot(l.hx, l.hz) + 2 && inLot(l, x, z, Math.max(hx, hz) + 0.3));
+  }
+
+  /** How far a junction's box reaches from its middle (its rim's farthest point). */
+  private junctionReach(jn: { x: number; z: number; rim: ReadonlyArray<{ x: number; z: number }> }): number {
+    let r = this.junctionReaches.get(jn);
+    if (r === undefined) {
+      r = Math.max(...jn.rim.map((q) => Math.hypot(q.x - jn.x, q.z - jn.z)));
+      this.junctionReaches.set(jn, r);
+    }
+    return r;
+  }
+
   /** A chunk's index from its column and row, and a point's chunk. */
   static chunkIndex(i: number, j: number): number {
     return j * CHUNKS_X + i;
@@ -137,6 +218,7 @@ export class Island {
         this.world.removeCollider(collider, false);
         for (const c of this.chunkColliders.get(k) ?? []) this.world.removeCollider(c, false);
         this.chunkColliders.delete(k);
+        this.onPropsUnload?.(k);
         this.active.delete(k);
         this.unloaded++;
       }
@@ -174,6 +256,7 @@ export class Island {
       if (desc) colliders.push(this.world.createCollider(desc.setFriction(1).setRestitution(wall ? 1 : 0).setCollisionGroups(wall ? GROUPS_SOLID : GROUPS_TERRAIN)));
     }
     this.chunkColliders.set(k, colliders);
+    this.onPropsLoad?.(k);
     this.loaded++;
     this.built = true;
   }

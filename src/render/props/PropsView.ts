@@ -92,7 +92,9 @@ export class PropsView {
       if (left <= 0) continue;
       // full for most of its life, sinking over its last three seconds; its top never still
       const h = 7 * Math.min(1, left / 3) * (0.94 + 0.06 * Math.sin(time * 9 + j * 1.7));
-      this.p.set(props.jets[j * 3] as number, 0, props.jets[j * 3 + 1]);
+      // (on the island, from its ground)
+      const jx = props.jets[j * 3] as number, jz = props.jets[j * 3 + 1] as number;
+      this.p.set(jx, sim.island ? sim.island.heightAt(jx, jz) : 0, jz);
       this.size.set(0.35, h, 0.35);
       this.m.compose(this.p, this.upright, this.size);
       this.columns.setMatrixAt(jets++, this.m);

@@ -6,6 +6,7 @@
  * render's triangles a chunk; no Three.js.
  */
 import { PARKING, PARKING_STYLE, type ParkingBay } from '../city/markings';
+import type { FootwayRun } from '../city/props';
 import type { RoadGraph } from '../city/roads';
 import { ISLAND_COLORS, PALETTE } from '../palette';
 import type { P2 } from './geom';
@@ -47,6 +48,8 @@ const ARROW = 9;
 const SOLID = 24;
 /** Parking bays start and end this far from a box's edge (clear of the approach's paint) (m). */
 const BAY_CLEAR = 20;
+/** A footway run goes on while the pavement's edge keeps within this of its straight line (m). */
+const RUN_BEND = 0.3;
 
 /** A section's points across its strip, as fractions of the half width right of the middle: its right edge to its left. */
 export const ACROSS = [1, 0.5, 0, -0.5, -1] as const;
@@ -79,6 +82,8 @@ export interface RoadSurfaces {
   /** The kerbs' pieces a chunk: the pavement's band, its middle at its top. */
   kerbs: Map<number, Piece[]>;
   chunks: Map<number, SurfaceChunk>;
+  /** The pavements as the grid's footway runs (straight, from the road's edge outward), for the props' lines. */
+  footways: FootwayRun[];
 }
 
 /** The segment of a strip holding station `s` (clamped). */
@@ -266,7 +271,8 @@ export function roadSurfaces(ground: Ground, graph: RoadGraph, chunkOf: (x: numb
     }
   }
 
-  // the strips and their pavements
+  // the strips and their pavements, and the pavements' footway runs (the props' lines, slice 7b)
+  const footways: FootwayRun[] = [];
   for (const st of strips) {
     const colour = st.cls === 'dirt' ? ISLAND_COLORS.dirt : st.cls === 'taxiway' ? PALETTE.concrete : PALETTE.asphalt;
     const paved = PAVED.has(st.cls), count = st.s.length;
@@ -276,8 +282,11 @@ export function roadSurfaces(ground: Ground, graph: RoadGraph, chunkOf: (x: numb
       return [(st.x[k] as number) + (st.rx[k] as number) * o, (st.h[k] as number[])[i] as number, (st.z[k] as number) + (st.rz[k] as number) * o];
     };
     const walked = [false, false], last = ACROSS.length - 1;
+    // each side's footway run being laid: straight while the pavement's edge keeps within `RUN_BEND` of its line
+    const runs: Array<FootwayRun | null> = [null, null];
+    const close = (w: number): void => { const r = runs[w]; if (r && r.length > 1) footways.push(r); runs[w] = null; };
     for (let k = 0; k + 1 < count; k++) {
-      if (!st.drawn[k]) { walked[0] = walked[1] = false; continue; }
+      if (!st.drawn[k]) { walked[0] = walked[1] = false; close(0); close(1); continue; }
       // the bands as `heightOn` reads them
       for (let i = 0; i < last; i++) quad(pt(k, i), pt(k + 1, i), pt(k + 1, i + 1), pt(k, i + 1), colour);
       for (const [side, e0, e1] of [[1, pt(k, 0), pt(k + 1, 0)], [-1, pt(k, last), pt(k + 1, last)]] as const) {
@@ -286,6 +295,19 @@ export function roadSurfaces(ground: Ground, graph: RoadGraph, chunkOf: (x: numb
         const outX1 = (st.x[k + 1] as number) + (st.rx[k + 1] as number) * side * (st.hw + PAVEMENT), outZ1 = (st.z[k + 1] as number) + (st.rz[k + 1] as number) * side * (st.hw + PAVEMENT);
         const walk = paved && ground.onLand(outX0, outZ0) && ground.onLand(outX1, outZ1)
           && ![[e0[0], e0[2]], [e1[0], e1[2]], [outX0, outZ0], [outX1, outZ1]].some(([x, z]) => ground.nearOtherRoad(x as number, z as number, st.road, CORNER));
+        if (walk) {
+          // the footway run: on from the last while this stretch's end stays on its line, else a new one from here
+          const ex = e1[0] as number, ez = e1[2] as number;
+          const r = runs[w];
+          const along = r ? (ex - r.x) * r.dx + (ez - r.z) * r.dz : 0, off = r ? Math.abs((ex - r.x) * r.dz - (ez - r.z) * r.dx) : Infinity;
+          if (r && off < RUN_BEND && along > r.length) r.length = along;
+          else {
+            close(w);
+            const sx = e0[0] as number, sz = e0[2] as number, l = Math.hypot(ex - sx, ez - sz) || 1, dx = (ex - sx) / l, dz = (ez - sz) / l;
+            // from the road across the footway: the side's way out (the right of the way it runs is (−dz, dx))
+            runs[w] = { x: sx, z: sz, dx, dz, nx: -side * dz, nz: side * dx, length: l, along: st.s[k] as number, district: districtOf(sx, sz), street: st.cls === 'avenue' ? 'avenue' : 'grid', entrances: [] };
+          }
+        } else close(w);
         if (!walk) {
           walked[w] = false;
           // the edge's skirt
@@ -313,6 +335,8 @@ export function roadSurfaces(ground: Ground, graph: RoadGraph, chunkOf: (x: numb
         list.push({ x: cx, y: (ya + yb) / 2, z: cz, yaw: Math.atan2(dx, dz), pitch: Math.atan2(yb - ya, run), length: Math.hypot(run, yb - ya) });
       }
     }
+    close(0);
+    close(1);
   }
 
   // the paint
@@ -455,5 +479,5 @@ export function roadSurfaces(ground: Ground, graph: RoadGraph, chunkOf: (x: numb
       }
     }
   }
-  return { strips, junctions, paint, parking, kerbs, chunks };
+  return { strips, junctions, paint, parking, kerbs, chunks, footways };
 }

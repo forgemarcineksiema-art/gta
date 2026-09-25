@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.10 slice 7b: the props, and the places' frame
+
+Done: the street furniture on the island by the grid's own rules (`chunkProps`) along the pavements' footway runs and
+the Works' yards: 2,650 props (Crown 607, Gardens 789, Quay 576, Works 678: within a fifth of the grid's, the Works'
+73 %, its port, canal and railway taking the ground). The props' runtime moved to the island: its chunks' ids, each
+prop on its kerb's slab or the ground, knocked, flying and lying at the ground's height; drawn a chunk within 420 m,
+a knocked one collapsed. The sim's player probe is read without traffic too. Pins 7.5–7.6. Also the places' frame for
+slices 8–12 (their own modules in sim, shapes and render), which five agents fill side by side in their worktrees. The
+long drives (2.4, 6a.4: over 20 s each) moved to `drive.long.test.ts`, the gate's.
+
 ## 2026-09-25 — M8.10 slice 7a: lots and buildings
 
 Done: `island/fill.ts` lays lots along every avenue and street behind its pavement, each district's by its rule: 104

@@ -98,6 +98,12 @@ function overlap(a: Lot, b: Lot, gap: number): boolean {
   return true;
 }
 
+/** Whether (x, z) lies within a lot's footprint grown by `margin`. */
+export function inLot(l: Pick<Lot, 'x' | 'z' | 'yaw' | 'hx' | 'hz'>, x: number, z: number, margin = 0): boolean {
+  const dx = x - l.x, dz = z - l.z, u = dx * Math.cos(l.yaw) - dz * Math.sin(l.yaw), v = dx * Math.sin(l.yaw) + dz * Math.cos(l.yaw);
+  return Math.abs(u) < l.hx + margin && Math.abs(v) < l.hz + margin;
+}
+
 /** A lot's footprint's points: its corners, its edges' middles and its middle. */
 export function footprint(l: Pick<Lot, 'x' | 'z' | 'yaw' | 'hx' | 'hz'>): P2[] {
   const ux = Math.cos(l.yaw), uz = -Math.sin(l.yaw), vx = Math.sin(l.yaw), vz = Math.cos(l.yaw), out: P2[] = [];

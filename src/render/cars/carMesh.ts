@@ -41,6 +41,10 @@ export interface CarMesh {
   spin(dt: number, speed: number): void;
   /** Those parts, for the tests. */
   readonly spinners: readonly THREE.Object3D[];
+  /** A rider's helmet's crown (M8.8 slice 15, the bike), in the mesh's frame: the topper sits there, not on a roof. */
+  crown?: { y: number; z: number };
+  /** An exhaust's end in the mesh's frame (the bike): the boost's flame burns there. */
+  exhaust?: { x: number; y: number; z: number };
 }
 
 /** A turning part's rate (rad/s): still under `minSpeed` m/s, then `base` and `perSpeed` a m/s, up to `max`. */

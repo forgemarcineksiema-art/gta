@@ -6,13 +6,15 @@ import * as THREE from 'three';
 import { PALETTE, type GhostPose, type SimWorld } from '../../sim';
 import { CAR_PROFILES } from './carProfiles';
 import { buildCarMesh, type CarMesh } from './carMesh';
+import { buildBikeMesh } from './bikeMesh';
 
 export class GhostCar {
   private readonly mesh: CarMesh;
   private readonly pose: GhostPose = { x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1 };
 
   constructor(scene: THREE.Scene, private readonly sim: SimWorld) {
-    this.mesh = buildCarMesh(sim.vehicle.tuning, CAR_PROFILES[sim.carId], PALETTE.carBlue);
+    const t = sim.vehicle.tuning;
+    this.mesh = t.twoWheel > 0 ? buildBikeMesh(t, PALETTE.carBlue) : buildCarMesh(t, CAR_PROFILES[sim.carId], PALETTE.carBlue);
     this.mesh.root.traverse(translucent);
     for (const w of this.mesh.wheels) {
       w.traverse(translucent);

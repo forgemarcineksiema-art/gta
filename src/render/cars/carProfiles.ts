@@ -202,8 +202,8 @@ export const OFFROAD: CarProfile = {
 };
 
 /**
- * The motorbike (M8.8 slice 14): a slim fairing, tank, seat and tail over its two wheels, 2.1 m. Slice 15 draws the
- * bike and its rider in full; this is the class's shell until then.
+ * The motorbike's shell (M8.8 slice 14): a slim fairing, tank, seat and tail over its two wheels, 2.1 m, the class's
+ * footprint in the tables. The bike and its rider are drawn by bikeMesh.ts (slice 15).
  */
 export const MOTO: CarProfile = {
   name: 'moto',

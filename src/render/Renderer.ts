@@ -167,6 +167,7 @@ export class Renderer {
     }
     for (const d of sim.dynamics) this.shapes.addDynamic(d);
     this.player = new PlayerCar(this.scene, sim);
+    this.director.fit(sim.carBody, this.player.roof);
     this.policeView = new PoliceView(this.scene, sim, this.player.classes);
     this.heliView = sim.police ? new HeliView(this.scene, sim) : null;
     this.ghost = new GhostCar(this.scene, sim);

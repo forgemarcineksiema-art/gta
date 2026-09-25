@@ -201,7 +201,7 @@ export class ChaseCamera {
     this.shakeEnergy = Math.min(0.7, this.shakeEnergy + amount);
   }
 
-  /** A longer or taller body than the classes (the bus): the camera sits this much further back and higher. */
+  /** A longer or taller body than the classes (the bus): the camera sits this much further back and higher; a small one (the bike) closer and lower, negative. */
   fit(distance: number, height: number): void {
     this.extraDistance = distance;
     this.extraHeight = height;

@@ -10,7 +10,7 @@ import type { VehicleTelemetry } from '../../src/sim';
 
 function telemetry(over: Partial<VehicleTelemetry> = {}): VehicleTelemetry {
   return {
-    speed: 20, speedKmh: 72, drifting: false, driftAngleDeg: 0, boost: 0, boosting: false, airborne: false, groundedWheels: 4,
+    speed: 20, speedKmh: 72, drifting: false, driftAngleDeg: 0, boost: 0, boosting: false, airborne: false, tumbling: false, groundedWheels: 4,
     steer: 0, steerDeg: 0, gear: 3, rpm: 3000, load: 0.5, throttle: 1, airTime: 0, driftTime: 0, maxSlipDeg: 0, maxSlipRatio: 0,
     minSlipRatio: 0, shifting: false, landingImpact: 0, brake: 0, driftDistance: 0, vx: 0, vy: 0, vz: 20, yawRate: 0, gLong: 0, gLat: 0, gVert: 0,
     impact: 0, scrape: 0, contactSide: 0, contactX: 0, contactY: 0, contactZ: 0, contactNx: 0, contactNy: 0, contactNz: 0,

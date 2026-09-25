@@ -84,6 +84,8 @@ export interface VehicleTelemetry {
   boost: number;
   boosting: boolean;
   airborne: boolean;
+  /** Down on two wheels: the bike and its rider in a fall (M8.8 slice 14), until they are stood up again. */
+  tumbling: boolean;
   groundedWheels: number;
   steer: number;
   steerDeg: number;
@@ -344,6 +346,7 @@ export class Vehicle {
       boost: this.boostMeter,
       boosting: false,
       airborne: false,
+      tumbling: false,
       groundedWheels: 0,
       steer: 0,
       steerDeg: 0,
@@ -1043,6 +1046,7 @@ export class Vehicle {
     tm.boost = this.boostMeter;
     tm.boosting = this.boosting;
     tm.airborne = airborne;
+    tm.tumbling = this.tumbleLeft > 0;
     tm.groundedWheels = grounded;
     tm.steer = this.steer;
     tm.steerDeg = this.steer / M.DEG;

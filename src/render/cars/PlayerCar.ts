@@ -2,13 +2,15 @@
  * The player's car: one mesh per class and the city's bodies built the first time one is taken (or is next to the
  * car), the swap between them, the garage's resprays, the crumple, and the driver's kit on whichever car is driven
  * (M6: the topper on the roof, the neon under it, a flame at each exhaust while the boost burns, the wheels, the
- * spoiler and the stance, the drift's tyre smoke). Reads sim state only.
+ * spoiler and the stance, the drift's tyre smoke). A bike and its rider are drawn by bikeMesh.ts (M8.8 slice 15): the
+ * topper on the helmet. Reads sim state only.
  */
 import * as THREE from 'three';
 import { ASPHALT, CAR_IDS, CAR_PRESETS, CITY_COLORS, DIRT, GRASS, KIT, PALETTE, bodySpec, bodyTuning, isShell, type BodyId, type CarId, type SimEvent, type SimWorld, type VehicleTelemetry } from '../../sim';
 import { CAR_PROFILES } from './carProfiles';
 import { BODY_PROFILES } from './bodyProfiles';
 import { buildCarMesh, restHeight, wheelGeometry, type CarMesh } from './carMesh';
+import { buildBikeMesh } from './bikeMesh';
 import { buildFlame, buildNeon, setNeonColours, spoilerGeometry, topperGeometry } from './kitMesh';
 import { lowriderBounce } from '../traffic/TrafficView';
 import { placeFromBuffer } from '../shapes';
@@ -62,7 +64,8 @@ export class PlayerCar {
   constructor(private readonly scene: THREE.Scene, private readonly sim: SimWorld) {
     const classes: Partial<Record<CarId, CarMesh>> = {};
     for (const id of CAR_IDS) {
-      const mesh = buildCarMesh(id === sim.carId ? sim.vehicle.tuning : CAR_PRESETS[id], CAR_PROFILES[id]);
+      const t = id === sim.carId ? sim.vehicle.tuning : CAR_PRESETS[id];
+      const mesh = t.twoWheel > 0 ? buildBikeMesh(t, CAR_PROFILES[id].paint) : buildCarMesh(t, CAR_PROFILES[id]);
       scene.add(mesh.root);
       for (const w of mesh.wheels) scene.add(w);
       const visible = id === sim.carId;
@@ -75,8 +78,7 @@ export class PlayerCar {
     this.bodyId = sim.carId;
     this.mesh = this.classes[sim.carId];
     for (const id of CAR_IDS) this.roofY[id] = roofOf(this.classes[id]);
-    this.mesh.root.add(this.topper);
-    this.topper.position.set(0, (this.roofY[sim.carId] ?? 1.2) - 0.02, -0.2);
+    this.seatTopper();
     this.fitKit(sim.carId);
   }
 
@@ -180,7 +182,8 @@ export class PlayerCar {
     let mesh = this.bodies.get(body);
     if (!mesh) {
       // built in a colour no fixed part uses, so a respray finds the paint alone (a white truck keeps a white box)
-      mesh = buildCarMesh(bodyTuning(body), BODY_PROFILES[body], SENTINEL_PAINT);
+      const t = bodyTuning(body);
+      mesh = t.twoWheel > 0 ? buildBikeMesh(t, SENTINEL_PAINT) : buildCarMesh(t, BODY_PROFILES[body], SENTINEL_PAINT);
       mesh.root.visible = false;
       this.scene.add(mesh.root);
       for (const w of mesh.wheels) {
@@ -211,9 +214,7 @@ export class PlayerCar {
       this.bodyId = body;
       this.fitKit(body);
       this.shownPaint = -1;
-      // the topper is the player's: it moves to the new car's roof
-      this.mesh.root.add(this.topper);
-      this.topper.position.set(0, this.roof - 0.02, -0.2);
+      this.seatTopper();
       swapped = true;
     }
     this.carId = sim.carId;
@@ -225,6 +226,15 @@ export class PlayerCar {
       this.shownPaint = paint;
     }
     return swapped;
+  }
+
+  /** The topper is the player's: on the shown car's roof, or a size down on a rider's helmet (M8.8 slice 15). */
+  private seatTopper(): void {
+    const crown = this.mesh.crown;
+    this.mesh.root.add(this.topper);
+    if (crown) this.topper.position.set(0, crown.y - 0.02, crown.z);
+    else this.topper.position.set(0, this.roof - 0.02, -0.2);
+    this.topper.scale.setScalar(crown ? 0.6 : 1);
   }
 
   /** The topper worn now on the roof: built the first time it is worn, one child of the holder at a time. */
@@ -330,18 +340,21 @@ export class PlayerCar {
     this.neon.scale.set(spec.halfWidth * 2 + 0.5, 1, spec.halfLength * 2 + 0.4);
     const tail = profile.sections[profile.sections.length - 1];
     const tz = tail ? tail.z : -spec.halfLength, ty = (tail ? tail.floor : 0.35) + ground + 0.06;
-    // a rocket's flame at its nozzle (the trolley, M8.8 slice 13), else one at each side of the tail
-    const nozzle = profile.nozzle;
+    // a rocket's flame at its nozzle (the trolley, M8.8 slice 13), a bike's at its exhaust (slice 15), else one at each side of the tail
+    const nozzle = profile.nozzle, exhaust = this.mesh.exhaust;
     for (let k = 0; k < this.flames.length; k++) {
       const f = this.flames[k] as THREE.Mesh;
       this.mesh.root.add(f);
-      if (nozzle) f.position.set(k === 0 ? 0.03 : -0.03, nozzle.y + ground, nozzle.z - 0.05);
+      if (exhaust) f.position.set(exhaust.x + (k === 0 ? 0.03 : -0.03), exhaust.y, exhaust.z - 0.05);
+      else if (nozzle) f.position.set(k === 0 ? 0.03 : -0.03, nozzle.y + ground, nozzle.z - 0.05);
       else f.position.set(k === 0 ? 0.36 : -0.36, ty, tz - 0.05);
     }
   }
 }
 
+/** The shown body's top: a rider's helmet on a bike, else the body's highest point. */
 function roofOf(mesh: CarMesh): number {
+  if (mesh.crown) return mesh.crown.y;
   const body = mesh.root.getObjectByName('body-and-trim') as THREE.Mesh | undefined;
   body?.geometry.computeBoundingBox();
   return body?.geometry.boundingBox?.max.y ?? 1.2;

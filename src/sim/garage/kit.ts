@@ -209,11 +209,16 @@ export class Kit {
     return 'ok';
   }
 
-  /** Whether a car part goes on a body: the big ones (the vans, the trucks, the buses) take no spoiler. */
+  /**
+   * Whether a car part goes on a body: the big ones (the vans, the trucks, the buses) take no spoiler, and a bike
+   * (M8.8 slice 15) no car part at all; the rider's kit (the topper, the neon, the flame, the smoke) goes anywhere.
+   */
   fits(i: number, body: BodyId): boolean {
     const k = KIT[i];
     if (!k) return false;
-    return k.slot !== 'spoiler' || !(bodySpec(body).big || bodySpec(body).car === 'heavy');
+    const spec = bodySpec(body);
+    if (spec.car === 'moto') return !isCarSlot(k.slot);
+    return k.slot !== 'spoiler' || !(spec.big || spec.car === 'heavy');
   }
 
   /** Fits a car part to a car in the garage, or back to stock when it is the one fitted. */

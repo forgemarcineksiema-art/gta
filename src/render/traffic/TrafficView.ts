@@ -8,11 +8,12 @@
  * their own colour.
  */
 import * as THREE from 'three';
-import { BODY_IDS, BODY_INDEX, PALETTE, bodyTuning, type TransformBuffer } from '../../sim';
+import { BODY_IDS, BODY_INDEX, PALETTE, bodyTuning, type BodyId, type TransformBuffer } from '../../sim';
 import { AgentState, type Traffic } from '../../sim/traffic/Traffic';
 import { BODIES } from '../../sim/traffic/bodies';
 import { BODY_PROFILES } from '../cars/bodyProfiles';
 import { buildBodyGeometry, paintMaskMaterial } from '../cars/bodyMesh';
+import { bikeTrafficGeometry } from '../cars/bikeMesh';
 import { FADE, blocks, fadeTarget, stepFade } from '../camera/fade';
 
 export class TrafficView {
@@ -46,7 +47,7 @@ export class TrafficView {
     const built = this.meshes[b];
     if (built) return built;
     const id = BODY_IDS[b] as (typeof BODY_IDS)[number];
-    const geometry = buildBodyGeometry(BODY_PROFILES[id], bodyTuning(id));
+    const geometry = trafficBodyGeometry(id);
     // what is drawn of each instance (M8.6 D9): the material's screen door reads it
     geometry.setAttribute('aFade', new THREE.InstancedBufferAttribute(new Float32Array(this.traffic.capacity).fill(1), 1));
     const mesh = new THREE.InstancedMesh(geometry, this.material, this.traffic.capacity);
@@ -144,6 +145,12 @@ export class TrafficView {
     }
     this.paintSerial = traffic.paintSerial;
   }
+}
+
+/** A body's instanced geometry: its loft, or a bike standing on its two wheels without its rider (M8.8 slice 15). */
+export function trafficBodyGeometry(id: BodyId): THREE.BufferGeometry {
+  const t = bodyTuning(id);
+  return t.twoWheel > 0 ? bikeTrafficGeometry(t) : buildBodyGeometry(BODY_PROFILES[id], t);
 }
 
 const LOWRIDER = BODY_INDEX.lowrider;

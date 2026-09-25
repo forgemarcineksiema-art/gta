@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.8 slice 3: what a car is for, on its card
+
+Done: every CARS card says its class's job in one quiet word under the name (`ROLE_WORDS` and `cardLine(body)` in
+`sim/jobs/catalog.ts`): DRIFT, CITY, RAM, SPEED, DISGUISE; a civilian body its class's (a kept taxi DRIFT, a bus RAM).
+In Polish DRIFT, MIASTO, TARAN, PRĘDKOŚĆ, PRZEBRANIE: DRIFT and MIASTO are the words the combo and the boot already say
+(the plan's POŚLIZG would have been a second name). The line is a label (it follows the language) in the dim ink, no
+colour of its own, so M8.9's tokens and scale take it as they come. Pins M8.8 3.1, 3.2 (`tests/ui/wall.test.ts`); the
+ten sizes are the gate's screens. Verify green.
+
 ## 2026-09-25 — M8.8 slice 2: the compact, the city car
 
 Done: the compact is quicker than the muscle car to about 80 km/h, level at 100, slower above (212 N·m with a strong

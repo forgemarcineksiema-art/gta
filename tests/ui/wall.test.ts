@@ -7,6 +7,9 @@
 import { describe, expect, it } from 'vitest';
 import type { SimWorld } from '../../src/sim';
 import { BALANCE } from '../../src/sim/balance';
+import { ROLE_WORDS, cardLine } from '../../src/sim/jobs/catalog';
+import { CAR_IDS } from '../../src/sim/vehicle/presets';
+import { PL } from '../../src/ui/pl';
 import { cardLines, countsLine, doorLines } from '../../src/ui/hud/totals';
 import { PAGE_TITLES, WALL_ACTIONS, WALL_PAGES, pageOf } from '../../src/ui/wall/wallPages';
 import { createWorld, run, runUntil } from '../sim/helpers';
@@ -69,5 +72,19 @@ describe('the wall in four', () => {
     for (const l of lines) expect(`${l.label} ${l.value}`).not.toMatch(/\bBANK\b|BANKED|MULTIPLIER|BEST RUN/);
     const counts = countsLine({ takedowns: 3, escapes: 1, billboards: 5, coins: 84, smashes: 12, damage: 12_300 });
     expect(counts.split(String.fromCharCode(0xa0)).join(' ')).toBe('3 TAKEDOWNS · 1 ESCAPE · 5 BILLBOARDS · 84 COINS · CITY DAMAGE 12,300');
+  });
+});
+
+describe('M8.8 slice 3: what a car is for', () => {
+  it('M8.8 3.1 every class has one role word, and each has its Polish', () => {
+    expect(Object.keys(ROLE_WORDS).sort()).toEqual([...CAR_IDS].sort());
+    for (const word of Object.values(ROLE_WORDS)) expect(PL[word]).toBeTruthy();
+  });
+
+  it('M8.8 3.2 a body\'s card says its class\'s job: a kept taxi DRIFT, a hatchback CITY, a bus RAM', () => {
+    expect(cardLine('taxi')).toBe('DRIFT');
+    expect(cardLine('hatch')).toBe('CITY');
+    expect(cardLine('bus')).toBe('RAM');
+    expect(cardLine('police')).toBe('DISGUISE');
   });
 });

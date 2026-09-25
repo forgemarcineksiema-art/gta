@@ -386,6 +386,10 @@ export const PL: Readonly<Record<string, string>> = {
   'ROADSTER': 'ROADSTER',
   'STREET SWEEPER': 'ZAMIATARKA',
   'HOT-DOG VAN': 'WÓZ Z HOT-DOGAMI',
+  // what a car is for, under its name on the wall (M8.8 slice 3); DRIFT and CITY say what they say elsewhere
+  'RAM': 'TARAN',
+  'SPEED': 'PRĘDKOŚĆ',
+  'DISGUISE': 'PRZEBRANIE',
 
   // the districts and their landmarks (sim/city/City.ts)
   'CROWN HEIGHTS': 'KORONNE WZGÓRZA',

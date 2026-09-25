@@ -18,6 +18,7 @@
     "perf": "playwright test e2e/perf.spec.ts",
     "perf:headed": "playwright test e2e/perf.spec.ts --headed",
     "screens": "playwright test e2e/screens.spec.ts",
+    "look": "playwright test e2e/look.spec.ts",
     "city": "playwright test e2e/city.spec.ts",
     "life": "playwright test e2e/life.spec.ts",
     "heat": "playwright test e2e/heat.spec.ts",

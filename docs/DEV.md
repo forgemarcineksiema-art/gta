@@ -92,6 +92,10 @@ npm run life         # M3: a bot run with traffic and pedestrians on, events flo
 npm run heat         # M4: the bot into the hideout, the door as a game-made break, heat 1/3/5
 npm run game         # M5: the garage by keys, the offers on every ad path, the cold open once, the save, a delivery and an order by the bot
 npm run balance      # M5: the busted rates by the bot policies (seeds 42 / 7 / 123), the EV table, the first hour, three assertions (~160 s, Node)
+npm run look         # M8.9: the look's states and the four districts at 1280x720 -> screens/look/<LOOK_SET>/, the world's numbers
+                     # (saturation, the facades' band, the sky behind the HUD, clipping) and the HUD's (texts under 13 px, the top
+                     # centre) on the console and in numbers.json; LOOK_STATES=calm,sign picks states (a slice's stills: -g stills),
+                     # LOOK_SIZES=all adds 800x450 and 1920x1080, LOOK_GATE=1 asserts M8.9's targets (the gate's run only)
 ```
 
 The whole-map check is accelerated fixed-step driving with sampled rendering;
@@ -104,6 +108,6 @@ real-time frame pacing separately.
 |---|---|
 | `dist/` | the last production build |
 | `perf/` | `latest.json` / `previous.json` / `startup.json` from the suites, plus named runs kept for the gate reports (`m4-gate-1.json`, …) |
-| `screens/` | the screenshot suite's output |
+| `screens/` | the screenshot suite's output; `screens/look/before/` is M8.9's before set (slice 1), kept for its gate's board |
 | `output/` | scratch probes, design-review captures, anything a session makes on the side; never committed |
 | `test-results/` | Playwright's traces on failure |

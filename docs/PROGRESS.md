@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.9 slice 1: the look suite and the before set
+
+Done: `e2e/look.spec.ts` (`npm run look`) shoots the plan's twelve states and the four districts' calm drives, reads the
+world's numbers from the WebGL canvas alone in the frame's own task (mean saturation, the share over 0.5, the facades'
+band, the luminance behind the HUD, the clipped share instead of "a sunlit chalk channel", which no frame can find by
+itself) and the HUD's from the DOM (texts under 13 px, the top centre); `LOOK_STATES` picks, `LOOK_SIZES=all` adds the
+small and the big screen, `LOOK_GATE=1` asserts §1.2. The before set (0.8.7 with slice 0) is in `screens/look/before/`:
+the districts at S 0.193–0.202, 3.6–5.6 % over 0.5, band 0.19–0.22, behind the HUD 0.25–0.36, clipped ≤ 0.5 %; the heli
+frame S 0.176, behind the HUD 0.41. Runs on this worktree's port (4238).
+
 ## 2026-09-25 — M8.9 slice 0: the pay label, the sign in the camera, the pause's veil
 
 Done (R7, R12): `PayLabel` wrote its place only when it moved half a pixel from `NaN`, so it never did and sat in the

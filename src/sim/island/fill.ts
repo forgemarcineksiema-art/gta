@@ -14,6 +14,7 @@ import { inPolygon, type P2 } from './geom';
 import type { Ground } from './ground';
 import { PLACES, districtOf, type DistrictId } from './plan';
 import { PAVEMENT, onStrip, type RoadSurfaces, type Strip } from './surfaces';
+import { crownReserved } from './shapes/crown';
 
 /** A lot and its building: its middle, the way its street face looks back at the road, its half sizes. */
 export interface Lot {
@@ -81,6 +82,7 @@ export function reserved(x: number, z: number): boolean {
   if (near(P.waterworks, 45) || near(P.lighthouse, 25) || near(P.controlTower, 20) || near(P.megaRamp, 50) || near(P.ferrisWheel, 30)) return true;
   if (P.cranes.some(([cx, cz]) => Math.hypot(x - cx, z - cz) < 35)) return true;
   if (toLine(P.canal) < P.canalWidth / 2 + 8 || toLine(P.railway) < 12) return true;
+  if (crownReserved(x, z)) return true;
   return false;
 }
 

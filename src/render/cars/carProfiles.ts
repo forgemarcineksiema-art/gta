@@ -201,4 +201,36 @@ export const OFFROAD: CarProfile = {
   paint: PALETTE.sand,
 };
 
-export const CAR_PROFILES: Record<CarId, CarProfile> = { muscle: MUSCLE, compact: COMPACT, heavy: HEAVY, sports: SPORTS, police: POLICE, offroad: OFFROAD };
+/**
+ * The motorbike (M8.8 slice 14): a slim fairing, tank, seat and tail over its two wheels, 2.1 m. Slice 15 draws the
+ * bike and its rider in full; this is the class's shell until then.
+ */
+export const MOTO: CarProfile = {
+  name: 'moto',
+  sections: [
+    { z: 1.05, floor: 0.58, belt: 0.8, roof: 0.84, hwFloor: 0.12, hwBelt: 0.15, hwRoof: 0.12 },
+    { z: 0.7, floor: 0.52, belt: 0.95, roof: 1.06, hwFloor: 0.2, hwBelt: 0.25, hwRoof: 0.2 },
+    { z: 0.1, floor: 0.52, belt: 0.95, roof: 1.0, hwFloor: 0.22, hwBelt: 0.26, hwRoof: 0.22 },
+    { z: -0.3, floor: 0.56, belt: 0.86, roof: 0.9, hwFloor: 0.18, hwBelt: 0.2, hwRoof: 0.18 },
+    { z: -1.05, floor: 0.62, belt: 0.8, roof: 0.85, hwFloor: 0.1, hwBelt: 0.12, hwRoof: 0.1 },
+  ],
+  glassSides: [0, 0],
+  glassTops: [],
+  aPillar: -1,
+  cPillar: -1,
+  pillars: [],
+  doorSeams: [],
+  handleZ: 0,
+  headlight: { width: 0.14, height: 0.1, y: 0.72, inset: 0.05 },
+  taillight: { width: 0.1, height: 0.06, y: 0.76, inset: 0.02 },
+  grille: null,
+  bumperHeight: 0.04,
+  lipSpoiler: false,
+  mirrors: false,
+  exhausts: 1,
+  wheelInset: 0,
+  wheelStyle: 'sports',
+  paint: PALETTE.carMagenta,
+};
+
+export const CAR_PROFILES: Record<CarId, CarProfile> = { muscle: MUSCLE, compact: COMPACT, heavy: HEAVY, sports: SPORTS, police: POLICE, offroad: OFFROAD, moto: MOTO };

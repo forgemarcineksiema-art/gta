@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.8 slice 14: the bike's model
+
+Done: a seventh class, `moto` (MOTORBIKE, MOTOR; JAMS, KORKI), the car model on two wheels (`twoWheel`): the four rays
+on a 0.1 m track go straight down and push straight up, so a lean never lifts them; an upright controller holds the lean
+of the turn's g (at most 50°, `leanGain` 220, `leanDamping` 30); a hit over 9 m/s, or a lean past 70° under 5 m/s, lets
+go for 1.2 s and stands it up where it lies (`tumbleLeft`). 290 kg, 95 N·m to 11,000 rpm: 0–100 4.5 s, 179 km/h, 27 m
+from 100, a 36.1 s lap; a half-g turn leans 26°, the 60 km/h slalom never falls, a 12 m/s wall drives again 1.2 s after.
+A slim placeholder shell until slice 15; 36,000 on the wall. The cars row takes `upTurning` (a bike leans; cars keep 0.9);
+the compact's tightest circle is of the cars. Pins M8.8 14.1 (its row), 14.2–14.5 (`bike.test.ts`).
+
 ## 2026-09-25 — M8.8 slice 13: the rocket trolley
 
 Done: `trolley` (the compact's class on castors, 180 kg with its rider): a push is its engine (5.5 km/h on the throttle,

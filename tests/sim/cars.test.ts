@@ -15,7 +15,7 @@
  * the table.
  */
 import { describe, expect, test } from 'vitest';
-import type { CarId } from '../../src/sim';
+import { CAR_PRESETS, type CarId } from '../../src/sim';
 import { TrackBot } from '../../src/app/trackBot';
 import { GRASS } from '../../src/sim/city/surface';
 import { createWorld, fullThrottle, kmh, position, run, runUntil, upness } from './helpers';
@@ -30,6 +30,8 @@ interface Expectations {
   pulse60: number;
   /** Track bot flying lap, seconds (the class benchmark). */
   botLap: [number, number];
+  /** The least upness while it turns, drifts or laps: a bike leans into its turns (M8.8 slice 14); absent, a car stays flat. */
+  upTurning?: number;
 }
 
 const CARS: Record<CarId, Expectations> = {
@@ -40,6 +42,8 @@ const CARS: Record<CarId, Expectations> = {
   police: { to100: [6.2, 8.6], top: [158, 185], brake100: [24, 44], driftBand: [18, 40], driftMinSpeed: 55, pulse60: 18, botLap: [32, 40] },
   // the 4×4 (M8.8 slice 10): 7.8 s, 165 km/h, 36 m, a 27° drift, a 38.5 s lap on the van's budget
   offroad: { to100: [7.5, 9], top: [150, 170], brake100: [25, 40], driftBand: [10, 40], driftMinSpeed: 35, pulse60: 12, botLap: [34, 44] },
+  // the motorbike (M8.8 slice 14): 4.5 s, 179 km/h, 27 m, a 36° slide, a 36.1 s lap, leaning 45° at most
+  moto: { to100: [4.2, 5.2], top: [165, 185], brake100: [18, 40], driftBand: [20, 45], driftMinSpeed: 25, pulse60: 12, botLap: [31, 42], upTurning: 0.6 },
 };
 
 for (const [id, e] of Object.entries(CARS) as Array<[CarId, Expectations]>) {
@@ -112,7 +116,7 @@ for (const [id, e] of Object.entries(CARS) as Array<[CarId, Expectations]>) {
         expect(a).toBeLessThan(e.driftBand[1]);
       }
       expect(minSpeed).toBeGreaterThan(e.driftMinSpeed);
-      expect(minUp).toBeGreaterThan(0.93);
+      expect(minUp).toBeGreaterThan(e.upTurning ?? 0.93);
     });
 
     test('turns sharply on grip at 60 km/h and stays composed at 120', async () => {
@@ -143,7 +147,7 @@ for (const [id, e] of Object.entries(CARS) as Array<[CarId, Expectations]>) {
         const turned = Math.abs(yawOf(sim) - y0);
         expect(turned).toBeGreaterThan(min);
         expect(turned).toBeLessThan(max);
-        expect(minUp).toBeGreaterThan(0.9);
+        expect(minUp).toBeGreaterThan(e.upTurning ?? 0.9);
       }
     });
 
@@ -210,7 +214,8 @@ describe('M8.8 slice 2: the compact, the city car', () => {
 
   test('M8.8 2.3 its turning circle at 20 km/h is the smallest of the classes', async () => {
     const compact = await circleAt20('compact');
-    for (const id of Object.keys(CARS) as CarId[]) if (id !== 'compact') expect(compact).toBeLessThan(await circleAt20(id));
+    // of the cars: the motorbike (slice 14) turns on a bike's wheelbase
+    for (const id of Object.keys(CARS) as CarId[]) if (id !== 'compact' && CAR_PRESETS[id].twoWheel === 0) expect(compact).toBeLessThan(await circleAt20(id));
   });
 });
 
@@ -228,7 +233,7 @@ for (const [id, e] of Object.entries(CARS) as Array<[CarId, Expectations]>) {
     }
     expect(laps).toBe(2);
     expect(bot.resets).toBe(0);
-    expect(minUp).toBeGreaterThan(0.93);
+    expect(minUp).toBeGreaterThan(e.upTurning ?? 0.93);
     expect(sim.lap.last).toBeGreaterThan(e.botLap[0]);
     expect(sim.lap.last).toBeLessThan(e.botLap[1]);
   });

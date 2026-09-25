@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.8 slice 13: the rocket trolley
+
+Done: `trolley` (the compact's class on castors, 180 kg with its rider): a push is its engine (5.5 km/h on the throttle,
+no engine braking), the rocket its boost (1,560 N: 0–100 4.2 s, 187 km/h), 8 s a meter that fills by itself in 4
+(`boostRegen`, a new tuning number, 0 on every other car). The plan's 2° of lock at speed turned it 13° in the 100 km/h
+pulse, more than the van: 1° from 54 km/h, turned slowly, turns it 2° (the bus 3.7, the least of the rest). Its rider
+sits in the basket (boxes in the pedestrians' colours), the boost's flame at the rocket's nozzle (`CarProfile.nozzle`),
+a rocket's roar for a voice, a countdown for a clue; on a corner of the Crown Tower's plaza. ONLY IT: RIDES A ROCKET
+(TYLKO ON: JEŹDZI NA RAKIECIE). Pins M8.8 13.1, 13.3, 13.4 (`trolley.test.ts`), 13.2 long (bodies.long).
+
 ## 2026-09-25 — M8.8 slice 12: the monster truck
 
 Done: `monster` (the 4×4's class, 4.2 t, 0.95 m wheels on 0.8 m springs, the chassis' underside 1.8 m up, so a car

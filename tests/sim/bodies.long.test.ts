@@ -104,4 +104,29 @@ describe('every body measured', () => {
       } finally { jump.dispose(); }
     }
   }, 600_000);
+
+  it('M8.8 13.2 at 100 km/h a full-lock pulse turns the rocket trolley less than any other body that reaches 100', async () => {
+    /** Degrees a 0.35 s full-lock pulse at 100 km/h turns the body, then a second on the throttle; -1 if it never gets there. */
+    const pulse100 = async (body: BodyId): Promise<number> => {
+      const sim = await createWorld({ spawn: 'straight', body });
+      try {
+        run(sim, 1);
+        // the trolley on its rocket, the meter held full; every other body on its throttle
+        const rocket = body === 'trolley';
+        if (runUntil(sim, 40, (s) => kmh(s) >= 100, (_t, c, s) => { c.throttle = 1; if (rocket) { c.boost = 1; s.vehicle.boostMeter = 1; } }) < 0) return -1;
+        const yaw = (): number => { const q = sim.vehicle.body.rotation(); return Math.atan2(2 * (q.w * q.y + q.x * q.z), 1 - 2 * (q.y * q.y + q.x * q.x)); };
+        const y0 = yaw();
+        run(sim, 0.35, (_t, c) => { c.steer = 1; c.throttle = 1; });
+        run(sim, 1, fullThrottle);
+        return Math.abs(Math.atan2(Math.sin(yaw() - y0), Math.cos(yaw() - y0))) * 180 / Math.PI;
+      } finally { sim.dispose(); }
+    };
+    const trolley = await pulse100('trolley');
+    expect(trolley).toBeGreaterThan(0);
+    for (const body of BODY_IDS) {
+      if (body === 'trolley') continue;
+      const turned = await pulse100(body);
+      if (turned >= 0) expect(trolley, body).toBeLessThan(turned);
+    }
+  }, 900_000);
 });

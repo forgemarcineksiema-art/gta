@@ -66,6 +66,10 @@ export class Run {
   chainLast = -1;
   /** The BORROW prompt's appearances so far: its second line teaches the disguise the first `chain.hintTimes`. */
   borrowHints = 0;
+  /** The screen's teaching lines this profile has seen, as bits (docs/M8.9_PLAN.md R5); the app sets them as they show. */
+  taught = 0;
+  /** The sessions this profile has started, this one counted (the app counts it at boot): the key hints show in the first two. */
+  sessions = 0;
   private borrowPrev = false;
   /** Seconds of active pursuit toward the next bounty (DESIGN.md §13.9). */
   private chaseClock = 0;

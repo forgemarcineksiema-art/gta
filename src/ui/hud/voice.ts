@@ -149,6 +149,190 @@ export function speak(kind: EventKind, value: number, target: number, ctx: Voice
   return out;
 }
 
+/**
+ * What may hold the top centre beside the goal line (docs/M8.9_PLAN.md R5), in the order that goes first: the intro's
+ * caption, the running job's card (and its result on the line), a warning (ROADBLOCK AHEAD, HELICOPTER), the stars'
+ * news, the other news (the suspect's car, a rival ready, the twins), a teaching line, the chain's step card, a NEW card.
+ */
+export type TopKind = 'caption' | 'job' | 'warning' | 'stars' | 'news' | 'teach' | 'step' | 'new';
+export const TOP_RANK: Readonly<Record<TopKind, number>> = { caption: 0, job: 1, warning: 2, stars: 3, news: 4, teach: 5, step: 6, new: 7 };
+
+/** Seconds a waiting line may wait before it is dropped (a card waits for its turn). */
+export const NEWS_WAIT = 4;
+
+/** A top event's place in the order: the radio's roadblock and helicopter warn, the ring's rule teaches. */
+export function topKind(kind: EventKind, value: number): TopKind {
+  if (kind === 'heatLevel') return 'stars';
+  if (kind === 'dispatch' && (value === 1 || value === 4)) return 'warning';
+  if (kind === 'ringPass') return 'teach';
+  return 'news';
+}
+
+/** Seconds a line stays up: the stars' news and a warning 2, the rest 3. */
+export function topSeconds(kind: TopKind): number {
+  return kind === 'stars' || kind === 'warning' ? 2 : 3;
+}
+
+/** One line or card waiting for the top, or on it. */
+export interface TopEntry {
+  kind: TopKind;
+  lead: string;
+  tone: Tone;
+  text: string;
+  /** Seconds it stays once up. */
+  seconds: number;
+  /** Seconds it has waited. */
+  waited: number;
+  /** A teaching line's bit (`TEACH`): the profile has learnt it once it shows. 0 for none. */
+  bit: number;
+  /** A card's subject: the chain's step, or the index of the kind a NEW card brings out. */
+  ref: number;
+}
+
+/** What holds the top this frame besides the queue. */
+export interface TopFrame {
+  /** The intro's caption is up: it speaks alone, and what waits keeps its clock (the quiet moment comes). */
+  caption: boolean;
+  /** The running job's card is up, or its result on the line. */
+  job: boolean;
+  /** A job runs or shows its result: the chain's step and the NEW cards wait for it. */
+  busy: boolean;
+  /** The ticket fills, or the wall or the busted card has the screen: nothing speaks, a line cut short is dropped. */
+  silent: boolean;
+}
+
+function isCard(kind: TopKind): boolean {
+  return kind === 'step' || kind === 'new';
+}
+
+/**
+ * One moment, one message (docs/M8.9_PLAN.md R5): the top centre holds the goal line and at most one more. The
+ * caption and the running job's card take it when they come; the rest waits in `TOP_RANK`'s order, the oldest first
+ * within a kind; a line that has waited `NEWS_WAIT` s is dropped, a card waits. Pure: the HUD draws `current`.
+ */
+export class TopVoice {
+  readonly queue: TopEntry[] = [];
+  /** The line or card on the top now (not the caption's or the job's, which are their own). */
+  current: TopEntry | null = null;
+  /** Bumps each time `current` changes: the drawers redraw on it. */
+  serial = 0;
+  /** Teaching bits shown since the app last took them into the profile. */
+  shownBits = 0;
+  private left = 0;
+  private slot: TopKind | 'none' = 'none';
+
+  /** The kind that has the top this frame ('none': only the goal line). */
+  get showing(): TopKind | 'none' {
+    return this.slot;
+  }
+
+  /** A line: the stars' news replaces one still waiting, the same line twice waits once. */
+  line(kind: TopKind, lead: string, text: string, tone: Tone, seconds: number, bit = 0): void {
+    for (let i = 0; i < this.queue.length; i++) {
+      const e = this.queue[i] as TopEntry;
+      if (e.kind === kind && (kind === 'stars' || e.text === text)) {
+        e.lead = lead; e.text = text; e.tone = tone; e.seconds = seconds; e.waited = 0; e.bit = bit;
+        return;
+      }
+    }
+    if (this.current && this.current.kind === kind && this.current.text === text) return;
+    this.queue.push({ kind, lead, tone, text, seconds, waited: 0, bit, ref: -1 });
+  }
+
+  /** A card: the chain's step (`ref` the step) or a kind brought out (`ref` its index); it waits for its turn. */
+  card(kind: 'step' | 'new', ref: number, seconds: number): void {
+    this.queue.push({ kind, lead: '', tone: 'info', text: '', seconds, waited: 0, bit: 0, ref });
+  }
+
+  /** Whether a teaching line with this bit waits or shows. */
+  holds(bit: number): boolean {
+    if (this.current && (this.current.bit & bit) !== 0) return true;
+    for (const e of this.queue) if ((e.bit & bit) !== 0) return true;
+    return false;
+  }
+
+  /** One frame: the top's owner, the queue's clocks, the next entry up. A quiet frame allocates nothing. */
+  step(dt: number, f: TopFrame): TopKind | 'none' {
+    // the waiting clocks run except under the intro's caption; a line past its wait goes, a card stays
+    if (!f.caption) {
+      for (let i = this.queue.length - 1; i >= 0; i--) {
+        const e = this.queue[i] as TopEntry;
+        e.waited += dt;
+        if (!isCard(e.kind) && e.waited >= NEWS_WAIT) this.queue.splice(i, 1);
+      }
+    }
+    if (f.silent || f.caption || f.job) {
+      const cur = this.current;
+      if (cur) {
+        // cut short: silence drops a line (it is stale by then), a card or a line under the caption or the job's card waits again
+        if (!f.silent || isCard(cur.kind)) {
+          cur.waited = 0;
+          this.queue.unshift(cur);
+        }
+        this.current = null;
+        this.serial++;
+      }
+      this.slot = f.silent ? 'none' : f.caption ? 'caption' : 'job';
+      return this.slot;
+    }
+    if (this.current) {
+      this.left -= dt;
+      if (this.left > 0) {
+        this.slot = this.current.kind;
+        return this.slot;
+      }
+      this.current = null;
+      this.serial++;
+    }
+    let best = -1;
+    for (let i = 0; i < this.queue.length; i++) {
+      const e = this.queue[i] as TopEntry;
+      if (f.busy && isCard(e.kind)) continue;
+      if (best < 0 || TOP_RANK[e.kind] < TOP_RANK[(this.queue[best] as TopEntry).kind]) best = i;
+    }
+    if (best >= 0) {
+      const e = this.queue.splice(best, 1)[0] as TopEntry;
+      this.current = e;
+      this.left = e.seconds;
+      this.serial++;
+      this.shownBits |= e.bit;
+    }
+    this.slot = this.current ? this.current.kind : 'none';
+    return this.slot;
+  }
+}
+
+/**
+ * Teaching at the moment (docs/M8.9_PLAN.md R5), once per profile each: the first bag, the first × that multiplies
+ * it, the first chase. A bit each in the profile's `taught`; the line waits while its moment lasts.
+ */
+export const TEACH = {
+  bag: { bit: 1, lead: 'BAG', text: 'BANK IT AT A GARAGE' },
+  mult: { bit: 2, lead: '', text: 'THE STARS MULTIPLY THE BAG' },
+  chase: { bit: 4, lead: 'LOSE THEM', text: 'GET OUT OF THEIR SIGHT' },
+} as const;
+export const TEACH_ALL = 7;
+export const TEACH_LINES = [TEACH.bag, TEACH.mult, TEACH.chase] as const;
+
+/** What a teaching moment reads. */
+export interface TeachState {
+  /** The intro teaches with its own captions. */
+  intro: boolean;
+  bag: number;
+  multiplier: number;
+  chased: boolean;
+}
+
+/** The teaching lines whose moment is now and which the profile has not learnt, as bits. */
+export function teachNow(s: TeachState, taught: number): number {
+  if (s.intro) return 0;
+  let out = 0;
+  if (s.bag > 0) out |= TEACH.bag.bit;
+  if (s.bag > 0 && s.multiplier > 1) out |= TEACH.mult.bit;
+  if (s.chased) out |= TEACH.chase.bit;
+  return out & ~taught;
+}
+
 /** The side stack: two slots at most; a new pop takes the older one's slot, so a burst never reflows. */
 export const POP_SLOTS = 2;
 export const POP_SECONDS = 1.2;

@@ -112,7 +112,7 @@ export const BALANCE = {
    */
   jobs: {
     // nearDoor: the placement's first picks are a ring within this of every door (the first goal after a door, DESIGN §13.4)
-    markerRadius: 4, beaconHeight: 3, timeBonus: 0.5, holdSeconds: 2, cardSeconds: 1.5, markerMinGap: 60, nearDoor: 250,
+    markerRadius: 4, beaconHeight: 3, timeBonus: 0.5, holdSeconds: 2, cardSeconds: 2.5, markerMinGap: 60, nearDoor: 250,
     // startSpeed (M8.7 D8): a ring starts its job when rolled into under it (m/s, 20 km/h); the rule is taught on the
     // first ring while the chain's first step is open and on the session's first `teachPasses` passes too fast
     startSpeed: 5.5, teachPasses: 3,

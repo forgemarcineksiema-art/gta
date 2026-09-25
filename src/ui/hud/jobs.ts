@@ -1,24 +1,35 @@
 /**
  * The line at the top centre (docs/M5_PLAN.md slice 1; DESIGN.md §13.4): the
- * running job (`DELIVERY 0:48 · 620 m · 12/48`, a card for its first 1.5 s,
+ * running job (`DELIVERY 0:48 · 620 m · 12/48`, a card for its first 2.5 s,
  * the result while it holds), else the goal (`TAKE A JOB · 320 m`, `BANK IT ·
- * 540 m`, `LOSE THEM`, the chain's step) with a dot in the colour of the ring
- * the arrow points at. A step of the first quarter hour's chain ticked shows
- * its card once the job's card is gone; the first order's card stays until
+ * 540 m`, `LOSE THEM`, the chain's step) with its badge. A card is a title,
+ * one line and a number (docs/M8.9_PLAN.md R5). A step of the first quarter
+ * hour's chain ticked and the kinds it brings out wait in the top's voice
+ * (`voice.ts`) for the job and its result; the first order's card stays until
  * the wanted car is ringed and says how to take it. Hidden inside the cold
- * open, behind a shut door, on the busted card and while the ticker has the
- * top centre. DOM writes only on change; reads sim state only. Every word in
- * the player's language (`lang.ts`, DESIGN.md §19).
+ * open, behind a shut door and on the busted card. DOM writes only on change;
+ * reads sim state only. Every word in the player's language (`lang.ts`,
+ * DESIGN.md §19).
  */
 import {
-  BALANCE, BODY_WORDS, CAR_WORDS, CHAIN_STEPS, CHIEF, MEDAL_WORDS, kindsRevealedBy, PLACE_WORDS, RIVALS, STEP, chainStep, copyGoal, goalFor, newGoal, paintName, posterNumber, reqText,
+  BALANCE, BODY_WORDS, CAR_WORDS, CHAIN_STEPS, CHIEF, MEDAL_WORDS, kindsRevealedBy, PLACE_WORDS, RIVALS, STEP, copyGoal, goalFor, newGoal, paintName, posterNumber, reqText,
   trialTimes, unpackDescriptor, type Goal, type GoalKind, type JobDef, type RivalDef, type SimWorld,
 } from '../../sim';
 import { GLYPH_ORDER, KIND_GLYPH, NO_GLYPH, digitSlot, glyphIndex, glyphOf, goalGlyph, numberGlyphs, type GlyphId } from '../../sim/glyphs';
 import { glyphMarkup } from '../glyph';
 import { num, paintedCar, t } from '../lang';
+import type { TopVoice } from './voice';
 
 export const KIND_TITLE: Record<JobDef['kind'], string> = { delivery: 'DELIVERY', order: 'STEAL TO ORDER', escape: 'ESCAPE', trial: 'TIME TRIAL', race: 'STREET RACE', rage: 'TAKEDOWN RAGE', mayhem: 'MAYHEM', fare: 'FARE', duel: 'WANTED BOARD' };
+
+/** The kinds in a fixed order: a NEW card names its kind by its index here. */
+const KINDS = Object.keys(KIND_TITLE) as JobDef['kind'][];
+
+/** Seconds a NEW card stays (a step's card stays `BALANCE.jobs.cardSeconds`, 2.5 s at least, M8.9 R5). */
+const NEW_SECONDS = 3;
+
+/** A card's one line (docs/M8.9_PLAN.md R5): at most this many characters in either language; the line says the rest. */
+export const CARD_LINE_MAX = 34;
 
 export class JobsHud {
   readonly root: HTMLElement;
@@ -38,7 +49,6 @@ export class JobsHud {
   private readonly cardSub: HTMLElement;
   private readonly cardKey: HTMLElement;
   private readonly cardPay: HTMLElement;
-  private readonly cardLimit: HTMLElement;
   private readonly point = { x: 0, z: 0 };
   private readonly goal = newGoal();
   private serial = -1;
@@ -62,17 +72,18 @@ export class JobsHud {
   private goalAmount = -1;
   /** The goal's rival and requirement (M6), packed: the line's words change with them. */
   private goalWho = -1;
-  /** Who has the card, and for how long the chain's card still shows. */
+  /** Who has the card. */
   private cardMode: '' | 'job' | 'chain' | 'new' = '';
   private chainSeen = -1;
-  private chainPending = -1;
-  private chainLeft = 0;
-  /** The kinds a ticked step brought out, waiting for their NEW cards after its own (M8.7 D10). */
-  private readonly newPending: JobDef['kind'][] = [];
   private readonly cardBadge: HTMLElement;
-  /** The chain's step on the card now, and the language changed under a card: filled again on the next frame. */
-  private chainShown = -1;
+  /** The top's voice (M8.9 R5): a ticked step's card and the NEW cards wait in it for their turn. */
+  private voice: TopVoice | null = null;
+  /** The voice's entry on the card now (its serial), and the language changed under a card: filled again next frame. */
+  private cardSerial = -1;
   private cardStale = false;
+  /** The running job's card or its result is up (the top is the job's); a job runs or the line is away (cards wait). */
+  private holding = false;
+  private waiting = true;
 
   constructor(parent: HTMLElement) {
     this.root = el('div', 'jobs');
@@ -88,9 +99,9 @@ export class JobsHud {
     this.cardSub = el('div', 'jobs__card-sub');
     this.cardKey = el('kbd', 'key jobs__card-key', 'E');
     this.cardPay = el('div', 'jobs__card-pay');
-    this.cardLimit = el('div', 'jobs__card-limit');
     this.cardBadge = el('span', 'jobs__card-badge');
-    this.card.append(this.cardBadge, this.cardTitle, this.cardSub, this.cardKey, this.cardPay, this.cardLimit);
+    // a card is its title, one line and its number (M8.9 R5): the goal line's clock and distance say the rest
+    this.card.append(this.cardBadge, this.cardTitle, this.cardSub, this.cardKey, this.cardPay);
     this.root.append(this.line, this.card);
     parent.appendChild(this.root);
   }
@@ -100,9 +111,24 @@ export class JobsHud {
     return this.visible;
   }
 
-  /** True while a job's or a chain step's card is up (the key hints and the news wait, M7 slice 1). */
+  /** True while a job's or a chain step's card is up. */
   get cardShowing(): boolean {
     return this.cardMode !== '';
+  }
+
+  /** The top is the job's: its card, or its result on the line (M8.9 R5: nothing else speaks over them). */
+  get jobHolds(): boolean {
+    return this.holding;
+  }
+
+  /** The chain's step and the NEW cards wait: a job runs or shows its result, or the line is away (the intro, a door). */
+  get cardsWait(): boolean {
+    return this.waiting;
+  }
+
+  /** The top's voice the step and NEW cards wait in. */
+  useVoice(voice: TopVoice): void {
+    this.voice = voice;
   }
 
   /** The swap key's label, for the first order's card. */
@@ -120,15 +146,15 @@ export class JobsHud {
     this.cardStale = true;
   }
 
-  update(sim: SimWorld, dt: number): void {
+  update(sim: SimWorld): void {
     const run = sim.run;
     if (this.chainSeen < 0) this.chainSeen = run.chainSerial;
     if (run.chainSerial !== this.chainSeen) {
       this.chainSeen = run.chainSerial;
-      if (run.chainLast >= 0) {
-        this.chainPending = run.chainLast;
+      if (run.chainLast >= 0 && this.voice) {
+        this.voice.card('step', run.chainLast, BALANCE.jobs.cardSeconds);
         // the kinds this step brings out: a NEW card each after the step's own (none when every kind is out already)
-        if (!sim.jobs.revealAll) this.newPending.push(...kindsRevealedBy(run.chainLast));
+        if (!sim.jobs.revealAll) for (const kind of kindsRevealedBy(run.chainLast)) this.voice.card('new', KINDS.indexOf(kind), NEW_SECONDS);
       }
     }
     const jobs = sim.jobs;
@@ -149,13 +175,18 @@ export class JobsHud {
     if (!visible) {
       this.showCard('');
       this.mode = '';
+      this.holding = false;
+      this.waiting = true;
       return;
     }
     if (jobLine && d) this.updateJob(sim, d);
     else this.updateGoal(sim);
-    // the card: the job's while it asks for it, else a ticked step of the chain for its 1.5 s
+    // the card: the job's while it asks for it; then its result on the line; the voice's step or NEW card after them
     const teach = jobLine && d !== null && this.teaching(sim, d);
-    const jobCard = jobLine && d !== null && jobs.state !== 'done' && jobs.state !== 'failed' && (jobs.elapsed < BALANCE.jobs.cardSeconds || teach);
+    const ended = jobs.state === 'done' || jobs.state === 'failed';
+    const jobCard = jobLine && d !== null && !ended && (jobs.elapsed < BALANCE.jobs.cardSeconds || teach);
+    this.holding = jobCard || (jobLine && ended);
+    this.waiting = jobLine;
     if (jobCard && d) {
       if (this.cardMode !== 'job' || this.cardStale) this.fillJobCard(sim, d);
       this.cardStale = false;
@@ -163,24 +194,16 @@ export class JobsHud {
       this.showCard('job');
       return;
     }
-    if (this.cardMode === 'chain' || this.cardMode === 'new') {
-      if (this.cardStale && this.cardMode === 'chain') this.fillChainCard(run.chain, this.chainShown);
+    const cur = this.voice?.current ?? null;
+    if (cur && (cur.kind === 'step' || cur.kind === 'new')) {
+      const serial = this.voice?.serial ?? 0;
+      if (serial !== this.cardSerial || this.cardStale) {
+        this.cardSerial = serial;
+        if (cur.kind === 'step') this.fillChainCard(cur.ref);
+        else this.fillNewCard(KINDS[cur.ref] ?? 'delivery');
+      }
       this.cardStale = false;
-      this.chainLeft -= dt;
-      if (this.chainLeft > 0) return;
-    }
-    if (this.chainPending >= 0) {
-      this.fillChainCard(run.chain, this.chainPending);
-      this.chainPending = -1;
-      this.chainLeft = BALANCE.jobs.cardSeconds;
-      this.showCard('chain');
-      return;
-    }
-    const kind = this.newPending.shift();
-    if (kind) {
-      this.fillNewCard(kind);
-      this.chainLeft = BALANCE.jobs.cardSeconds * 2;
-      this.showCard('new');
+      this.showCard(cur.kind === 'step' ? 'chain' : 'new');
       return;
     }
     this.showCard('');
@@ -346,73 +369,43 @@ export class JobsHud {
     }
   }
 
-  /** The card: what was taken on; the first order's says how to take the car. */
+  /** The card: what was taken on, in one line; its number the pay (a rival's, the purse and the car). */
   private fillJobCard(sim: SimWorld, d: JobDef): void {
-    this.cardTitle.textContent = t(KIND_TITLE[d.kind]);
+    this.cardBadge.innerHTML = '';
+    const hot = d.kind === 'fare' && sim.fares.hot;
+    this.cardTitle.textContent = t(hot ? 'HOT FARE' : KIND_TITLE[d.kind]);
     this.cardPay.textContent = money(d.payout);
+    const first = d.kind === 'order' && (sim.run.chain & (1 << STEP.order)) === 0 && sim.jobs.state === 'hunting';
+    this.cardSub.textContent = jobCardLine(d, first, hot);
     if (d.kind === 'duel') {
-      // the rival's poster: the name and the line, the race (a hunt races until M6 slice 2), the purse and the car
+      // the rival's poster: the name, what the duel asks, the purse and the car
       const r = RIVALS[d.level] as RivalDef;
       const n = posterNumber(d.level);
       const board = sim.board;
       const car = t(BODY_WORDS[r.body]), cash = Math.round(board.purse(d.level));
       this.cardTitle.textContent = n > 0 ? `#${n} ${t(r.name)}` : t(r.name);
-      this.cardSub.textContent = t(r.line);
-      this.cardLimit.textContent = r.format === 'chief' ? t('LOSE HIM AT ★★★★★') : r.format === 'hunt' ? t('WRECK THE {car} BEFORE IT GETS HOME', { car }) : t('FIRST TO THE FINISH · ANY ROUTE');
       this.cardPay.textContent = board.isBeaten(d.level) ? t('REMATCH · {cash}', { cash }) : t('{cash} + THE {car}', { cash, car });
-    } else if (d.kind === 'order') {
-      const w = unpackDescriptor(d.descriptor);
-      const first = (sim.run.chain & (1 << STEP.order)) === 0 && sim.jobs.state === 'hunting';
-      const car = paintedCar(paintName(w.paint), CAR_WORDS[w.kind]);
-      this.cardSub.textContent = first ? t("WANTED: {car} · IT'S IN TRAFFIC · SWAP INTO IT", { car }) : t('WANTED: {car}', { car });
-      this.cardLimit.textContent = t('{time} FROM THE SWAP · NO SCRATCHES', { time: clock(d.limitSeconds) });
-    } else if (d.kind === 'escape') {
-      this.cardSub.textContent = t('THE COPS HAVE YOU');
-      this.cardLimit.textContent = t('LOSE THEM');
-    } else if (d.kind === 'fare') {
-      this.cardSub.textContent = t(sim.fares.hot ? 'A CROOK WITH A SUITCASE · DOUBLE PAY · MORE STARS' : 'TAKE THEM THERE · FOLLOW THE LINE');
-      this.cardLimit.textContent = t('{time} · NEAR MISSES AND JUMPS TIP', { time: clock(d.limitSeconds) });
-    } else if (d.kind === 'rage' || d.kind === 'mayhem') {
-      const z = BALANCE.jobs.zone;
-      this.cardSub.textContent = t(d.kind === 'rage' ? 'WRECK CARS INSIDE THE RING' : 'SMASH IT UP INSIDE THE RING');
-      this.cardLimit.textContent = d.kind === 'rage' ? t('{n} TAKEDOWNS IN {s} S', { n: d.level, s: z.seconds }) : t('{cash} OF DAMAGE IN {s} S', { cash: Math.round(d.level), s: z.seconds });
-    } else if (d.kind === 'race') {
-      const pay = BALANCE.jobs.race.pay;
-      this.cardSub.textContent = t('FIRST TO THE FINISH · ANY ROUTE');
-      this.cardLimit.textContent = t('1ST {a} · 2ND {b} · 3RD {c}', { a: Math.round(pay[0] ?? 0), b: Math.round(pay[1] ?? 0), c: Math.round(pay[2] ?? 0) });
-    } else if (d.kind === 'trial') {
-      const [g, s, b] = trialTimes(d.limitSeconds);
-      const best = sim.jobs.medals.get(d.id) ?? 0;
-      this.cardSub.textContent = best > 0 ? t('FOLLOW THE COINS · YOUR BEST: {medal}', { medal: t(MEDAL_WORDS[best] ?? '') }) : t('FOLLOW THE COINS TO THE FINISH');
-      this.cardLimit.textContent = t('GOLD {g} · SILVER {s} · BRONZE {b}', { g: clock(Math.round(g)), s: clock(Math.round(s)), b: clock(Math.round(b)) });
-    } else {
-      this.cardSub.textContent = t('DELIVER IT · FOLLOW THE LINE');
-      this.cardLimit.textContent = t('{time} · FASTER PAYS MORE', { time: clock(d.limitSeconds) });
     }
     this.card.dataset['kind'] = d.kind;
   }
 
-  /** A kind brought out (M8.7 D10): its badge, NEW: its name, what it asks, where to look. */
+  /** A kind brought out (M8.7 D10): its badge (the sign to look for), NEW: its name, what it asks. */
   private fillNewCard(kind: JobDef['kind']): void {
     const words = newCardWords(kind);
     this.cardBadge.innerHTML = badgeMarkup(glyphIndex(KIND_GLYPH[kind]));
     this.cardTitle.textContent = words.title;
     this.cardSub.textContent = words.sub;
     this.cardPay.textContent = '';
-    this.cardLimit.textContent = words.limit;
     this.card.dataset['kind'] = 'new';
     this.card.classList.remove('is-teach');
   }
 
-  /** A ticked step: which of six, what it was, what comes next. */
-  private fillChainCard(chain: number, step: number): void {
+  /** A ticked step: which of six and what it was; the goal line says what comes next. */
+  private fillChainCard(step: number): void {
     this.cardBadge.innerHTML = '';
-    const next = chainStep(chain);
-    this.chainShown = step;
     this.cardTitle.textContent = t('STEP {n} OF {of}', { n: step + 1, of: CHAIN_STEPS.length });
     this.cardSub.textContent = t(CHAIN_STEPS[step] ?? '');
     this.cardPay.textContent = t('DONE');
-    this.cardLimit.textContent = next < 0 ? t('ALL DONE · THE CITY IS YOURS') : t('NEXT: {step}', { step: t(CHAIN_STEPS[next] ?? '') });
     this.card.dataset['kind'] = 'chain';
     this.card.classList.remove('is-teach');
   }
@@ -459,9 +452,30 @@ const NEW_LINES: Record<JobDef['kind'], string> = {
   fare: 'TAKE THEM THERE · FOLLOW THE LINE', duel: 'FIRST TO THE FINISH · ANY ROUTE',
 };
 
-/** A kind's NEW card (M8.7 D10): NEW: its name, what it asks, where to look. Pure; `t` says it in the screen's language. */
-export function newCardWords(kind: JobDef['kind']): { title: string; sub: string; limit: string } {
-  return { title: t('NEW: {kind}', { kind: t(KIND_TITLE[kind]) }), sub: t(NEW_LINES[kind]), limit: t('LOOK FOR ITS SIGN') };
+/** A kind's NEW card (M8.7 D10; M8.9 R5): NEW: its name and what it asks; its badge is the sign to look for. Pure. */
+export function newCardWords(kind: JobDef['kind']): { title: string; sub: string } {
+  return { title: t('NEW: {kind}', { kind: t(KIND_TITLE[kind]) }), sub: t(NEW_LINES[kind]) };
+}
+
+/**
+ * A job card's one line (docs/M8.9_PLAN.md R5), at most `CARD_LINE_MAX` characters in either language: what the job
+ * asks; the first order's teaches the swap, a hot fare's says its stakes, a rival's what the duel is. Pure.
+ */
+export function jobCardLine(d: Pick<JobDef, 'kind' | 'level' | 'limitSeconds'>, firstOrder: boolean, hot: boolean): string {
+  switch (d.kind) {
+    case 'order': return firstOrder ? t("IT'S IN TRAFFIC · SWAP INTO IT") : t('{time} FROM THE SWAP · NO SCRATCHES', { time: clock(d.limitSeconds) });
+    case 'escape': return t('THE COPS HAVE YOU · LOSE THEM');
+    case 'fare': return t(hot ? 'DOUBLE PAY · MORE STARS' : 'TAKE THEM THERE · FOLLOW THE LINE');
+    case 'rage': return t('WRECK CARS INSIDE THE RING');
+    case 'mayhem': return t('SMASH IT UP INSIDE THE RING');
+    case 'race': return t('FIRST TO THE FINISH · ANY ROUTE');
+    case 'trial': return t('FOLLOW THE COINS TO THE FINISH');
+    case 'duel': {
+      const r = RIVALS[d.level];
+      return r?.format === 'chief' ? t('LOSE HIM AT ★★★★★') : r?.format === 'hunt' ? t('WRECK IT BEFORE IT GETS HOME') : t('FIRST TO THE FINISH · ANY ROUTE');
+    }
+    default: return t('DELIVER IT · FOLLOW THE LINE');
+  }
 }
 
 /**

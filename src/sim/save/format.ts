@@ -100,6 +100,13 @@ export interface SaveDoc {
   /** The first quarter hour's chain (M5.5 slice 2): the six steps as bits, ticked in any order; the BORROW hint's appearances. */
   chain: number;
   borrowHints: number;
+  /**
+   * The screen's teaching lines seen (bits) and the sessions started (docs/M8.9_PLAN.md R5), within v6 as the
+   * settings' language was: a document without them is a new profile's when it has no runs, else one that has played
+   * (all taught, two sessions), and an older build dropping them only teaches again.
+   */
+  taught: number;
+  sessions: number;
   /** The time trials' best medals (M5.5 slice 10), a digit 0..3 per trial in the defs' order; '' for none. */
   medals: string;
   /** The hunt's ramps found (M5.5 slice 14): `Jumps.found` as bits, base64; '' when none. */
@@ -142,6 +149,8 @@ function defaults(): SaveDoc {
     caches: { date: '', found: '' },
     chain: 0,
     borrowHints: 0,
+    taught: 0,
+    sessions: 0,
     medals: '',
     jumps: '',
     carKit: {},
@@ -202,6 +211,8 @@ export function serialize(save: SaveDoc): string {
     caches: { date: save.caches.date, found: save.caches.found },
     chain: save.chain,
     borrowHints: save.borrowHints,
+    taught: save.taught,
+    sessions: save.sessions,
     medals: save.medals,
     jumps: save.jumps,
     carKit,
@@ -328,6 +339,12 @@ function sanitize(raw: Record<string, unknown>): SaveDoc {
   out.chain = typeof chain === 'number' && Number.isInteger(chain) && chain >= 0 && chain <= 63 ? chain : 0;
   const hints = raw['borrowHints'];
   out.borrowHints = typeof hints === 'number' && Number.isInteger(hints) && hints >= 0 && hints <= 9 ? hints : 0;
+  // added within v6 (M8.9): a profile that has run before has learnt the lines and is past its first two sessions
+  const played = out.runs > 0;
+  const taught = raw['taught'];
+  out.taught = typeof taught === 'number' && Number.isInteger(taught) && taught >= 0 && taught <= 255 ? taught : played ? 255 : 0;
+  const sessions = raw['sessions'];
+  out.sessions = typeof sessions === 'number' && Number.isInteger(sessions) && sessions >= 0 ? Math.min(sessions, 1_000_000) : played ? 2 : 0;
   // added within v2: a document without it has no medals
   const medals = raw['medals'];
   out.medals = typeof medals === 'string' && /^[0-3]{0,16}$/.test(medals) ? medals : '';
@@ -421,6 +438,8 @@ export function collect(sim: SimWorld, into: SaveDoc): void {
   }
   into.chain = run.chain;
   into.borrowHints = run.borrowHints;
+  into.taught = run.taught;
+  into.sessions = run.sessions;
   let medals = '';
   for (const d of sim.jobs.defs) if (d.kind === 'trial') medals += String(sim.jobs.medals.get(d.id) ?? 0);
   into.medals = medals.replace(/0+$/, '');
@@ -455,6 +474,8 @@ export function apply(sim: SimWorld, save: SaveDoc): void {
   run.playSeconds = save.playSeconds;
   run.chain = save.chain;
   run.borrowHints = save.borrowHints;
+  run.taught = save.taught;
+  run.sessions = save.sessions;
   let k = 0;
   for (const d of sim.jobs.defs) {
     if (d.kind !== 'trial') continue;

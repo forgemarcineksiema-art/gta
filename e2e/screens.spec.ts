@@ -299,8 +299,8 @@ for (const [w, h] of SIZES) {
     await expectNoOverlap(page, `goal ${w}x${h}`);
     // a calm drive (M8.5, DESIGN.md §17.2): once the key hints have taught and the district's name has had its seconds,
     // the line, the stars, the bank, the radar with the way's route, the speed with the boost: the six (no arrow, DESIGN.md §20)
-    // the frames' clock is the manual one here: 12.5 s of it and the hints have taught (their 12 s), the district's
-    // name has had its 4 s
+    // the frames' clock is the manual one here: 12.5 s of it and the hints have taught (their 8 s on an empty top,
+    // M8.9 R5), the district's name has had its 4 s
     await page.evaluate(() => window.advanceTime?.(12_500));
     await page.waitForSelector('.hud__hints.is-hidden', { state: 'attached', timeout: 5_000 });
     // the names fade over half a second of real time

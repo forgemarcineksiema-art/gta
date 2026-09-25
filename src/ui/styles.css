@@ -204,7 +204,7 @@ body {
 }
 .hud__top > .jobs, .hud__top > .cold, .hud__top > .hud__hints { transform: none; }
 .hud__top > .hud__ticker { transform: skewX(-10deg); white-space: normal; text-align: center; }
-.hud__top > .hud__ticker:not(.is-on), .hud__top > .hud__ticker.is-yield, .hud__top > .hud__hints.is-hidden { display: none; }
+.hud__top > .hud__ticker:not(.is-on), .hud__top > .hud__hints.is-hidden { display: none; }
 
 /* the gauge, bottom right (M8.9 R4): one round dial on a dark disc like the radar's; the speed in its middle, the boost
    its outer arc (ink; full, one pulse; boosting, brighter), the damage an inner arc in red after a hit (gauge.ts) */
@@ -335,18 +335,23 @@ body {
   pointer-events: none;
 }
 .hud__swap.is-visible { opacity: 1; }
-.hud__swap { flex-wrap: wrap; justify-content: center; }
-.hud__swap-hint {
+/* the disguise's clock (M8.9 R5): once a police car is borrowed, where the prompt was, how long the cops won't know */
+.hud__cover {
+  position: absolute;
+  left: 50%;
+  bottom: calc(9.375rem + var(--safe-bottom));
+  transform: translateX(-50%);
   display: none;
-  flex-basis: 100%;
-  text-align: center;
   font-size: 1rem;
   font-weight: 800;
   letter-spacing: 0.1em;
+  white-space: nowrap;
   color: var(--ink);
   text-shadow: 2px 2px 0 #000;
+  pointer-events: none;
 }
-.hud__swap-hint.is-on { display: block; }
+.hud__cover.is-on { display: block; }
+.hud__swap.is-visible ~ .hud__cover { bottom: calc(7.75rem + var(--safe-bottom)); }
 .hud__swap-label {
   font-size: 1.125rem;
   font-weight: 800;
@@ -502,6 +507,14 @@ body {
   text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
 }
 .hud__pause-sound.is-muted .hud__pause-sound-state { color: var(--trouble); }
+/* the full list of keys (M8.9 R5): the top's hints are four, in the first two sessions */
+.hud__pause-keys {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 0.25rem 1.5rem;
+  margin-top: 0.875rem;
+}
+.hud__pause-keys .hud__hint { color: var(--ink); }
 /* the settings on the pause screen (M7 slice 3): W/S a row, A/D its value, all clickable */
 .settings {
   display: flex;
@@ -550,7 +563,7 @@ body {
   opacity: 0.7;
 }
 
-/* keycap hints, top centre */
+/* the four key hints, top centre, one row (M8.9 R5; the full list is the pause screen's) */
 .hud__hints {
   position: absolute;
   left: 50%;
@@ -848,6 +861,22 @@ kbd.key {
   border-radius: 2px;
   transform-origin: left;
   transform: scaleX(0);
+}
+/* a car alongside while the ticket fills (M8.9 R5): its prompt on the ticket, one block with it */
+.run__ticket-prompt {
+  display: none;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.375rem;
+  transform: skewX(12deg);
+}
+.run__ticket-prompt.is-on { display: flex; }
+.run__ticket-word {
+  font-size: 1.125rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--way);
+  text-shadow: 2px 3px 0 #000;
 }
 
 .run__card,

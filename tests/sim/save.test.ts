@@ -41,6 +41,8 @@ function filled(smashedIds: number[]): SaveV1 {
     caches: { date: '2026-09-23', found: encodeBits(found) },
     chain: 4,
     borrowHints: 2,
+    taught: 5,
+    sessions: 7,
     medals: '3102',
     jumps: encodeBits(ramps),
     carKit: {},

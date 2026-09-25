@@ -5,15 +5,18 @@
  * a debug block, a pause overlay and the keycap hint strip. Reads sim state
  * only.
  */
-import { AgentState, BALANCE, POLICE, districtAt } from '../../sim';
+import { AgentState, BALANCE, bodySpec, districtAt } from '../../sim';
 import type { EventKind, SimEvent, SimWorld } from '../../sim';
 import { BigMap } from '../map/bigmap';
-import { DRIVE, comboMult, drive, hintRows, newDriveState, newHitClock, newPlaceClock, readDrive, screenTaken, tickHit, tickPlace, type KeyHints } from './corners';
+import {
+  DRIVE, comboMult, drive, hintRow, hintRows, newDriveState, newHitClock, newPlaceClock, promptPlace, readDrive, screenTaken, tickHit, tickPlace,
+  type KeyHints,
+} from './corners';
 import { GaugeHud } from './gauge';
 import { Minimap } from '../map/minimap';
 import { HeatHud } from './heat';
 import { label, num, relabel, t } from '../lang';
-import { POP_SLOTS, Pops, newSaid, speak, type Tone, type VoiceContext } from './voice';
+import { POP_SLOTS, Pops, TEACH_LINES, TopVoice, newSaid, speak, teachNow, topKind, topSeconds, type TeachState, type VoiceContext } from './voice';
 
 export type { KeyHints } from './corners';
 
@@ -41,20 +44,27 @@ export class Hud {
   private readonly gauge: GaugeHud;
   private readonly debug: HTMLElement;
   private readonly pause: HTMLElement;
+  private readonly pauseKeys: HTMLElement;
   /** The pause screen names the mute key and the sound's state. */
   private readonly sound: HTMLElement;
   private readonly soundKey: HTMLElement;
   private readonly soundState: HTMLElement;
   private readonly hints: HTMLElement;
   private readonly toast: HTMLElement;
-  /** One line at the top centre for 2 s: the heat level's news (M5.5 slice 0); the dispatch lines join in slice 4. */
+  /**
+   * The top's voice (docs/M8.9_PLAN.md R5): the goal line and one more. The app steps it with what holds the top
+   * (the caption, the job's card) and the ticker draws its line; the jobs HUD draws its cards.
+   */
+  readonly top = new TopVoice();
+  /** One line at the top centre: the voice's line (the stars' news, the radio, a teaching line). */
   private readonly ticker: HTMLElement;
   private readonly tickerLevel: HTMLElement;
   private readonly tickerText: HTMLElement;
-  private tickerLeft = 0;
-  private queuedLead = '';
-  private queuedText = '';
-  private queuedTone: Tone = 'info';
+  private tickerSerial = -1;
+  /** The ticket fills (M8.9 R5): only the ticket and its prompt speak, no pop. */
+  private silent = false;
+  /** What the teaching lines' moments read, filled each frame. */
+  private readonly teachState: TeachState = { intro: false, bag: 0, multiplier: 1, chased: false };
   /** Seconds since the radio last spoke: a line at most every `DISPATCH_EVERY`. */
   private dispatchQuiet = Infinity;
   private readonly lap: HTMLElement;
@@ -64,8 +74,6 @@ export class Hud {
   private lapVisible = false;
   private debugVisible = false;
   private toastTimer = 0;
-  /** The news waits while a card or the intro's caption is up (M7 slice 1). */
-  private newsYield = false;
   /** The speed camera's flash: a white overlay for `flashLeft` s. */
   private readonly flash: HTMLElement;
   private flashLeft = 0;
@@ -101,9 +109,9 @@ export class Hud {
   private readonly swapLabel: HTMLElement;
   /** The candidate is a police car: the prompt says BORROW (the disguise has to be discoverable). */
   private swapBorrow = false;
-  /** Under BORROW the first `chain.hintTimes` times: what the disguise does (M5.5). */
-  private readonly swapHint: HTMLElement;
-  private swapHintOn = false;
+  /** The disguise's clock (M8.9 R5): once a police car is borrowed, how long the cops won't know it, bottom centre. */
+  private readonly cover: HTMLElement;
+  private coverShown = -1;
   private swapVisible = false;
   private lastStage = -1;
   private swapKey = 'E';
@@ -144,9 +152,10 @@ export class Hud {
     this.swap = el('div', 'hud__swap');
     this.swapKeycap = el('kbd', 'key', 'E');
     this.swapLabel = el('span', 'hud__swap-label', t('SWAP'));
-    this.swapHint = el('div', 'hud__swap-hint', t("COPS WON'T KNOW YOU · {s} s", { s: POLICE.disguise.seconds }));
-    this.swap.append(this.swapKeycap, this.swapLabel, this.swapHint);
+    this.swap.append(this.swapKeycap, this.swapLabel);
     this.root.appendChild(this.swap);
+    this.cover = el('div', 'hud__cover');
+    this.root.appendChild(this.cover);
     const stack = el('div', 'hud__popups');
     this.popups = Array.from({ length: POP_SLOTS }, () => {
       const popup = el('div', 'hud__popup');
@@ -177,7 +186,9 @@ export class Hud {
     this.soundKey = el('kbd', 'key', 'M');
     this.soundState = el('span', 'hud__pause-sound-state', t('SOUND ON'));
     this.sound.append(this.soundKey, this.soundState);
-    this.pause.append(label(el('div', 'hud__pause-title'), 'PAUSED'), el('div', 'hud__pause-sub', ''), this.sound, el('div', 'hud__pause-build', `build ${__APP_VERSION__}`));
+    // the full list of keys (M8.9 R5): the top's hints are four, in the first two sessions only
+    this.pauseKeys = el('div', 'hud__pause-keys');
+    this.pause.append(label(el('div', 'hud__pause-title'), 'PAUSED'), el('div', 'hud__pause-sub', ''), this.sound, this.pauseKeys, el('div', 'hud__pause-build', `build ${__APP_VERSION__}`));
     // a sibling of the HUD, the run's layer and the full map, on top of them all: its veil covers the whole screen
     parent.appendChild(this.pause);
 
@@ -216,12 +227,9 @@ export class Hud {
   setHints(k: KeyHints): void {
     this.hintKeys = k;
     this.hints.replaceChildren();
-    for (const r of hintRows(k)) {
-      const row = el('div', 'hud__hint');
-      for (const key of r.keys) row.appendChild(el('kbd', 'key', key));
-      row.appendChild(el('span', 'hud__hint-label', r.label));
-      this.hints.appendChild(row);
-    }
+    for (const r of hintRow(k)) this.hints.appendChild(hint(r));
+    this.pauseKeys.replaceChildren();
+    for (const r of hintRows(k)) this.pauseKeys.appendChild(hint(r));
     const sub = this.pause.querySelector('.hud__pause-sub');
     if (sub) sub.textContent = t('press {key} to continue', { key: k.pause });
     this.swapKey = k.swap;
@@ -237,7 +245,8 @@ export class Hud {
     if (this.hintKeys) this.setHints(this.hintKeys);
     this.setSound(this.muteKey, this.muted);
     this.swapLabel.textContent = t(this.swapBorrow ? 'BORROW' : 'SWAP');
-    this.swapHint.textContent = t("COPS WON'T KNOW YOU · {s} s", { s: POLICE.disguise.seconds });
+    this.coverShown = -1;
+    this.tickerSerial = -1;
     // the combo's word on its next frame
     this.skillSerial = -1;
     this.minimap?.relabel();
@@ -286,11 +295,11 @@ export class Hud {
     return this.ticker;
   }
 
-  /** A card or the intro's caption has the top centre: the news waits, hidden, its clock stopped (M7 slice 1). */
-  setNewsYield(v: boolean): void {
-    if (v === this.newsYield) return;
-    this.newsYield = v;
-    this.ticker.classList.toggle('is-yield', v);
+  /** The ticket fills (M8.9 R5): nothing speaks but the ticket; the pops showing go. */
+  setSilent(v: boolean): void {
+    if (v === this.silent) return;
+    this.silent = v;
+    if (v) this.clearPops();
   }
 
   setPaused(paused: boolean, reason: 'user' | 'focus'): void {
@@ -304,29 +313,9 @@ export class Hud {
     this.debug.classList.toggle('is-visible', v);
   }
 
-  /** True while the ticker has news to show (shown, or waiting under a card or a caption). */
-  get tickerShowing(): boolean {
-    return this.tickerLeft > 0;
-  }
-
-  /** The ticker: a lead word in its tone's colour (the stars red, the radio blue, the rest ink, M8.9 R1) and the news, for `seconds`. */
-  showTicker(lead: string, text: string, seconds = 2, tone: Tone = 'info'): void {
-    this.tickerLevel.textContent = lead;
-    this.tickerLevel.dataset['tone'] = tone;
-    this.tickerText.textContent = text;
-    this.ticker.classList.add('is-on');
-    this.tickerLeft = seconds;
-  }
-
-  /** The ticker now, or next when it is busy (a level's news keeps the top centre). */
-  private ticker2(lead: string, text: string, tone: Tone): void {
-    if (this.tickerLeft > 0) {
-      this.queuedLead = lead;
-      this.queuedText = text;
-      this.queuedTone = tone;
-    } else {
-      this.showTicker(lead, text, 3, tone);
-    }
+  private clearPops(): void {
+    const out = this.pops.clear();
+    for (let i = 0; i < this.popups.length; i++) if ((out & (1 << i)) !== 0) this.popups[i]?.classList.remove('is-on');
   }
 
   showToast(text: string, seconds = 1.5): void {
@@ -364,19 +353,17 @@ export class Hud {
     // nothing of the drive speaks over the wall or the busted card
     if (said.where === 'none' || this.taken) return;
     if (said.where === 'top') {
+      // the radio at most every few seconds; every line waits its turn in the top's voice (M8.9 R5)
       if (kind === 'dispatch') {
-        // the radio: never over another line, at most every few seconds
-        if (this.dispatchQuiet < DISPATCH_EVERY || this.tickerLeft > 0) return;
+        if (this.dispatchQuiet < DISPATCH_EVERY) return;
         this.dispatchQuiet = 0;
-        this.showTicker(said.lead, said.text, 2, said.tone);
-      } else if (kind === 'heatLevel') {
-        // the stars' news takes the top at once: what the city sends from now on
-        this.showTicker(said.lead, said.text, 2, said.tone);
-      } else {
-        this.ticker2(said.lead, said.text, said.tone);
       }
+      const at = topKind(kind, value);
+      this.top.line(at, said.lead, said.text, said.tone, topSeconds(at));
       return;
     }
+    // while the ticket fills, no pop (it speaks alone)
+    if (this.silent) return;
     const i = this.pops.push(said.text);
     const popup = this.popups[i];
     if (!popup) return;
@@ -414,7 +401,9 @@ export class Hud {
     }
     // no swap behind a shut door or on the busted card: the controls are the break's
     // the cold open's own caption teaches the swap at the top: one prompt at a time
-    const swapVisible = life.swapCandidate >= 0 && (sim.run.state === 'running' || sim.run.state === 'closing') && sim.coldOpen.caption !== 'swap';
+    // while the ticket fills its prompt is on the ticket (run.ts), one block with it
+    const driving = sim.run.state === 'running' || sim.run.state === 'closing';
+    const swapVisible = driving && promptPlace(life.swapCandidate >= 0, sim.run.bustedProgress > 0, sim.coldOpen.caption === 'swap') === 'bottom';
     if (swapVisible !== this.swapVisible) {
       this.swapVisible = swapVisible;
       this.swap.classList.toggle('is-visible', swapVisible);
@@ -424,10 +413,13 @@ export class Hud {
       this.swapBorrow = borrow;
       this.swapLabel.textContent = t(borrow ? 'BORROW' : 'SWAP');
     }
-    const hint = borrow && sim.run.borrowHints <= BALANCE.chain.hintTimes;
-    if (hint !== this.swapHintOn) {
-      this.swapHintOn = hint;
-      this.swapHint.classList.toggle('is-on', hint);
+    // the disguise's clock once a police car is borrowed (the Chief's own runs none)
+    const p = sim.pursuit;
+    const cover = p.disguised && bodySpec(p.descriptor.body).unreported !== true && sim.run.state === 'running' ? Math.max(0, Math.ceil(p.coverLeft)) : -1;
+    if (cover !== this.coverShown) {
+      this.coverShown = cover;
+      this.cover.classList.toggle('is-on', cover >= 0);
+      if (cover >= 0) this.cover.textContent = t("COPS WON'T KNOW YOU · {s} s", { s: cover });
     }
     const voice = this.voice;
     voice.jumps = sim.jumps?.foundCount ?? 0;
@@ -437,16 +429,34 @@ export class Hud {
     const taken = screenTaken(sim.run.state);
     if (taken !== this.taken) {
       this.taken = taken;
-      if (taken) {
-        // the wall or the card takes the screen: the pops go, and a line still owed is stale by the next run
-        const out = this.pops.clear();
-        for (let i = 0; i < this.popups.length; i++) if ((out & (1 << i)) !== 0) this.popups[i]?.classList.remove('is-on');
-        this.tickerLeft = 0;
-        this.queuedText = '';
-        this.ticker.classList.remove('is-on');
-      }
+      // the wall or the card takes the screen: the pops go (the voice drops its line itself)
+      if (taken) this.clearPops();
     }
     this.eventSeq = sim.events.readFrom(this.eventSeq, this.onEvent);
+    // teaching at the moment (M8.9 R5): a line the profile has not seen waits in the voice while its moment lasts
+    const teach = this.teachState;
+    teach.intro = sim.coldOpen.active;
+    teach.bag = sim.run.bag;
+    teach.multiplier = sim.run.multiplier;
+    teach.chased = sim.pursuit.state === 'active';
+    const due = taken ? 0 : teachNow(teach, sim.run.taught);
+    if (due !== 0) {
+      for (const line of TEACH_LINES) {
+        if ((due & line.bit) !== 0 && !this.top.holds(line.bit)) this.top.line('teach', line.lead === '' ? '' : t(line.lead), t(line.text), 'info', 3, line.bit);
+      }
+    }
+    // the ticker draws the voice's line when it changes
+    if (this.top.serial !== this.tickerSerial) {
+      this.tickerSerial = this.top.serial;
+      const cur = this.top.current;
+      const on = cur !== null && cur.kind !== 'step' && cur.kind !== 'new';
+      if (on && cur) {
+        this.tickerLevel.textContent = cur.lead;
+        this.tickerLevel.dataset['tone'] = cur.tone;
+        this.tickerText.textContent = cur.text;
+      }
+      this.ticker.classList.toggle('is-on', on);
+    }
     // the skill chain: shown while it runs (the corners' combo bit); the window drains under it
     const skill = sim.skill;
     if ((m & DRIVE.combo) !== 0) {
@@ -473,17 +483,6 @@ export class Hud {
     if (this.toastTimer > 0) {
       this.toastTimer -= dt;
       if (this.toastTimer <= 0) this.toast.classList.remove('is-visible');
-    }
-    if (this.tickerLeft > 0 && !this.newsYield) {
-      this.tickerLeft -= dt;
-      if (this.tickerLeft <= 0) {
-        if (this.queuedText) {
-          this.showTicker(this.queuedLead, this.queuedText, 3, this.queuedTone);
-          this.queuedText = '';
-        } else {
-          this.ticker.classList.remove('is-on');
-        }
-      }
     }
     this.dispatchQuiet += dt;
 
@@ -524,4 +523,12 @@ function el(tag: string, className: string, text?: string): HTMLElement {
   e.className = className;
   if (text !== undefined) e.textContent = text;
   return e;
+}
+
+/** A key hint: its keycaps and its word. */
+function hint(r: { keys: string[]; label: string }): HTMLElement {
+  const row = el('div', 'hud__hint');
+  for (const key of r.keys) row.appendChild(el('kbd', 'key', key));
+  row.appendChild(el('span', 'hud__hint-label', r.label));
+  return row;
 }

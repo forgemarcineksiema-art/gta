@@ -15,7 +15,7 @@ import { createPlatform, type Platform } from '../platform';
 import { Renderer } from '../render/Renderer';
 import { ACTIONS, type Action } from '../input/actions';
 import { BODY_IDS, CAR_IDS, ECONOMY, FIXED_DT, Recorder, SimWorld, clearControls, districtAt, initPhysics, type BodyId, type CarId, type EventLog, type RecordingJSON, TRAFFIC, PEDS, DAMAGE, SWAP } from '../sim';
-import { devTools, screenTaken } from '../ui/hud/corners';
+import { HINT_SECONDS, devTools, hintsWanted, screenTaken } from '../ui/hud/corners';
 import { DebugPanel } from '../ui/dev/debugPanel';
 import { Hud } from '../ui/hud/hud';
 import { RunHud } from '../ui/hud/run';
@@ -23,7 +23,7 @@ import { ColdOpenHud } from '../ui/hud/coldOpen';
 import { JobsHud } from '../ui/hud/jobs';
 import { PayLabel } from '../ui/hud/pay';
 import { SIGN_Y, payOf, paySign, type SignView } from '../render/run/signs';
-import { arrangeTop, mountTop, topBit } from '../ui/hud/lanes';
+import { mountTop } from '../ui/hud/lanes';
 import { SettingsUi } from '../ui/settings';
 import { BootWatch } from './bootWatch';
 import { GarageUi, type GarageActions } from '../ui/wall/garage';
@@ -129,7 +129,8 @@ export class App {
   private readonly perf: PerfProbe | null;
   private readonly simProfile: SimProfile | null;
   private readonly handle: GameHandle;
-  private readonly hintsUntil: number;
+  /** Seconds the four key hints still have on an otherwise empty top, in the profile's first two sessions (M8.9 R5). */
+  private hintsLeft = HINT_SECONDS;
   private lastTime = 0;
   private started = false;
   private userPaused = false;
@@ -255,6 +256,8 @@ export class App {
     this.garageUi = new GarageUi(this.runHud.wall, sim, actions);
     this.coldOpenHud = new ColdOpenHud(uiRoot);
     this.jobsHud = new JobsHud(uiRoot);
+    // one moment, one message (M8.9 R5): the step and NEW cards wait in the top's voice with the news
+    this.jobsHud.useVoice(this.hud.top);
     this.payLabel = new PayLabel(uiRoot);
     // a click on a ring on the full map makes it the goal (M8.7 D7)
     this.hud.setMapPick((id) => this.sim.way?.pick(id));
@@ -265,7 +268,6 @@ export class App {
     const dev = devTools(params);
     this.dev = dev;
     this.sendKeys();
-    this.hintsUntil = performance.now() + 12000;
 
     this.panel = !dev ? null : new DebugPanel(uiRoot, sim, {
       spawnAt: (name) => sim.spawnAt(name),
@@ -484,6 +486,8 @@ export class App {
       save,
       coldOpen,
     });
+    // this session counted (M8.9 R5: the key hints show in the first two)
+    sim.run.sessions++;
     // the save's flag is written as it starts, so a reload never repeats it (the M4 session flag's rule)
     if (sim.coldOpen.active) void store.flush(sim);
     // `police=off`: the dispatcher sends nobody, the beat included (a job's flow measured clean: tests, playtests)
@@ -673,7 +677,7 @@ export class App {
   /** The keycaps every screen names: at the start and again in a new language. */
   private sendKeys(): void {
     const key = (a: Action): string => this.key(a);
-    this.runHud.setKeys({ any: key('throttle') });
+    this.runHud.setKeys({ any: key('throttle'), swap: key('swap') });
     this.garageUi.setKeys({ left: key('steerLeft'), right: key('steerRight'), confirm: key('throttle'), back: key('brake'), select: key('handbrake') });
     this.jobsHud.setSwapKey(key('swap'));
     this.coldOpenHud.setKeys({
@@ -845,19 +849,31 @@ export class App {
     this.hud.setMapVisible(st.value.map > 0.5 && playing && !this.bot);
     this.runHud.update(this.sim, frameDt);
     this.coldOpenHud.update(this.sim);
-    this.jobsHud.update(this.sim, frameDt);
+    this.jobsHud.update(this.sim);
     // the nearest open sign ahead: its kind and its pay, a metre over its face (M8.7 D5, M8.9 R7)
     this.renderer.view(this.signView);
     const paid = playing && !this.bot ? paySign(this.sim, this.signView) : null;
     if (paid && this.renderer.toScreen(paid.x, SIGN_Y + 1.05, paid.z, this.payAt)) this.payLabel.show(this.payAt.x, this.payAt.y, paid, payOf(this.sim, paid));
     else this.payLabel.hide();
-    // the top of the screen (M7 slice 1): the hints are for driving (behind a shut door the wall has the keys, the
-    // intro's captions teach the same ones); under a card or a caption the hints and the news wait
-    const wantsHints = now < this.hintsUntil && !this.bot && !this.sim.coldOpen.active && playing;
-    const top = arrangeTop((this.jobsHud.cardShowing ? topBit('card') : 0) | (this.coldOpenHud.captionShowing ? topBit('caption') : 0)
-      | (wantsHints ? topBit('hints') : 0) | (this.hud.tickerShowing ? topBit('news') : 0), screenTaken(this.sim.run.state));
-    this.hud.setHintsVisible((top & topBit('hints')) !== 0);
-    this.hud.setNewsYield(this.hud.tickerShowing && (top & topBit('news')) === 0);
+    // the top of the screen (M8.9 R5): the goal line and one more. The intro's caption and the running job's card
+    // take it; the voice's lines and cards wait in their order; while the ticket fills nothing speaks but the ticket
+    const ticket = run.bustedProgress > 0 && (run.state === 'running' || run.state === 'closing');
+    const silent = ticket || screenTaken(run.state);
+    this.hud.setSilent(silent);
+    const slot = this.hud.top.step(frameDt, {
+      caption: this.coldOpenHud.captionShowing, job: this.jobsHud.jobHolds, busy: this.jobsHud.cardsWait, silent,
+    });
+    // a teaching line on the screen is learnt by the profile
+    if (this.hud.top.shownBits !== 0) {
+      run.taught |= this.hud.top.shownBits;
+      this.hud.top.shownBits = 0;
+      this.store.markDirty();
+    }
+    // the four key hints on an otherwise empty top, for their seconds, in the first two sessions (the wall has the
+    // keys behind a door, the intro's captions teach the same ones, the pause screen lists them all)
+    const hints = !silent && slot === 'none' && this.hintsLeft > 0 && hintsWanted(run.sessions) && !this.bot && !this.sim.coldOpen.active && playing;
+    if (hints) this.hintsLeft -= frameDt;
+    this.hud.setHintsVisible(hints);
     this.garageUi.update(this.sim);
     this.hud.update(
       this.sim,

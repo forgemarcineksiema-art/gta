@@ -34,6 +34,35 @@ export interface JumpDesc {
   /** Up-slope length and ridge height, m. */
   length: number;
   height: number;
+  /**
+   * The mega-ramp's own surfaces (M8.8 slice 21), (along, height) from the lip: the launch ramp up to it, and the
+   * landing slope beyond the street; half its width. A kicker has none.
+   */
+  profile?: ReadonlyArray<{ along: number; y: number }>;
+  landing?: ReadonlyArray<{ along: number; y: number }>;
+  halfWidth?: number;
+}
+
+/**
+ * The mega-ramp (M8.8 slice 21): on Coral Quay's east strip (the Works' strips have a kicker before every crossing
+ * street), heading south up a port crane's side to a 12.9 m lip at 22°, over the street at z 225 onto a long landing
+ * slope: about 3.5 s in the air at the muscle car's full-boost speed, its apex in `apexSlowMo` s of the takedown's slow
+ * motion (control stays); the twenty-first jump, paying `bag.megaJump`.
+ */
+export const MEGA = { x: 737.5, z: 196, yaw: 0, halfWidth: 4, apexSlowMo: 0.6 } as const;
+/** The launch: six 10 m pieces steepening 2° to 22°, then the back face down; and the landing mound past the street. */
+const MEGA_LAUNCH = [
+  { along: -60, y: 0 }, { along: -50, y: 0.35 }, { along: -40, y: 1.58 }, { along: -30, y: 3.71 }, { along: -20, y: 6.77 },
+  { along: -10, y: 10.81 }, { along: 0, y: 15.91 }, { along: 0.6, y: 0 },
+] as const;
+const MEGA_LANDING = [
+  { along: 44, y: 0 }, { along: 54, y: 6 }, { along: 70, y: 8 }, { along: 100, y: 7 }, { along: 130, y: 5.5 },
+  { along: 160, y: 3.5 }, { along: 190, y: 1.5 }, { along: 220, y: 0 },
+] as const;
+
+/** The mega-ramp's desc, `id` after the kickers'. */
+export function megaRamp(id: number): JumpDesc {
+  return { id, x: MEGA.x, z: MEGA.z, yaw: MEGA.yaw, length: 60, height: 12.94, profile: MEGA_LAUNCH, landing: MEGA_LANDING, halfWidth: MEGA.halfWidth };
 }
 
 /** Half the ramp's width (m); the ramps sit in the gap between the edge parks' two rows of lots. */
@@ -69,6 +98,7 @@ export function placeJumps(seed: number, count: number): JumpDesc[] {
  * not throw the car), then one slab down. The collision slabs and the rendered ramp both follow it.
  */
 export function rampProfile(jd: JumpDesc): Array<{ along: number; y: number }> {
+  if (jd.profile) return jd.profile.map((p) => ({ along: p.along, y: p.y }));
   const tan = jd.height / jd.length;
   const seg = jd.length / 3;
   const out = [{ along: -jd.length, y: 0 }];
@@ -81,11 +111,16 @@ export function rampProfile(jd: JumpDesc): Array<{ along: number; y: number }> {
   return out;
 }
 
-/** The collision slabs under the rendered ramp: terrain, so the wheels ride them and the chassis does not. */
+/** The collision slabs under the rendered ramp (and a mega-ramp's landing): terrain, so the wheels ride them and the chassis does not. */
 export function jumpStatics(jd: JumpDesc): StaticDesc[] {
+  const out = slabs(jd, rampProfile(jd));
+  if (jd.landing) out.push(...slabs(jd, jd.landing));
+  return out;
+}
+
+function slabs(jd: JumpDesc, profile: ReadonlyArray<{ along: number; y: number }>): StaticDesc[] {
   const fx = Math.sin(jd.yaw), fz = Math.cos(jd.yaw);
-  const thick = 0.15;
-  const profile = rampProfile(jd);
+  const thick = 0.15, width = jd.halfWidth ?? RAMP_HALF_WIDTH;
   const out: StaticDesc[] = [];
   for (let k = 0; k + 1 < profile.length; k++) {
     const a = profile[k] as { along: number; y: number }, b = profile[k + 1] as { along: number; y: number };
@@ -95,7 +130,7 @@ export function jumpStatics(jd: JumpDesc): StaticDesc[] {
     // centred under the surface's midpoint, sunk by its half thickness, pitched nose up by `angle`
     const q = mulQuat(quatFromYaw(jd.yaw), quatFromAxisAngle(1, 0, 0, -angle));
     out.push({
-      shape: { kind: 'box', hx: RAMP_HALF_WIDTH, hy: thick, hz: half },
+      shape: { kind: 'box', hx: width, hy: thick, hz: half },
       position: { x: jd.x + fx * (along + thick * Math.sin(angle)), y: midY - thick * Math.cos(angle), z: jd.z + fz * (along + thick * Math.sin(angle)) },
       rotation: q, color: PALETTE.ramp, tag: 'kerb', collisionOnly: true,
     });
@@ -123,6 +158,8 @@ export class Jumps {
   foundCount = 0;
   private lastRamp = -1;
   private sinceRamp = Infinity;
+  /** The mega-ramp's flight has had its apex (its slow motion). */
+  private apexed = false;
 
   constructor(private readonly sim: SimWorld, readonly descs: readonly JumpDesc[]) {
     this.found = new Uint8Array(descs.length);
@@ -131,9 +168,16 @@ export class Jumps {
   step(probe: PlayerProbe, airborne: boolean, dt: number, events: EventLog): void {
     if (this.flying >= 0) {
       this.flightTime += dt;
-      // the slow motion rides the whole flight and runs out after the landing
-      this.sim.life.state.slowMo = ECONOMY.slowMoSeconds;
-      this.sim.life.state.slowMoTarget = -1;
+      if (this.descs[this.flying]?.profile === undefined) {
+        // the slow motion rides the whole flight and runs out after the landing
+        this.sim.life.state.slowMo = ECONOMY.slowMoSeconds;
+        this.sim.life.state.slowMoTarget = -1;
+      } else if (!this.apexed && this.sim.vehicle.telemetry.vy <= 0) {
+        // the mega-ramp's (M8.8 slice 21): the apex alone, as long as a takedown's
+        this.apexed = true;
+        this.sim.life.state.slowMo = MEGA.apexSlowMo;
+        this.sim.life.state.slowMoTarget = -1;
+      }
       if (airborne) return;
       const ramp = this.flying;
       this.flying = -1;
@@ -159,8 +203,11 @@ export class Jumps {
     if (this.lastRamp >= 0 && this.sinceRamp <= LAUNCH_GRACE) {
       this.flying = this.lastRamp;
       this.flightTime = 0;
-      this.sim.life.state.slowMo = ECONOMY.slowMoSeconds;
-      this.sim.life.state.slowMoTarget = -1;
+      this.apexed = false;
+      if (this.descs[this.flying]?.profile === undefined) {
+        this.sim.life.state.slowMo = ECONOMY.slowMoSeconds;
+        this.sim.life.state.slowMoTarget = -1;
+      }
     }
     this.lastRamp = -1;
   }
@@ -169,11 +216,11 @@ export class Jumps {
   private rampUnder(probe: PlayerProbe): number {
     for (let i = 0; i < this.descs.length; i++) {
       const jd = this.descs[i] as JumpDesc;
-      const dx = probe.x - jd.x, dz = probe.z - jd.z;
-      if (Math.abs(dx) > 30 || Math.abs(dz) > 30) continue;
+      const dx = probe.x - jd.x, dz = probe.z - jd.z, reach = jd.length + 21;
+      if (Math.abs(dx) > reach || Math.abs(dz) > reach) continue;
       const fx = Math.sin(jd.yaw), fz = Math.cos(jd.yaw);
       const along = dx * fx + dz * fz, across = -dx * fz + dz * fx;
-      if (along >= -jd.length && along <= 1 && Math.abs(across) <= RAMP_HALF_WIDTH + 0.5) return jd.id;
+      if (along >= -jd.length && along <= 1 && Math.abs(across) <= (jd.halfWidth ?? RAMP_HALF_WIDTH) + 0.5) return jd.id;
     }
     return -1;
   }

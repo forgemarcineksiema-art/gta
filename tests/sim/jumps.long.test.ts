@@ -21,9 +21,10 @@ describe('stunt jumps (long)', () => {
       const a = await createWorld({ map: 'city', seed, traffic: 0, peds: 0, record: false });
       const b = await createWorld({ map: 'city', seed, traffic: 0, peds: 0, record: false });
       try {
-        const jumps = a.jumps!.descs;
+        // the kickers: the mega-ramp (M8.8 slice 21) flies over a street on purpose, pinned in jumps.test
+        const jumps = a.jumps!.descs.filter((j) => !j.profile);
         expect(jumps.length).toBe(BALANCE.jumps.count);
-        expect(b.jumps!.descs).toEqual(jumps);
+        expect(b.jumps!.descs).toEqual(a.jumps!.descs);
         const hit = { x: 0, z: 0, yaw: 0 };
         for (const jd of jumps) {
           for (const o of jumps) if (o !== jd) expect(Math.hypot(o.x - jd.x, o.z - jd.z)).toBeGreaterThanOrEqual(120);

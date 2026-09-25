@@ -87,6 +87,10 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   through Coral Quay's parapet, framed by light grey kerbs, running 9 m out
   from the promenade's deck down under the sea's surface; the parapet and its
   coping stop at their sides. No other mark: the sea is the rendered one.
+- The mega-ramp (M8.8 slice 21): the kickers' red and white, 8 m wide, a
+  60 m climb steepening to a 16 m lip at 27°, astride it an orange port crane
+  (four legs, sills, crossbeams, a charcoal cab, the boom out over the
+  seawall); past the street a long red landing slope.
 
 ## Street architecture (M2.1)
 

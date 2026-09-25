@@ -299,7 +299,8 @@ export class SimWorld {
     this.heat.playerSpeed = () => this.probe.speed;
     this.roadblocks = this.traffic && this.cover ? new Roadblocks(this, this.cover.chokepoints) : null;
     this.cameras = this.cover ? new Cameras(this.cover.cameraSites, this.cover.daily.cameras) : null;
-    this.jumps = this.city ? new Jumps(this, this.city.jumps) : null;
+    // the kickers, then the mega-ramp (M8.8 slice 21)
+    this.jumps = this.city ? new Jumps(this, [...this.city.jumps, this.city.megaRamp]) : null;
     // the generator's sixteen markers (docs/M5_PLAN.md D4); the cold open adds its own as id 0
     this.jobs = new Jobs(this, this.city && this.traffic ? jobsFor(this.city, opts.seed ?? 42, this.traffic.lanes) : []);
     // the sea trial (M8.8 slice 20), after the generator's, before the way learns the rings

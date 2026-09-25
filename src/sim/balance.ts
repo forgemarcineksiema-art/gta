@@ -36,6 +36,8 @@ export const BALANCE = {
     roadblock: 1000,
     escapePerLevel: 500,
     jump: 400,
+    /** The mega-ramp's jump (M8.8 slice 21), whatever its airtime. */
+    megaJump: 1500,
     jumpPerSecond: 200,
     /** Every 10 s the pursuit is active, this × the heat level into the bag (NFS's bounty, DESIGN.md §13.9). */
     pursuitPer10s: 100,

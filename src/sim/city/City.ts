@@ -12,7 +12,7 @@ import { CAR_TOP, RUN_OUT_REACH, VERGE, placeBillboards, runOutFootprint, tallFo
 import { DROP_OFF_LOTS, GARAGE, cameraSites, dropOffAt, dropOffFor, hideoutSign, hideoutStatics, toDropOff, type DropOff } from './cover';
 import { COVER, coverStatics, insideCover, placeCovers, type CoverAvoid, type CoverDesc } from './covers';
 import { cameraStatics, placeCameras, type CameraDesc } from './cameras';
-import { RAMP_HALF_WIDTH, jumpStatics, placeJumps, type JumpDesc } from './jumps';
+import { MEGA, RAMP_HALF_WIDTH, jumpStatics, megaRamp, placeJumps, type JumpDesc } from './jumps';
 import { gateLine, layoutCoins, placeCoins, type CoinDesc, type CoinPoint } from './coins';
 import { buildRoadMarkings } from './markings';
 import { MARKET, PROP_LINES, chunkProps, type FootwayRun, type PropContext, type PropDesc, type PropPlace, type PropSpot } from './props';
@@ -239,6 +239,8 @@ export class City {
   readonly cameras: readonly CameraDesc[];
   /** The twenty stunt ramps (slice 6), likewise. */
   readonly jumps: readonly JumpDesc[];
+  /** The mega-ramp (M8.8 slice 21), the jump after the kickers. */
+  readonly megaRamp: JumpDesc;
   /** The island's coin layout from the seed (every line but the gate lines); each chunk takes the ones inside it. */
   readonly coinLayout: readonly CoinPoint[];
   /** The four covered streets (M5.5 slice 7); their boxes go into the chunks that hold them. */
@@ -249,6 +251,7 @@ export class City {
   constructor(readonly world: RAPIER.World, readonly seed = 42) {
     this.cameras = placeCameras(cameraSites(this.graph), POLICE.cameras.count);
     this.jumps = placeJumps(seed, BALANCE.jumps.count);
+    this.megaRamp = megaRamp(BALANCE.jumps.count);
     this.coinLayout = layoutCoins(this.jumps);
     // a covered street near each district's door (the Gardens': its landmark), clear of doors, ramps, cameras and plazas
     const doors = DROP_OFF_LOTS.map((lot) => dropOffFor(lot));
@@ -584,6 +587,11 @@ export class City {
     // speed cameras after the billboards, so the placer's clearance and the coin lines never change for them
     for (const cam of this.cameras) if (chunkCoord(cam.poleX) === cx && chunkCoord(cam.poleZ) === cz) statics.push(...cameraStatics(cam));
     for (const jd of this.jumps) if (chunkCoord(jd.x) === cx && chunkCoord(jd.z) === cz) statics.push(...jumpStatics(jd));
+    // the mega-ramp (M8.8 slice 21) and its port crane
+    if (chunkCoord(MEGA.x) === cx && chunkCoord(MEGA.z) === cz) {
+      statics.push(...jumpStatics(this.megaRamp));
+      this.crane(architecture);
+    }
     // the ground under the wheels, laid the first time (the same statics every time after)
     const k = (cz + 3) * 7 + cx + 3;
     if (this.laid[k] !== 1) {
@@ -591,6 +599,21 @@ export class City {
       this.surface.lay(statics);
     }
     return { key: `${cx},${cz}`, x: cx, z: cz, statics, billboards, coins };
+  }
+
+  /**
+   * The port crane the mega-ramp climbs beside (M8.8 slice 21): a gantry of four orange legs astride the ramp's top, its
+   * sills and crossbeams, the cab, and the boom out over the seawall. Drawn only.
+   */
+  private crane(architecture: Architecture): void {
+    const box = architecture.box.bind(architecture), orange = PALETTE.carOrange, x = MEGA.x, z = MEGA.z - 8;
+    for (const side of [-1, 1]) {
+      for (const end of [-7, 7]) box(x + side * 7.5, 11, z + end, 0.6, 11, 0.6, orange);
+      box(x + side * 7.5, 22.3, z, 0.7, 0.7, 7.7, orange);
+    }
+    for (const end of [-7, 7]) box(x, 22.9, z + end, 8.2, 0.6, 0.6, orange);
+    box(x + 2, 20.6, z, 1.5, 1.2, 1.6, PALETTE.charcoal);
+    box(x + 22, 24.2, z, 30, 0.6, 1.3, orange);
   }
 
   /** Coral Quay's seawall edge: paved promenade, palms and masts (its benches are props). */

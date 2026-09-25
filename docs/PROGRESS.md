@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.8 slice 21: the mega-ramp
+
+Done: the twenty-first jump (`MEGA`, `megaRamp`: its own launch and landing surfaces on the desc), 8 m wide, a 60 m
+climb steepening to a 16 m lip at 27° under an orange port crane, over the street at z 225 onto a long landing slope.
+Decided: on Coral Quay's east strip, not the Works' (their strips have a kicker before every crossing street). The
+muscle car on full boost from the strip north of z 0: 140 km/h at the lip, 28.8 m at the apex, 3.1 s in the air (the
+apex's 0.6 s of slow motion on top; the kickers keep theirs through the flight), down upright at 105 m on the slope,
+1,500 into the bag (`bag.megaJump`); the hunt counts it once (JUMPS n/21). The city's fingerprint and the long kicker
+pin take it apart. Pins M8.8 21.1, 21.2 (`jumps.test.ts`); 21.3, the apex frame on the low tier, at the gate.
+
 ## 2026-09-25 — M8.8 slice 20: the heat at sea; the sea trial
 
 Done: at sea the units stay ashore and a hovercraft out of their sight escapes by the cooldown; from four stars the

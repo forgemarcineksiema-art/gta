@@ -7,6 +7,8 @@ import { buildRoadMarkings } from '../../src/sim/city/markings';
 import { BLOCK, CITY_HALF, HIGHWAY_HALF, ROAD_HALF, SPECIAL_ROADS, buildRoadGraph } from '../../src/sim/city/roads';
 import type { StaticDesc } from '../../src/sim/scene';
 import { SLIPWAYS, slipwayStatics } from '../../src/sim/city/sea';
+import { jumpStatics, megaRamp } from '../../src/sim/city/jumps';
+import { BALANCE } from '../../src/sim/balance';
 
 /** FNV-1a over a string: the layout's fingerprint. */
 function fnv(s: string): number {
@@ -15,8 +17,9 @@ function fnv(s: string): number {
   return h;
 }
 
-/** The slipways' ramps (M8.8 slice 19), where they stand: the layout's fingerprint is of the city before them. */
-const RAMPS = new Set(SLIPWAYS.flatMap((s) => slipwayStatics(s)).filter((st) => st.tag === 'kerb').map((st) => `${st.position.x},${st.position.z}`));
+/** The slipways' ramps (M8.8 slice 19) and the mega-ramp's slabs (slice 21), where they stand: the fingerprint is of the city before them. */
+const RAMPS = new Set([...SLIPWAYS.flatMap((s) => slipwayStatics(s)), ...jumpStatics(megaRamp(BALANCE.jumps.count))]
+  .filter((st) => st.tag === 'kerb').map((st) => `${st.position.x},${st.position.z}`));
 
 /**
  * The city's layout at a seed without its heights and colours: every collider's footprint (the buildings' and
@@ -95,7 +98,7 @@ describe('the city\'s look and the big map (M7 slices 11–12)', () => {
     expect(layout(city)).toBe(2338173748);
     let ramps = 0;
     for (let cz = -3; cz <= 3; cz++) for (let cx = -3; cx <= 3; cx++) ramps += city.generate(cx, cz).statics.filter((st) => RAMPS.has(`${st.position.x},${st.position.z}`)).length;
-    expect(ramps).toBe(SLIPWAYS.length);
+    expect(ramps).toBe(RAMPS.size);
     expect(frontageRoads).toHaveLength(4);
     const signs: StaticDesc[] = [];
     for (let cz = -3; cz <= 3; cz++) for (let cx = -3; cx <= 3; cx++) signs.push(...city.generate(cx, cz).statics.filter((st) => st.tag === 'sign'));

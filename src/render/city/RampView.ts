@@ -1,8 +1,9 @@
 /**
  * The stunt ramps (docs/STYLE.md, ramps): each drawn from the sim's own
  * `rampProfile`, so the wheels meet the surface the slabs give them: `ramp`
- * red faces, a `barrier` white lip along the ridge, sides down to the grass.
- * Twenty ramps in one merged mesh, built once. Reads sim state only.
+ * red faces, a `barrier` white lip along the ridge, sides down to the grass;
+ * the mega-ramp's landing slope with it (M8.8 slice 21). Every ramp in one
+ * merged mesh, built once. Reads sim state only.
  */
 import * as THREE from 'three';
 import { PALETTE, type JumpDesc, type SimWorld } from '../../sim';
@@ -33,8 +34,8 @@ export class RampView {
 
 function ramp(jd: JumpDesc, pos: number[], col: number[]): void {
   const fx = Math.sin(jd.yaw), fz = Math.cos(jd.yaw);
-  // right of the heading is (-fz, fx)
-  const rx = -fz, rz = fx, w = RAMP_HALF_WIDTH;
+  // right of the heading is (-fz, fx); the mega-ramp is wider (M8.8 slice 21)
+  const rx = -fz, rz = fx, w = jd.halfWidth ?? RAMP_HALF_WIDTH;
   const at = (along: number, across: number, y: number): [number, number, number] =>
     [jd.x + fx * along + rx * across, y, jd.z + fz * along + rz * across];
   const red = new THREE.Color(PALETTE.ramp), white = new THREE.Color(PALETTE.barrier);
@@ -43,18 +44,22 @@ function ramp(jd: JumpDesc, pos: number[], col: number[]): void {
     for (let k = 0; k < 3; k++) col.push(colour.r, colour.g, colour.b);
   };
   const profile = rampProfile(jd);
-  for (let k = 0; k + 1 < profile.length; k++) {
-    const a = profile[k] as { along: number; y: number }, b = profile[k + 1] as { along: number; y: number };
-    // the top
-    const al = at(a.along, -w, a.y), ar = at(a.along, w, a.y), bl = at(b.along, -w, b.y), br = at(b.along, w, b.y);
-    tri(al, bl, br, red);
-    tri(al, br, ar, red);
-    // the two sides, down to the ground
-    tri(at(a.along, -w, 0), bl, al, red);
-    tri(at(a.along, -w, 0), at(b.along, -w, 0), bl, red);
-    tri(at(a.along, w, 0), ar, br, red);
-    tri(at(a.along, w, 0), br, at(b.along, w, 0), red);
-  }
+  // a surface: its top, and its two sides down to the ground
+  const surface = (points: ReadonlyArray<{ along: number; y: number }>): void => {
+    for (let k = 0; k + 1 < points.length; k++) {
+      const a = points[k] as { along: number; y: number }, b = points[k + 1] as { along: number; y: number };
+      const al = at(a.along, -w, a.y), ar = at(a.along, w, a.y), bl = at(b.along, -w, b.y), br = at(b.along, w, b.y);
+      tri(al, bl, br, red);
+      tri(al, br, ar, red);
+      tri(at(a.along, -w, 0), bl, al, red);
+      tri(at(a.along, -w, 0), at(b.along, -w, 0), bl, red);
+      tri(at(a.along, w, 0), ar, br, red);
+      tri(at(a.along, w, 0), br, at(b.along, w, 0), red);
+    }
+  };
+  surface(profile);
+  // the mega-ramp's landing slope past the street
+  if (jd.landing) surface(jd.landing);
   // the lip: a white band just over the ridge, facing back at the driver
   const ridge = profile[profile.length - 2] as { along: number; y: number };
   const l0 = at(ridge.along - 0.02, -w, ridge.y - 0.18), r0 = at(ridge.along - 0.02, w, ridge.y - 0.18);

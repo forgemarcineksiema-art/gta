@@ -1,10 +1,11 @@
 /**
- * M8.10 slice 13: the traffic, the parked cars and the walkers on the island (docs/M8.10_PLAN.md). Traffic-pool runs of
+ * M8.10 slice 13: the traffic, the parked cars and the walkers on the island (docs/M8.10_PLAN.md), the level crossings' stop. Traffic-pool runs of
  * ten seconds and more: run with LONG=1 (the gate); life.test.ts holds the quick look.
  */
 import { describe, expect, it } from 'vitest';
 import { clearControls, type SimWorld } from '../../../src/sim';
 import type { Island } from '../../../src/sim/island/Island';
+import { TRAIN, type LevelCrossing, type WorksPlace } from '../../../src/sim/island/places/works';
 import { AgentState, type Traffic } from '../../../src/sim/traffic/Traffic';
 import { createWorld } from '../helpers';
 
@@ -91,6 +92,43 @@ describe('M8.10 slice 13: life on the island', () => {
       console.log(`13.3 ${walking} walkers, ${sloped} on slopes`);
       expect(walking).toBeGreaterThan(10);
       expect(sloped).toBeGreaterThan(0);
+    } finally { sim.dispose(); }
+  }, 120_000);
+
+  it('13.4 a car stops short of a shut level crossing and goes over once it opens', async () => {
+    const sim = await createWorld({ map: 'island', seed: 42, traffic: 0, peds: 0, record: false });
+    try {
+      const island = sim.island as Island, traffic = sim.traffic as Traffic, lanes = traffic.lanes;
+      const works = island.places.find((p) => p.id === 'works') as WorksPlace;
+      const c = works.crossings[0] as LevelCrossing;
+      // a lane over the crossing with 50 m of run-up to its line
+      const proj = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };
+      let lane = -1, line = 0;
+      for (let l = 0; l < lanes.laneCount && lane < 0; l++) {
+        lanes.project(l, c.x, c.z, proj);
+        if (proj.dist < c.half + 2 && proj.s - c.out - 3.5 > 50 && proj.s < (lanes.length[l] as number)) { lane = l; line = proj.s - c.out - 3.5; }
+      }
+      expect(lane).toBeGreaterThanOrEqual(0);
+      // the barriers down: the timetable at the first pass over it, less the barriers' lead
+      const pass = c.passes[0] as { from: number; to: number };
+      works.train.time = pass.from - TRAIN.lead;
+      // the player beside the road, out of the way
+      const px = c.x + 25 * Math.sign(c.uz || 1), pz = c.z - 25 * Math.sign(c.ux || 1);
+      island.sync(px, pz, true);
+      sim.vehicle.teleport({ x: px, y: island.ground.surfaceHeight(px, pz) + 1, z: pz }, 0);
+      const car = traffic.spawnAt(lane, line - 40, 'sedan');
+      expect(car).toBeGreaterThanOrEqual(0);
+      hold(sim, 6);
+      expect(c.closed).toBe(true);
+      expect(traffic.lane[car]).toBe(lane);
+      expect(traffic.s[car] as number).toBeLessThan(line + 0.5);
+      expect(traffic.speed[car] as number).toBeLessThan(0.5);
+      // open: over the rails
+      works.train.time = pass.to + TRAIN.after + TRAIN.move + 1;
+      hold(sim, 6);
+      expect(c.closed).toBe(false);
+      const past = traffic.lane[car] !== lane || (traffic.s[car] as number) > line + c.out + 3.5;
+      expect(past).toBe(true);
     } finally { sim.dispose(); }
   }, 120_000);
 });

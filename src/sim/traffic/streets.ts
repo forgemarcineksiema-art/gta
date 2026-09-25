@@ -36,7 +36,15 @@ export interface StreetMap {
   readonly half: number;
   /** The moving traffic's count by the lanes' length round the player (the island's), else the grid's fixed count. */
   readonly byKm: boolean;
+  /** The level crossings (the island's railway): the cars stop short of one while it is shut. */
+  readonly crossings: readonly LevelStop[];
 }
+
+/**
+ * A level crossing as the traffic reads it: where its road meets the rails, the road's half width, how far along the road
+ * each barrier stands from the rails' middle, and whether it is shut (its barriers lowering, down or rising), live.
+ */
+export interface LevelStop { readonly x: number; readonly z: number; readonly half: number; readonly out: number; readonly closed: boolean }
 
 /** Half the grid's footway strip (m), its path down its middle. */
 const PAVEMENT_HALF = 2.25;
@@ -83,5 +91,6 @@ export function cityStreets(city: City): StreetMap {
     kind: () => null,
     half: CITY_HALF,
     byKm: false,
+    crossings: [],
   };
 }

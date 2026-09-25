@@ -1,13 +1,15 @@
 /**
  * The island's streets as the traffic, the walkers and the police read them (M8.10 slice 13): its network's lanes, the
  * surfaces' kerbside bays, the plan's districts, lights at the avenues' junctions (the crossing ways green in turn,
- * by the way each arrives), the ground's height and the pavements' tops, each lane's road's kind by its class.
+ * by the way each arrives), the ground's height and the pavements' tops, each lane's road's kind by its class, the
+ * railway's level crossings.
  */
 import type { Lane } from '../city/roads';
 import type { RoadKind } from '../traffic/bodies';
 import type { StreetMap } from '../traffic/streets';
 import { HALF_WIDTH } from './ground';
 import { CHUNK_X0, CHUNK_Z0, type Island } from './Island';
+import type { WorksPlace } from './places/works';
 import { districtOf, type RoadClass } from './plan';
 import { PAVEMENT } from './surfaces';
 
@@ -71,5 +73,7 @@ export function islandStreets(island: Island): StreetMap {
     },
     half: Math.max(-CHUNK_X0, -CHUNK_Z0),
     byKm: true,
+    // the Works' level crossings, shut while the freight train comes (slice 9)
+    crossings: (island.places.find((p) => p.id === 'works') as WorksPlace | undefined)?.crossings ?? [],
   };
 }

@@ -89,6 +89,8 @@ const PAINTS = CIVILIAN_PAINTS;
 const CAR_GAP = 4.5;
 /** Metres past the stop line a car may creep and still count as waiting at it. */
 const STOP_TOLERANCE = 1.5;
+/** A car stops this far short of a shut level crossing's barrier (m, from its place along the lane). */
+const CROSSING_SHORT = 3.5;
 const MAX_ON_LANE = 48;
 /** Reservation slots per junction node. */
 const HOLDERS = 4;
@@ -179,6 +181,13 @@ export class Traffic {
   private readonly laneAxis: Uint8Array;
   /** The signalled nodes, for the view. */
   readonly signalNodes: number[] = [];
+  /**
+   * The level crossings' stop lines (M8.10: the Works' railway): each lane's first line and one past its last in
+   * `stopFirst`, each line's place along its lane short of the barrier on the way in, and its crossing.
+   */
+  private readonly stopFirst: Int32Array;
+  private readonly stopS: Float32Array;
+  private readonly stopAt: Int16Array;
   readonly lanes: LaneTables;
   readonly state: Uint8Array;
   readonly kind: Uint8Array;
@@ -477,6 +486,23 @@ export class Traffic {
     }
     this.laneAxis = new Uint8Array(this.lanes.laneCount);
     for (const l of graph.lanes) this.laneAxis[l.id] = streets.signalAxis(l);
+    // the level crossings' stop lines: on each lane over a crossing, short of its barrier on the way in
+    const lines: Array<{ lane: number; s: number; k: number }> = [];
+    const over = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };
+    streets.crossings.forEach((c, k) => {
+      for (let l = 0; l < this.lanes.laneCount; l++) {
+        this.lanes.project(l, c.x, c.z, over);
+        if (over.dist > c.half + 2 || over.s <= 0 || over.s >= (this.lanes.length[l] as number)) continue;
+        const at = over.s - c.out - CROSSING_SHORT;
+        if (at > 0) lines.push({ lane: l, s: at, k });
+      }
+    });
+    lines.sort((a, b) => a.lane - b.lane || a.s - b.s);
+    this.stopFirst = new Int32Array(this.lanes.laneCount + 1);
+    this.stopS = Float32Array.from(lines, (q) => q.s);
+    this.stopAt = Int16Array.from(lines, (q) => q.k);
+    for (const q of lines) this.stopFirst[q.lane + 1] = (this.stopFirst[q.lane + 1] as number) + 1;
+    for (let l = 0; l < this.lanes.laneCount; l++) this.stopFirst[l + 1] = (this.stopFirst[l + 1] as number) + (this.stopFirst[l] as number);
     // the bays: which hold a car, and which car, by the seed alone (the spawner's dice are left alone)
     this.bays = streets.bays;
     const nb = this.bays.length;
@@ -1461,6 +1487,18 @@ export class Traffic {
       // Claim only on the approach: a car already in the box does not re-claim after its release.
       this.claimNode(i);
       this.wait[i] = 0;
+    }
+    // a level crossing shut ahead on its lane (M8.10): a stop at its line as at a red light, unless too near to stop
+    // short of it (a car already on its way over goes on, the barriers down ahead of the train); a chase runs it
+    if (!this.fast(i)) {
+      for (let q = this.stopFirst[lane] as number, e = this.stopFirst[lane + 1] as number; q < e; q++) {
+        const line = this.stopS[q] as number, v = this.speed[i] as number;
+        if (s > line + STOP_TOLERANCE || this.streets.crossings[this.stopAt[q] as number]?.closed !== true) continue;
+        if (line - s < (v * v) / (2 * t.brake) - 1) continue;
+        const stop = Math.sqrt(2 * t.brake * Math.max(0, line - 0.2 - s));
+        if (stop < desired) { desired = stop; blocker = 4; }
+        break;
+      }
     }
     this.blocker[i] = blocker;
     return desired;

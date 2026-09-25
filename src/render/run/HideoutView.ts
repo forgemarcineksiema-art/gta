@@ -8,10 +8,20 @@
  * the back wall: one merged mesh a garage, no shadows, the floor the car needs
  * left clear. The garage walls are chunk statics; the totals are DOM. Reads sim
  * state only.
+ *
+ * The showroom (docs/M8.9_PLAN.md R10): a lit ceiling with its strip lights, a
+ * painted bay on the floor, the house glyph in neon over the posters, and the
+ * room's one warm light, in the scene from the start at zero (the light count
+ * never changes: no program rebuilds at the door) and raised over the garage
+ * whose door is shut.
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CHIEF, GARAGE, HIDEOUT_SIGN, PALETTE, RIVALS, hideoutSign, type DropOff, type SimWorld } from '../../sim';
+import { GLYPHS } from '../../sim/glyphs';
+
+/** The showroom's light (M8.9 R10): warm, `intensity` candela at full, reaching `distance` m, `up` m over the floor. */
+export const ROOM_LIGHT = { color: 0xffd6a0, intensity: 70, distance: 22, up: 4.6 } as const;
 
 /** A wanted poster's state on the back wall (M6 slice 5): the rival beaten, the next one, or still waiting. */
 export type PosterState = 'beaten' | 'next' | 'waiting';
@@ -38,6 +48,10 @@ export class HideoutView {
    */
   private readonly signGeometries: THREE.BufferGeometry[] = [];
   private readonly glowMaterial: THREE.MeshBasicMaterial;
+  /** The showroom's dressing: the ceiling and the bay (lit), the strips and the neon (unlit); and its one light. */
+  private readonly roomGeometry: THREE.BufferGeometry;
+  private readonly roomGlowGeometry: THREE.BufferGeometry;
+  readonly lamp: THREE.PointLight;
 
   constructor(scene: THREE.Scene, sim: SimWorld) {
     this.geometry = doorGeometry();
@@ -56,9 +70,11 @@ export class HideoutView {
     this.propsGeometry = propsGeometry();
     this.boardGeometry = boardGeometry(posterStates(sim.board.beaten, sim.board.next()));
     this.boardSerial = sim.board.serial;
+    this.roomGeometry = roomGeometry();
+    this.roomGlowGeometry = roomGlowGeometry();
     for (const site of sim.run.dropOffs) {
-      for (const geometry of [this.propsGeometry, this.boardGeometry]) {
-        const props = new THREE.Mesh(geometry, this.material);
+      for (const geometry of [this.propsGeometry, this.boardGeometry, this.roomGeometry, this.roomGlowGeometry]) {
+        const props = new THREE.Mesh(geometry, geometry === this.roomGlowGeometry ? this.glowMaterial : this.material);
         props.position.set(site.x, GARAGE.floorTop, site.z);
         props.rotation.y = site.yaw;
         props.castShadow = false;
@@ -81,6 +97,16 @@ export class HideoutView {
       scene.add(mesh);
       this.doors.push(mesh);
     }
+    this.lamp = new THREE.PointLight(ROOM_LIGHT.color, 0, ROOM_LIGHT.distance, 2);
+    this.lamp.castShadow = false;
+    scene.add(this.lamp);
+  }
+
+  /** The room's light over the garage whose door is shut at `mix` of its strength (0 with none): only its strength moves. */
+  light(site: { x: number; y: number; z: number } | null, mix: number): void {
+    const intensity = site ? ROOM_LIGHT.intensity * mix : 0;
+    if (this.lamp.intensity !== intensity) this.lamp.intensity = intensity;
+    if (site) this.lamp.position.set(site.x, site.y + ROOM_LIGHT.up, site.z);
   }
 
   update(sim: SimWorld): void {
@@ -106,6 +132,9 @@ export class HideoutView {
     this.geometry.dispose();
     this.propsGeometry.dispose();
     this.boardGeometry.dispose();
+    this.roomGeometry.dispose();
+    this.roomGlowGeometry.dispose();
+    this.lamp.dispose();
     for (const g of this.signGeometries) g.dispose();
     this.material.dispose();
     this.glowMaterial.dispose();
@@ -217,6 +246,52 @@ export function propsGeometry(): THREE.BufferGeometry {
   box(1.0, 0.25, 0.03, 9.66, 0, 2.95, PALETTE.carRed);
   box(0.8, 0.55, 0.03, 9.66, 0, 2.3, PALETTE.charcoal);
   const merged = mergeGeometries(parts, false);
+  for (const p of parts) p.dispose();
+  return merged;
+}
+
+/**
+ * The showroom's lit dressing in the garage's frame (M8.9 R10; `propsGeometry`'s axes): a pale ceiling under the roof,
+ * so the room has no black void over it, and a painted bay on the floor round the turntable (a decal, 12 mm up).
+ */
+export function roomGeometry(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  const box = (w: number, h: number, d: number, along: number, across: number, y: number, hex: number): void => {
+    parts.push(paint(new THREE.BoxGeometry(w, h, d).translate(-across, y, along), hex));
+  };
+  const innerAcross = GARAGE.width / 2 - GARAGE.wall, innerAlong = GARAGE.depth / 2 - GARAGE.wall;
+  box(innerAcross * 2 - 0.1, 0.05, innerAlong * 2 - 0.1, 0, 0, GARAGE.height - 0.35, PALETTE.lightGrey);
+  // the bay: 5.6 × 8.4 m of lines, 12 cm wide, round the room's middle
+  const bw = 2.8, bl = 4.2, line = 0.12, y = 0.012;
+  box(line, 0.01, bl * 2, 0, -bw, y, PALETTE.laneMark);
+  box(line, 0.01, bl * 2, 0, bw, y, PALETTE.laneMark);
+  box(bw * 2 + line, 0.01, line, -bl, 0, y, PALETTE.laneMark);
+  box(bw * 2 + line, 0.01, line, bl, 0, y, PALETTE.laneMark);
+  const merged = mergeGeometries(parts, false);
+  for (const p of parts) p.dispose();
+  return merged;
+}
+
+/** The showroom's lights in the garage's frame, unlit: three strips under the ceiling and the house glyph in neon on the back wall. */
+export function roomGlowGeometry(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  for (const across of [-3.6, 0, 3.6]) {
+    for (const along of [-4.5, 4.5]) parts.push(paint(new THREE.BoxGeometry(0.28, 0.06, 6.5).translate(-across, GARAGE.height - 0.42, along), 0xfff3dc));
+  }
+  // the house, 1.6 m across, over the Chief's poster, facing the door
+  const shapes = (GLYPHS.house ?? []).map((g) => {
+    const at = (pts: readonly number[]): THREE.Vector2[] => {
+      const out: THREE.Vector2[] = [];
+      for (let i = 0; i < pts.length; i += 2) out.push(new THREE.Vector2(((pts[i] as number) - 0.5) * 1.6, (0.5 - (pts[i + 1] as number)) * 1.6));
+      return out;
+    };
+    const shape = new THREE.Shape(at(g.outer));
+    for (const h of g.holes ?? []) shape.holes.push(new THREE.Path(at(h)));
+    return shape;
+  });
+  const neon = new THREE.ShapeGeometry(shapes).rotateY(Math.PI).translate(0, 4.75, GARAGE.depth / 2 - GARAGE.wall - 0.04);
+  parts.push(paint(neon.index ? neon.toNonIndexed() : neon, PALETTE.carOrange));
+  const merged = mergeGeometries(parts.map((p) => (p.index ? p.toNonIndexed() : p)), false);
   for (const p of parts) p.dispose();
   return merged;
 }

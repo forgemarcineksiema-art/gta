@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.9 slice 13: the showroom
+
+Done (R10): the door shut, the camera leaves the back corner over 0.6 s for the showroom (`render/camera/showroom.ts`):
+the car glides to the room's middle and turns on a turntable at 8°/s (drawn only: `PlayerCar.showroom`, the sim's pose
+untouched), three-quarters from the front, framed in the left 52 % at every size (the eye as far as the turning
+footprint needs, 5–10.5 m, inside the room); the wall slides in on the right, `min(45vw, 36rem)`. The room: a pale
+ceiling with three strip lights, a painted bay, the house in orange neon over the posters, and one warm light in the
+scene from boot at zero, raised over the shut garage (the light count never changes). TOTALS fits 800×450. The buses
+(12 m) overflow the band: the room is too small for them. Pins M8.9 13.1–13.4. Stills and verify green.
+
 ## 2026-09-25 — M8.9 slice 12: signs that read; faults that are not faults
 
 Done (R7, R12): a sign never reads smaller than 28 px at 720p in the HUD's scale out to 150 m (`signScale`: drawn

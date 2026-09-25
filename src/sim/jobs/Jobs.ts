@@ -461,7 +461,8 @@ export class Jobs {
       this.race.start(d.targetX, d.targetZ, this.sim.probe, { cars, pace: pace * h.pace, band, lead: h.lead, armour, ...twists });
     } else {
       this.remaining = d.limitSeconds;
-      this.race.start(d.targetX, d.targetZ, this.sim.probe, { cars, pace, band, ...twists });
+      // a race's rival drives a physical car near the player (M8.8 slice 22)
+      this.race.start(d.targetX, d.targetZ, this.sim.probe, { cars, pace, band, physical: true, ...twists });
     }
     this.twist(tw);
   }

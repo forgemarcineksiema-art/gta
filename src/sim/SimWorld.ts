@@ -38,6 +38,7 @@ import { DONUT_SHOP, DonutShop } from './police/Donuts';
 import { Jobs } from './jobs/Jobs';
 import { Fares } from './jobs/Fares';
 import { jobsFor, seaTrial } from './jobs/place';
+import { AiCars } from './ai/AiCars';
 import { Garage } from './garage/Garage';
 import { Board } from './board/Board';
 import { Kit } from './garage/kit';
@@ -168,6 +169,8 @@ export class SimWorld {
   readonly coldOpen: ColdOpen;
   /** The goal the line names and the route to it (M8.7 D1–D2); null off the city. */
   readonly way: Way | null;
+  /** The AI cars that drive a physical race's rivals near the player (M8.8 slice 22). */
+  readonly ai: AiCars | null;
   /** The catalogue, paint, upgrades and prep: the wall's pages (M5 slice 4). */
   readonly garage: Garage;
   /** The pause screen's settings (M7 slice 3), carried for the save; nothing in the sim reads them. */
@@ -317,6 +320,7 @@ export class SimWorld {
     this.caches = this.coins ? new Caches(this) : null;
     this.jobs.revealAll = opts.reveal ?? false;
     this.way = this.city && this.traffic ? new Way(this, this.city.graph, this.traffic.lanes) : null;
+    this.ai = this.city && this.traffic ? new AiCars(this) : null;
     if (this.city) {
       // what the street furniture keeps out of (M8 D7): every job's ring and its end, the stash's cars, the
       // breakers' towers, the donut shop; the cold open's route, the first time a chunk near it asks, with the things
@@ -415,6 +419,8 @@ export class SimWorld {
       // the Fake Cruiser's disco bar: the road ahead pulls over (M8.8 slice 6)
       this.traffic.playerLit = bodySpec(this.carBody).lit === true;
       this.traffic.step(probe, FIXED_DT, this.events);
+      // a physical race's rivals near the player, on the car model (M8.8 slice 22)
+      this.ai?.preStep(probe, FIXED_DT);
     }
     this.mark?.(SimPhase.Traffic);
     // the street furniture's contacts, decided before the solver (M8 D1): the player's, then everyone else's (D6)
@@ -428,6 +434,7 @@ export class SimWorld {
     this.props?.afterPhysics(FIXED_DT);
     this.mark?.(SimPhase.Props);
     this.vehicle.writeTransforms();
+    this.ai?.postStep();
     this.traffic?.writeTransforms();
     this.peds?.writeTransforms();
     this.life.postStep(FIXED_DT);

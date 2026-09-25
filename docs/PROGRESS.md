@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.8 slice 22: the AI driver; the rivals on the car model
+
+Done: `ai/Driver.ts`, the track bot's method in the sim (pursuit at a lookahead point, the corner-speed plan inside a
+grip budget, capped by a plan's speed): it laps the test track to the hundredth of the bot's. `ai/AiCars.ts`, a pool
+of two `Vehicle`s parked and switched off: a duel race's rival (`RaceField.physical`; the hunts keep lane rivals, whose
+takedowns need a lent body) within 40 m of the player drives one, its record a `puppet` (the lane follower leaves it,
+it is drawn where the car is, the car's collider answers for it), its path its lane, the race's exit and the next
+(`Race.bestExit`), resampled at a new lane; past 60 m, or stalled 3 s off its lane out of sight, the record goes back
+to its lane blended as a lent body's. Pins M8.8 22.1, 22.4 (`driver.test.ts`); 22.2 and 22.3 long, run at the gate.
+
 ## 2026-09-25 — M8.8 slice 21: the mega-ramp
 
 Done: the twenty-first jump (`MEGA`, `megaRamp`: its own launch and landing surfaces on the desc), 8 m wide, a 60 m

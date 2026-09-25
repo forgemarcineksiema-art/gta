@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.8 slice 9: grass and dirt
+
+Done: `sim/city/surface.ts` lays each chunk's flat ground statics into 2 m cells the first time the city generates it
+(0.1 s for all 49, 4.6 ms the worst chunk), the topmost deciding by colour: the grass's, the soil's (dirt), anything
+else paved; every lane reads asphalt at every 3 m. Each grounded wheel reads its cell (`Vehicle.ground`,
+`WheelState.surface`) and scales its grip and rolling resistance by the tuning's `grassGrip/Roll`, `dirtGrip/Roll` (the
+4×4 gets its own). The plan's ×0.65/×4 made a lawn only 15 % slower for the muscle car (pin: 30); 0.7/×7 gives 35 %
+(the compact 50, the van twice, the sports car 19), dirt 0.8/×5; a stronger ×8 made the compact hunt gears on its
+wheelspin. Skid marks on asphalt only; drift smoke off grass or dirt in its colour. Pins M8.8 9.1, 9.2; 9.3 the gate's gc.
+
 ## 2026-09-25 — M8.8 slice 8: a voice per engine
 
 Done: `src/audio/voices.ts` gives each class a voice and the engine speaks in the body's (`EngineAudio.update` takes

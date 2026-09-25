@@ -19,6 +19,7 @@ import { MARKET, PROP_LINES, chunkProps, type FootwayRun, type PropContext, type
 import { signalPoles, signalledNodes } from './signals';
 import { BLOCK, CITY_HALF, HIGHWAY_HALF, HIGHWAY_LANE_OFFSETS, OVERPASS_NODES, ROAD_HALF, buildCityRoute, buildRoadGraph, distanceToPolyline, highwayHeightAt, projectOnLane, underOverpass, type Lane, type RoadPoint, type SpecialRoad } from './roads';
 import { overpassStatics } from './overpass';
+import { SurfaceMap } from './surface';
 
 export const DISTRICTS = [
   { id: 'crown', name: 'CROWN HEIGHTS', color: 0xb497d6, accent: ACCENTS.crown, landmark: 'Crown Tower' },
@@ -215,6 +216,9 @@ export class City {
   private readonly lots = new Map<string, FrontageLot[]>();
   private readonly lotsBySegment = new Map<string, Map<number, FrontageLot[]>>();
   private footprintCache: { parks: Rect[]; blocks: Rect[]; water: Polygon[] } | null = null;
+  /** The ground under the wheels (M8.8 slice 9): each chunk lays its ground into it once, when first generated. */
+  readonly surface = new SurfaceMap();
+  private readonly laid = new Uint8Array(49);
   /** What the street furniture keeps out of that the world knows (M8): set once before any prop is asked for. */
   private propKeepOut: { rings: ReadonlyArray<PropRing>; route: () => ColdOpenKeep; markets: ReadonlyArray<{ x: number; z: number }> } | null = null;
   private propRoute: ColdOpenKeep | null = null;
@@ -556,6 +560,12 @@ export class City {
     // speed cameras after the billboards, so the placer's clearance and the coin lines never change for them
     for (const cam of this.cameras) if (chunkCoord(cam.poleX) === cx && chunkCoord(cam.poleZ) === cz) statics.push(...cameraStatics(cam));
     for (const jd of this.jumps) if (chunkCoord(jd.x) === cx && chunkCoord(jd.z) === cz) statics.push(...jumpStatics(jd));
+    // the ground under the wheels, laid the first time (the same statics every time after)
+    const k = (cz + 3) * 7 + cx + 3;
+    if (this.laid[k] !== 1) {
+      this.laid[k] = 1;
+      this.surface.lay(statics);
+    }
     return { key: `${cx},${cz}`, x: cx, z: cz, statics, billboards, coins };
   }
 

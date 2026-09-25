@@ -269,6 +269,8 @@ export class SimWorld {
     this.carId = opts.car ?? 'muscle';
     const tuning = opts.tuning ?? cloneTuning(CAR_PRESETS[this.carId]);
     this.vehicle = new Vehicle(this.world, this.transforms, tuning, spawn.position, spawn.yaw);
+    // the wheels read the city's ground (M8.8 slice 9); the playground is asphalt everywhere
+    this.vehicle.ground = this.city?.surface ?? null;
     this.garage = new Garage(this);
     this.board = new Board(this);
     this.board.teasers = opts.teasers ?? true;

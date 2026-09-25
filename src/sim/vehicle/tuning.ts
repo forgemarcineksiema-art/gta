@@ -126,6 +126,11 @@ export interface VehicleTuning {
   slipRatioTail: number;
   /** Rolling resistance force per wheel per N of load. */
   rollingResistance: number;
+  /** Off the road (M8.8 slice 9): on grass and on dirt, the tyres' grip and their rolling resistance, factors on asphalt's. */
+  grassGrip: number;
+  grassRoll: number;
+  dirtGrip: number;
+  dirtRoll: number;
   /** Load sensitivity: grip per N drops by this fraction per unit of load above the static share (weight transfer costs total grip). */
   loadSensitivity: number;
   /** Fraction (0 contact patch .. 1 centre of mass) at which tyre forces are applied. Arcade roll control. */
@@ -318,6 +323,11 @@ export const DEFAULT_TUNING: VehicleTuning = {
   slipRatioPeak: 0.12,
   slipRatioTail: 0.7,
   rollingResistance: 0.012,
+  // a lawn costs a road car a third on its 0–100 (the muscle car 8.3 s, was 6.2); dirt about a fifth
+  grassGrip: 0.7,
+  grassRoll: 7,
+  dirtGrip: 0.8,
+  dirtRoll: 5,
   loadSensitivity: 0.15,
   tireForceHeight: 0.85,
 

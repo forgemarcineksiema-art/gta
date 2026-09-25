@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { BURST_FLIGHT, BURST_STAGGER, burstPoint } from '../../src/render/run/Coins';
 import { SKID, SkidMarks, skidStrength } from '../../src/render/fx/SkidMarks';
-import type { SimWorld } from '../../src/sim';
+import { ASPHALT, type SimWorld } from '../../src/sim';
 import { COIN_HEIGHT } from '../../src/sim/city/coins';
 import { createWorld, fullThrottle, kmh, run, runUntil } from '../sim/helpers';
 
@@ -52,7 +52,7 @@ describe('skid marks', () => {
 
   it('M7 4.3 the ring wraps: more marks than it holds overwrite the oldest, and nothing grows; no draw without a live mark', () => {
     const marks = new SkidMarks(new THREE.Scene(), 8);
-    const wheel = { grounded: true, isFront: false, normal: { x: 0, y: 1, z: 0 }, contact: { x: 0, y: 0, z: 0 }, slipAngle: 0.8, slipRatio: 0 };
+    const wheel = { grounded: true, isFront: false, normal: { x: 0, y: 1, z: 0 }, contact: { x: 0, y: 0, z: 0 }, slipAngle: 0.8, slipRatio: 0, surface: ASPHALT };
     const fake = { vehicle: { wheels: [wheel], telemetry: { speed: 20 } } } as unknown as SimWorld;
     const geometry = marks.mesh.geometry;
     const before = (geometry.getAttribute('position').array as Float32Array).length;

@@ -24,6 +24,7 @@ import type { VehicleControls } from '../controls';
 import * as M from '../math';
 import type { Vec3 } from '../math';
 import type { TransformBuffer } from '../transforms';
+import { ASPHALT, DIRT, GRASS, type SurfaceKind, type SurfaceReader } from '../city/surface';
 import type { VehicleTuning } from './tuning';
 
 const WHEEL_FR = 0;
@@ -62,6 +63,8 @@ export interface WheelState {
   lateralSpeed: number;
   /** Rolling angle for the visual wheel. */
   spin: number;
+  /** The ground under it (M8.8 slice 9): `ASPHALT`, `GRASS` or `DIRT`; asphalt in the air. */
+  surface: SurfaceKind;
   /** Transform slot for the renderer. */
   slot: number;
 }
@@ -208,6 +211,8 @@ export class Vehicle {
   lateralPull = 0;
   /** Outside factor on the engine's torque (a hurt car's, M8.8 slice 7); 1 is a sound engine. */
   torqueMul = 1;
+  /** The ground the wheels read (the city's surface map, M8.8 slice 9); null is asphalt everywhere. */
+  ground: SurfaceReader | null = null;
   /** Body slip angle of the previous step, radians (drift controller damping). */
   private bodySlipPrev = 0;
   /** Drift side (+1 right) and the rate-limited commanded angle in degrees (+ = right). */
@@ -313,6 +318,7 @@ export class Vehicle {
         forwardSpeed: 0,
         lateralSpeed: 0,
         spin: 0,
+        surface: ASPHALT,
         slot: transforms.allocate(),
       });
     }
@@ -765,8 +771,14 @@ export class Vehicle {
         w.forwardSpeed = forwardSpeed;
         w.lateralSpeed = 0;
         w.spin += w.omega * dt;
+        w.surface = ASPHALT;
         continue;
       }
+      // the ground under the tyre (M8.8 slice 9): grass and dirt take grip and drag at the tyre
+      const ground = this.ground ? this.ground.at(w.contact.x, w.contact.z) : ASPHALT;
+      w.surface = ground;
+      const groundGrip = ground === GRASS ? t.grassGrip : ground === DIRT ? t.dirtGrip : 1;
+      const groundRoll = ground === GRASS ? t.grassRoll : ground === DIRT ? t.dirtRoll : 1;
 
       // wheel frame on the contact plane (fronts steered; right = -steer about up)
       if (w.isFront && w.steer !== 0) {
@@ -789,7 +801,7 @@ export class Vehicle {
 
       // load sensitivity: a heavily loaded tyre gives less grip per newton
       const loadMul = M.clamp(1 - t.loadSensitivity * (w.load / staticLoad - 1), 0.6, 1.3);
-      const mu = (w.isFront ? t.muFront * this.frontGripMul : t.muRear * this.rearGripMul) * loadMul * this.gripMul;
+      const mu = (w.isFront ? t.muFront * this.frontGripMul : t.muRear * this.rearGripMul) * loadMul * this.gripMul * groundGrip;
       const muLoad = mu * w.load;
       const r = t.wheelRadius;
       const vRef = Math.max(Math.abs(vFwd), t.slipLowSpeed);
@@ -823,7 +835,7 @@ export class Vehicle {
       if (share > 0 && w.slipRatio > maxSlipRatio) maxSlipRatio = w.slipRatio;
       if (w.slipRatio < minSlipRatio) minSlipRatio = w.slipRatio;
       // rolling resistance (on a load capped at twice the static share, so a landing spike does not brake the car)
-      fLong -= Math.sign(vFwd) * Math.min(Math.abs(vFwd) * 200, t.rollingResistance * Math.min(w.load, 0.5 * t.mass * 9.81));
+      fLong -= Math.sign(vFwd) * Math.min(Math.abs(vFwd) * 200, t.rollingResistance * groundRoll * Math.min(w.load, 0.5 * t.mass * 9.81));
 
       // --- friction circle
       const mag = Math.hypot(fLat, fLong);

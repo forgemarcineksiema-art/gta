@@ -40,6 +40,7 @@ export { SAVE_VERSION, DEFAULT_SAVE, defaultSave, serialize, parse, migrate, col
 export { coverSites, dropOffFor, hideoutSign, hideoutStatics, toDropOff, DROP_OFF_LOTS, GARAGE, HIDEOUT_SIGN, type HideoutSign, type DropOff, type DropOffLot, type DoorPose, type CoverSites, type Chokepoint, type ParkedJunction, type CameraSite } from './city/cover';
 export { POLICE, type PoliceTuning } from './police/tuning';
 export { PALETTE, PED_TINTS, PED_COLORS, CITY_COLORS } from './palette';
+export { ASPHALT, DIRT, GRASS, SurfaceMap, type SurfaceKind, type SurfaceReader } from './city/surface';
 export { STRAIGHT, type SpawnPoint } from './playground';
 export type { StaticDesc, DynamicDesc, ShapeDesc, Vec3, Quat } from './scene';
 export { quatFromYaw } from './scene';

@@ -126,6 +126,11 @@ export interface VehicleTuning {
   slipRatioTail: number;
   /** Rolling resistance force per wheel per N of load. */
   rollingResistance: number;
+  /**
+   * How steeply a wheel climbs onto what it meets from the ground (M8.8 slice 12, the monster truck onto a car): the
+   * contact rises at most this share of the distance driven; 0, every car's, puts the wheel on it at once.
+   */
+  climbSlope: number;
   /** Off the road (M8.8 slice 9): on grass and on dirt, the tyres' grip and their rolling resistance, factors on asphalt's. */
   grassGrip: number;
   grassRoll: number;
@@ -323,6 +328,7 @@ export const DEFAULT_TUNING: VehicleTuning = {
   slipRatioPeak: 0.12,
   slipRatioTail: 0.7,
   rollingResistance: 0.012,
+  climbSlope: 0,
   // a lawn costs a road car a third on its 0–100 (the muscle car 8.3 s, was 6.2); dirt about a fifth
   grassGrip: 0.7,
   grassRoll: 7,

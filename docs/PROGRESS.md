@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.8 slice 12: the monster truck
+
+Done: `monster` (the 4×4's class, 4.2 t, 0.95 m wheels on 0.8 m springs, the chassis' underside 1.8 m up, so a car
+passes under it and only the wheels meet it): each wheel's ray keeps the collider it stands on (`WheelState.hitHandle`),
+and a car a wheel has been on for 0.2 s is flattened (`BodySpec.crush`, `Life.wheelStep`), a unit as a takedown. A
+ray put a wheel on a 1.4 m roof in one step and threw the truck: the contact now rises at most `climbSlope` (0.8) of the
+way driven (`Vehicle`, rises over 0.1 m only), and the crushed car takes up the climb's spring (the rise to 1 m/s, pitch
+and roll to 0.3). Across a sedan at 30 km/h: 0.66 m up, 22° at most, down on four wheels. Straddled lengthwise a car
+passes between its wheels. On the Gardens' park strip between two jumps. Pins M8.8 12.1–12.4, the card in 11.5.
+
 ## 2026-09-25 — M8.8 slice 11: the pancake and the steamroller
 
 Done: `Traffic.flatten` wrecks a record where it stands, flat at its heading, gives back its lent body and never lends

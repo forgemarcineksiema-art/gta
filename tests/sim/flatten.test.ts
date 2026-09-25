@@ -17,7 +17,7 @@ import type { SimWorld } from '../../src/sim';
 import { PedPose } from '../../src/sim/traffic/Pedestrians';
 import { AgentState, type Traffic } from '../../src/sim/traffic/Traffic';
 import { TRAFFIC } from '../../src/sim/traffic/tuning';
-import { createWorld, fullThrottle, kmh, run, runUntil } from './helpers';
+import { createWorld, fullThrottle, kmh, run, runUntil, upness } from './helpers';
 
 /** A straight two-point street lane at least `min` m long. */
 function streetLane(sim: SimWorld, min = 150): number {
@@ -118,6 +118,76 @@ describe('M8.8 slice 11: the pancake and the steamroller', () => {
     } finally { sim.dispose(); }
   }, 60_000);
 
+  /** The monster truck on a street lane, and a car standing across its way 25 m ahead (a sedan, or a parked unit). */
+  async function across(unit: boolean): Promise<{ sim: SimWorld; car: number }> {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false, body: 'monster' });
+    sim.police!.dispatching = false;
+    const traffic = sim.traffic as Traffic;
+    const lane = streetLane(sim);
+    const p = { x: 0, z: 0, yaw: 0 }, c = { x: 0, z: 0, yaw: 0 };
+    traffic.lanes.positionAt(lane, 30, 0, p);
+    traffic.lanes.positionAt(lane, 55, 0, c);
+    sim.city?.sync(p.x, p.z, true);
+    sim.vehicle.teleport({ x: p.x, y: 2, z: p.z }, p.yaw);
+    run(sim, 1);
+    const car = unit ? traffic.spawnParkedPolice(c.x, c.z, c.yaw + Math.PI / 2, 'police')
+      : traffic.spawnProp(c.x, c.z, c.yaw + Math.PI / 2, 'sedan', AgentState.Parked, 0xffffff);
+    return { sim, car };
+  }
+
+  it('M8.8 12.1 at 30 km/h into a parked sedan the monster truck climbs it (0.6 m or more), flattens it and stays upright', async () => {
+    const { sim, car } = await across(false);
+    try {
+      const y0 = sim.vehicle.body.translation().y;
+      let top = y0, minUp = 1;
+      run(sim, 5, (_t, c, s) => {
+        c.throttle = kmh(s) < 30 ? 1 : 0;
+        top = Math.max(top, s.vehicle.body.translation().y);
+        minUp = Math.min(minUp, upness(s));
+      });
+      expect(sim.traffic!.flat[car]).toBe(1);
+      expect(top - y0).toBeGreaterThanOrEqual(0.6);
+      expect(minUp).toBeGreaterThan(0.9);
+      expect(upness(sim)).toBeGreaterThan(0.97);
+    } finally { sim.dispose(); }
+  }, 60_000);
+
+  it('M8.8 12.2 the monster truck rests without creeping and lands the 16° ramp upright', async () => {
+    const lot = await createWorld({ spawn: 'lot', body: 'monster' });
+    try {
+      run(lot, 1);
+      const p0 = lot.vehicle.body.translation();
+      run(lot, 6);
+      const p1 = lot.vehicle.body.translation();
+      expect(Math.hypot(p1.x - p0.x, p1.z - p0.z)).toBeLessThan(0.01);
+      expect(upness(lot)).toBeGreaterThan(0.99);
+    } finally { lot.dispose(); }
+    const jump = await createWorld({ spawn: 'ramps', body: 'monster' });
+    try {
+      run(jump, 1);
+      runUntil(jump, 30, (s) => s.vehicle.body.translation().z > 105, fullThrottle);
+      expect(runUntil(jump, 5, (s) => s.vehicle.telemetry.airborne, fullThrottle)).toBeGreaterThan(0);
+      let minUpAir = 1;
+      runUntil(jump, 5, (s) => !s.vehicle.telemetry.airborne, (_t, c, s) => { c.throttle = 1; minUpAir = Math.min(minUpAir, upness(s)); });
+      run(jump, 1, fullThrottle);
+      expect(minUpAir).toBeGreaterThan(0.85);
+      expect(upness(jump)).toBeGreaterThan(0.97);
+      expect(jump.vehicle.telemetry.groundedWheels).toBe(4);
+    } finally { jump.dispose(); }
+  }, 60_000);
+
+  it('M8.8 12.3 a unit under the monster truck\'s wheels is flattened, a takedown', async () => {
+    const { sim, car } = await across(true);
+    try {
+      const seq = sim.events.sequence;
+      run(sim, 5, (_t, c, s) => { c.throttle = kmh(s) < 30 ? 1 : 0; });
+      expect(sim.traffic!.flat[car]).toBe(1);
+      let takedowns = 0;
+      sim.events.readFrom(seq, (e) => { if ((e.kind === 'takedown' || e.kind === 'takedownTraffic') && e.target === car) takedowns++; });
+      expect(takedowns).toBe(1);
+    } finally { sim.dispose(); }
+  }, 60_000);
+
   it('M8.8 11.4 its stash spot is clear ground in the Works\' yard', async () => {
     const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
     try {
@@ -132,6 +202,27 @@ describe('M8.8 slice 11: the pancake and the steamroller', () => {
       const shape = new RAPIER.Cuboid(1.3, 1.1, 3.2);
       const rot = { x: 0, y: Math.sin(spot.yaw / 2), z: 0, w: Math.cos(spot.yaw / 2) };
       sim.world.intersectionsWithShape({ x: spot.x, y: 1.4, z: spot.z }, rot, shape, (col) => {
+        if ((col.collisionGroups() >>> 16) !== (GROUPS_TERRAIN >>> 16)) hits++;
+        return true;
+      });
+      expect(hits).toBe(0);
+    } finally { sim.dispose(); }
+  }, 60_000);
+
+  it('M8.8 12.4 the monster truck stands on the Gardens\' park strip between two jumps, on clear ground off the road', async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
+    try {
+      const spot = STASH_SPOTS.monster;
+      expect(districtAt(spot.x, spot.z).id).toBe('gardens');
+      const near = Math.min(...sim.city!.jumps.map((j) => Math.hypot(j.x - spot.x, j.z - spot.z)));
+      expect(near).toBeGreaterThan(20);
+      expect(near).toBeLessThan(120);
+      sim.city!.sync(spot.x, spot.z, true);
+      run(sim, 0.1);
+      // the strip between the edge parks' rows is the quarter's soil (dirt), the jumps' own ground
+      expect(sim.city!.surface.at(spot.x, spot.z)).not.toBe(ASPHALT);
+      let hits = 0;
+      sim.world.intersectionsWithShape({ x: spot.x, y: 2.2, z: spot.z }, { x: 0, y: 0, z: 0, w: 1 }, new RAPIER.Cuboid(1.6, 1.6, 3.0), (col) => {
         if ((col.collisionGroups() >>> 16) !== (GROUPS_TERRAIN >>> 16)) hits++;
         return true;
       });

@@ -9,12 +9,15 @@ import type { VehicleControls } from '../controls';
 import { DAMAGE, ECONOMY, SWAP } from '../economy';
 import * as M from '../math';
 import type { SimWorld } from '../SimWorld';
-import { AgentState, type SwapHandover } from '../traffic/Traffic';
+import { AgentState, type SwapHandover, type Traffic } from '../traffic/Traffic';
 import { PedPose } from '../traffic/Pedestrians';
 import { POLICE } from '../police/tuning';
 
 /** How far past the steamroller's drum a car still counts as touching it (m): the contact holds a car off it. */
 const DRUM_REACH = 0.35;
+/** A car crushed under the monster truck takes up its climb: what is left of its rise (m/s) and of its pitch and roll. */
+const CRUSH_RISE = 1.0;
+const CRUSH_SPIN = 0.3;
 
 /** One axis of two ground rectangles' separation test: their spans on it overlap. */
 function spansMeet(ux: number, uz: number, dx: number, dz: number,
@@ -63,6 +66,9 @@ export class Life {
   private readonly cool: Float32Array;
   /** Agents already taken down (one takedown each); cleared when the agent is freed. */
   private readonly takenDown: Uint8Array;
+  /** Under the monster truck's wheels (M8.8 slice 12): seconds running, and the step a wheel was last on each car. */
+  private readonly underFor: Float32Array;
+  private readonly underTick: Int32Array;
   /** A spike strip punctured the tyres: grip down and a pull at the rear until a swap, the door or a fresh car. */
   spiked = false;
   /** The pulls at the rear axle (N, + right) the vehicle takes the sum of: the puncture's and the hurt car's (M8.8 slice 7). */
@@ -89,6 +95,8 @@ export class Life {
     this.wasAhead = new Uint8Array(n);
     this.cool = new Float32Array(n);
     this.takenDown = new Uint8Array(n);
+    this.underFor = new Float32Array(n);
+    this.underTick = new Int32Array(n).fill(-10);
   }
 
   preStep(controls: VehicleControls, dt: number): void {
@@ -121,7 +129,7 @@ export class Life {
     }
     this.hits();
     this.damageStep();
-    this.flattenStep();
+    this.flattenStep(dt);
     this.takedowns();
     this.billboards();
     this.nearMisses(dt);
@@ -184,10 +192,15 @@ export class Life {
    * The steamroller's drum (M8.8 slice 11): every car whose footprint meets it is flattened, at any speed, a parked unit
    * and a roadblock's cars too; a driver climbs out beside the pancake shaking a fist; a unit is the player's takedown.
    */
-  private flattenStep(): void {
+  private flattenStep(dt: number): void {
     const traffic = this.sim.traffic;
-    const drum = bodySpec(this.sim.carBody).drum;
-    if (!drum || !traffic || this.state.wrecked) return;
+    if (!traffic || this.state.wrecked) return;
+    const spec = bodySpec(this.sim.carBody);
+    if (spec.drum) this.drumStep(traffic, spec.drum);
+    if (spec.crush !== undefined) this.wheelStep(traffic, spec.crush, dt);
+  }
+
+  private drumStep(traffic: Traffic, drum: { halfWidth: number; length: number }): void {
     const v = this.sim.vehicle;
     const p = v.body.translation(this.proj);
     const yaw = M.yawOf(v.body.rotation(this.rot));
@@ -198,25 +211,63 @@ export class Life {
     for (let i = 0; i < traffic.capacity; i++) {
       const st = traffic.state[i];
       if (st === AgentState.Free || traffic.flat[i] === 1) continue;
-      const x = traffic.x[i] as number, z = traffic.z[i] as number, ayaw = traffic.yaw[i] as number;
+      const x = traffic.x[i] as number, z = traffic.z[i] as number;
       if ((x - cx) ** 2 + (z - cz) ** 2 > 81) continue;
-      if (!boxesMeet(cx, cz, yaw, drum.halfWidth + DRUM_REACH, drum.length / 2 + DRUM_REACH, x, z, ayaw, traffic.halfWidthOf(i), traffic.halfLengthOf(i))) continue;
-      const unit = traffic.police[i] === 1;
-      const driven = st === AgentState.Kinematic || st === AgentState.Physical || st === AgentState.Disturbed;
-      if (!traffic.flatten(i)) continue;
-      this.sim.events.push('flatten', 0, x, 0.3, z, i);
-      // its driver climbs out on the side away from the drum and shakes a fist at the roller
-      if (driven || unit) {
-        const lx = Math.cos(ayaw), lz = -Math.sin(ayaw);
-        const side = (x - cx) * lx + (z - cz) * lz >= 0 ? 1 : -1;
-        const px = x + lx * side * (traffic.halfWidthOf(i) + 1.2), pz = z + lz * side * (traffic.halfWidthOf(i) + 1.2);
-        this.sim.peds?.spawnAt(px, pz, Math.atan2(p.x - px, p.z - pz), PedPose.Fist);
+      if (!boxesMeet(cx, cz, yaw, drum.halfWidth + DRUM_REACH, drum.length / 2 + DRUM_REACH, x, z, traffic.yaw[i] as number, traffic.halfWidthOf(i), traffic.halfLengthOf(i))) continue;
+      this.squash(traffic, i, cx, cz, p.x, p.z);
+    }
+  }
+
+  /**
+   * The monster truck (M8.8 slice 12): its wheels' rays stand on a car's roof as on the road, so it climbs one; a car a
+   * wheel has been on for `crush` s running is flattened under it.
+   */
+  private wheelStep(traffic: Traffic, crush: number, dt: number): void {
+    const tick = this.sim.tick;
+    const v = this.sim.vehicle;
+    const p = v.body.translation(this.proj);
+    let crushed = false;
+    for (const w of v.wheels) {
+      if (!w.grounded || w.hitHandle < 0) continue;
+      const a = traffic.agentForCollider(w.hitHandle);
+      if (a < 0 || traffic.flat[a] === 1 || this.underTick[a] === tick) continue;
+      const under = this.underTick[a] === tick - 1 ? (this.underFor[a] as number) + dt : dt;
+      this.underFor[a] = under;
+      this.underTick[a] = tick;
+      if (under >= crush - 1e-6) {
+        this.squash(traffic, a, p.x, p.z, p.x, p.z);
+        crushed = true;
       }
-      // a unit flattened is a takedown (read below, this step)
-      if (unit) {
-        traffic.justWrecked[i] = 1;
-        traffic.lastPlayerContactTick[i] = this.sim.tick;
-      }
+    }
+    if (!crushed) return;
+    // the car gives way under it: the crush takes up the climb's spring, so the truck settles instead of taking off
+    const lin = v.body.linvel(), ang = v.body.angvel();
+    if (lin.y > CRUSH_RISE) v.body.setLinvel({ x: lin.x, y: CRUSH_RISE, z: lin.z }, true);
+    v.body.setAngvel({ x: ang.x * CRUSH_SPIN, y: ang.y, z: ang.z * CRUSH_SPIN }, true);
+  }
+
+  /**
+   * A car flattened (M8.8 slices 11–12): the pancake and its `flatten` event; its driver climbs out on the side away
+   * from (`fromX`, `fromZ`) and shakes a fist at the player (at `px`, `pz`); a unit is the player's takedown.
+   */
+  private squash(traffic: Traffic, i: number, fromX: number, fromZ: number, px: number, pz: number): void {
+    const st = traffic.state[i];
+    const unit = traffic.police[i] === 1;
+    const driven = st === AgentState.Kinematic || st === AgentState.Physical || st === AgentState.Disturbed;
+    const x = traffic.x[i] as number, z = traffic.z[i] as number, yaw = traffic.yaw[i] as number;
+    if (!traffic.flatten(i)) return;
+    this.sim.events.push('flatten', 0, x, 0.3, z, i);
+    if (driven || unit) {
+      const lx = Math.cos(yaw), lz = -Math.sin(yaw);
+      const side = (x - fromX) * lx + (z - fromZ) * lz >= 0 ? 1 : -1;
+      const out = traffic.halfWidthOf(i) + 1.2;
+      const dx = x + lx * side * out, dz = z + lz * side * out;
+      this.sim.peds?.spawnAt(dx, dz, Math.atan2(px - dx, pz - dz), PedPose.Fist);
+    }
+    // a unit flattened is a takedown (read below, this step)
+    if (unit) {
+      traffic.justWrecked[i] = 1;
+      traffic.lastPlayerContactTick[i] = this.sim.tick;
     }
   }
 

@@ -18,7 +18,7 @@ import { cloneTuning, type VehicleTuning } from '../vehicle/tuning';
 /** The wanted board's cars (M6, DESIGN.md §14.3): the ten rivals' and the Chief's, never spawned as traffic. */
 export type RivalBody = 'wagon' | 'pizza' | 'wrecker' | 'twin' | 'fakecop' | 'partybus' | 'lowrider' | 'limo' | 'bubble' | 'phantom' | 'chiefcar';
 /** The crazy cars (M8.8 phase F): hidden, one in each district, each the only one that does its thing. */
-export type CrazyBody = 'roller';
+export type CrazyBody = 'roller' | 'monster';
 export type CivilianBody = 'sedan' | 'hatch' | 'estate' | 'suv' | 'pickup' | 'taxi' | 'truck' | 'bus' | 'icecream' | RivalBody | 'roadster' | 'sweeper' | 'hotdog' | CrazyBody;
 export type BodyId = CarId | CivilianBody;
 export const RIVAL_BODIES: readonly RivalBody[] = ['wagon', 'pizza', 'wrecker', 'twin', 'fakecop', 'partybus', 'lowrider', 'limo', 'bubble', 'phantom', 'chiefcar'];
@@ -27,7 +27,7 @@ const FIRST_CIVILIANS: readonly CivilianBody[] = ['sedan', 'hatch', 'estate', 's
 /** The classes whose shells come first (their class index is their body index). */
 const FIRST_SHELLS: readonly CarId[] = ['muscle', 'compact', 'heavy', 'sports', 'police'];
 /** Every body added since, a class's shell or a civilian's, in the order it came: appended after the last. */
-const ADDED: readonly BodyId[] = ['offroad', 'roller'];
+const ADDED: readonly BodyId[] = ['offroad', 'roller', 'monster'];
 export const CIVILIAN_BODIES: readonly CivilianBody[] = [...FIRST_CIVILIANS, ...ADDED.filter((id): id is CivilianBody => !(CAR_IDS as readonly BodyId[]).includes(id))];
 export const BODY_IDS: readonly BodyId[] = [...FIRST_SHELLS, ...FIRST_CIVILIANS, ...ADDED];
 
@@ -75,6 +75,8 @@ export interface BodySpec {
   aiAccel?: number;
   /** The steamroller's front drum (M8.8 slice 11): half its width and its length along the car (m); a record it touches is flattened. */
   drum?: { halfWidth: number; length: number };
+  /** The monster truck (M8.8 slice 12): a car one of its wheels stands on this long (s) is flattened. */
+  crush?: number;
 }
 
 function shell(id: CarId): BodySpec {
@@ -134,6 +136,26 @@ const CRAZY = {
     t.boostTorqueMul = 1.15;
     t.boostThrust *= 0.3;
   },
+  /**
+   * The monster truck: 4.2 t on 0.95 m wheels and 0.8 m springs, the chassis' underside 1.8 m up so a car passes under
+   * it and only the wheels meet it (their rays stand on its roof); the gearing lengthened for the wheels, the mass low.
+   */
+  monster: (t: VehicleTuning): void => {
+    t.wheelRadius = 0.95;
+    t.wheelWidth = 0.62;
+    t.suspensionRestLength = 0.8;
+    t.suspensionAttachY = 0.3;
+    t.chassisHalfExtents = { x: t.chassisHalfExtents.x, y: 0.4, z: t.chassisHalfExtents.z };
+    t.chassisOffsetY = 0.88;
+    t.centerOfMassY = -0.9;
+    t.climbSlope = 0.8;
+    t.finalDrive *= 0.95 / 0.42;
+    t.antiRollStiffness *= 1.5;
+    t.airPitchTorque *= 2;
+    t.airRollTorque *= 2;
+    t.airLevelTorque *= 2;
+    t.airAngularDamping *= 2;
+  },
 } as const;
 
 /** Indexed like BODY_IDS. Sizes in metres; the profiles in render/bodyProfiles.ts are drawn on these wheels. */
@@ -177,6 +199,9 @@ export const BODIES: readonly BodySpec[] = [
   // the steamroller (slice 11), hidden in the Works' yard: a van's drivetrain under 9 t, 35 km/h flat out, a front drum
   // 1.5 m across and 1.9 m wide that flattens whatever it touches
   civilian('roller', 'heavy', 1.05, 2.9, 3.3, 1.9, 9000, 0, { paints: [PALETTE.coin], big: true, stretch: true, tune: CRAZY.roller, drum: { halfWidth: 0.95, length: 1.5 } }),
+  // the monster truck (slice 12), on the Gardens' park strip by the jumps: the 4×4's drivetrain on wheels taller than a
+  // car, so it climbs one and flattens it a fifth of a second after a wheel is on it
+  civilian('monster', 'offroad', 1.3, 2.7, 3.4, 2.5, 4200, 0, { paints: [PALETTE.carLime], big: true, stretch: true, tune: CRAZY.monster, crush: 0.2 }),
 ];
 
 export const BODY_INDEX = Object.fromEntries(BODY_IDS.map((id, i) => [id, i])) as Record<BodyId, number>;

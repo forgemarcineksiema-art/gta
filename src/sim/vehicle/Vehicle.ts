@@ -32,6 +32,8 @@ const WHEEL_FL = 1;
 const WHEEL_RR = 2;
 const WHEEL_RL = 3;
 const WHEEL_SUBSTEPS = 2;
+/** A rise in a wheel's contact this big in one step (m) is a thing met, climbed at `climbSlope`; a smaller one is the road. */
+const CLIMB_STEP = 0.1;
 const RPM_PER_RAD_S = 60 / (2 * Math.PI);
 
 export interface WheelState {
@@ -65,6 +67,10 @@ export interface WheelState {
   spin: number;
   /** The ground under it (M8.8 slice 9): `ASPHALT`, `GRASS` or `DIRT`; asphalt in the air. */
   surface: SurfaceKind;
+  /** The collider its ray stands on (a car's, under the monster truck's wheels: M8.8 slice 12), -1 in the air. */
+  hitHandle: number;
+  /** The ray's length to its contact last step (m; the whole ray in the air): the climb's memory. */
+  rayD: number;
   /** Transform slot for the renderer. */
   slot: number;
 }
@@ -319,6 +325,8 @@ export class Vehicle {
         lateralSpeed: 0,
         spin: 0,
         surface: ASPHALT,
+        hitHandle: -1,
+        rayD: 0,
         slot: transforms.allocate(),
       });
     }
@@ -461,7 +469,11 @@ export class Vehicle {
       this.ray.dir.z = s.rayDir.z;
       const hit = this.world.castRayAndGetNormal(this.ray, rayLen, true, undefined, QUERY_NOT_PROP, undefined, body);
       if (hit && hit.timeOfImpact > 0) {
-        const d = hit.timeOfImpact;
+        let d = hit.timeOfImpact;
+        // a tall wheel rolls up onto what it meets (the monster truck onto a car, M8.8 slice 12): from the ground the
+        // contact rises no faster than `climbSlope` of the way the car goes forward, where it would jump in one step
+        if (t.climbSlope > 0 && w.grounded && w.rayD - d > CLIMB_STEP) d = Math.max(d, w.rayD - t.climbSlope * absFwd * dt);
+        w.rayD = d;
         w.grounded = true;
         grounded++;
         w.compression = rayLen - d;
@@ -470,11 +482,14 @@ export class Vehicle {
         w.normal.x = hit.normal.x;
         w.normal.y = hit.normal.y;
         w.normal.z = hit.normal.z;
+        w.hitHandle = hit.collider.handle;
         if (M.dot(w.normal, s.up) < 0) M.scale(w.normal, w.normal, -1);
       } else {
         w.grounded = false;
         w.compression = 0;
         w.load = 0;
+        w.hitHandle = -1;
+        w.rayD = rayLen;
         M.addScaled(w.center, s.point, s.rayDir, t.suspensionRestLength);
         M.copy(w.contact, w.center);
         M.copy(w.normal, s.up);

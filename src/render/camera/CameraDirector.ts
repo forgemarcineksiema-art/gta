@@ -20,11 +20,20 @@ export class CameraDirector {
 
   constructor(private readonly chase: ChaseCamera, private readonly sim: SimWorld) {}
 
-  /** Car-swap: whip the camera onto the new car; a bus needs it further back and higher to see past it. */
+  /** Car-swap: whip the camera onto the new car, fitted to it. */
   onSwap(body: BodyId, roof: number): void {
     this.chase.whip(SWAP.whipSeconds);
+    this.fit(body, roof);
+  }
+
+  /**
+   * The chase fitted to the body: a bus needs it further back and higher to see past it; a small one (the bike, the
+   * trolley: under 1.5 m half a length, M8.8 slice 15) brings it 3 m closer and 1.1 m lower for each metre short.
+   */
+  fit(body: BodyId, roof: number): void {
     const spec = bodySpec(body);
-    this.chase.fit(Math.max(0, spec.halfLength - 2.7) * 1.1, Math.max(0, roof - 2.3) * 0.9);
+    const small = Math.max(0, 1.5 - spec.halfLength);
+    this.chase.fit(Math.max(0, spec.halfLength - 2.7) * 1.1 - small * 3, Math.max(0, roof - 2.3) * 0.9 - small * 1.1);
   }
 
   /** Seconds since the door shut, -1 while it is open: the car's glide to the turntable and its turn read it. */

@@ -11,6 +11,16 @@ kit on a grey car, the neon, the flames, the smoke and the horns as swatches in 
 Drawn at twice the size into a render target and scaled down; the wall's cards draw their cells (`Pictures`, the ui's
 shape of it) and show them in place of the swatch. Pins M8.9 14.1–14.3. Stills and verify green.
 
+## 2026-09-25 — M8.8 slice 15: the rider, the look
+
+Done: the bike drawn (`bikeMesh.ts`): a sport bike in blocks, paint on the tank, fairing, nose, tail and mudguard, its
+own two wheels on the body, the front one in a fork that turns with the steer, the brake light (2,608 triangles); the
+rider astride in navy and a white helmet, arms to the bars or thrown up in a fall (a `tumbling` flag on the telemetry;
+200 triangles). The topper on the helmet a size down (the mesh's `crown`), the flame at the exhaust, the neon under it;
+no car part fits a bike (`kit.fits`). The chase 3 m closer and 1.1 m lower a metre under 1.5 m half a length (the bike
+1.35 m closer, the trolley 2.4), fitted at the start too. A bike left in the street stands among the traffic without its
+rider; the ghost is a bike. The twin's voice came with slice 14. Pins M8.8 15.1, 15.2 (`tests/render/bodies.test.ts`).
+
 ## 2026-09-25 — M8.9 slice 13: the showroom
 
 Done (R10): the door shut, the camera leaves the back corner over 0.6 s for the showroom (`render/camera/showroom.ts`):

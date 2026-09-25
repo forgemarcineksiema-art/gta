@@ -64,6 +64,15 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 - Review both sides and front/rear three-quarter angles, then the normal driving
   camera during acceleration, steering, braking and reversing. Build/test success
   alone does not establish visual quality.
+- The bike (M8.8 slice 15, `render/cars/bikeMesh.ts`): a sport bike in blocks,
+  paint on the tank, fairing, nose, tail and front mudguard, charcoal frame,
+  chrome fork and exhaust; its own two wheels on the body, the front one turning
+  with the fork; under 3,000 triangles. The rider astride in the officer's navy,
+  boots, a white helmet with a dark visor, arms to the bars, thrown up in a fall;
+  under 1,500 triangles; bike and rider lean as one. The topper sits on the
+  helmet a size down; the neon under the bike; no car part fits. Left in the
+  street it stands among the traffic without its rider. The chase sits closer
+  and lower behind a small body.
 
 ## Street architecture (M2.1)
 

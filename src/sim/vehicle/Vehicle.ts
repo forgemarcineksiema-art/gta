@@ -1128,6 +1128,11 @@ export class Vehicle {
     }
   }
 
+  /** A knock that drops a bike (M8.8 slice 17: a unit's ram or PIT): bike and rider tumble as after a hard hit; a car rides it out. */
+  tumble(): void {
+    if (this.tuning.twoWheel > 0 && this.tumbleLeft === 0) this.tumbleLeft = this.tuning.tumbleSeconds;
+  }
+
   teleport(position: Vec3, yaw: number): void {
     const q = M.quatSetAxisAngle(scratch.q3, 0, 1, 0, yaw);
     this.body.setTranslation(position, true);

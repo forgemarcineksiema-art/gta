@@ -41,6 +41,8 @@ export interface PoliceTuning {
   pitRange: number;
   pitAcceleration: number;
   pitSideOffset: number;
+  /** A ram's or a PIT's shove on a bike, a share of a car's (M8.8 slice 17): 290 kg under a car's push would fly. */
+  bikeShove: number;
   /** Boxed in: `units` live police cars within `range` m while the player is under `speed` m/s fills the bar in `seconds`; moving drains it. */
   busted: { units: number; range: number; speed: number; seconds: number; drainPerSecond: number };
   /**
@@ -88,8 +90,10 @@ export interface PoliceTuning {
    * `rear` / `front` m along and `side` m across the player, braking at `decel` to arrive within `arrive` m;
    * the rest stand by `standby` m behind. `accel` caps the body's velocity change; `keep` m of hysteresis on a slot. Within
    * `near` m of the stopped player a unit moves at `nearSpeed` at most (M5.5: one passing to the front slot is not a rush).
+   * The slots are set for a car of `footLength` m half length and `footWidth` m half width (the compact's); a smaller one
+   * (the bike, M8.8 slice 17) is boxed as tight: the slots close in by what its footprint lacks.
    */
-  arrest: { playerSpeed: number; releaseSpeed: number; range: number; rear: number; front: number; side: number; diagonal: number; standby: number; decel: number; arrive: number; accel: number; keep: number; clear: number; detourSpeed: number; near: number; nearSpeed: number; heavyFirst: number };
+  arrest: { playerSpeed: number; releaseSpeed: number; range: number; rear: number; front: number; side: number; diagonal: number; standby: number; decel: number; arrive: number; accel: number; keep: number; clear: number; detourSpeed: number; near: number; nearSpeed: number; heavyFirst: number; footLength: number; footWidth: number };
   /** Sight lost: units drive to the last fix and fan out once within `reach` m of it; the radar's disc there grows from `discMin` to `discMax` m over the cooldown. */
   search: { reach: number; discMin: number; discMax: number };
   /**
@@ -157,6 +161,7 @@ export const POLICE: PoliceTuning = {
   pitAcceleration: 22,
   pitSideOffset: 1.1,
   patrolRecycle: 260,
+  bikeShove: 0.6,
   busted: { units: 2, range: 7, speed: 1.39, seconds: 3, drainPerSecond: 0.7 },
   box: { seconds: 5, range: 8, approach: 20, maxSeconds: 15, detourSpeed: 10 },
   disguise: { seconds: 30 },
@@ -171,7 +176,7 @@ export const POLICE: PoliceTuning = {
   heavy: { fromLevel: 4, share: 0.5, ramAcceleration: 20, aimSide: 1.3 },
   chief: { level: 5, speed: 45, pitAcceleration: 30, pitRange: 14, reinforceFactor: 2 },
   // clear: a unit passes the player's car no closer than this (m), at detourSpeed (m/s)
-  arrest: { playerSpeed: 6, releaseSpeed: 9, range: 60, rear: 5.6, front: 5.6, side: 3.2, diagonal: 5, standby: 12, decel: 6, arrive: 1.2, accel: 12, keep: 5, clear: 4, detourSpeed: 5, near: 10, nearSpeed: 7, heavyFirst: 12 },
+  arrest: { playerSpeed: 6, releaseSpeed: 9, range: 60, rear: 5.6, front: 5.6, side: 3.2, diagonal: 5, standby: 12, decel: 6, arrive: 1.2, accel: 12, keep: 5, clear: 4, detourSpeed: 5, near: 10, nearSpeed: 7, heavyFirst: 12, footLength: 1.9, footWidth: 0.85 },
   search: { reach: 30, discMin: 60, discMax: 150 },
   heli: { fromLevel: 4, arriveFrom: 350, altitude: 40, speed: 50, searchSpeed: 22, accel: 24, lead: 0.6, lightRate: 6, reach: 120, spot: 14, circle: 60, sweepRate: 0.35 },
   pressure: { within: 60, attack: 25, over: 4, min: 12 },

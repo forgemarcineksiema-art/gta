@@ -7,7 +7,7 @@ import { TRAFFIC } from '../../src/sim/traffic/tuning';
 import { POLICE } from '../../src/sim/police/tuning';
 import type { LaneProjection } from '../../src/sim/traffic/lanes';
 import { AgentState, type Traffic } from '../../src/sim/traffic/Traffic';
-import { createWorld, run, runUntil } from './helpers';
+import { createWorld, kmh, run, runUntil, upness } from './helpers';
 
 describe('police patrols', () => {
 
@@ -155,6 +155,43 @@ describe('police patrols', () => {
       expect([AgentState.Kinematic, AgentState.Physical]).toContain(traffic.state[agent]);
       run(sim, 1 / 60, (_t, c) => { c.brake = 1; });
       expect(['detected', 'active']).toContain(sim.pursuit.state);
+    } finally { sim.dispose(); }
+  }, 60_000);
+
+  it('M8.8 17.2 a ram on a bike at 50 km/h tumbles it, not a wreck, and it drives on within 2 s; the shove is 0.6 of a car\'s', async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false, heat: 20, car: 'moto', damage: true });
+    sim.police!.dispatching = false;
+    const traffic = sim.traffic as Traffic;
+    const lanes = traffic.lanes;
+    try {
+      let lane = -1;
+      for (let i = 0; i < lanes.laneCount; i++) {
+        if ((lanes.limit[i] as number) === TRAFFIC.speedHighway && (lanes.length[i] as number) > 170) { lane = i; break; }
+      }
+      const pose = { x: 0, z: 0, yaw: 0 };
+      lanes.positionAt(lane, 60, 0, pose);
+      sim.city!.sync(pose.x, pose.z, true);
+      sim.vehicle.teleport({ x: pose.x, y: 1, z: pose.z }, pose.yaw);
+      const v = 50 / 3.6, fx = Math.sin(pose.yaw), fz = Math.cos(pose.yaw);
+      run(sim, 0.5, (_t, _c, s) => s.vehicle.setVelocity(fx * v, s.vehicle.telemetry.vy, fz * v));
+      const proj: LaneProjection = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };
+      lanes.project(lane, sim.probe.x, sim.probe.z, proj);
+      const unit = traffic.spawnPoliceAt(lane, Math.max(4, proj.s - 20), 'police', sim.probe, 0, -1, 4);
+      sim.police!.enlist(unit);
+      let shove = 0;
+      const fell = runUntil(sim, 8, (s) => s.vehicle.tumbleLeft > 0, (_t, c, s) => {
+        s.pursuit.force();
+        c.throttle = kmh(s) < 50 ? 0.7 : 0;
+        shove = Math.max(shove, traffic.ramAccel[unit] as number);
+      });
+      expect(fell).toBeGreaterThan(0);
+      expect(shove).toBeCloseTo(POLICE.ramAcceleration * POLICE.bikeShove, 6);
+      expect(sim.life.state.wrecked).toBe(false);
+      const drives = runUntil(sim, 2, (s) => s.vehicle.tumbleLeft === 0 && kmh(s) > 5 && upness(s) > 0.9, (_t, c, s) => {
+        if (s.vehicle.tumbleLeft === 0) c.throttle = 1;
+      });
+      expect(drives).toBeGreaterThan(0);
+      expect(sim.life.state.wrecked).toBe(false);
     } finally { sim.dispose(); }
   }, 60_000);
 });

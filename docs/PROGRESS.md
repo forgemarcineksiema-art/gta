@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.8 slice 17: the police and the bike
+
+Done: a unit's ram or PIT that lands on a bike (the contact the roster counts as a ram) knocks it down: `Vehicle.tumble`,
+bike and rider for 1.2 s, then up and away; a wreck only if the damage wrecks it. The ram's shove on a bike is
+`POLICE.bikeShove` (0.6) of a car's. The arrest's slots close in by what a body's footprint lacks against the compact's
+(`arrest.footLength` 1.9, `footWidth` 0.85, `slotReach`): a bike is boxed as tight as a compact, a car's slots unchanged.
+The bots' bike case: `BotPolicy.keepCar` never swaps. Pins M8.8 17.2 (`police.test`: a ram at 50 km/h drops it, it rides
+on inside 2 s); 17.1 long (`police.long`: stopped at heat 2, busted in 20 s, four worlds) and 17.3 (the balance: its
+busted rate at level 3 within a quarter of the muscle car's) run at the gate.
+
 ## 2026-09-25 — M8.8 slice 16: scooters in the traffic, the bike in the catalogue
 
 Done: `scooter` (SKUTER), the bike's class at 190 kg on 12-inch wheels, 11 N·m through a long reduction: 0–50 4.9 s,

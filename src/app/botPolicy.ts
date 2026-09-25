@@ -6,7 +6,8 @@
  * or into any police car it is not already in), leaves the tour for a path
  * that turns at every junction while the police search for it, and boosts on
  * straights. Counts what it did for the measurements. App glue: reads the
- * sim, writes controls only.
+ * sim, writes controls only. The bike's case (M8.8 slice 17): `keepCar` never
+ * swaps, so a class is measured on its own (the busted rate on a bike).
  */
 import type { Lane, SimWorld, SimEvent, TrackSample, VehicleControls } from '../sim';
 import { junctionCurve, laneLength, laneSpan, resample, type Pt } from '../sim/city/route';
@@ -30,7 +31,7 @@ export class BotPolicy {
   private turnSalt = 0;
   private sim: SimWorld | null = null;
 
-  constructor(readonly name: PolicyName, readonly bot: TrackBot) {
+  constructor(readonly name: PolicyName, readonly bot: TrackBot, readonly keepCar = false) {
     if (name === 'skilled') bot.tuning.boostAbove = BOOST_ABOVE;
   }
 
@@ -44,7 +45,7 @@ export class BotPolicy {
     this.cursor = sim.events.readFrom(this.cursor, this.onEvent);
     if (this.name === 'skilled') this.steerSearch(sim);
     this.bot.drive(sim, controls, dt);
-    if (this.name === 'novice') return;
+    if (this.name === 'novice' || this.keepCar) return;
     const candidate = sim.life.state.swapCandidate;
     if (candidate < 0 || (sim.police?.crimeSeen() ?? true)) return;
     const policeCar = sim.traffic?.police[candidate] === 1;

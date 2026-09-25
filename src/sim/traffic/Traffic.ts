@@ -359,7 +359,8 @@ export class Traffic {
   private readonly ramX: Float32Array;
   private readonly ramZ: Float32Array;
   private readonly ramSpeed: Float32Array;
-  private readonly ramAccel: Float32Array;
+  /** Per police record, its plan's shove: the acceleration it closes on the car with (M8.8 slice 17's pin reads it). */
+  readonly ramAccel: Float32Array;
   /** 1: the plan's point is a place to go to (an arrest slot), not a car to shove: lane gaps no longer hold the unit back. */
   private readonly freeSteer: Uint8Array;
   private readonly lin = { x: 0, y: 0, z: 0 };

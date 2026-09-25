@@ -1,6 +1,6 @@
 /** Seeded, independently reproducible chunks. Only nearby solid bodies live in Rapier. */
 import RAPIER from '@dimforge/rapier3d-compat';
-import { GROUPS_PROP, GROUPS_SOLID, GROUPS_TERRAIN } from '../collision';
+import { GROUPS_GATE, GROUPS_PROP, GROUPS_SOLID, GROUPS_TERRAIN, GROUPS_WATER } from '../collision';
 import { ACCENTS, PALETTE } from '../palette';
 import { POLICE } from '../police/tuning';
 import { BALANCE } from '../balance';
@@ -12,7 +12,7 @@ import { CAR_TOP, RUN_OUT_REACH, VERGE, placeBillboards, runOutFootprint, tallFo
 import { DROP_OFF_LOTS, GARAGE, cameraSites, dropOffAt, dropOffFor, hideoutSign, hideoutStatics, toDropOff, type DropOff } from './cover';
 import { COVER, coverStatics, insideCover, placeCovers, type CoverAvoid, type CoverDesc } from './covers';
 import { cameraStatics, placeCameras, type CameraDesc } from './cameras';
-import { RAMP_HALF_WIDTH, jumpStatics, placeJumps, type JumpDesc } from './jumps';
+import { MEGA, RAMP_HALF_WIDTH, jumpStatics, megaRamp, placeJumps, type JumpDesc } from './jumps';
 import { gateLine, layoutCoins, placeCoins, type CoinDesc, type CoinPoint } from './coins';
 import { buildRoadMarkings } from './markings';
 import { MARKET, PROP_LINES, chunkProps, type FootwayRun, type PropContext, type PropDesc, type PropPlace, type PropSpot } from './props';
@@ -20,6 +20,7 @@ import { signalPoles, signalledNodes } from './signals';
 import { BLOCK, CITY_HALF, HIGHWAY_HALF, HIGHWAY_LANE_OFFSETS, OVERPASS_NODES, ROAD_HALF, buildCityRoute, buildRoadGraph, distanceToPolyline, highwayHeightAt, projectOnLane, underOverpass, type Lane, type RoadPoint, type SpecialRoad } from './roads';
 import { overpassStatics } from './overpass';
 import { SurfaceMap } from './surface';
+import { SEA, SEA_TRIAL, SLIPWAY, SLIPWAYS, buoyStatics, slipwayGaps, slipwayStatics, wallPieces } from './sea';
 
 export const DISTRICTS = [
   { id: 'crown', name: 'CROWN HEIGHTS', color: 0xb497d6, accent: ACCENTS.crown, landmark: 'Crown Tower' },
@@ -238,6 +239,8 @@ export class City {
   readonly cameras: readonly CameraDesc[];
   /** The twenty stunt ramps (slice 6), likewise. */
   readonly jumps: readonly JumpDesc[];
+  /** The mega-ramp (M8.8 slice 21), the jump after the kickers. */
+  readonly megaRamp: JumpDesc;
   /** The island's coin layout from the seed (every line but the gate lines); each chunk takes the ones inside it. */
   readonly coinLayout: readonly CoinPoint[];
   /** The four covered streets (M5.5 slice 7); their boxes go into the chunks that hold them. */
@@ -248,6 +251,7 @@ export class City {
   constructor(readonly world: RAPIER.World, readonly seed = 42) {
     this.cameras = placeCameras(cameraSites(this.graph), POLICE.cameras.count);
     this.jumps = placeJumps(seed, BALANCE.jumps.count);
+    this.megaRamp = megaRamp(BALANCE.jumps.count);
     this.coinLayout = layoutCoins(this.jumps);
     // a covered street near each district's door (the Gardens': its landmark), clear of doors, ramps, cameras and plazas
     const doors = DROP_OFF_LOTS.map((lot) => dropOffFor(lot));
@@ -269,10 +273,25 @@ export class City {
     // The one unbroken collision plane eliminates suspension seams at roads and chunk borders.
     world.createCollider(RAPIER.ColliderDesc.cuboid(CITY_HALF, 0.5, CITY_HALF)
       .setTranslation(0, -0.5, 0).setFriction(1).setCollisionGroups(GROUPS_TERRAIN));
+    // the island's walls, cut at the slipways (M8.8 slice 19) by gates only the hovercraft's chassis passes
+    for (const axis of [0, 1] as const) for (const sign of [-1, 1]) {
+      const wall = (mid: number, half: number, groups: number): void => {
+        world.createCollider(RAPIER.ColliderDesc.cuboid(axis === 0 ? 1 : half, 2, axis === 1 ? 1 : half)
+          .setTranslation(axis === 0 ? sign * CITY_HALF : mid, 2, axis === 1 ? sign * CITY_HALF : mid)
+          .setCollisionGroups(groups).setRestitution(1));
+      };
+      const gaps = slipwayGaps(axis, sign);
+      for (const [mid, half] of wallPieces(0, CITY_HALF, gaps)) wall(mid, half, GROUPS_SOLID);
+      for (const g of gaps) wall(g, SLIPWAY.width / 2, GROUPS_GATE);
+    }
+    // the sea (M8.8 slice 19): its surface at the rendered sea's level, met by the hovercraft's rays alone, and its
+    // edge `SEA.limit` m out from the seawall
+    const edge = CITY_HALF + SEA.limit;
+    world.createCollider(RAPIER.ColliderDesc.cuboid(edge, 0.5, edge).setTranslation(0, SEA.level - 0.5, 0).setCollisionGroups(GROUPS_WATER));
     for (const axis of [0, 1]) for (const sign of [-1, 1]) {
-      world.createCollider(RAPIER.ColliderDesc.cuboid(axis === 0 ? 1 : CITY_HALF, 2, axis === 1 ? 1 : CITY_HALF)
-        .setTranslation(axis === 0 ? sign * CITY_HALF : 0, 2, axis === 1 ? sign * CITY_HALF : 0)
-        .setCollisionGroups(GROUPS_SOLID).setRestitution(1));
+      world.createCollider(RAPIER.ColliderDesc.cuboid(axis === 0 ? 1 : edge, 3, axis === 1 ? 1 : edge)
+        .setTranslation(axis === 0 ? sign * edge : 0, 2, axis === 1 ? sign * edge : 0)
+        .setCollisionGroups(GROUPS_SOLID).setRestitution(0.5));
     }
     this.spawns = [];
     const start = this.route.start;
@@ -543,14 +562,22 @@ export class City {
     // Coral Quay's edges are a low parapet with a coping so the promenade sees the
     // water; the invisible 4 m boundary collider is unchanged. Elsewhere a seawall.
     const quay = x > 0 && z > 0;
+    // a slipway (M8.8 slice 19) cuts the parapet and the coping; its ramp is this chunk's
     if (Math.abs(cx) === 3) {
-      box(Math.sign(cx) * CITY_HALF, quay ? 0.55 : 2, z, 1, quay ? 0.55 : 2, BLOCK / 2, PALETTE.kerb, 'boundary');
-      if (quay) box(Math.sign(cx) * CITY_HALF, 1.16, z, 1.15, 0.07, BLOCK / 2, CITY_COLORS.trim, 'boundary');
+      for (const [mid, half] of wallPieces(z, BLOCK / 2, slipwayGaps(0, Math.sign(cx)))) {
+        box(Math.sign(cx) * CITY_HALF, quay ? 0.55 : 2, mid, 1, quay ? 0.55 : 2, half, PALETTE.kerb, 'boundary');
+        if (quay) box(Math.sign(cx) * CITY_HALF, 1.16, mid, 1.15, 0.07, half, CITY_COLORS.trim, 'boundary');
+      }
     }
     if (Math.abs(cz) === 3) {
-      box(x, quay ? 0.55 : 2, Math.sign(cz) * CITY_HALF, BLOCK / 2, quay ? 0.55 : 2, 1, PALETTE.kerb, 'boundary');
-      if (quay) box(x, 1.16, Math.sign(cz) * CITY_HALF, BLOCK / 2, 0.07, 1.15, CITY_COLORS.trim, 'boundary');
+      for (const [mid, half] of wallPieces(x, BLOCK / 2, slipwayGaps(1, Math.sign(cz)))) {
+        box(mid, quay ? 0.55 : 2, Math.sign(cz) * CITY_HALF, half, quay ? 0.55 : 2, 1, PALETTE.kerb, 'boundary');
+        if (quay) box(mid, 1.16, Math.sign(cz) * CITY_HALF, half, 0.07, 1.15, CITY_COLORS.trim, 'boundary');
+      }
     }
+    for (const s of SLIPWAYS) if (chunkCoord(s.x) === cx && chunkCoord(s.z) === cz) statics.push(...slipwayStatics(s));
+    // the sea trial's buoys (M8.8 slice 20), each drawn by the edge chunk nearest it
+    for (const b of SEA_TRIAL.buoys) if (chunkCoord(b.x) === cx && chunkCoord(b.z) === cz) statics.push(...buoyStatics(b));
     // the covered streets' and the overpasses' boxes, each in the chunk holding its centre
     for (const st of this.coverBoxes) if (chunkCoord(st.position.x) === cx && chunkCoord(st.position.z) === cz) statics.push(st);
     for (const st of this.overpassBoxes) if (chunkCoord(st.position.x) === cx && chunkCoord(st.position.z) === cz) statics.push(st);
@@ -560,6 +587,11 @@ export class City {
     // speed cameras after the billboards, so the placer's clearance and the coin lines never change for them
     for (const cam of this.cameras) if (chunkCoord(cam.poleX) === cx && chunkCoord(cam.poleZ) === cz) statics.push(...cameraStatics(cam));
     for (const jd of this.jumps) if (chunkCoord(jd.x) === cx && chunkCoord(jd.z) === cz) statics.push(...jumpStatics(jd));
+    // the mega-ramp (M8.8 slice 21) and its port crane
+    if (chunkCoord(MEGA.x) === cx && chunkCoord(MEGA.z) === cz) {
+      statics.push(...jumpStatics(this.megaRamp));
+      this.crane(architecture);
+    }
     // the ground under the wheels, laid the first time (the same statics every time after)
     const k = (cz + 3) * 7 + cx + 3;
     if (this.laid[k] !== 1) {
@@ -567,6 +599,21 @@ export class City {
       this.surface.lay(statics);
     }
     return { key: `${cx},${cz}`, x: cx, z: cz, statics, billboards, coins };
+  }
+
+  /**
+   * The port crane the mega-ramp climbs beside (M8.8 slice 21): a gantry of four orange legs astride the ramp's top, its
+   * sills and crossbeams, the cab, and the boom out over the seawall. Drawn only.
+   */
+  private crane(architecture: Architecture): void {
+    const box = architecture.box.bind(architecture), orange = PALETTE.carOrange, x = MEGA.x, z = MEGA.z - 8;
+    for (const side of [-1, 1]) {
+      for (const end of [-7, 7]) box(x + side * 7.5, 11, z + end, 0.6, 11, 0.6, orange);
+      box(x + side * 7.5, 22.3, z, 0.7, 0.7, 7.7, orange);
+    }
+    for (const end of [-7, 7]) box(x, 22.9, z + end, 8.2, 0.6, 0.6, orange);
+    box(x + 2, 20.6, z, 1.5, 1.2, 1.6, PALETTE.charcoal);
+    box(x + 22, 24.2, z, 30, 0.6, 1.3, orange);
   }
 
   /** Coral Quay's seawall edge: paved promenade, palms and masts (its benches are props). */

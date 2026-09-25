@@ -32,6 +32,11 @@ export interface JobDef {
   limitSeconds: number;
   /** Heat added once at the start (an escape sets its level instead). */
   heat: number;
+  /**
+   * A sea trial's buoys, in order (M8.8 slice 20): each counts when passed within `SEA_TRIAL.reach` m, the finish only
+   * after the last; its coins run buoy to buoy. Its ring is shown only to a hovercraft.
+   */
+  route?: ReadonlyArray<{ x: number; z: number }>;
 }
 
 /** The classes an order can ask for: the civilian bodies (a cruiser is update 2's job). */
@@ -85,7 +90,7 @@ export const BEST_AT: Partial<Record<BodyId, string>> = {
 };
 
 /** A crazy car's one trick, no other car's (M8.8 phase F): its card's ONLY IT line. */
-export const ONLY_IT: Partial<Record<BodyId, string>> = { roller: 'FLATTENS CARS', monster: 'DRIVES OVER CARS', trolley: 'RIDES A ROCKET' };
+export const ONLY_IT: Partial<Record<BodyId, string>> = { roller: 'FLATTENS CARS', monster: 'DRIVES OVER CARS', trolley: 'RIDES A ROCKET', hover: 'CROSSES WATER' };
 
 /** The line under a car's name on the wall (M8.8 slices 3, 5, 11): a crazy car's ONLY IT, a trophy's BEST AT, else what its class is for. */
 export function cardLine(body: BodyId): string {
@@ -98,7 +103,7 @@ export const BODY_WORDS: Record<BodyId, string> = {
   wagon: 'WAGON', pizza: 'PIZZA HATCH', wrecker: 'WRECKER', twin: 'TWIN', fakecop: 'FAKE CRUISER', partybus: 'PARTY BUS',
   lowrider: 'LOWRIDER', limo: 'GOLD LIMO', bubble: 'BUBBLE', phantom: 'PHANTOM', chiefcar: "CHIEF'S CRUISER",
   roadster: 'ROADSTER', sweeper: 'STREET SWEEPER', hotdog: 'HOT-DOG VAN',
-  roller: 'STEAMROLLER', monster: 'MONSTER TRUCK', trolley: 'ROCKET TROLLEY',
+  roller: 'STEAMROLLER', monster: 'MONSTER TRUCK', trolley: 'ROCKET TROLLEY', scooter: 'SCOOTER', hover: 'HOVERCRAFT',
 };
 
 /** A trial's medal times from its bronze limit (M5.5 slice 10): gold, silver, bronze, seconds. */

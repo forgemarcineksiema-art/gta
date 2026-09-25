@@ -36,6 +36,8 @@ export const BALANCE = {
     roadblock: 1000,
     escapePerLevel: 500,
     jump: 400,
+    /** The mega-ramp's jump (M8.8 slice 21), whatever its airtime. */
+    megaJump: 1500,
     jumpPerSecond: 200,
     /** Every 10 s the pursuit is active, this × the heat level into the bag (NFS's bounty, DESIGN.md §13.9). */
     pursuitPer10s: 100,
@@ -224,7 +226,7 @@ export const BALANCE = {
    * What a civilian body is worth (M6 slice 0, DESIGN.md §14.6): never for sale, only kept for `keep.share` of
    * this when it is driven home (a taxi 4,200); a hidden car is found, not kept, and is worth nothing here.
    */
-  bodyPrices: { sedan: 12000, hatch: 9000, estate: 13000, suv: 18000, pickup: 16000, taxi: 14000, truck: 24000, bus: 30000, icecream: 0, roadster: 0, sweeper: 0, hotdog: 0 },
+  bodyPrices: { sedan: 12000, hatch: 9000, estate: 13000, suv: 18000, pickup: 16000, taxi: 14000, truck: 24000, bus: 30000, icecream: 0, roadster: 0, sweeper: 0, hotdog: 0, scooter: 6000 },
   /**
    * Each upgrade tier's price, tier 1 to 3, the same for every stat and car: 24,000 / 26,000 / 30,000 (refitted at
    * the M7 gate; 15,000 / 17,000 / 21,000 at slice 10, 12,000 / 16,000 / 22,000 at M5.5): the tiers are the first

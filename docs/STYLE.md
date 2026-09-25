@@ -73,6 +73,24 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   helmet a size down; the neon under the bike; no car part fits. Left in the
   street it stands among the traffic without its rider. The chase sits closer
   and lower behind a small body.
+- The delivery scooter (M8.8 slice 16): floorboard, a raked leg shield, a
+  round cowl and a headlight nacelle in the paint, 12-inch wheels, a red box
+  with a white lid on the rack; the rider upright, feet on the floorboard. In
+  the traffic a courier in a red jacket rides it (one instanced mesh for all);
+  parked or left, it stands empty.
+- The hovercraft (M8.8 slice 18): a black rubber skirt all round, an orange
+  deck with light gunwales, a cockpit with a dark screen and its driver in an
+  orange life jacket and a navy cap, the fan's graphite duct at the stern with
+  steel blades and two painted rudders behind it; the boost's flame blows out
+  of the fan. Its cushion's four wheels (0.1 m) stay under the skirt.
+- The slipways (M8.8 slice 19): two 8 m concrete ramps (the kerb's colour)
+  through Coral Quay's parapet, framed by light grey kerbs, running 9 m out
+  from the promenade's deck down under the sea's surface; the parapet and its
+  coping stop at their sides. No other mark: the sea is the rendered one.
+- The mega-ramp (M8.8 slice 21): the kickers' red and white, 8 m wide, a
+  60 m climb steepening to a 16 m lip at 27°, astride it an orange port crane
+  (four legs, sills, crossbeams, a charcoal cab, the boom out over the
+  seawall); past the street a long red landing slope.
 
 ## Street architecture (M2.1)
 

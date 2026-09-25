@@ -465,8 +465,8 @@ export class Run {
         this.bag += bag.roadblock;
         break;
       case 'jump':
-        // value: seconds of airtime
-        this.bag += Math.round(bag.jump + bag.jumpPerSecond * e.value);
+        // value: seconds of airtime; the mega-ramp pays its own (M8.8 slice 21)
+        this.bag += this.sim.jumps?.descs[e.target]?.profile ? bag.megaJump : Math.round(bag.jump + bag.jumpPerSecond * e.value);
         break;
       case 'takedown':
       case 'takedownTraffic':

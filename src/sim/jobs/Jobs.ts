@@ -39,7 +39,8 @@ import { BALANCE } from '../balance';
 import { RIVALS, type RivalDef } from '../board/rivals';
 import type { SimEvent } from '../events';
 import type { SimWorld } from '../SimWorld';
-import { routeLine, type CoinPoint } from '../city/coins';
+import { COIN_HEIGHT, polyLine, routeLine, type CoinPoint } from '../city/coins';
+import { SEA, SEA_TRIAL } from '../city/sea';
 import { alongLane, laneChain } from '../city/route';
 import type { Lane } from '../city/roads';
 import { AgentState, type PlayerProbe } from '../traffic/Traffic';
@@ -74,6 +75,8 @@ export class Jobs {
   /** The last job's pay into the bag (the HUD's result line), and whether every coin of its route was taken (the tip). */
   lastPaid = 0;
   lastTip = false;
+  /** A sea trial's next buoy (M8.8 slice 20): its route's index; the finish counts only past the last. */
+  buoy = 0;
   /** The last trial's medal (3 gold .. 1 bronze), and the best per trial def id (saved). */
   lastMedal = 0;
   readonly medals = new Map<number, number>();
@@ -149,7 +152,9 @@ export class Jobs {
   shown(d: JobDef): boolean {
     const co = this.sim.coldOpen;
     if (co.active) return d.id === co.job;
-    return d.id !== co.job && this.revealed(d.kind) && (d.kind !== 'duel' || this.sim.board.live(d.level));
+    // a sea trial's ring is a hovercraft's (M8.8 slice 20)
+    return d.id !== co.job && this.revealed(d.kind) && (d.kind !== 'duel' || this.sim.board.live(d.level))
+      && (!d.route || this.sim.vehicle.tuning.hover > 0);
   }
 
   /** A marker the player can start now (M8.7 D9): shown, and not while the police are on the player; the cold open's own in its chase too. */
@@ -245,6 +250,9 @@ export class Jobs {
       this.sim.events.push('jobDone', d.payout, probe.x, 0, probe.z, d.id);
       return;
     }
+    // a sea trial's buoys, each in its turn (M8.8 slice 20)
+    const buoy = d.route?.[this.buoy];
+    if (buoy && (buoy.x - probe.x) ** 2 + (buoy.z - probe.z) ** 2 <= SEA_TRIAL.reach ** 2) this.buoy++;
     const reach = d.kind === 'trial' ? BALANCE.jobs.trial.finishRadius : d.kind === 'race' ? BALANCE.jobs.race.finishRadius : r;
     if ((d.targetX - probe.x) ** 2 + (d.targetZ - probe.z) ** 2 <= reach * reach && this.canArrive(d)) {
       let paid: number;
@@ -377,6 +385,7 @@ export class Jobs {
   private start(d: JobDef): void {
     this.active = d.id;
     this.elapsed = 0;
+    this.buoy = 0;
     this.serial++;
     this.sim.events.push('jobStart', d.payout, d.x, 0, d.z, d.id);
     if (d.kind === 'order') {
@@ -416,8 +425,9 @@ export class Jobs {
       this.inZone = true;
       return;
     }
-    // the coins along the way (DESIGN.md §13.5); the cold open lays its own line
-    if (d.id !== this.sim.coldOpen.job) this.layRoute(d.x, d.z, d.targetX, d.targetZ);
+    // the coins along the way (DESIGN.md §13.5); the cold open lays its own line; a sea trial's run buoy to buoy
+    if (d.route) this.laySea(d.route, d.targetX, d.targetZ);
+    else if (d.id !== this.sim.coldOpen.job) this.layRoute(d.x, d.z, d.targetX, d.targetZ);
   }
 
   /**
@@ -451,7 +461,8 @@ export class Jobs {
       this.race.start(d.targetX, d.targetZ, this.sim.probe, { cars, pace: pace * h.pace, band, lead: h.lead, armour, ...twists });
     } else {
       this.remaining = d.limitSeconds;
-      this.race.start(d.targetX, d.targetZ, this.sim.probe, { cars, pace, band, ...twists });
+      // a race's rival drives a physical car near the player (M8.8 slice 22)
+      this.race.start(d.targetX, d.targetZ, this.sim.probe, { cars, pace, band, physical: true, ...twists });
     }
     this.twist(tw);
   }
@@ -552,6 +563,17 @@ export class Jobs {
     this.routePoints.length = 0;
   }
 
+  /** A sea trial's coins (M8.8 slice 20): buoy to buoy over the water, the cap on the finish. */
+  private laySea(route: ReadonlyArray<{ x: number; z: number }>, targetX: number, targetZ: number): void {
+    const coins = this.sim.coins;
+    if (!coins) return;
+    coins.clearExtra('route');
+    this.routePoints.length = 0;
+    polyLine([...route, { x: targetX, z: targetZ }], SEA.level + COIN_HEIGHT, this.routePoints);
+    coins.addExtra(this.routePoints, 'route');
+    this.routePoints.length = 0;
+  }
+
   /** The wanted car: kept while it is the class and paint and still a driving civilian, else found again. */
   private hunt(d: JobDef, probe: PlayerProbe, dt: number): void {
     const traffic = this.sim.traffic;
@@ -592,8 +614,9 @@ export class Jobs {
     }
   }
 
-  /** An order arrives in its own class and not as a wreck; a delivery always. */
+  /** An order arrives in its own class and not as a wreck; a sea trial past its last buoy; a delivery always. */
   private canArrive(d: JobDef): boolean {
+    if (d.route) return this.buoy >= d.route.length;
     if (d.kind !== 'order') return true;
     // the class's own shell, as the order names it
     return this.sim.carBody === unpackDescriptor(d.descriptor).body && this.sim.life.state.stage < 4 && !this.sim.life.state.wrecked;

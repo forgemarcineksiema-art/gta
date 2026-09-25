@@ -33,12 +33,14 @@
  *    a car or a kit item, at least every 8 minutes. And the minute each of the
  *    wanted board's cash gates is reached: a 40,000 run (Neon Niko) and three
  *    cars owned (Fake Frank).
+ * 5. The bike (M8.8 slice 17): its busted rate at level 3 within a quarter of
+ *    the muscle car's, both policies keeping their car.
  */
 import { describe, expect, it } from 'vitest';
 import { BotPolicy, type PolicyName } from '../../src/app/botPolicy';
 import { CITY_BOT_TUNING, TrackBot, type TrackBotTuning } from '../../src/app/trackBot';
 import { BALANCE } from '../../src/sim/balance';
-import type { SimEvent, SimWorld } from '../../src/sim';
+import type { CarId, SimEvent, SimWorld } from '../../src/sim';
 import { createWorld, run, runUntil } from './helpers';
 import { best, COLD_OPEN, evTable, LEVELS, pooled, verdict, type ModelInput } from './model';
 
@@ -55,13 +57,13 @@ const BOT: Record<PolicyName, Partial<TrackBotTuning>> = {
 
 interface Capture { busted: number; perMinute: number }
 
-/** Busted a minute at a level: the bot drives on after each card, the heat is put back after 10 s. */
-async function capture(policy: PolicyName, level: number, seed: number): Promise<Capture> {
+/** Busted a minute at a level: the bot drives on after each card, the heat is put back after 10 s. In `car`, kept when `keepCar`. */
+async function capture(policy: PolicyName, level: number, seed: number, car: CarId = 'muscle', keepCar = false): Promise<Capture> {
   const threshold = BALANCE.heatThresholds[level - 1] as number;
-  const sim = await createWorld({ map: 'city', seed, traffic: 1, peds: 0, record: false, heat: threshold });
+  const sim = await createWorld({ map: 'city', seed, traffic: 1, peds: 0, record: false, heat: threshold, car });
   let busted = 0, rearm = -1, fellX = 0, fellZ = 0;
   try {
-    const bot = new BotPolicy(policy, new TrackBot(sim.carId, BOT[policy]));
+    const bot = new BotPolicy(policy, new TrackBot(sim.carId, BOT[policy]), keepCar);
     run(sim, SECONDS, (_t, c, s) => {
       if (s.run.state === 'busted') {
         busted++;
@@ -191,5 +193,19 @@ describe('the balance script', () => {
     // (d) something to see bought at least every 8 minutes (M6)
     expect(h.seenGaps.length).toBeGreaterThan(0);
     expect(Math.max(...h.seenGaps)).toBeLessThanOrEqual(8);
+  }, 1_800_000);
+
+  it('M8.8 17.3 the busted rate on a bike at level 3 within a quarter of the muscle car\'s, each policy keeping its car', async () => {
+    const out: string[] = [];
+    for (const policy of ['novice', 'skilled'] as const) {
+      const rate = { muscle: 0, moto: 0 };
+      for (const car of ['muscle', 'moto'] as const) {
+        for (const seed of SEEDS) rate[car] += (await capture(policy, 3, seed, car, true)).perMinute / SEEDS.length;
+      }
+      out.push(`level 3, ${policy}: the bike ${rate.moto.toFixed(2)} / min, the muscle car ${rate.muscle.toFixed(2)} / min`);
+      expect(rate.moto, policy).toBeGreaterThanOrEqual(rate.muscle * 0.75);
+      expect(rate.moto, policy).toBeLessThanOrEqual(rate.muscle * 1.25);
+    }
+    console.info(out.join('\n'));
   }, 1_800_000);
 });

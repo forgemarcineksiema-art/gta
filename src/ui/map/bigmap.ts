@@ -11,7 +11,7 @@
  * route 6 px, the player's ink arrow; the key lists only what is on the map
  * now; each district's name sits clear of every icon.
  */
-import { BALANCE, BreakerState, CITY_HALF, DISTRICTS, PALETTE, type BreakerDesc, type JobKind, type SimWorld } from '../../sim';
+import { BALANCE, BreakerState, CITY_HALF, DISTRICTS, PALETTE, SEA, type BreakerDesc, type JobKind, type SimWorld } from '../../sim';
 import { LANDMARKS, cityFootprints } from '../../sim/city/City';
 import { COVER } from '../../sim/city/covers';
 import { KIND_GLYPH, glyphIndex, glyphOf, goalGlyph } from '../../sim/glyphs';
@@ -24,7 +24,7 @@ import { SIGNALS } from '../../sim/palette';
 import { cssAlpha } from '../colors';
 import { fontReady } from '../fonts';
 import { label, labelAria, relabel, t } from '../lang';
-import { MINIMAP, bigMapProject, bigMapScale, clearSpot, yawFromQuat, type Box, type Vec2 } from './minimapModel';
+import { MINIMAP, bigMapProject, bigMapScale, clearSpot, mapHalf, yawFromQuat, type Box, type Vec2 } from './minimapModel';
 
 /** Repaint cadence while shown, ms: the units move, the map need not be smoother than the radar. */
 const REPAINT_MS = 66;
@@ -103,12 +103,17 @@ export function legendState(sim: SimWorld): LegendState {
   };
 }
 
+/** The map's half extent: the island's, out to the player at sea (M8.8 slice 19). */
+function halfOf(sim: SimWorld): number {
+  return mapHalf(sim.probe.x, sim.probe.z, CITY_HALF, SEA.limit);
+}
+
 /**
  * The icons' boxes on a map `size` px across (docs/M8.9_PLAN.md R6): the landmarks, the garages, the cameras, the
  * standing breakers, the day's caches, the rings shown and the goal's badge. The districts' names keep clear of them.
  */
 export function mapIcons(sim: SimWorld, size: number): Box[] {
-  const s = bigMapScale(size, CITY_HALF);
+  const s = bigMapScale(size, halfOf(sim));
   const out: Box[] = [];
   const tmp: Vec2 = { x: 0, y: 0 };
   const put = (x: number, z: number, r: number): void => {
@@ -144,7 +149,7 @@ export function nameFontPx(size: number): number {
 
 /** Each district's name's box, clear of every icon (`width` measures a name at `nameFontPx`). */
 export function namePlaces(sim: SimWorld, size: number, width: (name: string) => number, icons: readonly Box[] = mapIcons(sim, size)): Box[] {
-  const s = bigMapScale(size, CITY_HALF);
+  const s = bigMapScale(size, halfOf(sim));
   const font = nameFontPx(size);
   const tmp: Vec2 = { x: 0, y: 0 };
   return DISTRICTS.map((d, i) => {
@@ -253,7 +258,7 @@ export class BigMap {
     if (!sim || !this.onPick || !this.shown) return;
     const box = this.canvas.getBoundingClientRect();
     const x = e.clientX - box.left, y = e.clientY - box.top;
-    const s = bigMapScale(this.size, CITY_HALF);
+    const s = bigMapScale(this.size, halfOf(sim));
     let best = -1, bestD = PICK_PX * PICK_PX;
     for (const d of sim.jobs.defs) {
       if (d.kind === 'fare' || !sim.jobs.shown(d)) continue;
@@ -389,7 +394,7 @@ export class BigMap {
 
   private paint(sim: SimWorld): void {
     const c = this.ctx, size = this.size, paths = this.paths;
-    const s = bigMapScale(size, CITY_HALF);
+    const s = bigMapScale(size, halfOf(sim));
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     c.fillStyle = WATER;
     c.fillRect(0, 0, size, size);

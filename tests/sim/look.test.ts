@@ -6,6 +6,9 @@ import { DROP_OFF_LOTS, dropOffFor, hideoutSign } from '../../src/sim/city/cover
 import { buildRoadMarkings } from '../../src/sim/city/markings';
 import { BLOCK, CITY_HALF, HIGHWAY_HALF, ROAD_HALF, SPECIAL_ROADS, buildRoadGraph } from '../../src/sim/city/roads';
 import type { StaticDesc } from '../../src/sim/scene';
+import { SLIPWAYS, slipwayStatics } from '../../src/sim/city/sea';
+import { jumpStatics, megaRamp } from '../../src/sim/city/jumps';
+import { BALANCE } from '../../src/sim/balance';
 
 /** FNV-1a over a string: the layout's fingerprint. */
 function fnv(s: string): number {
@@ -14,9 +17,13 @@ function fnv(s: string): number {
   return h;
 }
 
+/** The slipways' ramps (M8.8 slice 19) and the mega-ramp's slabs (slice 21), where they stand: the fingerprint is of the city before them. */
+const RAMPS = new Set([...SLIPWAYS.flatMap((s) => slipwayStatics(s)), ...jumpStatics(megaRamp(BALANCE.jumps.count))]
+  .filter((st) => st.tag === 'kerb').map((st) => `${st.position.x},${st.position.z}`));
+
 /**
  * The city's layout at a seed without its heights and colours: every collider's footprint (the buildings' and
- * the kerbs'), every billboard and every coin, chunk by chunk.
+ * the kerbs'), every billboard and every coin, chunk by chunk; the slipways' ramps apart.
  */
 function layout(city: City): number {
   const parts: string[] = [];
@@ -25,6 +32,7 @@ function layout(city: City): number {
     const chunk = city.generate(cx, cz);
     for (const st of chunk.statics) {
       if (st.tag !== 'building' && st.tag !== 'kerb') continue;
+      if (RAMPS.has(`${st.position.x},${st.position.z}`)) continue;
       const s = st.shape;
       if (s.kind === 'prism') parts.push(`p${s.points.map((pt) => `${f(pt.x)},${f(pt.z)}`).join(';')}`);
       else if (s.kind === 'box') parts.push(`b${f(st.position.x)},${f(st.position.z)},${f(s.hx)},${f(s.hz)},${st.rotation.y.toFixed(5)},${st.rotation.w.toFixed(5)}`);
@@ -86,8 +94,11 @@ describe('the city\'s look and the big map (M7 slices 11–12)', () => {
   const frontageRoads = SPECIAL_ROADS.filter((r) => r.kind !== 'service');
 
   it('M7 11.1 the same city at seed 42 otherwise; every avenue has one landmark and its corner lots are shops on both streets', () => {
-    // every collider footprint, billboard and coin where it was before the slice
+    // every collider footprint, billboard and coin where it was before the slice; the slipways' two ramps besides
     expect(layout(city)).toBe(2338173748);
+    let ramps = 0;
+    for (let cz = -3; cz <= 3; cz++) for (let cx = -3; cx <= 3; cx++) ramps += city.generate(cx, cz).statics.filter((st) => RAMPS.has(`${st.position.x},${st.position.z}`)).length;
+    expect(ramps).toBe(RAMPS.size);
     expect(frontageRoads).toHaveLength(4);
     const signs: StaticDesc[] = [];
     for (let cz = -3; cz <= 3; cz++) for (let cx = -3; cx <= 3; cx++) signs.push(...city.generate(cx, cz).statics.filter((st) => st.tag === 'sign'));

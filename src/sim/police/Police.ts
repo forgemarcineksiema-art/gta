@@ -312,9 +312,11 @@ export class Police {
       }
       this.count++;
       this.ramCooldown[u] = Math.max(0, (this.ramCooldown[u] as number) - dt);
-      if (this.rammed[u] === 1 && traffic.hasBody(agent) && (traffic.playerDv[agent] as number) >= t.ramContactDv && this.ramCooldown[u] === 0) {
+      if (this.rammed[u] === 1 && traffic.solid(agent) && (traffic.playerDv[agent] as number) >= t.ramContactDv && this.ramCooldown[u] === 0) {
         this.ramsReceived++;
         this.ramCooldown[u] = t.ramCooldown;
+        // a ram or a PIT on a bike knocks it down (M8.8 slice 17): a tumble, not a wreck, unless the damage wrecks it
+        this.sim.vehicle.tumble();
       }
       this.rammed[u] = 0;
       traffic.clearPolicePlan(agent);
@@ -489,7 +491,7 @@ export class Police {
       const dz = player.z - (traffic.z[agent] as number);
       const gap = Math.hypot(dx, dz);
       const slot = this.slotOf[u] as number;
-      if (arresting && traffic.hasBody(agent) && gap < a.range) {
+      if (arresting && traffic.solid(agent) && gap < a.range) {
         // one not dealt yet (it came on duty since the last deal) waits on the first standby place and is dealt next
         // step (M8.6 D6): it used to ram the stopped car at its class's speed meanwhile
         if (slot < 0) this.slotLeft = 0;
@@ -546,7 +548,8 @@ export class Police {
         aimX += -fx * player.halfLength * 0.6 + -fz * side * t.heavy.aimSide;
         aimZ += -fz * player.halfLength * 0.6 + fx * side * t.heavy.aimSide;
       }
-      const shove = isChief ? t.chief.pitAcceleration : pit ? t.pitAcceleration : traffic.kindOf(agent) === 'heavy' ? t.heavy.ramAcceleration : t.ramAcceleration;
+      const shove = (isChief ? t.chief.pitAcceleration : pit ? t.pitAcceleration : traffic.kindOf(agent) === 'heavy' ? t.heavy.ramAcceleration : t.ramAcceleration)
+        * (this.sim.vehicle.tuning.twoWheel > 0 ? t.bikeShove : 1);
       traffic.setPolicePlan(agent, next, speed, aimX, aimZ, Math.min(speed, player.speed + t.ramClosingSpeed), shove);
       this.rammed[u] = 1;
     }
@@ -726,7 +729,7 @@ export class Police {
       const slot = this.slotOf[u] as number;
       const gap = Math.hypot(b.x - (traffic.x[agent] as number), b.z - (traffic.z[agent] as number));
       // by the lanes until the car is in the same street, then straight into a slot round it
-      if (slot >= 0 && traffic.hasBody(agent) && gap < t.box.approach) this.driveToSlot(agent, slot, b, t.box.range, t.box.detourSpeed);
+      if (slot >= 0 && traffic.solid(agent) && gap < t.box.approach) this.driveToSlot(agent, slot, b, t.box.range, t.box.detourSpeed);
       else traffic.setPolicePlan(agent, this.routeExit(agent, CHASE), t.chaseSpeed);
     }
   }
@@ -738,7 +741,7 @@ export class Police {
     for (let u = 0; u < this.units.length; u++) {
       const agent = this.units[u] as number;
       const lane = agent >= 0 ? traffic.lane[agent] as number : -1;
-      if (lane < 0 || !traffic.hasBody(agent)) continue;
+      if (lane < 0 || !traffic.solid(agent)) continue;
       if (Math.hypot(b.x - (traffic.x[agent] as number), b.z - (traffic.z[agent] as number)) > this.tuning.box.approach) continue;
       traffic.lanes.project(lane, b.x, b.z, this.projection);
       traffic.lanes.positionAt(lane, Math.min(traffic.lanes.length[lane] as number, this.projection.s + LEAVE_PAST), 0, this.pose);
@@ -754,7 +757,7 @@ export class Police {
     const tx = this.leaveX[u] as number, tz = this.leaveZ[u] as number;
     const left = (this.leaving[u] as number) - dt;
     this.leaving[u] = left;
-    if (left <= 0 || !traffic.hasBody(agent) || Math.hypot(tx - (traffic.x[agent] as number), tz - (traffic.z[agent] as number)) < LEAVE_REACHED) {
+    if (left <= 0 || !traffic.solid(agent) || Math.hypot(tx - (traffic.x[agent] as number), tz - (traffic.z[agent] as number)) < LEAVE_REACHED) {
       this.leaving[u] = 0;
       return;
     }
@@ -804,7 +807,7 @@ export class Police {
       // a car in a police livery the law takes for its own (Fake Frank, M6) counts as one
       if (traffic.police[i] !== 1 && traffic.badge[i] !== 1) continue;
       this.copSpeedMax[i] = Math.max(traffic.speed[i] as number, (this.copSpeedMax[i] as number) * 0.8);
-      if (!idle || cool > 0 || !traffic.hasBody(i)) continue;
+      if (!idle || cool > 0 || !traffic.solid(i)) continue;
       const state = traffic.state[i];
       if (state === AgentState.Wrecked || state === AgentState.Free) continue;
       if ((traffic.playerDv[i] as number) < t.assaultDv) continue;
@@ -822,20 +825,21 @@ export class Police {
 
   /** The places round the player (the four and the diagonals), and each slot on the place it was dealt. */
   private placeSlots(player: PlayerProbe): void {
-    const a = this.tuning.arrest;
+    const reach = slotReach(this.tuning.arrest, player.halfLength, player.halfWidth);
+    const rear = reach.rear, front = reach.front, side = reach.side, diagonal = reach.diagonal;
     const fx = Math.sin(player.yaw), fz = Math.cos(player.yaw);
     // right of the heading; +X is left when facing +Z
     const rx = -fz, rz = fx;
     const px = this.placeX, pz = this.placeZ;
-    px[0] = player.x - fx * a.rear; pz[0] = player.z - fz * a.rear;
-    px[1] = player.x + fx * a.front; pz[1] = player.z + fz * a.front;
-    px[2] = player.x - rx * a.side; pz[2] = player.z - rz * a.side;
-    px[3] = player.x + rx * a.side; pz[3] = player.z + rz * a.side;
+    px[0] = player.x - fx * rear; pz[0] = player.z - fz * rear;
+    px[1] = player.x + fx * front; pz[1] = player.z + fz * front;
+    px[2] = player.x - rx * side; pz[2] = player.z - rz * side;
+    px[3] = player.x + rx * side; pz[3] = player.z + rz * side;
     // the diagonals: rear-left, rear-right, front-left, front-right (M8.6 D5)
-    px[4] = player.x - fx * a.diagonal - rx * a.side; pz[4] = player.z - fz * a.diagonal - rz * a.side;
-    px[5] = player.x - fx * a.diagonal + rx * a.side; pz[5] = player.z - fz * a.diagonal + rz * a.side;
-    px[6] = player.x + fx * a.diagonal - rx * a.side; pz[6] = player.z + fz * a.diagonal - rz * a.side;
-    px[7] = player.x + fx * a.diagonal + rx * a.side; pz[7] = player.z + fz * a.diagonal + rz * a.side;
+    px[4] = player.x - fx * diagonal - rx * side; pz[4] = player.z - fz * diagonal - rz * side;
+    px[5] = player.x - fx * diagonal + rx * side; pz[5] = player.z - fz * diagonal + rz * side;
+    px[6] = player.x + fx * diagonal - rx * side; pz[6] = player.z + fz * diagonal - rz * side;
+    px[7] = player.x + fx * diagonal + rx * side; pz[7] = player.z + fz * diagonal + rz * side;
     for (let k = 0; k < SLOTS; k++) {
       const p = this.slotPlace[k] as number;
       this.slotX[k] = px[p] as number;
@@ -909,7 +913,7 @@ export class Police {
       let best = -1, bestCost = Infinity;
       for (let u = 0; u < this.units.length; u++) {
         const agent = this.units[u] as number;
-        if (agent < 0 || !traffic.hasBody(agent) || this.withdrawing[u] === 1) continue;
+        if (agent < 0 || !traffic.solid(agent) || this.withdrawing[u] === 1) continue;
         const current = held[u] as number;
         if (current >= 0 && current < k) continue;
         const d = Math.hypot((traffic.x[agent] as number) - (this.slotX[k] as number), (traffic.z[agent] as number) - (this.slotZ[k] as number));
@@ -924,7 +928,7 @@ export class Police {
     let standby = 0;
     for (let u = 0; u < this.units.length; u++) {
       const agent = this.units[u] as number;
-      if (agent < 0 || !traffic.hasBody(agent) || ((held[u] as number) >= 0 && (held[u] as number) < SLOTS)) continue;
+      if (agent < 0 || !traffic.solid(agent) || ((held[u] as number) >= 0 && (held[u] as number) < SLOTS)) continue;
       held[u] = SLOTS + standby;
       standby++;
     }
@@ -1438,6 +1442,15 @@ export class Police {
  * What a slot of the box costs a unit (lowest takes it): its distance, less `keep` for the slot it holds, and at
  * levels 4-5 (M7 slice 9) less `heavyFirst` for a heavy, so a heavy within reach takes a slot before a nearer saloon.
  */
+/**
+ * The arrest's slots from the player's middle (M8.8 slice 17): the tuning's for a car the compact's size or bigger; a
+ * smaller body (the bike) is boxed as tight, each slot closing in by what its half length or half width lacks.
+ */
+export function slotReach(a: PoliceTuning['arrest'], halfLength: number, halfWidth: number): { rear: number; front: number; side: number; diagonal: number } {
+  const inLength = Math.max(0, a.footLength - halfLength), inWidth = Math.max(0, a.footWidth - halfWidth);
+  return { rear: a.rear - inLength, front: a.front - inLength, side: a.side - inWidth, diagonal: a.diagonal - inLength };
+}
+
 export function slotCost(distance: number, holding: boolean, heavy: boolean, arrest: { keep: number; heavyFirst: number }): number {
   return distance - (holding ? arrest.keep : 0) - (heavy ? arrest.heavyFirst : 0);
 }

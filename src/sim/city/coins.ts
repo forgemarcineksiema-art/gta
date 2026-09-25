@@ -221,6 +221,24 @@ export function routeLine(graph: RoadGraph, chain: readonly number[], s0: number
   if (chain.length > 0) push(out, end, COIN_HEIGHT, TAG_LANE.route, c.cap, phase);
 }
 
+/**
+ * A line of coins over open water (M8.8 slice 20, the sea trial): runs of the route's straight count along each leg of
+ * `points`, `y` their centres' height, the cap on the last point.
+ */
+export function polyLine(points: readonly Pt[], y: number, out: CoinPoint[]): void {
+  const c = BALANCE.coin, r = c.route, pitch = c.pitch;
+  let phase = 0;
+  for (let i = 0; i + 1 < points.length; i++) {
+    const a = points[i] as Pt, b = points[i + 1] as Pt;
+    const length = Math.hypot(b.x - a.x, b.z - a.z), ux = (b.x - a.x) / length, uz = (b.z - a.z) / length;
+    for (let s = r.straightEvery / 2; s + (r.straight - 1) * pitch <= length; s += r.straightEvery) {
+      for (let k = 0; k < r.straight; k++) push(out, { x: a.x + ux * (s + k * pitch), z: a.z + uz * (s + k * pitch) }, y, TAG_LANE.route, c.value, phase++);
+    }
+  }
+  const last = points[points.length - 1];
+  if (last) push(out, last, y, TAG_LANE.route, c.cap, phase);
+}
+
 export class Coins {
   /** One byte per (chunk, slot), then one per extra coin. */
   readonly picked = new Uint8Array(EXTRA_COIN_BASE + EXTRA_COINS_MAX);

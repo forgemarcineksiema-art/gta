@@ -8,6 +8,8 @@ import { CITY_BOT_TUNING, TrackBot } from '../../src/app/trackBot';
 import { TRAFFIC } from '../../src/sim/traffic/tuning';
 import { POLICE } from '../../src/sim/police/tuning';
 import { AgentState, type Traffic } from '../../src/sim/traffic/Traffic';
+import { slotReach } from '../../src/sim/police/Police';
+import { CAR_PRESETS } from '../../src/sim/vehicle/presets';
 import type { SimWorld } from '../../src/sim';
 import { createWorld, run, runUntil } from './helpers';
 
@@ -162,4 +164,39 @@ describe('police patrols (long)', () => {
       } finally { sim.dispose(); }
     }
   }, 120_000);
+});
+
+describe('M8.8 slice 17: the police and the bike (long)', () => {
+  it('M8.8 17.1 a stopped bike is boxed as tight as a car and busted as a car is: under 20 s, gently, no police wreck', async () => {
+    // the slots close in by what the bike's footprint lacks against the compact's; a car's are the tuning's
+    const bike = CAR_PRESETS.moto.chassisHalfExtents, compact = CAR_PRESETS.compact.chassisHalfExtents, muscle = CAR_PRESETS.muscle.chassisHalfExtents;
+    const b = slotReach(POLICE.arrest, bike.z, bike.x), c = slotReach(POLICE.arrest, compact.z, compact.x);
+    expect(slotReach(POLICE.arrest, muscle.z, muscle.x)).toEqual({ rear: POLICE.arrest.rear, front: POLICE.arrest.front, side: POLICE.arrest.side, diagonal: POLICE.arrest.diagonal });
+    expect(b.rear - bike.z).toBeCloseTo(c.rear - compact.z, 6);
+    expect(b.side - bike.x).toBeCloseTo(c.side - compact.x, 6);
+    for (const [seed, spawn] of [[42, 'crown'], [7, 'foundry'], [123, 'gardens'], [42, 'marina']] as const) {
+      const sim = await createWorld({ map: 'city', seed, traffic: 1, peds: 1, record: false, heat: 40, spawn, car: 'moto' });
+      const traffic = sim.traffic as Traffic;
+      try {
+        let busted = -1, fastest = 0, wrecks = 0;
+        const wasWreck = new Uint8Array(traffic.capacity);
+        for (let i = 0; i < 20 * 60 && busted < 0; i++) {
+          sim.step();
+          for (let a = 0; a < traffic.capacity; a++) {
+            if (traffic.police[a] !== 1) continue;
+            const wreck = traffic.state[a] === AgentState.Wrecked ? 1 : 0;
+            if (wreck && !wasWreck[a]) wrecks++;
+            wasWreck[a] = wreck;
+            if (wreck || traffic.state[a] === AgentState.Free) continue;
+            if (Math.hypot((traffic.x[a] as number) - sim.probe.x, (traffic.z[a] as number) - sim.probe.z) < 8) fastest = Math.max(fastest, traffic.speed[a] as number);
+          }
+          if (sim.run.state === 'busted') busted = i / 60;
+        }
+        console.log(`[arrest] the bike, ${spawn} seed ${seed}: busted at ${busted.toFixed(1)} s, fastest unit within 8 m ${fastest.toFixed(1)} m/s, police wrecks ${wrecks}`);
+        expect(busted).toBeGreaterThan(0);
+        expect(fastest).toBeLessThan(9);
+        expect(wrecks).toBe(0);
+      } finally { sim.dispose(); }
+    }
+  }, 180_000);
 });

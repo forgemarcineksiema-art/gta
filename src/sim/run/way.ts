@@ -468,6 +468,22 @@ export class Way implements GoalChooser {
     this.length = NaN;
     this.routeLaneCount = 0;
     const g = this.goal;
+    // a sea trial on (M8.8 slice 20): its line is the water's, from the car by the buoys still to pass, not the road's
+    const jobs = this.sim.jobs, sea = g.hasTarget && g.kind === 'job' && jobs.state === 'active' ? jobs.running?.route : undefined;
+    if (sea) {
+      const p = this.sim.probe;
+      let x = p.x, z = p.z, length = 0;
+      this.push(x, z);
+      for (let k = jobs.buoy; k <= sea.length; k++) {
+        const b = k < sea.length ? sea[k] as { x: number; z: number } : g;
+        length += Math.hypot(b.x - x, b.z - z);
+        x = b.x;
+        z = b.z;
+        this.push(x, z);
+      }
+      this.length = length;
+      return;
+    }
     if (!g.hasTarget || !this.fieldReady || c < 0) return;
     const rev = this.fieldDistance, len = this.len;
     // off the car's lane by the link the field likes best, or straight on to the goal when it is ahead on it

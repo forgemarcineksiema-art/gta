@@ -48,7 +48,10 @@ const ROCKET: EngineVoice = { pulses: 1, saw: 0.14, square: 0.1, sub: 0.1, grit:
 export const CLASS_VOICES: Readonly<Record<CarId, EngineVoice>> = { muscle: V8, compact: FOUR, heavy: DIESEL, sports: SIX, police: V8, offroad: BIG_SIX, moto: TWIN };
 
 /** The bodies with a voice of their own. */
-export const OWN_VOICES: Readonly<Partial<Record<BodyId, EngineVoice>>> = { bubble: TWO_STROKE, trolley: ROCKET };
+/** The hovercraft's fan (M8.8 slice 18): a big propeller's airy drone over a low engine. */
+const FAN: EngineVoice = { pulses: 3, saw: 0.18, square: 0.08, sub: 0.3, grit: 55, floor: 380, open: 1500, rattle: 0.14, rattleHz: 850, level: 0.95 };
+
+export const OWN_VOICES: Readonly<Partial<Record<BodyId, EngineVoice>>> = { bubble: TWO_STROKE, trolley: ROCKET, scooter: TWO_STROKE, hover: FAN };
 
 export function voiceOf(body: BodyId): EngineVoice {
   return OWN_VOICES[body] ?? CLASS_VOICES[bodySpec(body).car];

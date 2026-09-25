@@ -12,6 +12,96 @@ DRIVE OUT keep −8° on `::before` plates. The ★ drawn inline (`hud/stars.ts`
 CSS; the maps write once the face is in. Pins M8.9 6.1–6.3, stills looked at; verify not run (Marcin: finish, no tests).
 Open: the door's `×2.6` keeps the English decimal point in Polish.
 
+## 2026-09-25 — M8.8 slice 24: the budget's switch
+
+Done: the switch the budget decides with: `POLICE.physicalUnits` and `AI.pool` (now settable, read when the world is
+built) both 0 make no car in the AI pool, so the physics world is the one from before the AI drove, and every rival and
+unit stays a lane record. Pin M8.8 24.1 (`driver.test.ts`; it fails with the switch on). Decided: the decision itself,
+`npm run perf` twice against the phase's start (`dca86e1`) with four physical units and a rival (sim step p95 under 4×
+CPU up by 2 ms at most, frame p95 not up), is taken at the gate (the pace rule); if it fails both knobs ship at 0, the
+numbers to BACKLOG.
+
+## 2026-09-25 — M8.8 slice 23: the police on the car model
+
+Done: on a chase, a box or an arrest the `POLICE.physicalUnits` (4) units nearest the player within 80 m drive physical
+cars of their bodies (`AiCars`, four more cars in its pool; given back past 110 m or when it is over): along their
+plan's lanes at its speed, or straight at its aim point (`Traffic.planAim`: a ram's, a PIT's, a box slot braked into
+and held on the handbrake); the shove accelerations retire for them, a hit is two masses, sensed as a lent body's.
+Police's and the takedowns' "has a body" is now `solid` (a lent body or a car). Decided: under the busted card the units
+keep their cars and stand (given back as the card closes, or the lane blend moves them). Pin M8.8 23.3 (`driver.test.ts`);
+23.1 (the police long pins, now with physical units) and 23.2 (the balance at level 3) at the gate.
+
+## 2026-09-25 — M8.8 slice 22: the AI driver; the rivals on the car model
+
+Done: `ai/Driver.ts`, the track bot's method in the sim (pursuit at a lookahead point, the corner-speed plan inside a
+grip budget, capped by a plan's speed): it laps the test track to the hundredth of the bot's. `ai/AiCars.ts`, a pool
+of two `Vehicle`s parked and switched off: a duel race's rival (`RaceField.physical`; the hunts keep lane rivals, whose
+takedowns need a lent body) within 40 m of the player drives one, its record a `puppet` (the lane follower leaves it,
+it is drawn where the car is, the car's collider answers for it), its path its lane, the race's exit and the next
+(`Race.bestExit`), resampled at a new lane; past 60 m, or stalled 3 s off its lane out of sight, the record goes back
+to its lane blended as a lent body's. Pins M8.8 22.1, 22.4 (`driver.test.ts`); 22.2 and 22.3 long, run at the gate.
+
+## 2026-09-25 — M8.8 slice 21: the mega-ramp
+
+Done: the twenty-first jump (`MEGA`, `megaRamp`: its own launch and landing surfaces on the desc), 8 m wide, a 60 m
+climb steepening to a 16 m lip at 27° under an orange port crane, over the street at z 225 onto a long landing slope.
+Decided: on Coral Quay's east strip, not the Works' (their strips have a kicker before every crossing street). The
+muscle car on full boost from the strip north of z 0: 140 km/h at the lip, 28.8 m at the apex, 3.1 s in the air (the
+apex's 0.6 s of slow motion on top; the kickers keep theirs through the flight), down upright at 105 m on the slope,
+1,500 into the bag (`bag.megaJump`); the hunt counts it once (JUMPS n/21). The city's fingerprint and the long kicker
+pin take it apart. Pins M8.8 21.1, 21.2 (`jumps.test.ts`); 21.3, the apex frame on the low tier, at the gate.
+
+## 2026-09-25 — M8.8 slice 20: the heat at sea; the sea trial
+
+Done: at sea the units stay ashore and a hovercraft out of their sight escapes by the cooldown; from four stars the
+helicopter holds it (nothing needed changing: the sea is nobody's cover). The sea trial: a trial def with a `route`,
+ten buoys (red floats, drawn by the edge chunks) from its ring at the south slipway's top round the island's corner and
+the east pier to a finish off the east slipway, a kilometre; each buoy counts within 25 m in order, the finish only
+after the last (a shortcut does not finish); coins buoy to buoy; its ring shown only to a hovercraft; the way by road to
+the ring, then by the buoys. On the water the skirt bites (`hoverWaterGrip` 4 across), and the rudders get a third of
+their air from the idling fan, so it turns from rest. Pins M8.8 20.1–20.4 (`sea.test.ts`).
+
+## 2026-09-25 — M8.8 slice 19: the slipways and the sea
+
+Done: the sea's surface at −0.5 m (`GROUP_WATER`, nothing collides with it), met by the hovercraft's rays alone
+(`QUERY_HOVER`; `QUERY_NOT_PROP` now leaves it out too, so it is nobody's cover); walls `SEA.limit` 180 m out hold it
+in. Two slipways (`city/sea.ts`) through Coral Quay's parapet, south at x 497 and east at z 255 between the palms: 8 m
+ramps 9 m out from the deck to −1 m, props kept off their tops; at each the island's wall is a gate (`GROUP_GATE`)
+every chassis stops at but the hovercraft's, whose rays pass through it (they fell through it at first). Down one,
+150 m out and back up at 30 km/h; a muscle car stops at the top. The full map widens to keep a player at sea on it
+(`mapHalf`). Pins M8.8 19.1–19.4 (`sea.test.ts`).
+
+## 2026-09-25 — M8.8 slice 18: the hovercraft
+
+Done: `hover` (PODUSZKOWIEC; the 4×4's class, 1.4 t) on the car model's `hover` mode: the four rays are the cushion's
+springs, plumb like the bike's, and push nothing along (`WheelState.tyreForce` 0); the fan pushes along the nose
+(`fanThrust` 5,000 N, the power tier's; the brake pulls half back), the skirt drags 130 N a m/s along and 100 across,
+split bow and stern; the rudders yaw it (`rudderTorque` 4,500 N·m in the fan's wash or at 15 m/s; twice on the
+handbrake); no drift controller, the engine's revs follow the fan. 0–80 in 10.2 s, 110 km/h, 0.27 g at full lock, a
+full turn at 60 km/h in 7 s runs 95 m out; still, it hovers without creeping. A fan's drone, a shanty for a clue;
+ONLY IT: CROSSES WATER (JEŹDZI PO WODZIE); on the Quay's south promenade where slice 19's slipway goes. Pins M8.8
+18.1–18.4 (`hover.test.ts`).
+
+## 2026-09-25 — M8.8 slice 17: the police and the bike
+
+Done: a unit's ram or PIT that lands on a bike (the contact the roster counts as a ram) knocks it down: `Vehicle.tumble`,
+bike and rider for 1.2 s, then up and away; a wreck only if the damage wrecks it. The ram's shove on a bike is
+`POLICE.bikeShove` (0.6) of a car's. The arrest's slots close in by what a body's footprint lacks against the compact's
+(`arrest.footLength` 1.9, `footWidth` 0.85, `slotReach`): a bike is boxed as tight as a compact, a car's slots unchanged.
+The bots' bike case: `BotPolicy.keepCar` never swaps. Pins M8.8 17.2 (`police.test`: a ram at 50 km/h drops it, it rides
+on inside 2 s); 17.1 long (`police.long`: stopped at heat 2, busted in 20 s, four worlds) and 17.3 (the balance: its
+busted rate at level 3 within a quarter of the muscle car's) run at the gate.
+
+## 2026-09-25 — M8.8 slice 16: scooters in the traffic, the bike in the catalogue
+
+Done: `scooter` (SKUTER), the bike's class at 190 kg on 12-inch wheels, 11 N·m through a long reduction: 0–50 4.9 s,
+69 km/h on the rev limit, a 0.45 g turn leans 25°, the 45 km/h slalom never falls; the Bubble's two-stroke. 0.05 of a
+street's draw (4–5 %), twice in Crown Heights and on Coral Quay, never on the highway, at 0.9 of the limit; worth 6,000
+kept. Drawn from `bikeMesh.ts`'s shapes (sport, scooter): leg shield, cowl, a red box; a courier in red rides a driven
+one (the traffic's rider mesh, built with the first), a parked or left one stands empty. The model's ladder takes the
+bike after the 4×4 (straight after the van the 4×4 waited 10.5 min, past the 10.1 pin's 10). Pins M8.8 16.1
+(`bodies.test`), 16.2 (`swap.test`), 16.3 (`garage.test`); M7 6.2 counts the couriers' mesh.
+
 ## 2026-09-25 — M8.9 slice 15: the preview; GOALS in pictures
 
 Done (R10): a focused card on STYLE shows on the car in the room (`sim/garage/look.ts`: the look is the car's paint and

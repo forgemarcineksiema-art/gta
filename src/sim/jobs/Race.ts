@@ -36,6 +36,8 @@ export interface RaceField {
   twins?: boolean;
   breakers?: boolean;
   hidden?: boolean;
+  /** Its rivals drive physical cars within `AI.physicalRadius` of the player (M8.8 slice 22: a duel's race). */
+  physical?: boolean;
 }
 
 export class Race {
@@ -49,6 +51,8 @@ export class Race {
   private pace = 1;
   private bandLow = 1;
   private bandHigh = 1;
+  /** The rivals may drive physical cars near the player (M8.8 slice 22, `ai/AiCars.ts`). */
+  physical = false;
   /** The twists (M6 slice 3); `hidden`: the maps draw no rival (the Ghost). */
   private twins = false;
   private breakers = false;
@@ -94,6 +98,7 @@ export class Race {
     this.twins = duel?.twins ?? false;
     this.breakers = duel?.breakers ?? false;
     this.hidden = duel?.hidden ?? false;
+    this.physical = duel?.physical ?? false;
     this.swapLeft.fill(0);
     this.swaps = 0;
     const lead = duel?.lead ?? r.gridAhead;
@@ -147,12 +152,7 @@ export class Race {
       }
       const lane = traffic.lane[agent] as number;
       if (lane < 0) continue;
-      // the exit whose way on to the finish is shortest
-      let next = -1, best = Infinity;
-      for (const out of lanes.outs(lane)) {
-        const d = lanes.connectionLength(lane, out) + (this.dist[out] as number);
-        if (d < best) { best = d; next = out; }
-      }
+      const next = this.bestExit(lane);
       // the rubber band: ahead of the player it eases off, behind it pushes
       const band = Math.max(this.bandLow, Math.min(this.bandHigh, 1 - (mine - theirs) / r.bandRange * (1 - this.bandLow)));
       traffic.setRacePlan(agent, next, (lanes.limit[lane] as number) * this.pace * band);
@@ -197,6 +197,18 @@ export class Race {
     sim.events.push('twinSwap', 0, x, 0, z, ((traffic.body[into] as number) << 24) | ((traffic.paint[into] as number) & 0xffffff));
   }
 
+  /** A lane's exit whose way on to the finish is shortest, -1 for none. */
+  bestExit(lane: number): number {
+    const lanes = this.sim.traffic?.lanes;
+    if (!lanes) return -1;
+    let next = -1, best = Infinity;
+    for (const out of lanes.outs(lane)) {
+      const d = lanes.connectionLength(lane, out) + (this.dist[out] as number);
+      if (d < best) { best = d; next = out; }
+    }
+    return next;
+  }
+
   /** The player's place now: one plus the rivals over the line or nearer it. */
   place(probe: PlayerProbe): number {
     const traffic = this.sim.traffic;
@@ -220,6 +232,7 @@ export class Race {
       this.rivals[k] = -1;
     }
     this.running = false;
+    this.physical = false;
   }
 
   /** Dijkstra backward from the finish: each lane's distance from its start to the finish point. */

@@ -232,6 +232,13 @@ export class Traffic {
   readonly justWrecked: Uint8Array;
   /** Flattened by the steamroller (M8.8 slice 11): a wreck drawn squashed, never lent a body again (nothing to hit). */
   readonly flat: Uint8Array;
+  /**
+   * 1: an AI car drives this record (M8.8 slice 22: a duel's rival near the player). The lane follower leaves it, it
+   * is drawn where the car is (`puppetPose`), and the car's collider answers for it.
+   */
+  readonly puppet: Uint8Array;
+  private readonly puppetQ: Float32Array;
+  private readonly puppetHandle: Int32Array;
   /** 1 = the light bar is on (parked patrols near the player at heat 3+, roadblock cars); the view reads it. */
   readonly lights: Uint8Array;
   /** Collider handle of the player's chassis, so contacts can be attributed. The world refreshes it every step. */
@@ -359,7 +366,8 @@ export class Traffic {
   private readonly ramX: Float32Array;
   private readonly ramZ: Float32Array;
   private readonly ramSpeed: Float32Array;
-  private readonly ramAccel: Float32Array;
+  /** Per police record, its plan's shove: the acceleration it closes on the car with (M8.8 slice 17's pin reads it). */
+  readonly ramAccel: Float32Array;
   /** 1: the plan's point is a place to go to (an arrest slot), not a car to shove: lane gaps no longer hold the unit back. */
   private readonly freeSteer: Uint8Array;
   private readonly lin = { x: 0, y: 0, z: 0 };
@@ -446,6 +454,9 @@ export class Traffic {
     this.damage = new Float32Array(n);
     this.justWrecked = new Uint8Array(n);
     this.flat = new Uint8Array(n);
+    this.puppet = new Uint8Array(n);
+    this.puppetQ = new Float32Array(n * 4);
+    this.puppetHandle = new Int32Array(n).fill(-1);
     this.lights = new Uint8Array(n);
     this.wobble = new Float32Array(n);
     this.turn = new Uint8Array(n);
@@ -635,6 +646,25 @@ export class Traffic {
     return (this.agentBody[agent] as number) >= 0;
   }
 
+  /** A body in the world: a lent one, or an AI car's (M8.8 slices 22–23): what can ram, box and be hit. */
+  solid(agent: number): boolean {
+    return (this.agentBody[agent] as number) >= 0 || this.puppet[agent] === 1;
+  }
+
+  /** A police plan's aim (M8.8 slice 23, an AI car's to drive): the point, its speed, whether it is a place to stop at. */
+  planAim(agent: number, out: { x: number; z: number; speed: number; free: boolean }): boolean {
+    out.x = this.ramX[agent] as number;
+    out.z = this.ramZ[agent] as number;
+    out.speed = this.ramSpeed[agent] as number;
+    out.free = this.freeSteer[agent] === 1;
+    return out.speed > 0 || out.free;
+  }
+
+  /** The exit a plan has chosen off the lane, -1 for none (M8.8 slice 23). */
+  planNext(agent: number): number {
+    return this.plannerNext[agent] as number;
+  }
+
   /** The agent's lent body, or null (the street furniture's knocks and the hydrants' water, M8). */
   rigidBodyOf(agent: number): RAPIER.RigidBody | null {
     const slot = this.agentBody[agent] as number;
@@ -656,6 +686,10 @@ export class Traffic {
 
   /** World-up component of the lent body's up axis (1 level, 0 on its side, -1 on its roof); 1 without a body. */
   upOf(agent: number): number {
+    if (this.puppet[agent] === 1) {
+      const k = agent * 4, qx = this.puppetQ[k] as number, qz = this.puppetQ[k + 2] as number;
+      return 1 - 2 * (qx * qx + qz * qz);
+    }
     const slot = this.agentBody[agent] as number;
     if (slot < 0) return 1;
     const r = (this.bodies[slot] as RAPIER.RigidBody).rotation(this.rot);
@@ -958,6 +992,62 @@ export class Traffic {
     this.gapT[agent] = 0.5;
   }
 
+  /** An AI car takes the record over where it is (M8.8 slice 22): its lent body goes, the car's collider stands for it. */
+  puppetOn(agent: number, collider: number): void {
+    if (this.hasBody(agent)) this.releaseBody(agent);
+    this.puppet[agent] = 1;
+    this.state[agent] = AgentState.Physical;
+    this.puppetHandle[agent] = collider;
+    this.colliderAgent.set(collider, agent);
+  }
+
+  /** The AI car's pose this step (the chassis origin, `y` its height), its speed, and where it is on the lanes. */
+  puppetPose(agent: number, x: number, y: number, z: number, q: { x: number; y: number; z: number; w: number }, speed: number, lane: number, s: number): void {
+    this.x[agent] = x;
+    this.y[agent] = y;
+    this.z[agent] = z;
+    this.yaw[agent] = M.yawOf(q);
+    const k = agent * 4;
+    this.puppetQ[k] = q.x;
+    this.puppetQ[k + 1] = q.y;
+    this.puppetQ[k + 2] = q.z;
+    this.puppetQ[k + 3] = q.w;
+    this.speed[agent] = speed;
+    if (lane >= 0 && lane !== this.lane[agent]) {
+      this.lane[agent] = lane;
+      this.next[agent] = -1;
+    }
+    this.s[agent] = s;
+  }
+
+  /** The record back on its lane, driving on from where its AI car left it, blended over a second (as a lent body's). */
+  puppetOff(agent: number): void {
+    if (this.puppet[agent] !== 1) return;
+    this.unpuppet(agent);
+    this.state[agent] = AgentState.Kinematic;
+    this.y[agent] = 0;
+    const lane = this.lane[agent] as number;
+    if (lane < 0) return;
+    const x0 = this.x[agent] as number, z0 = this.z[agent] as number, yaw0 = this.yaw[agent] as number;
+    this.lanes.projectPath(lane, this.next[agent] as number, x0, z0, this.proj, this.laneOffset[agent]);
+    if (this.proj.switched) this.switchLane(agent, this.proj.s);
+    else this.s[agent] = this.proj.s;
+    this.blendLeft[agent] = 0;
+    this.reposition(agent);
+    this.blendX[agent] = x0 - (this.x[agent] as number);
+    this.blendZ[agent] = z0 - (this.z[agent] as number);
+    this.blendYaw[agent] = Math.atan2(Math.sin(yaw0 - (this.yaw[agent] as number)), Math.cos(yaw0 - (this.yaw[agent] as number)));
+    this.blendLeft[agent] = BLEND_BACK;
+    this.reposition(agent);
+  }
+
+  private unpuppet(i: number): void {
+    if (this.puppet[i] !== 1) return;
+    this.colliderAgent.delete(this.puppetHandle[i] as number);
+    this.puppet[i] = 0;
+    this.puppetHandle[i] = -1;
+  }
+
   isRacer(agent: number): boolean {
     return this.racer[agent] === 1 && this.state[agent] !== AgentState.Free;
   }
@@ -1214,7 +1304,8 @@ export class Traffic {
     this.buildLaneLists();
     for (let i = 0; i < this.capacity; i++) {
       const st = this.state[i];
-      if (st === AgentState.Free) continue;
+      // an AI car drives a puppet (M8.8 slice 22)
+      if (st === AgentState.Free || this.puppet[i] === 1) continue;
       if (st === AgentState.Kinematic || st === AgentState.Physical) this.behave(i, player, dt, events);
       this.chooseNext(i);
       if (st === AgentState.Kinematic) this.moveKinematic(i, this.plan(i, player, dt, events), dt);
@@ -1231,6 +1322,13 @@ export class Traffic {
       const slot = this.slot[i] as number;
       if (this.state[i] === AgentState.Free) {
         tb.writeBoth(slot, 0, -50, 0, 0, 0, 0, 1);
+        continue;
+      }
+      if (this.puppet[i] === 1) {
+        // where its AI car is (M8.8 slice 22)
+        const k = i * 4;
+        tb.write(slot, this.x[i] as number, this.y[i] as number, this.z[i] as number,
+          this.puppetQ[k] as number, this.puppetQ[k + 1] as number, this.puppetQ[k + 2] as number, this.puppetQ[k + 3] as number);
         continue;
       }
       const bodyIndex = this.agentBody[i] as number;
@@ -2113,8 +2211,16 @@ export class Traffic {
     }
   }
 
+  /** An AI car's hits on its record (M8.8 slice 23): the contact impulses by kind, the damage and the wreck, as a lent body's. */
+  sensePuppet(i: number, col: RAPIER.Collider): void {
+    if (this.puppet[i] === 1) this.sense(i, col);
+  }
+
   private senseImpact(i: number): void {
-    const col = this.bodyCollider[this.agentBody[i] as number] as RAPIER.Collider;
+    this.sense(i, this.bodyCollider[this.agentBody[i] as number] as RAPIER.Collider);
+  }
+
+  private sense(i: number, col: RAPIER.Collider): void {
     this.contactSum = 0;
     this.playerSum = 0;
     this.wallSum = 0;
@@ -2139,7 +2245,7 @@ export class Traffic {
       this.justWrecked[i] = 1;
       return;
     }
-    if (dv > t.disturbedImpact * armour) {
+    if (dv > t.disturbedImpact * armour && this.puppet[i] !== 1) {
       if (st !== AgentState.Disturbed) this.loosen(i);
       this.state[i] = AgentState.Disturbed;
       this.disturbedFor[i] = this.tuning.disturbedTime;
@@ -2261,6 +2367,13 @@ export class Traffic {
   /** The agent is a wreck from now on: a stopped obstacle until it despawns. */
   wreck(i: number): void {
     if (this.state[i] === AgentState.Wrecked) return;
+    if (this.puppet[i] === 1) {
+      // an AI car's record lies where the car came to grief, as its body left it (M8.8 slice 23)
+      const k = i * 4;
+      for (let c = 0; c < 4; c++) this.poseQ[k + c] = this.puppetQ[k + c] as number;
+      this.posed[i] = 1;
+      this.unpuppet(i);
+    }
     this.loosen(i);
     this.state[i] = AgentState.Wrecked;
     this.wreckedFor[i] = 0;
@@ -2455,6 +2568,7 @@ export class Traffic {
 
   private free(i: number): void {
     if ((this.agentBody[i] as number) >= 0) this.releaseBody(i);
+    this.unpuppet(i);
     this.releaseHolds(i);
     this.state[i] = AgentState.Free;
     this.posed[i] = 0;

@@ -227,3 +227,36 @@ describe('M8.8 slice 10: the 4×4 in every table', () => {
     } finally { sim.dispose(); }
   }, 60_000);
 });
+
+describe('M8.8 slice 16: scooters in the traffic', () => {
+  it('M8.8 16.1 scooters at their share: about 0.05 of a street, twice that in Crown Heights and on Coral Quay, never on the highway', async () => {
+    for (const d of ['foundry', 'gardens']) {
+      expect(shares(d, 'street').scooter, d).toBeGreaterThan(0.035);
+      expect(shares(d, 'street').scooter, d).toBeLessThan(0.055);
+    }
+    for (const d of ['crown', 'marina']) {
+      expect(shares(d, 'street').scooter, d).toBeGreaterThan(0.07);
+      expect(shares(d, 'street').scooter, d).toBeLessThan(0.1);
+    }
+    for (const d of ['crown', 'foundry', 'gardens', 'marina']) expect(shares(d, 'highway').scooter, d).toBe(0);
+    // seed 42: scooters spawn, each on a street, never on a highway lane, with the bike's class and its narrow footprint
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 0, record: false });
+    try {
+      sim.police!.dispatching = false;
+      const traffic = sim.traffic as Traffic;
+      let seen = 0, onHighway = 0;
+      run(sim, 20, () => {
+        for (let i = 0; i < traffic.capacity; i++) {
+          if (traffic.state[i] !== AgentState.Kinematic || traffic.bodyOf(i) !== 'scooter') continue;
+          seen++;
+          if ((traffic.lanes.limit[traffic.lane[i] as number] as number) === TRAFFIC.speedHighway) onHighway++;
+          expect(traffic.kindOf(i)).toBe('moto');
+          expect(traffic.halfWidthOf(i)).toBeCloseTo(0.35, 5);
+        }
+      });
+      expect(traffic.bodySpawns[BODY_INDEX.scooter]).toBeGreaterThan(0);
+      expect(seen).toBeGreaterThan(0);
+      expect(onHighway).toBe(0);
+    } finally { sim.dispose(); }
+  }, 60_000);
+});

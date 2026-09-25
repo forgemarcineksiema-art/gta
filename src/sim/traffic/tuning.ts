@@ -239,15 +239,17 @@ export const TRAFFIC: TrafficTuning = {
       wagon: 0, pizza: 0, wrecker: 0, twin: 0, fakecop: 0, partybus: 0, lowrider: 0, limo: 0, bubble: 0, phantom: 0, chiefcar: 0,
       roadster: 0, sweeper: 0, hotdog: 0,
       // the crazy cars (M8.8 phase F) are hidden, never traffic
-      roller: 0, monster: 0, trolley: 0,
+      roller: 0, monster: 0, trolley: 0, hover: 0,
+      // the delivery scooters (M8.8 slice 16): twice as many in Crown Heights and on Coral Quay, never on the highway
+      scooter: 0.05,
     },
     places: {
-      crown: { taxi: 4 },
+      crown: { taxi: 4, scooter: 2 },
       foundry: { truck: 3, pickup: 2 },
       gardens: { estate: 1.6, suv: 1.5 },
-      marina: { hatch: 1.5, sedan: 1.2 },
+      marina: { hatch: 1.5, sedan: 1.2, scooter: 2 },
       avenue: { bus: 3, taxi: 1.5 },
-      highway: { truck: 2, taxi: 0.5, bus: 0 },
+      highway: { truck: 2, taxi: 0.5, bus: 0, scooter: 0 },
       service: { bus: 0 },
     },
   },

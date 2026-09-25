@@ -18,6 +18,7 @@ import { Roadblocks } from './police/Roadblocks';
 import { Cameras } from './city/cameras';
 import { Jumps } from './city/jumps';
 import { Stash, cityToys } from './city/stash';
+import { SLIPWAY, SLIPWAYS, slipwayTop } from './city/sea';
 import { BREAKER, BREAKERS, Breakers } from './city/breakers';
 import { createControls, type VehicleControls } from './controls';
 import { EventLog } from './events';
@@ -36,7 +37,8 @@ import { TicketOfficer } from './police/Ticket';
 import { DONUT_SHOP, DonutShop } from './police/Donuts';
 import { Jobs } from './jobs/Jobs';
 import { Fares } from './jobs/Fares';
-import { jobsFor } from './jobs/place';
+import { jobsFor, seaTrial } from './jobs/place';
+import { AiCars } from './ai/AiCars';
 import { Garage } from './garage/Garage';
 import { Board } from './board/Board';
 import { Kit } from './garage/kit';
@@ -167,6 +169,8 @@ export class SimWorld {
   readonly coldOpen: ColdOpen;
   /** The goal the line names and the route to it (M8.7 D1–D2); null off the city. */
   readonly way: Way | null;
+  /** The AI cars that drive a physical race's rivals near the player (M8.8 slice 22). */
+  readonly ai: AiCars | null;
   /** The catalogue, paint, upgrades and prep: the wall's pages (M5 slice 4). */
   readonly garage: Garage;
   /** The pause screen's settings (M7 slice 3), carried for the save; nothing in the sim reads them. */
@@ -298,9 +302,12 @@ export class SimWorld {
     this.heat.playerSpeed = () => this.probe.speed;
     this.roadblocks = this.traffic && this.cover ? new Roadblocks(this, this.cover.chokepoints) : null;
     this.cameras = this.cover ? new Cameras(this.cover.cameraSites, this.cover.daily.cameras) : null;
-    this.jumps = this.city ? new Jumps(this, this.city.jumps) : null;
+    // the kickers, then the mega-ramp (M8.8 slice 21)
+    this.jumps = this.city ? new Jumps(this, [...this.city.jumps, this.city.megaRamp]) : null;
     // the generator's sixteen markers (docs/M5_PLAN.md D4); the cold open adds its own as id 0
     this.jobs = new Jobs(this, this.city && this.traffic ? jobsFor(this.city, opts.seed ?? 42, this.traffic.lanes) : []);
+    // the sea trial (M8.8 slice 20), after the generator's, before the way learns the rings
+    if (this.city && this.traffic) this.jobs.add(seaTrial());
     this.fares = new Fares(this, this.events);
     this.skill = new Skill(this);
     this.stash = new Stash(this);
@@ -313,6 +320,7 @@ export class SimWorld {
     this.caches = this.coins ? new Caches(this) : null;
     this.jobs.revealAll = opts.reveal ?? false;
     this.way = this.city && this.traffic ? new Way(this, this.city.graph, this.traffic.lanes) : null;
+    this.ai = this.city && this.traffic ? new AiCars(this) : null;
     if (this.city) {
       // what the street furniture keeps out of (M8 D7): every job's ring and its end, the stash's cars, the
       // breakers' towers, the donut shop; the cold open's route, the first time a chunk near it asks, with the things
@@ -326,6 +334,8 @@ export class SimWorld {
       for (const spot of Object.values(this.stash.spots)) rings.push({ x: spot.x, z: spot.z, r: PARKED_CAR_RING });
       for (const b of BREAKERS) rings.push({ x: b.x, z: b.z, r: Math.hypot(BREAKER.halfWidth, BREAKER.halfDepth) + BREAKER.clear });
       rings.push({ x: DONUT_SHOP.x, z: DONUT_SHOP.z, r: DONUT_SHOP_RING });
+      // the slipways' tops (M8.8 slice 19): the way down to the sea stays open
+      for (const s of SLIPWAYS) rings.push({ ...slipwayTop(s), r: SLIPWAY.clear });
       const city = this.city;
       city.setPropKeepOut(rings, () => {
         const loop = city.spawns.find((s) => s.name === 'loop'), hideout = this.run.dropOffs[0];
@@ -409,6 +419,8 @@ export class SimWorld {
       // the Fake Cruiser's disco bar: the road ahead pulls over (M8.8 slice 6)
       this.traffic.playerLit = bodySpec(this.carBody).lit === true;
       this.traffic.step(probe, FIXED_DT, this.events);
+      // a physical race's rivals near the player, on the car model (M8.8 slice 22)
+      this.ai?.preStep(probe, FIXED_DT);
     }
     this.mark?.(SimPhase.Traffic);
     // the street furniture's contacts, decided before the solver (M8 D1): the player's, then everyone else's (D6)
@@ -422,6 +434,7 @@ export class SimWorld {
     this.props?.afterPhysics(FIXED_DT);
     this.mark?.(SimPhase.Props);
     this.vehicle.writeTransforms();
+    this.ai?.postStep();
     this.traffic?.writeTransforms();
     this.peds?.writeTransforms();
     this.life.postStep(FIXED_DT);

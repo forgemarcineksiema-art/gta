@@ -326,7 +326,9 @@ export class IslandView {
         if (len < 0.01 || shoreOpen((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)) continue;
         // toward the land
         const nx = (-dz / len) * line.land, nz = (dx / len) * line.land;
-        if (kind === 'cliff' || kind === 'bay') {
+        // none where a road crosses the shore (the taxiways' bridges, M8.10 slice 12), as the wall has none there
+        const road = (x: number, z: number): boolean => ground.nearOtherRoad(x, z, -1, 3);
+        if ((kind === 'cliff' || kind === 'bay') && !road((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)) {
           // a parapet just behind the edge: its two long faces and its top, on the land's height at each end
           const ha = ground.height(a[0] + nx * 2, a[1] + nz * 2), hb = ground.height(b[0] + nx * 2, b[1] + nz * 2);
           const o = PARAPET.inset, w = PARAPET.half, t = PARAPET.height;
@@ -343,6 +345,7 @@ export class IslandView {
         if (every === 0) continue;
         for (let d = carry; d < len; d += every) {
           const x = a[0] + (dx / len) * d, z = a[1] + (dz / len) * d;
+          if (road(x, z)) continue;
           if (kind === 'quay') {
             const bx = x + nx * BOLLARD.inset, bz = z + nz * BOLLARD.inset;
             p.set(bx, ground.height(bx, bz), bz);

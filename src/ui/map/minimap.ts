@@ -14,6 +14,7 @@ import { BALANCE, CITY_HALF, DISTRICTS, PALETTE, districtAt, type JobDef, type S
 import { GLYPHS, GLYPH_ORDER, NO_GLYPH, digitSlot, glyphOf, goalGlyph, numberGlyphs, type GlyphId } from '../../sim/glyphs';
 import { SIGNALS } from '../../sim/palette';
 import { INK as INK_COLOR, MONEY, OFF, POLICE, TROUBLE, WAY, cssAlpha } from '../colors';
+import { FONT_STACK, fontReady } from '../fonts';
 import { labelAria, relabel, t } from '../lang';
 import {
   MINIMAP, advance, buildRoadLayers, clampToRim, drawInShare, garageShown, nearestDoor, project, radarMarks, radarScale, routeStop, yawFromQuat,
@@ -34,7 +35,8 @@ export interface MinimapMarker { x: number; z: number; kind: MarkerKind; color: 
  */
 export const RIVAL = TROUBLE;
 
-export const FONT = "'Segoe UI', 'Helvetica Neue', Arial, system-ui, sans-serif";
+/** The maps write in the screen's typeface (M8.9 R2), once it is in (`fontReady`). */
+export const FONT = FONT_STACK;
 export const INK = INK_COLOR;
 export const DARK = cssAlpha(SIGNALS.outline, 0.92);
 export const CACHE_COLOR = MONEY;
@@ -733,6 +735,8 @@ export class Minimap {
       const ang = h + (q * Math.PI) / 2;
       const sx = Math.sin(ang), cy = Math.cos(ang);
       if (q === 0) {
+        // the N in Rubik or not at all: a canvas does not redraw when the face arrives
+        if (!fontReady()) continue;
         const nx = ccx + sx * (R - 9), ny = ccy - cy * (R - 9);
         c.lineWidth = 3;
         c.strokeStyle = DARK;

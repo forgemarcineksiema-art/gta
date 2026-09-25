@@ -18,6 +18,7 @@ import {
 import { GLYPH_ORDER, KIND_GLYPH, NO_GLYPH, digitSlot, glyphIndex, glyphOf, goalGlyph, numberGlyphs, type GlyphId } from '../../sim/glyphs';
 import { glyphMarkup } from '../glyph';
 import { num, paintedCar, t } from '../lang';
+import { starText } from './stars';
 import type { TopVoice } from './voice';
 
 export const KIND_TITLE: Record<JobDef['kind'], string> = { delivery: 'DELIVERY', order: 'STEAL TO ORDER', escape: 'ESCAPE', trial: 'TIME TRIAL', race: 'STREET RACE', rage: 'TAKEDOWN RAGE', mayhem: 'MAYHEM', fare: 'FARE', duel: 'WANTED BOARD' };
@@ -297,7 +298,7 @@ export class JobsHud {
       this.goalId = g.id;
       this.goalDoor = g.door;
       const { words, extra } = goalWords(sim, g);
-      this.lineKind.textContent = words;
+      starText(this.lineKind, words);
       this.kindText = words;
       this.lineTime.textContent = extra;
       this.setBadge(goalGlyph(g, this.defOf));
@@ -360,7 +361,7 @@ export class JobsHud {
     }
     if (kind !== this.kindText) {
       this.kindText = kind;
-      this.lineKind.textContent = kind;
+      starText(this.lineKind, kind);
     }
     this.setState(state);
     if (jobs.state === 'done' || jobs.state === 'failed') {
@@ -376,7 +377,7 @@ export class JobsHud {
     this.cardTitle.textContent = t(hot ? 'HOT FARE' : KIND_TITLE[d.kind]);
     this.cardPay.textContent = money(d.payout);
     const first = d.kind === 'order' && (sim.run.chain & (1 << STEP.order)) === 0 && sim.jobs.state === 'hunting';
-    this.cardSub.textContent = jobCardLine(d, first, hot);
+    starText(this.cardSub, jobCardLine(d, first, hot));
     if (d.kind === 'duel') {
       // the rival's poster: the name, what the duel asks, the purse and the car
       const r = RIVALS[d.level] as RivalDef;
@@ -394,7 +395,7 @@ export class JobsHud {
     const words = newCardWords(kind);
     this.cardBadge.innerHTML = badgeMarkup(glyphIndex(KIND_GLYPH[kind]));
     this.cardTitle.textContent = words.title;
-    this.cardSub.textContent = words.sub;
+    starText(this.cardSub, words.sub);
     this.cardPay.textContent = '';
     this.card.dataset['kind'] = 'new';
     this.card.classList.remove('is-teach');
@@ -404,7 +405,7 @@ export class JobsHud {
   private fillChainCard(step: number): void {
     this.cardBadge.innerHTML = '';
     this.cardTitle.textContent = t('STEP {n} OF {of}', { n: step + 1, of: CHAIN_STEPS.length });
-    this.cardSub.textContent = t(CHAIN_STEPS[step] ?? '');
+    starText(this.cardSub, t(CHAIN_STEPS[step] ?? ''));
     this.cardPay.textContent = t('DONE');
     this.card.dataset['kind'] = 'chain';
     this.card.classList.remove('is-teach');

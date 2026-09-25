@@ -116,6 +116,8 @@ async function boot(page: Page, query: string, w: number, h: number): Promise<vo
   await page.addInitScript(INSTALL);
   await page.goto(`/?lang=pl&${query}`);
   await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 60_000 });
+  // the screen's typeface in before anything is measured (M8.9 R2: font-display swap)
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
 }
 
 async function adv(page: Page, ms: number): Promise<void> {

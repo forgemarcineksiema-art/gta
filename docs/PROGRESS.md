@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.9 slice 6: one typeface, two styles
+
+Done (R2): Rubik (OFL) in three woff2 faces, 50 KB (`public/fonts/`), cut from Google's variable TTFs (the static ones
+are gone) with the ranges in `ui/fonts.ts`, the display face preloaded. Two rules at the end of `styles.css` set every
+text: the label (Bold, upright, 0.06 em, 1.5 px ring) and the display (Black Italic, 2 px ring and a 2×3 shadow). The
+outline is a ring of shadows (a stroke eats glyphs where paint-order fails). No text skewed: the job card, tabs and
+DRIVE OUT keep −8° on `::before` plates. The ★ drawn inline (`hud/stars.ts`); the tiers' dots and the tick drawn in
+CSS; the maps write once the face is in. Pins M8.9 6.1–6.3, stills looked at; verify not run (Marcin: finish, no tests).
+Open: the door's `×2.6` keeps the English decimal point in Polish.
+
 ## 2026-09-25 — M8.9 slice 15: the preview; GOALS in pictures
 
 Done (R10): a focused card on STYLE shows on the car in the room (`sim/garage/look.ts`: the look is the car's paint and

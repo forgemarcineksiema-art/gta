@@ -2,9 +2,12 @@ import './ui/styles.css';
 import { App } from './app/App';
 import { t } from './ui/lang';
 import { applyHudScale } from './ui/scale';
+import { loadFonts } from './ui/fonts';
 
 // the screen's one scale before anything is laid out (M8.9 R3): the root's font size follows the window's height
 applyHudScale();
+// the screen's one typeface (M8.9 R2): its faces registered, the display face on its way (index.html preloads it)
+void loadFonts();
 
 const canvas = document.getElementById('game');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('missing #game canvas');

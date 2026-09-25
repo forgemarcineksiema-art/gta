@@ -72,10 +72,10 @@ export function paintName(paint: number): string {
 }
 
 /** What the card calls a class. */
-export const CAR_WORDS: Record<CarId, string> = { muscle: 'MUSCLE CAR', compact: 'COMPACT', heavy: 'VAN', sports: 'SPORTS CAR', police: 'POLICE CAR', offroad: '4×4' };
+export const CAR_WORDS: Record<CarId, string> = { muscle: 'MUSCLE CAR', compact: 'COMPACT', heavy: 'VAN', sports: 'SPORTS CAR', police: 'POLICE CAR', offroad: '4×4', moto: 'MOTORBIKE' };
 
-/** A class's job in one word (M8.8 R1): the drift, the city, the ram, the speed, the disguise, off the road. */
-export const ROLE_WORDS: Record<CarId, string> = { muscle: 'DRIFT', compact: 'CITY', heavy: 'RAM', sports: 'SPEED', police: 'DISGUISE', offroad: 'OFF-ROAD' };
+/** A class's job in one word (M8.8 R1): the drift, the city, the ram, the speed, the disguise, off the road, the jams. */
+export const ROLE_WORDS: Record<CarId, string> = { muscle: 'DRIFT', compact: 'CITY', heavy: 'RAM', sports: 'SPEED', police: 'DISGUISE', offroad: 'OFF-ROAD', moto: 'JAMS' };
 
 /** A trophy's one thing, the best in the game at it (M8.8 R2, slice 5): its card's BEST AT line. */
 export const BEST_AT: Partial<Record<BodyId, string>> = {

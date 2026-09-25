@@ -329,8 +329,9 @@ A five-minute novice run: about 3k in coins plus 8k in the bag at ×1.3 is
 13k. Cars, cash only (the prices fitted by the model's quick half, M7 slice
 10, §2.7, refitted at the M7 gate on the careful novice's 13k a run of 2.6
 minutes): the compact 24,000 (the second run's door after the cold open, at
-minute 6.7, inside the brief's 5–7), the van 30,000, the 4×4 40,000 (M8.8
-slice 10, among the first hour's tiers), the sports car 60,000
+minute 6.7, inside the brief's 5–7), the van 30,000, the motorbike 36,000
+(M8.8 slice 14), the 4×4 40,000 (M8.8 slice 10, among the first hour's
+tiers), the sports car 60,000
 (the second hour's goal), the police car 120,000 plus one heat-5 escape; the
 hidden cars are found, not bought (§8). Upgrades stay three stats × three
 tiers as multipliers on the preset, 24,000 / 26,000 / 30,000 a tier, two or

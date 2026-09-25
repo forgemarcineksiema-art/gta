@@ -27,7 +27,7 @@ const FIRST_CIVILIANS: readonly CivilianBody[] = ['sedan', 'hatch', 'estate', 's
 /** The classes whose shells come first (their class index is their body index). */
 const FIRST_SHELLS: readonly CarId[] = ['muscle', 'compact', 'heavy', 'sports', 'police'];
 /** Every body added since, a class's shell or a civilian's, in the order it came: appended after the last. */
-const ADDED: readonly BodyId[] = ['offroad', 'roller', 'monster', 'trolley'];
+const ADDED: readonly BodyId[] = ['offroad', 'roller', 'monster', 'trolley', 'moto'];
 export const CIVILIAN_BODIES: readonly CivilianBody[] = [...FIRST_CIVILIANS, ...ADDED.filter((id): id is CivilianBody => !(CAR_IDS as readonly BodyId[]).includes(id))];
 export const BODY_IDS: readonly BodyId[] = [...FIRST_SHELLS, ...FIRST_CIVILIANS, ...ADDED];
 
@@ -234,6 +234,8 @@ export const BODIES: readonly BodySpec[] = [
   civilian('monster', 'offroad', 1.3, 2.7, 3.4, 2.5, 4200, 0, { paints: [PALETTE.carLime], big: true, stretch: true, tune: CRAZY.monster, crush: 0.2 }),
   // the rocket trolley (slice 13), on the Crown Tower's plaza: the compact's class on castors, the boost its engine
   civilian('trolley', 'compact', 0.4, 0.7, 0.8, 0.6, 180, 0, { paints: [PALETTE.chrome], tune: CRAZY.trolley }),
+  // the motorbike's shell (slice 14)
+  shell('moto'),
 ];
 
 export const BODY_INDEX = Object.fromEntries(BODY_IDS.map((id, i) => [id, i])) as Record<BodyId, number>;

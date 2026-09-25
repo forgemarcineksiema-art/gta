@@ -217,6 +217,10 @@ export class Vehicle {
   lateralPull = 0;
   /** Outside factor on the engine's torque (a hurt car's, M8.8 slice 7); 1 is a sound engine. */
   torqueMul = 1;
+  /** On two wheels (M8.8 slice 14): the lean now and the one held (rad, + right side down), and a fall's seconds left. */
+  lean = 0;
+  leanTarget = 0;
+  tumbleLeft = 0;
   /** The ground the wheels read (the city's surface map, M8.8 slice 9); null is asphalt everywhere. */
   ground: SurfaceReader | null = null;
   /** Body slip angle of the previous step, radians (drift controller damping). */
@@ -455,7 +459,10 @@ export class Vehicle {
     if (this.boosting) this.boostMeter = Math.max(0, this.boostMeter - t.boostDrain * dt);
 
     // ---- suspension raycasts --------------------------------------------------
-    M.scale(s.rayDir, s.up, -1);
+    // on two wheels (M8.8 slice 14) the rays go straight down, so a lean never lifts them off the road
+    const twoWheel = t.twoWheel > 0;
+    if (twoWheel) M.set(s.rayDir, 0, -1, 0);
+    else M.scale(s.rayDir, s.up, -1);
     const rayLen = t.suspensionRestLength + t.wheelRadius;
     let grounded = 0;
     for (const w of this.wheels) {
@@ -622,7 +629,8 @@ export class Vehicle {
       if (f > stopForce) f = stopForce;
       if (f < 0) f = 0;
       w.load = f;
-      M.scale(s.force, s.up, f);
+      // two wheels push straight up: the roll is the upright controller's, not the springs'
+      M.scale(s.force, twoWheel ? AXIS_Y : s.up, f);
       forceAt(s.force, s.point);
     }
 
@@ -976,6 +984,31 @@ export class Vehicle {
     // a meter that fills by itself while it rests (M8.8 slice 13: the rocket trolley's; 0 on every other car)
     if (t.boostRegen > 0 && !this.boosting) this.boostMeter = Math.min(1, this.boostMeter + t.boostRegen * dt);
 
+    // ---- two wheels: the upright controller and the fall (M8.8 slice 14) ------------------------
+    if (twoWheel) {
+      // the lean, + with the right side down, and its rate about the long axis
+      const lean = Math.atan2(-s.right.y, s.up.y);
+      const rollRate = M.dot(s.angvel, s.fwd);
+      this.lean = lean;
+      if (this.tumbleLeft > 0) {
+        // bike and rider as one, left to fall; then stood up where they lie
+        this.tumbleLeft -= dt;
+        if (this.tumbleLeft <= 0) {
+          this.tumbleLeft = 0;
+          if (Math.abs(lean) > 20 * M.DEG || s.up.y < 0.9) this.teleport({ x: s.pos.x, y: s.pos.y + 0.4, z: s.pos.z }, M.yawOf(s.q));
+        }
+      } else if (impact > t.tumbleImpact || (Math.abs(lean) > t.tumbleDeg * M.DEG && speed < 5)) {
+        this.tumbleLeft = t.tumbleSeconds;
+      } else {
+        // into the turn by the angle of the lateral acceleration (level in the air)
+        const aRight = grounded > 0 ? -forwardSpeed * s.angvel.y : 0;
+        const maxLean = t.leanMaxDeg * M.DEG;
+        this.leanTarget = M.clamp(Math.atan2(aRight, 9.81), -maxLean, maxLean);
+        const accel = t.leanGain * (this.leanTarget - lean) - t.leanDamping * rollRate;
+        M.addScaled(s.tSum, s.tSum, s.fwd, accel * boxInertia(t).z);
+      }
+    }
+
     // ---- body vs terrain: only when the car is on its side or roof -------------------
     const flipped = s.up.y < 0.35;
     if (flipped !== this.collidesWithTerrain) {
@@ -1106,6 +1139,9 @@ export class Vehicle {
     this.gear = 1;
     this.shiftTimer = 0;
     this.rpm = this.tuning.idleRpm;
+    this.lean = 0;
+    this.leanTarget = 0;
+    this.tumbleLeft = 0;
     for (const w of this.wheels) {
       w.grounded = false;
       w.compression = 0;

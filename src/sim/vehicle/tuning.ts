@@ -131,6 +131,19 @@ export interface VehicleTuning {
    * contact rises at most this share of the distance driven; 0, every car's, puts the wheel on it at once.
    */
   climbSlope: number;
+
+  // --- two wheels (M8.8 slice 14, the motorbike) --------------------------------------
+  /** 1: the four rays stand on a narrow track straight down and push straight up, and the upright controller holds the roll. */
+  twoWheel: number;
+  /** The lean the controller holds: the angle of the lateral acceleration, at most this (deg). */
+  leanMaxDeg: number;
+  /** The controller: roll acceleration per radian of lean error (1/s²) and per rad/s of roll rate (1/s). */
+  leanGain: number;
+  leanDamping: number;
+  /** A fall: a hit over this (m/s), or a lean past `tumbleDeg` under 5 m/s, lets go of the roll for `tumbleSeconds`, then it is righted. */
+  tumbleImpact: number;
+  tumbleDeg: number;
+  tumbleSeconds: number;
   /** Off the road (M8.8 slice 9): on grass and on dirt, the tyres' grip and their rolling resistance, factors on asphalt's. */
   grassGrip: number;
   grassRoll: number;
@@ -331,6 +344,13 @@ export const DEFAULT_TUNING: VehicleTuning = {
   slipRatioTail: 0.7,
   rollingResistance: 0.012,
   climbSlope: 0,
+  twoWheel: 0,
+  leanMaxDeg: 50,
+  leanGain: 120,
+  leanDamping: 22,
+  tumbleImpact: 9,
+  tumbleDeg: 70,
+  tumbleSeconds: 1.2,
   // a lawn costs a road car a third on its 0–100 (the muscle car 8.3 s, was 6.2); dirt about a fifth
   grassGrip: 0.7,
   grassRoll: 7,

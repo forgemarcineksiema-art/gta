@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../src/sim/balance';
-import { BODY_IDS, CAR_IDS, CAR_PRESETS, KIT, PALETTE } from '../../src/sim';
+import { BODY_IDS, CAR_PRESETS, KIT, PALETTE } from '../../src/sim';
 import { DEFAULT_SAVE, SAVE_VERSION, apply, collect, defaultSave, encodeBits, migrate, parse, serialize, type SaveV1 } from '../../src/sim/save/format';
 import { createWorld } from './helpers';
 
@@ -151,7 +151,7 @@ describe('save format', () => {
       apply(sim, save);
       expect(sim.garage.tiers.offroad).toEqual([0, 0, 0]);
       expect(sim.garage.owned.has('offroad')).toBe(false);
-      for (const id of CAR_IDS) if (id !== 'offroad') expect(sim.garage.owned.has(id)).toBe(true);
+      for (const id of save.owned) expect(sim.garage.owned.has(id)).toBe(true);
       sim.garage.select('suv');
       sim.garage.applyToVehicle();
       expect(sim.carBody).toBe('suv');

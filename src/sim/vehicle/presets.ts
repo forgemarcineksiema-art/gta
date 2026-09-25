@@ -8,9 +8,9 @@
  */
 import { DEFAULT_TUNING, cloneTuning, type VehicleTuning } from './tuning';
 
-export type CarId = 'muscle' | 'compact' | 'heavy' | 'sports' | 'police' | 'offroad';
+export type CarId = 'muscle' | 'compact' | 'heavy' | 'sports' | 'police' | 'offroad' | 'moto';
 /** The classes; one added after the first five has its shell appended after the last body (traffic/bodies.ts). */
-export const CAR_IDS: CarId[] = ['muscle', 'compact', 'heavy', 'sports', 'police', 'offroad'];
+export const CAR_IDS: CarId[] = ['muscle', 'compact', 'heavy', 'sports', 'police', 'offroad', 'moto'];
 
 function preset(overrides: Partial<VehicleTuning>): VehicleTuning {
   return { ...cloneTuning(DEFAULT_TUNING), ...overrides };
@@ -243,5 +243,66 @@ export const CAR_PRESETS: Record<CarId, VehicleTuning> = {
     airAngularDamping: 10000,
     boostTorqueMul: 1.3,
     boostThrust: 3600,
+  }),
+
+  /**
+   * The motorbike (M8.8 slice 14): 290 kg with its rider on two wheels, the car model's four rays on a 0.1 m track
+   * (`twoWheel`), the upright controller leaning it into the turn and letting go in a fall; a twin to 11,000 rpm.
+   */
+  moto: preset({
+    mass: 290,
+    chassisHalfExtents: { x: 0.35, y: 0.45, z: 1.05 },
+    chassisOffsetY: 0.5,
+    centerOfMassY: -0.1,
+    inertiaScale: { x: 1, y: 1, z: 1 },
+    wheelBase: 1.45,
+    trackWidth: 0.1,
+    wheelRadius: 0.32,
+    wheelWidth: 0.16,
+    suspensionAttachY: 0.1,
+    suspensionRestLength: 0.25,
+    suspensionStiffness: 26000,
+    suspensionDampingCompression: 2600,
+    suspensionDampingRebound: 3400,
+    bumpStopStiffness: 60000,
+    suspensionDampingProgressive: 100,
+    antiRollStiffness: 0,
+    maxSteerDegLow: 32,
+    maxSteerDegHigh: 4,
+    steerSpeedRef: 30,
+    steerRate: 6,
+    torqueMax: 95,
+    idleRpm: 1400,
+    redlineRpm: 11000,
+    engineBrakeTorque: 12,
+    engineInertia: 0.1,
+    gearRatios: [2.6, 1.9, 1.5, 1.25, 1.08, 0.95],
+    finalDrive: 3.6,
+    driveFrontShare: 0,
+    lsdPreload: 10,
+    lsdStiffness: 50,
+    brakeTorque: 1500,
+    brakeFrontBias: 0.65,
+    handbrakeTorque: 900,
+    wheelInertia: 0.25,
+    tireForceHeight: 0.4,
+    driftAngleGain: 30000,
+    driftAngleDamping: 2000,
+    driftYawTorqueMax: 7000,
+    driftThrottlePush: 1200,
+    drag: 0.52,
+    downforce: 0.3,
+    airPitchTorque: 800,
+    airRollTorque: 700,
+    airLevelTorque: 8000,
+    airAngularDamping: 1100,
+    // a short wheelbase follows its flight steeply: held to 12° it lands on both wheels
+    airPitchMaxDeg: 12,
+    twoWheel: 1,
+    // stiff enough to hold the lean of the turn's g within a degree or two against the fall
+    leanGain: 220,
+    leanDamping: 30,
+    boostTorqueMul: 1.25,
+    boostThrust: 600,
   }),
 };

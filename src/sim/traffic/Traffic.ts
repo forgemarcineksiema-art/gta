@@ -69,7 +69,7 @@ const KIND_INDEX = Object.fromEntries(CAR_IDS.map((id, i) => [id, i])) as Record
 /** The player's paint per class (docs/STYLE.md): what an abandoned player car keeps. */
 export const PLAYER_PAINT: Record<CarId, number> = {
   muscle: PALETTE.carRed, compact: PALETTE.carBlue, heavy: PALETTE.carOrange,
-  sports: PALETTE.carLime, police: PALETTE.policeWhite, offroad: PALETTE.sand,
+  sports: PALETTE.carLime, police: PALETTE.policeWhite, offroad: PALETTE.sand, moto: PALETTE.carMagenta,
 };
 
 export interface SwapHandover {

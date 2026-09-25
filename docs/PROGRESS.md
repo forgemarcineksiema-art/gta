@@ -11,6 +11,15 @@ dispatcher's clock (`unreported`), a seen crime still blows it. A duel's rival p
 (`aiAccel`, 16.7 m/s over the body's measured 0–60; in place of the unit's ×1.5): the Bubble 7.1 m/s², the Wrecker and
 the Party Bus 4.2 (their hunts start slower). BEST AT: CLEARING THE ROAD, GETTING BUSTED, DISGUISE. Pins M8.8 6.1–6.4.
 
+## 2026-09-25 — M8.9 slice 4: the sun and the clouds
+
+Done (R9's sky): the sun's disc and a wide warm halo (an additive fan and ring) on the light's bearing but low, at 9°, in
+the warm band (the plan had the disc on the light itself; at 32° it would stand in the violet like a moon, and the light
+stays high so the streets are not all in shade); the dome warmer toward the sun below 40°; twelve flat octagon clouds,
+seeded, 8°–25° up within 80° of the sun's bearing, orange-pink underneath and violet on top. All ride with the camera;
+three sky meshes, two draws added. The look suite gains `sunward` (the calm street turned to the sun). Pins M8.9
+4.1–4.3. Verify green; stills: the sun, its halo and the lit clouds over the Crown's lit offices.
+
 ## 2026-09-25 — M8.8 slice 5: the eight drivers' cars
 
 Done: each trophy's own numbers on its class (`BodySpec.tune`, after the mass) make it the best in the game at one thing,

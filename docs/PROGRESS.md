@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.10 slice 0: the plan as data
+
+Done: `src/sim/island/plan.ts` holds the sketches' island as data: the coast (a closed curve through 49 points, its parts
+cliffs, quays, bay, beach), the port's basin, the causeway, the islet, the hills (the ridge moved north-west so the
+tower stands on the island's top, 52 m), the districts by the harbour road and Palm Avenue, the highway's loop, the
+avenues and the places' roads, the places and DESIGN §21.4's placed things; `geom.ts` its geometry. Moved onto land:
+the cranes onto the quay, the lighthouse and its road onto the spit (the highway 16 m east to leave it room), the
+hovercraft's slipway, the ice-cream truck. The highway's loop is 5.4 km, the grid ring's length (the talk's 7 km was
+wrong; DESIGN §21.1 says so). Pins 0.1–0.7 (`tests/sim/island/plan.test.ts`).
+
 ## 2026-09-25 — M8.10 "The island": the plan written (Marcin: "zapisujemy i zaczynamy")
 
 After the atlas of the grid island (his words: a simple generator with a few authored roads; no palm in Palm Gardens,

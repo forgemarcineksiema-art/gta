@@ -2217,8 +2217,9 @@ It sits before the platform: the map is what a player plays.
 - **The size stays**: 2.54 km² of land (1.8 × 1.6 km, the bay and the port's
   basin cutting in; the grid island is 2.48), and 0.09 km² more for the
   airfield's causeway and the islet. At 150 km/h the island is crossed in
-  about 45 s and the highway's lap takes about 3 min, long enough for a
-  chase; the fog shows about half a kilometre, so the island is three or
+  about 45 s and the highway's lap (5.4 km, the grid's ring's length) takes
+  about 2 min, long enough for a chase; the fog shows about half a
+  kilometre, so the island is three or
   four views across; what failed was sameness, not size. The runway needs
   670 m and the hill about 500 m to rise 50 m; a smaller island loses them.
 - **The names stay and come true**: the hill under Crown Heights, the palms

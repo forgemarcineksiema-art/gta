@@ -47,6 +47,30 @@ describe('M8.10 slice 3: the ground\'s cover', () => {
     expect(sim.vehicle.wheels.filter((w) => w.grounded && w.surface === SAND).length).toBe(4);
   });
 
+  it('3.5 a wheel on what is built over the ground reads the road\'s: the bay bridge\'s deck over the sea, a drive-through\'s floor on the grass', async () => {
+    const sim = await createWorld({ map: 'island', traffic: 0, peds: 0 });
+    const island = sim.island as Island;
+    const on = (x: number, y: number, z: number, yaw: number): number => {
+      island.sync(x, z, true);
+      sim.vehicle.teleport({ x, y: y + 0.8, z }, yaw);
+      for (let i = 0; i < 40; i++) { clearControls(sim.controls); sim.controls.brake = 1; sim.step(); }
+      return sim.vehicle.wheels.filter((w) => w.grounded && w.surface === ASPHALT).length;
+    };
+    const bridge = island.structures.find((s) => s.kind === 'bridge');
+    const deck = bridge?.pieces[Math.floor(bridge.pieces.length / 2)];
+    expect(deck).toBeDefined();
+    if (deck) {
+      expect(island.ground.onLand(deck.x, deck.z), 'the bridge over the sea').toBe(false);
+      expect(on(deck.x, deck.y, deck.z, deck.yaw)).toBe(4);
+    }
+    const site = island.services.find((s) => s.kind === 'repair');
+    expect(site).toBeDefined();
+    if (site) {
+      expect(island.ground.surface(site.x, site.z), 'the ground under the floor').toBe(GRASS);
+      expect(on(site.x, site.y, site.z, site.yaw)).toBe(4);
+    }
+  });
+
   it('3.4 a car in the sea is put back on the nearest road within two seconds', async () => {
     const sim = await createWorld({ map: 'island', traffic: 0, peds: 0 });
     const island = sim.island as Island;

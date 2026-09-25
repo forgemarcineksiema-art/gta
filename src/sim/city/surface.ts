@@ -17,9 +17,12 @@ export const DIRT = 2;
 export const SAND = 3;
 export type SurfaceKind = typeof ASPHALT | typeof GRASS | typeof DIRT | typeof SAND;
 
-/** What the wheels read: the surface at a point of the ground. */
+/**
+ * What the wheels read: the surface at a point of the ground. `handle`: the collider the wheel stands on, when known (a
+ * map reads what is built over its ground, a deck or a floor, by it; -1 or none: the ground's).
+ */
 export interface SurfaceReader {
-  at(x: number, z: number): SurfaceKind;
+  at(x: number, z: number, handle?: number): SurfaceKind;
 }
 
 const CELL = 2;

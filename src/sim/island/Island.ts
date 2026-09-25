@@ -12,7 +12,7 @@ import type { SurfaceReader } from '../city/surface';
 import type { RoadPoint } from '../city/roads';
 import type { TrackDef, TrackSample } from '../track';
 import { inPolygon, type P2 } from './geom';
-import { GRASS } from '../city/surface';
+import { ASPHALT, GRASS } from '../city/surface';
 import { PROP_LINES, chunkProps, type PropDesc, type PropPlace } from '../city/props';
 import { FOOT, Ground, HALF_WIDTH, type CoastKind, type GroundProbe } from './ground';
 import { buildNetwork } from './network';
@@ -59,7 +59,12 @@ const LID = { half: 24, step: 3 } as const;
 export class Island {
   readonly ground = new Ground();
   /** What the wheels read (M8.10 slice 3): the ground's cover at a point. */
-  readonly surface: SurfaceReader = { at: (x, z) => this.ground.surface(x, z) };
+  readonly surface: SurfaceReader = {
+    // on what is built over the ground (a deck, a pier, a pavement's kerb, a floor, a roof): the road's; else the cover
+    at: (x, z, handle = -1) => (handle >= 0 && !this.groundHandles.has(handle) ? ASPHALT : this.ground.surface(x, z)),
+  };
+  /** The ground's own colliders (the chunks' height fields, the tunnel's lid): what the wheels read the cover of. */
+  private readonly groundHandles = new Set<number>();
   readonly spawns: SpawnPoint[];
   /** The highway's loop as the bot's and the lap timer's track. */
   readonly route: TrackDef;
@@ -227,6 +232,7 @@ export class Island {
       }
       for (const [k, collider] of this.active) {
         if (this.want.has(k)) continue;
+        this.groundHandles.delete(collider.handle);
         this.world.removeCollider(collider, false);
         for (const c of this.chunkColliders.get(k) ?? []) this.world.removeCollider(c, false);
         this.chunkColliders.delete(k);
@@ -245,7 +251,9 @@ export class Island {
 
   private load(k: number): void {
     if (this.active.has(k)) return;
-    this.active.set(k, this.buildChunk(k % CHUNKS_X, Math.floor(k / CHUNKS_X)));
+    const field = this.buildChunk(k % CHUNKS_X, Math.floor(k / CHUNKS_X));
+    this.active.set(k, field);
+    this.groundHandles.add(field.handle);
     // the pavements' kerbs: a slab under each piece of the band, its top the pavement's, climbed by the wheels
     const colliders = (this.surfaces.kerbs.get(k) ?? []).map((p) => this.slab(p, PAVEMENT / 2, 0.5, p.length / 2 + 0.2, 0, -0.5, 0, GROUPS_TERRAIN));
     // the chunk's statics by their tags, as the grid's: a building's (and a place's wall) solid, a kerb's (a ramp's
@@ -464,7 +472,7 @@ export class Island {
         if (hill > roof + 0.5) put({ ...p, x: mx, y: roof, z: mz }, DECK.half + 4, (hill - roof) / 2, 0.5, 0, (hill - roof) / 2, 0, GROUPS_SOLID, true);
       }
     }
-    if (lidTris.length > 0) this.world.createCollider(RAPIER.ColliderDesc.trimesh(new Float32Array(lid), new Uint32Array(lidTris)).setFriction(1).setCollisionGroups(GROUPS_TERRAIN));
+    if (lidTris.length > 0) this.groundHandles.add(this.world.createCollider(RAPIER.ColliderDesc.trimesh(new Float32Array(lid), new Uint32Array(lidTris)).setFriction(1).setCollisionGroups(GROUPS_TERRAIN)).handle);
   }
 
   /** The spawns: the first minute's start at the summit, facing down Crown Avenue; the port, the beach, the runway. */

@@ -855,7 +855,7 @@ export class Vehicle {
         continue;
       }
       // the ground under the tyre (M8.8 slice 9): grass, dirt and the island's sand take grip and drag at the tyre
-      const ground = this.ground ? this.ground.at(w.contact.x, w.contact.z) : ASPHALT;
+      const ground = this.ground ? this.ground.at(w.contact.x, w.contact.z, w.hitHandle) : ASPHALT;
       w.surface = ground;
       const groundGrip = ground === GRASS ? t.grassGrip : ground === DIRT ? t.dirtGrip : ground === SAND ? t.sandGrip : 1;
       const groundRoll = ground === GRASS ? t.grassRoll : ground === DIRT ? t.dirtRoll : ground === SAND ? t.sandRoll : 1;

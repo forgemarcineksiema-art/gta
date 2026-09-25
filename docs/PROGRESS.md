@@ -12,6 +12,15 @@ else paved; every lane reads asphalt at every 3 m. Each grounded wheel reads its
 (the compact 50, the van twice, the sports car 19), dirt 0.8/×5; a stronger ×8 made the compact hunt gears on its
 wheelspin. Skid marks on asphalt only; drift smoke off grass or dirt in its colour. Pins M8.8 9.1, 9.2; 9.3 the gate's gc.
 
+## 2026-09-25 — M8.9 slice 7: the HUD on one scale (slice 6, the typeface, waits for the font's download)
+
+Done (R3): every size of the screen's rules is in rem (a one-off rewrite; borders, shadows, radii and the dev panel keep
+their pixels) and `ui/scale.ts` sets the root's font size to 16 px × the height over 720, held to 0.85–1.5, from
+`main.ts` before anything is laid out. The clamps by the height became fixed rem (the speed 3.4, the stars 1.6, the radar
+10.35 = 165.6 px at 720p); the short screens' shrinks and the wall's ×1.2/×1.4 steps went (the scale does both); a label
+is 1 rem at least, the keycaps too. Stills at 800×450, 1280×720, 1920×1080: no text under 13 px at any, TOTALS fits
+800×450, the line 30 px at 1080p. Pins M8.9 7.1–7.3. Verify green.
+
 ## 2026-09-25 — M8.8 slice 8: a voice per engine
 
 Done: `src/audio/voices.ts` gives each class a voice and the engine speaks in the body's (`EngineAudio.update` takes

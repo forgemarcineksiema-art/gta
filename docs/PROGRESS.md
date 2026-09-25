@@ -11,6 +11,16 @@ seeded, 8°–25° up within 80° of the sun's bearing, orange-pink underneath a
 three sky meshes, two draws added. The look suite gains `sunward` (the calm street turned to the sun). Pins M8.9
 4.1–4.3. Verify green; stills: the sun, its halo and the lit clouds over the Crown's lit offices.
 
+## 2026-09-25 — M8.8 slice 5: the eight drivers' cars
+
+Done: each trophy's own numbers on its class (`BodySpec.tune`, after the mass) make it the best in the game at one thing,
+against every body (`bodyMeasure.ts`: drift, pulse, grip, wall, boost; `bodies.long.test.ts`): the Wagon holds a 43°
+drift (next 36), the Pizza Hatch turns 31° in the 60 km/h pulse (29), the Wrecker takes half a hit (`BodySpec.armour` 2,
+read by `Life`), the Twin holds 3.4 g (3.1), the Party Bus 159 km/h at 6.5 t, the Lowrider's nitro lasts 6 s (3.6), the
+Bubble 0–100 in 3.7 s (4.3), the Phantom 228 km/h (204). The card says BEST AT (`carLine`; in Polish agreeing with the
+car: NAJTWARDSZA, NAJSZYBSZY, `PL_BEST`). Pins M8.8 5.1–5.2 (long, run once here), 5.3; bodies 4.1 leaves the Twin and
+the Phantom their own numbers. Verify green.
+
 ## 2026-09-25 — M8.9 slice 3: the city lit at dusk, with depth
 
 Done (R9): `render/city/glow.ts` gives the city's one material a `cityLook` attribute (a byte of glow, a byte of

@@ -7,9 +7,10 @@
 import { describe, expect, it } from 'vitest';
 import type { SimWorld } from '../../src/sim';
 import { BALANCE } from '../../src/sim/balance';
-import { ROLE_WORDS, cardLine } from '../../src/sim/jobs/catalog';
+import { BEST_AT, ROLE_WORDS, cardLine } from '../../src/sim/jobs/catalog';
 import { CAR_IDS } from '../../src/sim/vehicle/presets';
-import { PL } from '../../src/ui/pl';
+import { carLine, setLang } from '../../src/ui/lang';
+import { PL, PL_BEST } from '../../src/ui/pl';
 import { cardLines, countsLine, doorLines } from '../../src/ui/hud/totals';
 import { PAGE_TITLES, WALL_ACTIONS, WALL_PAGES, pageOf } from '../../src/ui/wall/wallPages';
 import { createWorld, run, runUntil } from '../sim/helpers';
@@ -86,5 +87,22 @@ describe('M8.8 slice 3: what a car is for', () => {
     expect(cardLine('hatch')).toBe('CITY');
     expect(cardLine('bus')).toBe('RAM');
     expect(cardLine('police')).toBe('DISGUISE');
+  });
+
+  it('M8.8 5.3 a trophy\'s card says what it is the best at, in Polish agreeing with the car', () => {
+    try {
+      setLang('en');
+      expect(carLine('wagon')).toBe('BEST AT: DRIFTS');
+      expect(carLine('phantom')).toBe('BEST AT: TOP SPEED');
+      expect(carLine('taxi')).toBe('DRIFT');
+      setLang('pl');
+      expect(carLine('wagon')).toBe('NAJLEPSZY W DRIFCIE');
+      expect(carLine('wrecker')).toBe('NAJTWARDSZA');
+      expect(carLine('lowrider')).toBe('NAJDŁUŻSZE NITRO');
+      expect(carLine('bubble')).toBe('NAJSZYBCIEJ PRZYSPIESZA');
+      expect(carLine('bus')).toBe('TARAN');
+      // every trophy has its Polish in all three forms
+      for (const thing of Object.values(BEST_AT)) expect(PL_BEST[thing]?.length, thing).toBe(3);
+    } finally { setLang('en'); }
   });
 });

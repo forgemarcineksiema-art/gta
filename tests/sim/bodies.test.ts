@@ -176,10 +176,11 @@ describe('every body at its own mass (M8.8 slice 4)', () => {
     for (const body of BODY_IDS) if (!isShell(body)) expect(bodyTuning(body).mass, body).toBe(bodySpec(body).mass);
   });
 
-  it('M8.8 4.1 a shell and a rival on a shell drive as their class\'s preset, bitwise', () => {
-    for (const body of ['muscle', 'compact', 'heavy', 'sports', 'police', 'twin', 'phantom', 'fakecop', 'chiefcar'] as const) {
+  it('M8.8 4.1 a shell and a rival on a shell drive as their class\'s preset, bitwise, but for a trophy\'s own numbers (slice 5)', () => {
+    for (const body of ['muscle', 'compact', 'heavy', 'sports', 'police', 'fakecop', 'chiefcar'] as const) {
       expect(bodyTuning(body), body).toEqual(CAR_PRESETS[bodySpec(body).car]);
     }
+    for (const body of ['twin', 'phantom'] as const) expect(bodyTuning(body), body).not.toEqual(CAR_PRESETS[bodySpec(body).car]);
   });
 
   it('M8.8 4.3 a world started in a body drives it: its class, its paint, its mass', async () => {

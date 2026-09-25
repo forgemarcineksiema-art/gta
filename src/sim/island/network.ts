@@ -11,6 +11,7 @@ import { HIGHWAY_LANE_OFFSETS, type Lane, type RoadGraph, type RoadNode, type Ro
 import { catmullRom, resample, type P2 } from './geom';
 import { HALF_WIDTH, MAX_GRADE, type Ground } from './ground';
 import { HIGHWAY, RINGS, ROADS, highwayLoop, type RoadClass, type SpanKind } from './plan';
+import { districtStreets } from './streets';
 
 /** A road's ends join another road within this (m); joins this close along a road are one node. */
 const JOIN = 3;
@@ -29,7 +30,8 @@ interface Line { id: string; cls: RoadClass; pts: RoadPoint[]; onGround: boolean
 /** A lane eases between the ground and the tunnel's or a deck's profile over this many samples each side of the change. */
 const EASE = 2;
 
-export interface IslandNetwork { graph: RoadGraph; lines: Line[] }
+/** The graph, its sampled lines, and each lane's road (by id). */
+export interface IslandNetwork { graph: RoadGraph; lines: Line[]; laneRoad: string[] }
 
 /**
  * Whether a lane's point runs on the ground: its line's nearest point is firmly on it (the highway leaves it in the
@@ -119,7 +121,7 @@ function lines(ground: Ground): Line[] {
     });
   }
   out.push({ id: 'highway', cls: 'highway', pts, onGround, firm: [], closed: true, ring: false, s: [] });
-  for (const r of ROADS) {
+  for (const r of [...ROADS, ...districtStreets().roads]) {
     const p = sample(r.points, r.smooth);
     out.push({ id: r.id, cls: r.cls, pts: p, onGround: p.map(() => true), firm: [], closed: false, ring: false, s: [] });
   }
@@ -186,6 +188,8 @@ export function buildNetwork(ground: Ground): IslandNetwork {
       if (!nodes.some((n) => Math.hypot(n.x - end.x, n.z - end.z) < MERGE)) nodes.push({ id: nodes.length, x: end.x, z: end.z, outgoing: [] });
     }
   }
+  // and every crossing of a district's street with another road, at grade
+  for (const [x, z] of districtStreets().junctions) if (!nodes.some((n) => Math.hypot(n.x - x, n.z - z) < MERGE)) nodes.push({ id: nodes.length, x, z, outgoing: [] });
   // each line stops at every node on it (a road running through a junction another's end makes stops there too)
   const stops: Array<Array<{ s: number; node: number }>> = all.map((l) => {
     const list: Array<{ s: number; node: number }> = [];
@@ -198,7 +202,7 @@ export function buildNetwork(ground: Ground): IslandNetwork {
   // each node's widest road, for the lanes' insets
   const widest = new Map<number, number>();
   all.forEach((l, i) => { for (const st of stops[i] as Array<{ s: number; node: number }>) widest.set(st.node, Math.max(widest.get(st.node) ?? 0, l.ring ? 0 : HALF_WIDTH[l.cls])); });
-  const lanes: Lane[] = [];
+  const lanes: Lane[] = [], laneRoad: string[] = [];
   const addLane = (from: number, to: number, centre: RoadPoint[], line: Line, offset: number, onGround: (p: RoadPoint) => boolean): void => {
     let insetA = line.ring ? RING_INSET : (widest.get(from) ?? 0) + INSET_PAD;
     let insetB = line.ring ? RING_INSET : (widest.get(to) ?? 0) + INSET_PAD;
@@ -215,6 +219,7 @@ export function buildNetwork(ground: Ground): IslandNetwork {
       yaw0: Math.atan2(second.x - first.x, second.z - first.z), yaw: Math.atan2(last.x - before.x, last.z - before.z), next: [],
     };
     lanes.push(lane);
+    laneRoad.push(line.id);
     (nodes[from] as RoadNode).outgoing.push(lane.id);
   };
   all.forEach((l, i) => {
@@ -241,7 +246,7 @@ export function buildNetwork(ground: Ground): IslandNetwork {
       return !(lane.highway && o.highway && o.to === lane.from);
     });
   }
-  return { graph: { nodes, lanes, special: [] }, lines: all };
+  return { graph: { nodes, lanes, special: [] }, lines: all, laneRoad };
 }
 
 /** The index of a line's point nearest to `p`. */

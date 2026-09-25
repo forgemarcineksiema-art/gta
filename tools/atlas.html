@@ -134,8 +134,8 @@ function drawBase() {
   // the roads: the tunnel under, the streets, the avenues, the highway over
   for (const r of A.roads) if (r.span === 'tunnel') { trace(r.pts, false); g.save(); g.setLineDash([18, 12]); g.lineCap = 'butt'; g.lineWidth = 20; g.strokeStyle = 'rgba(42,36,56,0.6)'; g.stroke(); g.lineWidth = 11; g.strokeStyle = 'rgba(255,233,168,0.9)'; g.stroke(); g.restore(); }
   g.lineCap = 'round'; g.lineJoin = 'round';
-  const STY = { dirt: [8, '#6f5438', 5, '#a4835c'], street: [9, '#5b5566', 5.5, '#ece6d8'], serpentine: [9, '#5b5566', 5.5, '#ece6d8'], taxiway: [11, '#3a3a46', 7, '#6a6a78'], avenue: [14, '#4a4558', 9.5, '#f7f3ea'], ramp: [10, '#2a2438', 6, '#ffe9a8'] };
-  for (const pass of [0, 1]) for (const cls of ['dirt', 'street', 'serpentine', 'taxiway', 'avenue', 'ramp']) for (const r of A.roads) {
+  const STY = { side: [7, '#6a6474', 4, '#e2dccd'], dirt: [8, '#6f5438', 5, '#a4835c'], street: [9, '#5b5566', 5.5, '#ece6d8'], serpentine: [9, '#5b5566', 5.5, '#ece6d8'], taxiway: [11, '#3a3a46', 7, '#6a6a78'], avenue: [14, '#4a4558', 9.5, '#f7f3ea'], ramp: [10, '#2a2438', 6, '#ffe9a8'] };
+  for (const pass of [0, 1]) for (const cls of ['side', 'dirt', 'street', 'serpentine', 'taxiway', 'avenue', 'ramp']) for (const r of A.roads) {
     if (r.cls !== cls || r.span === 'tunnel') continue;
     const [cw, cc, fw, fc] = STY[cls]; trace(r.pts, false); g.lineWidth = pass ? fw : cw; g.strokeStyle = pass ? fc : cc; g.stroke();
   }

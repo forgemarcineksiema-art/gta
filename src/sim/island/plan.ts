@@ -120,7 +120,7 @@ export function naturalHeight(x: number, z: number): number {
 
 // ---------------------------------------------------------------- the main roads
 
-export type RoadClass = 'highway' | 'avenue' | 'street' | 'serpentine' | 'dirt' | 'taxiway' | 'ramp';
+export type RoadClass = 'highway' | 'avenue' | 'street' | 'serpentine' | 'dirt' | 'taxiway' | 'ramp' | 'side';
 /** How a stretch of road meets the ground: on it, under it, or over it. */
 export type SpanKind = 'ground' | 'tunnel' | 'viaduct' | 'bridge';
 

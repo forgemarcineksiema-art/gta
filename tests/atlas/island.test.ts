@@ -6,6 +6,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import { GLYPHS, KIND_GLYPH } from '../../src/sim/glyphs';
 import { catmullRom, circle } from '../../src/sim/island/geom';
+import { districtStreets } from '../../src/sim/island/streets';
 import {
   BAY, BASIN, BOUNDS, BREAKERS, BUOYS, CAMERAS, COAST_PARTS, COVERS, FIRST_MINUTE, FIRST_MINUTE_STEPS, GARAGES, HIGHWAY, JOBS, JUMPS,
   PLACES, RINGS, RIVAL_RINGS, ROADBLOCK_SITES, ROADS, SERVICES, SLIPWAYS, STASH, causeway, coastline, districtOf, islet, landArea,
@@ -41,6 +42,8 @@ it('dumps the island for the atlas', () => {
   }
   const roads = [...HIGHWAY, ...ROADS].map((r) => ({ id: r.id, cls: r.cls, span: r.span, pts: pts(r.smooth ? catmullRom(r.points, false, 6) : r.points) }));
   for (const ring of RINGS) roads.push({ id: ring.id, cls: ring.cls, span: 'ground', pts: pts([...circle(ring.x, ring.z, ring.r, 64), circle(ring.x, ring.z, ring.r, 64)[0] as [number, number]]) });
+  // the districts' streets (slice 5), drawn under the main roads
+  for (const s of districtStreets().roads) roads.push({ id: s.id, cls: s.cls, span: 'ground', pts: pts(s.points) });
   const data = {
     bounds: BOUNDS, area: landArea(),
     coast: pts(coastline()), coastSpan: spanOf, coastParts: COAST_PARTS, causeway: pts(causeway()), islet: pts(islet()), bay: pts(catmullRom(BAY, true, 6)), basin: BASIN,

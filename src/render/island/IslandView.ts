@@ -13,10 +13,10 @@ import { QUALITY, type QualityTier } from '../quality';
 import { GroundView } from './GroundView';
 
 /** Road strips sit this far over the ground so the two never fight, their skirts hang this far under their edges (m). */
-const LIFT = 0.06;
+const LIFT = 0.1;
 const ROAD_SKIRT = 0.8;
 /** The paved places' slabs: this far over the ground, under the roads' strips; a quad about this big (m). */
-const PAVE_LIFT = 0.04;
+const PAVE_LIFT = 0.09;
 const PAVE_CELL = 8;
 /** The chunks within this of the car are built at the start; the rest a few columns a frame (m). */
 const SNAP_REACH = 400;

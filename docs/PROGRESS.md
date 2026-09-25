@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.10 slice 5: the districts' streets
+
+Done: `island/streets.ts` lays each district's streets (15 km, 49 streets): Crown a 90 m grid round the summit, Works
+180 × 150 m yards, the Gardens two crescents and radials round the botanic garden, the Quay a 120 m grid; each kept
+where its district and the places allow, run on to the road it meets, and pruned until no end is loose. The ground
+grades them after the main roads: the crossings' heights eased over the whole grid so no block is steeper than its
+class, each street crossing flat 12 m each way (Crown's crests); a T on a main road takes its height. The network joins
+them at grade. Open: at a crossing the ground blends two roads' surfaces, a bump of up to +8 % on Crown's hill (slice 6
+lays each junction's box flat); a few Crown streets between two main roads run steeper than 16 %, never over 25 %.
+
 ## 2026-09-25 — M8.10 slice 4: the main network
 
 Done: `island/network.ts` makes the main roads a `RoadGraph` (`Island.network`): the roads joined where one's end meets

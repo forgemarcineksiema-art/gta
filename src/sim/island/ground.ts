@@ -11,11 +11,12 @@ import { SEA } from '../city/sea';
 import { ASPHALT, DIRT, GRASS, SAND, type SurfaceKind } from '../city/surface';
 import { catmullRom, circle, inPolygon, polylineLength, resample, signedArea, type P2 } from './geom';
 import { BASIN, BOUNDS, COAST, COAST_PARTS, HIGHWAY, PLACES, RINGS, ROADS, causeway, highwayLoop, islet, naturalHeight, type PlanRoad, type RoadClass } from './plan';
+import { districtStreets } from './streets';
 
 /** A road's half width by class (m), its carriageway without the pavement. */
-export const HALF_WIDTH: Readonly<Record<RoadClass, number>> = { highway: 19, avenue: 12, street: 9, serpentine: 7, dirt: 5, taxiway: 12, ramp: 7 };
+export const HALF_WIDTH: Readonly<Record<RoadClass, number>> = { highway: 19, avenue: 12, street: 9, serpentine: 7, dirt: 5, taxiway: 12, ramp: 7, side: 8 };
 /** The steepest a road's profile may run, by class (rise over run). */
-export const MAX_GRADE: Readonly<Record<RoadClass, number>> = { highway: 0.06, avenue: 0.1, street: 0.16, serpentine: 0.12, dirt: 0.18, taxiway: 0.02, ramp: 0.08 };
+export const MAX_GRADE: Readonly<Record<RoadClass, number>> = { highway: 0.06, avenue: 0.1, street: 0.16, serpentine: 0.12, dirt: 0.18, taxiway: 0.02, ramp: 0.08, side: 0.08 };
 /** The ground flat with the road this far past its edge, then blended back to the hill over `BLEND` (m). */
 export const SHOULDER = 2;
 export const BLEND = 12;
@@ -89,22 +90,18 @@ function onRoad(road: GradedRoad, x: number, z: number): { d: number; h: number 
 }
 
 /**
- * A road's profile: the natural heights along it, smoothed, held to its class's grade, its ends pinned where it meets
- * a road already graded (a T or a shared end).
+ * A road's profile: the natural heights along it, smoothed, held to its class's grade; its pinned points (where it
+ * meets a road already graded, or a crossing's flat) kept at their heights through both.
  */
-function profile(pts: P2[], cls: RoadClass, closed: boolean, start: number | null, end: number | null): number[] {
+function profile(pts: P2[], cls: RoadClass, closed: boolean, pins: ReadonlyMap<number, number>): number[] {
   const n = pts.length;
   const h = pts.map(([x, z]) => naturalHeight(x, z));
-  const pin = (): void => {
-    if (closed) return;
-    if (start !== null) h[0] = start;
-    if (end !== null) h[n - 1] = end;
-  };
+  const pin = (): void => { for (const [i, v] of pins) h[i] = v; };
   pin();
   for (let pass = 0; pass < 4; pass++) {
     const src = h.slice();
     for (let i = 0; i < n; i++) {
-      if (!closed && (i === 0 || i === n - 1)) continue;
+      if (pins.has(i) || (!closed && (i === 0 || i === n - 1))) continue;
       let s = 0, c = 0;
       for (let k = -SMOOTH; k <= SMOOTH; k++) {
         let j = i + k;
@@ -117,18 +114,26 @@ function profile(pts: P2[], cls: RoadClass, closed: boolean, start: number | nul
     }
     pin();
   }
-  const g = MAX_GRADE[cls];
   const span = (i: number, j: number): number => Math.hypot((pts[j] as P2)[0] - (pts[i] as P2)[0], (pts[j] as P2)[1] - (pts[i] as P2)[1]);
-  // held to the grade both ways, a pinned end never moved (re-pinning after the limit left a step at the end)
-  const fixedStart = !closed && start !== null, fixedEnd = !closed && end !== null;
+  // held to the grade both ways, a pinned point never moved (re-pinning after the limit left a step there); where two
+  // pins are further apart in height than the class's grade allows between them, the least grade that joins them
+  let g = MAX_GRADE[cls];
+  const pinned = [...pins.keys()].sort((a, b) => a - b);
+  for (let k = 0; k + 1 < pinned.length; k++) {
+    const a = pinned[k] as number, b = pinned[k + 1] as number;
+    if (b - a < 2) continue;
+    let run = 0;
+    for (let i = a; i < b; i++) run += span(i, i + 1);
+    g = Math.max(g, Math.abs((pins.get(b) as number) - (pins.get(a) as number)) / (run || 1));
+  }
   for (let pass = 0; pass < 8; pass++) {
     for (let i = 1; i < n; i++) {
-      if (i === n - 1 && fixedEnd) continue;
+      if (pins.has(i)) continue;
       const lim = g * span(i - 1, i), p = h[i - 1] as number;
       h[i] = Math.max(p - lim, Math.min(p + lim, h[i] as number));
     }
     for (let i = n - 2; i >= 0; i--) {
-      if (i === 0 && fixedStart) continue;
+      if (pins.has(i)) continue;
       const lim = g * span(i, i + 1), p = h[i + 1] as number;
       h[i] = Math.max(p - lim, Math.min(p + lim, h[i] as number));
     }
@@ -138,9 +143,9 @@ function profile(pts: P2[], cls: RoadClass, closed: boolean, start: number | nul
 
 /** The plan's roads on the ground, in the order they are graded: the highway, the roundabouts, the avenues, the rest. */
 function groundRoads(): Array<{ id: string; cls: RoadClass; pts: P2[]; closed: boolean }> {
-  const order: RoadClass[] = ['highway', 'avenue', 'taxiway', 'ramp', 'street', 'serpentine', 'dirt'];
+  const order: RoadClass[] = ['highway', 'avenue', 'taxiway', 'ramp', 'street', 'serpentine', 'dirt', 'side'];
   const open = (r: PlanRoad): { id: string; cls: RoadClass; pts: P2[]; closed: boolean } => ({ id: r.id, cls: r.cls, closed: false, pts: r.smooth ? catmullRom(r.points, false, STEP) : resample(r.points, STEP) });
-  const out = ROADS.filter((r) => r.span === 'ground').map(open);
+  const out = [...ROADS, ...districtStreets().roads].filter((r) => r.span === 'ground').map(open);
   // the highway's stretches on the ground, off its one smooth loop, each to the mouth or the abutment it runs into
   const loop = highwayLoop(STEP);
   let start = -1;
@@ -154,7 +159,9 @@ function groundRoads(): Array<{ id: string; cls: RoadClass; pts: P2[]; closed: b
   }
   for (const ring of RINGS) out.push({ id: ring.id, cls: ring.cls, closed: true, pts: circle(ring.x, ring.z, ring.r, Math.max(12, Math.round((2 * Math.PI * ring.r) / STEP))) });
   // rings before the avenues that end on them: a stable sort by class, the rings first within the avenues
-  return out.sort((a, b) => order.indexOf(a.cls) - order.indexOf(b.cls) || Number(b.closed) - Number(a.closed));
+  // the districts' streets after every main road (their crossings' heights are worked out between them)
+  const district = (r: { id: string }): number => (DISTRICT_STREET.test(r.id) ? 1 : 0);
+  return out.sort((a, b) => district(a) - district(b) || order.indexOf(a.cls) - order.indexOf(b.cls) || Number(b.closed) - Number(a.closed));
 }
 
 /**
@@ -203,6 +210,59 @@ function shores(): CoastLine[] {
     { pts: causeway().slice(), closed: true, kinds: causeway().map(() => 'rocks' as const), land: land(causeway()) },
     { pts: islet().slice(), closed: true, kinds: islet().map(() => 'beach' as const), land: land(islet()) },
   ];
+}
+
+/**
+ * How many samples each way a crossing's flat reaches (two, 12 m), fewer where the next crossing along the street is
+ * nearer than two flats: the `q`-th of a street's crossings `on` (by their points' indices).
+ */
+export function plateau(on: ReadonlyArray<readonly [number, number]>, q: number): number {
+  const i = (on[q] as readonly [number, number])[0];
+  const before = q > 0 ? i - (on[q - 1] as readonly [number, number])[0] : Infinity;
+  const after = q + 1 < on.length ? (on[q + 1] as readonly [number, number])[0] - i : Infinity;
+  return Math.max(0, Math.min(2, Math.floor((Math.min(before, after) - 1) / 2)));
+}
+
+/** A district's street (streets.ts names them so). */
+const DISTRICT_STREET = /^(crown|foundry|gardens|marina)-street-\d+$/;
+
+/** The crossings on a street: each junction within 3 m of one of its points, as [the point's index, the junction's]. */
+export function junctionsOn(pts: readonly P2[], junctions: readonly P2[]): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  junctions.forEach((j, k) => {
+    let bi = -1, bd = 3;
+    pts.forEach((p, i) => { const d = Math.hypot(p[0] - j[0], p[1] - j[1]); if (d < bd) { bd = d; bi = i; } });
+    if (bi >= 0) out.push([bi, k]);
+  });
+  return out.sort((a, b) => a[0] - b[0]);
+}
+
+/**
+ * The districts' crossings' heights: a main road's where one meets it (held there, and no flat: a T), else the
+ * ground's there, eased until two crossings along a street differ by no more than its class's grade allows over the
+ * block between their flats.
+ */
+function crossingHeights(streets: ReadonlyArray<{ cls: RoadClass; pts: P2[] }>, junctions: readonly P2[], graded: (p: P2) => number | null): { h: Float64Array; held: Uint8Array } {
+  const h = new Float64Array(junctions.length), held = new Uint8Array(junctions.length);
+  junctions.forEach((p, j) => { const v = graded(p); if (v !== null) { h[j] = v; held[j] = 1; } else h[j] = naturalHeight(p[0], p[1]); });
+  const links: Array<[number, number, number]> = [];
+  for (const r of streets) {
+    const on = junctionsOn(r.pts, junctions);
+    for (let k = 0; k + 1 < on.length; k++) {
+      const [ia, ja] = on[k] as [number, number], [ib, jb] = on[k + 1] as [number, number];
+      let d = 0;
+      for (let i = ia; i < ib; i++) d += Math.hypot((r.pts[i + 1] as P2)[0] - (r.pts[i] as P2)[0], (r.pts[i + 1] as P2)[1] - (r.pts[i] as P2)[1]);
+      const flats = (held[ja] === 1 ? 0 : 12) + (held[jb] === 1 ? 0 : 12);
+      links.push([ja, jb, MAX_GRADE[r.cls] * Math.max(d - flats, d * 0.3)]);
+    }
+  }
+  for (let pass = 0; pass < 60; pass++) {
+    for (const [a, b, lim] of links) {
+      if (held[b] === 0) h[b] = Math.max((h[a] as number) - lim, Math.min((h[a] as number) + lim, h[b] as number));
+      if (held[a] === 0) h[a] = Math.max((h[b] as number) - lim, Math.min((h[b] as number) + lim, h[a] as number));
+    }
+  }
+  return { h, held };
 }
 
 /** Fill a closed polygon into the mask by rows (the even-odd rule), with `value`. */
@@ -274,6 +334,8 @@ export class Ground {
   private readonly coastGrid: SegmentGrid;
   /** Per road: 1 when it is paved (every class but dirt). */
   private readonly paved: Uint8Array;
+  /** Per district crossing (`districtStreets().junctions`): 1 where it is on a main road (a T, no flat). */
+  readonly crossingOnMain: Uint8Array;
   /** Land (1) or water (0) every `MASK` m over the plan's bounds. */
   private readonly mask: Uint8Array;
   private readonly maskNx = Math.ceil((BOUNDS.x1 - BOUNDS.x0) / MASK);
@@ -294,20 +356,35 @@ export class Ground {
       const x = BOUNDS.x0 + (i + 0.5) * MASK, z = BOUNDS.z0 + (j + 0.5) * MASK;
       if (x > BASIN.x0 && x < BASIN.x1 && z > BASIN.z0 && z < BASIN.z1) this.mask[j * this.maskNx + i] = 0;
     }
-    // the roads' profiles, each end pinned to a road graded before it that it meets
-    for (const r of groundRoads()) {
-      const endHeight = (p: P2): number | null => {
-        let best: { d: number; h: number } | null = null;
-        for (const other of this.roads) {
-          const hit = onRoad(other, p[0], p[1]);
-          if (hit.d < 3 && (!best || hit.d < best.d)) best = hit;
-        }
-        return best ? best.h : null;
-      };
-      const first = r.pts[0] as P2, last = r.pts[r.pts.length - 1] as P2;
-      const h = profile(r.pts, r.cls, r.closed, r.closed ? null : endHeight(first), r.closed ? null : endHeight(last));
-      this.roads.push({ id: r.id, cls: r.cls, pts: r.pts, h, closed: r.closed });
+    // the roads' profiles: the main roads first, each pinned where it meets one graded before it; then the districts'
+    // streets, pinned at their crossings to heights worked out over the whole grid of them, so no block between two
+    // crossings is steeper than its class allows, and each crossing flat across its box (a crest on Crown's hill)
+    const graded = (p: P2): number | null => {
+      let best: { d: number; h: number } | null = null;
+      for (const other of this.roads) {
+        const hit = onRoad(other, p[0], p[1]);
+        if (hit.d < 3 && (!best || hit.d < best.d)) best = hit;
+      }
+      return best ? best.h : null;
+    };
+    const roads = groundRoads(), junctions = districtStreets().junctions;
+    let crossings: { h: Float64Array; held: Uint8Array } | null = null;
+    for (const r of roads) {
+      const n = r.pts.length, pins = new Map<number, number>();
+      if (!DISTRICT_STREET.test(r.id)) {
+        if (!r.closed) for (const i of [0, n - 1]) { const v = graded(r.pts[i] as P2); if (v !== null) pins.set(i, v); }
+        this.roads.push({ id: r.id, cls: r.cls, pts: r.pts, h: profile(r.pts, r.cls, r.closed, pins), closed: r.closed });
+        continue;
+      }
+      crossings ??= crossingHeights(roads.filter((q) => DISTRICT_STREET.test(q.id)), junctions, graded);
+      const c = crossings, on = junctionsOn(r.pts, junctions);
+      on.forEach(([i, j], q) => {
+        const m = c.held[j] === 1 ? 0 : plateau(on, q);
+        for (let k = i - m; k <= i + m; k++) if (k >= 0 && k < n) pins.set(k, c.h[j] as number);
+      });
+      this.roads.push({ id: r.id, cls: r.cls, pts: r.pts, h: profile(r.pts, r.cls, r.closed, pins), closed: r.closed });
     }
+    this.crossingOnMain = crossings?.held ?? new Uint8Array(junctions.length);
     this.paved = Uint8Array.from(this.roads, (r) => (r.cls === 'dirt' ? 0 : 1));
     const segs: Seg[] = [];
     this.roads.forEach((road, r) => {

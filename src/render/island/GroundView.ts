@@ -153,7 +153,7 @@ export class GroundView {
       let a: number, b: number;
       if ((r.cut[k] as number) < -3) a = b = 1e6;
       // under a road's strip or a paved place's slab: never over it
-      else if (road < 0 || r.surface[k] === ASPHALT) { a = 0.03; b = 0.6; }
+      else if (road < 0 || r.surface[k] === ASPHALT) { a = 0.08; b = 0.6; }
       else if (road < SHOULDER + 1) { a = 0.1; b = 0.3; }
       else if (h < SEA.level - 0.6) a = b = 3;
       else if (Math.abs(h - SEA.level) < 0.6) a = b = 0.08;

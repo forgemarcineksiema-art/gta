@@ -5,7 +5,7 @@
  * allocates nothing and old ones are simply overwritten.
  */
 import * as THREE from 'three';
-import type { SimWorld } from '../../sim';
+import { ASPHALT, type SimWorld } from '../../sim';
 
 export const SKID = {
   /** Below this speed (m/s) nothing marks. */
@@ -140,8 +140,8 @@ export class SkidMarks {
     for (let k = 0; k < wheels.length && k < 8; k++) {
       const w = wheels[k];
       if (!w) continue;
-      // the rears mark in a drift or a burnout; a front only when it is locked
-      const s = w.grounded && w.normal.y > 0.9 && (!w.isFront || w.slipRatio < -SKID.ratio) ? skidStrength(w.slipAngle, w.slipRatio, speed) : 0;
+      // the rears mark in a drift or a burnout; a front only when it is locked; only asphalt takes a mark (M8.8 slice 9)
+      const s = w.grounded && w.surface === ASPHALT && w.normal.y > 0.9 && (!w.isFront || w.slipRatio < -SKID.ratio) ? skidStrength(w.slipAngle, w.slipRatio, speed) : 0;
       const c = w.contact, o = k * 3;
       if (s <= 0) { this.marking[k] = 0; continue; }
       if (this.marking[k] === 0) {

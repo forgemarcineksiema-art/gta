@@ -5,7 +5,7 @@
  * spoiler and the stance, the drift's tyre smoke). Reads sim state only.
  */
 import * as THREE from 'three';
-import { CAR_IDS, CAR_PRESETS, KIT, PALETTE, bodySpec, bodyTuning, isShell, type BodyId, type CarId, type SimEvent, type SimWorld, type VehicleTelemetry } from '../../sim';
+import { ASPHALT, CAR_IDS, CAR_PRESETS, CITY_COLORS, DIRT, GRASS, KIT, PALETTE, bodySpec, bodyTuning, isShell, type BodyId, type CarId, type SimEvent, type SimWorld, type VehicleTelemetry } from '../../sim';
 import { CAR_PROFILES } from './carProfiles';
 import { BODY_PROFILES } from './bodyProfiles';
 import { buildCarMesh, restHeight, wheelGeometry, type CarMesh } from './carMesh';
@@ -145,12 +145,18 @@ export class PlayerCar {
     }
   }
 
-  /** A drift's tyre smoke off the rear wheels, in the kit's colour (a pale grey when none is worn). */
+  /**
+   * A drift's tyre smoke off the rear wheels, in the kit's colour (a pale grey when none is worn); off the road it
+   * comes up in the ground's colour, the grass's or the soil's (M8.8 slice 9).
+   */
   emitTyreSmoke(dt: number, smoke: Smoke, vel: THREE.Vector3): void {
     const tm = this.sim.vehicle.telemetry;
     if (!tm.drifting || tm.groundedWheels < 2 || this.sim.probe.speed < 6) { this.tyreAcc = 0; return; }
+    const wheels = this.sim.vehicle.wheels;
+    let ground: number = ASPHALT;
+    for (const w of wheels) if (!w.isFront && w.grounded && w.surface !== ASPHALT) ground = w.surface;
     const worn = this.sim.kit.worn('smoke');
-    const colour = worn >= 0 ? (KIT[worn]?.colour ?? -1) : -1;
+    const colour = ground === GRASS ? PALETTE.grass : ground === DIRT ? CITY_COLORS.soil : worn >= 0 ? (KIT[worn]?.colour ?? -1) : -1;
     const car = this.mesh.root;
     this.tmpFwd.set(0, 0, 1).applyQuaternion(car.quaternion);
     this.tyreAcc += 28 * dt;

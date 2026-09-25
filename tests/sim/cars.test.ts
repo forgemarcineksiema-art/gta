@@ -7,6 +7,12 @@
  * point of the change, not a regression. Only the two lower bounds that this
  * crossed were moved with it (compact 9 -> 8.5, heavy 10 -> 9.6); the top
  * speeds and every other pin are untouched.
+ *
+ * The compact became the city car (M8.8 slice 2, 2026-09-25): quicker than the
+ * muscle car to about 80 km/h, level at 100, slower above. Its 0-100 moved
+ * from 8.9 s to 5.9 s and its window with it (8.5-13 -> 5.6-6.5); its top
+ * (145 -> 144 km/h) and every other pin stand. The slice's own pins follow
+ * the table.
  */
 import { describe, expect, test } from 'vitest';
 import type { CarId } from '../../src/sim';
@@ -27,7 +33,7 @@ interface Expectations {
 
 const CARS: Record<CarId, Expectations> = {
   muscle: { to100: [5.8, 7.2], top: [160, 180], brake100: [22, 42], driftBand: [18, 42], driftMinSpeed: 50, pulse60: 20, botLap: [30, 40] },
-  compact: { to100: [8.5, 13], top: [130, 165], brake100: [22, 42], driftBand: [12, 40], driftMinSpeed: 40, pulse60: 20, botLap: [33, 43] },
+  compact: { to100: [5.6, 6.5], top: [130, 165], brake100: [22, 42], driftBand: [12, 40], driftMinSpeed: 40, pulse60: 20, botLap: [33, 43] },
   heavy: { to100: [9.6, 16], top: [105, 140], brake100: [24, 48], driftBand: [10, 40], driftMinSpeed: 35, pulse60: 12, botLap: [35, 46] },
   sports: { to100: [3.8, 5.6], top: [185, 212], brake100: [15, 30], driftBand: [22, 42], driftMinSpeed: 55, pulse60: 20, botLap: [30, 38] },
   police: { to100: [6.2, 8.6], top: [158, 185], brake100: [24, 44], driftBand: [18, 40], driftMinSpeed: 55, pulse60: 18, botLap: [32, 40] },
@@ -166,6 +172,44 @@ for (const [id, e] of Object.entries(CARS) as Array<[CarId, Expectations]>) {
     });
   });
 }
+
+/** Seconds from a standstill to `target` km/h on the straight at full throttle. */
+async function timeTo(id: CarId, target: number): Promise<number> {
+  const sim = await createWorld({ spawn: 'straight', car: id });
+  try {
+    run(sim, 1);
+    return runUntil(sim, 25, (s) => kmh(s) >= target, fullThrottle);
+  } finally { sim.dispose(); }
+}
+
+/** The turning circle's radius at 20 km/h on full lock, the speed held (m). */
+async function circleAt20(id: CarId): Promise<number> {
+  const sim = await createWorld({ spawn: 'lot', car: id });
+  try {
+    run(sim, 1);
+    runUntil(sim, 10, (s) => kmh(s) >= 20, fullThrottle);
+    let yaw = 0, n = 0, steps = 0;
+    run(sim, 4, (_t, c, s) => {
+      c.steer = 1;
+      const v = kmh(s);
+      c.throttle = v < 19.5 ? 0.6 : 0;
+      c.brake = v > 21 ? 0.3 : 0;
+      if (++steps > 120) { yaw += Math.abs(s.vehicle.telemetry.yawRate); n++; }
+    });
+    return 20 / 3.6 / (yaw / Math.max(1, n));
+  } finally { sim.dispose(); }
+}
+
+describe('M8.8 slice 2: the compact, the city car', () => {
+  test('M8.8 2.2 its 0-60 beats the muscle car\'s by 0.3 s or more', async () => {
+    expect(await timeTo('compact', 60)).toBeLessThanOrEqual((await timeTo('muscle', 60)) - 0.3);
+  });
+
+  test('M8.8 2.3 its turning circle at 20 km/h is the smallest of the classes', async () => {
+    const compact = await circleAt20('compact');
+    for (const id of Object.keys(CARS) as CarId[]) if (id !== 'compact') expect(compact).toBeLessThan(await circleAt20(id));
+  });
+});
 
 for (const [id, e] of Object.entries(CARS) as Array<[CarId, Expectations]>) {
   test(`car: ${id} laps the test track in its benchmark window`, async () => {

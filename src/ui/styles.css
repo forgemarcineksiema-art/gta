@@ -1282,6 +1282,14 @@ kbd.key {
   letter-spacing: 0.06em;
   text-align: center;
 }
+/* what the car is for (M8.8 slice 3): one quiet word under the name */
+.wall__card-role {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--ui-ink-dim);
+  text-align: center;
+}
 .wall__card-status {
   font-size: 15px;
   font-weight: 900;

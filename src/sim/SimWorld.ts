@@ -54,7 +54,7 @@ import { PEDS, TRAFFIC } from './traffic/tuning';
 import { SimPhase, type PhaseMark } from './profile';
 import { TransformBuffer } from './transforms';
 import { CAR_PRESETS, type CarId } from './vehicle/presets';
-import { policeLiveried, type BodyId } from './traffic/bodies';
+import { bodySpec, isShell, policeLiveried, type BodyId } from './traffic/bodies';
 import { cloneTuning, type VehicleTuning } from './vehicle/tuning';
 import { Vehicle } from './vehicle/Vehicle';
 import * as M from './math';
@@ -82,6 +82,8 @@ export interface SimWorldOptions {
   tuning?: VehicleTuning;
   spawn?: string;
   car?: CarId;
+  /** Start in any body, at its own mass and its class's upgrades (M8.8 slice 4: the QA hook for every vehicle, tests). */
+  body?: BodyId;
   /** Record every step (default true on playground, false in the city). */
   record?: boolean;
   /** Traffic density scale. 0 disables. Default 1. The pool arrives in a later slice. */
@@ -341,7 +343,22 @@ export class SimWorld {
         this.vehicle.applyTuning();
       }
     }
+    if (opts.body) this.setBody(opts.body, opts.tuning);
     if (opts.coldOpen) this.coldOpen.start();
+  }
+
+  /** Put the player in a body in place (`?body=`, tests): its class, its own paint, its tuning with the class's upgrades. */
+  setBody(body: BodyId, tuning?: VehicleTuning): void {
+    const spec = bodySpec(body);
+    this.carId = spec.car;
+    this.carBody = body;
+    this.carPaint = isShell(body) ? this.garage.paintOf(body) : (spec.paints[0] as number);
+    this.pursuit.descriptor.kind = spec.car;
+    this.pursuit.descriptor.body = body;
+    this.pursuit.descriptor.paint = this.carPaint;
+    this.pursuit.descriptor.police = policeLiveried(body);
+    this.vehicle.tuning = tuning ?? this.garage.tuningFor(body);
+    this.vehicle.applyTuning();
   }
 
   /** Advance the simulation by exactly one fixed step using the current `controls`. */

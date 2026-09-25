@@ -182,7 +182,7 @@ export class Garage {
   }
 
   /**
-   * The body's tuning (its class's preset on its axles, a truck's or a bus's stretched) times its class's tiers
+   * The body's tuning (its class's preset on its axles, at its own mass) times its class's tiers
    * into `out` (or a new tuning). Tier 0 multiplies by exactly 1, so a shell at tier 0 is its preset bitwise.
    */
   tuningFor(body: BodyId, out?: VehicleTuning): VehicleTuning {

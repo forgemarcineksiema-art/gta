@@ -104,8 +104,8 @@ describe('garage', () => {
   it('4.4 the compact at tier 3 power reaches 100 km/h sooner; at tier 0 it is inside cars.test.ts\'s band', async () => {
     const t0 = await to100([0, 0, 0]);
     const t3 = await to100([3, 0, 0]);
-    expect(t0).toBeGreaterThan(8.5);
-    expect(t0).toBeLessThan(13);
+    expect(t0).toBeGreaterThan(5.6);
+    expect(t0).toBeLessThan(6.5);
     expect(t3).toBeGreaterThan(0);
     expect(t3).toBeLessThan(t0);
     console.info(`compact 0-100: tier 0 ${t0.toFixed(2)} s, tier 3 power ${t3.toFixed(2)} s`);

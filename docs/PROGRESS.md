@@ -23,6 +23,33 @@ small and the big screen, `LOOK_GATE=1` asserts §1.2. The before set (0.8.7 wit
 the districts at S 0.193–0.202, 3.6–5.6 % over 0.5, band 0.19–0.22, behind the HUD 0.25–0.36, clipped ≤ 0.5 %; the heli
 frame S 0.176, behind the HUD 0.41. Runs on this worktree's port (4238).
 
+## 2026-09-25 — M8.8 slice 4: every body its own mass; any body at the start
+
+Done: `bodyTuning` scales every body that is not a shell to its own mass, each force with it (the trucks' and buses'
+rule since M5.5, now every body's): a Bubble is 550 kg in the player's hands as on the street, a taxi 1,450; a shell and
+a rival on a shell stay their preset bitwise. `?body=<id>` and `SimWorldOptions.body` start the player in any body
+(`SimWorld.setBody`; DEV). `tests/sim/bodyMeasure.ts` measures a body; the long `bodies.long.test.ts` measured all 28
+once here (every body's 0–100 within 1 % of its class's) and writes `perf/bodies.json` for the report. Pins M8.8 4.1,
+4.3 (bodies.test; 19.4's taxi mass moved to its own); 4.2 long. Verify green.
+
+## 2026-09-25 — M8.8 slice 3: what a car is for, on its card
+
+Done: every CARS card says its class's job in one quiet word under the name (`ROLE_WORDS` and `cardLine(body)` in
+`sim/jobs/catalog.ts`): DRIFT, CITY, RAM, SPEED, DISGUISE; a civilian body its class's (a kept taxi DRIFT, a bus RAM).
+In Polish DRIFT, MIASTO, TARAN, PRĘDKOŚĆ, PRZEBRANIE: DRIFT and MIASTO are the words the combo and the boot already say
+(the plan's POŚLIZG would have been a second name). The line is a label (it follows the language) in the dim ink, no
+colour of its own, so M8.9's tokens and scale take it as they come. Pins M8.8 3.1, 3.2 (`tests/ui/wall.test.ts`); the
+ten sizes are the gate's screens. Verify green.
+
+## 2026-09-25 — M8.8 slice 2: the compact, the city car
+
+Done: the compact is quicker than the muscle car to about 80 km/h, level at 100, slower above (212 N·m with a strong
+middle, 4.1 first, a 4.6 final drive, 0.8 overdrive, drag 1.3), and the quickest to change direction (yaw inertia ×0.85,
+steer rate 7); still front-drive, no power oversteer. On the straight: 0–60 2.43 s (muscle 2.78), 0–100 5.93 s (6.17),
+top 144 km/h (172); the turning circle at 20 km/h 4.0 m, the smallest (sports 4.8, muscle 5.1). Tuned on a scratch
+harness over eleven candidates. cars.test's compact 0–100 window moved (8.5–13 → 5.6–6.5, header note) and the swap
+and garage 4.4 pins' with it; its lap, drift and turns stand. Pins M8.8 2.2, 2.3. The city bot's lap is the gate's. Verify green.
+
 ## 2026-09-25 — M8.9 slice 0: the pay label, the sign in the camera, the pause's veil
 
 Done (R7, R12): `PayLabel` wrote its place only when it moved half a pixel from `NaN`, so it never did and sat in the

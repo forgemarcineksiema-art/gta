@@ -14,7 +14,7 @@ import { KeyboardDevice } from '../input/KeyboardDevice';
 import { createPlatform, type Platform } from '../platform';
 import { Renderer } from '../render/Renderer';
 import { ACTIONS, type Action } from '../input/actions';
-import { CAR_IDS, ECONOMY, FIXED_DT, Recorder, SimWorld, clearControls, districtAt, initPhysics, type CarId, type EventLog, type RecordingJSON, TRAFFIC, PEDS, DAMAGE, SWAP } from '../sim';
+import { BODY_IDS, CAR_IDS, ECONOMY, FIXED_DT, Recorder, SimWorld, clearControls, districtAt, initPhysics, type BodyId, type CarId, type EventLog, type RecordingJSON, TRAFFIC, PEDS, DAMAGE, SWAP } from '../sim';
 import { devTools, screenTaken } from '../ui/hud/corners';
 import { DebugPanel } from '../ui/dev/debugPanel';
 import { Hud } from '../ui/hud/hud';
@@ -94,7 +94,7 @@ const BREAK_MIN_MS = 600;
 /** Measured bot runs dismiss the wall and the card themselves after this long. */
 const BREAK_AUTO_MS = 1500;
 /** Any of these on the URL is a test or a dev session: no cold open unless `coldopen=1` forces it. */
-const COLD_OPEN_OFF_PARAMS = ['bot', 'spawn', 'heat', 'car', 'map', 'manual', 'job', 'board'];
+const COLD_OPEN_OFF_PARAMS = ['bot', 'spawn', 'heat', 'car', 'body', 'map', 'manual', 'job', 'board'];
 
 /** Every action ends a break except the ones that are not about driving on. */
 const DISMISS: readonly Action[] = ACTIONS.filter((a) => a !== 'pause' && a !== 'mute' && a !== 'debug' && a !== 'camera');
@@ -459,6 +459,9 @@ export class App {
     const spawn = params.get('spawn') ?? undefined;
     const carParam = params.get('car');
     const car = (CAR_IDS as string[]).includes(carParam ?? '') ? (carParam as CarId) : undefined;
+    // `body=<id>` (M8.8 slice 4): start in any vehicle, the new ones before their stash or price exists
+    const bodyParam = params.get('body');
+    const body = (BODY_IDS as readonly string[]).includes(bodyParam ?? '') ? (bodyParam as BodyId) : undefined;
     const citySpawns = ['city', 'crown', 'foundry', 'gardens', 'marina', 'highway'];
     const map = params.get('map') === 'playground' || params.get('bot') === 'track' || (spawn && !citySpawns.includes(spawn)) ? 'playground' : 'city';
     const seed = Number(params.get('seed') ?? '42');
@@ -477,6 +480,7 @@ export class App {
       heat: Math.max(0, Math.min(100, Number(params.get('heat') ?? 0) * 20)),
       ...(spawn ? { spawn } : coldOpen ? { spawn: 'loop' } : {}),
       ...(car ? { car } : {}),
+      ...(body ? { body } : {}),
       save,
       coldOpen,
     });

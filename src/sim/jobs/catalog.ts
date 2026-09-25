@@ -72,6 +72,14 @@ export function paintName(paint: number): string {
 
 /** What the card calls a class. */
 export const CAR_WORDS: Record<CarId, string> = { muscle: 'MUSCLE CAR', compact: 'COMPACT', heavy: 'VAN', sports: 'SPORTS CAR', police: 'POLICE CAR' };
+
+/** A class's job in one word (M8.8 R1): the drift, the city, the ram, the speed, the disguise. */
+export const ROLE_WORDS: Record<CarId, string> = { muscle: 'DRIFT', compact: 'CITY', heavy: 'RAM', sports: 'SPEED', police: 'DISGUISE' };
+
+/** The line under a car's name on the wall (M8.8 slice 3): what its class is for. */
+export function cardLine(body: BodyId): string {
+  return ROLE_WORDS[(BODIES[BODY_IDS.indexOf(body)] as (typeof BODIES)[number]).car];
+}
 /** What the radio calls a body. */
 export const BODY_WORDS: Record<BodyId, string> = {
   ...CAR_WORDS, sedan: 'SEDAN', hatch: 'HATCHBACK', estate: 'ESTATE', suv: 'SUV', pickup: 'PICKUP', taxi: 'TAXI', truck: 'BOX TRUCK', bus: 'BUS', icecream: 'ICE-CREAM TRUCK',

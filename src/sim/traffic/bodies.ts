@@ -48,7 +48,7 @@ export interface BodySpec {
   keepsLane: boolean;
   /** Overtakes when the car ahead is this share of `overtake.slowerBy` slower: under 1 hops lanes (the taxi). */
   hops: number;
-  /** A swap drives the class stretched to this body, every force scaled with the mass (the truck, the bus). */
+  /** Long and tall (the trucks, the buses, the limo): the traffic's box stands higher. The tuning scales every body to its mass (M8.8 slice 4). */
   stretch: boolean;
 }
 
@@ -126,17 +126,18 @@ export function isRivalBody(body: BodyId): body is RivalBody {
   return (RIVAL_BODIES as readonly BodyId[]).includes(body);
 }
 
-/** Forces and inertias that scale with the mass when a class is stretched to a bigger body. */
-const STRETCHED = [
+/** Forces and inertias that scale with a body's mass against its class's. */
+const MASS_SCALED = [
   'torqueMax', 'engineBrakeTorque', 'engineInertia', 'lsdPreload', 'lsdStiffness', 'brakeTorque', 'handbrakeTorque',
   'wheelInertia', 'suspensionStiffness', 'suspensionDampingCompression', 'suspensionDampingRebound', 'bumpStopStiffness',
   'suspensionDampingProgressive', 'antiRollStiffness', 'drag', 'downforce', 'driftYawTorqueMax', 'driftThrottlePush', 'boostThrust',
 ] as const satisfies ReadonlyArray<keyof VehicleTuning>;
 
 /**
- * What the player drives after a swap into this body (M5.5_PLAN slice 19): the class's preset with the
- * body's footprint and axles; a truck or a bus is the heavy stretched to its body, every force scaled with
- * the mass so it still pulls and stops like the van, and turns like the long thing it is.
+ * What the player drives in this body: the class's preset with the body's footprint and axles at the body's own mass,
+ * every force scaled with it, so it pulls and stops like its class and turns like the long or short thing it is (the
+ * trucks and buses since M5.5_PLAN slice 19, every body since M8.8 slice 4: a Bubble is 550 kg in the player's hands as
+ * on the street). A shell, and a rival on a shell, is its preset bitwise.
  */
 export function bodyTuning(body: BodyId): VehicleTuning {
   const spec = bodySpec(body);
@@ -145,10 +146,10 @@ export function bodyTuning(body: BodyId): VehicleTuning {
   t.chassisHalfExtents = { x: spec.halfWidth, y: t.chassisHalfExtents.y, z: spec.halfLength };
   t.wheelBase = spec.wheelBase;
   t.trackWidth = spec.trackWidth;
-  if (spec.stretch) {
-    const k = spec.mass / t.mass;
+  const k = spec.mass / t.mass;
+  if (k !== 1) {
     t.mass = spec.mass;
-    for (const key of STRETCHED) t[key] *= k;
+    for (const key of MASS_SCALED) t[key] *= k;
   }
   return t;
 }

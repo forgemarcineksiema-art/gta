@@ -29,7 +29,7 @@ import { PAGE_TITLES, WALL_PAGES, pageOf, type WallPage } from './wallPages';
 
 export type { WallPage } from './wallPages';
 import {
-  BALANCE, BODY_IDS, BODY_WORDS, CHIEF, DISTRICTS, KIT, MEDAL_WORDS, PALETTE, RIVALS, STATS, STREAK, isCarSlot, isShell, posterNumber, reqText,
+  BALANCE, BODY_IDS, BODY_WORDS, CHIEF, cardLine, DISTRICTS, KIT, MEDAL_WORDS, PALETTE, RIVALS, STATS, STREAK, isCarSlot, isShell, posterNumber, reqText,
   type BodyId, type CarSlot, type KitSlot, type PrepItem, type RivalDef, type SimWorld, type Stat,
 } from '../../sim';
 
@@ -168,7 +168,8 @@ export class GarageUi {
     for (const id of BODY_IDS) {
       const b = button(isShell(id) ? 'wall__card' : 'wall__card wall__card--body', '');
       b.dataset['car'] = id;
-      b.append(el('span', 'wall__card-swatch'), label(el('span', 'wall__card-name'), BODY_WORDS[id]), el('span', 'wall__card-status'));
+      // what the car is for, one word under its name (M8.8 slice 3)
+      b.append(el('span', 'wall__card-swatch'), label(el('span', 'wall__card-name'), BODY_WORDS[id]), label(el('span', 'wall__card-role'), cardLine(id)), el('span', 'wall__card-status'));
       grid.appendChild(b);
       const it = this.item(pageOf('buy'), b, () => this.carAction(id));
       if (!isShell(id)) {

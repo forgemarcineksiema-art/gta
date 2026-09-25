@@ -5,8 +5,9 @@
  */
 import * as THREE from 'three';
 import { describe, expect, test } from 'vitest';
-import { ChaseCamera, SIDE_CUT, sideCutEye } from '../../src/render/camera/ChaseCamera';
-import type { VehicleTelemetry } from '../../src/sim';
+import { ChaseCamera, DEFAULT_CAMERA, SIDE_CUT, sideCutEye } from '../../src/render/camera/ChaseCamera';
+import { SHOWROOM, newShot, showroomMix, showroomShot, turntableYaw } from '../../src/render/camera/showroom';
+import { BODIES, type VehicleTelemetry } from '../../src/sim';
 
 function telemetry(over: Partial<VehicleTelemetry> = {}): VehicleTelemetry {
   return {
@@ -186,5 +187,55 @@ describe('the takedown side cut (M5.5 slice 17)', () => {
     sideCutEye(out, 0, 0, 0, 1, 0, 1);
     expect(out.x).toBeCloseTo(-SIDE_CUT.back, 9);
     expect(out.z).toBeCloseTo(-SIDE_CUT.side, 9);
+  });
+});
+
+/** The ten sizes the platform shows the game at (CLAUDE.md). */
+const SIZES: ReadonlyArray<[number, number]> = [[821, 462], [907, 510], [1077, 606], [1216, 684], [1280, 720], [1366, 768], [1536, 864], [1920, 1080], [800, 450], [1080, 607]];
+
+describe('the showroom (M8.9 slice 13)', () => {
+  test('M8.9 13.1 the showroom camera sees the whole box of the car in the left 52 % (the wall and its margin have the rest) at the ten sizes, all the way round the turntable', () => {
+    const site = { x: 120, y: 0.16, z: -340, yaw: 0.7 };
+    const cam = new THREE.PerspectiveCamera(DEFAULT_CAMERA.fovBase, 16 / 9, 0.1, 500);
+    const shot = newShot();
+    const v = new THREE.Vector3();
+    const bad: string[] = [];
+    // every body the garage can hold in its middle: the buses (12 m) need more room than the garage has
+    const bodies = BODIES.filter((b) => b.halfLength <= 4);
+    expect(bodies.length).toBeGreaterThan(20);
+    for (const body of bodies) {
+      const radius = Math.hypot(body.halfLength, body.halfWidth);
+      const height = body.big ? 3.2 : 1.8;
+      for (const [w, h] of SIZES) {
+        cam.aspect = w / h;
+        cam.updateProjectionMatrix();
+        showroomShot(site, radius, height, cam.aspect, THREE.MathUtils.degToRad(cam.fov), shot);
+        cam.position.set(shot.eye.x, shot.eye.y, shot.eye.z);
+        cam.lookAt(shot.look.x, shot.look.y, shot.look.z);
+        cam.updateMatrixWorld();
+        for (let turn = 0; turn < 24; turn++) {
+          const yaw = shot.carYaw + (turn / 24) * Math.PI * 2;
+          const c = Math.cos(yaw), s = Math.sin(yaw);
+          for (const along of [-body.halfLength, body.halfLength]) {
+            for (const across of [-body.halfWidth, body.halfWidth]) {
+              for (const y of [0, height]) {
+                v.set(site.x + s * along + c * across, site.y + y, site.z + c * along - s * across).project(cam);
+                if (v.x < -1 || v.x > 2 * SHOWROOM.leftShare - 1 || v.y < -1 || v.y > 1 || v.z > 1) bad.push(`${body.id} ${w}x${h} turn ${turn}: ${v.x.toFixed(2)}, ${v.y.toFixed(2)}`);
+              }
+            }
+          }
+        }
+      }
+    }
+    expect(bad.slice(0, 5)).toEqual([]);
+    // inside the room: the eye never leaves the garage's walls (14 × 20 m)
+    showroomShot(site, 4, 3.2, 16 / 9, THREE.MathUtils.degToRad(60), shot);
+    const dx = shot.eye.x - site.x, dz = shot.eye.z - site.z;
+    const along = dx * Math.sin(site.yaw) + dz * Math.cos(site.yaw), across = -dx * Math.cos(site.yaw) + dz * Math.sin(site.yaw);
+    expect(Math.abs(along)).toBeLessThan(9.7);
+    expect(Math.abs(across)).toBeLessThan(6.7);
+    // the move and the turntable: 0.6 s eased, 8° a second
+    expect([showroomMix(0), showroomMix(SHOWROOM.seconds), showroomMix(10)]).toEqual([0, 1, 1]);
+    expect(turntableYaw(1, 10) - 1).toBeCloseTo((80 * Math.PI) / 180, 9);
   });
 });

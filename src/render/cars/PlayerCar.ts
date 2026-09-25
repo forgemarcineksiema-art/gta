@@ -60,6 +60,11 @@ export class PlayerCar {
   private readonly lastDent = new THREE.Vector3(0, 0.5, 2);
   private readonly tmpFwd = new THREE.Vector3();
   private readonly tmpPos = new THREE.Vector3();
+  /** The showroom's pose (M8.9 R10): the car's matrix where the game has it, the move to the turntable, the turn. */
+  private readonly showOld = new THREE.Matrix4();
+  private readonly showDelta = new THREE.Matrix4();
+  private readonly showQ = new THREE.Quaternion();
+  private readonly showUp = new THREE.Vector3(0, 1, 0);
 
   constructor(private readonly scene: THREE.Scene, private readonly sim: SimWorld) {
     const classes: Partial<Record<CarId, CarMesh>> = {};
@@ -120,6 +125,28 @@ export class PlayerCar {
       const w = car.wheels[i];
       const ws = wheels[i];
       if (w && ws) placeFromBuffer(w, tb, ws.slot, alpha);
+    }
+  }
+
+  /**
+   * The showroom (M8.9 R10): the car drawn in the room's middle (`x`, `z`) turned to `yaw` on the turntable, level,
+   * `mix` of the way from where it stopped (0) to there (1), its wheels with it. After `place`; drawn only: the car
+   * in the game stays where it stopped.
+   */
+  showroom(x: number, z: number, yaw: number, mix: number): void {
+    const root = this.mesh.root;
+    root.updateMatrix();
+    this.showOld.copy(root.matrix);
+    this.showQ.setFromAxisAngle(this.showUp, yaw);
+    root.quaternion.slerp(this.showQ, mix);
+    root.position.x += (x - root.position.x) * mix;
+    root.position.z += (z - root.position.z) * mix;
+    root.updateMatrix();
+    this.showDelta.copy(root.matrix).multiply(this.showOld.invert());
+    for (const w of this.mesh.wheels) {
+      w.updateMatrix();
+      w.matrix.premultiply(this.showDelta);
+      w.matrix.decompose(w.position, w.quaternion, w.scale);
     }
   }
 

@@ -4,7 +4,7 @@
  * drawn lives in the folders by what it is (docs/ARCHITECTURE.md, decision 97); this file keeps the order.
  */
 import * as THREE from 'three';
-import type { CarId, SimEvent, SimWorld } from '../sim';
+import { bodySpec, type CarId, type SimEvent, type SimWorld } from '../sim';
 import { CameraDirector } from './camera/CameraDirector';
 import { ChaseCamera } from './camera/ChaseCamera';
 import { GhostCar } from './cars/GhostCar';
@@ -26,6 +26,7 @@ import { AutoQuality, QUALITY, type QualityTier } from './quality';
 import { Coins } from './run/Coins';
 import { HideoutView } from './run/HideoutView';
 import { MarkerView } from './run/MarkerView';
+import { showroomMix, turntableYaw } from './camera/showroom';
 import { SIGN_Y, signScale, signTopY } from './run/signs';
 import { ShapesView } from './shapes';
 import { Sky } from './sky';
@@ -231,7 +232,17 @@ export class Renderer {
     const sim = this.sim;
     if (this.player.sync()) this.director.onSwap(sim.carBody, this.player.roof);
     this.shapes.update(sim.transforms, alpha);
+    // the door race from the garage's back corner; the door shut, the showroom (M8.9 R10): the camera's move, the car
+    // on its turntable (drawn only), the room's light raised
+    const body = bodySpec(sim.carBody);
+    this.director.syncDoor(dt, this.camera.aspect, THREE.MathUtils.degToRad(this.chase.tuning.fovBase), Math.hypot(body.halfLength, body.halfWidth), this.player.roof + 0.2);
     this.player.place(alpha);
+    const shut = this.director.shut;
+    if (shut >= 0) {
+      const site = this.director.site;
+      this.player.showroom(site.x, site.z, turntableYaw(this.director.shot.carYaw, shut), showroomMix(shut));
+    }
+    this.hideoutView?.light(shut >= 0 ? this.director.site : null, showroomMix(shut));
     const car = this.player.mesh.root;
     const carPos = car.position;
     // the camera where the last frame left it and the car where this one puts it: a car between them is thinned
@@ -248,7 +259,6 @@ export class Renderer {
     if (this.cityView && dt > 0 && dt <= 0.25) this.adaptQuality(dt);
     this.carVel.set(tm.vx, tm.vy, tm.vz);
 
-    this.director.syncDoor();
     this.chase.update(car, this.carVel, tm, dt, snap);
     this.hideoutView?.update(sim);
     this.coinsView?.update(sim, dt, carPos);

@@ -1183,13 +1183,22 @@ kbd.key {
   text-shadow: 2px 3px 0 #000;
 }
 
-/* the garage on the wall (docs/STYLE.md, the wall): tabs, one page at a time, a footer with the bank and DRIVE OUT */
+/* the garage on the wall (docs/STYLE.md, the wall): tabs, one page at a time, a footer with the bank and DRIVE OUT. The
+   showroom (M8.9 R10): the wall slides in on the right, 45 % of the width at most; the car turns on the left */
 .run__wall {
-  width: min(41.25rem, calc(100vw - 2rem));
+  left: auto;
+  right: calc(1rem + var(--safe-right));
+  transform: translateY(-50%);
+  width: min(45vw, 36rem);
   max-height: calc(100vh - 1.5rem);
   overflow: hidden;
   pointer-events: auto;
-  padding: 0.625rem 1.375rem 0.75rem;
+  padding: 0.625rem 1.125rem 0.75rem;
+}
+.run__wall.is-visible { animation: wall-in 0.35s ease-out; }
+@keyframes wall-in { from { opacity: 0; transform: translate(2.5rem, -50%); } }
+@media (prefers-reduced-motion: reduce) {
+  .run__wall.is-visible { animation: none; }
 }
 .run__wall button {
   font-family: var(--font-display);

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { KIT } from '../../src/sim/garage/kit';
 import { STYLE_SLOTS, GARAGE_PAINTS } from '../../src/ui/wall/garage';
@@ -52,5 +53,20 @@ describe('the wall\'s keys as a grid (M7 slice 12)', () => {
     expect(cars.leaves).toBe(true);
     expect(gridMove([3, 0, 2], { row: 0, col: 2 }, 'deeper')).toEqual({ row: 2, col: 1 });
     expect(gridStart([0, 0, 4])).toEqual({ row: 2, col: 0 });
+  });
+});
+
+describe('the showroom wall (M8.9 slice 13)', () => {
+  it('M8.9 13.4 the wall on the right walks the same grid: the rows are the pages’ own, never read off the layout', () => {
+    const garage = readFileSync(new URL('../../src/ui/wall/garage.ts', import.meta.url), 'utf8');
+    for (const read of ['offsetTop', 'offsetLeft', 'getBoundingClientRect', 'clientWidth']) expect(garage.includes(read), read).toBe(false);
+    // the cars in one row, a row per upgrade, the boosters two by two: the same walk at any width
+    const rows = [7, 1, 1, 1, 2, 2];
+    expect(gridMove(rows, { row: 0, col: 6 }, 'deeper')).toEqual({ row: 1, col: 0 });
+    expect(gridMove(rows, { row: 4, col: 1 }, 'deeper')).toEqual({ row: 5, col: 1 });
+    expect(gridMove(rows, { row: 0, col: 3 }, 'back')).toBeNull();
+    // the wall: on the right, 45 % of the width at most
+    const css = readFileSync(new URL('../../src/ui/styles.css', import.meta.url), 'utf8');
+    expect(css).toMatch(/\.run__wall \{\s*left: auto;\s*right: calc\(1rem \+ var\(--safe-right\)\);\s*transform: translateY\(-50%\);\s*width: min\(45vw, 36rem\);/);
   });
 });

@@ -11,6 +11,7 @@ import { SEA } from '../city/sea';
 import { ASPHALT, DIRT, GRASS, SAND, type SurfaceKind } from '../city/surface';
 import { catmullRom, circle, inPolygon, polylineLength, resample, signedArea, type P2 } from './geom';
 import { BASIN, BOUNDS, COAST, COAST_PARTS, PLACES, RINGS, ROADS, causeway, highwayLoop, islet, naturalHeight, type PlanRoad, type RoadClass, type SpanKind } from './plan';
+import { shaped } from './shapes';
 import { districtStreets } from './streets';
 
 /** A road's half width by class (m), its carriageway without the pavement. */
@@ -85,6 +86,11 @@ export interface GroundProbe {
 
 const smooth01 = (t: number): number => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 
+/** The plan's hills with the places' shapes (a pit, a channel, the dunes: slices 8–12), before the roads are graded. */
+export function natural(x: number, z: number): number {
+  return shaped(x, z, naturalHeight(x, z));
+}
+
 /** The basin's three quays as a polyline: from the shore in along one side, across its inner end, out along the other. */
 export function basinQuays(): P2[] {
   const inner = Math.abs(BASIN.z0 - BASIN.shore) < Math.abs(BASIN.z1 - BASIN.shore) ? BASIN.z1 : BASIN.z0;
@@ -111,7 +117,7 @@ function onRoad(road: GradedRoad, x: number, z: number): { d: number; h: number 
  */
 function profile(pts: P2[], cls: RoadClass, closed: boolean, pins: ReadonlyMap<number, number>): number[] {
   const n = pts.length;
-  const h = pts.map(([x, z]) => naturalHeight(x, z));
+  const h = pts.map(([x, z]) => natural(x, z));
   const pin = (): void => { for (const [i, v] of pins) h[i] = v; };
   pin();
   for (let pass = 0; pass < 4; pass++) {
@@ -288,7 +294,7 @@ function crossingHeights(streets: ReadonlyArray<{ cls: RoadClass; pts: P2[] }>, 
   const h = new Float64Array(junctions.length), held = new Uint8Array(junctions.length), flat = new Float64Array(junctions.length).fill(12);
   junctions.forEach((p, j) => {
     const v = graded(p);
-    if (v === null) { h[j] = naturalHeight(p[0], p[1]); return; }
+    if (v === null) { h[j] = natural(p[0], p[1]); return; }
     h[j] = v.h;
     held[j] = 1;
     // a held crossing's flat is across the main road's carriageway and shoulder
@@ -457,7 +463,7 @@ export class Ground {
         }
         if (r.cls !== 'highway') {
           // a road passing under the highway dips beneath its overpass, level under the deck
-          overpasses ??= stretches('overpass').map((s) => { const m = s.pts[Math.floor(s.pts.length / 2)] as P2; return { x: m[0], z: m[1], deck: this.highwayAt(m[0], m[1]) ?? naturalHeight(m[0], m[1]) }; });
+          overpasses ??= stretches('overpass').map((s) => { const m = s.pts[Math.floor(s.pts.length / 2)] as P2; return { x: m[0], z: m[1], deck: this.highwayAt(m[0], m[1]) ?? natural(m[0], m[1]) }; });
           for (const o of overpasses) {
             let bi = -1, bd = 8;
             r.pts.forEach((p, i) => { const d = Math.hypot(p[0] - o.x, p[1] - o.z); if (d < bd) { bd = d; bi = i; } });
@@ -607,11 +613,11 @@ export class Ground {
     const sh = this.shore;
     let h: number;
     if (this.onLand(x, z)) {
-      h = naturalHeight(x, z);
+      h = natural(x, z);
       if (sh.beach < BEACH) h = SEA.level + (h - SEA.level) * smooth01(sh.beach / BEACH);
     } else if (sh.steep < LIP && sh.steep <= sh.beach) {
       // past a steep edge's line the land's height holds over a physics cell: the fall is beyond the wall
-      h = naturalHeight(x, z);
+      h = natural(x, z);
     } else if (sh.d < SHELF) {
       const top = sh.kind === BEACH_KIND ? SEA.level : FOOT;
       h = top + (SEA_FLOOR - top) * smooth01(sh.d / SHELF);

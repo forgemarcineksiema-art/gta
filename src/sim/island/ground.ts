@@ -9,9 +9,9 @@
  */
 import { SEA } from '../city/sea';
 import { ASPHALT, DIRT, GRASS, SAND, type SurfaceKind } from '../city/surface';
-import { catmullRom, circle, inPolygon, polylineLength, resample, signedArea, type P2 } from './geom';
-import { BASIN, BOUNDS, COAST, COAST_PARTS, PLACES, RINGS, ROADS, causeway, highwayLoop, islet, naturalHeight, type PlanRoad, type RoadClass, type SpanKind } from './plan';
-import { shaped } from './shapes';
+import { catmullRom, circle, ellipse, inPolygon, polylineLength, resample, signedArea, type P2 } from './geom';
+import { BASIN, BOUNDS, COAST, COAST_PARTS, PLACES, PLACE_RINGS, PLACE_ROADS, RINGS, ROADS, causeway, highwayLoop, islet, naturalHeight, type PlanRoad, type RoadClass, type SpanKind } from './plan';
+import { placePaved, seabed, shaped } from './shapes';
 import { canalBed, inCanal, inScrapyard, onWaterworksPlaza } from './shapes/works';
 import { gardensCover } from './shapes/gardens';
 import { districtStreets } from './streets';
@@ -187,7 +187,7 @@ function steepest(pts: readonly P2[], h: readonly number[], closed: boolean): nu
 function groundRoads(): Array<{ id: string; cls: RoadClass; pts: P2[]; closed: boolean; deck?: boolean[] }> {
   const order: RoadClass[] = ['highway', 'avenue', 'taxiway', 'ramp', 'street', 'serpentine', 'dirt', 'side'];
   const open = (r: PlanRoad): { id: string; cls: RoadClass; pts: P2[]; closed: boolean; deck?: boolean[] } => ({ id: r.id, cls: r.cls, closed: false, pts: r.smooth ? catmullRom(r.points, false, STEP) : resample(r.points, STEP) });
-  const out = [...ROADS, ...districtStreets().roads].filter((r) => r.span === 'ground').map(open);
+  const out = [...ROADS, ...districtStreets().roads, ...PLACE_ROADS].filter((r) => r.span === 'ground').map(open);
   // the highway's stretches between its tunnel and its decks, off its one smooth loop, each to the mouth or the
   // abutment it runs into; graded through its overpasses (the ground under those follows the road passing beneath)
   const loop = highwayLoop(STEP);
@@ -200,10 +200,15 @@ function groundRoads(): Array<{ id: string; cls: RoadClass; pts: P2[]; closed: b
       start = -1;
     }
   }
-  for (const ring of RINGS) out.push({ id: ring.id, cls: ring.cls, closed: true, pts: circle(ring.x, ring.z, ring.r, Math.max(12, Math.round((2 * Math.PI * ring.r) / STEP))) });
+  for (const ring of [...RINGS, ...PLACE_RINGS]) {
+    const n = Math.max(12, Math.round((2 * Math.PI * ring.r) / STEP));
+    out.push({ id: ring.id, cls: ring.cls, closed: true, pts: ring.rz === undefined ? circle(ring.x, ring.z, ring.r, n) : ellipse(ring.x, ring.z, ring.r, ring.rz, n) });
+  }
   // rings before the avenues that end on them: a stable sort by class, the rings first within the avenues
-  // the districts' streets after every main road (their crossings' heights are worked out between them)
-  const district = (r: { id: string }): number => (DISTRICT_STREET.test(r.id) ? 1 : 0);
+  // the districts' streets after every main road (their crossings' heights are worked out between them), the places'
+  // own after those (a place's road ends on a street at its height)
+  const place = new Set([...PLACE_ROADS, ...PLACE_RINGS].map((r) => r.id));
+  const district = (r: { id: string }): number => (DISTRICT_STREET.test(r.id) ? 1 : place.has(r.id) ? 2 : 0);
   return out.sort((a, b) => district(a) - district(b) || order.indexOf(a.cls) - order.indexOf(b.cls) || Number(b.closed) - Number(a.closed));
 }
 
@@ -664,8 +669,8 @@ export class Ground {
       h = natural(x, z);
     } else if (sh.d < SHELF) {
       const top = sh.kind === BEACH_KIND ? SEA.level : FOOT;
-      h = top + (SEA_FLOOR - top) * smooth01(sh.d / SHELF);
-    } else h = SEA_FLOOR;
+      h = seabed(x, z, top + (SEA_FLOOR - top) * smooth01(sh.d / SHELF));
+    } else h = seabed(x, z, SEA_FLOOR);
     this.edge = Infinity;
     const g = this.roadGrid, c = g.cell(x, z);
     if (c < 0) return h;
@@ -760,6 +765,8 @@ export class Ground {
       }
     }
     if (dirt) return DIRT;
+    // a place's boards and floors (a pier over the water, a stand's concourse)
+    if (placePaved(x, z)) return ASPHALT;
     if (!this.onLand(x, z)) return SAND;
     if (inPolygon(x, z, PLACES.quarry)) return DIRT;
     // Sunset Works (slice 9): the dry canal's concrete and the Waterworks' plaza paved, the scrapyard's yard dirt

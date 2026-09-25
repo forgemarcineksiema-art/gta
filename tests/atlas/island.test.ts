@@ -5,15 +5,16 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import { GLYPHS, KIND_GLYPH } from '../../src/sim/glyphs';
-import { catmullRom, circle } from '../../src/sim/island/geom';
+import { catmullRom, circle, ellipse } from '../../src/sim/island/geom';
+import { DECKS, REEF } from '../../src/sim/island/shapes/quay';
 import { districtStreets } from '../../src/sim/island/streets';
 import {
   BEACH_JUMP, BOARDWALK, BUNKERS, CREST, DUNE_JUMP, FAIRWAYS, GLASSHOUSE, GREENS, POND, TEES, boardwalkRuns, gardenDunes, gardenPaths, gardenTrees,
 } from '../../src/sim/island/shapes/gardens';
 import {
   BAY, BASIN, BOUNDS, BREAKERS, BUOYS, CAMERAS, COAST_PARTS, COVERS, FIRST_MINUTE, FIRST_MINUTE_STEPS, GARAGES, HIGHWAY, JOBS, JUMPS,
-  PLACES, RINGS, RIVAL_RINGS, ROADBLOCK_SITES, ROADS, SERVICES, SLIPWAYS, STASH, causeway, coastline, districtOf, islet, landArea,
-  naturalHeight, onLand, COAST,
+  PLACES, PLACE_RINGS, PLACE_ROADS, RINGS, RIVAL_RINGS, ROADBLOCK_SITES, ROADS, SERVICES, SLIPWAYS, STASH, causeway, coastline, districtOf,
+  islet, landArea, naturalHeight, onLand, COAST,
 } from '../../src/sim/island/plan';
 
 const r1 = (v: number): number => Math.round(v * 10) / 10;
@@ -43,8 +44,11 @@ it('dumps the island for the atlas', () => {
     const steps = Math.max(2, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 6));
     for (let k = 0; k < steps; k++) spanOf.push(i);
   }
-  const roads = [...HIGHWAY, ...ROADS].map((r) => ({ id: r.id, cls: r.cls, span: r.span, pts: pts(r.smooth ? catmullRom(r.points, false, 6) : r.points) }));
-  for (const ring of RINGS) roads.push({ id: ring.id, cls: ring.cls, span: 'ground', pts: pts([...circle(ring.x, ring.z, ring.r, 64), circle(ring.x, ring.z, ring.r, 64)[0] as [number, number]]) });
+  const roads = [...HIGHWAY, ...ROADS, ...PLACE_ROADS].map((r) => ({ id: r.id, cls: r.cls, span: r.span, pts: pts(r.smooth ? catmullRom(r.points, false, 6) : r.points) }));
+  for (const ring of [...RINGS, ...PLACE_RINGS]) {
+    const loop = ring.rz === undefined ? circle(ring.x, ring.z, ring.r, 64) : ellipse(ring.x, ring.z, ring.r, ring.rz, 64);
+    roads.push({ id: ring.id, cls: ring.cls, span: 'ground', pts: pts([...loop, loop[0] as [number, number]]) });
+  }
   // the districts' streets (slice 5), drawn under the main roads
   for (const s of districtStreets().roads) roads.push({ id: s.id, cls: s.cls, span: 'ground', pts: pts(s.points) });
   const data = {
@@ -52,6 +56,8 @@ it('dumps the island for the atlas', () => {
     coast: pts(coastline()), coastSpan: spanOf, coastParts: COAST_PARTS, causeway: pts(causeway()), islet: pts(islet()), bay: pts(catmullRom(BAY, true, 6)), basin: BASIN,
     heights: { cell, nx, nz, values: heights }, districts: { cell: dcell, nx: dx, nz: dz, ids, values: districts },
     roads, places: PLACES,
+    // the Quay's decks and reef (slice 11)
+    quay: { decks: DECKS.map((d) => ({ a: [r1(d.ax), r1(d.az)], b: [r1(d.bx), r1(d.bz)], half: d.half })), reef: REEF },
     placed: {
       jobs: JOBS, rivals: RIVAL_RINGS, garages: GARAGES, jumps: JUMPS, cameras: CAMERAS, covers: COVERS, breakers: BREAKERS,
       roadblocks: ROADBLOCK_SITES, services: SERVICES, stash: STASH, slipways: SLIPWAYS, buoys: pts(catmullRom(BUOYS, false, 30)),

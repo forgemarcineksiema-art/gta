@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.10 slice 6b: the roads' surfaces
+
+Done: `island/surfaces.ts`: each road's strip 4 cm over the ground (5 points across, halved where the ground bends),
+broken at the 128 junctions where a polygon from the arms' edges takes over; pavements on 14 cm kerbs along the
+avenues and streets (their slabs the wheels climb, loaded with the physics' chunks); the paint: centre and lane lines,
+edge lines, 259 stop lines with zebras and arrows, 1,061 parking bays (`surfaces.parking`). The ground: a narrower road
+gives way to the wider across its carriageway (no bump in the main road), a street crosses it at its heights and
+climbs from its edge. Pins 6.1–6.5 (6.1 at 4 cm, not the plan's 2: the ground's mesh under a strip needs the room to
+stay in its 2,400 triangles). Open: a few streets near main roads climb their first stretch at up to 26 %.
+
 ## 2026-09-25 — M8.10 slice 6a: the highway's structures
 
 Done: `island/structures.ts` cuts the highway into its structures: the tunnel under the hill, the viaduct over the

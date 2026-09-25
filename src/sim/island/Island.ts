@@ -15,6 +15,7 @@ import type { P2 } from './geom';
 import { FOOT, Ground, HALF_WIDTH, type CoastKind } from './ground';
 import { buildNetwork } from './network';
 import { DECK, structures, type Piece, type Structure } from './structures';
+import { PAVEMENT, roadSurfaces, type RoadSurfaces } from './surfaces';
 import { BOUNDS, CIRCUS, highwayLoop } from './plan';
 
 /** A chunk of the ground: its side (m) and the height field's cell (m). The chunks cover the plan's bounds. */
@@ -51,8 +52,12 @@ export class Island {
   readonly network = buildNetwork(this.ground);
   /** The highway's structures (M8.10 slice 6a): the viaduct, the bay bridge, the overpasses, the tunnel. */
   readonly structures: Structure[] = structures((this.network.lines[0] as { pts: RoadPoint[] }).pts, highwayLoop(6).span);
+  /** The roads' surfaces (M8.10 slice 6b): the strips, the junctions, the pavements and their kerbs, the paint, the bays. */
+  readonly surfaces: RoadSurfaces = roadSurfaces(this.ground, this.network.graph, (x, z) => { const [i, j] = Island.chunkOf(x, z); return Island.chunkIndex(i, j); });
   /** The chunks with a height field in the physics, by index. */
   readonly active = new Map<number, RAPIER.Collider>();
+  /** Each physics chunk's kerbs, with its height field. */
+  private readonly chunkColliders = new Map<number, RAPIER.Collider[]>();
   loaded = 0;
   unloaded = 0;
   /** Chunks whose heights were worked out when the ring needed them, not ahead (the start's ring, or a prefetch late). */
@@ -109,6 +114,8 @@ export class Island {
       for (const [k, collider] of this.active) {
         if (this.want.has(k)) continue;
         this.world.removeCollider(collider, false);
+        for (const c of this.chunkColliders.get(k) ?? []) this.world.removeCollider(c, false);
+        this.chunkColliders.delete(k);
         this.active.delete(k);
         this.unloaded++;
       }
@@ -124,6 +131,8 @@ export class Island {
   private load(k: number): void {
     if (this.active.has(k)) return;
     this.active.set(k, this.buildChunk(k % CHUNKS_X, Math.floor(k / CHUNKS_X)));
+    // the pavements' kerbs: a slab under each piece of the band, its top the pavement's, climbed by the wheels
+    this.chunkColliders.set(k, (this.surfaces.kerbs.get(k) ?? []).map((p) => this.slab(p, PAVEMENT / 2, 0.5, p.length / 2 + 0.2, 0, -0.5, 0, GROUPS_TERRAIN)));
     this.loaded++;
     this.built = true;
   }
@@ -260,15 +269,20 @@ export class Island {
    * The structures' colliders: a deck's slab (the wheels' ground) and its railings; the tunnel's floor, walls and roof,
    * the lid over its trench at the hill's surface (the roof's top at least), a face over each mouth up to the hill.
    */
+  /** A box `hx, hy, hz` (half) at a piece's local offset, turned with it (`flat`: its heading only). */
+  private slab(p: Piece, hx: number, hy: number, hz: number, ox: number, oy: number, oz: number, groups: number, flat = false): RAPIER.Collider {
+    const pitch = flat ? 0 : p.pitch;
+    // the piece's frame: its climb (+Z turned up: a turn about +X by −pitch), then its heading about +Y
+    const a = -pitch, y1 = oy * Math.cos(a) - oz * Math.sin(a), z1 = oy * Math.sin(a) + oz * Math.cos(a);
+    const x2 = ox * Math.cos(p.yaw) + z1 * Math.sin(p.yaw), z2 = z1 * Math.cos(p.yaw) - ox * Math.sin(p.yaw);
+    const cy = Math.cos(p.yaw / 2), sy = Math.sin(p.yaw / 2), cp = Math.cos(a / 2), sp = Math.sin(a / 2);
+    return this.world.createCollider(RAPIER.ColliderDesc.cuboid(hx, hy, hz).setTranslation(p.x + x2, p.y + y1, p.z + z2)
+      .setRotation({ x: cy * sp, y: sy * cp, z: -sy * sp, w: cy * cp }).setCollisionGroups(groups));
+  }
+
   private structureColliders(): void {
     const put = (p: Piece, hx: number, hy: number, hz: number, ox: number, oy: number, oz: number, groups: number, flat = false): void => {
-      const pitch = flat ? 0 : p.pitch;
-      // the piece's frame: its climb (+Z turned up: a turn about +X by −pitch), then its heading about +Y
-      const a = -pitch, y1 = oy * Math.cos(a) - oz * Math.sin(a), z1 = oy * Math.sin(a) + oz * Math.cos(a);
-      const x2 = ox * Math.cos(p.yaw) + z1 * Math.sin(p.yaw), z2 = z1 * Math.cos(p.yaw) - ox * Math.sin(p.yaw);
-      const cy = Math.cos(p.yaw / 2), sy = Math.sin(p.yaw / 2), cp = Math.cos(a / 2), sp = Math.sin(a / 2);
-      this.world.createCollider(RAPIER.ColliderDesc.cuboid(hx, hy, hz).setTranslation(p.x + x2, p.y + y1, p.z + z2)
-        .setRotation({ x: cy * sp, y: sy * cp, z: -sy * sp, w: cy * cp }).setCollisionGroups(groups));
+      this.slab(p, hx, hy, hz, ox, oy, oz, groups, flat);
     };
     for (const s of this.structures) {
       for (const p of s.pieces) {

@@ -40,10 +40,14 @@ describe('M8.10 slice 4: the main network', () => {
 
   it('4.4 every lane\'s grade within its class\'s, away from the junctions', () => {
     const { nodes } = net.graph;
-    // a crossing's box blends two roads' surfaces (up to +8 % on Crown's hill) until slice 6 lays each box flat
+    // out of a junction a lane eases from the wider road's surface onto its own road's (slice 6b: the box is the wider
+    // road's, pin 6.5), up to 24 % on the serpentine's and a few of Crown's first stretches
     const nearNode = (p: { x: number; z: number }): boolean => nodes.some((n) => Math.hypot(n.x - p.x, n.z - p.z) < 30);
     for (const l of net.graph.lanes) {
       const cls = l.highway ? 'highway' : null;
+      // a district's street is held to its own pin (5.2: its least grade where two main roads far apart in height hold its
+      // ends, never over 25 %)
+      const street = /^(crown|foundry|gardens|marina)-street-/.test(net.laneRoad[l.id] ?? '');
       let steepest = 0;
       // over 5 m at least, as the profiles are held (every 6 m)
       for (let i = 0, j = 1; j < l.points.length; j++) {
@@ -54,7 +58,7 @@ describe('M8.10 slice 4: the main network', () => {
         i = j;
       }
       // the steepest class is dirt's; the highway its own
-      expect(steepest, `lane ${l.id}`).toBeLessThan((cls ? MAX_GRADE.highway : MAX_GRADE.dirt) + 0.02);
+      expect(steepest, `lane ${l.id}`).toBeLessThan((cls ? MAX_GRADE.highway : street ? 0.25 : MAX_GRADE.dirt) + 0.02);
     }
   });
 

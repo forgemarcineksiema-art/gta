@@ -1,24 +1,21 @@
 /**
- * The island drawn (M8.10 slices 2–3, 6a): the ground a chunk at a time (`GroundView`); the graded roads as strips on it,
- * each hung with a skirt so no gap shows under its edge; the paved places as slabs; the highway's structures (decks with
+ * The island drawn (M8.10 slices 2–3, 6): the ground a chunk at a time (`GroundView`); the roads' surfaces a chunk (the
+ * sim's strips, junctions, pavements and paint); the paved places as slabs; the highway's structures (decks with
  * railings and piers, the tunnel's walls, roof and portals); the coast's things: bollards along the quays, a parapet
  * along the cliffs and the Quay's bay, boulders along the rocks, the spit and the causeway; the sea; the Crown Tower on
  * the summit as the one landmark for now. Reads the sim's island, never writes it.
  */
 import * as THREE from 'three';
 import { ISLAND_COLORS, PALETTE, SEA } from '../../sim';
-import { APRON, HALF_WIDTH, type CoastKind } from '../../sim/island/ground';
-import { CHUNK, type Island } from '../../sim/island/Island';
+import { APRON, type CoastKind } from '../../sim/island/ground';
+import { CHUNK, CHUNKS_X, CHUNK_X0, CHUNK_Z0, type Island } from '../../sim/island/Island';
 import { DECK, type Piece } from '../../sim/island/structures';
 import { PLACES } from '../../sim/island/plan';
 import { QUALITY, type QualityTier } from '../quality';
 import { GroundView, MOUTH } from './GroundView';
 
-/** Road strips sit this far over the ground so the two never fight, their skirts hang this far under their edges (m). */
-const LIFT = 0.1;
-const ROAD_SKIRT = 0.8;
 /** The paved places' slabs: this far over the ground, under the roads' strips; a quad about this big (m). */
-const PAVE_LIFT = 0.09;
+const PAVE_LIFT = 0.035;
 const PAVE_CELL = 8;
 /** The chunks within this of the car are built at the start; the rest a few columns a frame (m). */
 const SNAP_REACH = 400;
@@ -31,6 +28,8 @@ export class IslandView {
   private readonly group = new THREE.Group();
   private readonly ground: GroundView;
   private readonly color = new THREE.Color();
+  /** The roads' surfaces' meshes by chunk. */
+  private readonly surfaceChunks = new Map<number, THREE.Mesh>();
 
   constructor(scene: THREE.Scene, private readonly island: Island) {
     scene.add(this.group);
@@ -40,7 +39,7 @@ export class IslandView {
     this.group.add(sea);
     this.ground = new GroundView(island);
     this.group.add(this.ground.group);
-    this.group.add(this.roads());
+    this.group.add(this.surfaces());
     this.group.add(this.paving());
     this.group.add(this.structures());
     this.group.add(...this.coast());
@@ -52,6 +51,10 @@ export class IslandView {
     const reach = QUALITY[quality].far + CHUNK * 0.75;
     if (snap) this.ground.sync(x, z, Math.min(reach, SNAP_REACH), true);
     this.ground.sync(x, z, reach);
+    for (const [k, mesh] of this.surfaceChunks) {
+      const i = k % CHUNKS_X, j = Math.floor(k / CHUNKS_X);
+      mesh.visible = Math.hypot(CHUNK_X0 + (i + 0.5) * CHUNK - x, CHUNK_Z0 + (j + 0.5) * CHUNK - z) < reach;
+    }
   }
 
   dispose(): void {
@@ -66,56 +69,29 @@ export class IslandView {
   }
 
   /**
-   * The graded roads as strips a hair over the ground (its heights at their edges and middle, so they lie on it where
-   * two roads blend), each edge hung with a skirt: asphalt, the taxiways' concrete, the quarry's dirt.
+   * The roads' surfaces (the sim's, slice 6b), a mesh a chunk: the strips a hair over the ground, the junctions, the
+   * pavements on their kerbs, the paint; each chunk shown within sight as the ground's are.
    */
-  private roads(): THREE.Mesh {
-    const pos: number[] = [], col: number[] = [];
-    const c = this.color, ground = this.island.ground;
-    const quad = (ax: number, ay: number, az: number, bx: number, by: number, bz: number, cx: number, cy: number, cz: number, dx: number, dy: number, dz: number): void => {
-      pos.push(ax, ay, az, bx, by, bz, cx, cy, cz, ax, ay, az, cx, cy, cz, dx, dy, dz);
-      for (let v = 0; v < 6; v++) col.push(c.r, c.g, c.b);
-    };
-    for (const road of ground.roads) {
-      const n = road.pts.length, last = road.closed ? n : n - 1, hw = HALF_WIDTH[road.cls];
-      // a cross-section: the left edge, the middle, the right edge, each on the ground
-      const section = (k: number): number[] => {
-        const p = road.pts[(k + n) % n] as readonly [number, number];
-        const prev = road.pts[road.closed ? (k - 1 + n) % n : Math.max(0, k - 1)] as readonly [number, number];
-        const next = road.pts[road.closed ? (k + 1) % n : Math.min(n - 1, k + 1)] as readonly [number, number];
-        const tx = next[0] - prev[0], tz = next[1] - prev[1], l = Math.hypot(tx, tz) || 1;
-        const nx = -tz / l, nz = tx / l;
-        const out: number[] = [];
-        for (const s of [1, 0, -1]) {
-          const x = p[0] + nx * hw * s, z = p[1] + nz * hw * s;
-          out.push(x, ground.surfaceHeight(x, z) + LIFT, z);
-        }
-        return out;
-      };
-      c.setHex(road.cls === 'dirt' ? ISLAND_COLORS.dirt : road.cls === 'taxiway' ? PALETTE.concrete : PALETTE.asphalt);
-      let a = section(0);
-      for (let k = 0; k < last; k++) {
-        const b = section(k + 1);
-        // over an overpass the deck draws the road
-        if (road.deck?.[k] === true && road.deck[k + 1] === true) { a = b; continue; }
-        const [l0x, l0y, l0z, m0x, m0y, m0z, r0x, r0y, r0z] = a as [number, number, number, number, number, number, number, number, number];
-        const [l1x, l1y, l1z, m1x, m1y, m1z, r1x, r1y, r1z] = b as [number, number, number, number, number, number, number, number, number];
-        // the two halves of the strip, facing up (the left edge is left of the way the road runs)
-        quad(l0x, l0y, l0z, l1x, l1y, l1z, m1x, m1y, m1z, m0x, m0y, m0z);
-        quad(m0x, m0y, m0z, m1x, m1y, m1z, r1x, r1y, r1z, r0x, r0y, r0z);
-        // the skirts under the edges, facing out
-        quad(l0x, l0y, l0z, l0x, l0y - ROAD_SKIRT, l0z, l1x, l1y - ROAD_SKIRT, l1z, l1x, l1y, l1z);
-        quad(r1x, r1y, r1z, r1x, r1y - ROAD_SKIRT, r1z, r0x, r0y - ROAD_SKIRT, r0z, r0x, r0y, r0z);
-        a = b;
-      }
+  private surfaces(): THREE.Group {
+    const g = new THREE.Group(), c = this.color;
+    const material = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1.5, polygonOffsetUnits: -3 });
+    for (const [k, chunk] of this.island.surfaces.chunks) {
+      const col = new Float32Array(chunk.positions.length);
+      chunk.colors.forEach((hex, t) => {
+        c.setHex(hex);
+        for (let v = 0; v < 3; v++) col.set([c.r, c.g, c.b], t * 9 + v * 3);
+      });
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(chunk.positions, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      geometry.computeVertexNormals();
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.receiveShadow = true;
+      mesh.matrixAutoUpdate = false;
+      this.surfaceChunks.set(k, mesh);
+      g.add(mesh);
     }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-    geometry.computeVertexNormals();
-    const mesh = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1.5, polygonOffsetUnits: -3 }));
-    mesh.receiveShadow = true;
-    return mesh;
+    return g;
   }
 
   /**

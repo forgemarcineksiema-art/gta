@@ -11,6 +11,14 @@ their pixels) and `ui/scale.ts` sets the root's font size to 16 px × the height
 is 1 rem at least, the keycaps too. Stills at 800×450, 1280×720, 1920×1080: no text under 13 px at any, TOTALS fits
 800×450, the line 30 px at 1080p. Pins M8.9 7.1–7.3. Verify green.
 
+## 2026-09-25 — M8.8 slice 8: a voice per engine
+
+Done: `src/audio/voices.ts` gives each class a voice and the engine speaks in the body's (`EngineAudio.update` takes
+`sim.carBody`): the muscle and police cars' V8 (four pulses a revolution, the engine as it was), the sports car's six
+(three, smooth and bright), the compact's four (two, buzzier, an octave up at the same revs), the van's diesel for every
+truck and bus (two, low, on a clatter of band-passed noise), the Bubble's two-stroke (one, a square's buzz and a rasp). A
+swap glides the mix over about 0.3 s. Pins M8.8 8.1, 8.2 (`tests/audio/voices.test.ts`); the sound is Marcin's ear.
+
 ## 2026-09-25 — M8.9 slice 5: one colour, one meaning
 
 Done (R1): `SIGNALS` in `sim/palette.ts` (money, way, trouble, police, ink, off, outline), the CSS's `:root` the same

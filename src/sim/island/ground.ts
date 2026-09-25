@@ -60,8 +60,15 @@ const APART = 0.2;
 /** The steepest a district's street may be left where the main roads it joins are far apart in height (pin 5.2). */
 const STEEPEST_STREET = 0.25;
 
-/** A road of the ground: its centreline and its profile's heights, one per point. */
-export interface GradedRoad { id: string; cls: RoadClass; pts: P2[]; h: number[]; closed: boolean; deck?: boolean[] }
+/**
+ * The serpentine's hairpins lean in (M8.10 slice 8): a cross-fall up to `most` (rise over run toward the curve's outside)
+ * where it turns as tight as `radius` m or tighter, eased in along the road over `ease` samples each way, flat across
+ * within `clear` m past another road's carriageway (a junction stays level).
+ */
+export const BANK = { most: 0.14, radius: 30, ease: 3, clear: 8 } as const;
+
+/** A road of the ground: its centreline and its profile's heights, one per point; its cross-fall where it banks (+ its right side up). */
+export interface GradedRoad { id: string; cls: RoadClass; pts: P2[]; h: number[]; closed: boolean; deck?: boolean[]; bank?: number[] }
 
 /** What a stretch of shore is: the plan's kinds; the basin's are quays, the causeway's rocks, the islet's a beach. */
 export type CoastKind = 'cliff' | 'quay' | 'bay' | 'beach' | 'rocks' | 'spit';
@@ -339,7 +346,33 @@ function fillPolygon(mask: Uint8Array, nx: number, nz: number, poly: readonly P2
   }
 }
 
-interface Seg { a: P2; b: P2; ha: number; hb: number; hw: number; kind: number; reach: number; nx?: number; nz?: number; cap?: number; ends?: number }
+interface Seg { a: P2; b: P2; ha: number; hb: number; hw: number; kind: number; reach: number; nx?: number; nz?: number; cap?: number; ends?: number; ba?: number; bb?: number }
+
+/**
+ * A banked road's cross-fall at each point (`BANK`): its turn over two samples each way, toward the outside of the
+ * curve, eased along it; none near its ends and where another road comes within reach of its carriageway.
+ */
+function banking(road: GradedRoad, roads: readonly GradedRoad[]): number[] {
+  const n = road.pts.length, pts = road.pts, hw = HALF_WIDTH[road.cls];
+  const heading = (i: number, j: number): number => Math.atan2((pts[j] as P2)[0] - (pts[i] as P2)[0], (pts[j] as P2)[1] - (pts[i] as P2)[1]);
+  const flat = pts.map(([x, z], i) => i < 2 || i > n - 3 || roads.some((o) => o !== road && onRoad(o, x, z).d < HALF_WIDTH[o.cls] + hw + BANK.clear));
+  let bank = pts.map((_, i) => {
+    if (flat[i]) return 0;
+    const a = heading(i - 2, i), b = heading(i, i + 2), run = Math.hypot((pts[i + 2] as P2)[0] - (pts[i - 2] as P2)[0], (pts[i + 2] as P2)[1] - (pts[i - 2] as P2)[1]);
+    // a left turn (the heading growing) puts the right side up
+    const curvature = Math.atan2(Math.sin(b - a), Math.cos(b - a)) / (run || 1);
+    return Math.max(-1, Math.min(1, curvature * BANK.radius)) * BANK.most;
+  });
+  for (let pass = 0; pass < 3; pass++) {
+    bank = bank.map((_, i) => {
+      if (flat[i]) return 0;
+      let s = 0, c = 0;
+      for (let k = Math.max(0, i - BANK.ease); k <= Math.min(n - 1, i + BANK.ease); k++) { s += bank[k] as number; c++; }
+      return s / c;
+    });
+  }
+  return bank;
+}
 
 /** A list of segments in typed arrays, and for each grid cell the segments within reach of it. */
 class SegmentGrid {
@@ -351,6 +384,8 @@ class SegmentGrid {
   readonly cap: Uint8Array;
   /** A road segment at an open road's end: 1 its first, 2 its last. */
   readonly ends: Uint8Array;
+  /** A banked road's cross-fall at the segment's two ends (0 for the rest). */
+  readonly ba: Float32Array; readonly bb: Float32Array;
   readonly start: Int32Array; readonly items: Int32Array;
   readonly cols = Math.ceil((BOUNDS.x1 - BOUNDS.x0) / CELL);
   readonly rows = Math.ceil((BOUNDS.z1 - BOUNDS.z0) / CELL);
@@ -359,11 +394,13 @@ class SegmentGrid {
     this.ax = new Float32Array(n); this.az = new Float32Array(n); this.bx = new Float32Array(n); this.bz = new Float32Array(n);
     this.ha = new Float32Array(n); this.hb = new Float32Array(n); this.hw = new Float32Array(n); this.kind = new Uint16Array(n);
     this.nx = new Float32Array(n); this.nz = new Float32Array(n); this.cap = new Uint8Array(n); this.ends = new Uint8Array(n);
+    this.ba = new Float32Array(n); this.bb = new Float32Array(n);
     const lists: number[][] = Array.from({ length: this.cols * this.rows }, () => []);
     segs.forEach((s, k) => {
       this.ax[k] = s.a[0]; this.az[k] = s.a[1]; this.bx[k] = s.b[0]; this.bz[k] = s.b[1];
       this.ha[k] = s.ha; this.hb[k] = s.hb; this.hw[k] = s.hw; this.kind[k] = s.kind;
       this.nx[k] = s.nx ?? 0; this.nz[k] = s.nz ?? 0; this.cap[k] = s.cap ?? 0; this.ends[k] = s.ends ?? 0;
+      this.ba[k] = s.ba ?? 0; this.bb[k] = s.bb ?? 0;
       const i0 = Math.max(0, Math.floor((Math.min(s.a[0], s.b[0]) - s.reach - BOUNDS.x0) / CELL));
       const i1 = Math.min(this.cols - 1, Math.floor((Math.max(s.a[0], s.b[0]) + s.reach - BOUNDS.x0) / CELL));
       const j0 = Math.max(0, Math.floor((Math.min(s.a[1], s.b[1]) - s.reach - BOUNDS.z0) / CELL));
@@ -514,6 +551,8 @@ export class Ground {
       const xs = t.pts.map((p) => p[0]), zs = t.pts.map((p) => p[1]);
       this.tunnel = { pts: t.pts, floor: s.map((d) => h0 + ((h1 - h0) * d) / total), x0: Math.min(...xs) - TRENCH, x1: Math.max(...xs) + TRENCH, z0: Math.min(...zs) - TRENCH, z1: Math.max(...zs) + TRENCH };
     }
+    // the serpentine's hairpins lean in (slice 8)
+    for (const r of this.roads) if (r.cls === 'serpentine') r.bank = banking(r, this.roads);
     this.paved = Uint8Array.from(this.roads, (r) => (r.cls === 'dirt' ? 0 : 1));
     const segs: Seg[] = [];
     this.roads.forEach((road, r) => {
@@ -528,7 +567,7 @@ export class Ground {
         if (deck?.[i] === true || deck?.[i + 1] === true) continue;
         const cap = open ? (i === 0 || deck?.[i - 1] === true ? 1 : 0) | (i === last - 1 || deck?.[i + 2] === true ? 2 : 0) : 0;
         const ends = road.closed ? 0 : (i === 0 ? 1 : 0) | (i === last - 1 ? 2 : 0);
-        segs.push({ a: road.pts[i] as P2, b: road.pts[(i + 1) % n] as P2, ha: road.h[i] as number, hb: road.h[(i + 1) % n] as number, hw, kind: r, reach: hw + SHOULDER + BLEND, cap, ends });
+        segs.push({ a: road.pts[i] as P2, b: road.pts[(i + 1) % n] as P2, ha: road.h[i] as number, hb: road.h[(i + 1) % n] as number, hw, kind: r, reach: hw + SHOULDER + BLEND, cap, ends, ba: road.bank?.[i] ?? 0, bb: road.bank?.[(i + 1) % n] ?? 0 });
       }
     });
     this.roadGrid = new SegmentGrid(segs);
@@ -648,6 +687,9 @@ export class Ground {
       if (d < (near.d[slot] as number)) {
         near.d[slot] = d;
         near.h[slot] = (g.ha[s] as number) + ((g.hb[s] as number) - (g.ha[s] as number)) * t;
+        // a banked road's cross-fall, its right side up by it, on over its shoulders and held past them
+        const bank = (g.ba[s] as number) + ((g.bb[s] as number) - (g.ba[s] as number)) * t, edge = (g.hw[s] as number) + SHOULDER;
+        if (bank !== 0) near.h[slot] = (near.h[slot] as number) + bank * Math.max(-edge, Math.min(edge, ((z - az) * dx - (x - ax) * dz) / (Math.hypot(dx, dz) || 1)));
         near.w[slot] = d <= reach ? 1 : 1 - smooth01((d - reach) / BLEND);
         near.hw[slot] = g.hw[s] as number;
       }

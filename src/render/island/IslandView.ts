@@ -2,8 +2,8 @@
  * The island drawn (M8.10 slices 2–3, 6): the ground a chunk at a time (`GroundView`); the roads' surfaces a chunk (the
  * sim's strips, junctions, pavements and paint); the paved places as slabs; the highway's structures (decks with
  * railings and piers, the tunnel's walls, roof and portals); the coast's things: bollards along the quays, a parapet
- * along the cliffs and the Quay's bay, boulders along the rocks, the spit and the causeway; the sea; the Crown Tower on
- * the summit as the one landmark for now. Reads the sim's island, never writes it.
+ * along the cliffs and the Quay's bay, boulders along the rocks, the spit and the causeway; the sea. The places' statics
+ * (the Crown Tower and the rest, slices 8–12) are drawn with the buildings. Reads the sim's island, never writes it.
  */
 import * as THREE from 'three';
 import { ISLAND_COLORS, PALETTE, PROP_KINDS, PropState, SEA, type PropKind, type Props, type StaticDesc } from '../../sim';
@@ -58,7 +58,6 @@ export class IslandView {
     this.group.add(this.paving());
     this.group.add(this.structures());
     this.group.add(...this.coast());
-    this.group.add(this.tower());
     this.views = placeViews(this.group, island);
   }
 
@@ -380,20 +379,5 @@ export class IslandView {
     wall.receiveShadow = true;
     out.push(wall);
     return out;
-  }
-
-  /** The Crown Tower on the summit: until the summit's plaza is built (slice 8), the island's one landmark. */
-  private tower(): THREE.Group {
-    const g = new THREE.Group();
-    const base = this.island.heightAt(PLACES.towerTop.x, PLACES.towerTop.z);
-    const body = new THREE.Mesh(new THREE.BoxGeometry(28, 94, 28), new THREE.MeshLambertMaterial({ color: 0xd8cbb0, flatShading: true }));
-    body.position.set(PLACES.towerTop.x, base + 47, PLACES.towerTop.z);
-    const crown = new THREE.Mesh(new THREE.BoxGeometry(12, 12, 12), new THREE.MeshLambertMaterial({ color: 0xf5cd75, flatShading: true }));
-    crown.position.set(PLACES.towerTop.x, base + 100, PLACES.towerTop.z);
-    const mast = new THREE.Mesh(new THREE.BoxGeometry(0.8, 18, 0.8), new THREE.MeshLambertMaterial({ color: 0xf5cd75 }));
-    mast.position.set(PLACES.towerTop.x, base + 115, PLACES.towerTop.z);
-    body.castShadow = true;
-    g.add(body, crown, mast);
-    return g;
   }
 }

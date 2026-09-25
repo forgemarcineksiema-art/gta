@@ -51,6 +51,8 @@ const PROP_SEED = 42;
 /** A Works lot's setback (fill.ts's rule) and the grid's pavement's width, which the grid's yards are laid from (m). */
 const FOUNDRY_SETBACK = 7;
 const GRID_PAVEMENT = 4.5;
+/** The tunnel's lid over its trench (slice 8): its half width across the tunnel and its mesh's step across (m). */
+const LID = { half: 24, step: 3 } as const;
 
 export class Island {
   readonly ground = new Ground();
@@ -408,10 +410,27 @@ export class Island {
       .setRotation({ x: cy * sp, y: sy * cp, z: -sy * sp, w: cy * cp }).setCollisionGroups(groups));
   }
 
+  /**
+   * A piece of the tunnel's lid over its trench (slice 8: the serpentine crosses it): the hill's surface, the roof's top
+   * at least, as a mesh `LID.step` m across, at the piece's ends and middle, so a road over it is where it is drawn.
+   */
+  private lidPiece(p: Piece, half: number, verts: number[], tris: number[]): void {
+    const fx = Math.sin(p.yaw), fz = Math.cos(p.yaw), across = Math.round((2 * LID.half) / LID.step), first = verts.length / 3;
+    for (const a of [-half, 0, half]) for (let j = 0; j <= across; j++) {
+      const c = -LID.half + (2 * LID.half * j) / across, x = p.x + fx * a + fz * c, z = p.z + fz * a - fx * c;
+      verts.push(x, Math.max(this.ground.surfaceHeight(x, z), p.y + Math.tan(p.pitch) * a + DECK.clear + 1), z);
+    }
+    for (let i = 0; i < 2; i++) for (let j = 0; j < across; j++) {
+      const k = first + i * (across + 1) + j, n = k + across + 1;
+      tris.push(k, n, k + 1, k + 1, n, n + 1);
+    }
+  }
+
   private structureColliders(): void {
     const put = (p: Piece, hx: number, hy: number, hz: number, ox: number, oy: number, oz: number, groups: number, flat = false): void => {
       this.slab(p, hx, hy, hz, ox, oy, oz, groups, flat);
     };
+    const lid: number[] = [], lidTris: number[] = [];
     for (const s of this.structures) {
       for (const p of s.pieces) {
         const half = p.length / 2 + 0.25;
@@ -422,8 +441,7 @@ export class Island {
         }
         for (const side of [-1, 1]) put(p, 0.5, DECK.clear / 2, half, side * (DECK.half + 0.5), DECK.clear / 2, 0, GROUPS_SOLID);
         put(p, DECK.half + 1, 0.5, half, 0, DECK.clear + 0.5, 0, GROUPS_SOLID);
-        const lid = Math.max(this.ground.surfaceHeight(p.x, p.z), p.y + DECK.clear + 1);
-        put({ ...p, y: lid }, DECK.half + 4, 0.5, half, 0, -0.5, 0, GROUPS_TERRAIN, true);
+        this.lidPiece(p, half, lid, lidTris);
       }
       if (s.kind !== 'tunnel') continue;
       // a face over each mouth, from the roof up to the hill there
@@ -434,6 +452,7 @@ export class Island {
         if (hill > roof + 0.5) put({ ...p, x: mx, y: roof, z: mz }, DECK.half + 4, (hill - roof) / 2, 0.5, 0, (hill - roof) / 2, 0, GROUPS_SOLID, true);
       }
     }
+    if (lidTris.length > 0) this.world.createCollider(RAPIER.ColliderDesc.trimesh(new Float32Array(lid), new Uint32Array(lidTris)).setFriction(1).setCollisionGroups(GROUPS_TERRAIN));
   }
 
   /** The spawns: the first minute's start at the summit, facing down Crown Avenue; the port, the beach, the runway. */

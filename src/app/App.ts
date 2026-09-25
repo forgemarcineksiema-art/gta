@@ -37,7 +37,8 @@ import { FixedStepLoop } from './loop';
 import { PerfProbe, heapMb } from './perf';
 import { SimProfile } from './simProfile';
 import { SaveStore } from './save';
-import { BALANCE, CHAIN_ALL, POLICE, defaultSave, resolveLang, volumeGain, type Lang, type SaveV1, type SimEvent } from '../sim';
+import { BALANCE, CHAIN_ALL, KIT, POLICE, defaultSave, resolveLang, volumeGain, type Lang, type SaveV1, type SimEvent } from '../sim';
+import { carLook, newLook } from '../sim/garage/look';
 import { lang, setLang, t } from '../ui/lang';
 
 /** Filled during `App.boot`; copied into the handle for `?dev` and the startup gate. */
@@ -131,6 +132,9 @@ export class App {
   private readonly handle: GameHandle;
   /** Seconds the four key hints still have on an otherwise empty top, in the profile's first two sessions (M8.9 R5). */
   private hintsLeft = HINT_SECONDS;
+  /** The showroom's look (M8.9 R10), reused, and the horn a focused card sounded (-1 none). */
+  private readonly look = newLook();
+  private previewHorn = -1;
   private lastTime = 0;
   private started = false;
   private userPaused = false;
@@ -880,6 +884,14 @@ export class App {
     if (hints) this.hintsLeft -= frameDt;
     this.hud.setHintsVisible(hints);
     this.garageUi.update(this.sim);
+    // the showroom's preview (M8.9 R10): the focused card on the car in the room; a horn looked at sounds once
+    const preview = this.garageUi.opened ? this.garageUi.preview : null;
+    this.renderer.setLook(preview ? carLook(this.sim, preview, this.look) : null, preview);
+    const horn = preview && preview.item >= 0 && KIT[preview.item]?.slot === 'horn' ? preview.item : -1;
+    if (horn !== this.previewHorn) {
+      this.previewHorn = horn;
+      if (horn >= 0) this.sfx.horn(horn);
+    }
     this.hud.update(
       this.sim,
       frameDt,

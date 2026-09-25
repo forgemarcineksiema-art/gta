@@ -15,6 +15,11 @@ import { buildFlame, buildNeon, setNeonColours, spoilerGeometry, topperGeometry 
 import { lowriderBounce } from '../traffic/TrafficView';
 import { placeFromBuffer } from '../shapes';
 import type { Smoke } from '../fx/Smoke';
+import type { CarLook } from '../../sim/garage/look';
+import type { KitSlot } from '../../sim';
+
+/** Seconds a flame or smoke looked at in the showroom shows (M8.9 R10). */
+const PUFF = 1;
 
 /** A colour no fixed part of a body uses: a taken body's mesh is built in it and resprayed at once. */
 const SENTINEL_PAINT = 0x808182;
@@ -60,6 +65,15 @@ export class PlayerCar {
   private readonly lastDent = new THREE.Vector3(0, 0.5, 2);
   private readonly tmpFwd = new THREE.Vector3();
   private readonly tmpPos = new THREE.Vector3();
+  /**
+   * The showroom's preview (M8.9 R10, `sim/garage/look.ts`): the paint and the kit the car shows while a card is
+   * focused, null for what it wears; a flame or smoke looked at shows in a puff of `PUFF` s.
+   */
+  private look: CarLook | null = null;
+  private flamePuff = 0;
+  private smokePuff = 0;
+  private puffFlame = -1;
+  private puffSmoke = -1;
   /** The showroom's pose (M8.9 R10): the car's matrix where the game has it, the move to the turntable, the turn. */
   private readonly showOld = new THREE.Matrix4();
   private readonly showDelta = new THREE.Matrix4();
@@ -85,6 +99,26 @@ export class PlayerCar {
     for (const id of CAR_IDS) this.roofY[id] = roofOf(this.classes[id]);
     this.seatTopper();
     this.fitKit(sim.carId);
+  }
+
+  /** The showroom's look (M8.9 R10): what the car shows in the room; null, what it wears. A flame or smoke newly looked at puffs. */
+  setLook(look: CarLook | null): void {
+    this.look = look;
+    const flame = look ? look.items.flame : -1, smoke = look ? look.items.smoke : -1;
+    const worn = this.sim.kit;
+    if (flame !== this.puffFlame) {
+      this.puffFlame = flame;
+      if (flame >= 0 && flame !== worn.worn('flame')) this.flamePuff = PUFF;
+    }
+    if (smoke !== this.puffSmoke) {
+      this.puffSmoke = smoke;
+      if (smoke >= 0 && smoke !== worn.worn('smoke')) this.smokePuff = PUFF;
+    }
+  }
+
+  /** A slot's item on the car: the look's in the showroom, else what the car wears. */
+  private wornIn(slot: KitSlot): number {
+    return this.look ? this.look.items[slot] : this.sim.kit.worn(slot);
   }
 
   /** The class whose mesh is shown (for the e2e swap check). */
@@ -151,6 +185,8 @@ export class PlayerCar {
   }
 
   update(tm: VehicleTelemetry, dt: number): void {
+    if (this.flamePuff > 0) this.flamePuff -= dt;
+    if (this.smokePuff > 0) this.smokePuff -= dt;
     this.mesh.update(tm);
     // the sweeper's brushes turn while it moves (M7 slice 13)
     this.mesh.spin(dt, tm.speed);
@@ -180,11 +216,13 @@ export class PlayerCar {
    */
   emitTyreSmoke(dt: number, smoke: Smoke, vel: THREE.Vector3): void {
     const tm = this.sim.vehicle.telemetry;
-    if (!tm.drifting || tm.groundedWheels < 2 || this.sim.probe.speed < 6) { this.tyreAcc = 0; return; }
+    // a smoke looked at in the showroom puffs from the rear wheels (M8.9 R10)
+    const puff = this.smokePuff > 0;
+    if (!puff && (!tm.drifting || tm.groundedWheels < 2 || this.sim.probe.speed < 6)) { this.tyreAcc = 0; return; }
     const wheels = this.sim.vehicle.wheels;
     let ground: number = ASPHALT;
-    for (const w of wheels) if (!w.isFront && w.grounded && w.surface !== ASPHALT) ground = w.surface;
-    const worn = this.sim.kit.worn('smoke');
+    if (!puff) for (const w of wheels) if (!w.isFront && w.grounded && w.surface !== ASPHALT) ground = w.surface;
+    const worn = this.wornIn('smoke');
     const colour = ground === GRASS ? PALETTE.grass : ground === DIRT ? CITY_COLORS.soil : worn >= 0 ? (KIT[worn]?.colour ?? -1) : -1;
     const car = this.mesh.root;
     this.tmpFwd.set(0, 0, 1).applyQuaternion(car.quaternion);
@@ -247,7 +285,7 @@ export class PlayerCar {
     this.carId = sim.carId;
     // behind the door a shell shows the garage's paint, so a respray shows at once; on the road every car wears the
     // paint it came in, a borrowed police car its own colours (M8.8 slice 1)
-    const paint = isShell(body) && sim.run.state === 'door' ? sim.garage.paintOf(body) : sim.carPaint;
+    const paint = this.look ? this.look.paint : isShell(body) && sim.run.state === 'door' ? sim.garage.paintOf(body) : sim.carPaint;
     if (paint !== this.shownPaint) {
       this.mesh.setPaint(paint);
       this.shownPaint = paint;
@@ -266,7 +304,7 @@ export class PlayerCar {
 
   /** The topper worn now on the roof: built the first time it is worn, one child of the holder at a time. */
   private syncTopper(): void {
-    const worn = this.sim.kit.worn('topper');
+    const worn = this.wornIn('topper');
     const id = worn >= 0 ? (KIT[worn]?.id ?? '') : '';
     if (id === this.topperId) return;
     this.topperId = id;
@@ -288,8 +326,7 @@ export class PlayerCar {
    * off the rear tyres in a drift. Colours from the kit; the flame and the smoke have their own when none is worn.
    */
   private syncKit(): void {
-    const kit = this.sim.kit;
-    const neon = kit.worn('neon'), flame = kit.worn('flame');
+    const neon = this.wornIn('neon'), flame = this.wornIn('flame');
     if (neon !== this.neonId) {
       this.neonId = neon;
       const item = neon >= 0 ? KIT[neon] : undefined;
@@ -303,7 +340,7 @@ export class PlayerCar {
     }
     this.syncCarKit();
     const tm = this.sim.vehicle.telemetry;
-    const burning = tm.boosting && !this.sim.life.state.wrecked;
+    const burning = (tm.boosting && !this.sim.life.state.wrecked) || this.flamePuff > 0;
     for (let k = 0; k < this.flames.length; k++) {
       const f = this.flames[k] as THREE.Mesh;
       if (f.visible !== burning) f.visible = burning;
@@ -313,8 +350,8 @@ export class PlayerCar {
 
   /** The car's kit on the car shown: its wheels restyled, a spoiler on its boot, its stance; stock on a car taken on the road. */
   private syncCarKit(): void {
-    const kit = this.sim.kit, body = this.sim.carBody;
-    const wheels = kit.worn('wheels'), spoiler = kit.worn('spoiler'), stance = kit.worn('stance');
+    const body = this.sim.carBody;
+    const wheels = this.wornIn('wheels'), spoiler = this.wornIn('spoiler'), stance = this.wornIn('stance');
     if (body !== this.kitBody) {
       this.kitBody = body;
       this.wheelsId = -2;

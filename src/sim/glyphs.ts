@@ -20,7 +20,9 @@ export interface GlyphShape {
 export type GlyphId = 'parcel' | 'key' | 'siren' | 'watch' | 'flag' | 'crash' | 'hammer' | 'taxi' | 'house' | 'star'
   | 'd0' | 'd1' | 'd2' | 'd3' | 'd4' | 'd5' | 'd6' | 'd7' | 'd8' | 'd9'
   // the HUD's own (docs/M8.9_PLAN.md R4): the bag's sack, the bank's coin, the boost's flame; not signs, so not in GLYPH_ORDER
-  | 'sack' | 'coin' | 'flame';
+  | 'sack' | 'coin' | 'flame'
+  // the hunts on GOALS (R10): a billboard on its legs, a jump's ramp
+  | 'board' | 'ramp';
 
 /** A regular polygon's points (a circle at `n` sides), clockwise from the top. */
 function circle(cx: number, cy: number, r: number, n = 20): number[] {
@@ -157,6 +159,14 @@ export const GLYPHS: Readonly<Record<GlyphId, readonly GlyphShape[]>> = {
     { outer: circle(0.5, 0.5, 0.44, 28), holes: [circle(0.5, 0.5, 0.33, 28)] },
     { outer: circle(0.5, 0.5, 0.24, 20) },
   ],
+  // a hunt's billboard: the panel on two legs, a stripe across it cut out
+  board: [
+    { outer: rect(0.08, 0.14, 0.92, 0.62), holes: [rect(0.2, 0.34, 0.8, 0.42)] },
+    { outer: rect(0.24, 0.62, 0.34, 0.92) },
+    { outer: rect(0.66, 0.62, 0.76, 0.92) },
+  ],
+  // a hunt's jump: the ramp's wedge on the ground
+  ramp: [{ outer: [0.06, 0.84, 0.94, 0.84, 0.94, 0.3, 0.8, 0.3] }],
   // the boost: a flame with a lick on its left and its core cut out
   flame: [
     {

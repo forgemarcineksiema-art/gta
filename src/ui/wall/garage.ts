@@ -21,15 +21,17 @@
  * to draw. Rebuilds only when the garage, the bank or the totals change. Every
  * word in the player's language (`lang.ts`, DESIGN.md §19).
  */
-import { huntsLine } from '../map/bigmap';
+import { glyphIcon } from '../glyph';
+import { goalsModel } from './goals';
 import { carLine, label, labelAria, num, relabel, t } from '../lang';
 import { nextLine } from '../hud/totals';
 import { gridMove, gridStart, type GridMove } from './wallGrid';
 import { PAGE_TITLES, WALL_PAGES, pageOf, type WallPage } from './wallPages';
 
 export type { WallPage } from './wallPages';
+import { newPreview, type Preview } from '../../sim/garage/look';
 import {
-  BALANCE, BODY_IDS, BODY_WORDS, CHIEF, DISTRICTS, KIT, MEDAL_WORDS, PALETTE, RIVALS, STATS, STREAK, isCarSlot, isShell, posterNumber, reqText,
+  BALANCE, BODY_IDS, BODY_WORDS, CHIEF, DISTRICTS, KIT, KIT_INDEX, MEDAL_WORDS, PALETTE, RIVALS, STATS, STREAK, isCarSlot, isShell, posterNumber, reqText,
   type BodyId, type CarSlot, type KitSlot, type PrepItem, type RivalDef, type SimWorld, type Stat,
 } from '../../sim';
 
@@ -140,6 +142,11 @@ export class GarageUi {
   private readonly pics: Pic[] = [];
   private pictures: Pictures | null = null;
   private picSerial = -1;
+  /**
+   * The focused card on STYLE (M8.9 R10): its paint or its item, which the car in the room shows while it is focused
+   * (`sim/garage/look.ts`); nothing elsewhere. The app reads it each frame.
+   */
+  readonly preview: Preview = newPreview();
   private readonly tuneFor: HTMLElement;
   private readonly carsCount: HTMLElement;
   /** CARS' upgrade rows (TUNE until M8.5) and the next run's boosters (PREP until M8.5), a cash and a video button each. */
@@ -257,6 +264,7 @@ export class GarageUi {
     for (const hex of GARAGE_PAINTS) {
       const b = button('wall__swatch', '');
       b.style.setProperty('--swatch', `#${hex.toString(16).padStart(6, '0')}`);
+      b.dataset['paint'] = String(hex);
       b.setAttribute('aria-label', t('paint {hex}', { hex: `#${hex.toString(16)}` }));
       swatches.appendChild(b);
       const it = this.item(pageOf('respray'), b, () => this.actions.respray(this.sim.garage.car, hex));
@@ -297,7 +305,8 @@ export class GarageUi {
     const strip = el('div', 'wall__board');
     for (let i = 0; i < RIVALS.length; i++) {
       const chip = el('div', 'wall__chip');
-      chip.append(el('span', 'wall__chip-swatch'), el('span', 'wall__chip-num', i === CHIEF ? '★' : `#${posterNumber(i)}`));
+      // the rival as their car (M8.9 R10): the picture when it comes, the paint's swatch till then
+      chip.append(this.pic(chip, `body:${(RIVALS[i] as RivalDef).body}`), el('span', 'wall__chip-swatch'), el('span', 'wall__chip-num', i === CHIEF ? '★' : `#${posterNumber(i)}`));
       (chip.firstElementChild as HTMLElement).style.background = `#${((RIVALS[i] as RivalDef).paints[0] as number).toString(16).padStart(6, '0')}`;
       strip.appendChild(chip);
       this.boardChips.push(chip);
@@ -573,30 +582,44 @@ export class GarageUi {
     this.boardNext.replaceChildren(...rows);
   }
 
-  /** GOALS' records: the hunts, the time trials' medals, the best run. */
+  /** GOALS' records (M8.9 R10): the hunts as three counters with their glyphs, the time trials' medals, the best run. */
   private fillRecords(sim: SimWorld): void {
     const rows: HTMLElement[] = [];
-    const hunts = huntsLine(sim);
-    if (hunts) rows.push(el('div', 'wall__streak wall__medals', t('HUNTS: {list}', { list: hunts })));
+    const model = goalsModel(sim);
+    if (model.hunts.length > 0) {
+      const hunts = el('div', 'wall__hunts');
+      for (const h of model.hunts) {
+        const counter = el('span', 'wall__hunt');
+        counter.append(glyphIcon(h.glyph, 'wall__hunt-glyph'), el('span', 'wall__hunt-count', `${money(h.n)}/${money(h.of)}`));
+        hunts.appendChild(counter);
+      }
+      rows.push(hunts);
+    }
     // the time trials' medals (M5.5 slice 10), counted once there is one: a row of dashes answered no question
     const won = [0, 0, 0, 0];
     for (const j of sim.jobs.defs) if (j.kind === 'trial') { const m = sim.jobs.medals.get(j.id) ?? 0; won[m] = (won[m] ?? 0) + 1; }
     const medals = [3, 2, 1].filter((m) => (won[m] as number) > 0).map((m) => t('{n} {medal}', { n: won[m] as number, medal: t(MEDAL_WORDS[m] ?? '') }));
     if (medals.length > 0) rows.push(el('div', 'wall__streak wall__medals', t('TIME TRIAL MEDALS: {list}', { list: medals.join(' · ') })));
-    if (sim.run.bestRun > 0) rows.push(el('div', 'wall__streak wall__medals', t('BEST RUN {cash}', { cash: Math.round(sim.run.bestRun) })));
+    if (model.bestRun > 0) rows.push(el('div', 'wall__streak wall__medals', t('BEST RUN {cash}', { cash: Math.round(model.bestRun) })));
     this.records.replaceChildren(...rows);
   }
 
-  /** GOALS' day: the day's three with their progress, the streak. */
+  /** GOALS' day (M8.9 R10): the day's three, each with its bar, the streak. */
   private fillDailies(sim: SimWorld): void {
     const d = sim.dailies;
     const rows: HTMLElement[] = [];
-    for (let i = 0; i < 3; i++) {
-      const text = d.text(i);
-      if (!text) continue;
-      const row = el('div', d.done[i] ? 'wall__daily is-done' : 'wall__daily');
-      row.append(el('span', 'wall__daily-text', t(text)), el('span', 'wall__daily-progress', d.done[i] ? t('DONE') : d.progressText(i, t)), el('span', 'wall__daily-reward', `+${money(d.reward(i))}`));
+    let i = 0;
+    for (const daily of goalsModel(sim).dailies) {
+      while (i < 3 && d.text(i) !== daily.text) i++;
+      const row = el('div', daily.done ? 'wall__daily is-done' : 'wall__daily');
+      const bar = el('span', 'wall__bar');
+      const fill = el('span', 'wall__bar-fill');
+      fill.style.transform = `scaleX(${daily.share.toFixed(3)})`;
+      bar.appendChild(fill);
+      row.append(el('span', 'wall__daily-text', t(daily.text)), el('span', 'wall__daily-progress', daily.done ? t('DONE') : d.progressText(i, t)),
+        el('span', 'wall__daily-reward', `+${money(daily.reward)}`), bar);
       rows.push(row);
+      i++;
     }
     this.todayFor.textContent = d.streak.count > 0 ? `${t('TODAY · STREAK DAY {n}', { n: d.streak.count })}${d.streak.topper ? ` · ${t('TOPPER ON')}` : ''}` : t('TODAY');
     this.dailiesBody.replaceChildren(...rows);
@@ -727,6 +750,13 @@ export class GarageUi {
     this.offerBank.classList.toggle('is-focus', this.offerOpen && this.offerFocus === 1);
     this.root.classList.toggle('is-offer', this.offerOpen);
     this.driveButton.classList.toggle('is-focus', !this.offerOpen && this.page === 'wall' && this.level === 'pages');
+    // the preview: the focused paint or kit card, while STYLE's cards have the keys
+    const p = this.preview;
+    p.paint = -1;
+    p.item = -1;
+    const card = this.isOpen && !this.offerOpen && this.level === 'items' && this.page === 'paint' ? list[this.focus]?.el : undefined;
+    if (card?.dataset['paint'] !== undefined) p.paint = Number(card.dataset['paint']);
+    else if (card?.dataset['kit'] !== undefined) p.item = KIT_INDEX[card.dataset['kit']] ?? -1;
     this.hintText();
   }
 

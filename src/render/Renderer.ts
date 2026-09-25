@@ -4,7 +4,8 @@
  * drawn lives in the folders by what it is (docs/ARCHITECTURE.md, decision 97); this file keeps the order.
  */
 import * as THREE from 'three';
-import { bodySpec, type CarId, type SimEvent, type SimWorld } from '../sim';
+import { KIT, bodySpec, type CarId, type SimEvent, type SimWorld } from '../sim';
+import type { CarLook, Preview } from '../sim/garage/look';
 import { CameraDirector } from './camera/CameraDirector';
 import { ChaseCamera } from './camera/ChaseCamera';
 import { GhostCar } from './cars/GhostCar';
@@ -80,6 +81,9 @@ export class Renderer {
   /** The street furniture that is down (M8). */
   private readonly propsView: PropsView | null;
   readonly hideoutView: HideoutView | null;
+  /** The turntable's extra turn toward a previewed card's side (M8.9 R10), and where it heads. */
+  private showTurn = 0;
+  private showTurnTo = 0;
   /** The garage's pictures (M8.9 R10): drawn behind the shut door, a few a frame, kept for the session. */
   readonly thumbs: Thumbs | null;
   readonly coinsView: Coins | null;
@@ -227,6 +231,16 @@ export class Renderer {
     return signTopY(signScale(depth, THREE.MathUtils.degToRad(this.camera.fov), this.stats.height), goal);
   }
 
+  /**
+   * The showroom's preview (M8.9 R10): the look the car shows while a card is focused (null: what it wears); a
+   * spoiler, a flame or smoke turns the turntable to show the tail.
+   */
+  setLook(look: CarLook | null, preview: Preview | null): void {
+    this.player.setLook(look);
+    const k = preview && preview.item >= 0 ? KIT[preview.item] : undefined;
+    this.showTurnTo = k && (k.slot === 'spoiler' || k.slot === 'flame' || k.slot === 'smoke') ? Math.PI : 0;
+  }
+
   /** The class whose mesh is shown (for the e2e swap check). */
   get visibleCar(): CarId {
     return this.player.visibleCar;
@@ -244,7 +258,9 @@ export class Renderer {
     const shut = this.director.shut;
     if (shut >= 0) {
       const site = this.director.site;
-      this.player.showroom(site.x, site.z, turntableYaw(this.director.shot.carYaw, shut), showroomMix(shut));
+      // a card that shows on the tail turns the car to it, eased
+      this.showTurn += (this.showTurnTo - this.showTurn) * (1 - Math.exp(-3 * dt));
+      this.player.showroom(site.x, site.z, turntableYaw(this.director.shot.carYaw, shut) + this.showTurn, showroomMix(shut));
     }
     this.hideoutView?.light(shut >= 0 ? this.director.site : null, showroomMix(shut));
     const car = this.player.mesh.root;

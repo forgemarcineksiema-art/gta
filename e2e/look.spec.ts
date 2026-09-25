@@ -297,7 +297,7 @@ for (const [w, h] of SIZES) {
   });
 
   test(`stills: busted, the door, CARS, STYLE at ${w}x${h}`, async ({ page }) => {
-    test.skip(!wanted('busted', 'totals', 'cars', 'style'));
+    test.skip(!wanted('busted', 'totals', 'cars', 'style', 'preview', 'goals'));
     await boot(page, `manual=1&spawn=crown&ad=off&fresh=1&${DATE}`, w, h);
     await page.evaluate(`${RUN_STATES}
       sim.police.dispatching = false;
@@ -327,6 +327,20 @@ for (const [w, h] of SIZES) {
     await page.locator('.wall__tab').nth(2).click();
     await adv(page, 200);
     await snap(page, 'style');
+    if (wanted('preview')) {
+      // the focus on the giant wing (M8.9 R10): on the car, the turntable turning its tail to the camera
+      for (const key of ['KeyW', 'KeyW', 'KeyW', 'KeyD', 'KeyD']) {
+        await page.keyboard.press(key);
+        await adv(page, 60);
+      }
+      await adv(page, 1500);
+      await snap(page, 'preview');
+    }
+    if (wanted('goals')) {
+      await page.locator('.wall__tab').nth(3).click();
+      await adv(page, 200);
+      await snap(page, 'goals');
+    }
   });
 
   if (w === 1280 || GATE) {

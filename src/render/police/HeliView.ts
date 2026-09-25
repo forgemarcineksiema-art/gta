@@ -1,9 +1,10 @@
 /**
  * The police helicopter (M5.5 slice 9): a white airframe with the police
  * band, a spinning rotor over a faint blur disc, a blinking bar, and the
- * searchlight as an additive cone down to a warm spot on the ground (or on
- * the deck the car is on). Shown while the air unit is on duty; reads the
- * sim only.
+ * searchlight as a lamp on its belly and a warm spot on the ground (or on
+ * the deck the car is on) with a soft edge; no cone (M8.9 R12: a flat pale
+ * shape washing the road and the sky read as a fault). Shown while the air
+ * unit is on duty; reads the sim only.
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -18,6 +19,33 @@ function part(g: THREE.BufferGeometry, color: number, x: number, y: number, z: n
   for (let i = 0; i < n; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
   out.setAttribute('color', new THREE.BufferAttribute(col, 3));
   return out;
+}
+
+/** The spot on the ground: full in its middle, fading to nothing at its rim (added light: black adds nothing). */
+export function spotGeometry(segments = 32): THREE.BufferGeometry {
+  const pos: number[] = [0, 0, 0], col: number[] = [1, 1, 1], index: number[] = [];
+  // the middle ring holds the full light, the rim none
+  for (const [r, c] of [[0.55, 1], [0.8, 0.45], [1, 0]] as const) {
+    for (let k = 0; k < segments; k++) {
+      const a = (k / segments) * Math.PI * 2;
+      pos.push(Math.sin(a) * r, 0, Math.cos(a) * r);
+      col.push(c, c, c);
+    }
+  }
+  for (let k = 0; k < segments; k++) {
+    const n = (k + 1) % segments;
+    // counter-clockwise seen from above: the disc faces up
+    index.push(0, 1 + k, 1 + n);
+    for (let ring = 0; ring < 2; ring++) {
+      const a = 1 + ring * segments, b = 1 + (ring + 1) * segments;
+      index.push(a + k, b + k, a + n, a + n, b + k, b + n);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(index);
+  return g;
 }
 
 /** The airframe: cabin, nose, glazing, the police band, tail boom and fin, skids. +Z forward. */
@@ -53,11 +81,7 @@ export class HeliView {
   private readonly tailRotor = new THREE.Group();
   private readonly bar: THREE.Mesh;
   private readonly barMaterial: THREE.MeshBasicMaterial;
-  private readonly cone: THREE.Mesh;
   private readonly spot: THREE.Mesh;
-  private readonly up = new THREE.Vector3(0, 1, 0);
-  private readonly dir = new THREE.Vector3();
-  private readonly top = new THREE.Vector3();
   private blink = 0;
 
   constructor(scene: THREE.Scene, private readonly sim: SimWorld) {
@@ -82,22 +106,21 @@ export class HeliView {
     this.bar = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.12, 0.2), this.barMaterial);
     this.bar.position.set(0, -0.8, 0.4);
     this.root.add(this.bar);
-    // the searchlight: an open cone with its apex at the aircraft, and the warm spot where it lands
-    this.cone = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 20, 1, true).translate(0, -0.5, 0),
-      new THREE.MeshBasicMaterial({ color: 0xfff1c8, transparent: true, opacity: 0.1, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
-    this.cone.frustumCulled = false;
-    this.spot = new THREE.Mesh(new THREE.CircleGeometry(1, 28).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({ color: 0xffe9b0, transparent: true, opacity: 0.32, depthWrite: false, blending: THREE.AdditiveBlending }));
+    // the searchlight: the lamp under the nose, lit, and the warm spot where it lands, soft at its edge
+    const lamp = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.08, 12), new THREE.MeshBasicMaterial({ color: 0xfff1c8 }));
+    lamp.position.set(0, -1.1, 1.6);
+    this.root.add(lamp);
+    this.spot = new THREE.Mesh(spotGeometry(),
+      new THREE.MeshBasicMaterial({ color: 0xffe9b0, vertexColors: true, transparent: true, opacity: 0.32, depthWrite: false, blending: THREE.AdditiveBlending }));
     this.root.visible = false;
-    this.cone.visible = false;
     this.spot.visible = false;
-    scene.add(this.root, this.cone, this.spot);
+    scene.add(this.root, this.spot);
   }
 
   update(dt: number): void {
     const heli = this.sim.police?.heli;
     const on = heli?.active ?? false;
-    if (this.root.visible !== on) { this.root.visible = on; this.cone.visible = on; this.spot.visible = on; }
+    if (this.root.visible !== on) { this.root.visible = on; this.spot.visible = on; }
     if (!heli || !on) return;
     this.root.position.set(heli.x, heli.y, heli.z);
     this.root.rotation.set(0, heli.yaw, 0);
@@ -113,13 +136,6 @@ export class HeliView {
     const groundY = near ? Math.max(0.06, this.sim.probe.y - 0.45) : 0.06;
     this.spot.position.set(heli.lightX, groundY, heli.lightZ);
     this.spot.scale.setScalar(spot);
-    (this.spot.material as THREE.MeshBasicMaterial).opacity = heli.sees ? 0.42 : 0.24;
-    // the cone from under the aircraft to the spot
-    const top = this.top.set(heli.x, heli.y - 1, heli.z);
-    this.dir.set(heli.lightX - top.x, groundY - top.y, heli.lightZ - top.z);
-    const length = this.dir.length();
-    this.cone.position.copy(top);
-    this.cone.quaternion.setFromUnitVectors(this.up, this.dir.multiplyScalar(-1 / length));
-    this.cone.scale.set(spot, length, spot);
+    (this.spot.material as THREE.MeshBasicMaterial).opacity = heli.sees ? 0.3 : 0.18;
   }
 }

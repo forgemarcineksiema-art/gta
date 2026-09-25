@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.9 slice 12: signs that read; faults that are not faults
+
+Done (R7, R12): a sign never reads smaller than 28 px at 720p in the HUD's scale out to 150 m (`signScale`: drawn
+larger about its centre past the depth where its face would shrink under it; beyond 150 m it shrinks with the world),
+the goal's a quarter larger, the pay label over the face as drawn (`Renderer.signTop`); no coins round the rings (the
+rings' pool stays empty; the route's coins stay); the helicopter's cone went: a lamp on its belly and a soft-edged spot;
+a thinned car's steady state is a one-pixel checker (`FADE.floor` 0.5, where the 4×4 pattern is one), the halftone only
+while it fades. The chase's teaching line drops its lead (the goal line says LOSE THEM). Pins M8.9 12.1–12.4. Stills
+and verify green.
+
 ## 2026-09-25 — M8.9 slice 11: the words, the pause, the loading, the cards
 
 Done (R11, R12): KÓŁKO for a job's ring and STREFA for a zone (ROZBIJAJ AUTA W STREFIE, GOTOWE · KÓŁKO JEST NA MAPIE),

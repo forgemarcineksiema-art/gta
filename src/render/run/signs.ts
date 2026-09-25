@@ -158,6 +158,30 @@ export function collectSigns(sim: SimWorld, time: number, view: SignView | null,
 /** The pay shows over an open sign within this of the car (m, M8.7 D5). */
 export const PAY_RANGE = 100;
 
+/** A sign's face across its rim (m): what the fold and the floor measure. */
+export const SIGN_SIZE = 1.52;
+
+/**
+ * A sign reads from afar (docs/M8.9_PLAN.md R7): never smaller on the screen than `px` at 720p, in the HUD's scale (the
+ * height over 720 held to 0.85–1.5, as `ui/scale.ts`); past the depth where its face would be, it is drawn larger about
+ * its centre, out to `reach` m (beyond, it shrinks as the world does). The goal's sign is `goal` times the others.
+ */
+export const SIGN_MIN = { px: 28, reach: 150, goal: 1.25, base: 720, scaleMin: 0.85, scaleMax: 1.5 } as const;
+
+/** The sign's growth at `depth` m for a vertical fov (rad) and a view `height` CSS px tall: 1 where its face reads, more past it. */
+export function signScale(depth: number, fovY: number, height: number): number {
+  if (!(depth > 0) || !(fovY > 0) || !(height > 0)) return 1;
+  const k = Math.min(SIGN_MIN.scaleMax, Math.max(SIGN_MIN.scaleMin, height / SIGN_MIN.base));
+  const px = signShare(SIGN_SIZE, Math.min(depth, SIGN_MIN.reach), fovY) * height;
+  const want = SIGN_MIN.px * k;
+  return px >= want ? 1 : want / px;
+}
+
+/** The height (m) a pay label sits at over a sign on its pole: over the face as drawn, grown or not. */
+export function signTopY(grow: number, goal: boolean): number {
+  return SIGN_Y + (SIGN_SIZE / 2) * grow * (goal ? SIGN_MIN.goal : 1) + 0.29;
+}
+
 /**
  * A sign taller on screen than `from` of the screen's height folds away and is gone at `to` (M8.9 R7): driving through
  * a ring's centre the camera passes its pole, and the face (1.52 m across) would fill the screen. Its pole folds with it.

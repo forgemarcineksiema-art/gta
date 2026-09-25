@@ -13,6 +13,7 @@
  */
 import * as THREE from 'three';
 import { PALETTE, type VehicleTuning } from '../../sim';
+import { BAYER4 } from '../camera/fade';
 import type { CarProfile, Section } from './carMesh';
 
 type V3 = { x: number; y: number; z: number };
@@ -41,9 +42,9 @@ export function paintMaskMaterial(): THREE.MeshLambertMaterial {
   return material;
 }
 
-/** The 4×4 Bayer threshold under this fragment, in (0, 1). */
+/** The 4×4 Bayer threshold under this fragment, in (0, 1) (`fade.ts`: at the floor, a one-pixel checker). */
 const SCREEN_DOOR = `
-const float BAYER[16] = float[16]( 0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0 );
+const float BAYER[16] = float[16]( ${BAYER4.map((v) => v.toFixed(1)).join(', ')} );
 float screenDoor() {
   int x = int( mod( gl_FragCoord.x, 4.0 ) );
   int y = int( mod( gl_FragCoord.y, 4.0 ) );

@@ -310,7 +310,8 @@ export class TopVoice {
 export const TEACH = {
   bag: { bit: 1, lead: 'BAG', text: 'BANK IT AT A GARAGE' },
   mult: { bit: 2, lead: '', text: 'THE STARS MULTIPLY THE BAG' },
-  chase: { bit: 4, lead: 'LOSE THEM', text: 'GET OUT OF THEIR SIGHT' },
+  // the goal line says LOSE THEM already: the line says how (one answer per question)
+  chase: { bit: 4, lead: '', text: 'GET OUT OF THEIR SIGHT' },
 } as const;
 export const TEACH_ALL = 7;
 export const TEACH_LINES = [TEACH.bag, TEACH.mult, TEACH.chase] as const;

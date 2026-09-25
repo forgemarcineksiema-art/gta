@@ -26,6 +26,7 @@ import { AutoQuality, QUALITY, type QualityTier } from './quality';
 import { Coins } from './run/Coins';
 import { HideoutView } from './run/HideoutView';
 import { MarkerView } from './run/MarkerView';
+import { SIGN_Y, signScale, signTopY } from './run/signs';
 import { ShapesView } from './shapes';
 import { Sky } from './sky';
 import { PedView } from './traffic/PedView';
@@ -209,6 +210,15 @@ export class Renderer {
     this.stats.dpr = dpr;
     this.stats.width = w;
     this.stats.height = h;
+    this.markerView.viewHeight = h;
+  }
+
+  /** The height (m) over a sign at (x, z) its pay label sits at: over its face as drawn, grown with the depth (M8.9 R7). */
+  signTop(x: number, z: number, goal: boolean): number {
+    this.camera.getWorldDirection(this.lookDir);
+    const c = this.camera.position;
+    const depth = (x - c.x) * this.lookDir.x + (SIGN_Y - c.y) * this.lookDir.y + (z - c.z) * this.lookDir.z;
+    return signTopY(signScale(depth, THREE.MathUtils.degToRad(this.camera.fov), this.stats.height), goal);
   }
 
   /** The class whose mesh is shown (for the e2e swap check). */

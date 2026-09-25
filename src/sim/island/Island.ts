@@ -10,9 +10,10 @@ import type { SpawnPoint } from '../playground';
 import { SEA } from '../city/sea';
 import type { SurfaceReader } from '../city/surface';
 import type { TrackDef, TrackSample } from '../track';
-import { catmullRom, resample, type P2 } from './geom';
+import type { P2 } from './geom';
 import { FOOT, Ground, HALF_WIDTH, type CoastKind } from './ground';
-import { BOUNDS, CIRCUS, HIGHWAY } from './plan';
+import { buildNetwork } from './network';
+import { BOUNDS, CIRCUS, highwayLoop } from './plan';
 
 /** A chunk of the ground: its side (m) and the height field's cell (m). The chunks cover the plan's bounds. */
 export const CHUNK = 250;
@@ -44,6 +45,8 @@ export class Island {
   readonly spawns: SpawnPoint[];
   /** The highway's loop as the bot's and the lap timer's track. */
   readonly route: TrackDef;
+  /** The main roads' lanes (M8.10 slice 4): the grid's `RoadGraph`, for the traffic, the police, the bot and the way. */
+  readonly network = buildNetwork(this.ground);
   /** The chunks with a height field in the physics, by index. */
   readonly active = new Map<number, RAPIER.Collider>();
   loaded = 0;
@@ -264,11 +267,7 @@ export class Island {
 
   /** The highway's loop sampled every 3 m, as the grid's route is. */
   private highwayTrack(): TrackDef {
-    const pts: P2[] = [];
-    for (const piece of HIGHWAY) {
-      const sampled = piece.smooth ? catmullRom(piece.points, false, 3) : resample(piece.points, 3);
-      pts.push(...sampled.slice(0, -1));
-    }
+    const pts: P2[] = highwayLoop(3).pts;
     const samples: TrackSample[] = [];
     let s = 0;
     for (let i = 0; i < pts.length; i++) {

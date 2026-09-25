@@ -2,6 +2,17 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.10 slice 4: the main network
+
+Done: `island/network.ts` makes the main roads a `RoadGraph` (`Island.network`): the roads joined where one's end meets
+another, split there, laned both ways (the highway two a way), the roundabouts one way round; lane heights the ground's,
+the tunnel's or a deck's (8 m over the basin, 10 m over the bay's mouth), eased over 12 m at their ends. The plan had
+nine ends in a field: the ramps, the harbour road, the beach road, the taxiways and the quarry tracks now meet roads (a
+road inland of the airfield, the runway between the taxiways, a passage from the beach road under the highway to the
+parkway, the quay sweep under it to the beach, the serpentine and a quarry track from the summit's ring). The highway is
+one smooth loop (a kink at the tunnel's mouth made its inner lane 15 % steep); a road's pinned end no longer leaves a
+step (Crown Avenue's top was 35 %). Pins 4.1–4.6. Changed at Marcin's word: one verify a slice, in the background.
+
 ## 2026-09-25 — M8.10 slice 3: the ground's look and the coast
 
 Done: the ground drawn a mesh a chunk (`island/GroundView.ts`: an RTIN over 65×65 points, tight under the roads and at

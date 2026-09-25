@@ -149,6 +149,18 @@ export const HIGHWAY: readonly PlanRoad[] = [
   road('highway-bay-bridge', 'highway', 'bridge', false, [[852, 610], [515, 752]]),
 ];
 
+/**
+ * The highway's loop as one closed curve through every piece's points, so no kink where two pieces meet, sampled every
+ * `spacing` m or so; each sample's piece (an index into `HIGHWAY`).
+ */
+export function highwayLoop(spacing: number): { pts: P2[]; piece: number[] } {
+  const ctrl: P2[] = [], owner: number[] = [];
+  HIGHWAY.forEach((p, k) => { for (let i = 0; i + 1 < p.points.length; i++) { ctrl.push(p.points[i] as P2); owner.push(k); } });
+  const spanOf: number[] = [];
+  const pts = catmullRom(ctrl, true, spacing, spanOf);
+  return { pts, piece: spanOf.map((s) => owner[s] as number) };
+}
+
 /** The roundabouts: the centre's, the summit's round the tower, the Garden Parkway round the botanic garden. */
 export const CIRCUS = { x: 0, z: 50 } as const;
 export const SUMMIT = { x: 470, z: 400 } as const;
@@ -165,7 +177,8 @@ const HARBOUR_SKETCH: readonly P2[] = [[8, -89], [30, -200], [90, -380], [160, -
 const PALM_SKETCH: readonly P2[] = [[0, -10], [18, 150], [10, 350], [-20, 550], [-50, 690], [-60, 752]];
 export const HARBOUR_ROAD: readonly P2[] = Ws(HARBOUR_SKETCH);
 export const PALM_AVENUE: readonly P2[] = Ws(PALM_SKETCH);
-export const QUAY_SWEEP: readonly P2[] = Ws([[720, 392], [640, 322], [520, 312], [410, 345], [335, 430], [310, 560], [318, 640]]);
+/** The Quay's sweep round the bay's north and west shores, then under the highway to the beach road's east end. */
+export const QUAY_SWEEP: readonly P2[] = Ws([[720, 392], [640, 322], [520, 312], [410, 345], [335, 430], [310, 560], [318, 640], [300, 700], [260, 750]]);
 export const ROADS: readonly PlanRoad[] = [
   road('crown-avenue-up', 'avenue', 'ground', false, [[-32, -74], [-406, -352]]),
   road('crown-avenue-down', 'avenue', 'ground', false, [[33, -27], [520, 312]]),
@@ -175,15 +188,26 @@ export const ROADS: readonly PlanRoad[] = [
   road('palm-avenue', 'avenue', 'ground', true, PALM_SKETCH),
   { id: 'quay-sweep', cls: 'avenue', span: 'ground', smooth: true, points: QUAY_SWEEP },
   road('beach-road', 'avenue', 'ground', true, [[-560, 752], [-470, 750], [-250, 752], [-60, 752], [150, 752], [260, 750]]),
-  road('serpentine', 'serpentine', 'ground', true, [[-650, -400], [-705, -425], [-730, -395], [-690, -360], [-700, -330], [-745, -318], [-735, -280], [-690, -250], [-705, -215], [-760, -200], [-784, -150]]),
+  // from the summit's ring down the west side to the highway
+  road('serpentine', 'serpentine', 'ground', true, [[-550, -400], [-650, -400], [-705, -425], [-730, -395], [-690, -360], [-700, -330], [-745, -318], [-735, -280], [-690, -250], [-705, -215], [-760, -200], [-784, -150]]),
   road('ramp-west', 'ramp', 'ground', false, [[-760, -6], [-796, 0]]),
   road('ramp-east', 'ramp', 'ground', false, [[760, -76], [796, -80]]),
-  road('ramp-north', 'ramp', 'ground', true, [[60, -641], [120, -600], [160, -545]]),
-  road('ramp-south', 'ramp', 'ground', false, [[-10, 652], [-60, 700]]),
+  // off the highway into the harbour road's end
+  road('ramp-north', 'ramp', 'ground', true, [[60, -641], [130, -605], [215, -560]]),
+  // off Palm Avenue, merging into the highway westward
+  road('ramp-south', 'ramp', 'ground', true, [[-33, 610], [-90, 672], [-150, 698]]),
   road('lighthouse-road', 'street', 'ground', true, [[720, 392], [772, 450], [800, 540], [806, 640], [818, 720], [826, 734]]),
-  road('taxiway-north', 'taxiway', 'ground', false, [[760, -200], [1005, -200]]),
-  road('taxiway-south', 'taxiway', 'ground', false, [[720, 60], [1005, 60]]),
-  road('quarry-track-north', 'dirt', 'ground', true, [[-650, -580], [-685, -565], [-710, -540]]),
+  // the beach road's west end under the highway up to the Garden Parkway
+  road('gardens-passage', 'street', 'ground', true, [[-560, 752], [-555, 690], [-530, 590], [-503, 467]]),
+  // the airfield: a road inland of the highway through the east avenue's end, the taxiways under the highway to the
+  // runway's middle, the runway between them
+  road('airfield-road', 'street', 'ground', true, [[720, 60], [745, 0], [760, -76], [760, -200]]),
+  road('taxiway-north', 'taxiway', 'ground', false, [[760, -200], [1025, -200]]),
+  road('taxiway-south', 'taxiway', 'ground', false, [[720, 60], [1025, 60]]),
+  road('runway-link', 'taxiway', 'ground', false, [[1025, -200], [1025, 60]]),
+  // the quarry: in from the summit's ring, across its floor, out to the serpentine
+  road('quarry-track-north', 'dirt', 'ground', true, [[-527, -457], [-600, -540], [-650, -580], [-685, -565], [-710, -540]]),
+  road('quarry-floor', 'dirt', 'ground', true, [[-710, -540], [-718, -500], [-670, -455]]),
   road('quarry-track-south', 'dirt', 'ground', true, [[-650, -400], [-655, -430], [-670, -455]]),
 ];
 

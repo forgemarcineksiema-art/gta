@@ -10,7 +10,7 @@
 import { SEA } from '../city/sea';
 import { ASPHALT, DIRT, GRASS, SAND, type SurfaceKind } from '../city/surface';
 import { catmullRom, circle, inPolygon, polylineLength, resample, signedArea, type P2 } from './geom';
-import { BASIN, BOUNDS, COAST, COAST_PARTS, HIGHWAY, PLACES, RINGS, ROADS, causeway, islet, naturalHeight, type PlanRoad, type RoadClass } from './plan';
+import { BASIN, BOUNDS, COAST, COAST_PARTS, HIGHWAY, PLACES, RINGS, ROADS, causeway, highwayLoop, islet, naturalHeight, type PlanRoad, type RoadClass } from './plan';
 
 /** A road's half width by class (m), its carriageway without the pavement. */
 export const HALF_WIDTH: Readonly<Record<RoadClass, number>> = { highway: 19, avenue: 12, street: 9, serpentine: 7, dirt: 5, taxiway: 12, ramp: 7 };
@@ -119,10 +119,19 @@ function profile(pts: P2[], cls: RoadClass, closed: boolean, start: number | nul
   }
   const g = MAX_GRADE[cls];
   const span = (i: number, j: number): number => Math.hypot((pts[j] as P2)[0] - (pts[i] as P2)[0], (pts[j] as P2)[1] - (pts[i] as P2)[1]);
-  for (let pass = 0; pass < 3; pass++) {
-    for (let i = 1; i < n; i++) { const lim = g * span(i - 1, i), p = h[i - 1] as number; h[i] = Math.max(p - lim, Math.min(p + lim, h[i] as number)); }
-    for (let i = n - 2; i >= 0; i--) { const lim = g * span(i, i + 1), p = h[i + 1] as number; h[i] = Math.max(p - lim, Math.min(p + lim, h[i] as number)); }
-    pin();
+  // held to the grade both ways, a pinned end never moved (re-pinning after the limit left a step at the end)
+  const fixedStart = !closed && start !== null, fixedEnd = !closed && end !== null;
+  for (let pass = 0; pass < 8; pass++) {
+    for (let i = 1; i < n; i++) {
+      if (i === n - 1 && fixedEnd) continue;
+      const lim = g * span(i - 1, i), p = h[i - 1] as number;
+      h[i] = Math.max(p - lim, Math.min(p + lim, h[i] as number));
+    }
+    for (let i = n - 2; i >= 0; i--) {
+      if (i === 0 && fixedStart) continue;
+      const lim = g * span(i, i + 1), p = h[i + 1] as number;
+      h[i] = Math.max(p - lim, Math.min(p + lim, h[i] as number));
+    }
   }
   return h;
 }
@@ -131,7 +140,18 @@ function profile(pts: P2[], cls: RoadClass, closed: boolean, start: number | nul
 function groundRoads(): Array<{ id: string; cls: RoadClass; pts: P2[]; closed: boolean }> {
   const order: RoadClass[] = ['highway', 'avenue', 'taxiway', 'ramp', 'street', 'serpentine', 'dirt'];
   const open = (r: PlanRoad): { id: string; cls: RoadClass; pts: P2[]; closed: boolean } => ({ id: r.id, cls: r.cls, closed: false, pts: r.smooth ? catmullRom(r.points, false, STEP) : resample(r.points, STEP) });
-  const out = [...HIGHWAY, ...ROADS].filter((r) => r.span === 'ground').map(open);
+  const out = ROADS.filter((r) => r.span === 'ground').map(open);
+  // the highway's stretches on the ground, off its one smooth loop, each to the mouth or the abutment it runs into
+  const loop = highwayLoop(STEP);
+  let start = -1;
+  for (let i = 0; i <= loop.pts.length; i++) {
+    const piece = i < loop.pts.length ? (HIGHWAY[loop.piece[i] as number] as PlanRoad) : null;
+    if (piece?.span === 'ground' && start < 0) start = i;
+    if (piece?.span !== 'ground' && start >= 0) {
+      out.push({ id: (HIGHWAY[loop.piece[start] as number] as PlanRoad).id, cls: 'highway', closed: false, pts: loop.pts.slice(start, i + 1) });
+      start = -1;
+    }
+  }
   for (const ring of RINGS) out.push({ id: ring.id, cls: ring.cls, closed: true, pts: circle(ring.x, ring.z, ring.r, Math.max(12, Math.round((2 * Math.PI * ring.r) / STEP))) });
   // rings before the avenues that end on them: a stable sort by class, the rings first within the avenues
   return out.sort((a, b) => order.indexOf(a.cls) - order.indexOf(b.cls) || Number(b.closed) - Number(a.closed));

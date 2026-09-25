@@ -19,6 +19,7 @@ import { PAVEMENT, roadSurfaces, type RoadSurfaces } from './surfaces';
 import { fillIsland, type IslandFill } from './fill';
 import { buildPlaces, type Place } from './places';
 import { BOUNDS, CIRCUS, highwayLoop } from './plan';
+import { shoreOpen } from './shapes';
 
 /** A chunk of the ground: its side (m) and the height field's cell (m). The chunks cover the plan's bounds. */
 export const CHUNK = 250;
@@ -271,11 +272,14 @@ export class Island {
     const crossed = (x: number, z: number): boolean => roads.some((r) => r.pts.some((p) => Math.hypot(p[0] - x, p[1] - z) < HALF_WIDTH[r.cls] + 4));
     for (const line of this.ground.coasts) {
       const pts = line.pts, n = pts.length, segs = line.closed ? n : n - 1;
+      // none where a place's deck leaves the shore (a pier's root: slices 8–12)
+      const open = (i: number): boolean => shoreOpen(((pts[i] as P2)[0] + (pts[(i + 1) % n] as P2)[0]) / 2, ((pts[i] as P2)[1] + (pts[(i + 1) % n] as P2)[1]) / 2);
       let from = 0;
       while (from < segs) {
+        if (open(from)) { from++; continue; }
         const kind = line.kinds[from] ?? 'rocks';
         let to = from, run = 0;
-        while (to < segs && (line.kinds[to] ?? 'rocks') === kind && run < WALL.piece) {
+        while (to < segs && (line.kinds[to] ?? 'rocks') === kind && run < WALL.piece && !open(to)) {
           const a = pts[to] as P2, b = pts[(to + 1) % n] as P2;
           run += Math.hypot(b[0] - a[0], b[1] - a[1]);
           to++;

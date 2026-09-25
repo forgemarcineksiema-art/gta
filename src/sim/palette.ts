@@ -126,3 +126,13 @@ export const ISLAND_COLORS = {
   fairway: 0x74b556, verge: 0x93a66a, rock: 0x8a8075, cliff: 0x776c63, wetSand: 0xb99b69, dirt: 0x9a7b55,
   paving: 0xb1aa9e, quayWall: 0x8c867c, seabed: 0x2f6f7f,
 } as const;
+
+/**
+ * Coral Quay's places (M8.10 slice 11): the giant duck's rubber yellow (a toy's, warmer than the coin's) and its beak;
+ * the coral of the reef and the stands' seats, the reef's clear shallows over it; the Coral Hotel's pale coral; the
+ * lighthouse's red; the decks' boards and piles; the stands' teal seats and the hulls' white.
+ */
+export const QUAY_COLORS = {
+  duck: 0xf7cf45, beak: 0xf2842c, coral: 0xef8a78, coralDeep: 0xd8607a, shallows: 0x74d6cf, hotel: 0xf4bcaa, lighthouse: 0xd8453c,
+  boards: 0xa07d5c, piles: 0x6b5a4b, seatTeal: 0x3fb3b8, hull: 0xf2efe6,
+} as const;

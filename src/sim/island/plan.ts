@@ -135,7 +135,7 @@ export interface PlanRoad {
   smooth: boolean;
   span: SpanKind;
 }
-export interface PlanRing { id: string; cls: RoadClass; x: number; z: number; r: number }
+export interface PlanRing { id: string; cls: RoadClass; x: number; z: number; r: number; /** An oval's half axis along z (its `r` along x). */ rz?: number }
 
 const road = (id: string, cls: RoadClass, span: SpanKind, smooth: boolean, points: readonly P2[]): PlanRoad => ({ id, cls, span, smooth, points: Ws(points) });
 
@@ -290,6 +290,18 @@ export const PLACES = {
     { points: Ws([[370, 486], [360, 600], [394, 680]]), width: 46 },
   ],
 } as const;
+
+/**
+ * The places' own roads and rings (M8.10 slices 8–12): graded and laned as the main roads are, but no district's street
+ * runs on into them (a set piece keeps its ways in). Coral Quay's: the stadium's oval, one way round, and the tunnel in
+ * under its west stand from the Quay's street.
+ */
+export const PLACE_ROADS: readonly PlanRoad[] = [
+  road('stadium-tunnel', 'side', 'ground', false, [[460, 178], [530, 178]]),
+];
+export const PLACE_RINGS: readonly PlanRing[] = [
+  { id: 'stadium-oval', cls: 'serpentine', x: PLACES.stadium.x, z: PLACES.stadium.z, r: 80, rz: 48 },
+];
 
 // ---------------------------------------------------------------- what stands where (the plan's §1.4, placed.jpg)
 

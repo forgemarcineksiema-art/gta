@@ -161,11 +161,22 @@ function drawBase() {
   // the stadium, the marina, the pleasure pier, the lighthouse, the duck
   const st = P.stadium;
   g.beginPath(); g.ellipse(X(st.x), Y(st.z), st.rx, st.rz, 0, 0, 7); g.fillStyle = '#b9b2c6'; g.fill(); g.lineWidth = 1.5; g.strokeStyle = '#1a1330'; g.stroke();
-  g.beginPath(); g.ellipse(X(st.x), Y(st.z), st.rx - 16, st.rz - 15, 0, 0, 7); g.fillStyle = '#4a4a58'; g.fill();
-  g.beginPath(); g.ellipse(X(st.x), Y(st.z), st.rx - 38, st.rz - 35, 0, 0, 7); g.fillStyle = '#7fbf6a'; g.fill();
+  // the oval as the sim lanes it (slice 11), its infield inside
+  const oval = road('stadium-oval');
+  if (oval) { trace(oval.pts, true); g.lineWidth = 14; g.strokeStyle = '#4a4a58'; g.stroke(); g.beginPath(); g.ellipse(X(st.x), Y(st.z), st.rx - 31, st.rz - 31, 0, 0, 7); g.fillStyle = '#7fbf6a'; g.fill(); }
+  else {
+    g.beginPath(); g.ellipse(X(st.x), Y(st.z), st.rx - 16, st.rz - 15, 0, 0, 7); g.fillStyle = '#4a4a58'; g.fill();
+    g.beginPath(); g.ellipse(X(st.x), Y(st.z), st.rx - 38, st.rz - 35, 0, 0, 7); g.fillStyle = '#7fbf6a'; g.fill();
+  }
   g.lineCap = 'butt';
-  for (const pier of P.marinaPiers) { trace([pier.from, pier.to], false); g.lineWidth = 5; g.strokeStyle = '#c9b89a'; g.stroke(); }
-  g.fillStyle = '#c9b89a'; g.fillRect(...rectOf(P.pleasurePier));
+  // the reef under the bay (its shallows, its coral) and the Quay's decks: the piers, the boardwalk and its gap, the pleasure pier
+  if (A.quay) {
+    for (const p of A.quay.reef) { g.beginPath(); g.arc(X(p.x), Y(p.z), p.r * 1.15, 0, 7); g.fillStyle = 'rgba(116,214,207,0.55)'; g.fill(); g.beginPath(); g.arc(X(p.x), Y(p.z), p.r * 0.6, 0, 7); g.fillStyle = 'rgba(239,138,120,0.85)'; g.fill(); }
+    for (const d of A.quay.decks) { trace([d.a, d.b], false); g.lineWidth = d.half * 2; g.strokeStyle = '#a07d5c'; g.stroke(); }
+  } else {
+    for (const pier of P.marinaPiers) { trace([pier.from, pier.to], false); g.lineWidth = 5; g.strokeStyle = '#c9b89a'; g.stroke(); }
+    g.fillStyle = '#c9b89a'; g.fillRect(...rectOf(P.pleasurePier));
+  }
   g.beginPath(); g.arc(X(P.ferrisWheel.x), Y(P.ferrisWheel.z), 20, 0, 7); g.lineWidth = 3; g.strokeStyle = '#f7f3ea'; g.stroke();
   g.beginPath(); g.arc(X(P.lighthouse.x), Y(P.lighthouse.z), 10, 0, 7); g.fillStyle = '#f7f3ea'; g.fill(); g.lineWidth = 4; g.strokeStyle = '#e8384f'; g.stroke();
   g.beginPath(); g.ellipse(X(P.duck.x), Y(P.duck.z), 17, 12, 0, 0, 7); g.fillStyle = '#ffd23f'; g.fill(); g.beginPath(); g.arc(X(P.duck.x + 12), Y(P.duck.z - 8), 7.5, 0, 7); g.fill();

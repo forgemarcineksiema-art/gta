@@ -10,7 +10,7 @@
 import { HIGHWAY_LANE_OFFSETS, type Lane, type RoadGraph, type RoadNode, type RoadPoint } from '../city/roads';
 import { catmullRom, resample, type P2 } from './geom';
 import { HALF_WIDTH, MAX_GRADE, type Ground } from './ground';
-import { RINGS, ROADS, highwayLoop, type RoadClass, type SpanKind } from './plan';
+import { PLACE_RINGS, PLACE_ROADS, RINGS, ROADS, highwayLoop, type RoadClass, type SpanKind } from './plan';
 import { districtStreets } from './streets';
 
 /** A road's ends join another road within this (m); joins this close along a road are one node. */
@@ -122,15 +122,16 @@ function lines(ground: Ground): Line[] {
     });
   }
   out.push({ id: 'highway', cls: 'highway', pts, onGround, firm: [], closed: true, ring: false, s: [] });
-  for (const r of [...ROADS, ...districtStreets().roads]) {
+  for (const r of [...ROADS, ...districtStreets().roads, ...PLACE_ROADS]) {
     const p = sample(r.points, r.smooth);
     out.push({ id: r.id, cls: r.cls, pts: p, onGround: p.map(() => true), firm: [], closed: false, ring: false, s: [] });
   }
-  for (const g of RINGS) {
+  for (const g of [...RINGS, ...PLACE_RINGS]) {
     const n = Math.max(12, Math.round((2 * Math.PI * g.r) / SAMPLE));
     const p: RoadPoint[] = [];
-    // the way round with the centre on the left (+X is a car's left facing +Z): the angle rising, x = sin, z = cos
-    for (let k = 0; k < n; k++) { const a = (2 * Math.PI * k) / n; p.push({ x: g.x + Math.sin(a) * g.r, z: g.z + Math.cos(a) * g.r }); }
+    // the way round with the centre on the left (+X is a car's left facing +Z): the angle rising, x = sin, z = cos (an
+    // oval's along its own half axis)
+    for (let k = 0; k < n; k++) { const a = (2 * Math.PI * k) / n; p.push({ x: g.x + Math.sin(a) * g.r, z: g.z + Math.cos(a) * (g.rz ?? g.r) }); }
     out.push({ id: g.id, cls: g.cls, pts: p, onGround: p.map(() => true), firm: [], closed: true, ring: true, s: [] });
   }
   for (const l of out) {

@@ -11,6 +11,7 @@ import { APRON, type CoastKind } from '../../sim/island/ground';
 import { CHUNK, CHUNKS_X, CHUNK_X0, CHUNK_Z0, type Island } from '../../sim/island/Island';
 import { DECK, type Piece } from '../../sim/island/structures';
 import { PLACES } from '../../sim/island/plan';
+import { shoreOpen } from '../../sim/island/shapes';
 import { cityGeometry } from '../city/CityView';
 import { lightCity } from '../city/glow';
 import { fadeRoadPaint } from '../city/roadPaint';
@@ -256,7 +257,8 @@ export class IslandView {
         const a = pts[i] as readonly [number, number], b = pts[(i + 1) % n] as readonly [number, number];
         const kind: CoastKind = line.kinds[i] ?? 'rocks';
         const dx = b[0] - a[0], dz = b[1] - a[1], len = Math.hypot(dx, dz);
-        if (len < 0.01) continue;
+        // (no wall where a place's deck leaves the shore, nor what stands for it)
+        if (len < 0.01 || shoreOpen((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)) continue;
         // toward the land
         const nx = (-dz / len) * line.land, nz = (dx / len) * line.land;
         if (kind === 'cliff' || kind === 'bay') {

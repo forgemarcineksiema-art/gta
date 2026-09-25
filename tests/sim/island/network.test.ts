@@ -6,7 +6,8 @@ import { buildNetwork, onTheGround, type IslandNetwork } from '../../../src/sim/
 
 describe('M8.10 slice 4: the main network', () => {
   let ground: Ground, net: IslandNetwork;
-  beforeAll(() => { ground = new Ground(); net = buildNetwork(ground); });
+  // the island's build takes seconds, more under a full run's load
+  beforeAll(() => { ground = new Ground(); net = buildNetwork(ground); }, 60_000);
 
   const lengthOf = (l: Lane): number => l.points.slice(1).reduce((s, p, i) => s + Math.hypot(p.x - (l.points[i] as { x: number }).x, p.z - (l.points[i] as { z: number }).z), 0);
 
@@ -76,8 +77,9 @@ describe('M8.10 slice 4: the main network', () => {
   it('4.6 a lane\'s height is the ground\'s within 5 cm where it runs on the ground', () => {
     let checked = 0, off = 0;
     for (const l of net.graph.lanes) for (const p of l.points) {
-      // off the ground: the highway in its tunnel under the hill and on its decks over the water
-      if (!onTheGround(net, l, p.x, p.z)) { off++; continue; }
+      // off the ground: the highway in its tunnel under the hill and on its decks (their own pins, slice 6a), and the
+      // dug ground at a mouth under the tunnel's floor
+      if (!onTheGround(net, l, p.x, p.z) || Math.abs(ground.surfaceHeight(p.x, p.z) - ground.height(p.x, p.z)) > 0.01) { off++; continue; }
       expect(Math.abs((p.y ?? 0) - ground.height(p.x, p.z)), `lane ${l.id}`).toBeLessThan(0.05);
       checked++;
     }

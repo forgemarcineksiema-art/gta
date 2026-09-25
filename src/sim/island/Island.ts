@@ -9,10 +9,12 @@ import { GROUPS_SOLID, GROUPS_TERRAIN, GROUPS_WATER } from '../collision';
 import type { SpawnPoint } from '../playground';
 import { SEA } from '../city/sea';
 import type { SurfaceReader } from '../city/surface';
+import type { RoadPoint } from '../city/roads';
 import type { TrackDef, TrackSample } from '../track';
 import type { P2 } from './geom';
 import { FOOT, Ground, HALF_WIDTH, type CoastKind } from './ground';
 import { buildNetwork } from './network';
+import { DECK, structures, type Piece, type Structure } from './structures';
 import { BOUNDS, CIRCUS, highwayLoop } from './plan';
 
 /** A chunk of the ground: its side (m) and the height field's cell (m). The chunks cover the plan's bounds. */
@@ -47,6 +49,8 @@ export class Island {
   readonly route: TrackDef;
   /** The main roads' lanes (M8.10 slice 4): the grid's `RoadGraph`, for the traffic, the police, the bot and the way. */
   readonly network = buildNetwork(this.ground);
+  /** The highway's structures (M8.10 slice 6a): the viaduct, the bay bridge, the overpasses, the tunnel. */
+  readonly structures: Structure[] = structures((this.network.lines[0] as { pts: RoadPoint[] }).pts, highwayLoop(6).span);
   /** The chunks with a height field in the physics, by index. */
   readonly active = new Map<number, RAPIER.Collider>();
   loaded = 0;
@@ -76,6 +80,7 @@ export class Island {
     }
     this.spawns = this.spawnPoints();
     this.route = this.highwayTrack();
+    this.structureColliders();
   }
 
   /** A chunk's index from its column and row, and a point's chunk. */
@@ -249,6 +254,44 @@ export class Island {
       .setTranslation(mx, (top + bottom) / 2, mz)
       .setRotation({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) })
       .setCollisionGroups(GROUPS_SOLID).setRestitution(0.5));
+  }
+
+  /**
+   * The structures' colliders: a deck's slab (the wheels' ground) and its railings; the tunnel's floor, walls and roof,
+   * the lid over its trench at the hill's surface (the roof's top at least), a face over each mouth up to the hill.
+   */
+  private structureColliders(): void {
+    const put = (p: Piece, hx: number, hy: number, hz: number, ox: number, oy: number, oz: number, groups: number, flat = false): void => {
+      const pitch = flat ? 0 : p.pitch;
+      // the piece's frame: its climb (+Z turned up: a turn about +X by −pitch), then its heading about +Y
+      const a = -pitch, y1 = oy * Math.cos(a) - oz * Math.sin(a), z1 = oy * Math.sin(a) + oz * Math.cos(a);
+      const x2 = ox * Math.cos(p.yaw) + z1 * Math.sin(p.yaw), z2 = z1 * Math.cos(p.yaw) - ox * Math.sin(p.yaw);
+      const cy = Math.cos(p.yaw / 2), sy = Math.sin(p.yaw / 2), cp = Math.cos(a / 2), sp = Math.sin(a / 2);
+      this.world.createCollider(RAPIER.ColliderDesc.cuboid(hx, hy, hz).setTranslation(p.x + x2, p.y + y1, p.z + z2)
+        .setRotation({ x: cy * sp, y: sy * cp, z: -sy * sp, w: cy * cp }).setCollisionGroups(groups));
+    };
+    for (const s of this.structures) {
+      for (const p of s.pieces) {
+        const half = p.length / 2 + 0.25;
+        put(p, DECK.half, DECK.depth / 2, half, 0, -DECK.depth / 2, 0, GROUPS_TERRAIN);
+        if (s.kind !== 'tunnel') {
+          for (const side of [-1, 1]) put(p, 0.15, DECK.railing / 2, half, side * (DECK.half - 0.15), DECK.railing / 2, 0, GROUPS_SOLID);
+          continue;
+        }
+        for (const side of [-1, 1]) put(p, 0.5, DECK.clear / 2, half, side * (DECK.half + 0.5), DECK.clear / 2, 0, GROUPS_SOLID);
+        put(p, DECK.half + 1, 0.5, half, 0, DECK.clear + 0.5, 0, GROUPS_SOLID);
+        const lid = Math.max(this.ground.surfaceHeight(p.x, p.z), p.y + DECK.clear + 1);
+        put({ ...p, y: lid }, DECK.half + 4, 0.5, half, 0, -0.5, 0, GROUPS_TERRAIN, true);
+      }
+      if (s.kind !== 'tunnel') continue;
+      // a face over each mouth, from the roof up to the hill there
+      for (const [p, sign] of [[s.pieces[0], 1], [s.pieces[s.pieces.length - 1], -1]] as const) {
+        if (!p) continue;
+        const mx = p.x + Math.sin(p.yaw) * sign * (p.length / 2), mz = p.z + Math.cos(p.yaw) * sign * (p.length / 2);
+        const roof = p.y + DECK.clear + 1, hill = this.ground.surfaceHeight(mx, mz);
+        if (hill > roof + 0.5) put({ ...p, x: mx, y: roof, z: mz }, DECK.half + 4, (hill - roof) / 2, 0.5, 0, (hill - roof) / 2, 0, GROUPS_SOLID, true);
+      }
+    }
   }
 
   /** The spawns: the first minute's start at the summit, facing down Crown Avenue; the port, the beach, the runway. */

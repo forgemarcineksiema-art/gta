@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import { ASPHALT, DIRT, GRASS, ISLAND_COLORS, PALETTE, SAND, SEA } from '../../sim';
 import { BLEND, COAST_KINDS, FOOT, SHOULDER, type GroundProbe } from '../../sim/island/ground';
 import { CHUNK, CHUNKS_X, CHUNKS_Z, CHUNK_X0, CHUNK_Z0, Island } from '../../sim/island/Island';
+import { DECK } from '../../sim/island/structures';
 import { Rtin } from './rtin';
 
 /** The mesh's grid: points a side of a chunk, and the step between them (m). */
@@ -26,6 +27,10 @@ const BANK = SHOULDER + 3;
 const FACE_BOTTOM = FOOT - 0.5;
 /** How far a chunk's border skirt hangs (m): past the most two neighbours' meshes can part there. */
 const SKIRT = 1.5;
+/** The hill's ground is cut back this far into each of the tunnel's mouths, so the mouth shows (m). */
+export const MOUTH = 10;
+/** A point cut away at a tunnel's mouth: no wall face hangs from that cut. */
+const IN_MOUTH = -2;
 /** Where the ground turns to rock: a triangle's normal this far from straight up (its y below this). */
 const ROCK_NORMAL_Y = 0.8;
 /** The grass's colour by height (m), from the lowland's to the summit's. */
@@ -60,7 +65,19 @@ export class GroundView {
   private col = new Uint8Array(4096 * 9);
   private tris = 0;
 
-  constructor(private readonly island: Island) {}
+  /** The tunnel's mouths: each where it opens and the way into the hill. */
+  private readonly mouths: Array<{ x: number; z: number; ux: number; uz: number }> = [];
+
+  constructor(private readonly island: Island) {
+    for (const s of island.structures) {
+      if (s.kind !== 'tunnel') continue;
+      for (const [p, sign] of [[s.pieces[0], 1], [s.pieces[s.pieces.length - 1], -1]] as const) {
+        if (!p) continue;
+        const ux = Math.sin(p.yaw) * sign, uz = Math.cos(p.yaw) * sign;
+        this.mouths.push({ x: p.x + ux * (p.length / 2), z: p.z + uz * (p.length / 2), ux, uz });
+      }
+    }
+  }
 
   /**
    * Show the chunks within `reach` of (x, z), free the far ones, and keep building the nearest missing one a few columns
@@ -136,13 +153,23 @@ export class GroundView {
       const k = row * GRID + c;
       ground.probe(x0 + c * STEP, z0 + row * STEP, p);
       r.h[k] = p.h;
-      // kept: the land behind a steep shore's line, and a road's bank out over the water
-      r.cut[k] = Math.max(p.steep, BANK - p.road);
-      r.kind[k] = p.steepKind;
+      // kept: the land behind a steep shore's line, and a road's bank out over the water; not the hill in a tunnel's mouth
+      const x = x0 + c * STEP, z = z0 + row * STEP, mouth = this.inMouth(x, z);
+      r.cut[k] = mouth ? -5 : Math.max(p.steep, BANK - p.road);
+      r.kind[k] = mouth ? IN_MOUTH : p.steepKind;
       r.road[k] = p.road;
       r.surface[k] = p.surface;
     }
     r.col = to;
+  }
+
+  /** In a tunnel's mouth: up to `MOUTH` m into the hill, within the tunnel's width. */
+  private inMouth(x: number, z: number): boolean {
+    for (const m of this.mouths) {
+      const dx = x - m.x, dz = z - m.z, along = dx * m.ux + dz * m.uz, across = Math.abs(dz * m.ux - dx * m.uz);
+      if (along > -1 && along < MOUTH && across < DECK.half + 2) return true;
+    }
+    return false;
   }
 
   /** The chunk's mesh from its points: each point's allowance, the RTIN, the cut and its faces, the colours. */
@@ -222,6 +249,8 @@ export class GroundView {
   private wall(r: Reading, cross: number[], kept: number, a: number, b: number, c: number): void {
     const [px, py, pz, qx, qy, qz] = cross as [number, number, number, number, number, number];
     if (Math.max(py, qy) <= SEA.level + 0.05) return;
+    // a tunnel's mouth is cut open, no face
+    for (const k of [a, b, c]) if ((r.cut[k] as number) < 0 && r.kind[k] === IN_MOUTH) return;
     // away from the kept corners: from their middle toward the edge's
     let kx = 0, kz = 0, kn = 0;
     const x0 = CHUNK_X0 + r.i * CHUNK, z0 = CHUNK_Z0 + r.j * CHUNK;

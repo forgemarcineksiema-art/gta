@@ -10,7 +10,7 @@
 import { HIGHWAY_LANE_OFFSETS, type Lane, type RoadGraph, type RoadNode, type RoadPoint } from '../city/roads';
 import { catmullRom, resample, type P2 } from './geom';
 import { HALF_WIDTH, MAX_GRADE, type Ground } from './ground';
-import { HIGHWAY, RINGS, ROADS, highwayLoop, type RoadClass, type SpanKind } from './plan';
+import { RINGS, ROADS, highwayLoop, type RoadClass, type SpanKind } from './plan';
 import { districtStreets } from './streets';
 
 /** A road's ends join another road within this (m); joins this close along a road are one node. */
@@ -23,12 +23,12 @@ const MIN_STEP = 3;
 const INSET_PAD = 8;
 const RING_INSET = 6;
 /** Where the highway leaves the ground, its deck's least height over the sea (m), by span. */
-const DECK: Readonly<Record<SpanKind, number>> = { ground: 0, tunnel: 0, viaduct: 8, bridge: 10 };
+const DECK: Readonly<Record<SpanKind, number>> = { ground: 0, tunnel: 0, viaduct: 8, bridge: 10, overpass: 0 };
 
 /** A sampled line of the network: its points (with the tunnel's or a deck's height where it leaves the ground), its class. */
 interface Line { id: string; cls: RoadClass; pts: RoadPoint[]; onGround: boolean[]; firm: boolean[]; closed: boolean; ring: boolean; s: number[] }
 /** A lane eases between the ground and the tunnel's or a deck's profile over this many samples each side of the change. */
-const EASE = 2;
+const EASE = 3;
 
 /** The graph, its sampled lines, and each lane's road (by id). */
 export interface IslandNetwork { graph: RoadGraph; lines: Line[]; laneRoad: string[] }
@@ -102,7 +102,7 @@ function lines(ground: Ground): Line[] {
   // the highway: one smooth loop, each stretch off the ground with its own profile between the ground at its two ends
   const loop = highwayLoop(SAMPLE);
   const pts: RoadPoint[] = loop.pts.map(([x, z]) => ({ x, z }));
-  const spanAt = (i: number): SpanKind => (HIGHWAY[loop.piece[(i + pts.length) % pts.length] as number] as { span: SpanKind }).span;
+  const spanAt = (i: number): SpanKind => loop.span[(i + pts.length) % pts.length] as SpanKind;
   const onGround = pts.map((_, i) => spanAt(i) === 'ground');
   for (let i = 0; i < pts.length; i++) {
     if (onGround[i] || onGround[(i - 1 + pts.length) % pts.length] === false) continue;
@@ -111,13 +111,14 @@ function lines(ground: Ground): Line[] {
     while (!onGround[(end + 1) % pts.length]) end++;
     const run = Array.from({ length: end - i + 2 }, (_, k) => pts[(i + k) % pts.length] as RoadPoint);
     const first = run[0] as RoadPoint, last = run[run.length - 1] as RoadPoint, span = spanAt(i);
-    const h0 = ground.height(first.x, first.z), h1 = ground.height(last.x, last.z);
+    const h0 = ground.highwayAt(first.x, first.z) ?? ground.surfaceHeight(first.x, first.z), h1 = ground.highwayAt(last.x, last.z) ?? ground.surfaceHeight(last.x, last.z);
     const s = lengths(run, false), total = s[s.length - 1] as number, grade = MAX_GRADE.highway;
     run.slice(0, -1).forEach((q, k) => {
       const d = s[k] as number;
       // the tunnel straight between its mouths; a deck up at the highway's grade to its height over the sea, and down
       const line = h0 + ((h1 - h0) * d) / total;
-      q.y = span === 'tunnel' ? line : Math.max(line, Math.min(DECK[span], h0 + grade * d, h1 + grade * (total - d)));
+      // an overpass carries the highway's own graded profile over the road beneath
+      q.y = span === 'overpass' ? (ground.highwayAt(q.x, q.z) ?? line) : span === 'tunnel' ? line : Math.max(line, Math.min(DECK[span], h0 + grade * d, h1 + grade * (total - d)));
     });
   }
   out.push({ id: 'highway', cls: 'highway', pts, onGround, firm: [], closed: true, ring: false, s: [] });
@@ -135,7 +136,7 @@ function lines(ground: Ground): Line[] {
   for (const l of out) {
     l.s = lengths(l.pts, l.closed);
     // every point its height, the ground's where it runs on it, so a cut between two points has one too
-    l.pts.forEach((p, i) => { if (l.onGround[i]) p.y = ground.height(p.x, p.z); });
+    l.pts.forEach((p, i) => { if (l.onGround[i]) p.y = ground.surfaceHeight(p.x, p.z); });
     // firmly on the ground: `EASE` samples from a tunnel's mouth or a deck's end, where the lanes ease from one to the other
     const n = l.pts.length;
     l.firm = l.onGround.map((g, i) => {
@@ -210,7 +211,7 @@ export function buildNetwork(ground: Ground): IslandNetwork {
     const length = lengths(centre, false).pop() as number;
     if (insetA + insetB > length - 4) { const k = Math.max(0, length - 4) / (insetA + insetB); insetA *= k; insetB *= k; }
     // firmly on the ground its height is the ground's; else its line's at its place along it (the tunnel, a deck, the ease)
-    const pts = offsetRight(trim(centre, insetA, insetB), offset).map((p) => ({ x: p.x, z: p.z, y: onGround(p) ? ground.height(p.x, p.z) : (pointAt(line, project(line, p.x, p.z).s).y ?? 0) }));
+    const pts = offsetRight(trim(centre, insetA, insetB), offset).map((p) => ({ x: p.x, z: p.z, y: onGround(p) ? ground.surfaceHeight(p.x, p.z) : (pointAt(line, project(line, p.x, p.z).s).y ?? 0) }));
     if (pts.length < 2) return;
     const first = pts[0] as RoadPoint, second = pts[1] as RoadPoint, last = pts[pts.length - 1] as RoadPoint, before = pts[pts.length - 2] as RoadPoint;
     const lane: Lane = {

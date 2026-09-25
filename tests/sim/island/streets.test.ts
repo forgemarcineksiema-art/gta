@@ -8,7 +8,8 @@ import { STREET_KM, districtStreets } from '../../../src/sim/island/streets';
 
 describe('M8.10 slice 5: the districts\' streets', () => {
   let ground: Ground, net: IslandNetwork;
-  beforeAll(() => { ground = new Ground(); net = buildNetwork(ground); });
+  // the island's build takes seconds, more under a full run's load
+  beforeAll(() => { ground = new Ground(); net = buildNetwork(ground); }, 60_000);
   const district = (id: string): DistrictId | null => (/^(crown|foundry|gardens|marina)-street-/.exec(id)?.[1] as DistrictId | undefined) ?? null;
 
   it('5.1 no dead end on the whole network', () => {

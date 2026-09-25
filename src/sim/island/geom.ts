@@ -100,6 +100,14 @@ export function polygonArea(poly: readonly P2[]): number {
   return Math.abs(a) / 2;
 }
 
+/** Where segment a–b crosses segment c–d, or null. */
+export function segmentCross(a: P2, b: P2, c: P2, d: P2): P2 | null {
+  const rx = b[0] - a[0], rz = b[1] - a[1], sx = d[0] - c[0], sz = d[1] - c[1], den = rx * sz - rz * sx;
+  if (Math.abs(den) < 1e-9) return null;
+  const t = ((c[0] - a[0]) * sz - (c[1] - a[1]) * sx) / den, u = ((c[0] - a[0]) * rz - (c[1] - a[1]) * rx) / den;
+  return t >= 0 && t <= 1 && u >= 0 && u <= 1 ? [a[0] + rx * t, a[1] + rz * t] : null;
+}
+
 /** The closed polygon's signed area (m²): positive when its inside lies left of the way it runs (left of +x is +z). */
 export function signedArea(poly: readonly P2[]): number {
   let a = 0;

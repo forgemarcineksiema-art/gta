@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.10 slice 6a: the highway's structures
+
+Done: `island/structures.ts` cuts the highway into its structures: the tunnel under the hill, the viaduct over the
+basin, the bridge over the bay's mouth and an overpass (30 m each way) wherever a main road crosses it. Decks are slabs
+the wheels drive on, with railings; the tunnel has walls, a roof, a lid of ground over it and portals; the road under
+an overpass dips 7 m below the deck. Drawn with piers, a cut in the ground at each mouth. Pins 6a.1–6a.4. Open: kerbs,
+flat junction boxes and markings are 6b; the island's build takes 3.2 s here (the streets 1.7 s), too slow for the
+switch's 6 s to control on the low tier: slice 18 speeds it up.
+
 ## 2026-09-25 — M8.10 slice 5: the districts' streets
 
 Done: `island/streets.ts` lays each district's streets (15 km, 49 streets): Crown a 90 m grid round the summit, Works

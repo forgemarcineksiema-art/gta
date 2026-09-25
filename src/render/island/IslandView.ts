@@ -1,16 +1,18 @@
 /**
- * The island drawn (M8.10 slices 2–3): the ground a chunk at a time (`GroundView`); the graded roads as strips on it,
- * each hung with a skirt so no gap shows under its edge; the paved places as slabs; the coast's things: bollards along
- * the quays, a parapet along the cliffs and the Quay's bay, boulders along the rocks, the spit and the causeway; the
- * sea; the Crown Tower on the summit as the one landmark for now. Reads the sim's island, never writes it.
+ * The island drawn (M8.10 slices 2–3, 6a): the ground a chunk at a time (`GroundView`); the graded roads as strips on it,
+ * each hung with a skirt so no gap shows under its edge; the paved places as slabs; the highway's structures (decks with
+ * railings and piers, the tunnel's walls, roof and portals); the coast's things: bollards along the quays, a parapet
+ * along the cliffs and the Quay's bay, boulders along the rocks, the spit and the causeway; the sea; the Crown Tower on
+ * the summit as the one landmark for now. Reads the sim's island, never writes it.
  */
 import * as THREE from 'three';
 import { ISLAND_COLORS, PALETTE, SEA } from '../../sim';
 import { APRON, HALF_WIDTH, type CoastKind } from '../../sim/island/ground';
 import { CHUNK, type Island } from '../../sim/island/Island';
+import { DECK, type Piece } from '../../sim/island/structures';
 import { PLACES } from '../../sim/island/plan';
 import { QUALITY, type QualityTier } from '../quality';
-import { GroundView } from './GroundView';
+import { GroundView, MOUTH } from './GroundView';
 
 /** Road strips sit this far over the ground so the two never fight, their skirts hang this far under their edges (m). */
 const LIFT = 0.1;
@@ -40,6 +42,7 @@ export class IslandView {
     this.group.add(this.ground.group);
     this.group.add(this.roads());
     this.group.add(this.paving());
+    this.group.add(this.structures());
     this.group.add(...this.coast());
     this.group.add(this.tower());
   }
@@ -85,7 +88,7 @@ export class IslandView {
         const out: number[] = [];
         for (const s of [1, 0, -1]) {
           const x = p[0] + nx * hw * s, z = p[1] + nz * hw * s;
-          out.push(x, ground.height(x, z) + LIFT, z);
+          out.push(x, ground.surfaceHeight(x, z) + LIFT, z);
         }
         return out;
       };
@@ -93,6 +96,8 @@ export class IslandView {
       let a = section(0);
       for (let k = 0; k < last; k++) {
         const b = section(k + 1);
+        // over an overpass the deck draws the road
+        if (road.deck?.[k] === true && road.deck[k + 1] === true) { a = b; continue; }
         const [l0x, l0y, l0z, m0x, m0y, m0z, r0x, r0y, r0z] = a as [number, number, number, number, number, number, number, number, number];
         const [l1x, l1y, l1z, m1x, m1y, m1z, r1x, r1y, r1z] = b as [number, number, number, number, number, number, number, number, number];
         // the two halves of the strip, facing up (the left edge is left of the way the road runs)
@@ -114,6 +119,68 @@ export class IslandView {
   }
 
   /**
+   * The highway's structures (slice 6a): each deck a concrete slab under an asphalt top with its railings, on piers down
+   * to the ground or the sea's floor (the viaduct's, the bridge's); the tunnel's floor, walls and roof, and a face over
+   * each mouth up past the hill's cut edge.
+   */
+  private structures(): THREE.Mesh {
+    const pos: number[] = [], col: number[] = [], c = this.color;
+    const box = new THREE.BoxGeometry(1, 1, 1).toNonIndexed();
+    const unit = box.getAttribute('position') as THREE.BufferAttribute;
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), s = new THREE.Vector3();
+    // a box `hx, hy, hz` (half) at the piece's local offset, turned with it (`flat`: its heading only)
+    const put = (p: Piece, hx: number, hy: number, hz: number, ox: number, oy: number, oz: number, hex: number, flat = false): void => {
+      e.set(flat ? 0 : -p.pitch, p.yaw, 0, 'YXZ');
+      q.setFromEuler(e);
+      v.set(ox, oy, oz).applyQuaternion(q).add(s.set(p.x, p.y, p.z));
+      m.compose(v, q, s.set(hx * 2, hy * 2, hz * 2));
+      c.setHex(hex);
+      for (let i = 0; i < unit.count; i++) {
+        v.fromBufferAttribute(unit, i).applyMatrix4(m);
+        pos.push(v.x, v.y, v.z);
+        col.push(c.r, c.g, c.b);
+      }
+    };
+    const ground = this.island.ground;
+    for (const st of this.island.structures) {
+      st.pieces.forEach((p, k) => {
+        const half = p.length / 2 + 0.25;
+        put(p, DECK.half, DECK.depth / 2, half, 0, -DECK.depth / 2 - 0.02, 0, PALETTE.concrete);
+        put(p, DECK.half - 0.4, 0.02, half, 0, 0, 0, PALETTE.asphalt);
+        if (st.kind === 'tunnel') {
+          for (const side of [-1, 1]) put(p, 0.5, DECK.clear / 2, half, side * (DECK.half + 0.5), DECK.clear / 2, 0, ISLAND_COLORS.quayWall);
+          put(p, DECK.half + 1, 0.5, half, 0, DECK.clear + 0.5, 0, PALETTE.charcoal);
+          return;
+        }
+        for (const side of [-1, 1]) put(p, 0.15, DECK.railing / 2, half, side * (DECK.half - 0.15), DECK.railing / 2, 0, PALETTE.kerb);
+        // piers every fifth piece under the long decks, down to the ground or the sea's floor
+        if ((st.kind === 'viaduct' || st.kind === 'bridge') && k % 5 === 2) {
+          const foot = Math.min(ground.surfaceHeight(p.x, p.z), p.y - DECK.depth), tall = p.y - DECK.depth - foot;
+          if (tall > 0.5) for (const side of [-1, 1]) put({ ...p, y: foot }, 1.2, tall / 2, 1.2, side * (DECK.half - 5), tall / 2, 0, PALETTE.concrete, true);
+        }
+      });
+      if (st.kind !== 'tunnel') continue;
+      // a face over each mouth, from the roof up past the hill where its cut edge is (the ground is cut back inside)
+      for (const [p, sign] of [[st.pieces[0], 1], [st.pieces[st.pieces.length - 1], -1]] as const) {
+        if (!p) continue;
+        const ux = Math.sin(p.yaw) * sign, uz = Math.cos(p.yaw) * sign;
+        const mx = p.x + ux * (p.length / 2), mz = p.z + uz * (p.length / 2);
+        const roof = p.y + DECK.clear + 1, hill = ground.surfaceHeight(mx + ux * MOUTH, mz + uz * MOUTH) + 1;
+        if (hill > roof) put({ ...p, x: mx, y: roof, z: mz }, DECK.half + 4, (hill - roof) / 2, 0.8, 0, (hill - roof) / 2, 0, PALETTE.concrete, true);
+      }
+    }
+    box.dispose();
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    geometry.computeVertexNormals();
+    const mesh = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return mesh;
+  }
+
+  /**
    * The paved places as slabs a hair over the ground (the ground's mesh follows too coarsely for their edges): the
    * runway, the yards, the lots and the hangars' aprons, the summit's plaza, the port's aprons behind its quays.
    */
@@ -125,7 +192,7 @@ export class IslandView {
       c.setHex(hex);
       const corner = (u: number, v: number): [number, number, number] => {
         const [x, z] = at(u / nu, v / nv);
-        return [x, ground.height(x, z) + PAVE_LIFT, z];
+        return [x, ground.surfaceHeight(x, z) + PAVE_LIFT, z];
       };
       for (let i = 0; i < nu; i++) for (let j = 0; j < nv; j++) {
         const a = corner(i, j), b = corner(i + 1, j), d = corner(i, j + 1), e = corner(i + 1, j + 1);

@@ -124,6 +124,8 @@ describe('M8.10 slice 2: the ground', () => {
     // the south coast's stretch, heading west (world axes: the sketch's (320, 704) is (-320, -704))
     let k0 = 0, best = Infinity;
     samples.forEach((s, k) => { const d = Math.hypot(s.x + 320, s.z + 704); if (d < best) { best = d; k0 = k; } });
+    // 180 m back, on the ground: the quay sweep's overpass (slice 6a) is ahead, crossed at speed
+    k0 = Math.max(0, k0 - 60);
     const s0 = samples[k0];
     if (!s0) throw new Error('route');
     island.sync(s0.x, s0.z, true);

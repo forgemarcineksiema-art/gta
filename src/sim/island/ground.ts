@@ -10,7 +10,7 @@
 import { SEA } from '../city/sea';
 import { ASPHALT, DIRT, GRASS, SAND, type SurfaceKind } from '../city/surface';
 import { catmullRom, circle, inPolygon, polylineLength, resample, signedArea, type P2 } from './geom';
-import { BASIN, BOUNDS, COAST, COAST_PARTS, HIGHWAY, PLACES, RINGS, ROADS, causeway, highwayLoop, islet, naturalHeight, type PlanRoad, type RoadClass } from './plan';
+import { BASIN, BOUNDS, COAST, COAST_PARTS, PLACES, RINGS, ROADS, causeway, highwayLoop, islet, naturalHeight, type PlanRoad, type RoadClass, type SpanKind } from './plan';
 import { districtStreets } from './streets';
 
 /** A road's half width by class (m), its carriageway without the pavement. */
@@ -35,6 +35,11 @@ const SHELF = 40;
 const BEACH = 20;
 /** How far in from a quay the port's apron is paved (m). */
 export const APRON = 14;
+/** A road under an overpass runs this far below its deck (m: a lorry's clearance and the deck's depth). */
+const UNDER = 7;
+/** Under the tunnel the physics' ground is dug this far below its floor, this far each side of its line (m). */
+const TRENCH_DEPTH = 3;
+const TRENCH = 23;
 /** How far a point's side of a steep edge is read, for the render's cut along it (m). */
 export const COAST_REACH = 12;
 /** The grid of segments near each cell (m), and the land's mask (m). */
@@ -44,7 +49,7 @@ const MASK = 2;
 const NEAR = 8;
 
 /** A road of the ground: its centreline and its profile's heights, one per point. */
-export interface GradedRoad { id: string; cls: RoadClass; pts: P2[]; h: number[]; closed: boolean }
+export interface GradedRoad { id: string; cls: RoadClass; pts: P2[]; h: number[]; closed: boolean; deck?: boolean[] }
 
 /** What a stretch of shore is: the plan's kinds; the basin's are quays, the causeway's rocks, the islet's a beach. */
 export type CoastKind = 'cliff' | 'quay' | 'bay' | 'beach' | 'rocks' | 'spit';
@@ -142,18 +147,19 @@ function profile(pts: P2[], cls: RoadClass, closed: boolean, pins: ReadonlyMap<n
 }
 
 /** The plan's roads on the ground, in the order they are graded: the highway, the roundabouts, the avenues, the rest. */
-function groundRoads(): Array<{ id: string; cls: RoadClass; pts: P2[]; closed: boolean }> {
+function groundRoads(): Array<{ id: string; cls: RoadClass; pts: P2[]; closed: boolean; deck?: boolean[] }> {
   const order: RoadClass[] = ['highway', 'avenue', 'taxiway', 'ramp', 'street', 'serpentine', 'dirt', 'side'];
-  const open = (r: PlanRoad): { id: string; cls: RoadClass; pts: P2[]; closed: boolean } => ({ id: r.id, cls: r.cls, closed: false, pts: r.smooth ? catmullRom(r.points, false, STEP) : resample(r.points, STEP) });
+  const open = (r: PlanRoad): { id: string; cls: RoadClass; pts: P2[]; closed: boolean; deck?: boolean[] } => ({ id: r.id, cls: r.cls, closed: false, pts: r.smooth ? catmullRom(r.points, false, STEP) : resample(r.points, STEP) });
   const out = [...ROADS, ...districtStreets().roads].filter((r) => r.span === 'ground').map(open);
-  // the highway's stretches on the ground, off its one smooth loop, each to the mouth or the abutment it runs into
+  // the highway's stretches between its tunnel and its decks, off its one smooth loop, each to the mouth or the
+  // abutment it runs into; graded through its overpasses (the ground under those follows the road passing beneath)
   const loop = highwayLoop(STEP);
   let start = -1;
   for (let i = 0; i <= loop.pts.length; i++) {
-    const piece = i < loop.pts.length ? (HIGHWAY[loop.piece[i] as number] as PlanRoad) : null;
-    if (piece?.span === 'ground' && start < 0) start = i;
-    if (piece?.span !== 'ground' && start >= 0) {
-      out.push({ id: (HIGHWAY[loop.piece[start] as number] as PlanRoad).id, cls: 'highway', closed: false, pts: loop.pts.slice(start, i + 1) });
+    const carried = i < loop.pts.length && (loop.span[i] === 'ground' || loop.span[i] === 'overpass');
+    if (carried && start < 0) start = i;
+    if (!carried && start >= 0) {
+      out.push({ id: `highway-${start}`, cls: 'highway', closed: false, pts: loop.pts.slice(start, i + 1), deck: loop.span.slice(start, i + 1).map((s) => s === 'overpass') });
       start = -1;
     }
   }
@@ -223,6 +229,20 @@ export function plateau(on: ReadonlyArray<readonly [number, number]>, q: number)
   return Math.max(0, Math.min(2, Math.floor((Math.min(before, after) - 1) / 2)));
 }
 
+/** The highway's stretches of one span, each from the last point on the ground before it to the first after. */
+function stretches(kind: SpanKind): Array<{ pts: P2[] }> {
+  const loop = highwayLoop(STEP), n = loop.pts.length, out: Array<{ pts: P2[] }> = [];
+  for (let i = 0; i < n; i++) {
+    if (loop.span[i] !== kind || loop.span[(i - 1 + n) % n] === kind) continue;
+    const pts: P2[] = [loop.pts[(i - 1 + n) % n] as P2];
+    let k = i;
+    while (loop.span[k % n] === kind && k < i + n) { pts.push(loop.pts[k % n] as P2); k++; }
+    pts.push(loop.pts[k % n] as P2);
+    out.push({ pts });
+  }
+  return out;
+}
+
 /** A district's street (streets.ts names them so). */
 const DISTRICT_STREET = /^(crown|foundry|gardens|marina)-street-\d+$/;
 
@@ -284,7 +304,7 @@ function fillPolygon(mask: Uint8Array, nx: number, nz: number, poly: readonly P2
   }
 }
 
-interface Seg { a: P2; b: P2; ha: number; hb: number; hw: number; kind: number; reach: number; nx?: number; nz?: number }
+interface Seg { a: P2; b: P2; ha: number; hb: number; hw: number; kind: number; reach: number; nx?: number; nz?: number; cap?: number }
 
 /** A list of segments in typed arrays, and for each grid cell the segments within reach of it. */
 class SegmentGrid {
@@ -292,6 +312,8 @@ class SegmentGrid {
   readonly ha: Float32Array; readonly hb: Float32Array; readonly hw: Float32Array; readonly kind: Uint16Array;
   /** A shore segment's normal toward its land (0 for a road's). */
   readonly nx: Float32Array; readonly nz: Float32Array;
+  /** A road segment whose road stops at a structure there reaches no further than its end: 1 before a, 2 past b. */
+  readonly cap: Uint8Array;
   readonly start: Int32Array; readonly items: Int32Array;
   readonly cols = Math.ceil((BOUNDS.x1 - BOUNDS.x0) / CELL);
   readonly rows = Math.ceil((BOUNDS.z1 - BOUNDS.z0) / CELL);
@@ -299,12 +321,12 @@ class SegmentGrid {
     const n = segs.length;
     this.ax = new Float32Array(n); this.az = new Float32Array(n); this.bx = new Float32Array(n); this.bz = new Float32Array(n);
     this.ha = new Float32Array(n); this.hb = new Float32Array(n); this.hw = new Float32Array(n); this.kind = new Uint16Array(n);
-    this.nx = new Float32Array(n); this.nz = new Float32Array(n);
+    this.nx = new Float32Array(n); this.nz = new Float32Array(n); this.cap = new Uint8Array(n);
     const lists: number[][] = Array.from({ length: this.cols * this.rows }, () => []);
     segs.forEach((s, k) => {
       this.ax[k] = s.a[0]; this.az[k] = s.a[1]; this.bx[k] = s.b[0]; this.bz[k] = s.b[1];
       this.ha[k] = s.ha; this.hb[k] = s.hb; this.hw[k] = s.hw; this.kind[k] = s.kind;
-      this.nx[k] = s.nx ?? 0; this.nz[k] = s.nz ?? 0;
+      this.nx[k] = s.nx ?? 0; this.nz[k] = s.nz ?? 0; this.cap[k] = s.cap ?? 0;
       const i0 = Math.max(0, Math.floor((Math.min(s.a[0], s.b[0]) - s.reach - BOUNDS.x0) / CELL));
       const i1 = Math.min(this.cols - 1, Math.floor((Math.max(s.a[0], s.b[0]) + s.reach - BOUNDS.x0) / CELL));
       const j0 = Math.max(0, Math.floor((Math.min(s.a[1], s.b[1]) - s.reach - BOUNDS.z0) / CELL));
@@ -336,6 +358,8 @@ export class Ground {
   private readonly paved: Uint8Array;
   /** Per district crossing (`districtStreets().junctions`): 1 where it is on a main road (a T, no flat). */
   readonly crossingOnMain: Uint8Array;
+  /** The tunnel's line from mouth to mouth, its floor's height at each point, and the box round its trench. */
+  private tunnel: { pts: P2[]; floor: number[]; x0: number; x1: number; z0: number; z1: number } | null = null;
   /** Land (1) or water (0) every `MASK` m over the plan's bounds. */
   private readonly mask: Uint8Array;
   private readonly maskNx = Math.ceil((BOUNDS.x1 - BOUNDS.x0) / MASK);
@@ -369,11 +393,21 @@ export class Ground {
     };
     const roads = groundRoads(), junctions = districtStreets().junctions;
     let crossings: { h: Float64Array; held: Uint8Array } | null = null;
+    let overpasses: Array<{ x: number; z: number; deck: number }> | null = null;
     for (const r of roads) {
       const n = r.pts.length, pins = new Map<number, number>();
       if (!DISTRICT_STREET.test(r.id)) {
         if (!r.closed) for (const i of [0, n - 1]) { const v = graded(r.pts[i] as P2); if (v !== null) pins.set(i, v); }
-        this.roads.push({ id: r.id, cls: r.cls, pts: r.pts, h: profile(r.pts, r.cls, r.closed, pins), closed: r.closed });
+        if (r.cls !== 'highway') {
+          // a road passing under the highway dips beneath its overpass, level under the deck
+          overpasses ??= stretches('overpass').map((s) => { const m = s.pts[Math.floor(s.pts.length / 2)] as P2; return { x: m[0], z: m[1], deck: this.highwayAt(m[0], m[1]) ?? naturalHeight(m[0], m[1]) }; });
+          for (const o of overpasses) {
+            let bi = -1, bd = 8;
+            r.pts.forEach((p, i) => { const d = Math.hypot(p[0] - o.x, p[1] - o.z); if (d < bd) { bd = d; bi = i; } });
+            if (bi >= 0) for (let k = bi - 2; k <= bi + 2; k++) if (k >= 0 && k < n) pins.set(k, o.deck - UNDER);
+          }
+        }
+        this.roads.push({ id: r.id, cls: r.cls, pts: r.pts, h: profile(r.pts, r.cls, r.closed, pins), closed: r.closed, ...(r.deck ? { deck: r.deck } : {}) });
         continue;
       }
       crossings ??= crossingHeights(roads.filter((q) => DISTRICT_STREET.test(q.id)), junctions, graded);
@@ -385,12 +419,30 @@ export class Ground {
       this.roads.push({ id: r.id, cls: r.cls, pts: r.pts, h: profile(r.pts, r.cls, r.closed, pins), closed: r.closed });
     }
     this.crossingOnMain = crossings?.held ?? new Uint8Array(junctions.length);
+    // the tunnel: its floor straight between the ground at its mouths, a trench under it in the ground the physics reads
+    const t = stretches('tunnel')[0];
+    if (t) {
+      const h0 = graded(t.pts[0] as P2) ?? 0, h1 = graded(t.pts[t.pts.length - 1] as P2) ?? 0;
+      const s = [0];
+      for (let i = 1; i < t.pts.length; i++) s.push((s[i - 1] as number) + Math.hypot((t.pts[i] as P2)[0] - (t.pts[i - 1] as P2)[0], (t.pts[i] as P2)[1] - (t.pts[i - 1] as P2)[1]));
+      const total = s[s.length - 1] as number;
+      const xs = t.pts.map((p) => p[0]), zs = t.pts.map((p) => p[1]);
+      this.tunnel = { pts: t.pts, floor: s.map((d) => h0 + ((h1 - h0) * d) / total), x0: Math.min(...xs) - TRENCH, x1: Math.max(...xs) + TRENCH, z0: Math.min(...zs) - TRENCH, z1: Math.max(...zs) + TRENCH };
+    }
     this.paved = Uint8Array.from(this.roads, (r) => (r.cls === 'dirt' ? 0 : 1));
     const segs: Seg[] = [];
     this.roads.forEach((road, r) => {
       const n = road.pts.length, last = road.closed ? n : n - 1, hw = HALF_WIDTH[road.cls];
       // a road segment's kind is its road's index: where two roads overlap, each road counts once, by its nearest segment
-      for (let i = 0; i < last; i++) segs.push({ a: road.pts[i] as P2, b: road.pts[(i + 1) % n] as P2, ha: road.h[i] as number, hb: road.h[(i + 1) % n] as number, hw, kind: r, reach: hw + SHOULDER + BLEND });
+      // the highway's stretches on the ground stop at its structures: no reach past their ends
+      const open = road.id.startsWith('highway-');
+      const deck = road.deck;
+      for (let i = 0; i < last; i++) {
+        // over an overpass the highway is its deck's, not the ground's: it reaches no further than where it leaves the ground
+        if (deck?.[i] === true && deck[i + 1] === true) continue;
+        const cap = open ? (i === 0 || deck?.[i] === true ? 1 : 0) | (i === last - 1 || deck?.[i + 1] === true ? 2 : 0) : 0;
+        segs.push({ a: road.pts[i] as P2, b: road.pts[(i + 1) % n] as P2, ha: road.h[i] as number, hb: road.h[(i + 1) % n] as number, hw, kind: r, reach: hw + SHOULDER + BLEND, cap });
+      }
     });
     this.roadGrid = new SegmentGrid(segs);
     // the shores' segments by kind, each with its normal toward the land
@@ -441,8 +493,35 @@ export class Ground {
     }
   }
 
-  /** The ground's height at (x, z), m over the sea. */
+  /** The highway's own graded height at (x, z) (on one of its stretches on the ground, within 4 m), or null. */
+  highwayAt(x: number, z: number): number | null {
+    let best: { d: number; h: number } | null = null;
+    for (const r of this.roads) {
+      if (r.cls !== 'highway') continue;
+      const hit = onRoad(r, x, z);
+      if (hit.d < 4 && (!best || hit.d < best.d)) best = hit;
+    }
+    return best ? best.h : null;
+  }
+
+  /** The ground's height at (x, z), m over the sea, as the physics has it: dug out under the tunnel. */
   height(x: number, z: number): number {
+    const h = this.surfaceHeight(x, z), t = this.tunnel;
+    if (!t || x < t.x0 || x > t.x1 || z < t.z0 || z > t.z1) return h;
+    // the nearest point of the tunnel's line, between its mouths only
+    let best = TRENCH, floor = 0;
+    for (let i = 0; i + 1 < t.pts.length; i++) {
+      const a = t.pts[i] as P2, b = t.pts[i + 1] as P2, dx = b[0] - a[0], dz = b[1] - a[1];
+      const u = ((x - a[0]) * dx + (z - a[1]) * dz) / (dx * dx + dz * dz || 1);
+      if ((i === 0 && u < 0) || (i === t.pts.length - 2 && u > 1)) continue;
+      const c = Math.max(0, Math.min(1, u)), d = Math.hypot(x - a[0] - dx * c, z - a[1] - dz * c);
+      if (d < best) { best = d; floor = (t.floor[i] as number) + ((t.floor[i + 1] as number) - (t.floor[i] as number)) * c; }
+    }
+    return best < TRENCH ? Math.min(h, floor - TRENCH_DEPTH) : h;
+  }
+
+  /** The ground's surface at (x, z), m over the sea: the hill whole over the tunnel (what is drawn, and its lid). */
+  surfaceHeight(x: number, z: number): number {
     this.nearestShore(x, z);
     const sh = this.shore;
     let h: number;
@@ -465,7 +544,9 @@ export class Ground {
     for (let k = g.start[c] as number, end = g.start[c + 1] as number; k < end; k++) {
       const s = g.items[k] as number;
       const ax = g.ax[s] as number, az = g.az[s] as number, dx = (g.bx[s] as number) - ax, dz = (g.bz[s] as number) - az;
-      const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1)));
+      const u = ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1), cap = g.cap[s] as number;
+      if ((u < 0 && (cap & 1) !== 0) || (u > 1 && (cap & 2) !== 0)) continue;
+      const t = Math.max(0, Math.min(1, u));
       const d = Math.hypot(x - ax - dx * t, z - az - dz * t);
       const reach = (g.hw[s] as number) + SHOULDER;
       if (d - (g.hw[s] as number) < this.edge) this.edge = d - (g.hw[s] as number);
@@ -497,7 +578,7 @@ export class Ground {
 
   /** The height and what the render reads at (x, z): the steep edge's side and distance, the carriageway's, the surface. */
   probe(x: number, z: number, out: GroundProbe): GroundProbe {
-    out.h = this.height(x, z);
+    out.h = this.surfaceHeight(x, z);
     const sh = this.shore;
     out.steep = sh.steep < COAST_REACH ? sh.side * sh.steep : this.onLand(x, z) ? COAST_REACH : -COAST_REACH;
     out.steepKind = sh.steep < COAST_REACH ? sh.steepKind : -1;

@@ -11,7 +11,7 @@
  */
 import type { HiddenCar } from '../city/stash';
 import type { JobKind } from '../jobs/catalog';
-import { catmullRom, crossAt, inPolygon, polygonArea, roundedRect, type P2 } from './geom';
+import { catmullRom, crossAt, inPolygon, polygonArea, resample, roundedRect, segmentCross, type P2 } from './geom';
 
 /** A sketch point in the world (+X west, +Z north). */
 const W = (p: P2): P2 => [-p[0], -p[1]];
@@ -122,7 +122,7 @@ export function naturalHeight(x: number, z: number): number {
 
 export type RoadClass = 'highway' | 'avenue' | 'street' | 'serpentine' | 'dirt' | 'taxiway' | 'ramp' | 'side';
 /** How a stretch of road meets the ground: on it, under it, or over it. */
-export type SpanKind = 'ground' | 'tunnel' | 'viaduct' | 'bridge';
+export type SpanKind = 'ground' | 'tunnel' | 'viaduct' | 'bridge' | 'overpass';
 
 /**
  * A road of the plan: its class, its control points (a Catmull-Rom curve if `smooth`, else straight segments), and how
@@ -149,16 +149,38 @@ export const HIGHWAY: readonly PlanRoad[] = [
   road('highway-bay-bridge', 'highway', 'bridge', false, [[852, 610], [515, 752]]),
 ];
 
+/** How far each way of a road passing under it the highway rides an overpass (m). */
+export const OVERPASS_HALF = 30;
+
+const loops = new Map<number, { pts: P2[]; piece: number[]; span: SpanKind[] }>();
 /**
  * The highway's loop as one closed curve through every piece's points, so no kink where two pieces meet, sampled every
- * `spacing` m or so; each sample's piece (an index into `HIGHWAY`).
+ * `spacing` m or so; each sample's piece (an index into `HIGHWAY`) and how it meets the ground there: its piece's span,
+ * or an overpass where a road crosses under it (the road's end on it is a junction, not a crossing).
  */
-export function highwayLoop(spacing: number): { pts: P2[]; piece: number[] } {
+export function highwayLoop(spacing: number): { pts: P2[]; piece: number[]; span: SpanKind[] } {
+  const known = loops.get(spacing);
+  if (known) return known;
   const ctrl: P2[] = [], owner: number[] = [];
   HIGHWAY.forEach((p, k) => { for (let i = 0; i + 1 < p.points.length; i++) { ctrl.push(p.points[i] as P2); owner.push(k); } });
   const spanOf: number[] = [];
   const pts = catmullRom(ctrl, true, spacing, spanOf);
-  return { pts, piece: spanOf.map((s) => owner[s] as number) };
+  const piece = spanOf.map((s) => owner[s] as number);
+  const span = piece.map((k) => (HIGHWAY[k] as PlanRoad).span);
+  const n = pts.length;
+  for (const r of ROADS) {
+    const rp = r.smooth ? catmullRom(r.points, false, 6) : resample(r.points, 6);
+    const ends = [rp[0], rp[rp.length - 1]] as P2[];
+    for (let a = 0; a + 1 < rp.length; a++) for (let i = 0; i < n; i++) {
+      if (span[i] !== 'ground') continue;
+      const x = segmentCross(rp[a] as P2, rp[a + 1] as P2, pts[i] as P2, pts[(i + 1) % n] as P2);
+      if (!x || ends.some((e) => Math.hypot(e[0] - x[0], e[1] - x[1]) < 5)) continue;
+      for (let k = 0; k < n; k++) if (Math.hypot((pts[k] as P2)[0] - x[0], (pts[k] as P2)[1] - x[1]) < OVERPASS_HALF) span[k] = 'overpass';
+    }
+  }
+  const out = { pts, piece, span };
+  loops.set(spacing, out);
+  return out;
 }
 
 /** The roundabouts: the centre's, the summit's round the tower, the Garden Parkway round the botanic garden. */

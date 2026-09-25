@@ -2189,6 +2189,166 @@ because the player chose it.
 - `src/ui/pl.ts`: the new words' Polish (SLOW DOWN IN THE RING, NEW,
   FOLLOW THE LINE).
 
+## 21. M8.10 "The island": a plan drawn by hand — decided (Marcin), 2026-09-25
+
+Marcin asked for the map drawn from above and a word on the world. The
+atlas (the generator's own chunks, every building, road and prop, drawn
+top-down) showed what the talk then named: a simple generator with a few
+authored roads. Seven streets on each side run past the ring road to the
+sea wall and end there; a square city of 36 blocks, each the same, with
+nothing to do in them; a ring of parks round it all, the grid's leftover;
+flat ground, one collision plane since M2; and three names the places do
+not keep. There is no palm in Palm Gardens (the game's only palms stand on
+the Quay); Coral Quay is the grid with a promenade on two edges and two
+small piers; Crown Heights has no hill. He took a hand-drawn plan whole
+(the two sketches in `docs/island/`), asked what the brief's four games
+have that it lacks, took the answer, and asked to write it down and start.
+It sits before the platform: the map is what a player plays.
+
+### 21.1 The decision
+
+- **The plan is drawn by hand**: the coast, the ground's heights, the
+  districts' areas, the main roads (the highway, the avenues, the set
+  pieces' roads) and where every placed thing stands. What fills it still
+  comes from the seed: each district's own streets by its rule, the lots,
+  the buildings, the things on the pavements. This changes the brief's "the
+  city is generated procedurally from a seed" to "the plan by hand, the
+  rest from the seed" (Marcin, 2026-09-25).
+- **The size stays**: 2.54 km² of land (1.8 × 1.6 km, the bay and the port's
+  basin cutting in; the grid island is 2.48), and 0.09 km² more for the
+  airfield's causeway and the islet. At 150 km/h the island is crossed in
+  about 45 s and the highway's lap takes about 3 min, long enough for a
+  chase; the fog shows about half a kilometre, so the island is three or
+  four views across; what failed was sameness, not size. The runway needs
+  670 m and the hill about 500 m to rise 50 m; a smaller island loses them.
+- **The names stay and come true**: the hill under Crown Heights, the palms
+  and the gardens in Palm Gardens, the quay and the coral in Coral Quay.
+- **No street ends in a field**: every street ends on another; the only
+  ends are a set piece's own (the lighthouse's loop, the pier's end over
+  the water).
+
+### 21.2 The island (sketch 1, `docs/island/plan.jpg`)
+
+- **The ground**: a hill under Crown Heights, 52 m at the summit, falling
+  to cliffs on the north-west; gentle hills in Palm Gardens (up to 18 m);
+  low ground (2–6 m) by the port and the bay. A height field; the roads are
+  cut and filled into it.
+- **The coast**: cliffs (Crown), quays (the port and its basin), a bay with
+  a marina (the Quay), a beach along the whole south, golf and dunes on the
+  south-west headland, a low rocky west. No ring of parks.
+- **The highway**: a loop along the coast, two lanes each way, with a
+  tunnel under the hill, a viaduct over the port's basin and a bridge over
+  the bay's mouth.
+- **The centre**: a roundabout with six avenues. Crown Avenue is one
+  straight line from the bay up to the summit, so the tower is seen from
+  the water and the bay from the top; the harbour road, the east and west
+  avenues, Palm Avenue to the beach.
+- **Crown Heights**: a grid over the hill, 90 m blocks, steep streets with
+  flat crossings (a car flies at each crossing); the summit's plaza round
+  the Crown Tower; the serpentine down the west side; the quarry; the
+  multi-storey car park with a roof-to-roof jump; the police headquarters
+  by the roundabout; the hideout.
+- **Sunset Works**: the port (the basin, cranes, a container maze); the dry
+  canal a car drives in, with bridges over it; the railway and a freight
+  train at the crossings; the Waterworks; the scrapyard; the airfield on
+  its causeway, a 670 m runway with the mega-ramp at its end and the islet
+  200 m beyond.
+- **Palm Gardens**: Palm Avenue lined with palms; the botanic garden with
+  the Glasshouse and its paths; crescents that follow the ground; the golf
+  course and the dunes; the beach; shortcuts through back gardens (fences).
+- **Coral Quay**: the bay with a marina (a jump between piers), a pleasure
+  pier with a ferris wheel, a reef in the shallows, the lighthouse on its
+  spit, the Coral Hotel on the water, the stadium with an oval, and a giant
+  rubber duck afloat in the bay.
+
+### 21.3 What the brief's four games have, now in it
+
+| Thing | From | What it gives |
+|---|---|---|
+| the airfield's runway | GTA, Burnout | the one place for top speed; the Phantom's trophy |
+| the mega-ramp to the islet | Burnout, Saints Row | the flight; the islet reached only by it or the hovercraft |
+| the stadium's oval | GTA, Burnout | a race in laps; cover under the stands |
+| the quarry, the car park | Burnout, NFS | ground for the 4×4; a big drop; a roof-to-roof jump |
+| drive-throughs | Burnout, GTA | fuel (a full boost, three), a repair shop (two), a paint shop (two: a new paint out of sight loses the pursuit, as a swap does, §2.5) |
+| a freight train | GTA, NFS | a crossing to beat in a chase |
+| the police headquarters | GTA | where the units come from and the Chief waits |
+| the giant duck | Saints Row | the absurd landmark; the hovercraft pushes it |
+
+Nothing copies a real map's layout (brief §2).
+
+### 21.4 What stands where (sketch 2, `docs/island/placed.jpg`)
+
+The counts stay as today: 28 job rings and 11 rivals, 3 garages, 20 jumps,
+50 billboards, 10 cameras, 8 breakers, 60 cache spots (30 a day). New: 3
+stations, 2 repair shops, 2 paint shops, 6 roadblock sites, 13 covers.
+
+- **Jobs where the ground gives them a reason**: time trials down the
+  serpentine, through the canal, along the highway (tunnel, viaduct,
+  bridge) and round the botanic garden; races in the stadium, over the
+  hill, along the coast and round the port; takedown rage in the container
+  maze and the stadium's car park; mayhem on Crown's market street and the
+  beach promenade; deliveries and orders across districts, through the
+  tunnel and over the bridge.
+- **Rivals on their turf**: the Ghost at the tunnel's mouth, Tow Truck Tina
+  at the scrapyard, Professor Pip at the Glasshouse, the Mayor's Nephew
+  under the tower, the Chief at the headquarters.
+- **Jumps are mostly the ground**: three crests on Crown Avenue and two more
+  on the hill, the serpentine's hairpin, the quarry's edge, over and into
+  the canal, the container stack, the rail flatcar, over the rails, the
+  piers' gap, two dunes, the stadium, the car park's roof, the botanic
+  garden's crest, the roundabout's island, the mega-ramp. The big ones
+  land through a billboard.
+- **Cameras**: the tunnel's exit, the viaduct, the east straight, the bay
+  bridge, the south and west highway, the foot of Crown Avenue, the runway,
+  the beach road, the harbour road.
+- **Cover**: the tunnel, the viaduct, five canal bridges, the stadium's
+  stands, the car park, the arcade, the pergola, the warehouse passage, the
+  cranes.
+- **Roadblock sites** where they cannot be driven round: the tunnel's two
+  mouths, the bridge's two ends, the viaduct, the roundabout.
+- **The fleet's finds**: the steamroller in the port, the monster truck on
+  the golf course, the rocket trolley on the car park's roof, the hovercraft
+  in the marina; two slipways (the marina, the beach); the sea trial on
+  buoys round the bay and the lighthouse. The hidden cars: the ice-cream
+  truck by the pleasure pier, the roadster in a hangar, the sweeper at the
+  stadium, the hot-dog van under the tower.
+- **The first minute** (§6.6's route, redrawn): the start at the summit by
+  the tower, then down Crown Avenue with the city and the bay ahead (the
+  first frame); the swap, the billboard, a patrol at the roundabout, the
+  delivery on the avenue's lower half, the hotel's garage. About 1.2 km.
+
+### 21.5 How it is built — set here
+
+- The plan is code (`src/sim/island/plan.ts`): the coast, the heights, the
+  districts, the roads, every placed thing. The atlas draws the plan from
+  the same data and is looked at every slice.
+- The island is built behind `?map=island` while the grid stays the
+  game's default; the switch is one slice, after everything is placed.
+- The ground: a height field per chunk; every "on the ground, y = 0" in the
+  sim becomes the ground's height at that point.
+- The roads: splines by class, junctions at any angle; lanes stay what they
+  are (polylines with a height), so the traffic, the police, the bot and
+  the way keep their code.
+- The fill: blocks are the road network's faces, cut into lots; a building
+  on a slope stands on a plinth to its low side.
+- The budgets hold (brief §6): the terrain is coarse where it is flat.
+
+### 21.6 What stays out
+
+Flyable planes (always in a vehicle: the planes are scenery), boats and
+tides, destructible buildings, a second island, anything a real city's map
+would lend. A car that leaves the land meets the sea as it does today.
+
+### 21.7 What this changes elsewhere
+
+- The brief (§4, art direction): the plan by hand, the rest from the seed.
+- §6: the layout, the roles and the reward density read §21; §6.6's route
+  is §21.4's first minute.
+- `docs/M8.8_PLAN.md`: the slipways, the sea trial's buoys, the mega-ramp and
+  its finds' stash spots move to §21.4's places in M8.10's placement slice.
+- `docs/M8.9_PLAN.md`: the maps and the city's colours dress the island.
+- `docs/M9_PLAN.md`: the platform after the M8.8, M8.9 and M8.10 gates.
+
 ## References
 
 Burnout Paradise (free-route races, road rules, showtime), Need for Speed

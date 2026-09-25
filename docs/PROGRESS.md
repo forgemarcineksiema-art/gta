@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.10 "The island": the plan written (Marcin: "zapisujemy i zaczynamy")
+
+After the atlas of the grid island (his words: a simple generator with a few authored roads; no palm in Palm Gardens,
+no quay on Coral Quay, no hill under Crown Heights) Marcin took a hand-drawn island and its placements whole
+(`docs/island/`), asked what the brief's four games have that it lacks and took the answer (a runway and a mega-ramp to
+an islet, a stadium, a quarry and a car park, drive-throughs, a freight train, the police headquarters, a giant duck),
+and kept the size (2.54 km² of land; the grid's 2.48). Written: DESIGN §21 (the plan by hand, the rest from the seed:
+the brief's change, his) and `docs/M8.10_PLAN.md` (slices 0–19, the island behind `?map=island` until the switch). In
+its own worktree (`m8.10-island`) beside M8.8 and M8.9, both idle; its `CLAUDE.md` lines go to Marcin (rule 7).
+
 ## 2026-09-25 — The FX pass (Marcin: "Ulepsz efekty fx")
 
 Done: smoke and fire are low-poly puffs, not soft points (`fx/Smoke.ts`): flat-shaded icosahedra lit and fogged with

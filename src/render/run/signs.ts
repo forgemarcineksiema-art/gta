@@ -15,17 +15,18 @@
  * No allocation per call.
  */
 import { BALANCE, RIVALS, type JobDef, type SimWorld } from '../../sim';
+import { SIGNALS } from '../../sim/palette';
 import { glyphIndex, glyphOf } from '../../sim/glyphs';
 
 export const SIGN_OPEN = 0;
 export const SIGN_GOAL = 1;
 export const SIGN_CLOSED = 2;
 
-/** Each state's colours: the sign's face, its rim, its pictogram, and the ring on the road. */
+/** Each state's colours (the signals, M8.9 R1): the sign's face, its rim, its pictogram, and the ring on the road. */
 export const SIGN_COLORS: ReadonlyArray<{ face: number; rim: number; glyph: number; ring: number }> = [
-  { face: 0xf7f3ea, rim: 0x160e28, glyph: 0x160e28, ring: 0xf7f3ea },
-  { face: 0xf7f3ea, rim: 0x2bd1ff, glyph: 0x160e28, ring: 0x2bd1ff },
-  { face: 0x8d8a96, rim: 0x4a4a55, glyph: 0x4a4a55, ring: 0x8d8a96 },
+  { face: SIGNALS.ink, rim: SIGNALS.outline, glyph: SIGNALS.outline, ring: SIGNALS.ink },
+  { face: SIGNALS.ink, rim: SIGNALS.way, glyph: SIGNALS.outline, ring: SIGNALS.way },
+  { face: SIGNALS.off, rim: 0x4a4a55, glyph: 0x4a4a55, ring: SIGNALS.off },
 ];
 
 /** A sign's centre over the ground on its pole (m), over a car or a walker, and over a door's opening. */

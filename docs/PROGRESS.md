@@ -2,6 +2,17 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.9 slice 5: one colour, one meaning
+
+Done (R1): `SIGNALS` in `sim/palette.ts` (money, way, trouble, police, ink, off, outline), the CSS's `:root` the same
+(`--money` … `--outline`, `--panel`, and three non-signals: the backdrop, the ticket's paper and ink), `ui/colors.ts`
+for the canvases. Every old accent moved by its meaning: selection, titles, the combo, a full boost, NEW BEST, the next
+car, the streak, the hunts, the escape bar, the video icon, a kept car's frame, the next rival's chip and the tabs to
+ink; the radar's player and highway, the garages and the landmarks to ink, a race's rivals red; a pop is yellow only when
+it names money; the news' lead by its tone (the stars red, the radio blue, the rest ink); the stars ink, flashing red and
+blue while seen. The +n stays till slice 8's meter. The look's chase is the skilled bot at three stars. Pins M8.9
+5.1–5.5. Verify green; stills: the flash, the blue radio, the white tabs.
+
 ## 2026-09-25 — M8.9 slice 4: the sun and the clouds
 
 Done (R9's sky): the sun's disc and a wide warm halo (an additive fan and ring) on the light's bearing but low, at 9°, in

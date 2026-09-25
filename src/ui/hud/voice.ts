@@ -46,17 +46,24 @@ export interface VoiceContext {
   cameraLimits: readonly number[];
 }
 
-/** One event's words: where, the lead (the top's red word), the text, and a pop's size and colour. */
+/** What a top line's lead means (M8.9 R1): the stars' news is trouble, the police radio the police, the rest ink. */
+export type Tone = 'trouble' | 'police' | 'info';
+
+/**
+ * One event's words: where, the lead and its tone, the text, a pop's size, and whether it names money (`gain`: a pop in
+ * yellow only when it pays, M8.9 R1).
+ */
 export interface Said {
   where: Where;
   lead: string;
+  tone: Tone;
   text: string;
   big: boolean;
   gain: boolean;
 }
 
 export function newSaid(): Said {
-  return { where: 'none', lead: '', text: '', big: false, gain: false };
+  return { where: 'none', lead: '', tone: 'info', text: '', big: false, gain: false };
 }
 
 /** What the city sends from each level on: the stars lead it (DESIGN.md §17.4: heat is the stars, never LEVEL). */
@@ -73,18 +80,22 @@ export const STARS_NEWS: Readonly<Record<number, string>> = {
 export function speak(kind: EventKind, value: number, target: number, ctx: VoiceContext, out: Said): Said {
   out.where = WHERE[kind];
   out.lead = '';
+  out.tone = 'info';
   out.text = '';
   out.big = false;
-  out.gain = value > 0;
+  // yellow is money (M8.9 R1): only a pop that names an amount is a gain
+  out.gain = false;
   if (out.where === 'none') return out;
   switch (kind) {
     case 'heatLevel':
       out.lead = '★'.repeat(Math.max(0, Math.min(5, value)));
+      out.tone = 'trouble';
       out.text = t(STARS_NEWS[value] ?? '');
       break;
     case 'dispatch':
       // the radio's codes: 1 a roadblock ahead, 3 the suspect's car, 4 the helicopter; 2 (a unit down) is flavour
       out.lead = t('DISPATCH');
+      out.tone = 'police';
       if (value === 1) out.text = t('ROADBLOCK AHEAD');
       else if (value === 4) out.text = t('HELICOPTER ON YOU');
       else if (value === 3) {
@@ -113,20 +124,22 @@ export function speak(kind: EventKind, value: number, target: number, ctx: Voice
     case 'escape': out.text = t('COPS LOST YOU'); break;
     case 'camera': out.text = t('FLASHED {kmh} KM/H', { kmh: Math.round((ctx.cameraLimits[target] ?? 0) + value) }); break;
     case 'jump': out.text = t('STUNT! {s} S', { s: fixed(value, 1) }); out.big = true; break;
-    case 'dailyDone': out.text = t('DAILY DONE +{cash}', { cash: value }); out.big = true; break;
-    case 'streak': out.text = t('DAY {day} STREAK +{cash}', { day: target, cash: value }); break;
+    case 'dailyDone': out.text = t('DAILY DONE +{cash}', { cash: value }); out.big = true; out.gain = true; break;
+    case 'streak': out.text = t('DAY {day} STREAK +{cash}', { day: target, cash: value }); out.gain = true; break;
     case 'blown': out.text = t('COVER BLOWN'); break;
     case 'cache':
       out.text = value > 0 ? t('CACHE {n}/{of} +{cash}', { n: target, of: ctx.cachesTotal, cash: value }) : t('CACHE {n}/{of}', { n: target, of: ctx.cachesTotal });
       out.big = value > 0;
+      out.gain = value > 0;
       break;
-    case 'chase': out.text = t('CHASE +{cash}', { cash: value }); break;
-    case 'skill': out.text = t('COMBO +{cash}', { cash: value }); out.big = true; break;
-    case 'skillLost': out.text = t('COMBO LOST'); out.gain = false; break;
+    case 'chase': out.text = t('CHASE +{cash}', { cash: value }); out.gain = true; break;
+    case 'skill': out.text = t('COMBO +{cash}', { cash: value }); out.big = true; out.gain = true; break;
+    case 'skillLost': out.text = t('COMBO LOST'); break;
     case 'hunt':
       if (target === 0) out.text = value > 0 ? t('ALL {n} JUMPS +{cash}', { n: ctx.jumpsTotal, cash: value }) : t('NEW JUMP {n}/{of}', { n: ctx.jumps, of: ctx.jumpsTotal });
       else out.text = t('ALL BILLBOARDS +{cash}', { cash: value });
       out.big = value > 0;
+      out.gain = value > 0 || target !== 0;
       break;
     case 'hiddenCar': out.text = t('HIDDEN CAR FOUND · IN THE GARAGE NOW'); out.big = true; break;
     case 'breaker': out.text = t('PURSUIT BREAKER!'); break;

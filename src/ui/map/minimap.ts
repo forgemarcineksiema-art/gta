@@ -8,6 +8,8 @@
 import { BALANCE, CITY_HALF, DISTRICTS, PALETTE, districtAt, type JobDef, type SimWorld } from '../../sim';
 import { LANDMARKS } from '../../sim/city/City';
 import { GLYPHS, GLYPH_ORDER, NO_GLYPH, digitSlot, glyphOf, goalGlyph, numberGlyphs, type GlyphId } from '../../sim/glyphs';
+import { SIGNALS } from '../../sim/palette';
+import { INK as INK_COLOR, MONEY, OFF, POLICE, TROUBLE, WAY, cssAlpha } from '../colors';
 import { labelAria, relabel, t } from '../lang';
 import { MINIMAP, advance, buildRoadLayers, clampToRim, drawInShare, project, routeStop, yawFromQuat, type MinimapState, type Vec2 } from './minimapModel';
 
@@ -18,28 +20,33 @@ export type MarkerKind = 'tower' | 'tank' | 'glasshouse' | 'hotel' | 'garage' | 
  */
 export interface MinimapMarker { x: number; z: number; kind: MarkerKind; color: string; yaw?: number; local?: boolean; glyph?: number; state?: number }
 
-/** A street race's rivals on the maps (the job rings have no colour of their own since M8.7: a badge by state). */
-export const RIVAL = hex(PALETTE.carLime);
+/**
+ * One colour, one meaning on the maps (docs/M8.9_PLAN.md R1, `ui/colors.ts`): a race's rivals are trouble (red); the
+ * player, a garage, a landmark, a camera are ink; money (a cache) yellow; the way (the route, the goal) cyan; the police
+ * blue, grey on the beat; a closed ring grey.
+ */
+export const RIVAL = TROUBLE;
 
 export const FONT = "'Segoe UI', 'Helvetica Neue', Arial, system-ui, sans-serif";
-export const INK = '#f7f3ea';
-export const DARK = 'rgba(22, 14, 40, 0.92)';
-export const ACCENT = '#ffd23f';
-export const CACHE_COLOR = hex(PALETTE.coin);
+export const INK = INK_COLOR;
+export const DARK = cssAlpha(SIGNALS.outline, 0.92);
+export const CACHE_COLOR = MONEY;
 /** The police on the radar (DESIGN.md §13.9): lit blue in a chase, grey on the beat; the search disc. */
-export const UNIT_LIT = '#3b82ff';
-export const UNIT_BEAT = '#9d9da8';
-export const SEARCH_FILL = 'rgba(59, 130, 246, 0.22)';
-export const SEARCH_EDGE = 'rgba(59, 130, 246, 0.7)';
+export const UNIT_LIT = POLICE;
+export const UNIT_BEAT = OFF;
+export const SEARCH_FILL = cssAlpha(SIGNALS.police, 0.22);
+export const SEARCH_EDGE = cssAlpha(SIGNALS.police, 0.7);
+/** The authored loop and the highway: the big roads, pale (no yellow since M8.9: yellow is money). */
 export const LOOP = '#ffe9a8';
+export const HIGHWAY = LOOP;
 /** The way's cyan (DESIGN.md §20.3 rule 6): the route and the goal's ring, and nothing else on the maps. */
-export const ROUTE = '#2bd1ff';
+export const ROUTE = WAY;
 /** A closed ring's grey: the police on the player (M8.7 D9); its pictogram's slate. */
-export const CLOSED = '#8d8a96';
+export const CLOSED = OFF;
 export const SLATE = '#4a4a55';
-export const GRID = 'rgba(247, 243, 234, 0.85)';
-const RIM = 'rgba(255, 210, 63, 0.45)';
-const PANEL = 0x160e28;
+export const GRID = cssAlpha(SIGNALS.ink, 0.85);
+const RIM = cssAlpha(SIGNALS.ink, 0.45);
+const PANEL = SIGNALS.outline;
 export const WATER = rgba(mix(PALETTE.water, PANEL, 0.3), 0.96);
 const ISLAND = rgba(PANEL, 0.9);
 const TINT_ALPHA = 0.22;
@@ -265,7 +272,8 @@ export function drawArrow(c: CanvasRenderingContext2D, x: number, y: number, ang
   c.lineWidth = 2.5;
   c.strokeStyle = DARK;
   c.stroke();
-  c.fillStyle = ACCENT;
+  // the player in ink (yellow is money since M8.9)
+  c.fillStyle = INK;
   c.fill();
   c.restore();
 }
@@ -349,8 +357,8 @@ export class Minimap {
     this.paths = buildMapPaths(sim);
     // the landmarks, then the three drop-offs: where a run can end is always on the rim
     this.base = [
-      ...LANDMARKS.map((l, i): MinimapMarker => ({ x: l.x, z: l.z, kind: GLYPH_KINDS[i] ?? 'tower', color: hex(DISTRICTS[i]?.accent ?? 0xffffff) })),
-      ...sim.run.dropOffs.map((d): MinimapMarker => ({ x: d.door.x, z: d.door.z, kind: 'garage', color: hex(PALETTE.carOrange) })),
+      ...LANDMARKS.map((l, i): MinimapMarker => ({ x: l.x, z: l.z, kind: GLYPH_KINDS[i] ?? 'tower', color: INK })),
+      ...sim.run.dropOffs.map((d): MinimapMarker => ({ x: d.door.x, z: d.door.z, kind: 'garage', color: INK })),
     ];
     this.markers = this.base;
 
@@ -540,7 +548,7 @@ export class Minimap {
     if (highwayVisible) {
       c.lineCap = 'butt';
       c.lineJoin = 'miter';
-      c.strokeStyle = ACCENT;
+      c.strokeStyle = HIGHWAY;
       c.lineWidth = highW;
       c.stroke(paths.highwayPath);
     }

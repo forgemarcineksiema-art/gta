@@ -245,13 +245,13 @@ for (const [w, h] of SIZES) {
 
   test(`stills: a chase at three stars at ${w}x${h}`, async ({ page }) => {
     test.skip(!wanted('chase3'));
-    await boot(page, `manual=1&spawn=gardens&heat=3&ad=off&fresh=1&${DATE}`, w, h);
-    await adv(page, 13_000);
-    await page.evaluate(() => {
-      const sim = window.__game!.sim;
-      sim.pursuit.force();
-    });
-    await adv(page, 1200);
+    // the skilled bot driving at three stars: the moment the police are on it (a stopped car is boxed within seconds)
+    await boot(page, `manual=1&bot=skilled&heat=3&seed=7&ad=off&fresh=1&${DATE}`, w, h);
+    for (let k = 0; k < 150; k++) {
+      await adv(page, 200);
+      if (await page.evaluate(() => window.__game!.sim.pursuit.state === 'active' && window.__game!.sim.run.state === 'running')) break;
+    }
+    await adv(page, 1500);
     await snap(page, 'chase3');
   });
 

@@ -98,3 +98,20 @@ export const CITY_COLORS = {
  * 0x67c9ce). The pedestrians' clothes keep their own tints.
  */
 export const ACCENTS = { crown: 0xf2b53a, foundry: 0x1fa9a6, gardens: 0xee6f9a, marina: 0x2cc4c9 } as const;
+
+/**
+ * One colour, one meaning (docs/M8.9_PLAN.md R1), on the screen, the maps and the world's marks (the signs, the rings,
+ * the route): money is yellow (the bag, a pay, a price, a coin, a cache); the way is cyan (the route, the goal, the
+ * swap); trouble is red (bad for you); the police are blue; everything else is ink; closed or off is grey; every
+ * outline and panel is the dark violet. The CSS's `:root` repeats them (pinned equal); nothing else on the screen has a
+ * hue of its own.
+ */
+export const SIGNALS = {
+  money: 0xffd23f,
+  way: 0x2bd1ff,
+  trouble: 0xff3b5c,
+  police: 0x3b82ff,
+  ink: 0xf7f3ea,
+  off: 0x8d8a96,
+  outline: 0x160e28,
+} as const;

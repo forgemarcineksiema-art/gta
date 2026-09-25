@@ -12,7 +12,7 @@ import { DRIVE, drive, hintRows, newDriveState, newPlaceClock, readDrive, screen
 import { Minimap } from '../map/minimap';
 import { HeatHud } from './heat';
 import { label, num, relabel, t } from '../lang';
-import { POP_SLOTS, Pops, newSaid, speak, type VoiceContext } from './voice';
+import { POP_SLOTS, Pops, newSaid, speak, type Tone, type VoiceContext } from './voice';
 
 export type { KeyHints } from './corners';
 
@@ -56,6 +56,7 @@ export class Hud {
   private tickerLeft = 0;
   private queuedLead = '';
   private queuedText = '';
+  private queuedTone: Tone = 'info';
   /** Seconds since the radio last spoke: a line at most every `DISPATCH_EVERY`. */
   private dispatchQuiet = Infinity;
   private readonly lap: HTMLElement;
@@ -333,21 +334,23 @@ export class Hud {
     return this.tickerLeft > 0;
   }
 
-  /** The ticker: a lead word (the level, in danger red) and the news, for `seconds`. */
-  showTicker(lead: string, text: string, seconds = 2): void {
+  /** The ticker: a lead word in its tone's colour (the stars red, the radio blue, the rest ink, M8.9 R1) and the news, for `seconds`. */
+  showTicker(lead: string, text: string, seconds = 2, tone: Tone = 'info'): void {
     this.tickerLevel.textContent = lead;
+    this.tickerLevel.dataset['tone'] = tone;
     this.tickerText.textContent = text;
     this.ticker.classList.add('is-on');
     this.tickerLeft = seconds;
   }
 
   /** The ticker now, or next when it is busy (a level's news keeps the top centre). */
-  private ticker2(lead: string, text: string): void {
+  private ticker2(lead: string, text: string, tone: Tone): void {
     if (this.tickerLeft > 0) {
       this.queuedLead = lead;
       this.queuedText = text;
+      this.queuedTone = tone;
     } else {
-      this.showTicker(lead, text, 3);
+      this.showTicker(lead, text, 3, tone);
     }
   }
 
@@ -390,12 +393,12 @@ export class Hud {
         // the radio: never over another line, at most every few seconds
         if (this.dispatchQuiet < DISPATCH_EVERY || this.tickerLeft > 0) return;
         this.dispatchQuiet = 0;
-        this.showTicker(said.lead, said.text);
+        this.showTicker(said.lead, said.text, 2, said.tone);
       } else if (kind === 'heatLevel') {
         // the stars' news takes the top at once: what the city sends from now on
-        this.showTicker(said.lead, said.text);
+        this.showTicker(said.lead, said.text, 2, said.tone);
       } else {
-        this.ticker2(said.lead, said.text);
+        this.ticker2(said.lead, said.text, said.tone);
       }
       return;
     }
@@ -518,7 +521,7 @@ export class Hud {
       this.tickerLeft -= dt;
       if (this.tickerLeft <= 0) {
         if (this.queuedText) {
-          this.showTicker(this.queuedLead, this.queuedText, 3);
+          this.showTicker(this.queuedLead, this.queuedText, 3, this.queuedTone);
           this.queuedText = '';
         } else {
           this.ticker.classList.remove('is-on');

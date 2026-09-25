@@ -14,9 +14,11 @@ import { COVER } from '../../sim/city/covers';
 import { KIND_GLYPH, glyphIndex, glyphOf, goalGlyph } from '../../sim/glyphs';
 import { BLOCK, HIGHWAY_HALF, OVERPASS, OVERPASS_NODES } from '../../sim/city/roads';
 import {
-  CACHE_COLOR, DARK, FONT, GLYPH_KINDS, GRID, INK, LOOP, ACCENT, RIVAL, ROUTE, SEARCH_EDGE, SEARCH_FILL, UNIT_BEAT, UNIT_LIT, WATER,
+  CACHE_COLOR, DARK, FONT, GLYPH_KINDS, GRID, HIGHWAY, INK, LOOP, RIVAL, ROUTE, SEARCH_EDGE, SEARCH_FILL, UNIT_BEAT, UNIT_LIT, WATER,
   drawArrow, drawBadge, drawGlyph, drawHeli, fillIsland, hex, type MapPaths, type MarkerKind,
 } from './minimap';
+import { SIGNALS } from '../../sim/palette';
+import { cssAlpha } from '../colors';
 import { label, labelAria, relabel, t } from '../lang';
 import { MINIMAP, bigMapProject, bigMapScale, yawFromQuat, type Vec2 } from './minimapModel';
 
@@ -26,11 +28,13 @@ const REPAINT_MS = 66;
 const ROUTE_PX = 4;
 const PICK_PX = 14;
 const GLYPH = 7;
-/** The cover on the map: where the helicopter cannot see (DESIGN.md §13.10). */
-const COVER_COLOR = 'rgba(126, 196, 214, 0.9)';
+/**
+ * The cover on the map: where the helicopter cannot see (DESIGN.md §13.10); a scaffold tower that brings down on the
+ * chasers (M5.5 slice 18); a speed camera. None is money, the way, trouble or the police: ink (M8.9 R1).
+ */
+const COVER_COLOR = cssAlpha(SIGNALS.ink, 0.55);
 const CAMERA_COLOR = INK;
-/** A scaffold tower that brings down on the chasers (M5.5 slice 18). */
-const BREAKER_COLOR = hex(PALETTE.carOrange);
+const BREAKER_COLOR = INK;
 /** The island's ground (M7 slice 12): the built blocks a shade darker than their district, the parks green, the shallows light. */
 const BLOCK_FILL = 'rgba(28, 27, 34, 0.16)';
 const PARK_FILL = hex(PALETTE.grass);
@@ -217,7 +221,7 @@ export class BigMap {
     item('YOU', (c) => drawArrow(c, 9, 9, 0, 7));
     // the job kinds by their pictograms (M8.7: no kind has a colour of its own)
     for (const [kind, word] of LEGEND_JOBS) item(word, (c) => drawBadge(c, glyphIndex(KIND_GLYPH[kind]), 9, 9, 8, 0));
-    item('GARAGE', (c) => drawGlyph(c, 'garage', 9, 9, GLYPH, hex(PALETTE.carOrange)));
+    item('GARAGE', (c) => drawGlyph(c, 'garage', 9, 9, GLYPH, INK));
     item('CACHE', (c) => drawGlyph(c, 'cache', 9, 9, GLYPH * 1.4, CACHE_COLOR));
     item('SPEED CAMERA', (c) => drawGlyph(c, 'camera', 9, 9, GLYPH, CAMERA_COLOR));
     item('PURSUIT BREAKER', (c) => drawGlyph(c, 'breaker', 9, 9, GLYPH * 0.8, BREAKER_COLOR));
@@ -294,7 +298,7 @@ export class BigMap {
       c.lineWidth = gridW + extra;
       for (const line of paths.gridLines) c.stroke(line.path);
       if (paths.highwayRing > 0) {
-        c.strokeStyle = pass === 0 ? DARK : ACCENT;
+        c.strokeStyle = pass === 0 ? DARK : HIGHWAY;
         c.lineWidth = highW + extra;
         c.stroke(paths.highwayPath);
       }
@@ -362,11 +366,11 @@ export class BigMap {
       c.strokeStyle = DARK;
       const name = t(d.name);
       c.strokeText(name, p.x, p.y);
-      c.fillStyle = hex(d.color);
+      c.fillStyle = INK;
       c.fillText(name, p.x, p.y);
     }
-    LANDMARKS.forEach((l, i) => this.glyphAt(GLYPH_KINDS[i] ?? 'tower', l.x, l.z, s, GLYPH, hex(DISTRICTS[i]?.accent ?? 0xffffff)));
-    for (const d of sim.run.dropOffs) this.glyphAt('garage', d.door.x, d.door.z, s, GLYPH * 1.2, hex(PALETTE.carOrange));
+    LANDMARKS.forEach((l, i) => this.glyphAt(GLYPH_KINDS[i] ?? 'tower', l.x, l.z, s, GLYPH, INK));
+    for (const d of sim.run.dropOffs) this.glyphAt('garage', d.door.x, d.door.z, s, GLYPH * 1.2, INK);
     for (const cam of sim.cameras?.descs ?? []) this.glyphAt('camera', cam.x, cam.z, s, GLYPH * 0.8, CAMERA_COLOR);
     // the pursuit breakers still standing (M5.5 slice 18)
     const breakers = sim.breakers;

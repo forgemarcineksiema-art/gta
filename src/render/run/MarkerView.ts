@@ -10,11 +10,12 @@
  */
 import * as THREE from 'three';
 import { BALANCE, FIXED_DT, type JobDef, type SimWorld } from '../../sim';
+import { SIGNALS } from '../../sim/palette';
 import { GLYPHS, GLYPH_ORDER, digitSlot, glyphIndex, numberGlyphs, type GlyphShape } from '../../sim/glyphs';
 import { SIGN_COLORS, SIGN_Y, collectSigns, newRingList, newSignList, signFold, signShare, type SignView } from './signs';
 
 /** The way's cyan a taken ring lights in for `FLASH` s, growing by `FLASH_GROW` (M8.7 D8); a zone's edge wears it too. */
-const CYAN = 0x2bd1ff;
+const CYAN = SIGNALS.way;
 const FLASH = 0.4;
 const FLASH_GROW = 0.35;
 /** The sign: its face's radius, the rim's inner radius and its reach past the face, the pictogram's square, its depth (m). */

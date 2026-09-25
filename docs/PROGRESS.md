@@ -10,6 +10,17 @@ Done: `src/audio/voices.ts` gives each class a voice and the engine speaks in th
 truck and bus (two, low, on a clatter of band-passed noise), the Bubble's two-stroke (one, a square's buzz and a rasp). A
 swap glides the mix over about 0.3 s. Pins M8.8 8.1, 8.2 (`tests/audio/voices.test.ts`); the sound is Marcin's ear.
 
+## 2026-09-25 — M8.9 slice 5: one colour, one meaning
+
+Done (R1): `SIGNALS` in `sim/palette.ts` (money, way, trouble, police, ink, off, outline), the CSS's `:root` the same
+(`--money` … `--outline`, `--panel`, and three non-signals: the backdrop, the ticket's paper and ink), `ui/colors.ts`
+for the canvases. Every old accent moved by its meaning: selection, titles, the combo, a full boost, NEW BEST, the next
+car, the streak, the hunts, the escape bar, the video icon, a kept car's frame, the next rival's chip and the tabs to
+ink; the radar's player and highway, the garages and the landmarks to ink, a race's rivals red; a pop is yellow only when
+it names money; the news' lead by its tone (the stars red, the radio blue, the rest ink); the stars ink, flashing red and
+blue while seen. The +n stays till slice 8's meter. The look's chase is the skilled bot at three stars. Pins M8.9
+5.1–5.5. Verify green; stills: the flash, the blue radio, the white tabs.
+
 ## 2026-09-25 — M8.8 slice 7: damage you can feel
 
 Done: from stage 2 the engine gives 0.95 of its torque, at stage 3 0.9 (`DAMAGE.handling`, `Vehicle.torqueMul`), and the

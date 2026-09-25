@@ -12,6 +12,7 @@ import { ASPHALT, DIRT, GRASS, SAND, type SurfaceKind } from '../city/surface';
 import { catmullRom, circle, inPolygon, polylineLength, resample, signedArea, type P2 } from './geom';
 import { BASIN, BOUNDS, COAST, COAST_PARTS, PLACES, RINGS, ROADS, causeway, highwayLoop, islet, naturalHeight, type PlanRoad, type RoadClass, type SpanKind } from './plan';
 import { shaped } from './shapes';
+import { canalBed, inCanal, inScrapyard, onWaterworksPlaza } from './shapes/works';
 import { districtStreets } from './streets';
 
 /** A road's half width by class (m), its carriageway without the pavement. */
@@ -630,9 +631,12 @@ export class Ground {
     return best ? best.h : null;
   }
 
-  /** The ground's height at (x, z), m over the sea, as the physics has it: dug out under the tunnel. */
+  /**
+   * The ground's height at (x, z), m over the sea, as the physics has it: the dry canal's channel dug (the roads cross it
+   * level on their bridges' decks, slice 9), and dug out under the tunnel.
+   */
   height(x: number, z: number): number {
-    const h = this.surfaceHeight(x, z), t = this.tunnel;
+    const h = Math.min(this.surfaceHeight(x, z), canalBed(x, z)), t = this.tunnel;
     if (!t || x < t.x0 || x > t.x1 || z < t.z0 || z > t.z1) return h;
     // the nearest point of the tunnel's line, between its mouths only
     let best = TRENCH, floor = 0;
@@ -757,6 +761,9 @@ export class Ground {
     if (dirt) return DIRT;
     if (!this.onLand(x, z)) return SAND;
     if (inPolygon(x, z, PLACES.quarry)) return DIRT;
+    // Sunset Works (slice 9): the dry canal's concrete and the Waterworks' plaza paved, the scrapyard's yard dirt
+    if (inCanal(x, z) || onWaterworksPlaza(x, z)) return ASPHALT;
+    if (inScrapyard(x, z)) return DIRT;
     if (paved(x, z)) return ASPHALT;
     this.nearestShore(x, z);
     if (this.shore.quay < APRON) return ASPHALT;

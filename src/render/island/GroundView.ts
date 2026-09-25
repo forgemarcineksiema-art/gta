@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import { ASPHALT, DIRT, GRASS, ISLAND_COLORS, PALETTE, SAND, SEA } from '../../sim';
 import { BLEND, COAST_KINDS, FOOT, SHOULDER, type GroundProbe } from '../../sim/island/ground';
 import { CHUNK, CHUNKS_X, CHUNKS_Z, CHUNK_X0, CHUNK_Z0, Island } from '../../sim/island/Island';
+import { canalEdge } from '../../sim/island/shapes/works';
 import { DECK } from '../../sim/island/structures';
 import { Rtin } from './rtin';
 
@@ -153,10 +154,11 @@ export class GroundView {
       const k = row * GRID + c;
       ground.probe(x0 + c * STEP, z0 + row * STEP, p);
       r.h[k] = p.h;
-      // kept: the land behind a steep shore's line, and a road's bank out over the water; not the hill in a tunnel's mouth
-      const x = x0 + c * STEP, z = z0 + row * STEP, mouth = this.inMouth(x, z);
-      r.cut[k] = mouth ? -5 : Math.max(p.steep, BANK - p.road);
-      r.kind[k] = mouth ? IN_MOUTH : p.steepKind;
+      // kept: the land behind a steep shore's line, and a road's bank out over the water; not the hill in a tunnel's mouth,
+      // nor the dry canal (its concrete lining is drawn over its channel, slice 9)
+      const x = x0 + c * STEP, z = z0 + row * STEP, mouth = this.inMouth(x, z), canal = canalEdge(x, z);
+      r.cut[k] = mouth ? -5 : Math.min(canal, Math.max(p.steep, BANK - p.road));
+      r.kind[k] = mouth || canal < 0 ? IN_MOUTH : p.steepKind;
       r.road[k] = p.road;
       r.surface[k] = p.surface;
     }

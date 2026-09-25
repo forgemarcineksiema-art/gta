@@ -207,10 +207,24 @@ for (const [w, h] of SIZES) {
   });
 
   test(`stills: a drive, the map, a sign, a card, a step at ${w}x${h}`, async ({ page }) => {
-    test.skip(!wanted('calm', 'sunward', 'map', 'sign', 'card', 'step'));
+    test.skip(!wanted('calm', 'sunward', 'pause', 'loading', 'map', 'sign', 'card', 'step'));
     await boot(page, `manual=1&spawn=crown&ad=off&fresh=1&${DATE}`, w, h);
     await adv(page, 13_000);
     await snap(page, 'calm');
+    if (wanted('loading')) {
+      // the loading screen as the boot leaves it (its bar full): the sky's stops, the word
+      await page.evaluate(() => document.getElementById('loading')?.classList.remove('is-hidden'));
+      await snap(page, 'loading');
+      await page.evaluate(() => document.getElementById('loading')?.classList.add('is-hidden'));
+    }
+    if (wanted('pause')) {
+      // the pause (M8.9 R12): PAUZA, the resume line, the sound, the settings, every key, the build small
+      await page.keyboard.press('KeyP');
+      await adv(page, 50);
+      await snap(page, 'pause');
+      await page.keyboard.press('KeyP');
+      for (let k = 0; k < 20 && await page.evaluate(() => window.__game!.paused); k++) await adv(page, 50);
+    }
     if (wanted('sunward')) {
       // the same street turned to the sun's bearing (render/shadows.ts SUN_OFFSET: atan2(-180, -120))
       await page.evaluate(() => {
@@ -255,6 +269,16 @@ for (const [w, h] of SIZES) {
     await page.evaluate(() => { const run = window.__game!.sim.run; run.bag = Math.max(run.bag, 18_500); });
     await adv(page, 1500);
     await snap(page, 'chase3');
+  });
+
+  test(`stills: a wreck at ${w}x${h}`, async ({ page }) => {
+    test.skip(!wanted('wreck'));
+    // WRAK over the debris' flight (M8.9 R12)
+    await boot(page, `manual=1&spawn=crown&ad=off&fresh=1&${DATE}`, w, h);
+    await adv(page, 9_000);
+    await page.evaluate(() => (window.__game!.sim.life as unknown as { wreck(): void }).wreck());
+    await adv(page, 500);
+    await snap(page, 'wreck');
   });
 
   test(`stills: five stars and the helicopter at ${w}x${h}`, async ({ page }) => {

@@ -423,15 +423,17 @@ export class App {
     setLang(resolveLang(params.get('lang'), ''));
     document.documentElement.lang = lang();
     // the boot's watch (M7 slice 7): a slow phase names itself on the loading screen, a stuck boot offers a retry
-    const watch = new BootWatch(performance.now() / 1000);
     const loading = document.getElementById('loading');
+    // the thin bar over the boot's phases (M8.9 R12)
+    const watch = new BootWatch(performance.now() / 1000, (w) => loading?.style.setProperty('--boot', w.progress.toFixed(2)));
+    const loadingText = loading?.querySelector<HTMLElement>('.loading__text') ?? loading;
     const shown = { text: '' };
     const onRetry = (): void => location.reload();
     bootWatchTimer = window.setInterval(() => {
       const l = watch.label(performance.now() / 1000, t);
-      if (!loading || l.text === shown.text) return;
+      if (!loading || !loadingText || l.text === shown.text) return;
       shown.text = l.text;
-      loading.textContent = l.text;
+      loadingText.textContent = l.text;
       if (l.retry) {
         loading.classList.add('is-retry');
         loading.addEventListener('click', onRetry, { once: true });
@@ -687,7 +689,7 @@ export class App {
     this.hud.setHints({
       throttle: key('throttle'), brake: key('brake'), steerLeft: key('steerLeft'), steerRight: key('steerRight'),
       handbrake: key('handbrake'), boost: key('boost'), reset: key('reset'), pause: key('pause'), camera: key('camera'),
-      debug: this.dev ? key('debug') : '', swap: key('swap'), map: key('map'), horn: key('horn'),
+      debug: this.dev ? key('debug') : '', swap: key('swap'), map: key('map'), horn: key('horn'), mute: key('mute'),
     });
     this.hud.setSound(key('mute'), this.audio.isUserMuted);
   }

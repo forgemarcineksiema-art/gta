@@ -19,6 +19,8 @@ import { fixed, num, paintedCar, polishForm, setLang, t } from '../../src/ui/lan
 import { PL, PL_GENDER, PL_PAINT } from '../../src/ui/pl';
 import { countsLine, doorLines } from '../../src/ui/hud/totals';
 import { newSaid, speak } from '../../src/ui/hud/voice';
+import { hintRows, type KeyHints } from '../../src/ui/hud/corners';
+import { ACTIONS } from '../../src/input/actions';
 
 const ROOT = new URL('../../', import.meta.url);
 const read = (file: string): string => readFileSync(new URL(file, ROOT), 'utf8');
@@ -160,5 +162,40 @@ describe('the game in Polish', () => {
       .toEqual([{ label: `ŁUP 32${NBSP}500 ×2,6`, value: `+84${NBSP}500`, strong: true }]);
     const counts = countsLine({ takedowns: 3, escapes: 1, billboards: 5, coins: 22, smashes: 12, damage: 12_300 });
     expect(counts.split(NBSP).join(' ')).toBe('3 ELIMINACJE · 1 UCIECZKA · 5 BILLBOARDÓW · 22 MONETY · SZKODY W MIEŚCIE 12 300');
+  });
+});
+
+describe('one word per thing, in capitals (M8.9 slice 11)', () => {
+  it('M8.9 11.1 KRĄG, OSŁONA and RESET never in Polish; KÓŁKO a job\'s ring, STREFA a zone', () => {
+    // the holes are the code's names (`{reset}` is the reset key's), not words
+    const wrong = Object.entries(PL).filter(([, v]) => /KR[ĄĘ]G|OSŁON|RESET/iu.test(v.replace(/\{[^}]*\}/g, ''))).map(([k]) => k);
+    expect(wrong).toEqual([]);
+    for (const key of ['SLOW DOWN IN THE RING', 'PICK UP THE PACKAGE · SLOW DOWN IN THE RING', 'READY · THE CYAN RING IS ON THE MAP']) expect(PL[key], key).toContain('KÓŁK');
+    for (const key of ['WRECK CARS INSIDE THE RING', 'SMASH IT UP INSIDE THE RING', 'BACK INTO THE ZONE']) expect(PL[key], key).toContain('STREF');
+    expect([PL['COVER'], PL['reset'], PL['PRESS ANY KEY'], PL['{swap} take a car  ·  {reset} respawn']])
+      .toEqual(['UKRYCIE', 'OD NOWA', 'NACIŚNIJ DOWOLNY KLAWISZ', '{swap} WEŹ AUTO  ·  {reset} OD NOWA']);
+  });
+
+  it('M8.9 11.2 the UI\'s root sets capitals, and no Polish the screen shows is in lower case', () => {
+    expect(/#ui\s*\{\s*text-transform:\s*uppercase;/.test(read('src/ui/styles.css'))).toBe(true);
+    // what only a screen reader hears keeps its sentence case: the aria labels
+    const aria = new Set<string>();
+    for (const file of CODE) {
+      const code = strip(read(file));
+      for (const m of code.matchAll(new RegExp(String.raw`\blabelAria\([^,]+,\s*${LITERAL}`, 'g'))) aria.add(unquote(m[1] as string));
+      for (const m of code.matchAll(new RegExp(String.raw`'aria-label',\s*t\(\s*${LITERAL}`, 'g'))) aria.add(unquote(m[1] as string));
+    }
+    expect(aria.size).toBeGreaterThanOrEqual(3);
+    const lower = Object.entries(PL).filter(([k, v]) => !aria.has(k) && /\p{Ll}/u.test(v.replace(/\{[^}]*\}/g, ''))).map(([k]) => k);
+    expect(lower).toEqual([]);
+  });
+
+  it('M8.9 11.3 the pause\'s list names every key the player drives with', () => {
+    const k = Object.fromEntries(ACTIONS.map((a, i) => [a, `K${i}`])) as unknown as KeyHints;
+    const named = new Set(hintRows(k).flatMap((r) => r.keys));
+    // the intro's own skip is the intro's caption; the tuning panel's key only with ?dev=1 (and then it is listed)
+    const missing = ACTIONS.filter((a) => a !== 'skip' && !named.has((k as unknown as Record<string, string>)[a] as string));
+    expect(missing).toEqual([]);
+    expect(hintRows({ ...k, debug: '' }).flatMap((r) => r.keys)).not.toContain('');
   });
 });

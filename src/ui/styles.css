@@ -22,6 +22,10 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
   --minimap-size: 10.35rem;
+  /* not signals: the sky's three stops (sim/palette.ts skyTop, skyMid, skyHorizon), behind the loading screen */
+  --sky-top: #3d3a7a;
+  --sky-mid: #d9849a;
+  --sky-horizon: #ffb487;
   /* the gauge mirrors the radar (M8.9 R4): 150 px at 720p */
   --gauge-size: 9.375rem;
 }
@@ -83,6 +87,10 @@ body {
   touch-action: none;
   overscroll-behavior: none;
 }
+
+/* every line on the screen in capitals (M8.9 R11): the UI's root sets them; the developer's tools keep their case */
+#ui { text-transform: uppercase; }
+#ui .devpanel, #ui .hud__debug { text-transform: none; }
 
 #game {
   position: fixed;
@@ -299,7 +307,8 @@ body {
 .hud__wrecked {
   position: absolute;
   left: 50%;
-  top: 30%;
+  /* above the debris' flight (M8.9 R12) */
+  top: 20%;
   transform: translate(-50%, -50%) skewX(-10deg);
   text-align: center;
   opacity: 0;
@@ -481,6 +490,13 @@ body {
 .hud__pause.is-visible {
   display: flex;
 }
+/* the pause (M8.9 R12): PAUZA, the resume line, the sound, the settings, the full list of keys, the build small */
+.hud__pause-title { order: 0; }
+.hud__pause-sub { order: 1; }
+.hud__pause-sound { order: 2; }
+.hud__pause > .settings { order: 3; }
+.hud__pause-keys { order: 4; }
+.hud__pause-build { order: 5; }
 .hud__pause-title {
   font-size: 3.6rem;
   font-weight: 900;
@@ -718,20 +734,38 @@ kbd.key {
   background: rgba(0, 0, 0, 0.5);
 }
 
-/* loading */
+/* loading (M8.9 R12): the sky's three stops behind the word, a thin bar over the boot's phases */
 .loading {
   position: fixed;
   inset: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: var(--backdrop);
+  gap: 1rem;
+  background: linear-gradient(to bottom, var(--sky-top) 0%, var(--sky-mid) 62%, var(--sky-horizon) 100%);
   color: var(--ink);
   font: 900 italic 1.75rem/1 var(--font-display);
   letter-spacing: 0.2em;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
   z-index: 30;
   transition: opacity 0.25s;
 }
+.loading__bar {
+  width: 12rem;
+  height: 0.25rem;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--outline) 45%, transparent);
+  overflow: hidden;
+}
+.loading__fill {
+  height: 100%;
+  background: var(--ink);
+  transform-origin: left center;
+  transform: scaleX(var(--boot, 0));
+  transition: transform 0.4s ease-out;
+}
+.loading.is-retry .loading__bar { display: none; }
 .loading.is-hidden {
   opacity: 0;
   pointer-events: none;

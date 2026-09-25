@@ -27,7 +27,7 @@ function calm(over: Partial<DriveState> = {}): DriveState {
 
 const KEYS: KeyHints = {
   throttle: 'W', brake: 'S', steerLeft: 'A', steerRight: 'D', handbrake: 'SPACE', boost: 'SHIFT', reset: 'R', pause: 'P',
-  camera: 'C', debug: '`', swap: 'E', map: 'TAB', horn: 'H',
+  camera: 'C', debug: '`', swap: 'E', map: 'TAB', horn: 'H', mute: 'M',
 };
 
 describe('the corners', () => {

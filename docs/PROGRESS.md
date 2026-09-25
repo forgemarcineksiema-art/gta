@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.9 slice 11: the words, the pause, the loading, the cards
+
+Done (R11, R12): KÓŁKO for a job's ring and STREFA for a zone (ROZBIJAJ AUTA W STREFIE, GOTOWE · KÓŁKO JEST NA MAPIE),
+R is OD NOWA (RESET in English), OSŁONA became UKRYCIE; every line in capitals (`#ui` sets them, the Polish table has no
+lower case the screen shows: the hints, the resume line, WEŹ AUTO · OD NOWA, the landmarks, KM/H); the busted card says
+NACIŚNIJ DOWOLNY KLAWISZ with no keycap. The pause in its order (PAUZA, the resume line, the sound, the settings, every
+key: the swap and the sound joined the list, the build small); the loading screen on the sky's three stops with a thin
+bar over the boot's phases (`BootWatch.progress`); WRAK at 20 %, over the debris. The look suite shoots `pause`,
+`loading`, `wreck`. Pins M8.9 11.1–11.3. Stills and verify green.
+
 ## 2026-09-25 — M8.9 slice 10: the radar and the full map
 
 Done (R6): the radar answers where to go, where the police are, where to bank: streets mid-grey, the loop and the

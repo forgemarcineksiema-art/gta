@@ -5,6 +5,7 @@
  * instanced mesh built from the same parts, so both are one model.
  */
 import { CITY_COLORS, PALETTE, PROP_TYPES, quatFromYaw, type PropDesc, type PropKind, type StaticDesc } from '../../sim';
+import { ACCENTS } from '../../sim/palette';
 
 /** One part: a box (half extents) or a cylinder (`hx` its radius, `hy` its half height, six or eight sides). */
 export interface PropPart { shape: 'box' | 'cylinder'; x: number; y: number; z: number; hx: number; hy: number; hz: number; color: number; sides?: number }
@@ -17,8 +18,8 @@ const TRUNK = 0x8b7966;
 const STAKE = PALETTE.wafer;
 const WOOD = CITY_COLORS.brick;
 /** Crown Heights' accent: the terraces' umbrellas, the newsstand's awning; the Quay's, the fish stalls'. */
-const CROWN = 0xf5cd75;
-const QUAY = 0x67c9ce;
+const CROWN = ACCENTS.crown;
+const QUAY = ACCENTS.marina;
 /** Fresh pine (pallets, crates, lobster pots) and a flamingo's pink. */
 const PINE = 0xc9a26b;
 const PINK = PALETTE.iceCream;

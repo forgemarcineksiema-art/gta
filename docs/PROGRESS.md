@@ -2,6 +2,17 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.9 slice 2: the golden hour
+
+Done (R8): the sun at 32° on its old bearing (was 51°; at the plan's 25° the streets sat in shade and read as night),
+warm gold `#ffcf8f` at 2.4; the fill a lavender sky over a warm ground bounce at 1.5, shadows 0.85; the sky in three
+stops on a 5°-ring dome (peach at the horizon, rose at 5°, deep violet from 15°), the fog and the background the
+horizon's; `CITY_COLORS` a third more saturated, the asphalt bluer, `ACCENTS` one table for the districts' canopies,
+rails and props (gold, teal, flower pink, aqua; were literals in City.ts and propMesh.ts). The look suite reads the
+saturation on lit pixels only and the near-black share (a dark frame read colourful). Stills, the four districts: S
+0.31–0.40 (0.19–0.20 before), over 0.5 16–30 % (4–6), band 0.26–0.32, behind the HUD 0.08–0.10 (0.25–0.36), near black
+1 %. Pins M8.9 2.1–2.3. Verify green.
+
 ## 2026-09-25 — M8.9 slice 1: the look suite and the before set
 
 Done: `e2e/look.spec.ts` (`npm run look`) shoots the plan's twelve states and the four districts' calm drives, reads the

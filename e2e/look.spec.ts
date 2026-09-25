@@ -22,13 +22,13 @@ const OUT = `screens/look/${SET}`;
 const DATE = 'date=2026-09-23';
 
 /** The world's targets (§1.2), asserted on the calm drives with `LOOK_GATE=1`. */
-const WORLD = { meanS: 0.3, strong: 0.1, band: 0.25, topLum: 0.18, clip: 0.005 } as const;
+const WORLD = { meanS: 0.3, strong: 0.1, band: 0.25, topLum: 0.18, clip: 0.005, dark: 0.15 } as const;
 /** The calm frames the world's targets read. */
 const CALM = new Set(['calm', 'district-crown', 'district-foundry', 'district-gardens', 'district-marina']);
 
 test.use({ deviceScaleFactor: 1 });
 
-interface WorldNumbers { meanS: number; strong: number; band: number; topLum: number; clip: number }
+interface WorldNumbers { meanS: number; strong: number; band: number; topLum: number; clip: number; dark: number }
 interface HudNumbers { small: string[]; top: string[] }
 
 /** In the page: the world's numbers from the canvas, the HUD's from the DOM. Installed before the game's script. */
@@ -48,25 +48,33 @@ const INSTALL = (): void => {
       const ctx = c.getContext('2d', { willReadFrequently: true }) as CanvasRenderingContext2D;
       ctx.drawImage(src, 0, 0);
       const d = ctx.getImageData(0, 0, w, h).data;
-      let n = 0, sumS = 0, strong = 0, clip = 0, bandN = 0, bandS = 0, topN = 0, topL = 0;
+      // saturation is read on the lit pixels only (value 0.25 and up): a near-black pixel's hue is noise, and a dark frame
+      // would read as a colourful one; the dark share says how much of the frame is near black
+      let n = 0, lit = 0, sumS = 0, strong = 0, clip = 0, dark = 0, bandN = 0, bandS = 0, topN = 0, topL = 0;
       for (let y = 0; y < h; y += 2) {
         const fy = y / h;
         for (let x = 0; x < w; x += 2) {
           const i = (y * w + x) * 4;
           const r = d[i] as number, g = d[i + 1] as number, b = d[i + 2] as number;
           const max = Math.max(r, g, b), min = Math.min(r, g, b);
-          const s = max === 0 ? 0 : (max - min) / max;
           n++;
+          if (max >= 250) clip++;
+          if (max < 38) dark++;
+          const fx = x / w;
+          if (fy < 0.15) { topN++; topL += 0.2126 * (lin[r] as number) + 0.7152 * (lin[g] as number) + 0.0722 * (lin[b] as number); }
+          if (max < 64) continue;
+          const s = (max - min) / max;
+          lit++;
           sumS += s;
           if (s > 0.5) strong++;
-          if (max >= 250) clip++;
-          const fx = x / w;
           // the facades' band, outside the player's car (centre, lower half)
           if (fy >= 0.3 && fy < 0.55 && !(fx > 0.38 && fx < 0.62 && fy > 0.45)) { bandN++; bandS += s; }
-          if (fy < 0.15) { topN++; topL += 0.2126 * (lin[r] as number) + 0.7152 * (lin[g] as number) + 0.0722 * (lin[b] as number); }
         }
       }
-      return { meanS: sumS / n, strong: strong / n, band: bandN ? bandS / bandN : 0, topLum: topN ? topL / topN : 0, clip: clip / n };
+      return {
+        meanS: lit ? sumS / lit : 0, strong: lit ? strong / lit : 0, band: bandN ? bandS / bandN : 0,
+        topLum: topN ? topL / topN : 0, clip: clip / n, dark: dark / n,
+      };
     },
     hud(): HudNumbers {
       const small: string[] = [];
@@ -133,7 +141,7 @@ async function snap(page: Page, state: string): Promise<void> {
   all[`${state}@${size}`] = { world, hud };
   writeFileSync(file, JSON.stringify(all, null, 1));
   const f = (v: number): string => v.toFixed(3);
-  console.log(`[look ${SET}] ${state} ${size}: S ${f(world.meanS)} strong ${f(world.strong)} band ${f(world.band)} top ${f(world.topLum)} clip ${f(world.clip)}; small ${hud.small.length}; top [${hud.top.join(',')}]`);
+  console.log(`[look ${SET}] ${state} ${size}: S ${f(world.meanS)} strong ${f(world.strong)} band ${f(world.band)} top ${f(world.topLum)} clip ${f(world.clip)} dark ${f(world.dark)}; small ${hud.small.length}; top [${hud.top.join(',')}]`);
   if (GATE) {
     if (CALM.has(state)) {
       expect(world.meanS, `${state} mean saturation`).toBeGreaterThanOrEqual(WORLD.meanS);
@@ -141,6 +149,7 @@ async function snap(page: Page, state: string): Promise<void> {
       expect(world.band, `${state} facades' band`).toBeGreaterThanOrEqual(WORLD.band);
       expect(world.topLum, `${state} behind the HUD`).toBeLessThanOrEqual(WORLD.topLum);
       expect(world.clip, `${state} clipped`).toBeLessThan(WORLD.clip);
+      expect(world.dark, `${state} near black`).toBeLessThanOrEqual(WORLD.dark);
     }
     expect(hud.small, `${state} ${size}: texts under 13 px`).toEqual([]);
     expect(hud.top.length, `${state} ${size}: the top centre [${hud.top.join(',')}]`).toBeLessThanOrEqual(1);

@@ -1,7 +1,7 @@
 /** Seeded, independently reproducible chunks. Only nearby solid bodies live in Rapier. */
 import RAPIER from '@dimforge/rapier3d-compat';
 import { GROUPS_PROP, GROUPS_SOLID, GROUPS_TERRAIN } from '../collision';
-import { PALETTE } from '../palette';
+import { ACCENTS, PALETTE } from '../palette';
 import { POLICE } from '../police/tuning';
 import { BALANCE } from '../balance';
 import type { SpawnPoint } from '../playground';
@@ -21,10 +21,10 @@ import { BLOCK, CITY_HALF, HIGHWAY_HALF, HIGHWAY_LANE_OFFSETS, OVERPASS_NODES, R
 import { overpassStatics } from './overpass';
 
 export const DISTRICTS = [
-  { id: 'crown', name: 'CROWN HEIGHTS', color: 0xb497d6, accent: 0xf5cd75, landmark: 'Crown Tower' },
-  { id: 'foundry', name: 'SUNSET WORKS', color: 0xd98768, accent: 0x5daeb5, landmark: 'The Waterworks' },
-  { id: 'gardens', name: 'PALM GARDENS', color: 0xe7bd87, accent: 0x8bb583, landmark: 'Glasshouse' },
-  { id: 'marina', name: 'CORAL QUAY', color: 0xeaa7ab, accent: 0x67c9ce, landmark: 'Coral Hotel' },
+  { id: 'crown', name: 'CROWN HEIGHTS', color: 0xb497d6, accent: ACCENTS.crown, landmark: 'Crown Tower' },
+  { id: 'foundry', name: 'SUNSET WORKS', color: 0xd98768, accent: ACCENTS.foundry, landmark: 'The Waterworks' },
+  { id: 'gardens', name: 'PALM GARDENS', color: 0xe7bd87, accent: ACCENTS.gardens, landmark: 'Glasshouse' },
+  { id: 'marina', name: 'CORAL QUAY', color: 0xeaa7ab, accent: ACCENTS.marina, landmark: 'Coral Hotel' },
 ] as const;
 export function districtAt(x: number, z: number): typeof DISTRICTS[number] {
   return DISTRICTS[(z >= 0 ? 2 : 0) + (x >= 0 ? 1 : 0)] as typeof DISTRICTS[number];
@@ -155,9 +155,9 @@ function lotClear(cx: number, cz: number, px: number, pz: number, yaw: number, h
 /** An authored road's frontage row: the district style, a lot's half size, the gap and setback, floors, accent. */
 interface Frontage { district: string; hx: number; hz: number; gap: number; setback: number; floors: number; accent: number }
 function frontageOf(road: SpecialRoad): Frontage | null {
-  return road.kind === 'avenue' ? { district: 'crown', hx: 10, hz: 10, gap: 3, setback: 1.3, floors: 4, accent: 0xf5cd75 }
-    : road.kind === 'quay' ? { district: 'marina', hx: 12, hz: 9, gap: 5, setback: 1.3, floors: 4, accent: 0x67c9ce }
-    : road.kind === 'parkway' ? { district: 'gardens', hx: 8, hz: 8, gap: 8, setback: 6, floors: 2, accent: 0x8bb583 } : null;
+  return road.kind === 'avenue' ? { district: 'crown', hx: 10, hz: 10, gap: 3, setback: 1.3, floors: 4, accent: ACCENTS.crown }
+    : road.kind === 'quay' ? { district: 'marina', hx: 12, hz: 9, gap: 5, setback: 1.3, floors: 4, accent: ACCENTS.marina }
+    : road.kind === 'parkway' ? { district: 'gardens', hx: 8, hz: 8, gap: 8, setback: 6, floors: 2, accent: ACCENTS.gardens } : null;
 }
 
 /**
@@ -695,10 +695,10 @@ export class City {
               }
             } else if (kind === 1) {
               const pt = place(hw + 15);
-              if (clear(pt, 7)) { architecture.tank(pt.x, pt.z, 4.2, 7.5, CITY_COLORS.stone, road.kind === 'service' ? 0x5daeb5 : PALETTE.laneMark); }
+              if (clear(pt, 7)) { architecture.tank(pt.x, pt.z, 4.2, 7.5, CITY_COLORS.stone, road.kind === 'service' ? ACCENTS.foundry : PALETTE.laneMark); }
             } else if (kind === 2) {
               const pt = place(hw + 20);
-              if (clear(pt, 13)) architecture.gantry(pt.x, pt.z, yaw + Math.PI / 2, 22, 0x5daeb5);
+              if (clear(pt, 13)) architecture.gantry(pt.x, pt.z, yaw + Math.PI / 2, 22, ACCENTS.foundry);
             } else {
               const pt = place(hw + 12);
               if (clear(pt, 3)) architecture.mast(pt.x, pt.z);

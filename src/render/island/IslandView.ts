@@ -11,6 +11,9 @@ import { APRON, type CoastKind } from '../../sim/island/ground';
 import { CHUNK, CHUNKS_X, CHUNK_X0, CHUNK_Z0, type Island } from '../../sim/island/Island';
 import { DECK, type Piece } from '../../sim/island/structures';
 import { PLACES } from '../../sim/island/plan';
+import { cityGeometry } from '../city/CityView';
+import { lightCity } from '../city/glow';
+import { fadeRoadPaint } from '../city/roadPaint';
 import { QUALITY, type QualityTier } from '../quality';
 import { GroundView, MOUTH } from './GroundView';
 
@@ -28,8 +31,9 @@ export class IslandView {
   private readonly group = new THREE.Group();
   private readonly ground: GroundView;
   private readonly color = new THREE.Color();
-  /** The roads' surfaces' meshes by chunk. */
+  /** The roads' surfaces' meshes and the buildings' by chunk. */
   private readonly surfaceChunks = new Map<number, THREE.Mesh>();
+  private readonly buildingChunks = new Map<number, THREE.Mesh>();
 
   constructor(scene: THREE.Scene, private readonly island: Island) {
     scene.add(this.group);
@@ -40,6 +44,7 @@ export class IslandView {
     this.ground = new GroundView(island);
     this.group.add(this.ground.group);
     this.group.add(this.surfaces());
+    this.group.add(this.buildings());
     this.group.add(this.paving());
     this.group.add(this.structures());
     this.group.add(...this.coast());
@@ -51,10 +56,27 @@ export class IslandView {
     const reach = QUALITY[quality].far + CHUNK * 0.75;
     if (snap) this.ground.sync(x, z, Math.min(reach, SNAP_REACH), true);
     this.ground.sync(x, z, reach);
-    for (const [k, mesh] of this.surfaceChunks) {
+    for (const list of [this.surfaceChunks, this.buildingChunks]) for (const [k, mesh] of list) {
       const i = k % CHUNKS_X, j = Math.floor(k / CHUNKS_X);
       mesh.visible = Math.hypot(CHUNK_X0 + (i + 0.5) * CHUNK - x, CHUNK_Z0 + (j + 0.5) * CHUNK - z) < reach;
     }
+  }
+
+  /** The lots' buildings, their plinths and the palms (the sim's fill, slice 7a), a mesh a chunk in the grid's kit. */
+  private buildings(): THREE.Group {
+    const g = new THREE.Group();
+    const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+    fadeRoadPaint(material);
+    lightCity(material);
+    for (const [k, list] of this.island.fill.chunks) {
+      const mesh = new THREE.Mesh(cityGeometry(list), material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.matrixAutoUpdate = false;
+      this.buildingChunks.set(k, mesh);
+      g.add(mesh);
+    }
+    return g;
   }
 
   dispose(): void {

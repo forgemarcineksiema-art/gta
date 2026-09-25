@@ -5,7 +5,7 @@
  * `?map=island`.
  */
 import RAPIER from '@dimforge/rapier3d-compat';
-import { GROUPS_SOLID, GROUPS_TERRAIN, GROUPS_WATER } from '../collision';
+import { GROUPS_PROP, GROUPS_SOLID, GROUPS_TERRAIN, GROUPS_WATER } from '../collision';
 import type { SpawnPoint } from '../playground';
 import { SEA } from '../city/sea';
 import type { SurfaceReader } from '../city/surface';
@@ -16,6 +16,7 @@ import { FOOT, Ground, HALF_WIDTH, type CoastKind } from './ground';
 import { buildNetwork } from './network';
 import { DECK, structures, type Piece, type Structure } from './structures';
 import { PAVEMENT, roadSurfaces, type RoadSurfaces } from './surfaces';
+import { fillIsland, type IslandFill } from './fill';
 import { BOUNDS, CIRCUS, highwayLoop } from './plan';
 
 /** A chunk of the ground: its side (m) and the height field's cell (m). The chunks cover the plan's bounds. */
@@ -54,9 +55,11 @@ export class Island {
   readonly structures: Structure[] = structures((this.network.lines[0] as { pts: RoadPoint[] }).pts, highwayLoop(6).span);
   /** The roads' surfaces (M8.10 slice 6b): the strips, the junctions, the pavements and their kerbs, the paint, the bays. */
   readonly surfaces: RoadSurfaces = roadSurfaces(this.ground, this.network.graph, (x, z) => { const [i, j] = Island.chunkOf(x, z); return Island.chunkIndex(i, j); });
+  /** The lots, their buildings and the palms (M8.10 slice 7a). */
+  readonly fill: IslandFill = fillIsland(this.ground, this.surfaces, (x, z) => { const [i, j] = Island.chunkOf(x, z); return Island.chunkIndex(i, j); });
   /** The chunks with a height field in the physics, by index. */
   readonly active = new Map<number, RAPIER.Collider>();
-  /** Each physics chunk's kerbs, with its height field. */
+  /** Each physics chunk's kerbs, buildings and trunks, with its height field. */
   private readonly chunkColliders = new Map<number, RAPIER.Collider[]>();
   loaded = 0;
   unloaded = 0;
@@ -132,7 +135,17 @@ export class Island {
     if (this.active.has(k)) return;
     this.active.set(k, this.buildChunk(k % CHUNKS_X, Math.floor(k / CHUNKS_X)));
     // the pavements' kerbs: a slab under each piece of the band, its top the pavement's, climbed by the wheels
-    this.chunkColliders.set(k, (this.surfaces.kerbs.get(k) ?? []).map((p) => this.slab(p, PAVEMENT / 2, 0.5, p.length / 2 + 0.2, 0, -0.5, 0, GROUPS_TERRAIN)));
+    const colliders = (this.surfaces.kerbs.get(k) ?? []).map((p) => this.slab(p, PAVEMENT / 2, 0.5, p.length / 2 + 0.2, 0, -0.5, 0, GROUPS_TERRAIN));
+    // the buildings and their plinths (walls), the trees' trunks (the props' group, as the grid's)
+    for (const st of this.fill.chunks.get(k) ?? []) {
+      const p = st.position, s = st.shape;
+      if (st.tag === 'trunk' && s.kind === 'cylinder') {
+        colliders.push(this.world.createCollider(RAPIER.ColliderDesc.cylinder(s.halfHeight, s.radius).setTranslation(p.x, p.y, p.z).setFriction(1).setRestitution(1).setCollisionGroups(GROUPS_PROP)));
+      } else if (st.tag === 'building' && s.kind === 'box') {
+        colliders.push(this.world.createCollider(RAPIER.ColliderDesc.cuboid(s.hx, s.hy, s.hz).setTranslation(p.x, p.y, p.z).setRotation(st.rotation).setFriction(1).setRestitution(1).setCollisionGroups(GROUPS_SOLID)));
+      }
+    }
+    this.chunkColliders.set(k, colliders);
     this.loaded++;
     this.built = true;
   }

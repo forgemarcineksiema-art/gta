@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.10 slice 7a: lots and buildings
+
+Done: `island/fill.ts` lays lots along every avenue and street behind its pavement, each district's by its rule: 104
+Crown offices (taller toward the summit), 34 Works sheds, 264 Gardens houses with a palm and a hedge in front, 136
+Quay blocks; none on a road, a pavement, another lot, the sea or a place kept for its set piece; each the grid's
+building on a plinth down to its lowest ground (walls in the physics' chunks). 415 palms: Palm Avenue, the beach road,
+the Quay's front, the Gardens' gardens (321), none in Crown. Lots follow the roads' frontages, not the plan's faces:
+the same town, a tenth of the code. Pins 7.1–7.4. Next: 7b, the props along the pavements.
+
 ## 2026-09-25 — M8.10 slice 6b: the roads' surfaces
 
 Done: `island/surfaces.ts`: each road's strip 4 cm over the ground (5 points across, halved where the ground bends),

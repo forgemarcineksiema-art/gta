@@ -61,14 +61,15 @@ describe('M8.10 slice 2: the ground', () => {
   it('2.2 a car handbraked on a 12 % slope holds', async () => {
     const sim = await createWorld({ map: 'island', traffic: 0, peds: 0 });
     const island = sim.island as Island;
-    // a hillside of 11–13 % off the roads: face down its fall line
+    // a hillside of 11–13 % off the roads and the lots (slice 7a's buildings): face down its fall line
     let spot: { x: number; z: number; yaw: number } | null = null;
     const p = { name: '', position: { x: 0, y: 0, z: 0 }, yaw: 0 };
+    const built = (x: number, z: number): boolean => island.fill.lots.some((l) => Math.hypot(l.x - x, l.z - z) < Math.hypot(l.hx, l.hz) + 15);
     for (let r = 120; r < 320 && !spot; r += 10) for (let a = 0; a < Math.PI * 2 && !spot; a += 0.2) {
       const x = SUMMIT.x + Math.cos(a) * r, z = SUMMIT.z + Math.sin(a) * r;
       const gx = (island.heightAt(x + 1, z) - island.heightAt(x - 1, z)) / 2, gz = (island.heightAt(x, z + 1) - island.heightAt(x, z - 1)) / 2;
       const grade = Math.hypot(gx, gz);
-      if (grade > 0.11 && grade < 0.13 && Math.hypot(island.nearestRoad(x, z, p).position.x - x, p.position.z - z) > 30) spot = { x, z, yaw: Math.atan2(-gx, -gz) };
+      if (grade > 0.11 && grade < 0.13 && Math.hypot(island.nearestRoad(x, z, p).position.x - x, p.position.z - z) > 30 && !built(x, z)) spot = { x, z, yaw: Math.atan2(-gx, -gz) };
     }
     expect(spot).not.toBeNull();
     if (!spot) return;

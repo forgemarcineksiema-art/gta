@@ -22,7 +22,7 @@ import { POLICE } from '../police/tuning';
 import type { Quat } from '../scene';
 import type { SimWorld } from '../SimWorld';
 import type { PlayerProbe } from '../traffic/Traffic';
-import { isRivalBody, type BodyId } from '../traffic/bodies';
+import { bodySpec, isRivalBody, type BodyId } from '../traffic/bodies';
 import { STEP } from './goal';
 
 export type RunState = 'running' | 'closing' | 'door' | 'busted';
@@ -92,6 +92,8 @@ export class Run {
   /** Prep items that paid out at the last run's end (the wall and the card name them). */
   lastLawyer = false;
   lastFence = false;
+  /** Busted in the Mayor's Nephew's limo: his uncle paid (M8.8 slice 6), the lawyer not needed. */
+  lastUncle = false;
   /** Bumps when the last door's totals change after the door shut (the double). */
   lastSerial = 0;
   readonly counts: RunCounts = { takedowns: 0, escapes: 0, billboards: 0, coins: 0, smashes: 0, damage: 0 };
@@ -309,6 +311,7 @@ export class Run {
     this.hotPaint = this.sim.pursuit.descriptor.paint;
     this.lastFence = prep.fence;
     this.lastLawyer = false;
+    this.lastUncle = false;
     this.lastDoubled = false;
     this.lastBag = this.bag;
     // the fence adds to the multiplier this run earned
@@ -341,7 +344,9 @@ export class Run {
 
   private bust(): void {
     const prep = this.sim.garage.prep;
-    this.lastLawyer = prep.lawyer;
+    // caught in the gold limo, the Mayor pays for his nephew's car (M8.8 slice 6): three quarters, the lawyer or not
+    this.lastUncle = bodySpec(this.sim.carBody).bribes === true;
+    this.lastLawyer = prep.lawyer && !this.lastUncle;
     this.lastFence = false;
     this.lastDoubled = false;
     this.lastBest = false;
@@ -349,7 +354,7 @@ export class Run {
     this.lastMultiplier = 1;
     this.lastBanked = 0;
     // the lawyer keeps three quarters instead of half
-    this.lastFine = Math.round(this.bag * (prep.lawyer ? BALANCE.prep.lawyerKeep : BALANCE.fine));
+    this.lastFine = Math.round(this.bag * (prep.lawyer || this.lastUncle ? BALANCE.prep.lawyerKeep : BALANCE.fine));
     this.bank += this.lastFine;
     this.bag = 0;
     this.endRun(true);

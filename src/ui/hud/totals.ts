@@ -30,6 +30,8 @@ export interface CardResult {
   lastBag: number;
   lastFine: number;
   lastLawyer: boolean;
+  /** Busted in the gold limo: the Mayor paid (M8.8 slice 6). */
+  lastUncle?: boolean;
   bank: number;
 }
 
@@ -43,7 +45,7 @@ export function doorLines(r: DoorResult): Line[] {
 
 /** The card: the bag, what is kept of it, and the bank (the card has no footer). */
 export function cardLines(r: CardResult): Line[] {
-  const keep = t(r.lastLawyer ? 'THE LAWYER KEEPS 3/4' : 'YOU KEEP HALF');
+  const keep = t(r.lastUncle === true ? 'THE MAYOR KEEPS 3/4' : r.lastLawyer ? 'THE LAWYER KEEPS 3/4' : 'YOU KEEP HALF');
   return [
     { label: `${t('BAG {cash}', { cash: Math.round(r.lastBag) })} · ${keep}`, value: `+${money(r.lastFine)}`, strong: true },
     { label: t('BANK'), value: money(r.bank), strong: false },

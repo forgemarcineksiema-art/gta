@@ -6,12 +6,14 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { BEST_AT } from '../../src/sim/jobs/catalog';
 import { BODY_IDS, bodySpec, bodyTuning, isShell, type BodyId } from '../../src/sim/traffic/bodies';
 import { driftHeld, grip80, measureBody, pulse60, wallDamage, type BodyRow } from './bodyMeasure';
 import { createWorld, fullThrottle, kmh, position, run, runUntil, upness } from './helpers';
 
 interface Row extends BodyRow { drift: number; pulse: number; grip: number; wall: number; mass: number; boost: number }
+
+/** The eight trophies best at a way of driving (slice 5); the three with connections (slice 6) drive as their class. */
+const DRIVERS: readonly BodyId[] = ['wagon', 'pizza', 'wrecker', 'twin', 'partybus', 'lowrider', 'bubble', 'phantom'];
 
 /** The body whose value is the largest (or, `least`, the smallest), others left out where `keep` says. */
 function best(rows: Row[], value: (r: Row) => number, least = false, keep: (r: Row) => boolean = () => true): BodyId {
@@ -38,7 +40,7 @@ describe('every body measured', () => {
     writeFileSync(new URL('../../perf/bodies.json', import.meta.url), JSON.stringify(rows, null, 1));
     const of = new Map(rows.map((r) => [r.body, r]));
     for (const r of rows) {
-      if (isShell(r.body) || BEST_AT[r.body]) continue;
+      if (isShell(r.body) || DRIVERS.includes(r.body)) continue;
       const cls = of.get(bodySpec(r.body).car) as Row;
       expect(r.to100, r.body).toBeGreaterThan(cls.to100 * 0.9);
       expect(r.to100, r.body).toBeLessThan(cls.to100 * 1.1);
@@ -61,7 +63,7 @@ describe('every body measured', () => {
   }, 1_800_000);
 
   it('M8.8 5.2 the eight trophies drive as cars do: they rest, clip a kerb and land the 16° ramp upright', async () => {
-    for (const body of Object.keys(BEST_AT) as BodyId[]) {
+    for (const body of DRIVERS) {
       const lot = await createWorld({ spawn: 'lot', body });
       try {
         run(lot, 1);

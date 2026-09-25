@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SimWorld } from '../../src/sim';
 import { AgentState, type Traffic } from '../../src/sim/traffic/Traffic';
+import { bodySpec } from '../../src/sim/traffic/bodies';
 import { TRAFFIC } from '../../src/sim/traffic/tuning';
 import { createWorld, run } from './helpers';
 
@@ -190,6 +191,57 @@ describe('traffic with character', () => {
       // and back on their side: nobody stays out on the oncoming lane
       run(sim, 4);
       for (const i of queue) expect(Math.abs(traffic.shift[i] as number)).toBeLessThanOrEqual(0.5);
+    } finally { sim.dispose(); }
+  }, 60_000);
+});
+
+describe('M8.8 slice 6: the three with connections; the rival at its car\'s pace', () => {
+  it('M8.8 6.1 the Fake Cruiser\'s disco bar 40 m behind a car on its lane: it pulls over; a muscle car there, it drives on', async () => {
+    for (const body of ['fakecop', 'muscle'] as const) {
+      const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false, body });
+      try {
+        sim.police!.dispatching = false;
+        const traffic = sim.traffic as Traffic;
+        const lane = streetLane(sim, 170);
+        const p = pose(sim, lane, 60);
+        sim.city?.sync(p.x, p.z, true);
+        sim.vehicle.teleport({ x: p.x, y: 0.8, z: p.z }, p.yaw);
+        sim.vehicle.setVelocity(0, 0, 0);
+        const car = traffic.spawnAt(lane, 100, 'compact');
+        traffic.pace[car] = 1;
+        traffic.bad[car] = 0;
+        run(sim, 1.5);
+        if (body === 'fakecop') {
+          expect(traffic.pullOvers).toBeGreaterThanOrEqual(1);
+          expect(traffic.shift[car] as number).toBeGreaterThanOrEqual(1.2);
+        } else {
+          expect(traffic.pullOvers).toBe(0);
+          expect(Math.abs(traffic.shift[car] as number)).toBeLessThan(0.3);
+        }
+      } finally { sim.dispose(); }
+    }
+  }, 60_000);
+
+  it('M8.8 6.4 from a stop the Bubble\'s rival reaches 60 km/h before a sedan\'s record does, at its car\'s rate', async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
+    try {
+      sim.police!.dispatching = false;
+      const traffic = sim.traffic as Traffic;
+      const lane = streetLane(sim, 170);
+      parkPlayerBehind(sim, lane);
+      const bubble = traffic.spawnRacer(lane, 110, 'bubble', 0, true);
+      const sedan = traffic.spawnRacer(lane, 20, 'sedan', 0);
+      const at = new Map<number, number>();
+      run(sim, 4, (_t, _c, s) => {
+        for (const i of [bubble, sedan]) {
+          traffic.setRacePlan(i, -1, 25);
+          if (!at.has(i) && (traffic.speed[i] as number) >= 60 / 3.6) at.set(i, s.time);
+        }
+      });
+      expect(at.get(bubble)).toBeLessThan(at.get(sedan) as number);
+      expect(at.get(bubble)).toBeCloseTo(60 / 3.6 / (bodySpec('bubble').aiAccel as number), 1);
+      // a record with no rate of its own pulls away as a unit on a chase does
+      expect(at.get(sedan)).toBeCloseTo(60 / 3.6 / (T.accel * 1.5), 1);
     } finally { sim.dispose(); }
   }, 60_000);
 });

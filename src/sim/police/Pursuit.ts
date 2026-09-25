@@ -1,6 +1,6 @@
 import type { EventLog } from '../events';
 import type { CarId } from '../vehicle/presets';
-import { BODY_INDEX, type BodyId } from '../traffic/bodies';
+import { BODY_INDEX, bodySpec, type BodyId } from '../traffic/bodies';
 import { POLICE, type PoliceTuning } from './tuning';
 
 /** The radio's lines (the `dispatch` event's value; docs/DESIGN.md §13.9). */
@@ -74,7 +74,8 @@ export class Pursuit {
       this.radioLeft -= dt;
       seen = true;
     }
-    if (this.disguised) {
+    // nobody reports the Chief's own car missing: its cover runs no clock (M8.8 slice 6)
+    if (this.disguised && bodySpec(this.descriptor.body).unreported !== true) {
       this.coverLeft -= dt;
       if (this.coverLeft <= 0) this.markBlown(x, z);
     }

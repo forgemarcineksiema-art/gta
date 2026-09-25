@@ -280,6 +280,8 @@ export class Traffic {
   /** Counters for the pins: lane changes into the fast lane, pull-overs, flinches, passes round a dead car, spawns and spawns with a clone near. */
   overtakes = 0;
   pullOvers = 0;
+  /** The player's car has a lit bar the civilians take for a unit's: the Fake Cruiser's disco (M8.8 slice 6; set by the sim). */
+  playerLit = false;
   flinches = 0;
   gawks = 0;
   spawns = 0;
@@ -1358,7 +1360,10 @@ export class Traffic {
     const speed = this.speed[i] as number;
     const unit = this.fast(i) ? POLICE_ACCEL : 1;
     const brake = ((this.flinchLeft[i] as number) > 0 ? t.flinch.brake : t.brake) * unit;
-    this.speed[i] = speed < desired ? Math.min(desired, speed + t.accel * unit * dt) : Math.max(0, Math.max(desired, speed - brake * dt));
+    // a race rival pulls away as its car does (M8.8 slice 6): its own rate in place of a unit's
+    const own = this.racer[i] === 1 ? (BODIES[this.body[i] as number] as (typeof BODIES)[number]).aiAccel : undefined;
+    const accel = own ?? t.accel * unit;
+    this.speed[i] = speed < desired ? Math.min(desired, speed + accel * dt) : Math.max(0, Math.max(desired, speed - brake * dt));
     const lane = this.lane[i] as number;
     const len = this.lanes.length[lane] as number;
     const nxt = this.next[i] as number;
@@ -2867,8 +2872,9 @@ export class Traffic {
       this.flinchLeft[i] = t.flinch.hold;
     }
 
-    // the pull-over: a lit police car close behind on its lane
-    if (this.litBehind(i, lane, s)) {
+    // the pull-over: a lit police car close behind on its lane, or the player in the Fake Cruiser (M8.8 slice 6)
+    const discoBehind = this.playerLit && along < 0 && -along < t.pullOver.behind && Math.abs(side) < 2.8 && Math.cos(player.yaw - yaw) > 0.5;
+    if (discoBehind || this.litBehind(i, lane, s)) {
       if ((this.pullLeft[i]) <= 0) this.pullOvers++;
       this.pullLeft[i] = t.pullOver.hold;
     }

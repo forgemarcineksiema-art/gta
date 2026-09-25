@@ -281,4 +281,24 @@ describe('the run', () => {
       expect(sim.run.state).toBe('running');
     } finally { sim.dispose(); }
   }, 60_000);
+
+  it('M8.8 6.2 busted in the gold limo keeps three quarters, with the lawyer or without: the Mayor pays', async () => {
+    for (const lawyer of [false, true]) {
+      const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false, heat: 20, body: 'limo' });
+      (sim.police as NonNullable<SimWorld['police']>).dispatching = false;
+      try {
+        const site = sim.run.dropOffs[1]!;
+        sim.garage.prep.lawyer = lawyer;
+        sim.run.bag = 10_000;
+        placeCar(sim, site, -GARAGE.depth / 2 - 16);
+        parkPolice(sim, site, -GARAGE.depth / 2 - 16, 3.5);
+        parkPolice(sim, site, -GARAGE.depth / 2 - 16, -3.5);
+        run(sim, POLICE.busted.seconds + 0.2);
+        expect(sim.run.state).toBe('busted');
+        expect(sim.run.lastFine).toBe(10_000 * BALANCE.prep.lawyerKeep);
+        expect(sim.run.lastUncle).toBe(true);
+        expect(sim.run.lastLawyer).toBe(false);
+      } finally { sim.dispose(); }
+    }
+  }, 60_000);
 });

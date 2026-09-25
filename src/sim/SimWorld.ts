@@ -404,6 +404,8 @@ export class SimWorld {
       this.police?.preStep(probe, FIXED_DT);
       // the streets thin as the chase grows (DESIGN.md §13.8)
       this.traffic.densityScale = TRAFFIC.densityByLevel[this.heat.level] ?? 1;
+      // the Fake Cruiser's disco bar: the road ahead pulls over (M8.8 slice 6)
+      this.traffic.playerLit = bodySpec(this.carBody).lit === true;
       this.traffic.step(probe, FIXED_DT, this.events);
     }
     this.mark?.(SimPhase.Traffic);

@@ -53,4 +53,20 @@ describe('M8.8 slice 1: every police car is a disguise', () => {
       }
     } finally { sim.dispose(); }
   }, 60_000);
+
+  it('M8.8 6.3 nobody reports the Chief\'s Cruiser missing: its disguise holds past the dispatcher\'s clock and blows on a seen crime', async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
+    try {
+      sim.police!.dispatching = false;
+      sim.garage.own('chiefcar');
+      sim.garage.select('chiefcar');
+      sim.garage.applyToVehicle();
+      run(sim, POLICE.disguise.seconds + 5);
+      expect(sim.pursuit.blown).toBe(false);
+      expect(sim.pursuit.disguised).toBe(true);
+      // what the police do with a crime a unit saw (identity 5.4 pins the sight)
+      sim.pursuit.markBlown(sim.probe.x, sim.probe.z);
+      expect(sim.pursuit.disguised).toBe(false);
+    } finally { sim.dispose(); }
+  }, 60_000);
 });

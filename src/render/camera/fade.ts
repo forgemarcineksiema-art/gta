@@ -2,13 +2,24 @@
  * The player's car is always seen (M8.6 D9; DESIGN.md §18.2 rule 7): a car between the camera and the player's car, or
  * within `FADE.near` m of the camera, is drawn thinned through a screen door (a 4×4 ordered pattern discards its
  * pixels: no transparency, no sorting, no extra draw call) down to `FADE.floor` over `FADE.seconds`, and back when
- * clear. The camera pulls in for walls and roofs (ChaseCamera's occlusion rule); a car in the way is thinned instead,
- * so the camera stays where the player put it. Pure: the view writes what these return into its instances.
+ * clear. At the floor the 4×4 pattern is a one-pixel checker, which reads as half transparent (M8.9 R12: the coarse
+ * halftone only while it fades). The camera pulls in for walls and roofs (ChaseCamera's occlusion rule); a car in the
+ * way is thinned instead, so the camera stays where the player put it. Pure: the view writes what these return into
+ * its instances.
  */
 
+/** The 4×4 ordered (Bayer) pattern's ranks, row by row: a fragment is drawn while the fade is above its (rank + 0.5) / 16. */
+export const BAYER4: readonly number[] = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+
+/** Whether the screen door draws the pixel at (x, y) at `fade` (the shader's rule, for the pins). */
+export function doorDraws(fade: number, x: number, y: number): boolean {
+  if (fade >= 0.999) return true;
+  return fade > ((BAYER4[(x % 4) + (y % 4) * 4] as number) + 0.5) / 16;
+}
+
 export const FADE = {
-  /** What is left of a car in the way (the pattern's share drawn). */
-  floor: 0.25,
+  /** What is left of a car in the way (the pattern's share drawn): a half, the one-pixel checker. */
+  floor: 0.5,
   /** From whole to thinned, and back (s). */
   seconds: 0.15,
   /** A car this close to the camera is thinned wherever it stands (m). */

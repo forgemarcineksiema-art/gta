@@ -217,23 +217,20 @@ describe('jobs (M5 slice 1)', () => {
     } finally { sim.dispose(); }
   });
 
-  it('1.10 every marker has its coin ring: seven coins on the side facing the junction and a cap in front of the beacon', async () => {
+  it('M8.9 12.3 no coin within 6 m of a marker: the coins round the rings went (they pulled a player through a ring that says slow down)', async () => {
     const sim = await placedWorld();
     try {
-      // laid on the jobs' first step
       sim.step();
-      const extra = sim.coins!.extra;
-      // a rival's ring has none: it is there only while the board says so (M6)
-      for (const d of sim.jobs.defs.filter((k) => k.kind !== 'duel')) {
-        const ring = extra.filter((c) => Math.hypot(c.x - d.x, c.z - d.z) <= BALANCE.jobs.markerRadius + 0.01);
-        expect(ring.length).toBe(8);
-        expect(ring.filter((c) => c.value === BALANCE.coin.cap).length).toBe(1);
-        // the half facing the junction: every coin is at most a right angle off the marker's facing
-        for (const c of ring) {
-          const along = (c.x - d.x) * Math.sin(d.yaw) + (c.z - d.z) * Math.cos(d.yaw);
-          expect(along).toBeGreaterThan(-1e-6);
-        }
+      // none laid for the rings, and none of the chunks' own (the billboards', the ramps') by a ring; the day's caches
+      // are the date's draw, their own goal, not a ring's
+      expect(sim.coins!.extra.filter((c) => c.lane === -3)).toEqual([]);
+      const coins = sim.city!.coinLayout;
+      expect(coins.length).toBeGreaterThan(0);
+      const near: string[] = [];
+      for (const d of sim.jobs.defs) {
+        for (const c of coins) if (Math.hypot(c.x - d.x, c.z - d.z) < 6) near.push(`${d.kind} ${d.id}`);
       }
+      expect(near).toEqual([]);
     } finally { sim.dispose(); }
   });
 });

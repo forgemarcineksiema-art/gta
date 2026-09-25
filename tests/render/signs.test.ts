@@ -15,6 +15,8 @@ import {
 } from '../../src/render/run/signs';
 import { badgeMarkup, goalWords, newCardWords } from '../../src/ui/hud/jobs';
 import { setLang } from '../../src/ui/lang';
+import { hudScale } from '../../src/ui/scale';
+import { SIGN_MIN, SIGN_SIZE, signScale, signShare, signTopY } from '../../src/render/run/signs';
 import { createWorld, run, runUntil } from '../sim/helpers';
 
 const CITY = { map: 'city', seed: 42, traffic: 0, peds: 0, record: false } as const;
@@ -172,5 +174,40 @@ describe('the signs (M8.7 slice 3)', () => {
     expect(pl.title).toBe('NOWOŚĆ: WYŚCIG ULICZNY');
     expect(pl.sub).toBe('PIERWSZY NA METĘ · DOWOLNA TRASA');
     for (const kind of ['trial', 'rage', 'mayhem', 'escape', 'order'] as const) expect(newCardWords(kind).sub).not.toBe('');
+  });
+});
+
+describe('signs that read (M8.9 slice 12)', () => {
+  it('M8.9 12.1 a sign keeps 28 px at 720p to 150 m, in the HUD\'s scale, and is 1 where its face is larger', () => {
+    for (const fovDeg of [55, 65, 75]) {
+      const fov = (fovDeg * Math.PI) / 180;
+      for (const height of [450, 720, 1080]) {
+        const floor = SIGN_MIN.px * hudScale(height);
+        for (let depth = 2; depth <= 150; depth += 2) {
+          const natural = signShare(SIGN_SIZE, depth, fov) * height;
+          const k = signScale(depth, fov, height);
+          expect(natural * k, `${fovDeg}° ${height} px ${depth} m`).toBeGreaterThanOrEqual(floor - 1e-6);
+          if (natural >= floor) expect(k).toBe(1);
+          else expect(natural * k).toBeCloseTo(floor, 6);
+        }
+        // past 150 m it grows no more: it shrinks as the world does
+        expect(signScale(300, fov, height)).toBe(signScale(150, fov, height));
+      }
+    }
+    // the render's scale is the HUD's (ui/scale.ts)
+    for (const h of [300, 450, 720, 900, 1080, 2160]) {
+      expect(Math.min(SIGN_MIN.scaleMax, Math.max(SIGN_MIN.scaleMin, h / SIGN_MIN.base))).toBe(hudScale(h));
+    }
+    // behind the camera, nothing to grow
+    expect(signScale(-5, 1, 720)).toBe(1);
+  });
+
+  it('M8.9 12.2 the goal\'s sign is a quarter larger than the others', () => {
+    expect(SIGN_MIN.goal).toBe(1.25);
+    const view = readFileSync(new URL('../../src/render/run/MarkerView.ts', import.meta.url), 'utf8');
+    expect(view).toContain('signs.state[i] === SIGN_GOAL ? SIGN_MIN.goal : 1');
+    // the pay sits over the face as drawn: over the goal's larger one, and over a grown one
+    expect(signTopY(1, true)).toBeGreaterThan(signTopY(1, false));
+    expect(signTopY(3, false)).toBeGreaterThan(signTopY(1, false));
   });
 });

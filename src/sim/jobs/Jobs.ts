@@ -46,7 +46,7 @@ import { AgentState, type PlayerProbe } from '../traffic/Traffic';
 import type { BodyId } from '../traffic/bodies';
 import { trialMedal, unpackDescriptor, type JobDef } from './catalog';
 import { Race } from './Race';
-import { markerRingCoins, pointTarget } from './place';
+import { pointTarget } from './place';
 
 export type { JobDef, JobKind } from './catalog';
 
@@ -100,8 +100,6 @@ export class Jobs {
   private cursor: number;
   /** An `escape` event was read this step. */
   private escaped = false;
-  /** The markers' coin rings are laid on the first step (once; the world's constructor leaves the extra coins to its callers). */
-  private ringsLaid = false;
   private readonly routePoints: CoinPoint[] = [];
 
   constructor(private readonly sim: SimWorld, defs: JobDef[]) {
@@ -160,12 +158,6 @@ export class Jobs {
   }
 
   step(probe: PlayerProbe, dt: number): void {
-    if (!this.ringsLaid) {
-      this.ringsLaid = true;
-      // a ring of coins round every placed marker (DESIGN.md §3.2); not the cold open's, whose line leads there, nor
-      // a rival's, which is there only while the board says so (M6)
-      this.sim.coins?.addExtra(markerRingCoins(this.defs.filter((d) => d.id !== 0 && d.kind !== 'duel')));
-    }
     this.escaped = false;
     this.cursor = this.sim.events.readFrom(this.cursor, this.onEvent);
     const r = BALANCE.jobs.markerRadius;

@@ -22,7 +22,7 @@ import { RunHud } from '../ui/hud/run';
 import { ColdOpenHud } from '../ui/hud/coldOpen';
 import { JobsHud } from '../ui/hud/jobs';
 import { PayLabel } from '../ui/hud/pay';
-import { SIGN_Y, payOf, paySign, type SignView } from '../render/run/signs';
+import { payOf, paySign, type SignView } from '../render/run/signs';
 import { mountTop } from '../ui/hud/lanes';
 import { SettingsUi } from '../ui/settings';
 import { BootWatch } from './bootWatch';
@@ -855,7 +855,8 @@ export class App {
     // the nearest open sign ahead: its kind and its pay, a metre over its face (M8.7 D5, M8.9 R7)
     this.renderer.view(this.signView);
     const paid = playing && !this.bot ? paySign(this.sim, this.signView) : null;
-    if (paid && this.renderer.toScreen(paid.x, SIGN_Y + 1.05, paid.z, this.payAt)) this.payLabel.show(this.payAt.x, this.payAt.y, paid, payOf(this.sim, paid));
+    const payY = paid ? this.renderer.signTop(paid.x, paid.z, this.sim.way?.goal.id === paid.id) : 0;
+    if (paid && this.renderer.toScreen(paid.x, payY, paid.z, this.payAt)) this.payLabel.show(this.payAt.x, this.payAt.y, paid, payOf(this.sim, paid));
     else this.payLabel.hide();
     // the top of the screen (M8.9 R5): the goal line and one more. The intro's caption and the running job's card
     // take it; the voice's lines and cards wait in their order; while the ticket fills nothing speaks but the ticket

@@ -12,7 +12,9 @@ import * as THREE from 'three';
 import { BALANCE, FIXED_DT, type JobDef, type SimWorld } from '../../sim';
 import { SIGNALS } from '../../sim/palette';
 import { GLYPHS, GLYPH_ORDER, digitSlot, glyphIndex, numberGlyphs, type GlyphShape } from '../../sim/glyphs';
-import { SIGN_COLORS, SIGN_Y, collectSigns, newRingList, newSignList, signFold, signShare, type SignView } from './signs';
+import {
+  SIGN_COLORS, SIGN_GOAL, SIGN_MIN, SIGN_SIZE, SIGN_Y, collectSigns, newRingList, newSignList, signFold, signScale, signShare, type SignView,
+} from './signs';
 
 /** The way's cyan a taken ring lights in for `FLASH` s, growing by `FLASH_GROW` (M8.7 D8); a zone's edge wears it too. */
 const CYAN = SIGNALS.way;
@@ -21,7 +23,7 @@ const FLASH_GROW = 0.35;
 /** The sign: its face's radius, the rim's inner radius and its reach past the face, the pictogram's square, its depth (m). */
 const RADIUS = 0.7;
 const RIM_IN = 0.62;
-const RIM_OUT = 0.76;
+const RIM_OUT = SIGN_SIZE / 2;
 const GLYPH_SIZE = 0.84;
 const DEPTH = 0.03;
 const POLE = 0x6d6d78;
@@ -85,6 +87,8 @@ export class MarkerView {
   private readonly digitLocal: THREE.Matrix4[][];
   private readonly numbers: number[][];
   private readonly view: SignView = { x: 0, z: 0, dirX: 0, dirZ: 1 };
+  /** The view's height in CSS px (the renderer's, on every resize): a sign's floor on the screen is in it. */
+  viewHeight = 720;
   /** Each chain-revealed kind: out at the last frame, and when it came out (its signs rise). */
   private readonly wasOut = new Map<JobDef['kind'], boolean>();
   private readonly riseStart = new Map<JobDef['kind'], number>();
@@ -202,7 +206,8 @@ export class MarkerView {
     }
 
     // the signs: each turned to the camera about the vertical; one grown past a share of the screen folds away with its
-    // pole (M8.9 R7: the camera never enters a sign)
+    // pole (M8.9 R7: the camera never enters a sign); a far one is drawn larger about its centre so it never reads
+    // smaller than its floor, the goal's a quarter larger than the rest
     this.glyphCount.fill(0);
     const perspective = cam as THREE.PerspectiveCamera | null;
     const fovY = perspective?.isPerspectiveCamera ? THREE.MathUtils.degToRad(perspective.fov) : 0;
@@ -212,12 +217,14 @@ export class MarkerView {
       const rise = this.rise(jobs.defs[signs.def[i] as number], time);
       const y = (signs.y[i] as number) * rise;
       const depth = cam ? (x - cam.position.x) * this.dir.x + (y - cam.position.y) * this.dir.y + (z - cam.position.z) * this.dir.z : 0;
-      const fold = fovY > 0 ? signFold(signShare(2 * RIM_OUT, depth, fovY)) : 1;
+      const goal = signs.state[i] === SIGN_GOAL ? SIGN_MIN.goal : 1;
+      const fold = fovY > 0 ? signFold(signShare(SIGN_SIZE * goal, depth, fovY)) : 1;
       if (fold <= 0) continue;
+      const size = fold * goal * signScale(depth, fovY, this.viewHeight);
       const colours = stateColours(signs.state[i] as number);
       const yaw = cam ? Math.atan2(cam.position.x - x, cam.position.z - z) : 0;
       this.q.setFromAxisAngle(this.up, yaw);
-      this.putSign(this.faces, shown, x, y, z, fold);
+      this.putSign(this.faces, shown, x, y, z, size);
       this.faces.setColorAt(shown, this.color.setHex(colours.face));
       this.rims.setMatrixAt(shown, this.m);
       this.rims.setColorAt(shown, this.color.setHex(colours.rim));
@@ -229,13 +236,13 @@ export class MarkerView {
         this.poles.setMatrixAt(poles++, this.m);
         // the face's matrix again for the pictogram below
         this.p.set(x, y, z);
-        this.s.set(fold, fold, fold);
+        this.s.set(size, size, size);
         this.m.compose(this.p, this.q, this.s);
       }
       const glyph = signs.glyph[i] as number;
       this.color.setHex(colours.glyph);
       if (glyph >= 0) {
-        this.putSign(this.glyphs[glyph] as THREE.InstancedMesh, this.glyphCount[glyph] as number, x, y, z, fold);
+        this.putSign(this.glyphs[glyph] as THREE.InstancedMesh, this.glyphCount[glyph] as number, x, y, z, size);
         (this.glyphs[glyph] as THREE.InstancedMesh).setColorAt(this.glyphCount[glyph] as number, this.color);
         this.glyphCount[glyph] = (this.glyphCount[glyph] as number) + 1;
       } else {
@@ -243,7 +250,7 @@ export class MarkerView {
         const digits = this.numbers[Math.min(-glyph, 10)] as number[];
         const places = this.digitLocal[Math.min(digits.length, 2) - 1] as THREE.Matrix4[];
         this.p.set(x, y, z);
-        this.s.set(fold, fold, fold);
+        this.s.set(size, size, size);
         this.m.compose(this.p, this.q, this.s);
         for (let k = 0; k < digits.length && k < 2; k++) {
           const g = digits[k] as number;
@@ -292,7 +299,7 @@ export class MarkerView {
     }
   }
 
-  /** A sign's part at (x, y, z), turned as `this.q`, at `scale` in every axis (its fold). */
+  /** A sign's part at (x, y, z), turned as `this.q`, at `scale` in every axis (its fold, its growth, the goal's quarter). */
   private putSign(mesh: THREE.InstancedMesh, i: number, x: number, y: number, z: number, scale: number): void {
     this.p.set(x, y, z);
     this.s.set(scale, scale, scale);

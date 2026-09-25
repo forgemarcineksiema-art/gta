@@ -5,8 +5,9 @@
  * - static, in the chunks: the gate line through a billboard (`gateCoins`
  *   and the cap on the panel) and the arc over a ramp (`arcCoins` in the
  *   air and the cap on the landing);
- * - run-time pools (`addExtra` / `clearExtra` by tag): the rings round the
- *   job markers (laid once, `jobs/place.ts`), the day's caches (`caches.ts`,
+ * - run-time pools (`addExtra` / `clearExtra` by tag): the rings' pool, empty
+ *   since M8.9 R7 (no coins round a ring: they pulled a player through a ring
+ *   that says slow down), the day's caches (`caches.ts`,
  *   by the date seed) and the running job's route (`routeLine`: runs into and
  *   out of every turn, a run every `straightEvery` m of straight, the cap on
  *   the target; laid at the job's start, cleared at its end).

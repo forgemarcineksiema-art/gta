@@ -3,7 +3,7 @@
  * screen door; the choice and the pace, pure.
  */
 import { describe, expect, it } from 'vitest';
-import { FADE, blocks, fadeTarget, stepFade } from '../../src/render/camera/fade';
+import { FADE, blocks, doorDraws, fadeTarget, stepFade } from '../../src/render/camera/fade';
 
 /** A sedan's box: 0.9 half wide, 0.75 half high, 2.3 half long. */
 const HW = 0.9, HH = 0.75, HL = 2.3;
@@ -31,7 +31,8 @@ describe('the car is always seen', () => {
     expect(fadeTarget(false, FADE.near + 0.1)).toBe(1);
     expect(fadeTarget(true, 30)).toBe(FADE.floor);
     expect(FADE.floor).toBeGreaterThan(0);
-    expect(FADE.floor).toBeLessThan(0.5);
+    // thinned to half at most: the steady state is the one-pixel checker (M8.9 R12)
+    expect(FADE.floor).toBeLessThanOrEqual(0.5);
   });
 
   it('M8.6 4.3 the fade goes from whole to thinned in 0.15 s, never faster, and back', () => {
@@ -45,5 +46,22 @@ describe('the car is always seen', () => {
     expect(steps).toBe(Math.ceil(FADE.seconds * 60 - 1e-9));
     for (let k = 0; k < 9; k++) f = stepFade(f, 1, 1 / 60);
     expect(f).toBe(1);
+  });
+});
+
+describe('nothing looks like a fault (M8.9 slice 12)', () => {
+  it('M8.9 12.4 at the steady fade the screen door is a one-pixel checker; the 4×4 pattern only while it fades', () => {
+    const drawn = (fade: number): boolean[] => {
+      const out: boolean[] = [];
+      for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) out.push(doorDraws(fade, x, y));
+      return out;
+    };
+    const steady = drawn(FADE.floor);
+    for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) expect(steady[x + y * 8], `${x},${y}`).toBe((x + y) % 2 === 0);
+    // whole is whole; on the way there, some other share of the 4×4 (not a checker)
+    expect(drawn(1).every(Boolean)).toBe(true);
+    const halfway = drawn(0.75);
+    expect(halfway.filter(Boolean).length).toBe(48);
+    expect(halfway.every((d, i) => d === (((i % 8) + Math.floor(i / 8)) % 2 === 0))).toBe(false);
   });
 });

@@ -17,6 +17,7 @@ import { buildNetwork } from './network';
 import { DECK, structures, type Piece, type Structure } from './structures';
 import { PAVEMENT, roadSurfaces, type RoadSurfaces } from './surfaces';
 import { fillIsland, type IslandFill } from './fill';
+import { buildPlaces, type Place } from './places';
 import { BOUNDS, CIRCUS, highwayLoop } from './plan';
 
 /** A chunk of the ground: its side (m) and the height field's cell (m). The chunks cover the plan's bounds. */
@@ -57,6 +58,8 @@ export class Island {
   readonly surfaces: RoadSurfaces = roadSurfaces(this.ground, this.network.graph, (x, z) => { const [i, j] = Island.chunkOf(x, z); return Island.chunkIndex(i, j); });
   /** The lots, their buildings and the palms (M8.10 slice 7a). */
   readonly fill: IslandFill = fillIsland(this.ground, this.surfaces, (x, z) => { const [i, j] = Island.chunkOf(x, z); return Island.chunkIndex(i, j); });
+  /** Each district's places (M8.10 slices 8–12): their statics in `fill.chunks`, the ones that move stepped here. */
+  readonly places: Place[];
   /** The chunks with a height field in the physics, by index. */
   readonly active = new Map<number, RAPIER.Collider>();
   /** Each physics chunk's kerbs, buildings and trunks, with its height field. */
@@ -89,6 +92,21 @@ export class Island {
     this.spawns = this.spawnPoints();
     this.route = this.highwayTrack();
     this.structureColliders();
+    const chunks = this.fill.chunks;
+    this.places = buildPlaces({
+      ground: this.ground, network: this.network, surfaces: this.surfaces, fill: this.fill, world,
+      statics: (x, z) => {
+        const [i, j] = Island.chunkOf(x, z), key = Island.chunkIndex(i, j);
+        let list = chunks.get(key);
+        if (!list) { list = []; chunks.set(key, list); }
+        return list;
+      },
+    });
+  }
+
+  /** Run the places that move (a train, a barrier, a wheel), a fixed step. */
+  step(dt: number): void {
+    for (const p of this.places) p.step?.(dt);
   }
 
   /** A chunk's index from its column and row, and a point's chunk. */
@@ -136,14 +154,24 @@ export class Island {
     this.active.set(k, this.buildChunk(k % CHUNKS_X, Math.floor(k / CHUNKS_X)));
     // the pavements' kerbs: a slab under each piece of the band, its top the pavement's, climbed by the wheels
     const colliders = (this.surfaces.kerbs.get(k) ?? []).map((p) => this.slab(p, PAVEMENT / 2, 0.5, p.length / 2 + 0.2, 0, -0.5, 0, GROUPS_TERRAIN));
-    // the buildings and their plinths (walls), the trees' trunks (the props' group, as the grid's)
+    // the chunk's statics by their tags, as the grid's: a building's (and a place's wall) solid, a kerb's (a ramp's
+    // deck, a floor) the wheels' ground, a tree's trunk in the props' group
     for (const st of this.fill.chunks.get(k) ?? []) {
       const p = st.position, s = st.shape;
       if (st.tag === 'trunk' && s.kind === 'cylinder') {
         colliders.push(this.world.createCollider(RAPIER.ColliderDesc.cylinder(s.halfHeight, s.radius).setTranslation(p.x, p.y, p.z).setFriction(1).setRestitution(1).setCollisionGroups(GROUPS_PROP)));
-      } else if (st.tag === 'building' && s.kind === 'box') {
-        colliders.push(this.world.createCollider(RAPIER.ColliderDesc.cuboid(s.hx, s.hy, s.hz).setTranslation(p.x, p.y, p.z).setRotation(st.rotation).setFriction(1).setRestitution(1).setCollisionGroups(GROUPS_SOLID)));
+        continue;
       }
+      if (st.tag !== 'building' && st.tag !== 'kerb') continue;
+      const wall = st.tag === 'building';
+      let desc: RAPIER.ColliderDesc | null = null;
+      if (s.kind === 'box') desc = RAPIER.ColliderDesc.cuboid(s.hx, s.hy, s.hz).setTranslation(p.x, p.y, p.z).setRotation(st.rotation);
+      else if (s.kind === 'prism') {
+        const hull = new Float32Array(s.points.length * 6);
+        s.points.forEach((q, i) => { hull.set([q.x, s.y0, q.z], i * 3); hull.set([q.x, s.y1, q.z], (s.points.length + i) * 3); });
+        desc = RAPIER.ColliderDesc.convexHull(hull);
+      }
+      if (desc) colliders.push(this.world.createCollider(desc.setFriction(1).setRestitution(wall ? 1 : 0).setCollisionGroups(wall ? GROUPS_SOLID : GROUPS_TERRAIN)));
     }
     this.chunkColliders.set(k, colliders);
     this.loaded++;

@@ -308,14 +308,25 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   spin, gone within a few seconds): bumper bits in silver or charcoal on a
   damage stage, a burst in the car's paint on a wreck or a takedown, chalk or
   paint planks plus a few steel bits on a billboard.
-- Smoke is 160 soft points: grey from a stage-2 car, dark from stage 3, with
-  orange "fire" points at stage 4 and on every wreck; drifts with the car's
-  velocity, dies within seconds. Never a full-screen effect: a puff is sized
-  in metres (0.3 m growing to about 1.2 m), the car's own smoke thins with
-  speed (half as dense at 36 km/h, a quarter at 108) and every puff fades
-  out between 7 and 3.5 m from the camera, so the trail a moving car leaves
-  never washes over it. A stopped stage-2 car shows a thin column off the
-  bonnet.
+- Smoke is up to 256 low-poly puffs in one draw call: flat-shaded
+  icosahedra lit by the sun and the sky and fogged like the city, tumbling
+  slowly, so a puff has a lit top and a shaded belly (the FX pass,
+  2026-09-25; before it, soft points). Grey from a stage-2 car, dark from
+  stage 3, with fire at stage 3 and 4 and on every wreck: tongues standing
+  up, lighting themselves, pale yellow going orange then deep red, shrinking
+  as they rise. Drifts with the car's velocity, dies within seconds. Never a
+  full-screen effect: a puff is sized in metres (0.3 m growing to about
+  1.2 m), the car's own smoke thins with speed (half as dense at 36 km/h, a
+  quarter at 108) and every puff fades out between 7 and 3.5 m from the
+  camera, so the trail a moving car leaves never washes over it. A stopped
+  stage-2 car shows a thin column off the bonnet.
+- What the ground throws up, in the same puffs: dust behind a wheel rolling
+  on dirt (less on grass) from 3 m/s, thicker when it spins or slides, in the
+  ground's colour gone pale; the hovercraft's spray off the sea, a mist at
+  rest and a wall of it at speed, white in any light (partly its own); a
+  landing's ring of dust (spray at sea) by its speed into the surface, not
+  its fall, so a landing slope taken at its pitch throws none; past 8 m/s
+  into it the floor scrapes and throws sparks.
 - Wrecked: the engine cuts, the overlay says WRECKED with a countdown, and the
   respawn rolls the car out at 8 m/s on the nearest road. No fade to black, no
   camera cut longer than the snap.
@@ -594,7 +605,7 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 - **The driver's kit** (slices 6–7): toppers of a few boxes (the cone, a rubber duck, a shark fin, a crown, a traffic
   light, a donut, a dish, a mattress, a trophy, a flamingo, the rivals' seven), under 300 triangles, seated on the roof
   of whatever the player drives; neon as a soft additive glow in the body's footprint, no light; the boost's flame as
-  two short additive cones at the tail; a drift's tyre smoke low off the rear tyres; each in its item's colour (the
+  two short additive cones at the tail, each round a hot pale core; a drift's tyre smoke low off the rear tyres; each in its item's colour (the
   flame orange and the smoke a pale grey when none is worn).
 - **The car's kit** (slice 8): chrome stars, a deep dish with a wide chrome lip, gold wires, white discs; a lip, a wing
   or the giant red wing on the boot (not on the big ones); slammed 6 cm or lifted 10 cm, the body over its wheels.
@@ -605,7 +616,7 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 ## Camera and motion
 
 - Chase camera behind and above, FOV 60 → up to 80 with speed and boost, pulls back and drops with speed, follows the velocity direction so drifts show the car sideways. Very small shake at high speed. Steering input itself never swivels the view; actual yaw contributes only 0.04 s of heading lead and at most 0.65 m of lateral look offset. Heading follow is capped at 110°/s; speed/boost FOV changes ease at 2.5/s. See `src/render/camera/ChaseCamera.ts`.
-- Sparks: only where the body scrapes a wall, at the contact point on the car's flank, thrown backwards along the wall. Chunky bright points with short tails, hot white-yellow to orange, additive, dead within half a second. Never in front of the car.
+- Sparks: only where the body scrapes a wall, at the contact point on the car's flank, thrown backwards along the wall (and from metal knocked down, and from under the floor on a landing hard enough to bottom out). Chunky bright points with short tails, hot white-yellow to orange, additive, dead within half a second. Never in front of the car.
 - Speed lines: a screen-space pass of short streaks rushing outward from the frame's periphery above ~100 km/h and under boost (cyan lean). The centre of the frame, where the road is, is masked out; nothing is ever drawn in front of the car. This is how Burnout/NFS/Mario Kart do it: FOV, camera, peripheral blur or lines, sound; world particles only behind or beside the car.
 
 ## Tone

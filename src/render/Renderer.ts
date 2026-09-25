@@ -109,7 +109,7 @@ export class Renderer {
   private readonly shapes: ShapesView;
   private readonly player: PlayerCar;
   private readonly ghost: GhostCar;
-  /** Made first: every resize sizes the smoke's points, the first one inside the first quality set. */
+  /** Smoke, fire, dust and spray: the effects' and the player car's tyre smoke's one pool. */
   private readonly smoke = new Smoke();
   private readonly fx: Effects;
   /** The clock the skid marks fade by and a knocked hydrant's water moves on (stopped while paused). */
@@ -216,7 +216,6 @@ export class Renderer {
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
-    this.smoke.setViewport(h * dpr, this.camera.fov);
     this.stats.dpr = dpr;
     this.stats.width = w;
     this.stats.height = h;
@@ -295,6 +294,7 @@ export class Renderer {
     this.player.mesh.setDamage(sim.life.state.stage);
     this.fx.emitSmoke(dt, car, this.carVel);
     this.player.emitTyreSmoke(dt, this.smoke, this.carVel);
+    this.fx.kick(dt, this.player.mesh.wheels, car, this.carVel);
     this.elapsed += dt;
     if (this.billboards && sim.collectibles) this.billboards.update(sim.collectibles);
     this.fx.update(dt, this.elapsed);

@@ -1,7 +1,8 @@
 /**
  * The effects together: speed lines, sparks, debris, smoke and skid marks; what each sim event throws; the smoke off
- * the player's bonnet by damage stage and off wrecked traffic nearby. The smoke is made by the renderer first (its
- * points are sized by the viewport from the first resize) and handed in.
+ * the player's bonnet by damage stage and off wrecked traffic nearby; what the ground throws up under the car (dust,
+ * the cushion's spray, a landing's ring). The smoke is made by the renderer (the player car's tyre smoke is emitted
+ * into it too) and handed in.
  */
 import * as THREE from 'three';
 import { AgentState } from '../../sim/traffic/Traffic';
@@ -9,6 +10,7 @@ import { PALETTE, PROP_KINDS, PROP_TYPES, type PropKind, type SimEvent, type Sim
 import { propParts } from '../props/propMesh';
 import type { Billboards } from '../city/Billboards';
 import { Debris } from './Debris';
+import { Kickup } from './Kickup';
 import { SkidMarks } from './SkidMarks';
 import type { Smoke } from './Smoke';
 import { Sparks } from './Sparks';
@@ -20,6 +22,8 @@ export class Effects {
   private readonly debris: Debris;
   /** The tyres' marks on the ground (M7 slice 4). */
   private readonly skid: SkidMarks;
+  /** Dust, spray and a landing's ring under the player's car. */
+  private readonly kickup = new Kickup();
   private smokeAcc = 0;
   private fireAcc = 0;
   private readonly wreckSmokeAcc: Float32Array;
@@ -115,6 +119,12 @@ export class Effects {
     }
   }
 
+  /** What the ground throws up under the player's car; `drawn` are its drawn wheels, in the sim's order. */
+  kick(dt: number, drawn: readonly THREE.Object3D[], car: THREE.Object3D, vel: THREE.Vector3): void {
+    const v = this.sim.vehicle;
+    this.kickup.update(dt, v.wheels, v.telemetry, v.tuning.hover > 0, drawn, car, vel, this.smoke, this.sparks);
+  }
+
   /** The skid marks fade by `elapsed` (the renderer's clock, stopped while paused); debris and smoke move on. */
   update(dt: number, elapsed: number): void {
     this.skid.update(this.sim, elapsed);
@@ -124,5 +134,6 @@ export class Effects {
 
   dispose(): void {
     this.skid.dispose();
+    this.smoke.dispose();
   }
 }

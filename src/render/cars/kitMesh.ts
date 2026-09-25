@@ -196,13 +196,21 @@ export function setNeonColours(neon: THREE.Mesh, front: number, back: number): v
   col.needsUpdate = true;
 }
 
-/** The boost's flame at an exhaust (M6 slice 7): a cone pointing back, additive, in the flame's colour; the renderer flickers it. */
+/**
+ * The boost's flame at an exhaust (M6 slice 7): a cone pointing back, additive, in the flame's colour, round a short
+ * hot core of pale yellow-white, the hottest gas at the pipe's mouth; the renderer flickers it (the core with it).
+ */
 export function buildFlame(): THREE.Mesh {
-  const geometry = new THREE.ConeGeometry(0.1, 0.55, 8, 1, true).rotateX(-Math.PI / 2).translate(0, 0, -0.275);
-  const material = new THREE.MeshBasicMaterial({ color: PALETTE.carOrange, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+  const geometry = new THREE.ConeGeometry(0.11, 0.6, 8, 1, true).rotateX(-Math.PI / 2).translate(0, 0, -0.3);
+  const material = new THREE.MeshBasicMaterial({ color: PALETTE.carOrange, transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false });
   const mesh = new THREE.Mesh(geometry, material);
   mesh.name = 'flame';
   mesh.visible = false;
+  const coreGeometry = new THREE.ConeGeometry(0.06, 0.3, 8, 1, true).rotateX(-Math.PI / 2).translate(0, 0, -0.15);
+  const core = new THREE.Mesh(coreGeometry, new THREE.MeshBasicMaterial({ color: 0xfff4c8, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false }));
+  core.name = 'flame-core';
+  core.renderOrder = 1;
+  mesh.add(core);
   return mesh;
 }
 

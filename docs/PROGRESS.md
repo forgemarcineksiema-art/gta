@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — The FX pass (Marcin: "Ulepsz efekty fx")
+
+Done: smoke and fire are low-poly puffs, not soft points (`fx/Smoke.ts`): flat-shaded icosahedra lit and fogged with
+the world, one instanced draw, hidden while empty; fire is self-lit tongues, yellow to red, shrinking as they rise.
+New (`fx/Kickup.ts`): dust off dirt and grass behind a rolling wheel (more when it spins or slides), the hovercraft's
+spray on the sea (a mist at rest), a landing's ring of dust by its speed into the surface (a landing slope throws
+none), sparks off the floor past 8 m/s. The boost flame has a hot core. Pins FX.1–FX.5 (`tests/render/fx.test.ts`).
+Seen in the browser once (sea, stage 3, drift). Open: on the playground no tyre smoke (the probe needs traffic; old).
+
 ## 2026-09-25 — M8.8: the physical police and rivals on (Marcin's word)
 
 Marcin: "Włącz fizyczne radiowozy i rywali". The units were on since slice 23 (a bot's chase at three and five stars

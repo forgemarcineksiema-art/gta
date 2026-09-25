@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.9 slice 7: the HUD on one scale (slice 6, the typeface, waits for the font's download)
+
+Done (R3): every size of the screen's rules is in rem (a one-off rewrite; borders, shadows, radii and the dev panel keep
+their pixels) and `ui/scale.ts` sets the root's font size to 16 px × the height over 720, held to 0.85–1.5, from
+`main.ts` before anything is laid out. The clamps by the height became fixed rem (the speed 3.4, the stars 1.6, the radar
+10.35 = 165.6 px at 720p); the short screens' shrinks and the wall's ×1.2/×1.4 steps went (the scale does both); a label
+is 1 rem at least, the keycaps too. Stills at 800×450, 1280×720, 1920×1080: no text under 13 px at any, TOTALS fits
+800×450, the line 30 px at 1080p. Pins M8.9 7.1–7.3. Verify green.
+
 ## 2026-09-25 — M8.9 slice 5: one colour, one meaning
 
 Done (R1): `SIGNALS` in `sim/palette.ts` (money, way, trouble, police, ink, off, outline), the CSS's `:root` the same

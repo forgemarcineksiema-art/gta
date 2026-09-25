@@ -16,6 +16,7 @@ import { lightCity } from '../city/glow';
 import { fadeRoadPaint } from '../city/roadPaint';
 import { QUALITY, type QualityTier } from '../quality';
 import { GroundView, MOUTH } from './GroundView';
+import { placeViews, type PlaceView } from './places';
 
 /** The paved places' slabs: this far over the ground, under the roads' strips; a quad about this big (m). */
 const PAVE_LIFT = 0.035;
@@ -34,6 +35,8 @@ export class IslandView {
   /** The roads' surfaces' meshes and the buildings' by chunk. */
   private readonly surfaceChunks = new Map<number, THREE.Mesh>();
   private readonly buildingChunks = new Map<number, THREE.Mesh>();
+  /** The places that move (slices 8–12). */
+  private readonly views: PlaceView[];
 
   constructor(scene: THREE.Scene, private readonly island: Island) {
     scene.add(this.group);
@@ -49,6 +52,12 @@ export class IslandView {
     this.group.add(this.structures());
     this.group.add(...this.coast());
     this.group.add(this.tower());
+    this.views = placeViews(this.group, island);
+  }
+
+  /** The places that move, each frame (`alpha` the fixed step's fraction, `dt` the frame's seconds). */
+  update(alpha: number, dt: number): void {
+    for (const v of this.views) v.update?.(alpha, dt);
   }
 
   /** Build the ground's chunks within sight of (x, z), a few columns a frame (the near ones at once when `snap`). */
@@ -80,6 +89,7 @@ export class IslandView {
   }
 
   dispose(): void {
+    for (const v of this.views) v.dispose?.();
     this.ground.dispose();
     this.group.removeFromParent();
     this.group.traverse((o) => {

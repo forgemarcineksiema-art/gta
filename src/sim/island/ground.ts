@@ -10,7 +10,7 @@
 import { SEA } from '../city/sea';
 import { ASPHALT, DIRT, GRASS, SAND, type SurfaceKind } from '../city/surface';
 import { catmullRom, circle, inPolygon, polylineLength, resample, signedArea, type P2 } from './geom';
-import { BASIN, BOUNDS, COAST, COAST_PARTS, PLACES, RINGS, ROADS, causeway, highwayLoop, islet, naturalHeight, type PlanRoad, type RoadClass, type SpanKind } from './plan';
+import { BASIN, BOUNDS, COAST, COAST_PARTS, OVERPASS_HALF, PLACES, RINGS, ROADS, causeway, highwayLoop, islet, naturalHeight, type PlanRoad, type RoadClass, type SpanKind } from './plan';
 import { shaped } from './shapes';
 import { districtStreets } from './streets';
 
@@ -38,6 +38,21 @@ const BEACH = 20;
 export const APRON = 14;
 /** A road under an overpass runs this far below its deck (m: a lorry's clearance and the deck's depth). */
 const UNDER = 7;
+/**
+ * On the low coast (2 m) a road's dip `UNDER` its overpass would stand in the sea, so the highway rises over the classes
+ * in `RISES_OVER` (M8.10 slice 12: the airfield's taxiways) to keep them `DRY` m over it: flat `top` m each way from the
+ * passage (the deck, and a sample past its ends, where the ground under the deck's ends is the road's last height on the
+ * ground), eased into its `grade` over `curve` m and out of it again at the foot, so no crest throws a car. (The south's
+ * passages, palm avenue's, the quay sweep's and the Gardens', dip under the sea too; a rise there meets the ramp merging
+ * alongside it, so their slices decide.)
+ */
+const DRY = 1;
+const RISE = { top: OVERPASS_HALF + 2 * STEP, curve: 40, grade: 0.05 } as const;
+const RISES_OVER: ReadonlySet<RoadClass> = new Set<RoadClass>(['taxiway']);
+/** Over the water a bridged road (the taxiways to the causeway) raises the ground under its carriageway and this much past it (m): its deck. */
+const BRIDGE_EDGE = 1;
+/** A capped road segment stops this share of its length past its end (its Float32 ends read back a hair off). */
+const CAP_SLACK = 1e-3;
 /** Under the tunnel the physics' ground is dug this far below its floor, this far each side of its line (m). */
 const TRENCH_DEPTH = 3;
 const TRENCH = 23;
@@ -161,6 +176,21 @@ function profile(pts: P2[], cls: RoadClass, closed: boolean, pins: ReadonlyMap<n
     }
   }
   return h;
+}
+
+/**
+ * How far the highway's rise over a passage stands over its foot, `d` m along from the passage, for a rise of `height`
+ * m; -1 past its foot.
+ */
+function riseAbove(d: number, height: number): number {
+  const c = RISE.curve, g = Math.min(RISE.grade, height / c), straight = (height - g * c) / g;
+  let t = d - RISE.top;
+  if (t <= 0) return height;
+  if (t <= c) return height - (g * t * t) / (2 * c);
+  t -= c;
+  if (t <= straight) return height - (g * c) / 2 - g * t;
+  t -= straight;
+  return t < c ? (g * (c - t) * (c - t)) / (2 * c) : -1;
 }
 
 /** A profile's steepest grade between neighbouring points. */
@@ -393,6 +423,8 @@ export class Ground {
   private readonly coastGrid: SegmentGrid;
   /** Per road: 1 when it is paved (every class but dirt). */
   private readonly paved: Uint8Array;
+  /** Per road: 1 when it crosses the sea on bridges (the taxiways to the causeway): no bank over the water past its deck. */
+  private readonly bridged: Uint8Array;
   /** Per district crossing (`districtStreets().junctions`): 1 where it is on a main road (a T, no flat). */
   readonly crossingOnMain: Uint8Array;
   /** The tunnel's line from mouth to mouth, its floor's height at each point, and the box round its trench. */
@@ -443,6 +475,7 @@ export class Ground {
     const roads = groundRoads(), junctions = districtStreets().junctions;
     let crossings: { h: Float64Array; held: Uint8Array } | null = null;
     let overpasses: Array<{ x: number; z: number; deck: number }> | null = null;
+    let passages: P2[] | null = null;
     // a profile with its points across the roads it meets on those roads' heights, unless that leaves a block steeper
     // than its class allows (a short street between two main roads far apart in height climbs from their middles)
     const levelled = (r: { pts: P2[]; cls: RoadClass; closed: boolean }, pins: Map<number, number>, flat: Map<number, number>): number[] => {
@@ -468,6 +501,26 @@ export class Ground {
             let bi = -1, bd = 8;
             r.pts.forEach((p, i) => { const d = Math.hypot(p[0] - o.x, p[1] - o.z); if (d < bd) { bd = d; bi = i; } });
             if (bi >= 0) for (let k = bi - 2; k <= bi + 2; k++) if (k >= 0 && k < n) { pins.set(k, o.deck - UNDER); flat.set(k, o.deck - UNDER); }
+          }
+        } else {
+          // on low ground the highway rises over a taxiway passing beneath it, so its dip under the deck stays over the
+          // sea: the rise pinned whole, eased at its crest and its foot
+          const top = SEA.level + DRY + UNDER, along = [0];
+          for (let i = 1; i < n; i++) along.push((along[i - 1] as number) + Math.hypot((r.pts[i] as P2)[0] - (r.pts[i - 1] as P2)[0], (r.pts[i] as P2)[1] - (r.pts[i - 1] as P2)[1]));
+          const under = (m: P2): boolean => roads.some((q) => RISES_OVER.has(q.cls) && q.pts.some((p) => Math.hypot(p[0] - m[0], p[1] - m[1]) < 8));
+          for (const [x, z] of (passages ??= stretches('overpass').map((s) => s.pts[Math.floor(s.pts.length / 2)] as P2).filter(under))) {
+            const foot = natural(x, z);
+            if (foot >= top) continue;
+            let bi = -1, bd = 8;
+            r.pts.forEach((p, i) => { const d = Math.hypot(p[0] - x, p[1] - z); if (d < bd) { bd = d; bi = i; } });
+            if (bi < 0) continue;
+            for (let k = 0; k < n; k++) {
+              // over the ground under it, so the rise meets the hills' own grade at its foot; pinned all the way to it (two
+              // rises meeting leave no point between them to the smoothing)
+              const up = riseAbove(Math.abs((along[k] as number) - (along[bi] as number)), top - foot);
+              const v = natural((r.pts[k] as P2)[0], (r.pts[k] as P2)[1]) + up;
+              if (up >= 0 && v > (pins.get(k) ?? -Infinity)) { pins.set(k, v); flat.set(k, v); }
+            }
           }
         }
         this.roads.push({ id: r.id, cls: r.cls, pts: r.pts, h: levelled(r, pins, flat), closed: r.closed, ...(r.deck ? { deck: r.deck } : {}) });
@@ -515,6 +568,7 @@ export class Ground {
       this.tunnel = { pts: t.pts, floor: s.map((d) => h0 + ((h1 - h0) * d) / total), x0: Math.min(...xs) - TRENCH, x1: Math.max(...xs) + TRENCH, z0: Math.min(...zs) - TRENCH, z1: Math.max(...zs) + TRENCH };
     }
     this.paved = Uint8Array.from(this.roads, (r) => (r.cls === 'dirt' ? 0 : 1));
+    this.bridged = Uint8Array.from(this.roads, (r) => (r.cls === 'taxiway' ? 1 : 0));
     const segs: Seg[] = [];
     this.roads.forEach((road, r) => {
       const n = road.pts.length, last = road.closed ? n : n - 1, hw = HALF_WIDTH[road.cls];
@@ -612,7 +666,8 @@ export class Ground {
     this.nearestShore(x, z);
     const sh = this.shore;
     let h: number;
-    if (this.onLand(x, z)) {
+    const land = this.onLand(x, z);
+    if (land) {
       h = natural(x, z);
       if (sh.beach < BEACH) h = SEA.level + (h - SEA.level) * smooth01(sh.beach / BEACH);
     } else if (sh.steep < LIP && sh.steep <= sh.beach) {
@@ -632,13 +687,16 @@ export class Ground {
       const s = g.items[k] as number;
       const ax = g.ax[s] as number, az = g.az[s] as number, dx = (g.bx[s] as number) - ax, dz = (g.bz[s] as number) - az;
       const u = ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1), cap = g.cap[s] as number;
-      if ((u < 0 && (cap & 1) !== 0) || (u > 1 && (cap & 2) !== 0)) continue;
+      // (a hair of slack: the grid's ends are Float32, and a capped segment still holds its own end points)
+      if ((u < -CAP_SLACK && (cap & 1) !== 0) || (u > 1 + CAP_SLACK && (cap & 2) !== 0)) continue;
       const t = Math.max(0, Math.min(1, u));
       const d = Math.hypot(x - ax - dx * t, z - az - dz * t);
       const reach = (g.hw[s] as number) + SHOULDER;
       if (d - (g.hw[s] as number) < this.edge) this.edge = d - (g.hw[s] as number);
       if (d >= reach + BLEND) continue;
       const road = g.kind[s] as number;
+      // over the water a bridged road stands on its deck: no bank past it, the sea up to the bridge's sides
+      if (!land && this.bridged[road] === 1 && d > (g.hw[s] as number) + BRIDGE_EDGE) continue;
       let slot = 0;
       while (slot < count && near.road[slot] !== road) slot++;
       if (slot === count) {

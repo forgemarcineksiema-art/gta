@@ -5,20 +5,20 @@
  * `?map=island`.
  */
 import RAPIER from '@dimforge/rapier3d-compat';
-import { GROUPS_PROP, GROUPS_SOLID, GROUPS_TERRAIN, GROUPS_WATER } from '../collision';
+import { GROUPS_GATE, GROUPS_PROP, GROUPS_SOLID, GROUPS_TERRAIN, GROUPS_WATER } from '../collision';
 import type { SpawnPoint } from '../playground';
 import { SEA } from '../city/sea';
 import type { SurfaceReader } from '../city/surface';
 import type { RoadPoint } from '../city/roads';
 import type { TrackDef, TrackSample } from '../track';
-import type { P2 } from './geom';
+import { inPolygon, type P2 } from './geom';
 import { FOOT, Ground, HALF_WIDTH, type CoastKind } from './ground';
 import { buildNetwork } from './network';
 import { DECK, structures, type Piece, type Structure } from './structures';
 import { PAVEMENT, roadSurfaces, type RoadSurfaces } from './surfaces';
 import { fillIsland, type IslandFill } from './fill';
 import { buildPlaces, type Place } from './places';
-import { BOUNDS, CIRCUS, highwayLoop } from './plan';
+import { BOUNDS, CIRCUS, highwayLoop, islet } from './plan';
 
 /** A chunk of the ground: its side (m) and the height field's cell (m). The chunks cover the plan's bounds. */
 export const CHUNK = 250;
@@ -271,6 +271,9 @@ export class Island {
     const crossed = (x: number, z: number): boolean => roads.some((r) => r.pts.some((p) => Math.hypot(p[0] - x, p[1] - z) < HALF_WIDTH[r.cls] + 4));
     for (const line of this.ground.coasts) {
       const pts = line.pts, n = pts.length, segs = line.closed ? n : n - 1;
+      // the islet's is a gate (M8.10 slice 12): every car stops in its surf, the hovercraft comes ashore
+      const mid = pts.reduce((m, p) => [m[0] + p[0] / n, m[1] + p[1] / n], [0, 0]);
+      const groups = line.closed && inPolygon(mid[0], mid[1], islet()) ? GROUPS_GATE : GROUPS_SOLID;
       let from = 0;
       while (from < segs) {
         const kind = line.kinds[from] ?? 'rocks';
@@ -280,14 +283,14 @@ export class Island {
           run += Math.hypot(b[0] - a[0], b[1] - a[1]);
           to++;
         }
-        this.wallPiece(pts[from] as P2, pts[to % n] as P2, kind, line.land, crossed);
+        this.wallPiece(pts[from] as P2, pts[to % n] as P2, kind, line.land, crossed, groups);
         from = to;
       }
     }
   }
 
   /** One piece of the wall from `a` to `b` along a shore of `kind`, its land on the `land` side. */
-  private wallPiece(a: P2, b: P2, kind: CoastKind, land: 1 | -1, crossed: (x: number, z: number) => boolean): void {
+  private wallPiece(a: P2, b: P2, kind: CoastKind, land: 1 | -1, crossed: (x: number, z: number) => boolean, groups: number): void {
     const dx = b[0] - a[0], dz = b[1] - a[1], len = Math.hypot(dx, dz);
     if (len < 0.5) return;
     // toward the land
@@ -303,7 +306,7 @@ export class Island {
     this.world.createCollider(RAPIER.ColliderDesc.cuboid(WALL.half, (top - bottom) / 2, len / 2 + 0.3)
       .setTranslation(mx, (top + bottom) / 2, mz)
       .setRotation({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) })
-      .setCollisionGroups(GROUPS_SOLID).setRestitution(0.5));
+      .setCollisionGroups(groups).setRestitution(0.5));
   }
 
   /**

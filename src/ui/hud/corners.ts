@@ -7,18 +7,19 @@
  * radar's route (`map/minimap.ts`, DESIGN.md §20: no arrow).
  *
  * A calm drive shows six things: the line, the stars, the bank, the radar,
- * the speed, the boost. The rest comes on its moment and goes: the
+ * the gauge's speed and boost. The rest comes on its moment and goes: the
  * bag with its first money, its × from the first level that multiplies, the
- * district's name for a few seconds, the damage once dented, the combo while
- * it runs. Behind a shut door and on the busted card none of it shows: the
- * wall or the card has the screen.
+ * district's name for a few seconds, the damage's arc for a few seconds after
+ * a hit and standing from the third stage (docs/M8.9_PLAN.md R4), the combo
+ * while it runs, its × from ×2. Behind a shut door and on the busted card none
+ * of it shows: the wall or the card has the screen.
  *
  * Pure: the HUD modules read `drive()` every frame and write the DOM only when
  * a bit changes. No allocation per frame (`readDrive` fills the caller's
  * object).
  */
 import type { RunState, SimWorld } from '../../sim';
-import { t } from '../lang';
+import { num, t } from '../lang';
 
 /** The driving screen's elements this module decides, a bit each. */
 export const DRIVE = {
@@ -44,8 +45,11 @@ export interface DriveState {
   bag: number;
   /** What the door would pay the bag at now. */
   multiplier: number;
-  /** The car's damage, 0..1. */
+  /** The car's damage, 0..1, and its stage (0..4; 4 is the wreck). */
   damage: number;
+  stage: number;
+  /** Seconds since the damage last rose (a hit); Infinity before the first. */
+  hitAge: number;
   /** A combo is running (its points above 0). */
   combo: boolean;
   /** Seconds since the district's name changed, or since a new run started. */
@@ -54,6 +58,10 @@ export interface DriveState {
 
 /** Seconds the district's name shows after a change or a new run (GTA's rule: the radar answers where, the name is news). */
 export const PLACE_SECONDS = 4;
+
+/** Seconds the damage's arc shows after a hit (M8.9 R4); from `DAMAGE_STANDS` it stays. */
+export const HIT_SECONDS = 3;
+export const DAMAGE_STANDS = 3;
 
 /** Behind a shut door the wall has the screen, on the busted card the card: nothing of the drive shows or speaks. */
 export function screenTaken(run: RunState): boolean {
@@ -64,7 +72,8 @@ export function screenTaken(run: RunState): boolean {
 export function drive(s: DriveState): number {
   if (screenTaken(s.run)) return 0;
   let m = DRIVE.speed | DRIVE.boost;
-  if (s.damage > 0) m |= DRIVE.damage;
+  // a hit shows the damage for a moment; only a car near its wreck keeps it on the screen
+  if (s.damage > 0 && (s.hitAge < HIT_SECONDS || s.stage >= DAMAGE_STANDS)) m |= DRIVE.damage;
   if (s.combo) m |= DRIVE.combo;
   if (!s.city) return m;
   m |= DRIVE.stars | DRIVE.bank | DRIVE.radar;
@@ -101,6 +110,29 @@ export function tickPlace(c: PlaceClock, place: unknown, run: RunState, dt: numb
   return c.age;
 }
 
+/** The hit's clock: the damage last read (-1 before the first read) and seconds since it last rose. */
+export interface HitClock {
+  damage: number;
+  age: number;
+}
+
+export function newHitClock(): HitClock {
+  return { damage: -1, age: Infinity };
+}
+
+/** One frame: back to 0 when the damage rose (a hit), else older by `dt`; the first reading (the intro's dented van) and a fresh car are no hit. */
+export function tickHit(c: HitClock, damage: number, dt: number): number {
+  if (c.damage >= 0 && damage > c.damage + 1e-6) c.age = 0;
+  else c.age += dt;
+  c.damage = damage;
+  return c.age;
+}
+
+/** The combo's ×, from ×2 (M8.9 R4): ×1 multiplies nothing, so it says nothing. */
+export function comboMult(multiplier: number): string {
+  return multiplier >= 2 ? `×${num(multiplier)}` : '';
+}
+
 /** The names of a mask's elements, in `DRIVE`'s order (the pins and the screens read them). */
 export function driveNames(mask: number): DriveElement[] {
   return (Object.keys(DRIVE) as DriveElement[]).filter((k) => (mask & DRIVE[k]) !== 0);
@@ -108,16 +140,18 @@ export function driveNames(mask: number): DriveElement[] {
 
 /** A fresh state: a new run on the test track. */
 export function newDriveState(): DriveState {
-  return { city: false, run: 'running', bag: 0, multiplier: 1, damage: 0, combo: false, placeAge: 0 };
+  return { city: false, run: 'running', bag: 0, multiplier: 1, damage: 0, stage: 0, hitAge: Infinity, combo: false, placeAge: 0 };
 }
 
-/** The world into `out` (the district's age is the caller's: it keeps the clock). */
-export function readDrive(sim: SimWorld, placeAge: number, out: DriveState): DriveState {
+/** The world into `out` (the district's and the hit's ages are the caller's: it keeps the clocks). */
+export function readDrive(sim: SimWorld, placeAge: number, out: DriveState, hitAge = Infinity): DriveState {
   out.city = sim.city !== null;
   out.run = sim.run.state;
   out.bag = sim.run.bag;
   out.multiplier = sim.run.multiplier;
   out.damage = sim.life.state.damage;
+  out.stage = sim.life.state.stage;
+  out.hitAge = hitAge;
   out.combo = sim.skill.points > 0;
   out.placeAge = placeAge;
   return out;

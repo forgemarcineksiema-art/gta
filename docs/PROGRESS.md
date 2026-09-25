@@ -12,6 +12,16 @@ catalogue by price; the model's first hour buys it. Decided: pin 10.2 leaves out
 it would need grass that stops road cars dead); the track bot's budget stays hand-set (11, the van's; no rule fits the
 five). Pins M8.8 10.1 (its row), 10.2, 10.3 (save.test), 10.4 (bodies.test).
 
+## 2026-09-25 — M8.9 slice 8: the corners and the gauge
+
+Done (R4): the stars without their panel, outlined, the next one filling from its foot (`heatFill`, 24 steps; the `+n`
+went); the money block under them, the bank (the coin) then the bag (the sack, its × from ×1.3), the pops' lane under
+it; the combo named KOMBO, its × from ×2; `ui/hud/gauge.ts`, a round dial of 150 px at 720p on the radar's dark disc:
+the speed, km/h, the boost's 270° arc in ink (a pulse when full, white while boosting, the flame at its start), the
+damage's inner arc in red for 3 s after a hit and standing from the third stage (NITRO and USZKODZENIA went). The sack,
+the coin and the flame are `sim/glyphs.ts` outlines, drawn by `ui/glyph.ts`; the wall's sum drops ×1. The chase still
+now carries a bag; screens' life frame sets stage 3. Pins M8.9 8.1–8.5. Stills and verify green.
+
 ## 2026-09-25 — M8.8 slice 9: grass and dirt
 
 Done: `sim/city/surface.ts` lays each chunk's flat ground statics into 2 m cells the first time the city generates it

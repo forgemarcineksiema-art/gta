@@ -14,7 +14,8 @@ import {
   BALANCE, BODY_WORDS, CAR_WORDS, CHAIN_STEPS, CHIEF, MEDAL_WORDS, kindsRevealedBy, PLACE_WORDS, RIVALS, STEP, chainStep, copyGoal, goalFor, newGoal, paintName, posterNumber, reqText,
   trialTimes, unpackDescriptor, type Goal, type GoalKind, type JobDef, type RivalDef, type SimWorld,
 } from '../../sim';
-import { GLYPHS, GLYPH_ORDER, KIND_GLYPH, NO_GLYPH, digitSlot, glyphIndex, glyphOf, goalGlyph, numberGlyphs, type GlyphId } from '../../sim/glyphs';
+import { GLYPH_ORDER, KIND_GLYPH, NO_GLYPH, digitSlot, glyphIndex, glyphOf, goalGlyph, numberGlyphs, type GlyphId } from '../../sim/glyphs';
+import { glyphMarkup } from '../glyph';
 import { num, paintedCar, t } from '../lang';
 
 export const KIND_TITLE: Record<JobDef['kind'], string> = { delivery: 'DELIVERY', order: 'STEAL TO ORDER', escape: 'ESCAPE', trial: 'TIME TRIAL', race: 'STREET RACE', rage: 'TAKEDOWN RAGE', mayhem: 'MAYHEM', fare: 'FARE', duel: 'WANTED BOARD' };
@@ -514,16 +515,7 @@ export function badgeMarkup(glyph: number): string {
   let paths = '';
   ids.forEach((id, k) => {
     const slot = digitSlot(k, ids.length);
-    for (const shape of GLYPHS[id]) {
-      let d = '';
-      for (const pts of [shape.outer, ...(shape.holes ?? [])]) {
-        for (let i = 0; i < pts.length; i += 2) {
-          d += `${i === 0 ? 'M' : 'L'}${(slot.cx + ((pts[i] as number) - 0.5) * slot.sx).toFixed(3)} ${(pts[i + 1] as number).toFixed(3)}`;
-        }
-        d += 'Z';
-      }
-      paths += `<path d="${d}" fill-rule="evenodd"/>`;
-    }
+    paths += glyphMarkup(id, slot.cx, slot.sx);
   });
   const svg = '<svg class="jobs__badge-svg" viewBox="-0.25 -0.25 1.5 1.5" aria-hidden="true">'
     + '<circle class="jobs__badge-rim" cx="0.5" cy="0.5" r="0.72"/><circle class="jobs__badge-face" cx="0.5" cy="0.5" r="0.6"/>'

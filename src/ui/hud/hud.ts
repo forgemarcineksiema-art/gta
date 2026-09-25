@@ -1,14 +1,15 @@
 /**
  * In-game HUD: plain DOM over the canvas. The corners of the driving screen
  * (DESIGN.md §17.2; `corners.ts` decides what shows): the stars, the radar,
- * the speed with the boost and the damage, the combo; the pops, the ticker,
+ * the gauge (`gauge.ts`), the combo; the pops, the ticker,
  * a debug block, a pause overlay and the keycap hint strip. Reads sim state
  * only.
  */
 import { AgentState, BALANCE, POLICE, districtAt } from '../../sim';
 import type { EventKind, SimEvent, SimWorld } from '../../sim';
 import { BigMap } from '../map/bigmap';
-import { DRIVE, drive, hintRows, newDriveState, newPlaceClock, readDrive, screenTaken, tickPlace, type KeyHints } from './corners';
+import { DRIVE, comboMult, drive, hintRows, newDriveState, newHitClock, newPlaceClock, readDrive, screenTaken, tickHit, tickPlace, type KeyHints } from './corners';
+import { GaugeHud } from './gauge';
 import { Minimap } from '../map/minimap';
 import { HeatHud } from './heat';
 import { label, num, relabel, t } from '../lang';
@@ -36,11 +37,8 @@ export class Hud {
   private readonly bigMap: BigMap | null;
   private readonly heat: HeatHud;
   readonly root: HTMLElement;
-  /** The car's corner, bottom right: the speed, the boost, the damage. */
-  private readonly speedo: HTMLElement;
-  private readonly speed: HTMLElement;
-  private readonly boostFill: HTMLElement;
-  private readonly boostWrap: HTMLElement;
+  /** The car's corner, bottom right: the gauge with the speed, the boost's arc and the damage's. */
+  private readonly gauge: GaugeHud;
   private readonly debug: HTMLElement;
   private readonly pause: HTMLElement;
   /** The pause screen names the mute key and the sound's state. */
@@ -77,11 +75,8 @@ export class Hud {
   /** The wall or the busted card has the screen: nothing of the drive speaks over it. */
   private taken = false;
   private lastDebugAt = 0;
-  private lastSpeedText = '';
-  private lastBoostText = '';
   private frameIndex = 0;
-  private readonly damageWrap: HTMLElement;
-  /** The skill chain (M5.5 slice 14): the multiplier, the points, the last trick, the window draining. */
+  /** The combo (M5.5 slice 14; M8.9 R4): its name, the points, the × from ×2, the last trick, the window draining. */
   private readonly skill: HTMLElement;
   private readonly skillMult: HTMLElement;
   private readonly skillPoints: HTMLElement;
@@ -95,7 +90,8 @@ export class Hud {
   private mask = -1;
   /** The district the car is in, and seconds since it changed or a new run started: its name shows for a while. */
   private readonly place = newPlaceClock();
-  private readonly damageFill: HTMLElement;
+  /** Seconds since the last hit: the damage's arc shows for a while after one. */
+  private readonly hit = newHitClock();
   private readonly wrecked: HTMLElement;
   private readonly wreckedSub: HTMLElement;
   /** The overlay follows the wreck itself, not only the damage stage (a wreck is not always a stage change). */
@@ -109,7 +105,6 @@ export class Hud {
   private readonly swapHint: HTMLElement;
   private swapHintOn = false;
   private swapVisible = false;
-  private lastDamageText = '';
   private lastStage = -1;
   private swapKey = 'E';
   private resetKey = 'R';
@@ -124,8 +119,6 @@ export class Hud {
 
   private lastLifeAt = 0;
   private lastLifeSeq = 0;
-  private boostFlash = 0;
-  private lastMeter = 0;
   /** Bound once: the event ring is polled every frame. */
   private readonly onEvent = (e: SimEvent): void => this.showEvent(e.kind, e.value, e.target);
 
@@ -141,27 +134,9 @@ export class Hud {
     this.minimap = sim.city ? new Minimap(this.root, sim) : null;
     this.heat = new HeatHud(this.root, sim);
 
-    // the car's corner (DESIGN.md §17.2): no gear (the box is automatic; the debug block keeps it), no counters (a
-    // find pops with its count), no ONCOMING (the combo's word says it)
-    this.speedo = el('div', 'hud__speedo');
-    const speedRow = el('div', 'hud__speed-row');
-    this.speed = el('div', 'hud__speed', '0');
-    speedRow.append(this.speed);
-    const unit = label(el('div', 'hud__unit'), 'km/h');
-    this.boostWrap = el('div', 'hud__boost');
-    const boostLabel = label(el('div', 'hud__boost-label'), 'BOOST');
-    const boostTrack = el('div', 'hud__boost-track');
-    this.boostFill = el('div', 'hud__boost-fill');
-    boostTrack.appendChild(this.boostFill);
-    this.boostWrap.append(boostLabel, boostTrack);
-    this.speedo.append(speedRow, unit, this.boostWrap);
-    this.damageWrap = el('div', 'hud__damage');
-    const damageTrack = el('div', 'hud__damage-track');
-    this.damageFill = el('div', 'hud__damage-fill');
-    damageTrack.appendChild(this.damageFill);
-    this.damageWrap.append(label(el('div', 'hud__damage-label'), 'DAMAGE'), damageTrack);
-    this.speedo.append(this.damageWrap);
-    this.root.appendChild(this.speedo);
+    // the car's corner (DESIGN.md §17.2, M8.9 R4): the gauge. No gear (the box is automatic; the debug block keeps
+    // it), no counters (a find pops with its count), no ONCOMING (the combo's word says it)
+    this.gauge = new GaugeHud(this.root);
     this.wrecked = el('div', 'hud__wrecked');
     this.wreckedSub = el('div', 'hud__wrecked-sub', '');
     this.wrecked.append(label(el('div', 'hud__wrecked-title'), 'WRECKED'), this.wreckedSub);
@@ -181,14 +156,14 @@ export class Hud {
     this.root.appendChild(stack);
 
     this.skill = el('div', 'hud__skill');
-    this.skillMult = el('span', 'hud__skill-mult', '×1');
+    this.skillMult = el('span', 'hud__skill-mult', '');
     this.skillPoints = el('span', 'hud__skill-points', '0');
     this.skillWord = el('span', 'hud__skill-word', '');
     const skillTrack = el('div', 'hud__skill-track');
     this.skillFill = el('div', 'hud__skill-fill');
     skillTrack.appendChild(this.skillFill);
     const skillRow = el('div', 'hud__skill-row');
-    skillRow.append(this.skillMult, this.skillPoints, this.skillWord);
+    skillRow.append(label(el('span', 'hud__skill-name'), 'COMBO'), this.skillPoints, this.skillMult, this.skillWord);
     this.skill.append(skillRow, skillTrack);
     this.root.appendChild(this.skill);
 
@@ -417,11 +392,11 @@ export class Hud {
     this.frameIndex++;
     // the corners (DESIGN.md §17.2): one mask for the frame; the district's name has its own clock
     const placeAge = tickPlace(this.place, sim.city ? districtAt(sim.probe.x, sim.probe.z) : null, sim.run.state, dt);
-    const m = drive(readDrive(sim, placeAge, this.driveState));
+    const hitAge = tickHit(this.hit, sim.life.state.damage, dt);
+    const m = drive(readDrive(sim, placeAge, this.driveState, hitAge));
     if (m !== this.mask) {
       this.mask = m;
-      this.speedo.classList.toggle('is-hidden', (m & DRIVE.speed) === 0);
-      this.damageWrap.classList.toggle('is-visible', (m & DRIVE.damage) !== 0);
+      this.gauge.show((m & DRIVE.speed) !== 0, (m & DRIVE.damage) !== 0);
       this.skill.classList.toggle('is-visible', (m & DRIVE.combo) !== 0);
       this.minimap?.setVisible((m & DRIVE.radar) !== 0);
       this.minimap?.setPlaceVisible((m & DRIVE.place) !== 0);
@@ -429,29 +404,12 @@ export class Hud {
     this.bigMap?.update(sim, now);
     this.minimap?.update(sim, dt, now);
     this.heat.update(sim, dt, (m & DRIVE.stars) !== 0);
+    this.gauge.update(sim, dt);
     const tm = sim.vehicle.telemetry;
-    const kmh = Math.round(Math.abs(tm.speedKmh));
-    const speedText = String(kmh);
-    if (speedText !== this.lastSpeedText) {
-      this.speed.textContent = speedText;
-      this.lastSpeedText = speedText;
-    }
-    const boostText = `scaleX(${tm.boost.toFixed(3)})`;
-    if (boostText !== this.lastBoostText) { this.boostFill.style.transform = boostText; this.lastBoostText = boostText; }
-    this.boostWrap.classList.toggle('is-active', tm.boosting);
-    this.boostWrap.classList.toggle('is-full', tm.boost >= 0.999);
-    if (tm.boost > this.lastMeter + 0.001) this.boostFlash = 0.3;
-    this.lastMeter = tm.boost;
-    if (this.boostFlash > 0) this.boostFlash -= dt;
-    this.boostWrap.classList.toggle('is-gain', this.boostFlash > 0);
     const life = sim.life.state;
-    const damageText = `scaleX(${life.damage.toFixed(3)})`;
-    if (damageText !== this.lastDamageText) { this.damageFill.style.transform = damageText; this.lastDamageText = damageText; }
     if (life.stage !== this.lastStage || life.wrecked !== this.lastWrecked) {
       this.lastStage = life.stage;
       this.lastWrecked = life.wrecked;
-      this.damageWrap.classList.toggle('is-danger', life.stage >= 3);
-      this.damageWrap.classList.toggle('is-wrecked', life.stage >= 4);
       this.wrecked.classList.toggle('is-visible', life.wrecked);
     }
     // no swap behind a shut door or on the busted card: the controls are the break's
@@ -495,9 +453,8 @@ export class Hud {
       const shown = Math.round(skill.points);
       if (skill.serial !== this.skillSerial || shown !== this.skillShown) {
         if (skill.serial !== this.skillSerial) {
-          this.skillMult.textContent = `×${num(skill.multiplier)}`;
+          this.skillMult.textContent = comboMult(skill.multiplier);
           this.skillWord.textContent = t(skill.word);
-          this.skill.classList.toggle('is-max', skill.multiplier >= BALANCE.skill.maxMult);
         }
         this.skillSerial = skill.serial;
         this.skillShown = shown;

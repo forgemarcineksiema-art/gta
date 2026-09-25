@@ -125,9 +125,11 @@ describe('M8.8 slice 3: what a car is for', () => {
       setLang('en');
       expect(carLine('roller')).toBe('ONLY IT: FLATTENS CARS');
       expect(carLine('monster')).toBe('ONLY IT: DRIVES OVER CARS');
+      expect(carLine('trolley')).toBe('ONLY IT: RIDES A ROCKET');
       setLang('pl');
       expect(carLine('roller')).toBe('TYLKO ON: ROZJEŻDŻA AUTA');
       expect(carLine('monster')).toBe('TYLKO ON: JEŹDZI PO AUTACH');
+      expect(carLine('trolley')).toBe('TYLKO ON: JEŹDZI NA RAKIECIE');
     } finally { setLang('en'); }
   });
 });

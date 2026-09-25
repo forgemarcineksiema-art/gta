@@ -18,7 +18,7 @@ import { cloneTuning, type VehicleTuning } from '../vehicle/tuning';
 /** The wanted board's cars (M6, DESIGN.md §14.3): the ten rivals' and the Chief's, never spawned as traffic. */
 export type RivalBody = 'wagon' | 'pizza' | 'wrecker' | 'twin' | 'fakecop' | 'partybus' | 'lowrider' | 'limo' | 'bubble' | 'phantom' | 'chiefcar';
 /** The crazy cars (M8.8 phase F): hidden, one in each district, each the only one that does its thing. */
-export type CrazyBody = 'roller' | 'monster';
+export type CrazyBody = 'roller' | 'monster' | 'trolley';
 export type CivilianBody = 'sedan' | 'hatch' | 'estate' | 'suv' | 'pickup' | 'taxi' | 'truck' | 'bus' | 'icecream' | RivalBody | 'roadster' | 'sweeper' | 'hotdog' | CrazyBody;
 export type BodyId = CarId | CivilianBody;
 export const RIVAL_BODIES: readonly RivalBody[] = ['wagon', 'pizza', 'wrecker', 'twin', 'fakecop', 'partybus', 'lowrider', 'limo', 'bubble', 'phantom', 'chiefcar'];
@@ -27,7 +27,7 @@ const FIRST_CIVILIANS: readonly CivilianBody[] = ['sedan', 'hatch', 'estate', 's
 /** The classes whose shells come first (their class index is their body index). */
 const FIRST_SHELLS: readonly CarId[] = ['muscle', 'compact', 'heavy', 'sports', 'police'];
 /** Every body added since, a class's shell or a civilian's, in the order it came: appended after the last. */
-const ADDED: readonly BodyId[] = ['offroad', 'roller', 'monster'];
+const ADDED: readonly BodyId[] = ['offroad', 'roller', 'monster', 'trolley'];
 export const CIVILIAN_BODIES: readonly CivilianBody[] = [...FIRST_CIVILIANS, ...ADDED.filter((id): id is CivilianBody => !(CAR_IDS as readonly BodyId[]).includes(id))];
 export const BODY_IDS: readonly BodyId[] = [...FIRST_SHELLS, ...FIRST_CIVILIANS, ...ADDED];
 
@@ -156,6 +156,36 @@ const CRAZY = {
     t.airLevelTorque *= 2;
     t.airAngularDamping *= 2;
   },
+  /**
+   * The rocket trolley: a shopping trolley, its rider and a rocket, 180 kg. The motor is a push (a walking pace on the
+   * throttle alone, no engine to brake with); the rocket is the boost, 8 s of it, the meter filling by itself in 4;
+   * castors that steer like a brick.
+   */
+  trolley: (t: VehicleTuning): void => {
+    t.wheelRadius = 0.12;
+    t.wheelWidth = 0.06;
+    t.suspensionRestLength = 0.12;
+    t.suspensionAttachY = 0.05;
+    t.chassisHalfExtents = { x: t.chassisHalfExtents.x, y: 0.4, z: t.chassisHalfExtents.z };
+    t.chassisOffsetY = 0.5;
+    t.centerOfMassY = -0.3;
+    t.torqueMax = 1;
+    t.engineBrakeTorque = 0;
+    t.gearRatios = [12, 12, 12, 12, 12, 12];
+    // on the rocket 0–100 in 4.2 s (after the Bubble), 187 km/h flat out
+    t.drag = 0.56;
+    t.boostThrust = 1560;
+    t.boostTorqueMul = 1;
+    t.boostDrain = 0.125;
+    t.boostRegen = 0.25;
+    t.boostInitial = 1;
+    // a brick's steering: 12° of lock at a walk, 1° from 54 km/h, turned slowly (the plan's 2° turned it 13° in the
+    // 100 km/h pulse, more than the van; 1° turned slowly, 2°, less than every body)
+    t.maxSteerDegLow = 12;
+    t.maxSteerDegHigh = 1;
+    t.steerSpeedRef = 15;
+    t.steerRate = 2;
+  },
 } as const;
 
 /** Indexed like BODY_IDS. Sizes in metres; the profiles in render/bodyProfiles.ts are drawn on these wheels. */
@@ -202,6 +232,8 @@ export const BODIES: readonly BodySpec[] = [
   // the monster truck (slice 12), on the Gardens' park strip by the jumps: the 4×4's drivetrain on wheels taller than a
   // car, so it climbs one and flattens it a fifth of a second after a wheel is on it
   civilian('monster', 'offroad', 1.3, 2.7, 3.4, 2.5, 4200, 0, { paints: [PALETTE.carLime], big: true, stretch: true, tune: CRAZY.monster, crush: 0.2 }),
+  // the rocket trolley (slice 13), on the Crown Tower's plaza: the compact's class on castors, the boost its engine
+  civilian('trolley', 'compact', 0.4, 0.7, 0.8, 0.6, 180, 0, { paints: [PALETTE.chrome], tune: CRAZY.trolley }),
 ];
 
 export const BODY_INDEX = Object.fromEntries(BODY_IDS.map((id, i) => [id, i])) as Record<BodyId, number>;

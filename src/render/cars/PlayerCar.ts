@@ -330,10 +330,13 @@ export class PlayerCar {
     this.neon.scale.set(spec.halfWidth * 2 + 0.5, 1, spec.halfLength * 2 + 0.4);
     const tail = profile.sections[profile.sections.length - 1];
     const tz = tail ? tail.z : -spec.halfLength, ty = (tail ? tail.floor : 0.35) + ground + 0.06;
+    // a rocket's flame at its nozzle (the trolley, M8.8 slice 13), else one at each side of the tail
+    const nozzle = profile.nozzle;
     for (let k = 0; k < this.flames.length; k++) {
       const f = this.flames[k] as THREE.Mesh;
       this.mesh.root.add(f);
-      f.position.set(k === 0 ? 0.36 : -0.36, ty, tz - 0.05);
+      if (nozzle) f.position.set(k === 0 ? 0.03 : -0.03, nozzle.y + ground, nozzle.z - 0.05);
+      else f.position.set(k === 0 ? 0.36 : -0.36, ty, tz - 0.05);
     }
   }
 }

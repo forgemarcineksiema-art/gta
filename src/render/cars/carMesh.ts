@@ -96,6 +96,8 @@ export interface CarProfile {
   windowMargins?: { bottom: number; top: number };
   /** The headlamps dark (M6: the Ghost's car drives with its lights off). */
   lampsOff?: boolean;
+  /** A rocket's nozzle (M8.8 slice 13, the trolley): the boost's flame burns there on the centreline, not at the exhausts. */
+  nozzle?: { y: number; z: number };
 }
 
 /** A box fitted to a body: size and centre in metres (heights above the ground), a colour or one of the paint's tones; `mirror` adds the one at -x. */

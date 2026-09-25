@@ -7,7 +7,7 @@
  * with bodyMesh.ts (a few hundred triangles, instanced); the player drives
  * one after a swap with carMesh.ts in full detail.
  */
-import { PALETTE, type BodyId } from '../../sim';
+import { PALETTE, PED_COLORS, type BodyId } from '../../sim';
 import type { BodyPart, CarProfile } from './carMesh';
 import { CAR_PROFILES, POLICE as POLICE_CAR, SPORTS } from './carProfiles';
 
@@ -738,6 +738,54 @@ export const MONSTER: CarProfile = {
   paint: PALETTE.carLime,
 };
 
+/**
+ * The rocket trolley (M8.8 slice 13), 1.4 m: a shopping trolley's basket on castors, its rider sat in it in a red
+ * helmet holding the rim, the handle behind, a rocket strapped under the back with the boost's flame at its nozzle.
+ */
+export const TROLLEY: CarProfile = {
+  name: 'trolley',
+  sections: [
+    { z: 0.7, floor: 0.42, belt: 0.84, roof: 0.87, hwFloor: 0.3, hwBelt: 0.35, hwRoof: 0.34 },
+    { z: 0.6, floor: 0.36, belt: 0.88, roof: 0.9, hwFloor: 0.33, hwBelt: 0.38, hwRoof: 0.37 },
+    { z: -0.3, floor: 0.36, belt: 0.9, roof: 0.92, hwFloor: 0.36, hwBelt: 0.4, hwRoof: 0.39 },
+    { z: -0.4, floor: 0.36, belt: 0.9, roof: 0.92, hwFloor: 0.36, hwBelt: 0.4, hwRoof: 0.39 },
+  ],
+  glassSides: [0, 0],
+  glassTops: [],
+  aPillar: -1,
+  cPillar: -1,
+  pillars: [],
+  doorSeams: [],
+  handleZ: 0,
+  headlight: { width: 0.08, height: 0.06, y: 0.7, inset: 0.22 },
+  taillight: { width: 0.08, height: 0.06, y: 0.7, inset: 0.22 },
+  grille: null,
+  bumperHeight: 0.06,
+  lipSpoiler: false,
+  mirrors: false,
+  exhausts: 0,
+  wheelInset: 0.02,
+  wheelStyle: 'compact',
+  nozzle: { y: 0.5, z: -0.72 },
+  parts: [
+    // the rider: legs out to the front, the body, arms to the rim, a head in a red helmet
+    { size: [0.14, 0.14, 0.5], at: [0.1, 0.98, 0.25], color: PED_COLORS.denim, mirror: true },
+    { size: [0.38, 0.5, 0.26], at: [0, 1.15, -0.1], color: PALETTE.carOrange },
+    { size: [0.1, 0.1, 0.42], at: [0.25, 1.22, 0.1], color: PALETTE.carOrange, mirror: true },
+    { size: [0.22, 0.22, 0.22], at: [0, 1.5, -0.08], color: PED_COLORS.skin },
+    { size: [0.26, 0.14, 0.26], at: [0, 1.62, -0.08], color: PALETTE.carRed },
+    // the handle and its posts
+    { size: [0.76, 0.05, 0.05], at: [0, 1.02, -0.42], color: PALETTE.carRed },
+    { size: [0.04, 0.14, 0.04], at: [0.36, 0.95, -0.42], color: PALETTE.chrome, mirror: true },
+    // the rocket under the back: its body, two fins, the nozzle
+    { size: [0.24, 0.24, 0.62], at: [0, 0.5, -0.4], color: PALETTE.carWhite },
+    { size: [0.24, 0.1, 0.12], at: [0, 0.5, -0.1], color: PALETTE.carRed },
+    { size: [0.02, 0.2, 0.16], at: [0.13, 0.5, -0.62], color: PALETTE.carRed, mirror: true },
+    { size: [0.18, 0.18, 0.06], at: [0, 0.5, -0.72], color: PALETTE.charcoal },
+  ],
+  paint: PALETTE.chrome,
+};
+
 /** Every body's profile: the player's five classes, the city's eight, the hidden truck and the wanted board's cars. */
 export const BODY_PROFILES: Record<BodyId, CarProfile> = {
   ...CAR_PROFILES,
@@ -745,5 +793,5 @@ export const BODY_PROFILES: Record<BodyId, CarProfile> = {
   wagon: WAGON, pizza: PIZZA, wrecker: WRECKER, twin: TWIN, fakecop: FAKECOP, partybus: PARTYBUS,
   lowrider: LOWRIDER, limo: LIMO, bubble: BUBBLE, phantom: PHANTOM, chiefcar: CHIEFCAR,
   roadster: ROADSTER, sweeper: SWEEPER, hotdog: HOTDOG,
-  roller: ROLLER, monster: MONSTER,
+  roller: ROLLER, monster: MONSTER, trolley: TROLLEY,
 };

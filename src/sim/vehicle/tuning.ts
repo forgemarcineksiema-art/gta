@@ -260,6 +260,8 @@ export interface VehicleTuning {
   boostDrain: number;
   boostGainDrift: number;
   boostGainAir: number;
+  /** The meter's own refill while not boosting, per second (M8.8 slice 13: the rocket trolley's 0.25; 0 on every other car). */
+  boostRegen: number;
   /** Starting meter in the playground. */
   boostInitial: number;
 }
@@ -396,6 +398,7 @@ export const DEFAULT_TUNING: VehicleTuning = {
   boostDrain: 0.28,
   boostGainDrift: 0.16,
   boostGainAir: 0.35,
+  boostRegen: 0,
   boostInitial: 0.6,
 };
 

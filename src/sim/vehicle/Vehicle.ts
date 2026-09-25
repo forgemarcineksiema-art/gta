@@ -973,6 +973,8 @@ export class Vehicle {
     if (this.drifting && absFwd > t.driftMinSpeed) {
       this.boostMeter = Math.min(1, this.boostMeter + t.boostGainDrift * dt);
     }
+    // a meter that fills by itself while it rests (M8.8 slice 13: the rocket trolley's; 0 on every other car)
+    if (t.boostRegen > 0 && !this.boosting) this.boostMeter = Math.min(1, this.boostMeter + t.boostRegen * dt);
 
     // ---- body vs terrain: only when the car is on its side or roof -------------------
     const flipped = s.up.y < 0.35;

@@ -39,11 +39,14 @@ const BIG_SIX: EngineVoice = { pulses: 3, saw: 0.32, square: 0.2, sub: 0.32, gri
 /** The Bubble's two-stroke: one pulse a revolution, a square's buzz, a rasp over it. */
 const TWO_STROKE: EngineVoice = { pulses: 1, saw: 0.18, square: 0.42, sub: 0.04, grit: 60, floor: 900, open: 3500, rattle: 0.06, rattleHz: 3200, level: 0.85 };
 
+/** The rocket trolley's rocket (M8.8 slice 13): a roar of noise over a thin whine, loud when it burns. */
+const ROCKET: EngineVoice = { pulses: 1, saw: 0.14, square: 0.1, sub: 0.1, grit: 80, floor: 700, open: 3000, rattle: 0.45, rattleHz: 700, level: 0.9 };
+
 /** Each class's voice: its shell's, and its civilian bodies' unless they have their own. */
 export const CLASS_VOICES: Readonly<Record<CarId, EngineVoice>> = { muscle: V8, compact: FOUR, heavy: DIESEL, sports: SIX, police: V8, offroad: BIG_SIX };
 
 /** The bodies with a voice of their own. */
-export const OWN_VOICES: Readonly<Partial<Record<BodyId, EngineVoice>>> = { bubble: TWO_STROKE };
+export const OWN_VOICES: Readonly<Partial<Record<BodyId, EngineVoice>>> = { bubble: TWO_STROKE, trolley: ROCKET };
 
 export function voiceOf(body: BodyId): EngineVoice {
   return OWN_VOICES[body] ?? CLASS_VOICES[bodySpec(body).car];

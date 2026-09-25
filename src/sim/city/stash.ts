@@ -4,9 +4,10 @@
  * park, and one in each district without one, parked in a quiet kerbside bay:
  * a roadster in Crown Heights, a street sweeper in Sunset Works, a hot-dog van
  * on the Coral Quay; the crazy cars (M8.8 phase F), the steamroller on the
- * Works' yard, the monster truck on the Gardens' park strip. Each plays its
- * own clue to whoever drives near. A swap into one finds it for good: the
- * garage owns it and its stash stands empty.
+ * Works' yard, the monster truck on the Gardens' park strip, the rocket
+ * trolley on the Crown Tower's plaza. Each plays its own clue to whoever
+ * drives near. A swap into one finds it for good: the garage owns it and its
+ * stash stands empty.
  * A parked record is placed when the player comes within `range` m and freed
  * by the traffic's own despawn; the city's toys (the giant ball in the Works
  * yard) live here too. No allocation per step.
@@ -22,19 +23,20 @@ import { BODY_INDEX, bodySpec } from '../traffic/bodies';
 import { AgentState, type PlayerProbe } from '../traffic/Traffic';
 
 /** The hidden cars; each is a civilian body the spawner never draws. The crazy cars (M8.8 phase F) are hidden too. */
-export type HiddenCar = 'icecream' | 'roadster' | 'sweeper' | 'hotdog' | 'roller' | 'monster';
-export const HIDDEN_CARS: readonly HiddenCar[] = ['icecream', 'roadster', 'sweeper', 'hotdog', 'roller', 'monster'];
+export type HiddenCar = 'icecream' | 'roadster' | 'sweeper' | 'hotdog' | 'roller' | 'monster' | 'trolley';
+export const HIDDEN_CARS: readonly HiddenCar[] = ['icecream', 'roadster', 'sweeper', 'hotdog', 'roller', 'monster', 'trolley'];
 
 /**
  * The ones that stand on open ground, left there: the ice-cream truck on the Palm Gardens edge park's lawn, the
  * steamroller on the Works' yard by the giant ball (M8.8 slice 11), the monster truck on the Gardens' park strip
- * between two of the jumps (slice 12).
+ * between two of the jumps (slice 12), the rocket trolley on a corner of the Crown Tower's plaza (slice 13).
  */
-type GroundCar = 'icecream' | 'roller' | 'monster';
+type GroundCar = 'icecream' | 'roller' | 'monster' | 'trolley';
 export const STASH_SPOTS: Readonly<Record<GroundCar, { x: number; z: number; yaw: number }>> = {
   icecream: { x: -350, z: 737.5, yaw: Math.PI / 2 },
   roller: { x: 318, z: -466, yaw: -Math.PI / 2 },
   monster: { x: -737.5, z: 505, yaw: 0 },
+  trolley: { x: -346, z: -346, yaw: Math.PI / 4 },
 };
 
 /** The district each of the others waits in, in a kerbside bay (city/City.ts ids). */

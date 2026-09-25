@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.8 slice 19: the slipways and the sea
+
+Done: the sea's surface at −0.5 m (`GROUP_WATER`, nothing collides with it), met by the hovercraft's rays alone
+(`QUERY_HOVER`; `QUERY_NOT_PROP` now leaves it out too, so it is nobody's cover); walls `SEA.limit` 180 m out hold it
+in. Two slipways (`city/sea.ts`) through Coral Quay's parapet, south at x 497 and east at z 255 between the palms: 8 m
+ramps 9 m out from the deck to −1 m, props kept off their tops; at each the island's wall is a gate (`GROUP_GATE`)
+every chassis stops at but the hovercraft's, whose rays pass through it (they fell through it at first). Down one,
+150 m out and back up at 30 km/h; a muscle car stops at the top. The full map widens to keep a player at sea on it
+(`mapHalf`). Pins M8.8 19.1–19.4 (`sea.test.ts`).
+
 ## 2026-09-25 — M8.8 slice 18: the hovercraft
 
 Done: `hover` (PODUSZKOWIEC; the 4×4's class, 1.4 t) on the car model's `hover` mode: the four rays are the cushion's

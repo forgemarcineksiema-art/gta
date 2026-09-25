@@ -41,6 +41,7 @@ export { coverSites, dropOffFor, hideoutSign, hideoutStatics, toDropOff, DROP_OF
 export { POLICE, type PoliceTuning } from './police/tuning';
 export { PALETTE, PED_TINTS, PED_COLORS, CITY_COLORS } from './palette';
 export { ASPHALT, DIRT, GRASS, SurfaceMap, type SurfaceKind, type SurfaceReader } from './city/surface';
+export { SEA, SLIPWAY, SLIPWAYS, slipwayTop, type Slipway } from './city/sea';
 export { STRAIGHT, type SpawnPoint } from './playground';
 export type { StaticDesc, DynamicDesc, ShapeDesc, Vec3, Quat } from './scene';
 export { quatFromYaw } from './scene';

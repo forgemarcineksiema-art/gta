@@ -83,6 +83,10 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   orange life jacket and a navy cap, the fan's graphite duct at the stern with
   steel blades and two painted rudders behind it; the boost's flame blows out
   of the fan. Its cushion's four wheels (0.1 m) stay under the skirt.
+- The slipways (M8.8 slice 19): two 8 m concrete ramps (the kerb's colour)
+  through Coral Quay's parapet, framed by light grey kerbs, running 9 m out
+  from the promenade's deck down under the sea's surface; the parapet and its
+  coping stop at their sides. No other mark: the sea is the rendered one.
 
 ## Street architecture (M2.1)
 

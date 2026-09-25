@@ -19,7 +19,7 @@
  * rotation about +Y turns the nose to the left, so "steer right" rotates by -steer.
  */
 import RAPIER from '@dimforge/rapier3d-compat';
-import { GROUPS_CHASSIS_FLIPPED, GROUPS_CHASSIS_UPRIGHT, QUERY_NOT_PROP } from '../collision';
+import { GROUPS_CHASSIS_FLIPPED, GROUPS_CHASSIS_UPRIGHT, GROUPS_HOVER_FLIPPED, GROUPS_HOVER_UPRIGHT, QUERY_HOVER, QUERY_NOT_PROP } from '../collision';
 import type { VehicleControls } from '../controls';
 import * as M from '../math';
 import type { Vec3 } from '../math';
@@ -397,7 +397,8 @@ export class Vehicle {
       .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min)
       .setRestitution(t.wallRestitution)
       .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Multiply)
-      .setCollisionGroups(GROUPS_CHASSIS_UPRIGHT)
+      // the hovercraft's chassis passes the slipways' gates (M8.8 slice 19)
+      .setCollisionGroups(t.hover > 0 ? GROUPS_HOVER_UPRIGHT : GROUPS_CHASSIS_UPRIGHT)
       .setMassProperties(t.mass, { x: 0, y: t.centerOfMassY, z: 0 }, boxInertia(t), { x: 0, y: 0, z: 0, w: 1 });
   }
 
@@ -471,6 +472,8 @@ export class Vehicle {
     if (plumb) M.set(s.rayDir, 0, -1, 0);
     else M.scale(s.rayDir, s.up, -1);
     const rayLen = t.suspensionRestLength + t.wheelRadius;
+    // the hovercraft's cushion stands on the sea too (M8.8 slice 19); no other car's ray meets it
+    const rayGroups = hover ? QUERY_HOVER : QUERY_NOT_PROP;
     let grounded = 0;
     for (const w of this.wheels) {
       M.rotate(s.a, s.q, w.local);
@@ -481,7 +484,7 @@ export class Vehicle {
       this.ray.dir.x = s.rayDir.x;
       this.ray.dir.y = s.rayDir.y;
       this.ray.dir.z = s.rayDir.z;
-      const hit = this.world.castRayAndGetNormal(this.ray, rayLen, true, undefined, QUERY_NOT_PROP, undefined, body);
+      const hit = this.world.castRayAndGetNormal(this.ray, rayLen, true, undefined, rayGroups, undefined, body);
       if (hit && hit.timeOfImpact > 0) {
         let d = hit.timeOfImpact;
         // a tall wheel rolls up onto what it meets (the monster truck onto a car, M8.8 slice 12): from the ground the
@@ -1013,7 +1016,7 @@ export class Vehicle {
         this.ray.dir.x = 0;
         this.ray.dir.y = -1;
         this.ray.dir.z = 0;
-        const hit = this.world.castRayAndGetNormal(this.ray, 14, true, undefined, QUERY_NOT_PROP, undefined, body);
+        const hit = this.world.castRayAndGetNormal(this.ray, 14, true, undefined, rayGroups, undefined, body);
         if (hit) {
           const gap = Math.max(0, hit.timeOfImpact - (t.suspensionRestLength + t.wheelRadius));
           if (gap / Math.max(0.5, -s.vel.y) < t.airLandingLevelTime) M.set(s.b, hit.normal.x, hit.normal.y, hit.normal.z);
@@ -1062,7 +1065,7 @@ export class Vehicle {
     const flipped = s.up.y < 0.35;
     if (flipped !== this.collidesWithTerrain) {
       this.collidesWithTerrain = flipped;
-      this.collider.setCollisionGroups(flipped ? GROUPS_CHASSIS_FLIPPED : GROUPS_CHASSIS_UPRIGHT);
+      this.collider.setCollisionGroups(hover ? (flipped ? GROUPS_HOVER_FLIPPED : GROUPS_HOVER_UPRIGHT) : flipped ? GROUPS_CHASSIS_FLIPPED : GROUPS_CHASSIS_UPRIGHT);
     }
 
     // ---- flip recovery ----------------------------------------------------------

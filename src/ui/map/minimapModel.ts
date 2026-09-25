@@ -288,6 +288,14 @@ export function routeStop(points: ArrayLike<number>, n: number, share: number, o
   }
 }
 
+/**
+ * The full map's half extent, m (M8.8 slice 19): the island's `island`, or out to the player at sea (`x`, `z`) with 30 m
+ * round them, `sea` m past the island at most (the sea's edge).
+ */
+export function mapHalf(x: number, z: number, island: number, sea: number): number {
+  return Math.min(island + sea, Math.max(island, Math.abs(x) + 30, Math.abs(z) + 30));
+}
+
 export function bigMapScale(size: number, half: number, margin = 25): number {
   return size / 2 / (half + margin);
 }

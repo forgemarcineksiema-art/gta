@@ -1,6 +1,6 @@
 /** Seeded, independently reproducible chunks. Only nearby solid bodies live in Rapier. */
 import RAPIER from '@dimforge/rapier3d-compat';
-import { GROUPS_PROP, GROUPS_SOLID, GROUPS_TERRAIN } from '../collision';
+import { GROUPS_GATE, GROUPS_PROP, GROUPS_SOLID, GROUPS_TERRAIN, GROUPS_WATER } from '../collision';
 import { ACCENTS, PALETTE } from '../palette';
 import { POLICE } from '../police/tuning';
 import { BALANCE } from '../balance';
@@ -20,6 +20,7 @@ import { signalPoles, signalledNodes } from './signals';
 import { BLOCK, CITY_HALF, HIGHWAY_HALF, HIGHWAY_LANE_OFFSETS, OVERPASS_NODES, ROAD_HALF, buildCityRoute, buildRoadGraph, distanceToPolyline, highwayHeightAt, projectOnLane, underOverpass, type Lane, type RoadPoint, type SpecialRoad } from './roads';
 import { overpassStatics } from './overpass';
 import { SurfaceMap } from './surface';
+import { SEA, SLIPWAY, SLIPWAYS, slipwayGaps, slipwayStatics, wallPieces } from './sea';
 
 export const DISTRICTS = [
   { id: 'crown', name: 'CROWN HEIGHTS', color: 0xb497d6, accent: ACCENTS.crown, landmark: 'Crown Tower' },
@@ -269,10 +270,25 @@ export class City {
     // The one unbroken collision plane eliminates suspension seams at roads and chunk borders.
     world.createCollider(RAPIER.ColliderDesc.cuboid(CITY_HALF, 0.5, CITY_HALF)
       .setTranslation(0, -0.5, 0).setFriction(1).setCollisionGroups(GROUPS_TERRAIN));
+    // the island's walls, cut at the slipways (M8.8 slice 19) by gates only the hovercraft's chassis passes
+    for (const axis of [0, 1] as const) for (const sign of [-1, 1]) {
+      const wall = (mid: number, half: number, groups: number): void => {
+        world.createCollider(RAPIER.ColliderDesc.cuboid(axis === 0 ? 1 : half, 2, axis === 1 ? 1 : half)
+          .setTranslation(axis === 0 ? sign * CITY_HALF : mid, 2, axis === 1 ? sign * CITY_HALF : mid)
+          .setCollisionGroups(groups).setRestitution(1));
+      };
+      const gaps = slipwayGaps(axis, sign);
+      for (const [mid, half] of wallPieces(0, CITY_HALF, gaps)) wall(mid, half, GROUPS_SOLID);
+      for (const g of gaps) wall(g, SLIPWAY.width / 2, GROUPS_GATE);
+    }
+    // the sea (M8.8 slice 19): its surface at the rendered sea's level, met by the hovercraft's rays alone, and its
+    // edge `SEA.limit` m out from the seawall
+    const edge = CITY_HALF + SEA.limit;
+    world.createCollider(RAPIER.ColliderDesc.cuboid(edge, 0.5, edge).setTranslation(0, SEA.level - 0.5, 0).setCollisionGroups(GROUPS_WATER));
     for (const axis of [0, 1]) for (const sign of [-1, 1]) {
-      world.createCollider(RAPIER.ColliderDesc.cuboid(axis === 0 ? 1 : CITY_HALF, 2, axis === 1 ? 1 : CITY_HALF)
-        .setTranslation(axis === 0 ? sign * CITY_HALF : 0, 2, axis === 1 ? sign * CITY_HALF : 0)
-        .setCollisionGroups(GROUPS_SOLID).setRestitution(1));
+      world.createCollider(RAPIER.ColliderDesc.cuboid(axis === 0 ? 1 : edge, 3, axis === 1 ? 1 : edge)
+        .setTranslation(axis === 0 ? sign * edge : 0, 2, axis === 1 ? sign * edge : 0)
+        .setCollisionGroups(GROUPS_SOLID).setRestitution(0.5));
     }
     this.spawns = [];
     const start = this.route.start;
@@ -543,14 +559,20 @@ export class City {
     // Coral Quay's edges are a low parapet with a coping so the promenade sees the
     // water; the invisible 4 m boundary collider is unchanged. Elsewhere a seawall.
     const quay = x > 0 && z > 0;
+    // a slipway (M8.8 slice 19) cuts the parapet and the coping; its ramp is this chunk's
     if (Math.abs(cx) === 3) {
-      box(Math.sign(cx) * CITY_HALF, quay ? 0.55 : 2, z, 1, quay ? 0.55 : 2, BLOCK / 2, PALETTE.kerb, 'boundary');
-      if (quay) box(Math.sign(cx) * CITY_HALF, 1.16, z, 1.15, 0.07, BLOCK / 2, CITY_COLORS.trim, 'boundary');
+      for (const [mid, half] of wallPieces(z, BLOCK / 2, slipwayGaps(0, Math.sign(cx)))) {
+        box(Math.sign(cx) * CITY_HALF, quay ? 0.55 : 2, mid, 1, quay ? 0.55 : 2, half, PALETTE.kerb, 'boundary');
+        if (quay) box(Math.sign(cx) * CITY_HALF, 1.16, mid, 1.15, 0.07, half, CITY_COLORS.trim, 'boundary');
+      }
     }
     if (Math.abs(cz) === 3) {
-      box(x, quay ? 0.55 : 2, Math.sign(cz) * CITY_HALF, BLOCK / 2, quay ? 0.55 : 2, 1, PALETTE.kerb, 'boundary');
-      if (quay) box(x, 1.16, Math.sign(cz) * CITY_HALF, BLOCK / 2, 0.07, 1.15, CITY_COLORS.trim, 'boundary');
+      for (const [mid, half] of wallPieces(x, BLOCK / 2, slipwayGaps(1, Math.sign(cz)))) {
+        box(mid, quay ? 0.55 : 2, Math.sign(cz) * CITY_HALF, half, quay ? 0.55 : 2, 1, PALETTE.kerb, 'boundary');
+        if (quay) box(mid, 1.16, Math.sign(cz) * CITY_HALF, half, 0.07, 1.15, CITY_COLORS.trim, 'boundary');
+      }
     }
+    for (const s of SLIPWAYS) if (chunkCoord(s.x) === cx && chunkCoord(s.z) === cz) statics.push(...slipwayStatics(s));
     // the covered streets' and the overpasses' boxes, each in the chunk holding its centre
     for (const st of this.coverBoxes) if (chunkCoord(st.position.x) === cx && chunkCoord(st.position.z) === cz) statics.push(st);
     for (const st of this.overpassBoxes) if (chunkCoord(st.position.x) === cx && chunkCoord(st.position.z) === cz) statics.push(st);

@@ -18,6 +18,7 @@ import { Roadblocks } from './police/Roadblocks';
 import { Cameras } from './city/cameras';
 import { Jumps } from './city/jumps';
 import { Stash, cityToys } from './city/stash';
+import { SLIPWAY, SLIPWAYS, slipwayTop } from './city/sea';
 import { BREAKER, BREAKERS, Breakers } from './city/breakers';
 import { createControls, type VehicleControls } from './controls';
 import { EventLog } from './events';
@@ -326,6 +327,8 @@ export class SimWorld {
       for (const spot of Object.values(this.stash.spots)) rings.push({ x: spot.x, z: spot.z, r: PARKED_CAR_RING });
       for (const b of BREAKERS) rings.push({ x: b.x, z: b.z, r: Math.hypot(BREAKER.halfWidth, BREAKER.halfDepth) + BREAKER.clear });
       rings.push({ x: DONUT_SHOP.x, z: DONUT_SHOP.z, r: DONUT_SHOP_RING });
+      // the slipways' tops (M8.8 slice 19): the way down to the sea stays open
+      for (const s of SLIPWAYS) rings.push({ ...slipwayTop(s), r: SLIPWAY.clear });
       const city = this.city;
       city.setPropKeepOut(rings, () => {
         const loop = city.spawns.find((s) => s.name === 'loop'), hideout = this.run.dropOffs[0];

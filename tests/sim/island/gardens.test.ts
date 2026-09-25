@@ -1,10 +1,10 @@
 /** M8.10 slice 10: Palm Gardens (docs/M8.10_PLAN.md): the botanic garden, the golf, the dunes, the beach, the back gardens. */
 import RAPIER from '@dimforge/rapier3d-compat';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { ASPHALT, DIRT, GRASS, SAND, SEA, type SimWorld } from '../../../src/sim';
-import { PROP_KINDS } from '../../../src/sim/city/props';
+import { ASPHALT, DIRT, GRASS, SAND, SEA, clearControls, type SimWorld } from '../../../src/sim';
+import { PROP_KINDS, type PropDesc, type PropSpot } from '../../../src/sim/city/props';
 import type { P2 } from '../../../src/sim/island/geom';
-import { PLUMB_TILT, type Island } from '../../../src/sim/island/Island';
+import { Island, PLUMB_TILT } from '../../../src/sim/island/Island';
 import type { GardensPlace } from '../../../src/sim/island/places/gardens';
 import { BLEND, HALF_WIDTH, MAX_GRADE, SHOULDER } from '../../../src/sim/island/ground';
 import { GARDEN } from '../../../src/sim/island/plan';
@@ -12,6 +12,7 @@ import {
   BOARDWALK, BUNKERS, CREST, FAIRWAYS, GLASSHOUSE, GREENS, PATH, POND, TEES, boardwalkRuns, gardenDunes, gardenPaths, humpAt,
 } from '../../../src/sim/island/shapes/gardens';
 import { KERB, ROAD_LIFT } from '../../../src/sim/island/surfaces';
+import { PropState } from '../../../src/sim/props/Props';
 import { createWorld } from '../helpers';
 
 describe('M8.10 slice 10: Palm Gardens', () => {
@@ -66,7 +67,31 @@ describe('M8.10 slice 10: Palm Gardens', () => {
     expect(decks).toBeGreaterThanOrEqual(6);
   });
 
-  it.todo('10.2 a fence breaks at 30 km/h (the fences\' spots are in `GardensPlace.fences`; the props come to the island with slice 7b)');
+  it('10.2 every back fence\'s panel stands as a prop at its spot, and one breaks at 30 km/h', () => {
+    const gardens = island.places.find((p) => p.id === 'gardens') as GardensPlace;
+    expect(gardens.fences.length).toBeGreaterThan(20);
+    const at = (s: PropSpot): PropDesc | undefined => {
+      const [i, j] = Island.chunkOf(s.x, s.z);
+      return island.props(Island.chunkIndex(i, j)).find((p) => p.kind === 'fence' && Math.hypot(p.x - s.x, p.z - s.z) < 0.01);
+    };
+    for (const s of gardens.fences) expect(at(s), `a fence at ${s.x.toFixed(0)}, ${s.z.toFixed(0)}`).toBeDefined();
+    // the car along a shortcut at 30 km/h into a panel: the panel goes
+    const spot = gardens.fences[0] as PropSpot, fence = at(spot) as PropDesc, fx = Math.sin(spot.yaw), fz = Math.cos(spot.yaw);
+    const x = spot.x - fx * 10, z = spot.z - fz * 10;
+    island.sync(x, z, true);
+    sim.vehicle.teleport({ x, y: island.ground.surfaceHeight(x, z) + 0.8, z }, spot.yaw);
+    for (let i = 0; i < 24; i++) { clearControls(sim.controls); sim.controls.brake = 1; sim.step(); }
+    expect(sim.props?.state[fence.id]).toBe(PropState.Standing);
+    const v = 30 / 3.6, lv = { x: 0, y: 0, z: 0 };
+    let knocked = false;
+    for (let i = 0; i < 120 && !knocked; i++) {
+      clearControls(sim.controls);
+      sim.vehicle.setVelocity(fx * v, sim.vehicle.body.linvel(lv).y, fz * v);
+      sim.step();
+      knocked = sim.props?.state[fence.id] !== PropState.Standing;
+    }
+    expect(knocked).toBe(true);
+  });
 
   it('10.3 the garden\'s paths join the parkway at both ends: gravel end to end, a car\'s grade but on the crest, nothing standing on them', () => {
     const g = island.ground, paths = gardenPaths();

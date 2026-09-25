@@ -34,9 +34,10 @@ const RINGS_OUT: ReadonlyArray<{ r: number; hw: number }> = [
 ];
 /**
  * The shortcuts (m): a car's way clear of every house by `clear` either side, the ways at least `apart` apart along the
- * inner ring, at most `most` between two rings; the fences a panel every 2 m across the way, at the houses' back lines.
+ * inner ring, at most `most` between two rings; the fences a panel every 2 m across the way, at the houses' back lines;
+ * `reach` past a street's pavement the way's line keeps (its fences' widest panel's far edge and half a metre).
  */
-const SHORTCUT = { clear: 2.6, apart: 45, most: 8, step: 0.006, wide: 3.1 } as const;
+const SHORTCUT = { clear: 2.6, apart: 45, most: 8, step: 0.006, wide: 3.1, reach: 3.5 } as const;
 /** The beach's palms: off the boardwalk's sea edge, one every so far along it, clear of its dune and the slipway (m). */
 const BEACH_PALMS = { out: 4.5, every: 24 } as const;
 
@@ -213,9 +214,11 @@ export function backGardenShortcuts(ground: Ground, fill: IslandFill): { shortcu
       // both rings there, and no other road on the way
       const [ix, iz] = on(inner.r, a), [ox, oz] = on(outer.r, a);
       if (!ground.nearOtherRoad(ix, iz, -1, -inner.hw + 1) || !ground.nearOtherRoad(ox, oz, -1, -outer.hw + 1)) continue;
-      for (let r = r0 + PAVEMENT + 1; r < r1 - PAVEMENT - 1 && clear >= SHORTCUT.clear; r += 4) {
+      // off every other street by its pavement and the fences' reach (their widest panel's far edge, 3 m out): not a
+      // way beside a street, and no panel on a pavement
+      for (let r = r0 + PAVEMENT + SHORTCUT.reach + 1; r < r1 - PAVEMENT - SHORTCUT.reach - 1 && clear >= SHORTCUT.clear; r += 4) {
         const [x, z] = on(r, a);
-        if (ground.nearOtherRoad(x, z, -1, 3)) clear = 0;
+        if (ground.nearOtherRoad(x, z, -1, PAVEMENT + SHORTCUT.reach)) clear = 0;
       }
       if (clear >= SHORTCUT.clear) found.push({ a, clear });
     }

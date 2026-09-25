@@ -136,10 +136,11 @@ export interface FootwayRun {
  * A place with its own things: a park's path, the promenade along the seawall, a corner shop's terrace, a Works
  * lot's front yard, a Gardens house's front garden. A lot's place stands on the road edge in front of the lot's
  * middle, `half` its half width along the road. A mayhem zone's market leg (M8 slice 8) starts at its kerb corner
- * and runs `half` m along the footway, its doors in `entrances`; the cold open's things stand at their `spots`.
+ * and runs `half` m along the footway, its doors in `entrances`; the cold open's things stand at their `spots`, and a
+ * place's own things (`spots`: the island's) at theirs, side by side.
  */
 export interface PropPlace {
-  kind: 'park' | 'promenade' | 'terrace' | 'yard' | 'garden' | 'market' | 'route';
+  kind: 'park' | 'promenade' | 'terrace' | 'yard' | 'garden' | 'market' | 'route' | 'spots';
   /** Its centre and the way its length runs (a park's path, the promenade's wall), and its half length. */
   x: number; z: number;
   dx: number; dz: number;
@@ -215,11 +216,12 @@ export function chunkProps(cx: number, cz: number, ctx: PropContext, index = (cz
   const rnd = mulberry32(ctx.seed ^ 0x51ab3e ^ Math.imul(cx + 41, 668265263) ^ Math.imul(cz + 47, 374761393));
   const out: PropDesc[] = [];
   const taken: Array<{ x: number; z: number; r: number }> = [];
-  const put = (kind: PropKind, x: number, z: number, yaw: number, onRoute?: 'loose' | 'solid'): boolean => {
+  const put = (kind: PropKind, x: number, z: number, yaw: number, onRoute?: 'loose' | 'solid', laid = false): boolean => {
     if (out.length >= PROPS_PER_CHUNK) return false;
     const f = propFootprint(kind);
     const r = propRadius(kind);
-    for (const t of taken) if (Math.hypot(t.x - x, t.z - z) < t.r + r + PROP_LINES.apart) return false;
+    // a thing laid at its own spot stands side by side with its row (a fence's panels); the rest keep apart
+    if (!laid) for (const t of taken) if (Math.hypot(t.x - x, t.z - z) < t.r + r + PROP_LINES.apart) return false;
     if (ctx.blocked(x, z, yaw, f.hx, f.hz, onRoute)) return false;
     taken.push({ x, z, r });
     out.push({ id: index * PROPS_PER_CHUNK + out.length, kind, x, z, yaw });
@@ -228,6 +230,8 @@ export function chunkProps(cx: number, cz: number, ctx: PropContext, index = (cz
   // the places that claim their ground first, drawing nothing: the things the cold open drives through, a market
   for (const place of ctx.places) {
     if (place.kind === 'route') for (const s of place.spots ?? []) put(s.kind, s.x, s.z, s.yaw, PROP_TYPES[s.kind].breakImpulse > 0 ? 'solid' : 'loose');
+    // a place's own things at their spots (the island's: the Gardens' back fences, M8.10 slice 10)
+    if (place.kind === 'spots') for (const s of place.spots ?? []) put(s.kind, s.x, s.z, s.yaw, undefined, true);
     if (place.kind !== 'market') continue;
     const face = Math.atan2(-place.nx, -place.nz);
     const at = (u: number, off: number): [number, number] => [place.x + place.dx * u + place.nx * off, place.z + place.dz * u + place.nz * off];

@@ -20,6 +20,7 @@ import { DECK, structures, type Piece, type Structure } from './structures';
 import { PAVEMENT, roadSurfaces, type RoadSurfaces } from './surfaces';
 import { fillIsland, inLot, type IslandFill } from './fill';
 import { buildPlaces, type Place } from './places';
+import type { GardensPlace } from './places/gardens';
 import { buildServices, serviceSpots, siteRect, type ServiceSite } from './services';
 import type { StaticDesc } from '../scene';
 import { BOUNDS, CIRCUS, highwayLoop, islet } from './plan';
@@ -151,6 +152,10 @@ export class Island {
       const x = l.x - fx * back, z = l.z - fz * back;
       return x >= x0 && x < x0 + CHUNK && z >= z0 && z < z0 + CHUNK ? [{ kind: 'yard', x, z, dx: Math.cos(l.yaw), dz: -Math.sin(l.yaw), half: l.hx, nx: fx, nz: fz }] : [];
     });
+    // the places' own things at their spots: the Gardens' back fences across their shortcuts (slice 10)
+    const gardens = this.places.find((p) => p.id === 'gardens') as GardensPlace | undefined;
+    const spots = (gardens?.fences ?? []).filter((s) => s.x >= x0 && s.x < x0 + CHUNK && s.z >= z0 && s.z < z0 + CHUNK);
+    if (spots.length > 0) places.unshift({ kind: 'spots', x: x0, z: z0, dx: 1, dz: 0, half: 0, nx: 0, nz: 1, spots });
     list = chunkProps(i, j, { seed: PROP_SEED, runs, places, blocked: (x, z, yaw, hx, hz) => this.propBlocked(x, z, yaw, hx, hz) }, index);
     this.propLists.set(index, list);
     return list;

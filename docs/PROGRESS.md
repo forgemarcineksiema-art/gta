@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.8 slice 7: damage you can feel
+
+Done: from stage 2 the engine gives 0.95 of its torque, at stage 3 0.9 (`DAMAGE.handling`, `Vehicle.torqueMul`), and the
+car pulls toward the side of the hit that raised the stage (`Life.hurt`, summed with a puncture's pull); a swap, the
+drive-out or a fresh car clears both (`heal`). The plan's numbers broke its own pins, measured on the straight: 0.85 made
+the van's 0–100 19 % slower (pin: at most 15; 0.9 gives 12–14 % in every class), and half the spike's 900 N drifted the
+muscle car 3.7 m in 100 m at 80 km/h (pin 0.5–1.5): the pull is 0.045 / 0.09 m/s² of the car's own mass, about a metre
+in every class. The cold open's van (stage 2 by `setDamage`) gets the tired engine, no pull. Pins M8.8 7.1–7.3.
+
 ## 2026-09-25 — M8.8 slice 6: the three with connections; the rival at its car's pace
 
 Done: the Fake Cruiser's disco bar pulls the road ahead over as a lit unit does (`BodySpec.lit`, `Traffic.playerLit`);

@@ -31,6 +31,11 @@ export interface DamageRules {
   wreckRespawn: number;
   respawnSpeed: number;
   respawnClear: number;
+  /**
+   * A hurt car (M8.8 slice 7), by stage 0–4: the engine's share of its torque, and the sideways push at the rear axle
+   * toward the side of the hit that raised the stage, in m/s² of the car's own mass (so every class drifts alike).
+   */
+  handling: { torque: readonly number[]; pull: readonly number[] };
 }
 
 export interface SwapRules {
@@ -73,6 +78,9 @@ export const DAMAGE: DamageRules = {
   wreckRespawn: 3,
   respawnSpeed: 8,
   respawnClear: 15,
+  // stage 3: the 0–100 at most 14 % slower in any class (the heavy's; 0.85 made it 19 %), and about a metre off a 100 m
+  // line at 80 km/h with no steering (the plan's half of the spike's 900 N made it 3.7 m in the muscle car)
+  handling: { torque: [1, 1, 0.95, 0.9, 0.9], pull: [0, 0, 0.045, 0.09, 0.09] },
 };
 
 export const SWAP: SwapRules = {

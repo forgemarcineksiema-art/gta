@@ -80,6 +80,8 @@ export const TRACK_BOT_BY_CAR: Record<CarId, Partial<TrackBotTuning>> = {
   // 19-23 m/s^2 make the sports car run wide out of the hairpin; the default holds.
   sports: {},
   police: { latAccel: 15 },
+  // tall on soft springs: the van's budget until the gate's sweep (the five hand-set ones fit no rule on mu × g)
+  offroad: { latAccel: 11, brakeAccel: 8 },
 };
 
 /** A police car this close to a stopped bot is an arrest in progress: the bot waits it out instead of resetting (m). */

@@ -3,7 +3,7 @@
  * tuning). Heights above ground with the car at rest, +Z forward.
  */
 import { PALETTE, type CarId } from '../../sim';
-import type { CarProfile } from './carMesh';
+import type { BodyPart, CarProfile } from './carMesh';
 
 /** A long-bonnet coupe: the first car. Heights above ground, length 4.5 m, width ~1.9 m at the belt. */
 export const MUSCLE: CarProfile = {
@@ -161,4 +161,44 @@ export const POLICE: CarProfile = {
   paint: PALETTE.policeWhite,
 };
 
-export const CAR_PROFILES: Record<CarId, CarProfile> = { muscle: MUSCLE, compact: COMPACT, heavy: HEAVY, sports: SPORTS, police: POLICE };
+/** The 4×4 (M8.8 slice 10): a boxy wagon high on big wheels, 4.6 m and 1.95 m tall, a roof rack, a bull bar, a spare on the tailgate. */
+export const OFFROAD: CarProfile = {
+  name: 'offroad',
+  sections: [
+    { z: 2.3, floor: 0.64, belt: 1.02, roof: 1.08, hwFloor: 0.9, hwBelt: 0.94, hwRoof: 0.9 },
+    { z: 2.12, floor: 0.6, belt: 1.12, roof: 1.17, hwFloor: 0.95, hwBelt: 0.98, hwRoof: 0.95 },
+    { z: 1.05, floor: 0.6, belt: 1.18, roof: 1.23, hwFloor: 0.95, hwBelt: 0.98, hwRoof: 0.95 },
+    { z: 0.55, floor: 0.6, belt: 1.2, roof: 1.92, hwFloor: 0.95, hwBelt: 0.98, hwRoof: 0.86 },
+    { z: -2.05, floor: 0.6, belt: 1.2, roof: 1.94, hwFloor: 0.95, hwBelt: 0.98, hwRoof: 0.87 },
+    { z: -2.3, floor: 0.64, belt: 1.18, roof: 1.9, hwFloor: 0.92, hwBelt: 0.96, hwRoof: 0.86 },
+  ],
+  glassSides: [3, 4],
+  glassTops: [2],
+  aPillar: 2,
+  cPillar: 4,
+  pillars: [-0.6],
+  doorSeams: [1.0, -0.65],
+  handleZ: 0.3,
+  headlight: { width: 0.3, height: 0.22, y: 0.93, inset: 0.26 },
+  taillight: { width: 0.2, height: 0.32, y: 1.12, inset: 0.14 },
+  grille: { width: 0.9, height: 0.24, y: 0.9 },
+  bumperHeight: 0.16,
+  lipSpoiler: false,
+  mirrors: true,
+  exhausts: 1,
+  wheelInset: -0.03,
+  wheelStyle: 'heavy',
+  parts: [
+    // the roof rack's rails and its three cross bars
+    { size: [0.06, 0.06, 2.2], at: [0.7, 1.99, -0.75], color: PALETTE.graphite, mirror: true },
+    ...[-1.7, -0.75, 0.2].map((z): BodyPart => ({ size: [1.46, 0.05, 0.06], at: [0, 2.03, z], color: PALETTE.graphite })),
+    // the bull bar over the grille and the spare wheel on the tailgate
+    { size: [1.2, 0.08, 0.08], at: [0, 1.0, 2.38], color: PALETTE.charcoal },
+    { size: [0.08, 0.5, 0.08], at: [0.5, 0.78, 2.38], color: PALETTE.charcoal, mirror: true },
+    { size: [0.72, 0.72, 0.26], at: [0, 1.28, -2.44], color: PALETTE.tyre },
+    { size: [0.4, 0.4, 0.28], at: [0, 1.28, -2.45], color: PALETTE.silver },
+  ],
+  paint: PALETTE.sand,
+};
+
+export const CAR_PROFILES: Record<CarId, CarProfile> = { muscle: MUSCLE, compact: COMPACT, heavy: HEAVY, sports: SPORTS, police: POLICE, offroad: OFFROAD };

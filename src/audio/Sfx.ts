@@ -50,6 +50,8 @@ export class Sfx {
     else if (e.kind === 'camera') this.shutter(ctx, master);
     else if (e.kind === 'jump') { this.crunch(ctx, master, 1); this.ding(ctx, master); }
     else if (e.kind === 'roadblock') { this.splinter(ctx, master); this.crunch(ctx, master, 1); }
+    // a car flattened by the steamroller (M8.8 slice 11): a crunch and a comic two-note sag
+    else if (e.kind === 'flatten') { this.crunch(ctx, master, 3); this.note(ctx, master, 392, 0.06, 0.14, 0.07, 'triangle'); this.note(ctx, master, 196, 0.18, 0.3, 0.07, 'triangle'); }
     // jobs and the wall (M5): a two-note sting up, a chord, a low buzz; a ping when the wanted car turns up
     else if (e.kind === 'jobStart') { this.note(ctx, master, 523.25, 0, 0.12, 0.09, 'square'); this.note(ctx, master, 783.99, 0.11, 0.2, 0.09, 'square'); }
     else if (e.kind === 'jobDone') { for (const f of [523.25, 659.25, 783.99, 1046.5]) this.note(ctx, master, f, 0, 0.6, 0.06, 'triangle'); }

@@ -12,6 +12,26 @@ borrow. Four hints for 8 s in sessions 1–2, the full list on the pause; three 
 a title, one line (≤ 34, both languages) and its number; cards 2.5 s. Decided: `taught` and `sessions` join v6 as the
 language did (no version bump while M8.8's build shares the save). Pins M8.9 9.1–9.6. Stills and verify green.
 
+## 2026-09-25 — M8.8 slice 11: the pancake and the steamroller
+
+Done: `Traffic.flatten` wrecks a record where it stands, flat at its heading, gives back its lent body and never lends
+it again (nothing to hit); the render draws it a quarter high and a tenth wider (`traffic.flat`), a `flatten` event plays
+a crunch and a two-note sag. The steamroller (`roller`, the van's class, 9 t, 33 km/h flat out) flattens every car its
+front drum meets (`BodySpec.drum`, `Life.flattenStep`, a ground-rectangle overlap test): a driver climbs out shaking a
+fist, a unit is a takedown, a roadblock's car breaches the block and pays. Hidden on the Works' yard by the giant ball,
+a slow low chug for a clue; its card ONLY IT: FLATTENS CARS (TYLKO ON: ROZJEŻDŻA AUTA). Bodies added since M8.8 are
+appended in the order they came (`ADDED`). The crazy cars are measured, not ranked, in bodies.long. Pins M8.8 11.1–11.5.
+
+## 2026-09-25 — M8.8 slice 10: the 4×4 class
+
+Done: a sixth class, `offroad` (4×4, TERENÓWKA; OFF-ROAD, TEREN): 1,950 kg, 4WD, 360 N·m to 6,000 rpm, 0.42 m wheels on
+0.42 m springs; 0–100 7.8 s, 165 km/h, 36 m from 100, a 27° drift, a 38.5 s lap; on a lawn 8.0 s (the muscle car 8.3).
+Its shell is appended after the last body; `isShell`, the descriptors, `Jobs`, `ensure` and the parked police read the
+class through the body, never the index. The SUV and the pickup drive as it; 40,000 on the wall, which now lists the
+catalogue by price; the model's first hour buys it. Decided: pin 10.2 leaves out the sports car (5.1 s on a lawn; beating
+it would need grass that stops road cars dead); the track bot's budget stays hand-set (11, the van's; no rule fits the
+five). Pins M8.8 10.1 (its row), 10.2, 10.3 (save.test), 10.4 (bodies.test).
+
 ## 2026-09-25 — M8.9 slice 8: the corners and the gauge
 
 Done (R4): the stars without their panel, outlined, the next one filling from its foot (`heatFill`, 24 steps; the `+n`

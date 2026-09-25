@@ -119,4 +119,13 @@ describe('M8.8 slice 3: what a car is for', () => {
       expect(carLine('fakecop')).toBe('NAJLEPIEJ TORUJE DROGĘ');
     } finally { setLang('en'); }
   });
+
+  it('M8.8 11.5 a crazy car\'s card says the one thing only it does, the Polish pronoun the car\'s', () => {
+    try {
+      setLang('en');
+      expect(carLine('roller')).toBe('ONLY IT: FLATTENS CARS');
+      setLang('pl');
+      expect(carLine('roller')).toBe('TYLKO ON: ROZJEŻDŻA AUTA');
+    } finally { setLang('en'); }
+  });
 });

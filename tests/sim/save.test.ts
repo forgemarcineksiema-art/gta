@@ -138,7 +138,25 @@ describe('save format', () => {
       collect(sim, out);
       expect(out).toEqual(save);
       expect(serialize(out)).toBe(serialize(save));
-      for (const id of CAR_IDS) expect(sim.garage.owned.has(id)).toBe(true);
+      // every car the document owns (it predates the 4×4, M8.8 slice 10)
+      for (const id of save.owned) expect(sim.garage.owned.has(id)).toBe(true);
+    } finally { sim.dispose(); }
+  });
+
+  it('M8.8 10.3 a save from before the 4×4 loads with the class at tier 0, not owned, and a kept SUV drives as a 4×4', async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
+    try {
+      const save = filled([]);
+      save.owned.push('suv');
+      apply(sim, save);
+      expect(sim.garage.tiers.offroad).toEqual([0, 0, 0]);
+      expect(sim.garage.owned.has('offroad')).toBe(false);
+      for (const id of CAR_IDS) if (id !== 'offroad') expect(sim.garage.owned.has(id)).toBe(true);
+      sim.garage.select('suv');
+      sim.garage.applyToVehicle();
+      expect(sim.carBody).toBe('suv');
+      expect(sim.carId).toBe('offroad');
+      expect(sim.vehicle.tuning.driveFrontShare).toBe(CAR_PRESETS.offroad.driveFrontShare);
     } finally { sim.dispose(); }
   });
 

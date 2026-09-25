@@ -376,6 +376,7 @@ export const PL: Readonly<Record<string, string>> = {
   'VAN': 'VAN',
   'SPORTS CAR': 'AUTO SPORTOWE',
   'POLICE CAR': 'RADIOWÓZ',
+  '4×4': 'TERENÓWKA',
   'SEDAN': 'SEDAN',
   'HATCHBACK': 'HATCHBACK',
   'ESTATE': 'KOMBI',
@@ -399,10 +400,12 @@ export const PL: Readonly<Record<string, string>> = {
   'ROADSTER': 'ROADSTER',
   'STREET SWEEPER': 'ZAMIATARKA',
   'HOT-DOG VAN': 'WÓZ Z HOT-DOGAMI',
+  'STEAMROLLER': 'WALEC',
   // what a car is for, under its name on the wall (M8.8 slice 3); DRIFT and CITY say what they say elsewhere
   'RAM': 'TARAN',
   'SPEED': 'PRĘDKOŚĆ',
   'DISGUISE': 'PRZEBRANIE',
+  'OFF-ROAD': 'TEREN',
   // a trophy's BEST AT (M8.8 slice 5): the English line's words; the Polish line agrees with the car (PL_BEST below)
   'BEST AT: {thing}': 'NAJLEPSZY W: {thing}',
   'DRIFTS': 'DRIFT',
@@ -414,6 +417,9 @@ export const PL: Readonly<Record<string, string>> = {
   // the three with connections (M8.8 slice 6)
   'CLEARING THE ROAD': 'TOROWANIE DROGI',
   'GETTING BUSTED': 'WPADKA',
+  // a crazy car's one trick (M8.8 phase F): the English line's words; the Polish pronoun agrees with the car (PL_ONLY_IT)
+  'ONLY IT: {thing}': 'TYLKO ON: {thing}',
+  'FLATTENS CARS': 'ROZJEŻDŻA AUTA',
 
   // the districts and their landmarks (sim/city/City.ts)
   'CROWN HEIGHTS': 'KORONNE WZGÓRZA',
@@ -536,10 +542,11 @@ export const PL: Readonly<Record<string, string>> = {
 
 /** A car's grammatical gender, by its English name: the paint before it agrees (CZERWONY SEDAN, CZERWONA TAKSÓWKA). */
 export const PL_GENDER: Readonly<Record<string, 'm' | 'f' | 'n'>> = {
-  'MUSCLE CAR': 'm', 'COMPACT': 'm', 'VAN': 'm', 'SPORTS CAR': 'n', 'POLICE CAR': 'm', 'SEDAN': 'm', 'HATCHBACK': 'm',
+  'MUSCLE CAR': 'm', 'COMPACT': 'm', 'VAN': 'm', 'SPORTS CAR': 'n', 'POLICE CAR': 'm', '4×4': 'f', 'SEDAN': 'm', 'HATCHBACK': 'm',
   'ESTATE': 'n', 'SUV': 'm', 'PICKUP': 'm', 'TAXI': 'f', 'BOX TRUCK': 'm', 'BUS': 'm', 'ICE-CREAM TRUCK': 'm', 'WAGON': 'm',
   'PIZZA HATCH': 'm', 'WRECKER': 'f', 'TWIN': 'm', 'FAKE CRUISER': 'm', 'PARTY BUS': 'm', 'LOWRIDER': 'm', 'GOLD LIMO': 'f',
   'BUBBLE': 'm', 'PHANTOM': 'm', "CHIEF'S CRUISER": 'm', 'ROADSTER': 'm', 'STREET SWEEPER': 'f', 'HOT-DOG VAN': 'm',
+  'STEAMROLLER': 'm',
 };
 
 /** A paint's three forms (masculine, feminine, neuter), by its English name (`PAINT_NAMES`, and ODD for any other). */
@@ -556,6 +563,9 @@ export const PL_PAINT: Readonly<Record<string, readonly [string, string, string]
   'YELLOW': ['ŻÓŁTY', 'ŻÓŁTA', 'ŻÓŁTE'],
   'ODD': ['NIETYPOWY', 'NIETYPOWA', 'NIETYPOWE'],
 };
+
+/** ONLY IT in Polish, by the car's gender (M8.8 phase F): TYLKO ON (walec), TYLKO ONA, TYLKO ONO. */
+export const PL_ONLY_IT: readonly [string, string, string] = ['TYLKO ON', 'TYLKO ONA', 'TYLKO ONO'];
 
 /**
  * A trophy's BEST AT line by its English thing (M8.8 slice 5): masculine, feminine, neuter, as the car is (PL_GENDER).

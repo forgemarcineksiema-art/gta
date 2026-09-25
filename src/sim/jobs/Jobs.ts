@@ -44,8 +44,7 @@ import { alongLane, laneChain } from '../city/route';
 import type { Lane } from '../city/roads';
 import { AgentState, type PlayerProbe } from '../traffic/Traffic';
 import type { BodyId } from '../traffic/bodies';
-import { CAR_IDS } from '../vehicle/presets';
-import { trialMedal, type JobDef } from './catalog';
+import { trialMedal, unpackDescriptor, type JobDef } from './catalog';
 import { Race } from './Race';
 import { markerRingCoins, pointTarget } from './place';
 
@@ -565,8 +564,7 @@ export class Jobs {
   private hunt(d: JobDef, probe: PlayerProbe, dt: number): void {
     const traffic = this.sim.traffic;
     if (!traffic) return;
-    const kind = CAR_IDS[(d.descriptor >>> 24) & 0xff] ?? 'compact';
-    const paint = d.descriptor & 0xffffff;
+    const { kind, paint } = unpackDescriptor(d.descriptor);
     const w = this.wantedAgent;
     if (w >= 0) {
       const st = traffic.state[w];
@@ -605,8 +603,8 @@ export class Jobs {
   /** An order arrives in its own class and not as a wreck; a delivery always. */
   private canArrive(d: JobDef): boolean {
     if (d.kind !== 'order') return true;
-    const kind = CAR_IDS[(d.descriptor >>> 24) & 0xff];
-    return this.sim.carBody === kind && this.sim.life.state.stage < 4 && !this.sim.life.state.wrecked;
+    // the class's own shell, as the order names it
+    return this.sim.carBody === unpackDescriptor(d.descriptor).body && this.sim.life.state.stage < 4 && !this.sim.life.state.wrecked;
   }
 
   /** The wanted car goes back to being traffic. */

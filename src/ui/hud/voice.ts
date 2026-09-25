@@ -18,8 +18,9 @@ export type Where = 'top' | 'pop' | 'none';
 export const WHERE: Record<EventKind, Where> = {
   // the combo counts these, and shows them in its own corner
   nearMiss: 'none', nearMissOncoming: 'none', oncoming: 'none', smash: 'none',
-  // the world says these: the walker's leap, the new car, the horn, the dents, the WRECKED card
+  // the world says these: the walker's leap, the new car, the horn, the dents, the WRECKED card, the pancake
   nearMissPed: 'none', swap: 'none', honk: 'none', horn: 'none', hit: 'none', damage: 'none', wrecked: 'none', respawn: 'none',
+  flatten: 'none',
   // the run's own screens and lines say these: the door, the card, the job line and its card, the wall, the bag
   door: 'none', banked: 'none', busted: 'none', coin: 'none', spill: 'none', roadblock: 'none',
   jobStart: 'none', jobDone: 'none', jobFailed: 'none', orderFound: 'none', purchase: 'none',

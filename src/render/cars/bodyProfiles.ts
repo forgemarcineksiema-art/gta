@@ -648,6 +648,51 @@ export const HOTDOG: CarProfile = {
   paint: PALETTE.coin,
 };
 
+/**
+ * The steamroller (M8.8 slice 11), 5.8 m: the drum across the front (a steel octagon of two crossed blocks, 1.5 m across
+ * and 1.9 wide) in its yellow yoke, the engine box behind, a cab with a canopy over the rear wheels.
+ */
+export const ROLLER: CarProfile = {
+  name: 'roller',
+  sections: [
+    { z: 1.3, floor: 0.55, belt: 1.3, roof: 1.36, hwFloor: 0.92, hwBelt: 0.96, hwRoof: 0.9 },
+    { z: 1.2, floor: 0.5, belt: 1.4, roof: 1.48, hwFloor: 0.96, hwBelt: 1.0, hwRoof: 0.96 },
+    { z: 0.2, floor: 0.5, belt: 1.42, roof: 1.5, hwFloor: 0.96, hwBelt: 1.0, hwRoof: 0.96 },
+    { z: 0.1, floor: 0.5, belt: 1.42, roof: 2.75, hwFloor: 1.0, hwBelt: 1.02, hwRoof: 0.98 },
+    { z: -2.1, floor: 0.5, belt: 1.42, roof: 2.75, hwFloor: 1.0, hwBelt: 1.02, hwRoof: 0.98 },
+    { z: -2.2, floor: 0.5, belt: 1.4, roof: 1.6, hwFloor: 1.0, hwBelt: 1.02, hwRoof: 0.98 },
+    { z: -2.9, floor: 0.55, belt: 1.36, roof: 1.42, hwFloor: 0.96, hwBelt: 0.98, hwRoof: 0.94 },
+  ],
+  glassSides: [3, 4],
+  glassTops: [2],
+  aPillar: 2,
+  cPillar: -1,
+  pillars: [],
+  doorSeams: [0.05, -1.2],
+  handleZ: -0.9,
+  headlight: { width: 0.24, height: 0.16, y: 1.2, inset: 0.18 },
+  taillight: { width: 0.18, height: 0.16, y: 1.1, inset: 0.12 },
+  grille: { width: 1.2, height: 0.4, y: 0.95 },
+  bumperHeight: 0.14,
+  lipSpoiler: false,
+  mirrors: false,
+  exhausts: 0,
+  wheelInset: 0.01,
+  wheelStyle: 'heavy',
+  parts: [
+    // the drum: two crossed steel blocks make its octagon, the hubs darker; the yoke over it in the paint
+    { size: [1.9, 1.5, 0.9], at: [0, 0.75, 2.15], color: PALETTE.steel },
+    { size: [1.9, 0.9, 1.5], at: [0, 0.75, 2.15], color: PALETTE.steel },
+    { size: [0.06, 0.5, 0.5], at: [0.96, 0.75, 2.15], color: PALETTE.charcoal, mirror: true },
+    { size: [2.02, 0.16, 1.3], at: [0, 1.66, 2.15], color: 'paint' },
+    { size: [0.08, 0.8, 0.5], at: [1.0, 1.2, 2.15], color: 'paint', mirror: true },
+    // the exhaust stack and the amber beacon on the canopy
+    { size: [0.12, 1.0, 0.12], at: [0.6, 1.95, 0.9], color: PALETTE.charcoal },
+    { size: [0.24, 0.16, 0.24], at: [0, 2.83, -1.0], color: PALETTE.cone },
+  ],
+  paint: PALETTE.coin,
+};
+
 /** Every body's profile: the player's five classes, the city's eight, the hidden truck and the wanted board's cars. */
 export const BODY_PROFILES: Record<BodyId, CarProfile> = {
   ...CAR_PROFILES,
@@ -655,4 +700,5 @@ export const BODY_PROFILES: Record<BodyId, CarProfile> = {
   wagon: WAGON, pizza: PIZZA, wrecker: WRECKER, twin: TWIN, fakecop: FAKECOP, partybus: PARTYBUS,
   lowrider: LOWRIDER, limo: LIMO, bubble: BUBBLE, phantom: PHANTOM, chiefcar: CHIEFCAR,
   roadster: ROADSTER, sweeper: SWEEPER, hotdog: HOTDOG,
+  roller: ROLLER,
 };

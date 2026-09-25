@@ -13,6 +13,27 @@ import { AgentState, type SwapHandover } from '../traffic/Traffic';
 import { PedPose } from '../traffic/Pedestrians';
 import { POLICE } from '../police/tuning';
 
+/** How far past the steamroller's drum a car still counts as touching it (m): the contact holds a car off it. */
+const DRUM_REACH = 0.35;
+
+/** One axis of two ground rectangles' separation test: their spans on it overlap. */
+function spansMeet(ux: number, uz: number, dx: number, dz: number,
+  afx: number, afz: number, ahw: number, ahl: number, bfx: number, bfz: number, bhw: number, bhl: number): boolean {
+  const ra = ahl * Math.abs(afx * ux + afz * uz) + ahw * Math.abs(-afz * ux + afx * uz);
+  const rb = bhl * Math.abs(bfx * ux + bfz * uz) + bhw * Math.abs(-bfz * ux + bfx * uz);
+  return Math.abs(dx * ux + dz * uz) <= ra + rb;
+}
+
+/** Whether two rectangles on the ground meet: centres, headings (+z forward at yaw 0) and half extents (across, along). */
+function boxesMeet(ax: number, az: number, ayaw: number, ahw: number, ahl: number, bx: number, bz: number, byaw: number, bhw: number, bhl: number): boolean {
+  const dx = bx - ax, dz = bz - az;
+  const afx = Math.sin(ayaw), afz = Math.cos(ayaw), bfx = Math.sin(byaw), bfz = Math.cos(byaw);
+  return spansMeet(afx, afz, dx, dz, afx, afz, ahw, ahl, bfx, bfz, bhw, bhl)
+    && spansMeet(-afz, afx, dx, dz, afx, afz, ahw, ahl, bfx, bfz, bhw, bhl)
+    && spansMeet(bfx, bfz, dx, dz, afx, afz, ahw, ahl, bfx, bfz, bhw, bhl)
+    && spansMeet(-bfz, bfx, dx, dz, afx, afz, ahw, ahl, bfx, bfz, bhw, bhl);
+}
+
 export interface LifeState {
   damage: number;
   stage: 0 | 1 | 2 | 3 | 4;
@@ -100,6 +121,7 @@ export class Life {
     }
     this.hits();
     this.damageStep();
+    this.flattenStep();
     this.takedowns();
     this.billboards();
     this.nearMisses(dt);
@@ -156,6 +178,46 @@ export class Life {
     }
     this.prevVx = tm.vx;
     this.prevVz = tm.vz;
+  }
+
+  /**
+   * The steamroller's drum (M8.8 slice 11): every car whose footprint meets it is flattened, at any speed, a parked unit
+   * and a roadblock's cars too; a driver climbs out beside the pancake shaking a fist; a unit is the player's takedown.
+   */
+  private flattenStep(): void {
+    const traffic = this.sim.traffic;
+    const drum = bodySpec(this.sim.carBody).drum;
+    if (!drum || !traffic || this.state.wrecked) return;
+    const v = this.sim.vehicle;
+    const p = v.body.translation(this.proj);
+    const yaw = M.yawOf(v.body.rotation(this.rot));
+    const fx = Math.sin(yaw), fz = Math.cos(yaw);
+    // the drum across the front of the chassis, a hand's breadth of reach round it (the cars meet it, never enter it)
+    const along = v.tuning.chassisHalfExtents.z - drum.length / 2;
+    const cx = p.x + fx * along, cz = p.z + fz * along;
+    for (let i = 0; i < traffic.capacity; i++) {
+      const st = traffic.state[i];
+      if (st === AgentState.Free || traffic.flat[i] === 1) continue;
+      const x = traffic.x[i] as number, z = traffic.z[i] as number, ayaw = traffic.yaw[i] as number;
+      if ((x - cx) ** 2 + (z - cz) ** 2 > 81) continue;
+      if (!boxesMeet(cx, cz, yaw, drum.halfWidth + DRUM_REACH, drum.length / 2 + DRUM_REACH, x, z, ayaw, traffic.halfWidthOf(i), traffic.halfLengthOf(i))) continue;
+      const unit = traffic.police[i] === 1;
+      const driven = st === AgentState.Kinematic || st === AgentState.Physical || st === AgentState.Disturbed;
+      if (!traffic.flatten(i)) continue;
+      this.sim.events.push('flatten', 0, x, 0.3, z, i);
+      // its driver climbs out on the side away from the drum and shakes a fist at the roller
+      if (driven || unit) {
+        const lx = Math.cos(ayaw), lz = -Math.sin(ayaw);
+        const side = (x - cx) * lx + (z - cz) * lz >= 0 ? 1 : -1;
+        const px = x + lx * side * (traffic.halfWidthOf(i) + 1.2), pz = z + lz * side * (traffic.halfWidthOf(i) + 1.2);
+        this.sim.peds?.spawnAt(px, pz, Math.atan2(p.x - px, p.z - pz), PedPose.Fist);
+      }
+      // a unit flattened is a takedown (read below, this step)
+      if (unit) {
+        traffic.justWrecked[i] = 1;
+        traffic.lastPlayerContactTick[i] = this.sim.tick;
+      }
+    }
   }
 
   /** A billboard the footprint crosses at speed smashes: boost, a small speed loss, one `billboard` event, once per id. */

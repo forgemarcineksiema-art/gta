@@ -28,7 +28,7 @@ export interface ModelInput {
 export interface Knobs {
   multiplier: readonly number[];
   fine: number;
-  prices: { compact: number; heavy: number; sports: number };
+  prices: { compact: number; heavy: number; offroad: number; sports: number };
   tierPrices: readonly number[];
 }
 
@@ -89,14 +89,15 @@ export function evTable(input: ModelInput, knobs: Knobs = BALANCE_KNOBS): { novi
 }
 
 /**
- * The purchase ladder in the order a player buys: the compact, a tier, the van, then the tiers, with the sports
- * car last (the second hour's goal; the tiers carry the first).
+ * The purchase ladder in the order a player buys: the compact, a tier, the van, then the tiers with the 4×4 among
+ * them (M8.8 slice 10), the sports car last (the second hour's goal; the tiers carry the first).
  */
 export function ladder(knobs: Knobs = BALANCE_KNOBS): Array<[string, number]> {
   const t = knobs.tierPrices;
   return [
     ['compact', knobs.prices.compact], ['tier 1 power', t[0] as number], ['heavy', knobs.prices.heavy],
     ['tier 1 grip', t[0] as number], ['tier 2 power', t[1] as number], ['tier 1 boost', t[0] as number],
+    ['offroad', knobs.prices.offroad],
     ['tier 2 grip', t[1] as number], ['tier 3 power', t[2] as number], ['tier 2 boost', t[1] as number],
     ['tier 3 grip', t[2] as number], ['tier 3 boost', t[2] as number], ['sports', knobs.prices.sports],
   ];
@@ -132,7 +133,7 @@ export function firstHour(input: ModelInput, knobs: Knobs = BALANCE_KNOBS): Firs
   const kitShop = KIT.filter((k) => k.price > 0).sort((a, b) => a.price - b.price);
   let kitNext = 0, lastSeen = COLD_OPEN.minutes, cars = 1;
   const seen: number[] = [];
-  const CARS = new Set(['compact', 'heavy', 'sports']);
+  const CARS = new Set(['compact', 'heavy', 'offroad', 'sports']);
   const step = 1 / 60, doorTicks = Math.round(runMinutes / step);
   for (let tick = 1, start = Math.round(COLD_OPEN.minutes / step); start + tick <= HOUR / step && rung < steps.length; tick++) {
     funds += input.coinsPerMinute * step;

@@ -8,10 +8,15 @@
 import { HIDDEN_CARS } from '../../src/sim/city/stash';
 import { describe, expect, it } from 'vitest';
 import type { SimWorld } from '../../src/sim';
-import { BODIES, BODY_IDS, BODY_INDEX, CIVILIAN_BODIES, bodySpec, bodyTuning, isRivalBody, isShell, pickBody, type CivilianBody, type RoadKind } from '../../src/sim/traffic/bodies';
-import { AgentState, type Traffic } from '../../src/sim/traffic/Traffic';
+import { BODIES, BODY_IDS, BODY_INDEX, CIVILIAN_BODIES, bodySpec, bodyTuning, isRivalBody, isShell, pickBody, type BodyId, type CivilianBody, type RoadKind } from '../../src/sim/traffic/bodies';
+import { AgentState, PLAYER_PAINT, type Traffic } from '../../src/sim/traffic/Traffic';
 import { TRAFFIC } from '../../src/sim/traffic/tuning';
 import { CAR_IDS, CAR_PRESETS } from '../../src/sim/vehicle/presets';
+import { BALANCE } from '../../src/sim/balance';
+import { CAR_WORDS, ROLE_WORDS, packDescriptor, unpackDescriptor } from '../../src/sim/jobs/catalog';
+import { TRACK_BOT_BY_CAR } from '../../src/app/trackBot';
+import { CAR_PROFILES } from '../../src/render/cars/carProfiles';
+import { CLASS_VOICES } from '../../src/audio/voices';
 import { PALETTE } from '../../src/sim/palette';
 import { createWorld, run } from './helpers';
 
@@ -61,9 +66,10 @@ describe('traffic\'s own bodies', () => {
       sim.police!.dispatching = false;
       const traffic = sim.traffic as Traffic;
       run(sim, 6);
-      for (let b = 0; b < CAR_IDS.length; b++) expect(traffic.bodySpawns[b]).toBe(0);
+      // a shell is read by its class, not its index: a class added since (the 4×4) has its shell after the civilians
+      for (const id of CAR_IDS) expect(traffic.bodySpawns[BODY_INDEX[id]]).toBe(0);
       let kinds = 0;
-      for (let b = CAR_IDS.length; b < BODIES.length; b++) if ((traffic.bodySpawns[b] as number) > 0) kinds++;
+      for (let b = 0; b < BODIES.length; b++) if (!isShell(BODY_IDS[b] as BodyId) && (traffic.bodySpawns[b] as number) > 0) kinds++;
       expect(kinds).toBeGreaterThanOrEqual(6);
       let checked = 0;
       for (let i = 0; i < traffic.capacity; i++) {
@@ -192,4 +198,32 @@ describe('every body at its own mass (M8.8 slice 4)', () => {
       expect(sim.vehicle.tuning.mass).toBe(550);
     } finally { sim.dispose(); }
   });
+});
+
+describe('M8.8 slice 10: the 4×4 in every table', () => {
+  it('M8.8 10.4 its shell comes after the civilians and is read by its class; its descriptor unpacks to it; every class table has its row', async () => {
+    // appended right after the last body before it, never renumbered (the steamroller came after it, slice 11)
+    expect(BODY_IDS.indexOf('offroad')).toBe(BODY_IDS.indexOf('hotdog') + 1);
+    expect(BODIES.map((b) => b.id)).toEqual([...BODY_IDS]);
+    expect(isShell('offroad')).toBe(true);
+    expect(isShell('suv')).toBe(false);
+    expect([bodySpec('suv').car, bodySpec('pickup').car]).toEqual(['offroad', 'offroad']);
+    expect(unpackDescriptor(packDescriptor('offroad', PALETTE.sand))).toEqual({ kind: 'offroad', body: 'offroad', paint: PALETTE.sand });
+    // the first five pack as they always did, so a descriptor written before still reads
+    for (const id of CAR_IDS.slice(0, 5)) expect(packDescriptor(id, 0) >>> 24).toBe(CAR_IDS.indexOf(id));
+    const tables: ReadonlyArray<Readonly<Record<string, unknown>>> = [
+      CAR_PRESETS, CAR_WORDS, ROLE_WORDS, PLAYER_PAINT, TRAFFIC.classPace, TRAFFIC.mass, TRACK_BOT_BY_CAR, CAR_PROFILES, CLASS_VOICES,
+    ];
+    for (const table of tables) expect(Object.keys(table).sort()).toEqual([...CAR_IDS].sort());
+    expect(BALANCE.prices.offroad).toBe(40_000);
+    // a record in its shell drives as the class
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
+    try {
+      const traffic = sim.traffic as Traffic;
+      const agent = traffic.spawnAt(0, 10, 'offroad');
+      expect(traffic.bodyOf(agent)).toBe('offroad');
+      expect(traffic.kindOf(agent)).toBe('offroad');
+      expect(traffic.halfLengthOf(agent)).toBeCloseTo(CAR_PRESETS.offroad.chassisHalfExtents.z, 5);
+    } finally { sim.dispose(); }
+  }, 60_000);
 });

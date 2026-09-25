@@ -7,8 +7,8 @@
 import { BALANCE } from '../balance';
 import { CITY_COLORS, PALETTE } from '../palette';
 import { PLAYER_PAINT } from '../traffic/Traffic';
-import { CAR_IDS, type CarId } from '../vehicle/presets';
-import { BODIES, BODY_IDS, type BodyId } from '../traffic/bodies';
+import type { CarId } from '../vehicle/presets';
+import { BODIES, BODY_IDS, BODY_INDEX, type BodyId } from '../traffic/bodies';
 
 export type JobKind = 'delivery' | 'order' | 'escape' | 'trial' | 'race' | 'rage' | 'mayhem' | 'fare' | 'duel';
 
@@ -56,7 +56,8 @@ export function orderPaints(kind: CarId): number[] {
 }
 
 export function packDescriptor(kind: CarId, paint: number): number {
-  return (CAR_IDS.indexOf(kind) << 24) | (paint & 0xffffff);
+  // the class's shell's body index (a class added since M8.8 slice 10 has its shell after the civilians)
+  return (BODY_INDEX[kind] << 24) | (paint & 0xffffff);
 }
 
 /** An order's or a suspect's car: the body index over the paint (a class's index is its own shell's). */
@@ -71,10 +72,10 @@ export function paintName(paint: number): string {
 }
 
 /** What the card calls a class. */
-export const CAR_WORDS: Record<CarId, string> = { muscle: 'MUSCLE CAR', compact: 'COMPACT', heavy: 'VAN', sports: 'SPORTS CAR', police: 'POLICE CAR' };
+export const CAR_WORDS: Record<CarId, string> = { muscle: 'MUSCLE CAR', compact: 'COMPACT', heavy: 'VAN', sports: 'SPORTS CAR', police: 'POLICE CAR', offroad: '4×4' };
 
-/** A class's job in one word (M8.8 R1): the drift, the city, the ram, the speed, the disguise. */
-export const ROLE_WORDS: Record<CarId, string> = { muscle: 'DRIFT', compact: 'CITY', heavy: 'RAM', sports: 'SPEED', police: 'DISGUISE' };
+/** A class's job in one word (M8.8 R1): the drift, the city, the ram, the speed, the disguise, off the road. */
+export const ROLE_WORDS: Record<CarId, string> = { muscle: 'DRIFT', compact: 'CITY', heavy: 'RAM', sports: 'SPEED', police: 'DISGUISE', offroad: 'OFF-ROAD' };
 
 /** A trophy's one thing, the best in the game at it (M8.8 R2, slice 5): its card's BEST AT line. */
 export const BEST_AT: Partial<Record<BodyId, string>> = {
@@ -83,10 +84,13 @@ export const BEST_AT: Partial<Record<BodyId, string>> = {
   fakecop: 'CLEARING THE ROAD', limo: 'GETTING BUSTED', chiefcar: 'DISGUISE',
 };
 
-/** The line under a car's name on the wall (M8.8 slices 3, 5): a trophy's BEST AT, else what its class is for. */
+/** A crazy car's one trick, no other car's (M8.8 phase F): its card's ONLY IT line. */
+export const ONLY_IT: Partial<Record<BodyId, string>> = { roller: 'FLATTENS CARS' };
+
+/** The line under a car's name on the wall (M8.8 slices 3, 5, 11): a crazy car's ONLY IT, a trophy's BEST AT, else what its class is for. */
 export function cardLine(body: BodyId): string {
-  const best = BEST_AT[body];
-  return best ? `BEST AT: ${best}` : ROLE_WORDS[(BODIES[BODY_IDS.indexOf(body)] as (typeof BODIES)[number]).car];
+  const only = ONLY_IT[body], best = BEST_AT[body];
+  return only ? `ONLY IT: ${only}` : best ? `BEST AT: ${best}` : ROLE_WORDS[(BODIES[BODY_IDS.indexOf(body)] as (typeof BODIES)[number]).car];
 }
 /** What the radio calls a body. */
 export const BODY_WORDS: Record<BodyId, string> = {
@@ -94,6 +98,7 @@ export const BODY_WORDS: Record<BodyId, string> = {
   wagon: 'WAGON', pizza: 'PIZZA HATCH', wrecker: 'WRECKER', twin: 'TWIN', fakecop: 'FAKE CRUISER', partybus: 'PARTY BUS',
   lowrider: 'LOWRIDER', limo: 'GOLD LIMO', bubble: 'BUBBLE', phantom: 'PHANTOM', chiefcar: "CHIEF'S CRUISER",
   roadster: 'ROADSTER', sweeper: 'STREET SWEEPER', hotdog: 'HOT-DOG VAN',
+  roller: 'STEAMROLLER',
 };
 
 /** A trial's medal times from its bronze limit (M5.5 slice 10): gold, silver, bronze, seconds. */

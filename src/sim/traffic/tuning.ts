@@ -238,6 +238,8 @@ export const TRAFFIC: TrafficTuning = {
       // the wanted board's cars (M6) are never traffic
       wagon: 0, pizza: 0, wrecker: 0, twin: 0, fakecop: 0, partybus: 0, lowrider: 0, limo: 0, bubble: 0, phantom: 0, chiefcar: 0,
       roadster: 0, sweeper: 0, hotdog: 0,
+      // the crazy cars (M8.8 phase F) are hidden, never traffic
+      roller: 0,
     },
     places: {
       crown: { taxi: 4 },
@@ -250,7 +252,7 @@ export const TRAFFIC: TrafficTuning = {
     },
   },
   pace: { values: [0.85, 1.0, 1.1, 1.18], weights: [0.15, 0.55, 0.22, 0.08] },
-  classPace: { compact: 1, muscle: 1, heavy: 0.9, sports: 1.1, police: 1 },
+  classPace: { compact: 1, muscle: 1, heavy: 0.9, sports: 1.1, police: 1, offroad: 1 },
   temper: { gapTime: [0.9, 1.6], badShare: 0.125, badGap: 0.6, badDrift: 0.5, badClaimAfter: 3 },
   overtake: { slowerBy: 2, clear: 1.2, look: 40, endClear: 40, cooldown: 4 },
   flinch: { seconds: 2.5, offset: 1.2, brake: 8, hold: 1.5 },
@@ -263,7 +265,7 @@ export const TRAFFIC: TrafficTuning = {
   shiftRate: 2.5,
   densityByLevel: [1, 1, 1, 0.9, 0.6, 0.6],
   cloneDistance: 150,
-  mass: { compact: 1050, muscle: 1300, heavy: 2400, sports: 1180, police: 1620 },
+  mass: { compact: 1050, muscle: 1300, heavy: 2400, sports: 1180, police: 1620, offroad: 1950 },
   friction: 0.4,
   restitution: 0.3,
   linearDamping: 0.3,

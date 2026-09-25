@@ -43,7 +43,9 @@ export type EventKind =
   // a standing prop knocked down (M8): value = its bill when the player knocked it (0 for anyone else), target = its id
   | 'smash'
   // the run's property damage in a district passed a mark (M8 slice 6): value = the mark, target = the district's index
-  | 'damageNews';
+  | 'damageNews'
+  // a car flattened by the steamroller's drum (M8.8 slice 11): target = its record
+  | 'flatten';
 
 export interface SimEvent {
   kind: EventKind;

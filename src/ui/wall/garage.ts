@@ -33,6 +33,16 @@ import {
   type BodyId, type CarSlot, type KitSlot, type PrepItem, type RivalDef, type SimWorld, type Stat,
 } from '../../sim';
 
+/** The CARS page's order: the catalogue by price (the 4×4 between the van and the sports car, M8.8 slice 10), then the city's cars. */
+const CARD_ORDER: readonly BodyId[] = [
+  ...BODY_IDS.filter((id) => isShell(id)).sort((a, b) => shellPrice(a) - shellPrice(b)),
+  ...BODY_IDS.filter((id) => !isShell(id)),
+];
+
+function shellPrice(id: BodyId): number {
+  return (BALANCE.prices as Partial<Record<BodyId, number>>)[id] ?? 0;
+}
+
 export interface GarageActions {
   buy(car: BodyId): void;
   /** Keep the car driven in (DESIGN.md §13.7, any body since M6). */
@@ -165,7 +175,7 @@ export class GarageUi {
     this.carsCount = el('div', 'wall__for');
     const grid = el('div', 'wall__cars');
     const carItems: Item[] = [];
-    for (const id of BODY_IDS) {
+    for (const id of CARD_ORDER) {
       const b = button(isShell(id) ? 'wall__card' : 'wall__card wall__card--body', '');
       b.dataset['car'] = id;
       // what the car is for under its name (M8.8 slices 3, 5): its class's job, or a trophy's BEST AT (filled in `update`)
@@ -416,8 +426,8 @@ export class GarageUi {
     // CARS: how many of the city's cars are yours, then a card per car
     this.carsCount.textContent = t('CARS {n}/{of} · DRIVE ANY CAR HOME TO KEEP IT', { n: g.owned.size, of: BODY_IDS.length });
     const cars = this.items.get('cars') ?? [];
-    for (let k = 0; k < BODY_IDS.length; k++) {
-      const id = BODY_IDS[k] as BodyId;
+    for (let k = 0; k < CARD_ORDER.length; k++) {
+      const id = CARD_ORDER[k] as BodyId;
       const it = cars[k] as Item;
       const b = it.el;
       const owned = g.owned.has(id);

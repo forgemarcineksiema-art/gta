@@ -27,7 +27,7 @@ import { mulberry32 } from '../random';
 import type { Quat } from '../scene';
 import type { TransformBuffer } from '../transforms';
 import { BALANCE } from '../balance';
-import type { CarId } from '../vehicle/presets';
+import { CAR_IDS, type CarId } from '../vehicle/presets';
 import { districtAt } from '../city/City';
 import { BODIES, BODY_IDS, BODY_INDEX, CIVILIAN_PAINTS, bodySpec, pickBody, policeLiveried, type BodyId, type RoadKind } from './bodies';
 import type { ParkingBay } from '../city/markings';
@@ -54,7 +54,8 @@ export interface PlayerProbe {
   halfLength: number;
 }
 
-const KINDS: CarId[] = ['muscle', 'compact', 'heavy', 'sports', 'police'];
+/** The classes by their index (the records' `kind`); a class's index is not always its shell's body index (bodies.ts). */
+const KINDS: readonly CarId[] = CAR_IDS;
 
 /**
  * A contact's damage on a car (0..1): what a hit of `dv` m/s adds past the threshold, divided by the car's
@@ -64,11 +65,11 @@ const KINDS: CarId[] = ['muscle', 'compact', 'heavy', 'sports', 'police'];
 export function impactDamage(damage: number, dv: number, armour: number, t: { damageThreshold: number; damagePerDv: number }): number {
   return dv > t.damageThreshold ? Math.min(1, damage + (dv - t.damageThreshold) * t.damagePerDv / armour) : damage;
 }
-const KIND_INDEX: Record<CarId, number> = { muscle: 0, compact: 1, heavy: 2, sports: 3, police: 4 };
+const KIND_INDEX = Object.fromEntries(CAR_IDS.map((id, i) => [id, i])) as Record<CarId, number>;
 /** The player's paint per class (docs/STYLE.md): what an abandoned player car keeps. */
 export const PLAYER_PAINT: Record<CarId, number> = {
   muscle: PALETTE.carRed, compact: PALETTE.carBlue, heavy: PALETTE.carOrange,
-  sports: PALETTE.carLime, police: PALETTE.policeWhite,
+  sports: PALETTE.carLime, police: PALETTE.policeWhite, offroad: PALETTE.sand,
 };
 
 export interface SwapHandover {
@@ -229,6 +230,8 @@ export class Traffic {
   readonly damage: Float32Array;
   /** Set on the step a car was wrecked by its own damage or one big contact (not by a caller): Life reads it for takedowns. */
   readonly justWrecked: Uint8Array;
+  /** Flattened by the steamroller (M8.8 slice 11): a wreck drawn squashed, never lent a body again (nothing to hit). */
+  readonly flat: Uint8Array;
   /** 1 = the light bar is on (parked patrols near the player at heat 3+, roadblock cars); the view reads it. */
   readonly lights: Uint8Array;
   /** Collider handle of the player's chassis, so contacts can be attributed. The world refreshes it every step. */
@@ -442,6 +445,7 @@ export class Traffic {
     this.prevSpeed = new Float32Array(n);
     this.damage = new Float32Array(n);
     this.justWrecked = new Uint8Array(n);
+    this.flat = new Uint8Array(n);
     this.lights = new Uint8Array(n);
     this.wobble = new Float32Array(n);
     this.turn = new Uint8Array(n);
@@ -732,7 +736,8 @@ export class Traffic {
   ensure(kind: CarId, paint: number, player: PlayerProbe, near: number, cosHalf: number): number {
     const o = BALANCE.jobs.order;
     const min2 = o.ensureMin * o.ensureMin, max2 = o.ensureMax * o.ensureMax;
-    const index = KIND_INDEX[kind];
+    // the class's shell (a class added since M8.8 slice 10 has its shell after the civilians)
+    const index = BODY_INDEX[kind];
     const radius = Math.hypot(this.halfW[index] as number, this.halfL[index] as number);
     let best = -1, bestD = Infinity;
     for (let i = 0; i < this.capacity; i++) {
@@ -1052,7 +1057,7 @@ export class Traffic {
   spawnParkedPolice(x: number, z: number, yaw: number, kind: 'police' | 'sports' | 'heavy', player: PlayerProbe | null = null, near = 0, cosHalf = 1): number {
     const i = player ? this.claim(player, near, cosHalf) : this.findFree();
     if (i < 0) return -1;
-    this.placeAtPoint(i, x, z, yaw, KIND_INDEX[kind], AgentState.Parked, PLAYER_PAINT.police);
+    this.placeAtPoint(i, x, z, yaw, BODY_INDEX[kind], AgentState.Parked, PLAYER_PAINT.police);
     this.police[i] = 1;
     return i;
   }
@@ -1174,6 +1179,7 @@ export class Traffic {
     this.wreckedFor[agent] = 0;
     this.damage[agent] = 0;
     this.justWrecked[agent] = 0;
+    this.flat[agent] = 0;
     this.lastPlayerContactTick[agent] = -100000;
     this.shift[agent] = 0;
     this.passAgent[agent] = -1;
@@ -1947,7 +1953,7 @@ export class Traffic {
     let best = -1;
     let bestD = Infinity;
     for (let i = 0; i < this.capacity; i++) {
-      if ((this.agentBody[i] as number) >= 0) continue;
+      if ((this.agentBody[i] as number) >= 0 || this.flat[i] === 1) continue;
       const st = this.state[i];
       if (st !== AgentState.Kinematic && st !== AgentState.Wrecked && st !== AgentState.Abandoned && st !== AgentState.Parked) continue;
       const dx = (this.x[i] as number) - player.x;
@@ -2220,6 +2226,38 @@ export class Traffic {
     body.setAngvel(this.ang, true);
   }
 
+  /**
+   * Flattened (M8.8 slice 11: the steamroller's drum): a wreck squashed flat where it stood, its lent body given back
+   * and never lent again, so the roller drives on over it. False when it already was (or is no car).
+   */
+  flatten(i: number): boolean {
+    if (this.state[i] === AgentState.Free || this.flat[i] === 1) return false;
+    const slot = this.agentBody[i] as number;
+    if (slot >= 0) {
+      // where its body stood, flat on the ground at its heading (a pancake has no lean)
+      const body = this.bodies[slot] as RAPIER.RigidBody;
+      body.translation(this.pos);
+      this.x[i] = this.pos.x;
+      this.z[i] = this.pos.z;
+      const yaw = M.yawOf(body.rotation(this.rot));
+      this.yaw[i] = yaw;
+      const q = M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, yaw), k = i * 4;
+      this.poseQ[k] = q.x;
+      this.poseQ[k + 1] = q.y;
+      this.poseQ[k + 2] = q.z;
+      this.poseQ[k + 3] = q.w;
+      // on the road under it (the highway's deck or the street)
+      const lane = this.lane[i] as number;
+      this.y[i] = lane >= 0 ? this.lanes.heightAt(lane, this.s[i] as number) : 0;
+      this.posed[i] = 1;
+    }
+    this.wreck(i);
+    this.releaseBody(i);
+    this.flat[i] = 1;
+    this.paintSerial++;
+    return true;
+  }
+
   /** The agent is a wreck from now on: a stopped obstacle until it despawns. */
   wreck(i: number): void {
     if (this.state[i] === AgentState.Wrecked) return;
@@ -2420,6 +2458,7 @@ export class Traffic {
     this.releaseHolds(i);
     this.state[i] = AgentState.Free;
     this.posed[i] = 0;
+    this.flat[i] = 0;
     this.parkedCiv[i] = 0;
     this.parkBay[i] = -1;
     this.police[i] = 0;

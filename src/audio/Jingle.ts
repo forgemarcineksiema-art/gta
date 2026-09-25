@@ -31,6 +31,8 @@ const TUNES: Readonly<Record<HiddenCar, ReadonlyArray<readonly [number, number]>
   roadster: [[-12, 1], [-8, 1], [-5, 1], [-3, 2], [-5, 1], [-8, 1], [-12, 2], [NaN, 2], [-10, 1], [-7, 1], [-3, 1], [-1, 2], [-3, 1], [-7, 1], [-10, 2], [NaN, 2]],
   sweeper: [[19, 1], [NaN, 1], [19, 1], [NaN, 1], [19, 1], [NaN, 3]],
   hotdog: [[16, 1], [19, 1], [NaN, 1], [16, 1], [19, 1], [NaN, 1], [24, 2], [NaN, 3]],
+  // the steamroller's slow low chug (M8.8 slice 11)
+  roller: [[-24, 2], [NaN, 1], [-24, 2], [NaN, 1], [-19, 1], [-24, 3], [NaN, 3]],
 };
 
 export class Jingle {

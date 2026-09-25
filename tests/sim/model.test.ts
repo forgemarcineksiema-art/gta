@@ -39,7 +39,8 @@ describe('the balance model (M7 slice 10)', () => {
 
   it('M7 10.2 the fitted multipliers and prices are BALANCE\'s, and DESIGN.md §2.6 and §3.3 name them', () => {
     expect(BALANCE.multiplier).toEqual([1, 1, 1.3, 1.65, 2.6, 3]);
-    expect(BALANCE.prices).toEqual({ compact: 24000, heavy: 30000, sports: 60000, police: 120000 });
+    // the 4×4 joined at 40,000 (M8.8 slice 10)
+    expect(BALANCE.prices).toEqual({ compact: 24000, heavy: 30000, offroad: 40000, sports: 60000, police: 120000 });
     expect(BALANCE.tierPrices).toEqual([24000, 26000, 30000]);
     expect(section('2.6')).toContain(BALANCE.multiplier.slice(1).map((m) => `×${m}`).join(' / '));
     const earnings = section('3.3');

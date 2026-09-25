@@ -34,11 +34,13 @@ const FOUR: EngineVoice = { pulses: 2, saw: 0.42, square: 0.12, sub: 0.1, grit: 
 const SIX: EngineVoice = { pulses: 3, saw: 0.28, square: 0.26, sub: 0.18, grit: 10, floor: 460, open: 3200, rattle: 0, rattleHz: 1000, level: 1 };
 /** The van's diesel, and every truck's and bus's: a low four's note on a clatter of noise. */
 const DIESEL: EngineVoice = { pulses: 2, saw: 0.3, square: 0.22, sub: 0.34, grit: 40, floor: 260, open: 1500, rattle: 0.22, rattleHz: 1400, level: 1.05 };
+/** The 4×4's big six (M8.8 slice 10): three pulses, low and gruff, a little clatter under it. */
+const BIG_SIX: EngineVoice = { pulses: 3, saw: 0.32, square: 0.2, sub: 0.32, grit: 26, floor: 300, open: 1900, rattle: 0.08, rattleHz: 1100, level: 1 };
 /** The Bubble's two-stroke: one pulse a revolution, a square's buzz, a rasp over it. */
 const TWO_STROKE: EngineVoice = { pulses: 1, saw: 0.18, square: 0.42, sub: 0.04, grit: 60, floor: 900, open: 3500, rattle: 0.06, rattleHz: 3200, level: 0.85 };
 
 /** Each class's voice: its shell's, and its civilian bodies' unless they have their own. */
-export const CLASS_VOICES: Readonly<Record<CarId, EngineVoice>> = { muscle: V8, compact: FOUR, heavy: DIESEL, sports: SIX, police: V8 };
+export const CLASS_VOICES: Readonly<Record<CarId, EngineVoice>> = { muscle: V8, compact: FOUR, heavy: DIESEL, sports: SIX, police: V8, offroad: BIG_SIX };
 
 /** The bodies with a voice of their own. */
 export const OWN_VOICES: Readonly<Partial<Record<BodyId, EngineVoice>>> = { bubble: TWO_STROKE };

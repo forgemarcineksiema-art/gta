@@ -364,6 +364,7 @@ export const PL: Readonly<Record<string, string>> = {
   'VAN': 'VAN',
   'SPORTS CAR': 'AUTO SPORTOWE',
   'POLICE CAR': 'RADIOWÓZ',
+  '4×4': 'TERENÓWKA',
   'SEDAN': 'SEDAN',
   'HATCHBACK': 'HATCHBACK',
   'ESTATE': 'KOMBI',
@@ -391,6 +392,7 @@ export const PL: Readonly<Record<string, string>> = {
   'RAM': 'TARAN',
   'SPEED': 'PRĘDKOŚĆ',
   'DISGUISE': 'PRZEBRANIE',
+  'OFF-ROAD': 'TEREN',
   // a trophy's BEST AT (M8.8 slice 5): the English line's words; the Polish line agrees with the car (PL_BEST below)
   'BEST AT: {thing}': 'NAJLEPSZY W: {thing}',
   'DRIFTS': 'DRIFT',
@@ -524,7 +526,7 @@ export const PL: Readonly<Record<string, string>> = {
 
 /** A car's grammatical gender, by its English name: the paint before it agrees (CZERWONY SEDAN, CZERWONA TAKSÓWKA). */
 export const PL_GENDER: Readonly<Record<string, 'm' | 'f' | 'n'>> = {
-  'MUSCLE CAR': 'm', 'COMPACT': 'm', 'VAN': 'm', 'SPORTS CAR': 'n', 'POLICE CAR': 'm', 'SEDAN': 'm', 'HATCHBACK': 'm',
+  'MUSCLE CAR': 'm', 'COMPACT': 'm', 'VAN': 'm', 'SPORTS CAR': 'n', 'POLICE CAR': 'm', '4×4': 'f', 'SEDAN': 'm', 'HATCHBACK': 'm',
   'ESTATE': 'n', 'SUV': 'm', 'PICKUP': 'm', 'TAXI': 'f', 'BOX TRUCK': 'm', 'BUS': 'm', 'ICE-CREAM TRUCK': 'm', 'WAGON': 'm',
   'PIZZA HATCH': 'm', 'WRECKER': 'f', 'TWIN': 'm', 'FAKE CRUISER': 'm', 'PARTY BUS': 'm', 'LOWRIDER': 'm', 'GOLD LIMO': 'f',
   'BUBBLE': 'm', 'PHANTOM': 'm', "CHIEF'S CRUISER": 'm', 'ROADSTER': 'm', 'STREET SWEEPER': 'f', 'HOT-DOG VAN': 'm',

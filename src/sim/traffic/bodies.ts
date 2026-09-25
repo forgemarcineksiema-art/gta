@@ -5,8 +5,11 @@
  * five bodies are the player's classes in their own shells (an abandoned
  * player car, a police unit, an order's car); the other eight are the
  * civilian set the spawner draws from. Appended, never renumbered: the index
- * is packed into descriptors next to the paint, and a class's index is its
- * own body's index, so a descriptor written before the bodies still reads.
+ * is packed into descriptors next to the paint, so a descriptor written
+ * before the bodies still reads. The first five classes' indices are their
+ * shells'; a class added since (the 4×4, M8.8 slice 10) has its shell
+ * appended after the last body, so its class index is not its body index:
+ * read a body's class through `BODIES[index].car`, never the index.
  */
 import { CITY_COLORS, PALETTE } from '../palette';
 import { CAR_IDS, CAR_PRESETS, type CarId } from '../vehicle/presets';
@@ -18,7 +21,10 @@ export type CivilianBody = 'sedan' | 'hatch' | 'estate' | 'suv' | 'pickup' | 'ta
 export type BodyId = CarId | CivilianBody;
 export const RIVAL_BODIES: readonly RivalBody[] = ['wagon', 'pizza', 'wrecker', 'twin', 'fakecop', 'partybus', 'lowrider', 'limo', 'bubble', 'phantom', 'chiefcar'];
 export const CIVILIAN_BODIES: readonly CivilianBody[] = ['sedan', 'hatch', 'estate', 'suv', 'pickup', 'taxi', 'truck', 'bus', 'icecream', ...RIVAL_BODIES, 'roadster', 'sweeper', 'hotdog'];
-export const BODY_IDS: readonly BodyId[] = [...CAR_IDS, ...CIVILIAN_BODIES];
+/** The classes whose shells come first (their class index is their body index); the later ones' come after the civilians. */
+const FIRST_SHELLS: readonly CarId[] = ['muscle', 'compact', 'heavy', 'sports', 'police'];
+const LATER_SHELLS: readonly CarId[] = CAR_IDS.filter((id) => !FIRST_SHELLS.includes(id));
+export const BODY_IDS: readonly BodyId[] = [...FIRST_SHELLS, ...CIVILIAN_BODIES, ...LATER_SHELLS];
 
 /** Traffic's paints (the order cards name them in jobs/catalog.ts). */
 export const CIVILIAN_PAINTS: readonly number[] = [
@@ -112,12 +118,13 @@ const TROPHY = {
 
 /** Indexed like BODY_IDS. Sizes in metres; the profiles in render/bodyProfiles.ts are drawn on these wheels. */
 export const BODIES: readonly BodySpec[] = [
-  ...CAR_IDS.map(shell),
+  ...FIRST_SHELLS.map(shell),
   civilian('sedan', 'muscle', 0.92, 2.35, 2.8, 1.6, 1400, 1),
   civilian('hatch', 'compact', 0.87, 2.05, 2.55, 1.52, 1150, 1),
   civilian('estate', 'muscle', 0.92, 2.42, 2.85, 1.6, 1450, 0.97),
-  civilian('suv', 'heavy', 0.96, 2.35, 2.8, 1.68, 1900, 1),
-  civilian('pickup', 'heavy', 0.98, 2.7, 3.3, 1.72, 2100, 0.95),
+  // the SUV and the pickup drive as the 4×4 (M8.8 slice 10); a kept one moves with them
+  civilian('suv', 'offroad', 0.96, 2.35, 2.8, 1.68, 1900, 1),
+  civilian('pickup', 'offroad', 0.98, 2.7, 3.3, 1.72, 2100, 0.95),
   civilian('taxi', 'muscle', 0.92, 2.35, 2.8, 1.6, 1450, 1.1, { paints: [PALETTE.coin], hops: 0.5 }),
   civilian('truck', 'heavy', 1.12, 3.5, 4.2, 1.9, 4000, 0.85, { big: true, stretch: true }),
   civilian('bus', 'heavy', 1.27, 6.0, 6.6, 2.24, 6500, 0.8, { paints: BUS_PAINTS, big: true, keepsLane: true, stretch: true }),
@@ -145,6 +152,8 @@ export const BODIES: readonly BodySpec[] = [
   civilian('roadster', 'muscle', 0.84, 2.2, 2.9, 1.5, 1100, 1, { paints: [PALETTE.carRed] }),
   civilian('sweeper', 'heavy', 1.1, 2.9, 3.2, 1.86, 3200, 0.8, { paints: [PALETTE.carWhite], big: true, stretch: true }),
   civilian('hotdog', 'heavy', 1.08, 2.8, 3.3, 1.86, 2600, 0.85, { paints: [PALETTE.coin], big: true, stretch: true }),
+  // the classes added since, in their own shells (the 4×4, M8.8 slice 10)
+  ...LATER_SHELLS.map(shell),
 ];
 
 export const BODY_INDEX = Object.fromEntries(BODY_IDS.map((id, i) => [id, i])) as Record<BodyId, number>;
@@ -153,9 +162,9 @@ export function bodySpec(body: BodyId): BodySpec {
   return BODIES[BODY_INDEX[body]] as BodySpec;
 }
 
-/** One of the player's five shells, not a civilian body. */
+/** One of the player's classes in its own shell, not a civilian body (a shell drives as the class it is). */
 export function isShell(body: BodyId): body is CarId {
-  return BODY_INDEX[body] < CAR_IDS.length;
+  return (BODIES[BODY_INDEX[body]] as BodySpec).car === body;
 }
 
 /**

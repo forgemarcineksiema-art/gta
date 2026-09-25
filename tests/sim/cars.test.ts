@@ -17,6 +17,7 @@
 import { describe, expect, test } from 'vitest';
 import type { CarId } from '../../src/sim';
 import { TrackBot } from '../../src/app/trackBot';
+import { GRASS } from '../../src/sim/city/surface';
 import { createWorld, fullThrottle, kmh, position, run, runUntil, upness } from './helpers';
 
 interface Expectations {
@@ -37,6 +38,8 @@ const CARS: Record<CarId, Expectations> = {
   heavy: { to100: [9.6, 16], top: [105, 140], brake100: [24, 48], driftBand: [10, 40], driftMinSpeed: 35, pulse60: 12, botLap: [35, 46] },
   sports: { to100: [3.8, 5.6], top: [185, 212], brake100: [15, 30], driftBand: [22, 42], driftMinSpeed: 55, pulse60: 20, botLap: [30, 38] },
   police: { to100: [6.2, 8.6], top: [158, 185], brake100: [24, 44], driftBand: [18, 40], driftMinSpeed: 55, pulse60: 18, botLap: [32, 40] },
+  // the 4×4 (M8.8 slice 10): 7.8 s, 165 km/h, 36 m, a 27° drift, a 38.5 s lap on the van's budget
+  offroad: { to100: [7.5, 9], top: [150, 170], brake100: [25, 40], driftBand: [10, 40], driftMinSpeed: 35, pulse60: 12, botLap: [34, 44] },
 };
 
 for (const [id, e] of Object.entries(CARS) as Array<[CarId, Expectations]>) {
@@ -230,3 +233,24 @@ for (const [id, e] of Object.entries(CARS) as Array<[CarId, Expectations]>) {
     expect(sim.lap.last).toBeLessThan(e.botLap[1]);
   });
 }
+
+/** Seconds from a standstill to 100 km/h on the straight, on a lawn (every wheel reads grass) or on the road. */
+async function to100On(id: CarId, lawn: boolean): Promise<number> {
+  const sim = await createWorld({ spawn: 'straight', car: id });
+  try {
+    if (lawn) sim.vehicle.ground = { at: () => GRASS };
+    run(sim, 1);
+    return runUntil(sim, 40, (s) => kmh(s) >= 100, fullThrottle);
+  } finally { sim.dispose(); }
+}
+
+describe('M8.8 slice 10: the 4×4', () => {
+  // the sports car stays the quickest anywhere (300 N·m on 1,180 kg, 5.1 s on a lawn): beating it there would have
+  // taken a lawn that stops the road cars dead, so the pin names the four the 4×4 trails or passes on the road
+  test('M8.8 10.2 on a lawn its 0-100 beats the muscle car\'s, the compact\'s, the van\'s and the police car\'s; on the road the muscle car beats it', async () => {
+    const lawn = await to100On('offroad', true);
+    expect(lawn).toBeGreaterThan(0);
+    for (const id of ['muscle', 'compact', 'heavy', 'police'] as const) expect(lawn, id).toBeLessThan(await to100On(id, true));
+    expect(await to100On('muscle', false)).toBeLessThan(await to100On('offroad', false));
+  });
+});

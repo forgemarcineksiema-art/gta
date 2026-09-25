@@ -8,8 +8,9 @@
  */
 import { DEFAULT_TUNING, cloneTuning, type VehicleTuning } from './tuning';
 
-export type CarId = 'muscle' | 'compact' | 'heavy' | 'sports' | 'police';
-export const CAR_IDS: CarId[] = ['muscle', 'compact', 'heavy', 'sports', 'police'];
+export type CarId = 'muscle' | 'compact' | 'heavy' | 'sports' | 'police' | 'offroad';
+/** The classes; one added after the first five has its shell appended after the last body (traffic/bodies.ts). */
+export const CAR_IDS: CarId[] = ['muscle', 'compact', 'heavy', 'sports', 'police', 'offroad'];
 
 function preset(overrides: Partial<VehicleTuning>): VehicleTuning {
   return { ...cloneTuning(DEFAULT_TUNING), ...overrides };
@@ -186,5 +187,61 @@ export const CAR_PRESETS: Record<CarId, VehicleTuning> = {
     wallHitRetainSpin: 0.08,
     boostTorqueMul: 1.25,
     boostThrust: 2800,
+  }),
+
+  /**
+   * The 4×4 (M8.8 slice 10): high on long soft springs and big wheels, four-wheel drive, a torquey engine that runs
+   * out of revs early. Slower than the muscle car on the road; on grass and dirt its tyres keep nearly all their grip.
+   */
+  offroad: preset({
+    mass: 1950,
+    chassisHalfExtents: { x: 0.98, y: 0.46, z: 2.3 },
+    chassisOffsetY: 0.72,
+    centerOfMassY: 0.02,
+    inertiaScale: { x: 1.1, y: 1.05, z: 1.1 },
+    wheelBase: 2.8,
+    trackWidth: 1.72,
+    wheelRadius: 0.42,
+    wheelWidth: 0.32,
+    suspensionAttachY: 0.2,
+    suspensionRestLength: 0.42,
+    suspensionStiffness: 62000,
+    suspensionDampingCompression: 5600,
+    suspensionDampingRebound: 7400,
+    antiRollStiffness: 42000,
+    maxSteerDegLow: 34,
+    maxSteerDegHigh: 5,
+    steerSpeedRef: 30,
+    steerRate: 5.5,
+    torqueMax: 360,
+    redlineRpm: 6000,
+    torqueCurve: [0.75, 0.95, 1.0, 0.9, 0.75],
+    gearRatios: [4.4, 3.05, 2.15, 1.56, 1.15, 0.92],
+    finalDrive: 3.35,
+    driveFrontShare: 0.45,
+    brakeTorque: 8200,
+    handbrakeTorque: 5000,
+    wheelInertia: 1.8,
+    muFront: 2.0,
+    muRear: 2.05,
+    grassGrip: 0.95,
+    grassRoll: 1.5,
+    dirtGrip: 1.0,
+    dirtRoll: 1.2,
+    slipAngPeakDeg: 9,
+    powerOversteer: 0.06,
+    driftMaxAngleDeg: 28,
+    driftAngleGain: 220000,
+    driftYawTorqueMax: 52000,
+    driftThrottlePush: 6000,
+    tireForceHeight: 0.9,
+    drag: 1.45,
+    downforce: 1.0,
+    airPitchTorque: 7500,
+    airRollTorque: 6000,
+    airLevelTorque: 42000,
+    airAngularDamping: 10000,
+    boostTorqueMul: 1.3,
+    boostThrust: 3600,
   }),
 };

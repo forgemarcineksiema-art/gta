@@ -170,8 +170,9 @@ export const BALANCE = {
    * M7 gate on its measured novice (the careful bot, 13.2k a run of 2.6 minutes at level 3; the M6 gate's 7k of 2.4):
    * the compact at 24,000 is the second run's door after the cold open, minute 6.7 (18,000 was the first's, at 4.1,
    * before the brief's 5–7); the van at 30,000 the fourth's, two runs a rung; the sports car stays the second hour's.
+   * The 4×4 (M8.8 slice 10) at 40,000, between the van and the sports car: the first hour's last rung.
    */
-  prices: { compact: 24000, heavy: 30000, sports: 60000, police: 120000 },
+  prices: { compact: 24000, heavy: 30000, offroad: 40000, sports: 60000, police: 120000 },
   /**
    * The wanted board (M6, DESIGN.md §14.3): a rematch pays `rematchShare` of the purse (the car is won once); a
    * race duel's rival runs at `pace` × the street race's pace, rubber-banded between `band`, both by rival index

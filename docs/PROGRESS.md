@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.8 slice 10: the 4×4 class
+
+Done: a sixth class, `offroad` (4×4, TERENÓWKA; OFF-ROAD, TEREN): 1,950 kg, 4WD, 360 N·m to 6,000 rpm, 0.42 m wheels on
+0.42 m springs; 0–100 7.8 s, 165 km/h, 36 m from 100, a 27° drift, a 38.5 s lap; on a lawn 8.0 s (the muscle car 8.3).
+Its shell is appended after the last body; `isShell`, the descriptors, `Jobs`, `ensure` and the parked police read the
+class through the body, never the index. The SUV and the pickup drive as it; 40,000 on the wall, which now lists the
+catalogue by price; the model's first hour buys it. Decided: pin 10.2 leaves out the sports car (5.1 s on a lawn; beating
+it would need grass that stops road cars dead); the track bot's budget stays hand-set (11, the van's; no rule fits the
+five). Pins M8.8 10.1 (its row), 10.2, 10.3 (save.test), 10.4 (bodies.test).
+
 ## 2026-09-25 — M8.8 slice 9: grass and dirt
 
 Done: `sim/city/surface.ts` lays each chunk's flat ground statics into 2 m cells the first time the city generates it

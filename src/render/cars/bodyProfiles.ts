@@ -693,6 +693,51 @@ export const ROLLER: CarProfile = {
   paint: PALETTE.coin,
 };
 
+/**
+ * The monster truck (M8.8 slice 12), 5.4 m: a pickup's body 1.8 m up on a black frame over wheels taller than a car,
+ * a roll bar over the bed and flames down its flanks.
+ */
+export const MONSTER: CarProfile = {
+  name: 'monster',
+  sections: [
+    { z: 2.7, floor: 1.85, belt: 2.3, roof: 2.35, hwFloor: 1.1, hwBelt: 1.16, hwRoof: 1.1 },
+    { z: 2.5, floor: 1.8, belt: 2.42, roof: 2.48, hwFloor: 1.18, hwBelt: 1.22, hwRoof: 1.18 },
+    { z: 1.1, floor: 1.8, belt: 2.48, roof: 2.53, hwFloor: 1.18, hwBelt: 1.22, hwRoof: 1.18 },
+    { z: 0.6, floor: 1.8, belt: 2.5, roof: 3.15, hwFloor: 1.18, hwBelt: 1.22, hwRoof: 1.06 },
+    { z: -0.55, floor: 1.8, belt: 2.5, roof: 3.15, hwFloor: 1.18, hwBelt: 1.22, hwRoof: 1.06 },
+    { z: -0.65, floor: 1.8, belt: 2.46, roof: 2.5, hwFloor: 1.18, hwBelt: 1.22, hwRoof: 1.18 },
+    { z: -2.7, floor: 1.85, belt: 2.42, roof: 2.46, hwFloor: 1.14, hwBelt: 1.18, hwRoof: 1.14 },
+  ],
+  glassSides: [3, 4],
+  glassTops: [2, 4],
+  aPillar: 2,
+  cPillar: 4,
+  pillars: [],
+  doorSeams: [0.55, -0.5],
+  handleZ: -0.3,
+  headlight: { width: 0.3, height: 0.16, y: 2.1, inset: 0.26 },
+  taillight: { width: 0.22, height: 0.2, y: 2.15, inset: 0.14 },
+  grille: { width: 1.0, height: 0.26, y: 2.05 },
+  bumperHeight: 0.16,
+  lipSpoiler: false,
+  mirrors: true,
+  exhausts: 0,
+  wheelInset: -0.08,
+  wheelStyle: 'heavy',
+  darkTops: [5],
+  parts: [
+    // the frame down to the axles, the axles themselves, the roll bar over the bed, flames down the flanks
+    { size: [0.16, 0.5, 5.0], at: [0.62, 1.5, 0], color: PALETTE.charcoal, mirror: true },
+    { size: [2.3, 0.2, 0.2], at: [0, 0.95, 1.7], color: PALETTE.graphite },
+    { size: [2.3, 0.2, 0.2], at: [0, 0.95, -1.7], color: PALETTE.graphite },
+    { size: [0.1, 0.9, 0.1], at: [1.0, 2.95, -0.9], color: PALETTE.chrome, mirror: true },
+    { size: [2.1, 0.1, 0.1], at: [0, 3.4, -0.9], color: PALETTE.chrome },
+    { size: [0.02, 0.18, 1.6], at: [1.225, 2.1, 1.2], color: PALETTE.carOrange, mirror: true },
+    { size: [0.02, 0.1, 1.0], at: [1.225, 2.25, 1.5], color: PALETTE.carRed, mirror: true },
+  ],
+  paint: PALETTE.carLime,
+};
+
 /** Every body's profile: the player's five classes, the city's eight, the hidden truck and the wanted board's cars. */
 export const BODY_PROFILES: Record<BodyId, CarProfile> = {
   ...CAR_PROFILES,
@@ -700,5 +745,5 @@ export const BODY_PROFILES: Record<BodyId, CarProfile> = {
   wagon: WAGON, pizza: PIZZA, wrecker: WRECKER, twin: TWIN, fakecop: FAKECOP, partybus: PARTYBUS,
   lowrider: LOWRIDER, limo: LIMO, bubble: BUBBLE, phantom: PHANTOM, chiefcar: CHIEFCAR,
   roadster: ROADSTER, sweeper: SWEEPER, hotdog: HOTDOG,
-  roller: ROLLER,
+  roller: ROLLER, monster: MONSTER,
 };

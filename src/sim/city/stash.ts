@@ -4,8 +4,9 @@
  * park, and one in each district without one, parked in a quiet kerbside bay:
  * a roadster in Crown Heights, a street sweeper in Sunset Works, a hot-dog van
  * on the Coral Quay; the crazy cars (M8.8 phase F), the steamroller on the
- * Works' yard. Each plays its own clue to whoever drives near. A swap
- * into one finds it for good: the garage owns it and its stash stands empty.
+ * Works' yard, the monster truck on the Gardens' park strip. Each plays its
+ * own clue to whoever drives near. A swap into one finds it for good: the
+ * garage owns it and its stash stands empty.
  * A parked record is placed when the player comes within `range` m and freed
  * by the traffic's own despawn; the city's toys (the giant ball in the Works
  * yard) live here too. No allocation per step.
@@ -21,14 +22,19 @@ import { BODY_INDEX, bodySpec } from '../traffic/bodies';
 import { AgentState, type PlayerProbe } from '../traffic/Traffic';
 
 /** The hidden cars; each is a civilian body the spawner never draws. The crazy cars (M8.8 phase F) are hidden too. */
-export type HiddenCar = 'icecream' | 'roadster' | 'sweeper' | 'hotdog' | 'roller';
-export const HIDDEN_CARS: readonly HiddenCar[] = ['icecream', 'roadster', 'sweeper', 'hotdog', 'roller'];
+export type HiddenCar = 'icecream' | 'roadster' | 'sweeper' | 'hotdog' | 'roller' | 'monster';
+export const HIDDEN_CARS: readonly HiddenCar[] = ['icecream', 'roadster', 'sweeper', 'hotdog', 'roller', 'monster'];
 
-/** The ones that stand on open ground, left there: the ice-cream truck on the Palm Gardens edge park's lawn, the steamroller on the Works' yard by the giant ball (M8.8 slice 11). */
-type GroundCar = 'icecream' | 'roller';
+/**
+ * The ones that stand on open ground, left there: the ice-cream truck on the Palm Gardens edge park's lawn, the
+ * steamroller on the Works' yard by the giant ball (M8.8 slice 11), the monster truck on the Gardens' park strip
+ * between two of the jumps (slice 12).
+ */
+type GroundCar = 'icecream' | 'roller' | 'monster';
 export const STASH_SPOTS: Readonly<Record<GroundCar, { x: number; z: number; yaw: number }>> = {
   icecream: { x: -350, z: 737.5, yaw: Math.PI / 2 },
   roller: { x: 318, z: -466, yaw: -Math.PI / 2 },
+  monster: { x: -737.5, z: 505, yaw: 0 },
 };
 
 /** The district each of the others waits in, in a kerbside bay (city/City.ts ids). */
@@ -116,7 +122,7 @@ export class Stash {
       if (this.found.has(id) || (this.agents[k] as number) >= 0) continue;
       const spot = this.spots[id];
       if (Math.hypot(probe.x - spot.x, probe.z - spot.z) > BALANCE.stash.range) continue;
-      // the ice-cream truck and the steamroller stand on open ground as cars left there; the others are parked in their
+      // the ice-cream truck and the crazy cars stand on open ground as cars left there; the others are parked in their
       // bays like the street's own parked cars (an abandoned car at a kerb has the traffic slow and swing round it)
       this.agents[k] = traffic.spawnProp(spot.x, spot.z, spot.yaw, id, id in STASH_SPOTS ? AgentState.Abandoned : AgentState.Parked, bodySpec(id).paints[0] as number);
     }

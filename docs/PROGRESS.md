@@ -12,6 +12,16 @@ key: the swap and the sound joined the list, the build small); the loading scree
 bar over the boot's phases (`BootWatch.progress`); WRAK at 20 %, over the debris. The look suite shoots `pause`,
 `loading`, `wreck`. Pins M8.9 11.1–11.3. Stills and verify green.
 
+## 2026-09-25 — M8.8 slice 12: the monster truck
+
+Done: `monster` (the 4×4's class, 4.2 t, 0.95 m wheels on 0.8 m springs, the chassis' underside 1.8 m up, so a car
+passes under it and only the wheels meet it): each wheel's ray keeps the collider it stands on (`WheelState.hitHandle`),
+and a car a wheel has been on for 0.2 s is flattened (`BodySpec.crush`, `Life.wheelStep`), a unit as a takedown. A
+ray put a wheel on a 1.4 m roof in one step and threw the truck: the contact now rises at most `climbSlope` (0.8) of the
+way driven (`Vehicle`, rises over 0.1 m only), and the crushed car takes up the climb's spring (the rise to 1 m/s, pitch
+and roll to 0.3). Across a sedan at 30 km/h: 0.66 m up, 22° at most, down on four wheels. Straddled lengthwise a car
+passes between its wheels. On the Gardens' park strip between two jumps. Pins M8.8 12.1–12.4, the card in 11.5.
+
 ## 2026-09-25 — M8.9 slice 10: the radar and the full map
 
 Done (R6): the radar answers where to go, where the police are, where to bank: streets mid-grey, the loop and the

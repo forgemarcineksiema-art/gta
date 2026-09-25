@@ -406,6 +406,7 @@ export const PL: Readonly<Record<string, string>> = {
   'STREET SWEEPER': 'ZAMIATARKA',
   'HOT-DOG VAN': 'WÓZ Z HOT-DOGAMI',
   'STEAMROLLER': 'WALEC',
+  'MONSTER TRUCK': 'MONSTER TRUCK',
   // what a car is for, under its name on the wall (M8.8 slice 3); DRIFT and CITY say what they say elsewhere
   'RAM': 'TARAN',
   'SPEED': 'PRĘDKOŚĆ',
@@ -425,6 +426,7 @@ export const PL: Readonly<Record<string, string>> = {
   // a crazy car's one trick (M8.8 phase F): the English line's words; the Polish pronoun agrees with the car (PL_ONLY_IT)
   'ONLY IT: {thing}': 'TYLKO ON: {thing}',
   'FLATTENS CARS': 'ROZJEŻDŻA AUTA',
+  'DRIVES OVER CARS': 'JEŹDZI PO AUTACH',
 
   // the districts and their landmarks (sim/city/City.ts)
   'CROWN HEIGHTS': 'KORONNE WZGÓRZA',
@@ -551,7 +553,7 @@ export const PL_GENDER: Readonly<Record<string, 'm' | 'f' | 'n'>> = {
   'ESTATE': 'n', 'SUV': 'm', 'PICKUP': 'm', 'TAXI': 'f', 'BOX TRUCK': 'm', 'BUS': 'm', 'ICE-CREAM TRUCK': 'm', 'WAGON': 'm',
   'PIZZA HATCH': 'm', 'WRECKER': 'f', 'TWIN': 'm', 'FAKE CRUISER': 'm', 'PARTY BUS': 'm', 'LOWRIDER': 'm', 'GOLD LIMO': 'f',
   'BUBBLE': 'm', 'PHANTOM': 'm', "CHIEF'S CRUISER": 'm', 'ROADSTER': 'm', 'STREET SWEEPER': 'f', 'HOT-DOG VAN': 'm',
-  'STEAMROLLER': 'm',
+  'STEAMROLLER': 'm', 'MONSTER TRUCK': 'm',
 };
 
 /** A paint's three forms (masculine, feminine, neuter), by its English name (`PAINT_NAMES`, and ODD for any other). */

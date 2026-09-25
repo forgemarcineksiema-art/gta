@@ -84,7 +84,8 @@ function drawBase() {
   for (const [k, c] of [[1, '#b8966c'], [0.72, '#a88660'], [0.45, '#967653'], [0.2, '#86694a']]) { trace(q.map(([x, z]) => [qc[0] + (x - qc[0]) * k, qc[1] + (z - qc[1]) * k]), true); g.fillStyle = c; g.fill(); g.lineWidth = 1.5; g.strokeStyle = 'rgba(60,40,20,0.4)'; g.stroke(); }
   g.beginPath(); g.arc(X(P.botanicGarden.x), Y(P.botanicGarden.z), P.botanicGarden.r, 0, 7); g.fillStyle = '#7fa769'; g.fill();
   seed = 5;
-  for (let i = 0; i < 90; i++) { const a = rnd() * 6.283, r = 70 + rnd() * 80; g.beginPath(); g.arc(X(P.botanicGarden.x + Math.cos(a) * r), Y(P.botanicGarden.z + Math.sin(a) * r), 5 + rnd() * 5, 0, 7); g.fillStyle = i % 3 ? '#5c8a4c' : '#4f7d44'; g.fill(); }
+  if (!A.gardens) for (let i = 0; i < 90; i++) { const a = rnd() * 6.283, r = 70 + rnd() * 80; g.beginPath(); g.arc(X(P.botanicGarden.x + Math.cos(a) * r), Y(P.botanicGarden.z + Math.sin(a) * r), 5 + rnd() * 5, 0, 7); g.fillStyle = i % 3 ? '#5c8a4c' : '#4f7d44'; g.fill(); }
+  if (A.gardens) drawGardens(A.gardens);
   g.beginPath(); g.arc(X(P.summitPlaza.x), Y(P.summitPlaza.z), P.summitPlaza.r, 0, 7); g.fillStyle = '#ddd3c0'; g.fill();
   g.beginPath(); g.arc(X(P.circusIsland.x), Y(P.circusIsland.z), P.circusIsland.r, 0, 7); g.fillStyle = '#7fa769'; g.fill();
   // contours every 10 m
@@ -169,6 +170,32 @@ function drawBase() {
   g.beginPath(); g.arc(X(P.ferrisWheel.x), Y(P.ferrisWheel.z), 20, 0, 7); g.lineWidth = 3; g.strokeStyle = '#f7f3ea'; g.stroke();
   g.beginPath(); g.arc(X(P.lighthouse.x), Y(P.lighthouse.z), 10, 0, 7); g.fillStyle = '#f7f3ea'; g.fill(); g.lineWidth = 4; g.strokeStyle = '#e8384f'; g.stroke();
   g.beginPath(); g.ellipse(X(P.duck.x), Y(P.duck.z), 17, 12, 0, 0, 7); g.fillStyle = '#ffd23f'; g.fill(); g.beginPath(); g.arc(X(P.duck.x + 12), Y(P.duck.z - 8), 7.5, 0, 7); g.fill();
+}
+
+/** Palm Gardens (slice 10): the dunes' sand, the golf's fairways, greens, tees, bunkers, pond and flags; the garden's paths, terrace and trees; the boardwalk. */
+function drawGardens(GD) {
+  g.save(); g.lineCap = 'round'; g.lineJoin = 'round';
+  trace(GD.duneLine, false); g.lineWidth = GD.band * 2; g.strokeStyle = 'rgba(226,198,142,0.75)'; g.stroke();
+  for (const d of GD.dunes) { g.beginPath(); g.arc(X(d.x), Y(d.z), d.r * 0.7, 0, 7); g.fillStyle = '#d9b57a'; g.fill(); }
+  for (const f of GD.fairways) { g.beginPath(); g.moveTo(X(f.ax), Y(f.az)); g.lineTo(X(f.bx), Y(f.bz)); g.lineWidth = f.r * 2; g.strokeStyle = '#74b556'; g.stroke(); }
+  const oval = (o, fill) => { g.beginPath(); g.ellipse(X(o.x), Y(o.z), o.rx, o.rz, 0, 0, 7); g.fillStyle = fill; g.fill(); };
+  for (const o of GD.greens) oval(o, '#8fd16a');
+  for (const t of GD.tees) { g.fillStyle = '#8fd16a'; g.fillRect(X(t.x) - 5, Y(t.z) - 5, 10, 10); }
+  for (const o of GD.bunkers) oval(o, '#e6c98f');
+  oval({ x: GD.pond.x, z: GD.pond.z, rx: GD.pond.rx * 0.62, rz: GD.pond.rz * 0.62 }, '#2f8fb0');
+  for (const o of GD.greens) { g.fillStyle = '#f7f3ea'; g.fillRect(X(o.x) - 0.8, Y(o.z) - 12, 1.6, 12); g.beginPath(); g.moveTo(X(o.x), Y(o.z) - 12); g.lineTo(X(o.x) + 8, Y(o.z) - 9); g.lineTo(X(o.x), Y(o.z) - 6); g.fillStyle = '#ee6f9a'; g.fill(); }
+  for (const p of GD.paths) { trace(p.pts, p.closed); g.lineWidth = 7; g.strokeStyle = '#c9b996'; g.stroke(); }
+  g.beginPath(); g.arc(X(GD.terrace.x), Y(GD.terrace.z), GD.terrace.r, 0, 7); g.fillStyle = '#b1aa9e'; g.fill();
+  for (const t of GD.trees) { g.beginPath(); g.arc(X(t.x), Y(t.z), t.palm ? 3.5 : 5.5, 0, 7); g.fillStyle = t.palm ? '#3f8f5a' : '#4f7d44'; g.fill(); }
+  for (const run of GD.boardwalk) { trace(run, false); g.lineCap = 'butt'; g.lineWidth = GD.boardwalkHalf * 2; g.strokeStyle = '#a77a52'; g.stroke(); }
+  // the ground's jumps: each hump's ramps and top across its way
+  for (const j of GD.jumps) {
+    const l = j.top + j.ramp, w = j.half;
+    g.beginPath(); g.moveTo(X(j.x - j.dx * l - j.dz * w), Y(j.z - j.dz * l + j.dx * w)); g.lineTo(X(j.x + j.dx * l - j.dz * w), Y(j.z + j.dz * l + j.dx * w));
+    g.lineTo(X(j.x + j.dx * l + j.dz * w), Y(j.z + j.dz * l - j.dx * w)); g.lineTo(X(j.x - j.dx * l + j.dz * w), Y(j.z - j.dz * l - j.dx * w)); g.closePath();
+    g.fillStyle = 'rgba(160,120,70,0.45)'; g.fill();
+  }
+  g.restore();
 }
 
 // ---------- words and marks

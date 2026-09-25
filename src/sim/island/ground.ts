@@ -13,6 +13,7 @@ import { catmullRom, circle, inPolygon, polylineLength, resample, signedArea, ty
 import { BASIN, BOUNDS, COAST, COAST_PARTS, PLACES, RINGS, ROADS, causeway, highwayLoop, islet, naturalHeight, type PlanRoad, type RoadClass, type SpanKind } from './plan';
 import { shaped } from './shapes';
 import { canalBed, inCanal, inScrapyard, onWaterworksPlaza } from './shapes/works';
+import { gardensCover } from './shapes/gardens';
 import { districtStreets } from './streets';
 
 /** A road's half width by class (m), its carriageway without the pavement. */
@@ -764,6 +765,9 @@ export class Ground {
     // Sunset Works (slice 9): the dry canal's concrete and the Waterworks' plaza paved, the scrapyard's yard dirt
     if (inCanal(x, z) || onWaterworksPlaza(x, z)) return ASPHALT;
     if (inScrapyard(x, z)) return DIRT;
+    // the Gardens' own (slice 10): the garden's gravel paths, the golf's bunkers and the dunes' sand, the terrace
+    const cover = gardensCover(x, z);
+    if (cover !== null) return cover === 'gravel' ? DIRT : cover === 'sand' ? SAND : ASPHALT;
     if (paved(x, z)) return ASPHALT;
     this.nearestShore(x, z);
     if (this.shore.quay < APRON) return ASPHALT;

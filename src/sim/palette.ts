@@ -125,4 +125,7 @@ export const ISLAND_COLORS = {
   lowland: 0x7c9f5e, meadow: 0x8aa55b, upland: 0xa0a65a, dryGrass: 0xb5a75e, summit: 0xc3aa68,
   fairway: 0x74b556, verge: 0x93a66a, rock: 0x8a8075, cliff: 0x776c63, wetSand: 0xb99b69, dirt: 0x9a7b55,
   paving: 0xb1aa9e, quayWall: 0x8c867c, seabed: 0x2f6f7f,
+  // Palm Gardens (M8.10 slice 10): the fairway's mown stripe, the greens and tees, the botanic garden's lawn, its
+  // gravel, the boardwalk
+  fairwayStripe: 0x67a84b, green: 0x8fd16a, lawn: 0x78aa53, gravel: 0xc9b996, timber: 0xa77a52,
 } as const;

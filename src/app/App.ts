@@ -822,7 +822,7 @@ export class App {
 
     this.renderer.render(alpha, this.paused ? 0 : frameDt);
     this.queuePrefetch();
-    this.audio.update(this.sim.vehicle.telemetry, frameDt);
+    this.audio.update(this.sim.vehicle.telemetry, frameDt, this.sim.carBody);
     this.sfx.update(this.sim);
     this.siren.update(this.sim, this.paused ? 0 : frameDt);
     this.rotor.update(this.sim);

@@ -2,6 +2,14 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.8 slice 8: a voice per engine
+
+Done: `src/audio/voices.ts` gives each class a voice and the engine speaks in the body's (`EngineAudio.update` takes
+`sim.carBody`): the muscle and police cars' V8 (four pulses a revolution, the engine as it was), the sports car's six
+(three, smooth and bright), the compact's four (two, buzzier, an octave up at the same revs), the van's diesel for every
+truck and bus (two, low, on a clatter of band-passed noise), the Bubble's two-stroke (one, a square's buzz and a rasp). A
+swap glides the mix over about 0.3 s. Pins M8.8 8.1, 8.2 (`tests/audio/voices.test.ts`); the sound is Marcin's ear.
+
 ## 2026-09-25 — M8.8 slice 7: damage you can feel
 
 Done: from stage 2 the engine gives 0.95 of its torque, at stage 3 0.9 (`DAMAGE.handling`, `Vehicle.torqueMul`), and the

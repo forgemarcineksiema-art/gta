@@ -2,11 +2,14 @@
  * Synthesized engine, wind and tyre-skid audio in WebAudio. No samples: two
  * detuned oscillators plus a noise bed shaped by RPM and load, wind noise by
  * speed, a band-passed noise for skids. One master gain for the ad-mute hook.
+ * The engine speaks in the body's voice (M8.8 slice 8, `voices.ts`); a swap
+ * glides from one voice to the next over about 0.3 s.
  *
  * The AudioContext is created lazily on the first user gesture (browser policy;
  * on iOS it must also be resumed inside a gesture).
  */
-import type { VehicleTelemetry } from '../sim';
+import type { BodyId, VehicleTelemetry } from '../sim';
+import { voiceOf, type EngineVoice } from './voices';
 
 const GESTURES = ['keydown', 'pointerdown', 'touchstart', 'touchend', 'click'] as const;
 
@@ -25,6 +28,15 @@ export class EngineAudio {
   private oscA: OscillatorNode | null = null;
   private oscB: OscillatorNode | null = null;
   private oscSub: OscillatorNode | null = null;
+  /** The voice's mix (M8.8 slice 8): the three oscillators' levels, the saw's grit, the rattle's band and level. */
+  private gainA: GainNode | null = null;
+  private gainB: GainNode | null = null;
+  private gainSub: GainNode | null = null;
+  private shaper: WaveShaperNode | null = null;
+  private rattleFilter: BiquadFilterNode | null = null;
+  private rattleGain: GainNode | null = null;
+  private body: BodyId = 'muscle';
+  private voice: EngineVoice = voiceOf('muscle');
   private engineFilter: BiquadFilterNode | null = null;
   private windFilter: BiquadFilterNode | null = null;
   private skidFilter: BiquadFilterNode | null = null;
@@ -117,20 +129,23 @@ export class EngineAudio {
     this.oscB.type = 'square';
     this.oscSub = ctx.createOscillator();
     this.oscSub.type = 'sine';
+    const v = this.voice;
     const gA = ctx.createGain();
-    gA.gain.value = 0.35;
+    gA.gain.value = v.saw;
     const gB = ctx.createGain();
-    gB.gain.value = 0.18;
+    gB.gain.value = v.square;
     const gS = ctx.createGain();
-    gS.gain.value = 0.3;
-    this.oscA.connect(gA).connect(this.engineFilter);
+    gS.gain.value = v.sub;
+    this.gainA = gA;
+    this.gainB = gB;
+    this.gainSub = gS;
     this.oscB.connect(gB).connect(this.engineFilter);
     this.oscSub.connect(gS).connect(this.engineFilter);
     // a little grit: waveshaper on the saw
     const shaper = ctx.createWaveShaper();
-    shaper.curve = makeDistortionCurve(18);
-    gA.disconnect();
-    gA.connect(shaper).connect(this.engineFilter);
+    shaper.curve = distortionCurve(v.grit);
+    this.shaper = shaper;
+    this.oscA.connect(gA).connect(shaper).connect(this.engineFilter);
     this.oscA.start();
     this.oscB.start();
     this.oscSub.start();
@@ -140,6 +155,15 @@ export class EngineAudio {
     noise.buffer = makeNoiseBuffer(ctx, 2);
     noise.loop = true;
     noise.start();
+
+    // the voice's rattle: a band of the noise under the engine (a diesel's clatter)
+    this.rattleFilter = ctx.createBiquadFilter();
+    this.rattleFilter.type = 'bandpass';
+    this.rattleFilter.frequency.value = v.rattleHz;
+    this.rattleFilter.Q.value = 1.4;
+    this.rattleGain = ctx.createGain();
+    this.rattleGain.gain.value = 0;
+    noise.connect(this.rattleFilter).connect(this.rattleGain).connect(this.effects);
 
     // wind
     this.windFilter = ctx.createBiquadFilter();
@@ -175,22 +199,27 @@ export class EngineAudio {
     noise.connect(this.scrapeFilter).connect(this.scrapeGain).connect(this.effects);
   }
 
-  update(tm: VehicleTelemetry, dt: number): void {
-    if (!this.ctx || !this.oscA || !this.oscB || !this.oscSub || !this.engineFilter || !this.engineGain || !this.windGain || !this.skidGain || !this.skidFilter || !this.crashGain || !this.scrapeGain || !this.scrapeFilter) return;
+  /** The engine, the wind, the tyres and the body for this frame, in the voice of `body` (the player's car). */
+  update(tm: VehicleTelemetry, dt: number, body: BodyId = this.body): void {
+    if (!this.ctx || !this.oscA || !this.oscB || !this.oscSub || !this.engineFilter || !this.engineGain || !this.windGain || !this.skidGain || !this.skidFilter || !this.crashGain || !this.scrapeGain || !this.scrapeFilter || !this.rattleGain) return;
+    if (body !== this.body) this.setVoice(body);
     const k = 1 - Math.exp(-dt * 10);
     this.rpmSmooth += (tm.rpm - this.rpmSmooth) * k;
     this.loadSmooth += (tm.load - this.loadSmooth) * k;
     const t = this.ctx.currentTime;
     const tc = 0.03;
+    const v = this.voice;
 
-    // 4 firing pulses per rev for a V8-ish tone
-    const f = (this.rpmSmooth / 60) * 4;
+    // the voice's firing pulses a revolution: a V8's 4, a six's 3, a four's 2
+    const f = (this.rpmSmooth / 60) * v.pulses;
     this.oscA.frequency.setTargetAtTime(f, t, tc);
     this.oscB.frequency.setTargetAtTime(f * 0.5 * 1.005, t, tc);
     this.oscSub.frequency.setTargetAtTime(f * 0.25, t, tc);
-    this.engineFilter.frequency.setTargetAtTime(350 + this.loadSmooth * 2400 + this.rpmSmooth * 0.15, t, tc);
+    this.engineFilter.frequency.setTargetAtTime(v.floor + this.loadSmooth * v.open + this.rpmSmooth * 0.15, t, tc);
     const boostBite = tm.boosting ? 0.12 : 0;
-    this.engineGain.gain.setTargetAtTime(0.16 + this.loadSmooth * 0.22 + boostBite, t, tc);
+    this.engineGain.gain.setTargetAtTime((0.16 + this.loadSmooth * 0.22 + boostBite) * v.level, t, tc);
+    // the rattle rides the load and fades in off idle
+    this.rattleGain.gain.setTargetAtTime(v.rattle * (0.35 + this.loadSmooth * 0.65) * Math.min(1, this.rpmSmooth / 2000), t, tc);
 
     const speed = Math.abs(tm.speed);
     const wind = Math.pow(Math.min(1, speed / 65), 2) * 0.6;
@@ -214,6 +243,21 @@ export class EngineAudio {
     }
     this.scrapeGain.gain.setTargetAtTime(tm.scrape * 0.3, t, 0.04);
     this.scrapeFilter.frequency.setTargetAtTime(1800 + speed * 25, t, 0.05);
+  }
+
+  /** Another body: its voice's mix glides in over about 0.3 s (a time constant of 0.1 s); the grit changes at once. */
+  private setVoice(body: BodyId): void {
+    this.body = body;
+    const v = voiceOf(body);
+    if (v === this.voice) return;
+    this.voice = v;
+    if (!this.ctx || !this.gainA || !this.gainB || !this.gainSub || !this.shaper || !this.rattleFilter) return;
+    const t = this.ctx.currentTime;
+    this.gainA.gain.setTargetAtTime(v.saw, t, 0.1);
+    this.gainB.gain.setTargetAtTime(v.square, t, 0.1);
+    this.gainSub.gain.setTargetAtTime(v.sub, t, 0.1);
+    this.rattleFilter.frequency.setTargetAtTime(v.rattleHz, t, 0.1);
+    this.shaper.curve = distortionCurve(v.grit);
   }
 
   /** Ad-mute hook (adStarted / adFinished). Independent from the player's own mute. */
@@ -257,6 +301,18 @@ function makeNoiseBuffer(ctx: AudioContext, seconds: number): AudioBuffer {
     data[i] = (s / 4294967296) * 2 - 1;
   }
   return buf;
+}
+
+/** The waveshaper's curves by drive, made once each (a swap reuses them). */
+const CURVES = new Map<number, Float32Array<ArrayBuffer>>();
+
+function distortionCurve(amount: number): Float32Array<ArrayBuffer> {
+  let curve = CURVES.get(amount);
+  if (!curve) {
+    curve = makeDistortionCurve(amount);
+    CURVES.set(amount, curve);
+  }
+  return curve;
 }
 
 function makeDistortionCurve(amount: number): Float32Array<ArrayBuffer> {

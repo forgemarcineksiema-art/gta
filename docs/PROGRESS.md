@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.10 after the merge: crossings, passages, decks
+
+Done: the traffic stops short of a shut level crossing and goes over once it opens (pin 13.4, long); the highway
+rises over every road passing beneath it on the low coast, so the south's three passages (4.3–4.7 m under the sea,
+flooded) stand a metre over it, a ramp beside it held level; a wheel on a deck, a pier, a kerb, a floor or a roof
+reads the road, not the ground's cover under it (pin 3.5). Known: where a street forks off an avenue at 45° and the
+two part in height (Crown's street 2), the street's carriageway keeps a smooth 0.5 m dip across it; to look at with
+the island's forks before the switch.
+
 ## 2026-09-25 — M8.10 slices 8–12: the districts' places, merged
 
 Done: five agents built the places side by side in their worktrees, merged here (each slice's as-built note in its

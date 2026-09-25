@@ -26,8 +26,8 @@ export const WHERE: Record<EventKind, Where> = {
   jobStart: 'none', jobDone: 'none', jobFailed: 'none', orderFound: 'none', purchase: 'none',
   // a duel's result is its job line (BEATEN +purse · THE CAR IS YOURS); flavour the screen tells better
   rivalBeaten: 'none', rivalSeen: 'none', damageNews: 'none',
-  // what changes what you do: the top centre
-  heatLevel: 'top', dispatch: 'top', rivalReady: 'top', twinSwap: 'top',
+  // what changes what you do: the top centre (a drive-through's service too, M8.10 slice 16)
+  heatLevel: 'top', dispatch: 'top', rivalReady: 'top', twinSwap: 'top', service: 'top',
   // how a job is taken, while the sim says it teaches (M8.7 D8)
   ringPass: 'top',
   // what pays or counts outside the combo: a pop
@@ -144,6 +144,11 @@ export function speak(kind: EventKind, value: number, target: number, ctx: Voice
       break;
     case 'hiddenCar': out.text = t('HIDDEN CAR FOUND · IN THE GARAGE NOW'); out.big = true; break;
     case 'breaker': out.text = t('PURSUIT BREAKER!'); break;
+    // a drive-through (M8.10 slice 16): fuel, a repair, a new paint
+    case 'service':
+      out.lead = value === 0 ? t('FUEL') : value === 1 ? t('REPAIR SHOP') : t('PAINT SHOP');
+      out.text = value === 0 ? t('BOOST FULL') : value === 1 ? t('REPAIRED') : t('NEW PAINT');
+      break;
     default: break;
   }
   if (out.text === '') out.where = 'none';

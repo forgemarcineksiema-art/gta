@@ -15,6 +15,7 @@ const SOLID_ONLY = interactionGroups(0xffff, GROUP_DEFAULT);
 import { City, type PropRing } from './city/City';
 import { Island, PLUMB_TILT } from './island/Island';
 import { islandStreets } from './island/streetMap';
+import { Services } from './island/services';
 import { coverSites, type CoverSites } from './city/cover';
 import { Roadblocks } from './police/Roadblocks';
 import { Cameras } from './city/cameras';
@@ -199,6 +200,8 @@ export class SimWorld {
   readonly collectibles: Collectibles | null;
   /** The street furniture's states, the knock before the physics and the flying bodies after it (M8); null off the city. */
   readonly props: Props | null;
+  /** The island's drive-throughs at work (M8.10 slice 16): fuel, repair, paint. */
+  readonly services: Services | null;
   /** Coins on the road and the spill pool; null on the playground. */
   readonly coins: Coins | null;
   /** The day's thirty caches (DESIGN.md §13.5); null on the playground. */
@@ -363,6 +366,7 @@ export class SimWorld {
     }
     // before the first sync: the ring's chunks bring their props' posts
     this.props = this.city || this.island ? new Props(this) : null;
+    this.services = this.island ? new Services(this, this.island.services) : null;
     this.city?.sync(spawn.position.x, spawn.position.z, true);
     if (opts.save) {
       applySave(this, opts.save);
@@ -442,6 +446,8 @@ export class SimWorld {
       probe.halfWidth = he.x;
       probe.halfLength = he.z;
     }
+    // the car in a drive-through's bay is served (the island's, slice 16)
+    this.services?.step(FIXED_DT);
     if (this.traffic) {
       const probe = this.probe;
       this.traffic.playerColliderHandle = this.vehicle.collider.handle;

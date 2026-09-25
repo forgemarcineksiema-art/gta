@@ -90,6 +90,13 @@ export const PL: Readonly<Record<string, string>> = {
   'NEW JUMP {n}/{of}': 'NOWY SKOK {n}/{of}',
   'ALL BILLBOARDS +{cash}': 'WSZYSTKIE BILLBOARDY +{cash}',
   'HIDDEN CAR FOUND · IN THE GARAGE NOW': 'UKRYTE AUTO ZNALEZIONE · JUŻ W GARAŻU',
+  // the island's drive-throughs (M8.10 slice 16)
+  'FUEL': 'STACJA',
+  'REPAIR SHOP': 'WARSZTAT',
+  'PAINT SHOP': 'LAKIERNIA',
+  'BOOST FULL': 'PEŁNE NITRO',
+  'REPAIRED': 'NAPRAWIONE',
+  'NEW PAINT': 'NOWY LAKIER',
   'PURSUIT BREAKER!': 'PUŁAPKA!',
 
   // the goal line and the job's card (jobs.ts)

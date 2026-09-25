@@ -20,6 +20,8 @@ import { DECK, structures, type Piece, type Structure } from './structures';
 import { PAVEMENT, roadSurfaces, type RoadSurfaces } from './surfaces';
 import { fillIsland, inLot, type IslandFill } from './fill';
 import { buildPlaces, type Place } from './places';
+import { buildServices, serviceSpots, siteRect, type ServiceSite } from './services';
+import type { StaticDesc } from '../scene';
 import { BOUNDS, CIRCUS, highwayLoop } from './plan';
 
 /** A chunk of the ground: its side (m) and the height field's cell (m). The chunks cover the plan's bounds. */
@@ -63,8 +65,10 @@ export class Island {
   readonly structures: Structure[] = structures((this.network.lines[0] as { pts: RoadPoint[] }).pts, highwayLoop(6).span);
   /** The roads' surfaces (M8.10 slice 6b): the strips, the junctions, the pavements and their kerbs, the paint, the bays. */
   readonly surfaces: RoadSurfaces = roadSurfaces(this.ground, this.network.graph, (x, z) => { const [i, j] = Island.chunkOf(x, z); return Island.chunkIndex(i, j); });
-  /** The lots, their buildings and the palms (M8.10 slice 7a). */
-  readonly fill: IslandFill = fillIsland(this.ground, this.surfaces, (x, z) => { const [i, j] = Island.chunkOf(x, z); return Island.chunkIndex(i, j); });
+  /** The drive-throughs (M8.10 slice 16): their sites, beside their roads; the sim's `Services` serves the car in their bays. */
+  readonly services: ServiceSite[] = serviceSpots(this.ground);
+  /** The lots, their buildings and the palms (M8.10 slice 7a), off the drive-throughs' sites. */
+  readonly fill: IslandFill = fillIsland(this.ground, this.surfaces, (x, z) => { const [i, j] = Island.chunkOf(x, z); return Island.chunkIndex(i, j); }, this.services.map(siteRect));
   /** Each district's places (M8.10 slices 8–12): their statics in `fill.chunks`, the ones that move stepped here. */
   readonly places: Place[];
   /** The chunks with a height field in the physics, by index. */
@@ -106,15 +110,15 @@ export class Island {
     this.route = this.highwayTrack();
     this.structureColliders();
     const chunks = this.fill.chunks;
-    this.places = buildPlaces({
-      ground: this.ground, network: this.network, surfaces: this.surfaces, fill: this.fill, world,
-      statics: (x, z) => {
-        const [i, j] = Island.chunkOf(x, z), key = Island.chunkIndex(i, j);
-        let list = chunks.get(key);
-        if (!list) { list = []; chunks.set(key, list); }
-        return list;
-      },
-    });
+    const statics = (x: number, z: number): StaticDesc[] => {
+      const [i, j] = Island.chunkOf(x, z), key = Island.chunkIndex(i, j);
+      let list = chunks.get(key);
+      if (!list) { list = []; chunks.set(key, list); }
+      return list;
+    };
+    this.places = buildPlaces({ ground: this.ground, network: this.network, surfaces: this.surfaces, fill: this.fill, world, statics });
+    // the drive-throughs (slice 16): fuel, repair, paint
+    buildServices(this.ground, this.services, statics);
   }
 
   /** Run the places that move (a train, a barrier, a wheel), a fixed step. */

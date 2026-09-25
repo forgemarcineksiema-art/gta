@@ -84,11 +84,16 @@ export function reserved(x: number, z: number): boolean {
   return false;
 }
 
+/** A turned rectangle: a lot's footprint, or a site the fill keeps clear. */
+export type Rect = Pick<Lot, 'x' | 'z' | 'yaw' | 'hx' | 'hz'>;
+/** How far the fill keeps its lots and palms off a kept site (m). */
+const KEEP_OFF = 3;
+
 /** Two lots' footprints overlap (with `gap` between them): the separating axes of two turned rectangles. */
-function overlap(a: Lot, b: Lot, gap: number): boolean {
+function overlap(a: Rect, b: Rect, gap: number): boolean {
   if (Math.hypot(a.x - b.x, a.z - b.z) > Math.hypot(a.hx, a.hz) + Math.hypot(b.hx, b.hz) + gap) return false;
   for (const r of [a, b]) for (const [ax, az] of [[Math.cos(r.yaw), -Math.sin(r.yaw)], [Math.sin(r.yaw), Math.cos(r.yaw)]] as const) {
-    const extent = (q: Lot): number => {
+    const extent = (q: Rect): number => {
       const ux = Math.cos(q.yaw), uz = -Math.sin(q.yaw), vx = Math.sin(q.yaw), vz = Math.cos(q.yaw);
       return q.hx * Math.abs(ux * ax + uz * az) + q.hz * Math.abs(vx * ax + vz * az);
     };
@@ -111,8 +116,8 @@ export function footprint(l: Pick<Lot, 'x' | 'z' | 'yaw' | 'hx' | 'hz'>): P2[] {
   return out;
 }
 
-/** The island's lots, buildings and palms along its roads' surfaces; `chunkOf` names a point's chunk. */
-export function fillIsland(ground: Ground, surfaces: RoadSurfaces, chunkOf: (x: number, z: number) => number, seed = 1): IslandFill {
+/** The island's lots, buildings and palms along its roads' surfaces, off the `keep` sites; `chunkOf` names a point's chunk. */
+export function fillIsland(ground: Ground, surfaces: RoadSurfaces, chunkOf: (x: number, z: number) => number, keep: readonly Rect[] = [], seed = 1): IslandFill {
   const rnd = stream(seed ^ 0x51f1);
   const lots: Lot[] = [], palms: Array<{ x: number; z: number }> = [];
   const chunks = new Map<number, StaticDesc[]>();
@@ -125,8 +130,9 @@ export function fillIsland(ground: Ground, surfaces: RoadSurfaces, chunkOf: (x: 
     return out;
   };
   // free ground for a lot: land, grass (no road, paved place, beach or quarry), off every road's pavement and the
-  // plan's places
-  const free = (x: number, z: number): boolean => ground.onLand(x, z) && ground.surface(x, z) === GRASS && !ground.nearOtherRoad(x, z, -1, PAVEMENT + CLEAR) && !reserved(x, z);
+  // plan's places and the kept sites
+  const free = (x: number, z: number): boolean => ground.onLand(x, z) && ground.surface(x, z) === GRASS && !ground.nearOtherRoad(x, z, -1, PAVEMENT + CLEAR) && !reserved(x, z)
+    && !keep.some((k) => inLot(k, x, z, KEEP_OFF));
   const p = { x: 0, y: 0, z: 0 };
   const statics = (x: number, z: number): StaticDesc[] => {
     const key = chunkOf(x, z);
@@ -151,7 +157,7 @@ export function fillIsland(ground: Ground, surfaces: RoadSurfaces, chunkOf: (x: 
         s += 2 * hx + rule.gap;
         if (!lot) continue;
         const pts = footprint(lot);
-        if (!pts.every(([x, z]) => free(x, z))) continue;
+        if (!pts.every(([x, z]) => free(x, z)) || keep.some((k) => overlap(k, lot, KEEP_OFF))) continue;
         if (nearLots(lot.x, lot.z).some((o) => overlap(o, lot, Math.min(rule.gap, RULE[o.district].gap)))) continue;
         const hs = pts.map(([x, z]) => ground.surfaceHeight(x, z));
         lot.base = Math.max(...hs);
@@ -189,7 +195,7 @@ export function fillIsland(ground: Ground, surfaces: RoadSurfaces, chunkOf: (x: 
   }
   // a palm, clear of the lots (none on Crown's hill: R2)
   function palm(x: number, z: number): void {
-    if (districtOf(x, z) === 'crown' || nearLots(x, z).some((o) => overlap(o, { x, z, yaw: 0, hx: 1.5, hz: 1.5 } as Lot, 0))) return;
+    if (districtOf(x, z) === 'crown' || nearLots(x, z).some((o) => overlap(o, { x, z, yaw: 0, hx: 1.5, hz: 1.5 }, 0))) return;
     const list = statics(x, z), kit = new Architecture(list), start = list.length;
     kit.tree(0, 0, true);
     kit.rotateFrom(start, x, z, 0);

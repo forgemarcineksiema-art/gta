@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.10 slice 16: fuel, repair, paint
+
+Done: the drive-throughs (`island/services.ts`): three fuel stations (a canopy over two pump islands; a full boost,
+each once a minute), two repair shops and two paint shops (a shed between two walls; repaired after 2 s inside; the
+body's next paint, and unseen by every unit the chase is lost as by a swap). Each stands at its plan point beside its
+road, on the nearest spot clear of every road's pavement, the places and the sea, level enough for its floor; the fill
+keeps its lots and palms off it. The message at the top: STACJA · PEŁNE NITRO, WARSZTAT · NAPRAWIONE, LAKIERNIA · NOWY
+LAKIER. Pins 16.0–16.3.
+
 ## 2026-09-25 — M8.10 slice 13: traffic, walkers, police on the island
 
 Done: the traffic, the walkers and the police read a street map (`traffic/streets.ts`: the grid's city as before, the

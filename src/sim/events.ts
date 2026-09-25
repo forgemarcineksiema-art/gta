@@ -45,7 +45,9 @@ export type EventKind =
   // the run's property damage in a district passed a mark (M8 slice 6): value = the mark, target = the district's index
   | 'damageNews'
   // a car flattened by the steamroller's drum (M8.8 slice 11): target = its record
-  | 'flatten';
+  | 'flatten'
+  // a drive-through served the car (M8.10 slice 16): value 0 fuel, 1 repair, 2 paint; target = the site's index
+  | 'service';
 
 export interface SimEvent {
   kind: EventKind;

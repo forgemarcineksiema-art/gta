@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { BODY_IDS, KIT, bodySpec, bodyTuning, type BodyId, type SimWorld } from '../../sim';
 import { GLYPHS } from '../../sim/glyphs';
 import { BODY_PROFILES } from './bodyProfiles';
+import { buildBikeMesh } from './bikeMesh';
 import { buildCarMesh, restHeight, wheelGeometry, type CarMesh } from './carMesh';
 import { spoilerGeometry, topperGeometry } from './kitMesh';
 
@@ -175,8 +176,9 @@ export class Thumbs {
       const id = key.slice(5) as BodyId;
       const paint = this.sim.garage.paintOf(id);
       this.paints.set(id, paint);
-      // built for its picture and let go: the atlas keeps the picture, a respray builds it again
-      const car = buildCarMesh(bodyTuning(id), BODY_PROFILES[id], paint);
+      // built for its picture and let go: the atlas keeps the picture, a respray builds it again; a bike is a bike
+      const t = bodyTuning(id);
+      const car = t.twoWheel > 0 ? buildBikeMesh(t, paint) : buildCarMesh(t, BODY_PROFILES[id], paint);
       this.shoot(car, id, x, y);
       dispose(car);
       return;

@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import { ASPHALT, DIRT, GRASS, ISLAND_COLORS, PALETTE, SAND, SEA } from '../../sim';
 import { BLEND, COAST_KINDS, FOOT, SHOULDER, type GroundProbe } from '../../sim/island/ground';
 import { CHUNK, CHUNKS_X, CHUNKS_Z, CHUNK_X0, CHUNK_Z0, Island } from '../../sim/island/Island';
+import { LAID, LAWN, gardensGround } from '../../sim/island/shapes/gardens';
 import { DECK } from '../../sim/island/structures';
 import { Rtin } from './rtin';
 
@@ -42,8 +43,8 @@ const FACE: Readonly<Record<string, number>> = {
   cliff: ISLAND_COLORS.cliff, quay: ISLAND_COLORS.quayWall, bay: PALETTE.kerb, beach: ISLAND_COLORS.rock, rocks: ISLAND_COLORS.rock, spit: ISLAND_COLORS.rock,
 };
 
-/** A chunk's points being read: its column and row, the next column to read, what each point holds. */
-interface Reading { i: number; j: number; col: number; h: Float32Array; cut: Float32Array; kind: Int8Array; road: Float32Array; surface: Uint8Array }
+/** A chunk's points being read: its column and row, the next column to read, what each point holds (`laid`: the Gardens' marks, `gardensGround`). */
+interface Reading { i: number; j: number; col: number; h: Float32Array; cut: Float32Array; kind: Int8Array; road: Float32Array; surface: Uint8Array; laid: Uint8Array }
 
 /** A chunk's ground as arrays: three corners a triangle, a colour a corner, and its count. */
 export interface ChunkMesh { positions: Float32Array; colors: Uint8Array; triangles: number }
@@ -143,7 +144,7 @@ export class GroundView {
 
   private startReading(i: number, j: number): Reading {
     const n = GRID * GRID;
-    return { i, j, col: 0, h: new Float32Array(n), cut: new Float32Array(n), kind: new Int8Array(n), road: new Float32Array(n), surface: new Uint8Array(n) };
+    return { i, j, col: 0, h: new Float32Array(n), cut: new Float32Array(n), kind: new Int8Array(n), road: new Float32Array(n), surface: new Uint8Array(n), laid: new Uint8Array(n) };
   }
 
   /** Read the chunk's points up to column `to` (not included). */
@@ -159,6 +160,7 @@ export class GroundView {
       r.kind[k] = mouth ? IN_MOUTH : p.steepKind;
       r.road[k] = p.road;
       r.surface[k] = p.surface;
+      r.laid[k] = gardensGround(x, z);
     }
     r.col = to;
   }
@@ -179,15 +181,17 @@ export class GroundView {
       const h = r.h[k] as number, road = r.road[k] as number;
       let a: number, b: number;
       if ((r.cut[k] as number) < -3) a = b = 1e6;
-      // under a road's strip or a paved place's slab (4 cm over the ground, 3.5 the slabs): never over it
-      else if (road < 0 || r.surface[k] === ASPHALT) { a = 0.036; b = 0.6; }
+      // under a road's strip or a paved place's slab (4 cm over the ground, 3.5 the slabs) or a place's own surface
+      // (the Gardens' paths and golf, 5 cm over): never over it
+      else if (road < 0 || r.surface[k] === ASPHALT || ((r.laid[k] as number) & LAID) !== 0) { a = 0.036; b = 0.6; }
       else if (road < SHOULDER + 1) { a = 0.1; b = 0.3; }
       else if (h < SEA.level - 0.6) a = b = 3;
       else if (Math.abs(h - SEA.level) < 0.6) a = b = 0.08;
       else a = b = 0.3;
       this.above[k] = a;
       this.below[k] = b;
-      this.tint[k] = cornerColour(r.surface[k] as number, road, h);
+      // (the botanic garden's lawn its own green; under a place's surface the grass's, which its edges show)
+      this.tint[k] = ((r.laid[k] as number) & LAWN) !== 0 && h > SEA.level ? ISLAND_COLORS.lawn : cornerColour(((r.laid[k] as number) & LAID) !== 0 ? GRASS : (r.surface[k] as number), road, h);
     }
     this.rtin.update(r.h, this.above, this.below, r.cut, CUT_SIZE);
     this.tris = 0;

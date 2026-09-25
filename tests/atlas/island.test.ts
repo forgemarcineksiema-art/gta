@@ -8,6 +8,9 @@ import { GLYPHS, KIND_GLYPH } from '../../src/sim/glyphs';
 import { catmullRom, circle } from '../../src/sim/island/geom';
 import { districtStreets } from '../../src/sim/island/streets';
 import {
+  BEACH_JUMP, BOARDWALK, BUNKERS, CREST, DUNE_JUMP, FAIRWAYS, GLASSHOUSE, GREENS, POND, TEES, boardwalkRuns, gardenDunes, gardenPaths, gardenTrees,
+} from '../../src/sim/island/shapes/gardens';
+import {
   BAY, BASIN, BOUNDS, BREAKERS, BUOYS, CAMERAS, COAST_PARTS, COVERS, FIRST_MINUTE, FIRST_MINUTE_STEPS, GARAGES, HIGHWAY, JOBS, JUMPS,
   PLACES, RINGS, RIVAL_RINGS, ROADBLOCK_SITES, ROADS, SERVICES, SLIPWAYS, STASH, causeway, coastline, districtOf, islet, landArea,
   naturalHeight, onLand, COAST,
@@ -55,6 +58,16 @@ it('dumps the island for the atlas', () => {
       firstMinute: FIRST_MINUTE, firstMinuteSteps: FIRST_MINUTE_STEPS,
     },
     glyphs: GLYPHS, kindGlyph: KIND_GLYPH,
+    // Palm Gardens (slice 10): the garden's paths, terrace and trees; the golf; the dunes; the jumps; the boardwalk
+    gardens: {
+      paths: gardenPaths().map((p) => ({ id: p.id, closed: p.closed, pts: pts(p.pts) })),
+      terrace: { x: GLASSHOUSE.x, z: GLASSHOUSE.z, r: GLASSHOUSE.paved },
+      trees: gardenTrees().map((t) => ({ x: r1(t.x), z: r1(t.z), palm: t.palm })),
+      fairways: FAIRWAYS, greens: GREENS, tees: TEES, bunkers: BUNKERS, pond: { x: POND.x, z: POND.z, rx: POND.rx, rz: POND.rz },
+      dunes: gardenDunes().dunes.map((d) => ({ x: r1(d.x), z: r1(d.z), r: r1(d.r) })), duneLine: pts(gardenDunes().line), band: gardenDunes().band,
+      jumps: [CREST, DUNE_JUMP, BEACH_JUMP],
+      boardwalk: boardwalkRuns().map((r) => pts(r)), boardwalkHalf: BOARDWALK.half,
+    },
   };
   const json = JSON.stringify(data);
   expect(json.includes('null')).toBe(false);

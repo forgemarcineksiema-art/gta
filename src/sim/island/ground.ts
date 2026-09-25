@@ -12,6 +12,7 @@ import { ASPHALT, DIRT, GRASS, SAND, type SurfaceKind } from '../city/surface';
 import { catmullRom, circle, inPolygon, polylineLength, resample, signedArea, type P2 } from './geom';
 import { BASIN, BOUNDS, COAST, COAST_PARTS, PLACES, RINGS, ROADS, causeway, highwayLoop, islet, naturalHeight, type PlanRoad, type RoadClass, type SpanKind } from './plan';
 import { shaped } from './shapes';
+import { gardensCover } from './shapes/gardens';
 import { districtStreets } from './streets';
 
 /** A road's half width by class (m), its carriageway without the pavement. */
@@ -715,6 +716,9 @@ export class Ground {
     if (dirt) return DIRT;
     if (!this.onLand(x, z)) return SAND;
     if (inPolygon(x, z, PLACES.quarry)) return DIRT;
+    // the Gardens' own (slice 10): the garden's gravel paths, the golf's bunkers and the dunes' sand, the terrace
+    const cover = gardensCover(x, z);
+    if (cover !== null) return cover === 'gravel' ? DIRT : cover === 'sand' ? SAND : ASPHALT;
     if (paved(x, z)) return ASPHALT;
     this.nearestShore(x, z);
     if (this.shore.quay < APRON) return ASPHALT;

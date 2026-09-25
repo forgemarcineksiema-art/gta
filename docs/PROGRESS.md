@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.9 slice 14: the pictures
+
+Done (R10): `render/cars/thumbs.ts` draws an atlas of 160×100 cells, one per body and per kit item, at the session's
+first door, three a frame while the wall is up and never while the run drives (`ThumbQueue`); a car in its paint
+three-quarters from the front (built for its shot and freed: the atlas keeps it; a respray draws it again), the car's
+kit on a grey car, the neon, the flames, the smoke and the horns as swatches in their shapes (the flame is the glyph).
+Drawn at twice the size into a render target and scaled down; the wall's cards draw their cells (`Pictures`, the ui's
+shape of it) and show them in place of the swatch. Pins M8.9 14.1–14.3. Stills and verify green.
+
 ## 2026-09-25 — M8.9 slice 13: the showroom
 
 Done (R10): the door shut, the camera leaves the back corner over 0.6 s for the showroom (`render/camera/showroom.ts`):

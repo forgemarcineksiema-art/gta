@@ -89,6 +89,29 @@ const PREP_WORDS: Record<PrepItem, [string, string]> = {
   fence: ['BAG BONUS', 'THE GARAGE PAYS +0.5 × ON THE BAG'],
 };
 
+/**
+ * The pictures' atlas (M8.9 R10): the render's (`render/cars/thumbs.ts`), read through this shape (the ui does not
+ * import the render): a cell per body (`body:<id>`) and per kit item (`kit:<id>`), each with a version that bumps when
+ * it is drawn.
+ */
+export interface Pictures {
+  readonly canvas: HTMLCanvasElement;
+  readonly serial: number;
+  readonly cellW: number;
+  readonly cellH: number;
+  readonly cols: number;
+  cellOf(key: string): number;
+  version(cell: number): number;
+}
+
+/** A card's picture: its canvas, its cell, the version drawn into it. */
+interface Pic {
+  card: HTMLElement;
+  canvas: HTMLCanvasElement;
+  cell: number;
+  drawn: number;
+}
+
 interface Item {
   el: HTMLButtonElement;
   act: () => void;
@@ -113,6 +136,10 @@ export class GarageUi {
   private readonly paintFor: HTMLElement;
   /** The STYLE page's kit cards (M6): the item's index in `KIT` beside each card. */
   private readonly kitCards: Array<{ el: HTMLButtonElement; item: number }> = [];
+  /** Every card's picture (M8.9 R10), drawn from the atlas as its cell comes. */
+  private readonly pics: Pic[] = [];
+  private pictures: Pictures | null = null;
+  private picSerial = -1;
   private readonly tuneFor: HTMLElement;
   private readonly carsCount: HTMLElement;
   /** CARS' upgrade rows (TUNE until M8.5) and the next run's boosters (PREP until M8.5), a cash and a video button each. */
@@ -179,7 +206,7 @@ export class GarageUi {
       const b = button(isShell(id) ? 'wall__card' : 'wall__card wall__card--body', '');
       b.dataset['car'] = id;
       // what the car is for under its name (M8.8 slices 3, 5): its class's job, or a trophy's BEST AT (filled in `update`)
-      b.append(el('span', 'wall__card-swatch'), label(el('span', 'wall__card-name'), BODY_WORDS[id]), el('span', 'wall__card-role'), el('span', 'wall__card-status'));
+      b.append(this.pic(b, `body:${id}`), el('span', 'wall__card-swatch'), label(el('span', 'wall__card-name'), BODY_WORDS[id]), el('span', 'wall__card-role'), el('span', 'wall__card-status'));
       grid.appendChild(b);
       const it = this.item(pageOf('buy'), b, () => this.carAction(id));
       if (!isShell(id)) {
@@ -247,7 +274,7 @@ export class GarageUi {
         b.dataset['kit'] = k.id;
         const sw = el('span', 'wall__card-swatch');
         sw.style.background = `#${k.colour.toString(16).padStart(6, '0')}`;
-        b.append(sw, label(el('span', 'wall__card-name'), k.name), el('span', 'wall__card-status'));
+        b.append(this.pic(b, `kit:${k.id}`), sw, label(el('span', 'wall__card-name'), k.name), el('span', 'wall__card-status'));
         row.appendChild(b);
         const it = this.item(pageOf('kit'), b, () => this.actions.kit(i));
         paintItems.push(it);
@@ -413,8 +440,15 @@ export class GarageUi {
     return (this.rows.get(this.page) ?? []).map((row) => row.filter((it) => !it.hidden));
   }
 
+  /** The pictures' atlas (M8.9 R10): the cards draw their cells from it as they come. */
+  setPictures(p: Pictures): void {
+    this.pictures = p;
+    this.picSerial = -1;
+  }
+
   update(sim: SimWorld): void {
     if (!this.isOpen) return;
+    this.drawPictures();
     const g = sim.garage;
     const funds = sim.run.bank;
     if (g.serial + sim.kit.serial * 4096 === this.garageSerial && funds === this.bank && sim.dailies.serial === this.dailySerial && sim.run.hot === this.hot) return;
@@ -566,6 +600,39 @@ export class GarageUi {
     }
     this.todayFor.textContent = d.streak.count > 0 ? `${t('TODAY · STREAK DAY {n}', { n: d.streak.count })}${d.streak.topper ? ` · ${t('TOPPER ON')}` : ''}` : t('TODAY');
     this.dailiesBody.replaceChildren(...rows);
+  }
+
+  /** A card's picture canvas, drawn when its cell comes (the swatch shows till then). */
+  private pic(card: HTMLElement, key: string): HTMLCanvasElement {
+    const canvas = document.createElement('canvas');
+    canvas.className = 'wall__pic';
+    canvas.width = 160;
+    canvas.height = 100;
+    canvas.setAttribute('aria-hidden', 'true');
+    // its cell is looked up on the first draw (-2: not yet)
+    this.pics.push({ card, canvas, cell: -2, drawn: 0 });
+    canvas.dataset['key'] = key;
+    return canvas;
+  }
+
+  /** The cards whose cells were drawn since, drawn again from the atlas. */
+  private drawPictures(): void {
+    const p = this.pictures;
+    if (!p || p.serial === this.picSerial) return;
+    this.picSerial = p.serial;
+    for (const pic of this.pics) {
+      if (pic.cell === -2) pic.cell = p.cellOf(pic.canvas.dataset['key'] ?? '');
+      if (pic.cell < 0) continue;
+      const v = p.version(pic.cell);
+      if (v === 0 || v === pic.drawn) continue;
+      pic.drawn = v;
+      const c = pic.canvas.getContext('2d');
+      if (!c) continue;
+      const x = (pic.cell % p.cols) * p.cellW, y = Math.floor(pic.cell / p.cols) * p.cellH;
+      c.clearRect(0, 0, pic.canvas.width, pic.canvas.height);
+      c.drawImage(p.canvas, x, y, p.cellW, p.cellH, 0, 0, pic.canvas.width, pic.canvas.height);
+      pic.card.classList.add('has-pic');
+    }
   }
 
   private newPage(p: WallPage): HTMLElement {

@@ -26,6 +26,7 @@ import { AutoQuality, QUALITY, type QualityTier } from './quality';
 import { Coins } from './run/Coins';
 import { HideoutView } from './run/HideoutView';
 import { MarkerView } from './run/MarkerView';
+import { Thumbs } from './cars/thumbs';
 import { showroomMix, turntableYaw } from './camera/showroom';
 import { SIGN_Y, signScale, signTopY } from './run/signs';
 import { ShapesView } from './shapes';
@@ -79,6 +80,8 @@ export class Renderer {
   /** The street furniture that is down (M8). */
   private readonly propsView: PropsView | null;
   readonly hideoutView: HideoutView | null;
+  /** The garage's pictures (M8.9 R10): drawn behind the shut door, a few a frame, kept for the session. */
+  readonly thumbs: Thumbs | null;
   readonly coinsView: Coins | null;
   readonly markerView: MarkerView;
   readonly roadblockView: RoadblockView | null;
@@ -154,6 +157,7 @@ export class Renderer {
     this.trafficView = sim.traffic && (sim.trafficDensity > 0 || sim.police) ? new TrafficView(this.scene, sim.traffic, sim.trafficDensity > 0) : null;
     this.pedView = sim.peds && sim.pedsDensity > 0 ? new PedView(this.scene, sim.peds) : null;
     this.hideoutView = sim.run.dropOffs.length > 0 ? new HideoutView(this.scene, sim) : null;
+    this.thumbs = sim.run.dropOffs.length > 0 ? new Thumbs(this.renderer, sim) : null;
     this.markerView = new MarkerView(this.scene, sim, this.camera);
     this.roadblockView = sim.roadblocks ? new RoadblockView(this.scene) : null;
     this.signalView = sim.city && sim.traffic ? new SignalView(this.scene, sim) : null;
@@ -278,6 +282,8 @@ export class Renderer {
     if (this.billboards && sim.collectibles) this.billboards.update(sim.collectibles);
     this.fx.update(dt, this.elapsed);
 
+    // the wall's pictures while it is up, never while the run drives (before the frame: they borrow the renderer)
+    this.thumbs?.step(sim.run.state === 'door');
     this.renderer.info.reset();
     this.renderer.render(this.scene, this.camera);
     this.stats.drawCalls = this.renderer.info.render.calls;

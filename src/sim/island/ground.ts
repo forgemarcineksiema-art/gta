@@ -41,16 +41,16 @@ export const APRON = 14;
 /** A road under an overpass runs this far below its deck (m: a lorry's clearance and the deck's depth). */
 const UNDER = 7;
 /**
- * On the low coast (2 m) a road's dip `UNDER` its overpass would stand in the sea, so the highway rises over the classes
- * in `RISES_OVER` (M8.10 slice 12: the airfield's taxiways) to keep them `DRY` m over it: flat `top` m each way from the
- * passage (the deck, and a sample past its ends, where the ground under the deck's ends is the road's last height on the
- * ground), eased into its `grade` over `curve` m and out of it again at the foot, so no crest throws a car. (The south's
- * passages, palm avenue's, the quay sweep's and the Gardens', dip under the sea too; a rise there meets the ramp merging
- * alongside it, so their slices decide.)
+ * On the low coast (2 m) a road's dip `UNDER` its overpass would stand in the sea, so the highway rises over every road
+ * passing beneath it there (the airfield's taxiways, the south's palm avenue, quay sweep and Gardens passage) to keep it
+ * `DRY` m over the sea: flat `top` m each way from the passage (the deck, and a sample past its ends, where the ground
+ * under the deck's ends is the road's last height on the ground), eased into its `grade` over `curve` m and out of it
+ * again at the foot, so no crest throws a car. A ramp joining it alongside is held level with it (`ALONGSIDE`).
  */
 const DRY = 1;
 const RISE = { top: OVERPASS_HALF + 2 * STEP, curve: 40, grade: 0.05 } as const;
-const RISES_OVER: ReadonlySet<RoadClass> = new Set<RoadClass>(['taxiway']);
+/** A ramp is held level with the highway it joins as far as its line runs this near the highway's (m): beside it. */
+const ALONGSIDE = HALF_WIDTH.highway + HALF_WIDTH.ramp + SHOULDER + 2;
 /** Over the water a bridged road (the taxiways to the causeway) raises the ground under its carriageway and this much past it (m): its deck. */
 const BRIDGE_EDGE = 1;
 /** A capped road segment stops this share of its length past its end (its Float32 ends read back a hair off). */
@@ -537,6 +537,15 @@ export class Ground {
           pins.set(i, v.h);
           flat.set(i, v.h);
           across(r.pts, i, step, flat, v.road);
+          // a ramp beside the highway it joins runs level with it (no step between their lanes where it rises)
+          if (r.cls === 'ramp' && v.road.cls === 'highway') {
+            for (let k = i + step; k >= 0 && k < n; k += step) {
+              const hit = onRoad(v.road, (r.pts[k] as P2)[0], (r.pts[k] as P2)[1]);
+              if (hit.d >= ALONGSIDE) break;
+              pins.set(k, hit.h);
+              flat.set(k, hit.h);
+            }
+          }
         }
         if (r.cls !== 'highway') {
           // a road passing under the highway dips beneath its overpass, level under the deck
@@ -551,7 +560,7 @@ export class Ground {
           // sea: the rise pinned whole, eased at its crest and its foot
           const top = SEA.level + DRY + UNDER, along = [0];
           for (let i = 1; i < n; i++) along.push((along[i - 1] as number) + Math.hypot((r.pts[i] as P2)[0] - (r.pts[i - 1] as P2)[0], (r.pts[i] as P2)[1] - (r.pts[i - 1] as P2)[1]));
-          const under = (m: P2): boolean => roads.some((q) => RISES_OVER.has(q.cls) && q.pts.some((p) => Math.hypot(p[0] - m[0], p[1] - m[1]) < 8));
+          const under = (m: P2): boolean => roads.some((q) => q.cls !== 'highway' && q.pts.some((p) => Math.hypot(p[0] - m[0], p[1] - m[1]) < 8));
           for (const [x, z] of (passages ??= stretches('overpass').map((s) => s.pts[Math.floor(s.pts.length / 2)] as P2).filter(under))) {
             const foot = natural(x, z);
             if (foot >= top) continue;

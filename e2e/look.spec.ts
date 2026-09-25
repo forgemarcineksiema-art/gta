@@ -207,10 +207,21 @@ for (const [w, h] of SIZES) {
   });
 
   test(`stills: a drive, the map, a sign, a card, a step at ${w}x${h}`, async ({ page }) => {
-    test.skip(!wanted('calm', 'map', 'sign', 'card', 'step'));
+    test.skip(!wanted('calm', 'sunward', 'map', 'sign', 'card', 'step'));
     await boot(page, `manual=1&spawn=crown&ad=off&fresh=1&${DATE}`, w, h);
     await adv(page, 13_000);
     await snap(page, 'calm');
+    if (wanted('sunward')) {
+      // the same street turned to the sun's bearing (render/shadows.ts SUN_OFFSET: atan2(-180, -120))
+      await page.evaluate(() => {
+        const sim = window.__game!.sim, p = sim.vehicle.body.translation();
+        sim.vehicle.teleport({ x: p.x, y: 0.9, z: p.z }, Math.atan2(-180, -120));
+      });
+      await adv(page, 1500);
+      await snap(page, 'sunward');
+      await boot(page, `manual=1&spawn=crown&ad=off&fresh=1&${DATE}`, w, h);
+      await adv(page, 13_000);
+    }
     if (wanted('map')) {
       await page.keyboard.down('Tab');
       await adv(page, 400);

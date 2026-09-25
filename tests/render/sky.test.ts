@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { PALETTE } from '../../src/sim/palette';
 import { SUN_OFFSET } from '../../src/render/shadows';
-import { SKY, skyColorAt } from '../../src/render/sky';
+import { CLOUDS, SKY, SUN_DISC, Sky, cloudLayout, skyColorAt, sunBearing, sunDiscDirection } from '../../src/render/sky';
 
 /** Relative luminance of a linear colour (three's working space is linear sRGB). */
 const luminance = (c: THREE.Color): number => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
@@ -43,5 +43,36 @@ describe('the golden hour (M8.9 slice 2)', () => {
     expect(PALETTE.fog).toBe(PALETTE.skyHorizon);
     expect(SKY.stops[0]?.color).toBe(PALETTE.skyHorizon);
     expect(SKY.stops[0]?.at).toBe(0);
+  });
+});
+
+describe('the sun and the clouds (M8.9 slice 4)', () => {
+  it('M8.9 4.1 the sun is seen on the light\'s bearing, low in the warm band', () => {
+    const d = sunDiscDirection(new THREE.Vector3());
+    expect(Math.atan2(d.x, d.z)).toBeCloseTo(Math.atan2(SUN_OFFSET.x, SUN_OFFSET.z), 6);
+    const elevation = THREE.MathUtils.radToDeg(Math.asin(d.y));
+    expect(elevation).toBeGreaterThan(3);
+    expect(elevation).toBeLessThanOrEqual(12);
+    expect(elevation).toBeCloseTo(SUN_DISC.elevation, 6);
+  });
+
+  it('M8.9 4.2 the clouds sit between 8° and 25° up, in the sun\'s half of the sky, the same every time', () => {
+    const clouds = cloudLayout();
+    expect(clouds.length).toBe(CLOUDS.count);
+    for (const c of clouds) {
+      expect(c.elevation).toBeGreaterThanOrEqual(8);
+      expect(c.elevation).toBeLessThanOrEqual(25);
+      const off = Math.atan2(Math.sin(c.bearing - sunBearing()), Math.cos(c.bearing - sunBearing()));
+      expect(Math.abs(off)).toBeLessThanOrEqual(Math.PI / 2);
+    }
+    expect(cloudLayout()).toEqual(clouds);
+  });
+
+  it('M8.9 4.3 the sky is three meshes: the dome, the clouds and the sun (two draws added)', () => {
+    const scene = new THREE.Scene();
+    new Sky(scene);
+    let meshes = 0;
+    scene.traverse((o) => { if (o instanceof THREE.Mesh) meshes++; });
+    expect(meshes).toBe(3);
   });
 });

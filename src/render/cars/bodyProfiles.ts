@@ -788,6 +788,66 @@ export const TROLLEY: CarProfile = {
 
 /** Every body's profile: the player's five classes, the city's eight, the hidden truck and the wanted board's cars. */
 /**
+ * The hovercraft (M8.8 slice 18), 5.2 m: the black rubber skirt all round (the loft), a painted deck on it, a cockpit
+ * with a screen and its driver in a life jacket, and the big fan in its duct at the stern with two rudders behind; the
+ * boost's flame blows out of the fan. Its four wheels are the cushion's, 0.1 m, lost under the skirt.
+ */
+export const HOVER: CarProfile = {
+  name: 'hover',
+  sections: [
+    { z: 2.6, floor: 0.12, belt: 0.42, roof: 0.52, hwFloor: 0.85, hwBelt: 1.0, hwRoof: 0.9 },
+    { z: 2.15, floor: 0.02, belt: 0.45, roof: 0.56, hwFloor: 1.08, hwBelt: 1.2, hwRoof: 1.12 },
+    { z: -2.15, floor: 0.02, belt: 0.45, roof: 0.56, hwFloor: 1.08, hwBelt: 1.2, hwRoof: 1.12 },
+    { z: -2.6, floor: 0.12, belt: 0.42, roof: 0.52, hwFloor: 0.9, hwBelt: 1.02, hwRoof: 0.92 },
+  ],
+  glassSides: [0, 0],
+  glassTops: [],
+  aPillar: -1,
+  cPillar: -1,
+  pillars: [],
+  doorSeams: [],
+  handleZ: 0,
+  headlight: { width: 0.16, height: 0.08, y: 0.72, inset: 0.35 },
+  taillight: { width: 0.12, height: 0.06, y: 0.72, inset: 0.3 },
+  grille: null,
+  bumperHeight: 0.02,
+  lipSpoiler: false,
+  mirrors: false,
+  exhausts: 0,
+  wheelInset: 0.3,
+  wheelStyle: 'compact',
+  fixed: { from: 0, to: 3, color: PALETTE.charcoal },
+  paint: PALETTE.carOrange,
+  nozzle: { y: 1.42, z: -2.45 },
+  parts: [
+    // the deck and its gunwales, the bow's dark rubbing strake
+    { size: [2.1, 0.14, 4.6], at: [0, 0.63, 0], color: 'paint' },
+    { size: [0.12, 0.28, 4.2], at: [1.0, 0.84, -0.1], color: 'light', mirror: true },
+    { size: [1.9, 0.22, 0.4], at: [0, 0.8, 2.25], color: 'dark' },
+    // the cockpit: the seat, the screen, the dash
+    { size: [0.95, 0.34, 0.8], at: [0, 0.87, -0.6], color: PALETTE.ink },
+    { size: [1.4, 0.36, 0.06], at: [0, 1.0, 0.95], color: PALETTE.glassDark },
+    { size: [1.2, 0.2, 0.3], at: [0, 0.8, 0.75], color: PALETTE.graphite },
+    // the driver: legs forward, a life jacket, arms to the stick, a head in a navy cap
+    { size: [0.14, 0.14, 0.5], at: [0.12, 1.0, -0.2], color: PED_COLORS.denim, mirror: true },
+    { size: [0.4, 0.5, 0.28], at: [0, 1.28, -0.6], color: PALETTE.carOrange },
+    { size: [0.1, 0.1, 0.42], at: [0.24, 1.3, -0.35], color: PALETTE.carOrange, mirror: true },
+    { size: [0.22, 0.22, 0.22], at: [0, 1.65, -0.6], color: PED_COLORS.skin },
+    { size: [0.26, 0.1, 0.26], at: [0, 1.79, -0.6], color: PED_COLORS.navy },
+    // the fan's duct at the stern, its blades and hub, the struts to the deck
+    { size: [1.7, 0.12, 0.3], at: [0, 2.12, -2.3], color: PALETTE.graphite },
+    { size: [1.7, 0.12, 0.3], at: [0, 0.72, -2.3], color: PALETTE.graphite },
+    { size: [0.12, 1.52, 0.3], at: [0.85, 1.42, -2.3], color: PALETTE.graphite, mirror: true },
+    { size: [1.5, 0.12, 0.04], at: [0, 1.42, -2.26], color: PALETTE.steel },
+    { size: [0.12, 1.3, 0.04], at: [0, 1.42, -2.26], color: PALETTE.steel },
+    { size: [0.22, 0.22, 0.22], at: [0, 1.42, -2.18], color: PALETTE.chrome },
+    { size: [0.08, 0.7, 0.08], at: [0.6, 1.0, -1.95], color: PALETTE.graphite, mirror: true },
+    // the rudders behind the fan
+    { size: [0.04, 1.2, 0.32], at: [0.4, 1.42, -2.6], color: 'paint', mirror: true },
+  ],
+};
+
+/**
  * The delivery scooter's shell (M8.8 slice 16): its footprint in the tables, 1.8 m. The scooter, its rider and its box
  * are drawn by bikeMesh.ts.
  */
@@ -824,5 +884,5 @@ export const BODY_PROFILES: Record<BodyId, CarProfile> = {
   wagon: WAGON, pizza: PIZZA, wrecker: WRECKER, twin: TWIN, fakecop: FAKECOP, partybus: PARTYBUS,
   lowrider: LOWRIDER, limo: LIMO, bubble: BUBBLE, phantom: PHANTOM, chiefcar: CHIEFCAR,
   roadster: ROADSTER, sweeper: SWEEPER, hotdog: HOTDOG,
-  roller: ROLLER, monster: MONSTER, trolley: TROLLEY, scooter: SCOOTER,
+  roller: ROLLER, monster: MONSTER, trolley: TROLLEY, scooter: SCOOTER, hover: HOVER,
 };

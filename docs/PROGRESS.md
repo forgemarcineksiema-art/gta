@@ -2,6 +2,17 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.8 slice 18: the hovercraft
+
+Done: `hover` (PODUSZKOWIEC; the 4×4's class, 1.4 t) on the car model's `hover` mode: the four rays are the cushion's
+springs, plumb like the bike's, and push nothing along (`WheelState.tyreForce` 0); the fan pushes along the nose
+(`fanThrust` 5,000 N, the power tier's; the brake pulls half back), the skirt drags 130 N a m/s along and 100 across,
+split bow and stern; the rudders yaw it (`rudderTorque` 4,500 N·m in the fan's wash or at 15 m/s; twice on the
+handbrake); no drift controller, the engine's revs follow the fan. 0–80 in 10.2 s, 110 km/h, 0.27 g at full lock, a
+full turn at 60 km/h in 7 s runs 95 m out; still, it hovers without creeping. A fan's drone, a shanty for a clue;
+ONLY IT: CROSSES WATER (JEŹDZI PO WODZIE); on the Quay's south promenade where slice 19's slipway goes. Pins M8.8
+18.1–18.4 (`hover.test.ts`).
+
 ## 2026-09-25 — M8.8 slice 17: the police and the bike
 
 Done: a unit's ram or PIT that lands on a bike (the contact the roster counts as a ram) knocks it down: `Vehicle.tumble`,

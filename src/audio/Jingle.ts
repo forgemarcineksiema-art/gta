@@ -37,6 +37,8 @@ const TUNES: Readonly<Record<HiddenCar, ReadonlyArray<readonly [number, number]>
   monster: [[-12, 1], [-10, 1], [-7, 1], [-5, 1], [-2, 2], [NaN, 1], [-2, 1], [-5, 1], [-12, 2], [NaN, 3]],
   // the rocket trolley's countdown and lift-off (M8.8 slice 13)
   trolley: [[7, 1], [NaN, 1], [5, 1], [NaN, 1], [4, 1], [NaN, 1], [12, 1], [19, 2], [NaN, 3]],
+  // the hovercraft's sea shanty (M8.8 slice 18)
+  hover: [[-5, 1], [0, 1], [0, 1], [0, 1], [-5, 1], [0, 1], [4, 2], [2, 1], [-1, 1], [-5, 2], [NaN, 3]],
 };
 
 export class Jingle {

@@ -78,6 +78,11 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   with a white lid on the rack; the rider upright, feet on the floorboard. In
   the traffic a courier in a red jacket rides it (one instanced mesh for all);
   parked or left, it stands empty.
+- The hovercraft (M8.8 slice 18): a black rubber skirt all round, an orange
+  deck with light gunwales, a cockpit with a dark screen and its driver in an
+  orange life jacket and a navy cap, the fan's graphite duct at the stern with
+  steel blades and two painted rudders behind it; the boost's flame blows out
+  of the fan. Its cushion's four wheels (0.1 m) stay under the skirt.
 
 ## Street architecture (M2.1)
 

@@ -60,6 +60,8 @@ export interface WheelState {
   slipAngle: number;
   /** Longitudinal slip ratio (+ driving, - braking; -1 = locked). */
   slipRatio: number;
+  /** The tyre's force on the road this step, N (0 in the air, and always on the hovercraft's cushion: M8.8 slice 18). */
+  tyreForce: number;
   /** Contact patch speeds along the wheel plane, m/s. */
   forwardSpeed: number;
   lateralSpeed: number;
@@ -327,6 +329,7 @@ export class Vehicle {
         omega: 0,
         slipAngle: 0,
         slipRatio: 0,
+        tyreForce: 0,
         forwardSpeed: 0,
         lateralSpeed: 0,
         spin: 0,
@@ -462,9 +465,10 @@ export class Vehicle {
     if (this.boosting) this.boostMeter = Math.max(0, this.boostMeter - t.boostDrain * dt);
 
     // ---- suspension raycasts --------------------------------------------------
-    // on two wheels (M8.8 slice 14) the rays go straight down, so a lean never lifts them off the road
-    const twoWheel = t.twoWheel > 0;
-    if (twoWheel) M.set(s.rayDir, 0, -1, 0);
+    // on two wheels (M8.8 slice 14) the rays go straight down, so a lean never lifts them off the road; the hovercraft's
+    // cushion (slice 18) too, so its springs never push it along
+    const twoWheel = t.twoWheel > 0, hover = t.hover > 0, plumb = twoWheel || hover;
+    if (plumb) M.set(s.rayDir, 0, -1, 0);
     else M.scale(s.rayDir, s.up, -1);
     const rayLen = t.suspensionRestLength + t.wheelRadius;
     let grounded = 0;
@@ -632,8 +636,8 @@ export class Vehicle {
       if (f > stopForce) f = stopForce;
       if (f < 0) f = 0;
       w.load = f;
-      // two wheels push straight up: the roll is the upright controller's, not the springs'
-      M.scale(s.force, twoWheel ? AXIS_Y : s.up, f);
+      // two wheels and the cushion push straight up: the roll is the upright controller's, the cushion never drives
+      M.scale(s.force, plumb ? AXIS_Y : s.up, f);
       forceAt(s.force, s.point);
     }
 
@@ -652,7 +656,8 @@ export class Vehicle {
     // entry: handbrake while turning, a brake tap while turning hard at speed, or the rear stepping out
     const turning = Math.abs(controls.steer) > 0.2;
     const brakeEntry = t.brakeDriftEntry > 0 && brakeIn > 0.5 && Math.abs(controls.steer) > 0.6 && absFwd > 14;
-    if (rearGrounded && absFwd > t.driftMinSpeed) {
+    // the hovercraft has no drift controller (it slides on its own)
+    if (!hover && rearGrounded && absFwd > t.driftMinSpeed) {
       if (!this.drifting && ((handbrake && turning) || brakeEntry || rearSlip > t.driftEnterDeg * M.DEG)) {
         this.drifting = true;
         this.driftTime = 0;
@@ -667,7 +672,7 @@ export class Vehicle {
         this.driftExitTimer = wantsOut ? this.driftExitTimer + dt : 0;
         if (this.driftTime > t.driftMinTime && this.driftExitTimer > t.driftExitHold) this.drifting = false;
       }
-    } else if (absFwd <= t.driftMinSpeed * 0.7 || grounded === 0) {
+    } else if (hover || absFwd <= t.driftMinSpeed * 0.7 || grounded === 0) {
       // too slow, or fully airborne; a briefly lifted inner rear wheel does not end a drift
       this.drifting = false;
     }
@@ -726,14 +731,16 @@ export class Vehicle {
       }
     }
     drivenOmega = drivenCount > 0 ? drivenOmega / drivenCount : 0;
-    const wheelRpm = Math.abs(drivenOmega * ratio) * RPM_PER_RAD_S;
+    // the hovercraft's engine turns the fan: its revs follow the pedal (the fan's pitch), never the road
+    const fanPedal = hover ? Math.max(throttle, brakeIn * 0.5, this.boosting ? 1 : 0) : 0;
+    const wheelRpm = hover ? t.idleRpm + (t.redlineRpm * 0.95 - t.idleRpm) * fanPedal : Math.abs(drivenOmega * ratio) * RPM_PER_RAD_S;
     const targetRpm = Math.max(t.idleRpm, Math.min(t.redlineRpm * 1.05, wheelRpm));
     // small lag on the reported rpm (engine inertia) so the note does not jitter
     this.rpm += (targetRpm - this.rpm) * (1 - Math.exp(-dt / Math.max(0.01, t.engineInertia * 0.2)));
 
     // automatic shifting with a torque cut
     if (this.shiftTimer > 0) this.shiftTimer = Math.max(0, this.shiftTimer - dt);
-    if (this.gear > 0 && this.shiftTimer === 0 && grounded > 0) {
+    if (!hover && this.gear > 0 && this.shiftTimer === 0 && grounded > 0) {
       if (wheelRpm > t.redlineRpm * t.shiftUpAt && this.gear < t.gearRatios.length) {
         this.gear++;
         this.shiftTimer = t.shiftTime;
@@ -790,6 +797,19 @@ export class Vehicle {
       const handTorque = handIsBrake ? t.handbrakeTorque : 0;
       const brakeTorque = pedalTorque + handTorque;
 
+      // the cushion has no tyres (M8.8 slice 18): its 'wheels' roll with the ground under them and push nothing
+      if (hover) {
+        velAt(w.contact, s.b);
+        w.forwardSpeed = M.dot(s.b, s.fwd);
+        w.lateralSpeed = M.dot(s.b, s.right);
+        w.omega = w.grounded ? w.forwardSpeed / t.wheelRadius : w.omega;
+        w.spin += w.omega * dt;
+        w.slipAngle = 0;
+        w.slipRatio = 0;
+        w.tyreForce = 0;
+        w.surface = w.grounded && this.ground ? this.ground.at(w.contact.x, w.contact.z) : ASPHALT;
+        continue;
+      }
       if (!w.grounded) {
         this.spinFreeWheel(w, driveTorque, brakeTorque, dt);
         w.slipAngle = 0;
@@ -798,6 +818,7 @@ export class Vehicle {
         w.lateralSpeed = 0;
         w.spin += w.omega * dt;
         w.surface = ASPHALT;
+        w.tyreForce = 0;
         continue;
       }
       // the ground under the tyre (M8.8 slice 9): grass and dirt take grip and drag at the tyre
@@ -871,12 +892,37 @@ export class Vehicle {
         fLong *= kk;
       }
       w.spin += w.omega * dt;
+      w.tyreForce = Math.hypot(fLat, fLong);
 
       M.scale(s.force, s.wheelRight, fLat);
       M.addScaled(s.force, s.force, s.wheelFwd, fLong);
       // apply above the contact patch to limit body roll (arcade)
       M.addScaled(s.point, w.contact, s.up, (comHeight + t.wheelRadius) * t.tireForceHeight);
       forceAt(s.force, s.point);
+    }
+
+    // ---- the air cushion: fan, skirt drag, rudders (M8.8 slice 18) ------------------------
+    if (hover) {
+      // the fan pushes along the nose, in the air too; the brake reverses its pitch to half
+      const push = (throttle - 0.5 * brakeIn) * t.fanThrust * this.torqueMul;
+      M.scale(s.force, s.fwd, push);
+      M.add(s.fSum, s.fSum, s.force);
+      if (grounded > 0) {
+        // the skirt drags on the ground: along the nose at the middle, across it half at the bow and half at the stern
+        M.scale(s.force, s.fwd, -t.hoverDrag * forwardSpeed);
+        M.add(s.fSum, s.fSum, s.force);
+        for (let end = 1; end >= -1; end -= 2) {
+          M.addScaled(s.point, s.pos, s.fwd, end * t.wheelBase * 0.5);
+          velAt(s.point, s.b);
+          M.scale(s.force, s.right, -0.5 * t.hoverSideDrag * M.dot(s.b, s.right));
+          forceAt(s.force, s.point);
+        }
+      }
+      // the rudders in the fan's wash or the airflow of the speed; + steer (right) turns the nose right
+      const air = M.clamp01(Math.max(fanPedal, absFwd / t.rudderSpeedRef));
+      const yaw = -this.steerRaw * t.rudderTorque * air * (handbrake ? 2 : 1);
+      M.scale(s.force, s.up, yaw);
+      M.add(s.tSum, s.tSum, s.force);
     }
 
     // ---- boost thrust ---------------------------------------------------------

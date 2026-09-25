@@ -191,6 +191,8 @@ export class Garage {
     const tiers = this.tiers[this.classOf(body)], m = BALANCE.tiers;
     const power = m.power[tiers[0]] ?? 1, grip = m.grip[tiers[1]] ?? 1, boost = m.boost[tiers[2]] ?? 1;
     t.torqueMax *= power;
+    // the hovercraft's power is its fan (M8.8 slice 18)
+    t.fanThrust *= power;
     t.muFront *= grip;
     t.muRear *= grip;
     t.boostDrain *= boost;

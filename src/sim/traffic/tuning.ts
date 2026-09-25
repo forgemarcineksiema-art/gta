@@ -239,7 +239,7 @@ export const TRAFFIC: TrafficTuning = {
       wagon: 0, pizza: 0, wrecker: 0, twin: 0, fakecop: 0, partybus: 0, lowrider: 0, limo: 0, bubble: 0, phantom: 0, chiefcar: 0,
       roadster: 0, sweeper: 0, hotdog: 0,
       // the crazy cars (M8.8 phase F) are hidden, never traffic
-      roller: 0, monster: 0, trolley: 0,
+      roller: 0, monster: 0, trolley: 0, hover: 0,
       // the delivery scooters (M8.8 slice 16): twice as many in Crown Heights and on Coral Quay, never on the highway
       scooter: 0.05,
     },

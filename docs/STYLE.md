@@ -221,10 +221,10 @@ Why this and not another: the golden hour gives strong directional shadows (spee
 
 ## UI
 
-- Plain DOM over the canvas. Typography: a heavy italic system sans for numbers and titles (`Segoe UI` 900 italic → falls back to Helvetica/Arial/system-ui), 600 weight for body text. No web fonts (bytes, offline, licensing).
+- Plain DOM over the canvas. Typography (M8.9 R2): one typeface, Rubik (SIL OFL, woff2 subsets of the game's characters in `public/fonts/`, 50 KB, the display face preloaded), in two styles. The display (20 px and up: numbers, titles, the line's kind, the pays, a card's title): Black Italic 900, a 2 px outline and a flat 2×3 shadow. The label (18 px and under: hints, a card's line, the wall's lines, legends, names): Bold 700, upright, tracked 0.06 em, a 1.5 px outline. Numbers in tabular figures; the ★ is the HUD's star drawn inline (`src/ui/hud/stars.ts`), never a glyph. The two rules at the end of `styles.css` are the only ones that set a text (pinned). The old "no web fonts" went: its reasons (bytes, offline, licence) are met by 50 KB of OFL files inside the build.
 - Colours: ink `#f7f3ea`, accent yellow `#ffd23f`, accent cyan `#2bd1ff`, danger `#ff3b5c`, panel `rgba(22,14,40,0.78)`.
-- Skew important elements slightly (-8° to -14°) for motion; drop shadows in flat black, never blur glows.
-- Text shadow on everything over the 3D view for legibility on both peach sky and dark asphalt.
+- No text is skewed (M8.9 R2): the italic carries the motion. Plates (the job card, the wall's tabs, DRIVE OUT) and bars keep −8°, a plate drawn by its `::before` under upright words. Drop shadows flat, never blur glows.
+- Every text has its outline for legibility on both peach sky and dark asphalt: a ring of eight shadows in `--outline` (a text stroke eats into the glyphs where `paint-order` is not honoured on HTML text, and draws the faces' overlapping contours). Words on a light plate (keycaps, the page's tab, DRIVE OUT in focus) have none.
 - Minimum sizes at DPR 1: primary numbers ≥ 44 px, labels ≥ 12 px bold uppercase with tracking. Verify with `npm run screens`.
 - Keycaps: white rounded rectangles with dark text, always beside a one-word label.
 - Event popups (M3): a right-aligned stack above the speedo, 18 px heavy

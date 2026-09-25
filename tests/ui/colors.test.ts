@@ -89,7 +89,7 @@ describe('one colour, one meaning (M8.9 slice 5)', () => {
 
   it('M8.9 5.5 cyan is the way\'s alone: the route, the goal\'s badge and card, the swap prompt', () => {
     // the swap prompt on the ticket too (M8.9 R5): the same prompt, one block with the ticket
-    const allowed = new Set(['.hud__swap-label', '.run__ticket-word', '.cold__caption--swap .cold__word', '.jobs__card', '.jobs__badge-rim', '.devpanel__section']);
+    const allowed = new Set(['.hud__swap-label', '.run__ticket-word', '.cold__caption--swap .cold__word', '.jobs__card::before', '.jobs__badge-rim', '.devpanel__section']);
     const users = rules(REST).filter((r) => r.body.includes('var(--way)')).map((r) => r.selector);
     for (const s of users) expect(allowed.has(s), s).toBe(true);
     expect(users.length).toBeGreaterThanOrEqual(4);

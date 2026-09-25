@@ -114,6 +114,8 @@ for (const [w, h] of SIZES) {
     await page.setViewportSize({ width: w, height: h });
     await page.goto('/?lang=en&bot=1&seed=7');
     await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 30_000 });
+    // the screen's typeface in before anything is measured (M8.9 R2: font-display swap)
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
     // let the bot get some speed so the HUD shows numbers
     await page.waitForFunction(() => Math.abs(window.__game?.sim.vehicle.telemetry.speedKmh ?? 0) > 40, null, { timeout: 20_000 });
     await page.screenshot({ path: `screens/hud-${w}x${h}.png` });
@@ -176,6 +178,8 @@ for (const [w, h] of SIZES) {
     // ads off: these frames are the card and the wall, not the ad that follows them
     await page.goto('/?lang=en&manual=1&quality=low&spawn=crown&ad=off&fresh=1&date=2026-09-23');
     await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 30_000 });
+    // the screen's typeface in before anything is measured (M8.9 R2: font-display swap)
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
     // a delivery just taken: its line at the top and its card
     await page.evaluate(() => {
       const sim = window.__game!.sim;
@@ -275,6 +279,8 @@ for (const [w, h] of SIZES) {
     // the first rival ready, the player pulled up at her bay: the race's card, then its line
     await page.goto('/?lang=en&manual=1&quality=low&ad=off&fresh=1&board=10&job=duel');
     await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 30_000 });
+    // the screen's typeface in before anything is measured (M8.9 R2: font-display swap)
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
     await page.evaluate(() => window.advanceTime?.(400));
     await page.waitForSelector('.jobs__card.is-visible', { timeout: 10_000 });
     await page.waitForTimeout(300);
@@ -292,6 +298,8 @@ for (const [w, h] of SIZES) {
     await page.setViewportSize({ width: w, height: h });
     await page.goto('/?lang=en&manual=1&quality=low&spawn=crown&ad=off&fresh=1&date=2026-09-23');
     await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 30_000 });
+    // the screen's typeface in before anything is measured (M8.9 R2: font-display swap)
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
     // the goal line with no job running: the chain's first step and the way to it
     await page.evaluate(() => window.advanceTime?.(600));
     await page.waitForSelector('.jobs.is-visible', { timeout: 10_000 });
@@ -354,6 +362,8 @@ for (const [w, h] of SIZES) {
     await page.setViewportSize({ width: w, height: h });
     await page.goto('/?lang=en&coldopen=1&manual=1&quality=low');
     await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 30_000 });
+    // the screen's typeface in before anything is measured (M8.9 R2: font-display swap)
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
     await page.evaluate(() => window.advanceTime?.(800));
     await page.waitForSelector('.cold__caption--steer.is-visible', { timeout: 10_000 });
     // past the caption's 0.25 s entrance
@@ -368,6 +378,8 @@ test('5.9 a police car alongside: the swap prompt says BORROW at 1280x720', asyn
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto('/?lang=en&manual=1&quality=low&spawn=crown');
   await page.waitForFunction(() => window.__game?.started === true, null, { timeout: 30_000 });
+  // the screen's typeface in before anything is measured (M8.9 R2: font-display swap)
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
   await page.evaluate(() => {
     window.advanceTime?.(600);
     const sim = window.__game!.sim;

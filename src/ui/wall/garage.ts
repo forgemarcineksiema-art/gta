@@ -24,6 +24,7 @@
 import { glyphIcon } from '../glyph';
 import { goalsModel } from './goals';
 import { carLine, label, labelAria, num, relabel, t } from '../lang';
+import { starText } from '../hud/stars';
 import { nextLine } from '../hud/totals';
 import { gridMove, gridStart, type GridMove } from './wallGrid';
 import { PAGE_TITLES, WALL_PAGES, pageOf, type WallPage } from './wallPages';
@@ -228,7 +229,10 @@ export class GarageUi {
     for (const stat of STATS) {
       const b = button('wall__row', '');
       b.dataset['stat'] = stat;
-      b.append(label(el('span', 'wall__row-name'), STAT_WORDS[stat]), el('span', 'wall__dots'), el('span', 'wall__row-price'));
+      // the tiers as three dots drawn, not a font's circles (M8.9 R2)
+      const dots = el('span', 'wall__dots');
+      for (let d = 0; d < 3; d++) dots.appendChild(el('span', 'wall__dot'));
+      b.append(label(el('span', 'wall__row-name'), STAT_WORDS[stat]), dots, el('span', 'wall__row-price'));
       rows.appendChild(b);
       this.tuneItems.push(this.item(pageOf('upgrade'), b, () => this.actions.upgrade(this.sim.garage.car, stat)));
     }
@@ -491,8 +495,8 @@ export class GarageUi {
       b.classList.toggle('is-locked', locked);
       b.classList.toggle('is-hot', hot && !locked);
       b.classList.toggle('is-short', hot ? funds < g.keepPrice(id) : can === 'cash');
-      status.textContent = g.car === id ? t('SELECTED') : owned ? t('OWNED') : locked ? t('ESCAPE ★★★★★ FIRST')
-        : hot ? t('KEEP IT {cash}', { cash: Math.round(g.keepPrice(id)) }) : money(g.price(id));
+      starText(status, g.car === id ? t('SELECTED') : owned ? t('OWNED') : locked ? t('ESCAPE ★★★★★ FIRST')
+        : hot ? t('KEEP IT {cash}', { cash: Math.round(g.keepPrice(id)) }) : money(g.price(id)));
     }
     // STYLE: the paint, and each kit card: worn, had, today's pick, its price, or who has it
     this.paintFor.textContent = t('PAINT: {car} · FREE', { car: t(BODY_WORDS[g.car]) });
@@ -523,7 +527,8 @@ export class GarageUi {
       const stat = STATS[k] as Stat;
       const b = (this.tuneItems[k] as Item).el;
       const tier = tiers[k] as number;
-      (b.querySelector('.wall__dots') as HTMLElement).textContent = '●'.repeat(tier) + '○'.repeat(3 - tier);
+      const dots = (b.querySelector('.wall__dots') as HTMLElement).children;
+      for (let d = 0; d < dots.length; d++) dots[d]?.classList.toggle('is-on', d < tier);
       const price = g.tierPrice(g.car, stat);
       (b.querySelector('.wall__row-price') as HTMLElement).textContent = Number.isFinite(price) ? money(price) : t('MAX');
       b.classList.toggle('is-short', Number.isFinite(price) && funds < price);
@@ -540,7 +545,7 @@ export class GarageUi {
       video.classList.toggle('is-bought', bought);
     }
     // GOALS
-    this.goalsNext.textContent = nextLine(sim);
+    starText(this.goalsNext, nextLine(sim));
     this.fillDailies(sim);
     this.fillBoard(sim);
     this.fillRecords(sim);
@@ -779,7 +784,8 @@ function money(v: number): string {
 function el(tag: string, className: string, text?: string): HTMLElement {
   const e = document.createElement(tag);
   e.className = className;
-  if (text !== undefined) e.textContent = text;
+  // a board's line or a day's goal may name stars: drawn as the HUD's (M8.9 R2)
+  if (text !== undefined) starText(e, text);
   return e;
 }
 

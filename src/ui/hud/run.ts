@@ -11,6 +11,7 @@ import { BALANCE } from '../../sim/balance';
 import { DRIVE, drive, newDriveState, promptPlace, readDrive } from './corners';
 import { glyphIcon } from '../glyph';
 import { label, labelAria, num, relabel, t } from '../lang';
+import { starText } from './stars';
 import { cardLines, countsLine, doorLines, nextLine, type Line } from './totals';
 
 const TWEEN_SECONDS = 0.3;
@@ -244,7 +245,7 @@ export class RunHud {
     this.wallBest.classList.toggle('is-visible', run.lastBest);
     this.wallLines.replaceChildren(...doorLines(run).map(line));
     const next = nextLine(sim);
-    this.wallFirst.textContent = next;
+    starText(this.wallFirst, next);
     this.wallFirst.classList.toggle('is-visible', next !== '');
     this.wallSentence.classList.toggle('is-visible', (run.chain & (1 << STEP.escape)) === 0);
     this.wallCounts.textContent = countsLine(run.counts);

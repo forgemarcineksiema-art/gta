@@ -15,8 +15,15 @@
   --backdrop: #2b1b5a;
   --paper: #f2efe6;
   --paper-ink: #1f2a44;
-  --font-display: 'Segoe UI', 'Helvetica Neue', Arial, system-ui, sans-serif;
-  --font-body: 'Segoe UI', system-ui, Arial, sans-serif;
+  /* one typeface (M8.9 R2, ui/fonts.ts FONT_STACK): Rubik, the system's sans for what its subsets lack */
+  --font: Rubik, 'Segoe UI', Arial, system-ui, sans-serif;
+  /* the two styles' outlines (R2): a ring of eight shadows, 2 px round the display and 1.5 px round the label at 720p
+     (in rem: they scale with the screen), and the display's flat 2×3 shadow under its ring */
+  --display-outline: 0.125rem 0 0 var(--outline), -0.125rem 0 0 var(--outline), 0 0.125rem 0 var(--outline), 0 -0.125rem 0 var(--outline),
+    0.088rem 0.088rem 0 var(--outline), -0.088rem 0.088rem 0 var(--outline), 0.088rem -0.088rem 0 var(--outline), -0.088rem -0.088rem 0 var(--outline);
+  --display-shadow: 0.125rem 0.1875rem 0 var(--outline);
+  --label-outline: 0.094rem 0 0 var(--outline), -0.094rem 0 0 var(--outline), 0 0.094rem 0 var(--outline), 0 -0.094rem 0 var(--outline),
+    0.066rem 0.066rem 0 var(--outline), -0.066rem 0.066rem 0 var(--outline), 0.066rem -0.066rem 0 var(--outline), -0.066rem -0.066rem 0 var(--outline);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -43,21 +50,15 @@
 }
 .minimap__district {
   font-size: 1rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
   text-transform: uppercase;
   text-align: center;
   line-height: 1.1;
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
 }
 .minimap__landmark {
   font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
   text-align: center;
   line-height: 1.1;
   color: var(--ink-dim);
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
   margin-bottom: 0.375rem;
 }
 /* the corners (DESIGN.md §17.2): the radar goes behind a door; the names fade after a few seconds, the circle stays put */
@@ -81,7 +82,6 @@ body {
   overflow: hidden;
   background: var(--backdrop);
   color: var(--ink);
-  font-family: var(--font-body);
   user-select: none;
   -webkit-user-select: none;
   touch-action: none;
@@ -106,7 +106,6 @@ body {
   inset: 0;
   pointer-events: none;
   padding: calc(1rem + var(--safe-top)) calc(1rem + var(--safe-right)) calc(1rem + var(--safe-bottom)) calc(1rem + var(--safe-left));
-  font-family: var(--font-display);
 }
 
 /* the stars (M8.9 R4): five over the world, no panel, each outlined so it reads on the sky and on the street; the
@@ -169,15 +168,11 @@ body {
   position: absolute;
   left: 50%;
   top: calc(1rem + var(--safe-top));
-  transform: translateX(-50%) skewX(-10deg);
+  transform: translateX(-50%);
   font-size: 1.25rem;
-  font-weight: 900;
-  font-style: italic;
-  letter-spacing: 0.08em;
   text-transform: uppercase;
   white-space: nowrap;
   color: var(--ink);
-  text-shadow: 2px 3px 0 #000;
   opacity: 0;
   transition: opacity 0.15s;
   pointer-events: none;
@@ -211,7 +206,7 @@ body {
   max-width: 100%;
 }
 .hud__top > .jobs, .hud__top > .cold, .hud__top > .hud__hints { transform: none; }
-.hud__top > .hud__ticker { transform: skewX(-10deg); white-space: normal; text-align: center; }
+.hud__top > .hud__ticker { transform: none; white-space: normal; text-align: center; }
 .hud__top > .hud__ticker:not(.is-on), .hud__top > .hud__hints.is-hidden { display: none; }
 
 /* the gauge, bottom right (M8.9 R4): one round dial on a dark disc like the radar's; the speed in its middle, the boost
@@ -261,18 +256,11 @@ body {
   position: relative;
   margin-top: 0.375rem;
   font-size: 2.75rem;
-  font-weight: 900;
-  font-style: italic;
   line-height: 1;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
 }
 .hud__unit {
   position: relative;
   font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
   color: var(--ink-dim);
 }
 
@@ -289,14 +277,9 @@ body {
 }
 .hud__popup {
   font-size: 1.125rem;
-  font-weight: 800;
-  font-style: italic;
-  letter-spacing: 0.08em;
   text-transform: uppercase;
-  transform: skewX(-10deg);
   opacity: 0;
   color: var(--ink);
-  text-shadow: 2px 3px 0 #000;
 }
 .hud__popup.is-on { opacity: 1; }
 .hud__popup:not(.is-on) { display: none; }
@@ -309,7 +292,7 @@ body {
   left: 50%;
   /* above the debris' flight (M8.9 R12) */
   top: 20%;
-  transform: translate(-50%, -50%) skewX(-10deg);
+  transform: translate(-50%, -50%);
   text-align: center;
   opacity: 0;
   pointer-events: none;
@@ -317,18 +300,11 @@ body {
 .hud__wrecked.is-visible { opacity: 1; }
 .hud__wrecked-title {
   font-size: 3.375rem;
-  font-weight: 900;
-  font-style: italic;
-  letter-spacing: 0.06em;
   color: var(--trouble);
-  text-shadow: 3px 4px 0 #000;
 }
 .hud__wrecked-sub {
   font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
   color: var(--ink);
-  text-shadow: 2px 3px 0 #000;
 }
 
 /* swap prompt: a keycap and one word, centre bottom, only while a car is alongside */
@@ -336,7 +312,7 @@ body {
   position: absolute;
   left: 50%;
   bottom: calc(9.375rem + var(--safe-bottom));
-  transform: translateX(-50%) skewX(-8deg);
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -352,21 +328,15 @@ body {
   transform: translateX(-50%);
   display: none;
   font-size: 1rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
   white-space: nowrap;
   color: var(--ink);
-  text-shadow: 2px 2px 0 #000;
   pointer-events: none;
 }
 .hud__cover.is-on { display: block; }
 .hud__swap.is-visible ~ .hud__cover { bottom: calc(7.75rem + var(--safe-bottom)); }
 .hud__swap-label {
   font-size: 1.125rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
   color: var(--way);
-  text-shadow: 2px 3px 0 #000;
 }
 
 /* the combo (M5.5 slice 14; M8.9 R4): its name, the points, the × from ×2 and the last trick over a draining bar, all
@@ -387,20 +357,13 @@ body {
   align-items: baseline;
   gap: 0.5rem;
   color: var(--ink);
-  font-weight: 900;
-  font-style: italic;
-  text-shadow: 2px 2px 0 #000;
 }
 .hud__skill-name, .hud__skill-word {
   font-size: 1rem;
-  font-weight: 800;
-  font-style: normal;
-  letter-spacing: 0.12em;
   color: var(--ink-dim);
 }
 .hud__skill-points, .hud__skill-mult {
   font-size: 1.5rem;
-  font-variant-numeric: tabular-nums;
 }
 /* no ×1: the × shows from ×2 */
 .hud__skill-mult:empty { display: none; }
@@ -423,10 +386,6 @@ body {
   top: calc(3.75rem + var(--safe-top));
   display: none;
   flex-direction: column;
-  font-weight: 900;
-  font-style: italic;
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
-  font-variant-numeric: tabular-nums;
 }
 .hud__lap.is-visible {
   display: flex;
@@ -445,7 +404,6 @@ body {
 }
 .hud__lap-label {
   color: var(--ink);
-  letter-spacing: 0.15em;
   min-width: 3.2em;
 }
 .devpanel__graph {
@@ -462,6 +420,8 @@ body {
   margin: 0;
   display: none;
   font: 12px/1.45 Consolas, 'Courier New', monospace;
+  letter-spacing: normal;
+  text-shadow: none;
   color: #fff;
   background: rgba(0, 0, 0, 0.45);
   padding: 6px 8px;
@@ -479,7 +439,6 @@ body {
   inset: 0;
   z-index: 45;
   pointer-events: none;
-  font-family: var(--font-display);
   display: none;
   flex-direction: column;
   align-items: center;
@@ -499,16 +458,11 @@ body {
 .hud__pause-build { order: 5; }
 .hud__pause-title {
   font-size: 3.6rem;
-  font-weight: 900;
-  font-style: italic;
-  letter-spacing: 0.1em;
   color: var(--ink);
-  text-shadow: 0 4px 0 rgba(0, 0, 0, 0.5);
 }
 .hud__pause-sub {
   margin-top: 0.5rem;
   font-size: 1.1rem;
-  font-weight: 600;
   color: var(--ink-dim);
 }
 .hud__pause-sound {
@@ -517,10 +471,7 @@ body {
   gap: 0.5rem;
   margin-top: 0.875rem;
   font-size: 1rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
   color: var(--ink);
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
 }
 .hud__pause-sound.is-muted .hud__pause-sound-state { color: var(--trouble); }
 /* the full list of keys (M8.9 R5): the top's hints are four, in the first two sessions */
@@ -547,16 +498,14 @@ body {
   border: 2px solid transparent;
   border-radius: 4px;
   font-size: 1rem;
-  font-weight: 900;
-  letter-spacing: 0.12em;
   color: var(--ink);
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
 }
 .settings__row.is-focus { border-color: var(--ink); background: rgba(0, 0, 0, 0.25); }
 .settings__name { width: 7rem; color: var(--ink-dim); }
 .settings__row.is-focus .settings__name { color: var(--ink); }
 .settings__step {
-  font: 900 1.125rem/1 var(--font-display);
+  font-size: 1.125rem;
+  line-height: 1;
   color: var(--ink);
   background: color-mix(in srgb, var(--ink) 10%, transparent);
   border: none;
@@ -565,7 +514,7 @@ body {
   cursor: pointer;
 }
 .settings__step:hover { background: color-mix(in srgb, var(--ink) 35%, transparent); }
-.settings__value { min-width: 6.5rem; text-align: center; font-style: italic; }
+.settings__value { min-width: 6.5rem; text-align: center; }
 .settings__value.is-volume {
   border-radius: 3px;
   background: linear-gradient(90deg, color-mix(in srgb, var(--ink) 55%, transparent) var(--fill), color-mix(in srgb, var(--ink) 12%, transparent) var(--fill));
@@ -573,8 +522,6 @@ body {
 .hud__pause-build {
   margin-top: 1.75rem;
   font-size: 1rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
   color: var(--ink-dim);
   opacity: 0.7;
 }
@@ -600,11 +547,8 @@ body {
   align-items: center;
   gap: 0.25rem;
   font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-dim);
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
 }
 .hud__hint-label {
   margin-left: 0.25rem;
@@ -616,7 +560,8 @@ kbd.key {
   border-radius: 4px;
   background: var(--ink);
   color: #1c1b22;
-  font: 700 1rem/1.2 var(--font-display);
+  font-size: 1rem;
+  line-height: 1.2;
   box-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
   text-align: center;
 }
@@ -628,11 +573,7 @@ kbd.key {
   top: 22%;
   transform: translateX(-50%);
   font-size: 1.6rem;
-  font-weight: 900;
-  font-style: italic;
-  letter-spacing: 0.06em;
   color: var(--ink);
-  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.5);
   opacity: 0;
   transition: opacity 0.2s;
 }
@@ -653,6 +594,8 @@ kbd.key {
   border-left: 1px solid var(--ink-dim);
   color: var(--ink);
   font: 12px/1.3 Consolas, 'Courier New', monospace;
+  letter-spacing: normal;
+  text-shadow: none;
   z-index: 20;
 }
 .devpanel.is-visible {
@@ -724,7 +667,7 @@ kbd.key {
   justify-content: center;
   background: repeating-linear-gradient(45deg, #1c1b22 0 20px, #2a2833 20px 40px);
   color: #fff;
-  font: 700 22px/1.2 var(--font-display);
+  font: 700 22px/1.2 var(--font);
   letter-spacing: 0.1em;
 }
 .fake-ad__label {
@@ -745,9 +688,8 @@ kbd.key {
   gap: 1rem;
   background: linear-gradient(to bottom, var(--sky-top) 0%, var(--sky-mid) 62%, var(--sky-horizon) 100%);
   color: var(--ink);
-  font: 900 italic 1.75rem/1 var(--font-display);
-  letter-spacing: 0.2em;
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+  font-size: 1.75rem;
+  line-height: 1;
   z-index: 30;
   transition: opacity 0.25s;
 }
@@ -771,14 +713,13 @@ kbd.key {
   pointer-events: none;
 }
 /* a boot that has not given control in 20 s offers a retry (M7 slice 7) */
-.loading.is-retry { cursor: pointer; font-size: 1.375rem; letter-spacing: 0.12em; }
+.loading.is-retry { cursor: pointer; font-size: 1.375rem; }
 
 /* the run (docs/STYLE.md, the run HUD): the bag under the stars, the busted bar, the card and the wall */
 .run {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  font-family: var(--font-display);
 }
 /* the money block (M8.9 R4): under the stars, the bank first (ink, the coin), the bag under it (yellow, the sack, its
    × from ×1.3); the bank never jumps and no gap is kept for the bag */
@@ -805,7 +746,6 @@ kbd.key {
   align-items: center;
   gap: 0.375rem;
   color: var(--ink);
-  text-shadow: 2px 3px 0 #000;
   transform-origin: 100% 50%;
   transition: transform 0.07s ease-out;
 }
@@ -814,10 +754,7 @@ kbd.key {
 .run__coins.is-pop { transform: scale(1.22); }
 .run__coins-value {
   font-size: 1.375rem;
-  font-weight: 900;
-  font-style: italic;
   line-height: 1;
-  font-variant-numeric: tabular-nums;
   transition: color 0.15s ease-out;
 }
 .run__coins.is-cap .run__coins-value { color: var(--money); }
@@ -825,25 +762,18 @@ kbd.key {
   display: none;
   align-items: center;
   gap: 0.375rem;
-  text-shadow: 3px 4px 0 #000;
   color: var(--money);
 }
 .run__bag.is-visible { display: flex; }
 .run__bag.is-hidden { opacity: 0; }
 .run__bag-value {
   font-size: 2.75rem;
-  font-weight: 900;
-  font-style: italic;
   line-height: 1;
-  font-variant-numeric: tabular-nums;
 }
 .run__mult {
   align-self: flex-end;
   margin-bottom: 0.25rem;
   font-size: 1.25rem;
-  font-weight: 900;
-  font-style: italic;
-  letter-spacing: 0.04em;
   transition: transform 0.15s;
 }
 .run__mult.is-pop { transform: scale(1.5); }
@@ -855,7 +785,7 @@ kbd.key {
   left: 50%;
   /* under the swap prompt (150 px), over the drift readout (28 px) */
   bottom: calc(4.125rem + var(--safe-bottom));
-  transform: translateX(-50%) skewX(-12deg);
+  transform: translateX(-50%);
   display: none;
   flex-direction: column;
   align-items: center;
@@ -870,7 +800,7 @@ kbd.key {
   background: var(--paper);
   border: 2px solid #1c1b22;
   box-shadow: 3px 3px 0 #000;
-  transform: skewX(12deg) rotate(-3deg);
+  transform: rotate(-3deg);
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -881,8 +811,6 @@ kbd.key {
   background: var(--trouble);
   color: var(--ink);
   font-size: 1rem;
-  font-weight: 900;
-  letter-spacing: 0.3em;
   text-align: center;
 }
 .run__ticket-line {
@@ -902,15 +830,11 @@ kbd.key {
   align-items: center;
   gap: 0.5rem;
   margin-top: 0.375rem;
-  transform: skewX(12deg);
 }
 .run__ticket-prompt.is-on { display: flex; }
 .run__ticket-word {
   font-size: 1.125rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
   color: var(--way);
-  text-shadow: 2px 3px 0 #000;
 }
 
 .run__card,
@@ -932,13 +856,8 @@ kbd.key {
 .run__wall.is-visible { display: flex; }
 .run__title {
   font-size: 3.375rem;
-  font-weight: 900;
-  font-style: italic;
-  letter-spacing: 0.06em;
   line-height: 1.05;
   color: var(--money);
-  transform: skewX(-10deg);
-  text-shadow: 3px 4px 0 #000;
 }
 .run__title--danger { color: var(--trouble); }
 .run__lines {
@@ -952,32 +871,23 @@ kbd.key {
   justify-content: space-between;
   gap: 2rem;
   font-size: 1.125rem;
-  font-weight: 800;
-  font-style: italic;
-  letter-spacing: 0.08em;
-  text-shadow: 2px 3px 0 #000;
 }
 .run__line-label { color: var(--ink-dim); }
 .run__line-value {
   color: var(--ink);
-  font-variant-numeric: tabular-nums;
   text-align: right;
 }
 .run__line.is-strong .run__line-value { color: var(--money); }
 .run__counts {
   margin-top: 0.375rem;
   font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
   color: var(--ink-dim);
-  text-shadow: 2px 2px 0 #000;
 }
 /* NEW BEST beside the title when this door beat every run before it (M8.5) */
 .run__best {
   display: none;
   margin-left: 1rem;
   font-size: 1.125rem;
-  letter-spacing: 0.12em;
   vertical-align: middle;
   color: var(--ink);
 }
@@ -988,8 +898,6 @@ kbd.key {
   gap: 0.375rem;
   margin-top: 0.5rem;
   font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
   color: var(--ink);
 }
 
@@ -1019,7 +927,6 @@ kbd.key {
   justify-content: center;
   flex-wrap: wrap;
   gap: 0.375rem;
-  transform: skewX(-10deg);
 }
 .cold__caption.is-visible { display: flex; animation: cold-in 0.25s ease-out; }
 .cold__key {
@@ -1029,13 +936,8 @@ kbd.key {
 }
 .cold__word {
   margin-left: 0.375rem;
-  font-family: var(--font-display);
   font-size: 1.625rem;
-  font-weight: 900;
-  font-style: italic;
-  letter-spacing: 0.08em;
   color: var(--ink);
-  text-shadow: 2px 3px 0 #000;
   white-space: nowrap;
 }
 .cold__caption--swap .cold__word { color: var(--way); }
@@ -1045,14 +947,11 @@ kbd.key {
   align-items: center;
   gap: 0.375rem;
   font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
   color: var(--ink-dim);
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
 }
 @keyframes cold-in {
-  from { opacity: 0; transform: skewX(-10deg) translateY(-0.375rem); }
-  to { opacity: 1; transform: skewX(-10deg) translateY(0); }
+  from { opacity: 0; transform: translateY(-0.375rem); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* the speed camera's flash: 100 ms of white at 60 % over everything but the panels */
@@ -1078,7 +977,6 @@ kbd.key {
   max-width: calc(100vw - 27.5rem - var(--safe-left) - var(--safe-right));
   min-width: 18.75rem;
   pointer-events: none;
-  font-family: var(--font-display);
 }
 .jobs.is-visible { display: flex; }
 .jobs__line {
@@ -1088,16 +986,11 @@ kbd.key {
   justify-content: center;
   column-gap: 0.75rem;
   font-size: 1.25rem;
-  font-weight: 900;
-  font-style: italic;
-  letter-spacing: 0.08em;
   text-transform: uppercase;
   text-align: center;
-  transform: skewX(-10deg);
   color: var(--ink);
-  text-shadow: 2px 3px 0 #000;
 }
-.jobs__time { color: var(--ink); font-variant-numeric: tabular-nums; }
+.jobs__time { color: var(--ink); }
 .jobs__time:empty, .jobs__dist:empty { display: none; }
 .jobs__dist { font-size: 1rem; color: var(--ink); }
 .jobs__dist::before { content: '· '; color: var(--ink-dim); }
@@ -1111,12 +1004,8 @@ kbd.key {
   display: none;
   pointer-events: none;
   font-size: 1.375rem;
-  font-weight: 900;
-  font-style: italic;
-  letter-spacing: 0.04em;
   white-space: nowrap;
   color: var(--ink);
-  text-shadow: 2px 3px 0 #000;
 }
 .pay.is-visible { display: block; }
 .pay__cash { margin-left: 0.3em; color: var(--money); }
@@ -1140,14 +1029,23 @@ kbd.key {
   align-items: center;
   gap: 0.125rem;
   padding: 0.625rem 1.375rem 0.75rem;
+  position: relative;
+  isolation: isolate;
+  text-align: center;
+}
+/* the card's plate (M8.9 R2): the panels' −8° under words that stand upright */
+.jobs__card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
   background: var(--panel);
   border-left: 4px solid var(--way);
   border-radius: 4px;
-  transform: skewX(-10deg);
   box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.6);
-  text-align: center;
+  transform: skewX(-8deg);
 }
-.jobs__card[data-kind='chain'] { border-left-color: var(--ink); }
+.jobs__card[data-kind='chain']::before { border-left-color: var(--ink); }
 /* a kind brought out (M8.7 D10): its badge over NEW: its name */
 .jobs__card-badge { display: none; width: 2.5rem; height: 2.5rem; }
 .jobs__card[data-kind='new'] .jobs__card-badge { display: block; }
@@ -1160,27 +1058,17 @@ kbd.key {
 .jobs__card.is-visible { display: flex; animation: cold-in 0.25s ease-out; }
 .jobs__card-title {
   font-size: 1.625rem;
-  font-weight: 900;
-  font-style: italic;
-  letter-spacing: 0.08em;
   color: var(--ink);
-  text-shadow: 2px 3px 0 #000;
 }
 .jobs__card-sub, .jobs__card-limit {
   font-size: 1rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
   color: var(--ink);
-  text-shadow: 0 2px 0 #000;
 }
 .jobs__card-limit { color: var(--ink-dim); }
 .jobs__card-pay {
   font-size: 2.75rem;
-  font-weight: 900;
-  font-style: italic;
   line-height: 1.05;
   color: var(--money);
-  text-shadow: 2px 3px 0 #000;
 }
 
 /* the garage on the wall (docs/STYLE.md, the wall): tabs, one page at a time, a footer with the bank and DRIVE OUT. The
@@ -1201,13 +1089,11 @@ kbd.key {
   .run__wall.is-visible { animation: none; }
 }
 .run__wall button {
-  font-family: var(--font-display);
   color: var(--ink);
   background: color-mix(in srgb, var(--ink) 8%, transparent);
   border: 2px solid transparent;
   border-radius: 4px;
   cursor: pointer;
-  text-shadow: 1px 2px 0 #000;
 }
 .run__wall button:hover { border-color: color-mix(in srgb, var(--ink) 50%, transparent); }
 .run__wall button.is-focus {
@@ -1223,25 +1109,19 @@ kbd.key {
   display: flex;
   gap: 0.25rem;
   margin-bottom: 0.375rem;
-  transform: skewX(-8deg);
 }
 .wall__tab {
   flex: 1;
   padding: 0.3125rem 0.25rem;
   font-size: 1rem;
-  font-weight: 900;
-  letter-spacing: 0.12em;
   color: var(--ink-dim);
 }
-.run__wall .wall__tab.is-current { color: var(--outline); background: var(--ink); text-shadow: none; }
+.run__wall .wall__tab.is-current { color: var(--outline); text-shadow: none; }
 .wall__page { display: none; flex-direction: column; gap: 0.375rem; min-height: 0; }
 .wall__page.is-current { display: flex; }
 .wall__for {
   font-size: 1rem;
-  font-weight: 900;
-  letter-spacing: 0.12em;
   color: var(--ink-dim);
-  text-shadow: 1px 2px 0 #000;
 }
 .wall__cars {
   display: grid;
@@ -1270,11 +1150,7 @@ kbd.key {
 .wall__page--cars > *, .wall__page--goals > * { flex-shrink: 0; }
 .wall__next {
   font-size: 1rem;
-  font-weight: 900;
-  font-style: italic;
-  letter-spacing: 0.06em;
   color: var(--ink);
-  text-shadow: 2px 2px 0 #000;
 }
 .wall__records { display: flex; flex-direction: column; gap: 0.125rem; }
 .wall__card {
@@ -1293,33 +1169,26 @@ kbd.key {
 }
 .wall__card-name {
   font-size: 1rem;
-  font-weight: 900;
-  font-style: italic;
-  letter-spacing: 0.06em;
   text-align: center;
 }
 /* what the car is for (M8.8 slice 3): one quiet word under the name */
 .wall__card-role {
   font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
   color: var(--ink-dim);
   text-align: center;
 }
 .wall__card-status {
   font-size: 1rem;
-  font-weight: 900;
   color: var(--money);
   text-align: center;
-  font-variant-numeric: tabular-nums;
 }
-.wall__card.is-owned .wall__card-status { color: var(--ink-dim); font-size: 1rem; letter-spacing: 0.12em; }
+.wall__card.is-owned .wall__card-status { color: var(--ink-dim); font-size: 1rem; }
 .wall__card.is-selected { background: color-mix(in srgb, var(--ink) 18%, transparent); }
 .wall__card.is-selected .wall__card-status { color: var(--ink); }
 /* the car you drove in (M5.5): HOT · KEEP IT in the accent's cyan */
 .wall__card.is-hot { border-color: var(--ink); }
 .wall__card.is-hot .wall__card-status { color: var(--ink); font-size: 1rem; }
-.wall__card.is-locked .wall__card-status { color: var(--ink-dim); font-size: 1rem; letter-spacing: 0.04em; }
+.wall__card.is-locked .wall__card-status { color: var(--ink-dim); font-size: 1rem; }
 .wall__card.is-short .wall__card-status,
 .wall__row.is-short .wall__row-price,
 .wall__btn--cash.is-short .wall__btn-label { color: var(--trouble); }
@@ -1347,17 +1216,14 @@ kbd.key {
 }
 .wall__row-name {
   font-size: 1.125rem;
-  font-weight: 900;
-  font-style: italic;
-  letter-spacing: 0.08em;
 }
-.wall__dots { font-size: 1.25rem; letter-spacing: 0.15em; color: var(--ink); }
+.wall__dots { display: flex; gap: 0.3125rem; }
+.wall__dot { width: 0.625rem; height: 0.625rem; border-radius: 50%; border: 2px solid var(--ink); box-shadow: 0 0 0 1.5px var(--outline); }
+.wall__dot.is-on { background: var(--ink); }
 .wall__row-price {
   font-size: 1.125rem;
-  font-weight: 900;
   color: var(--money);
   text-align: right;
-  font-variant-numeric: tabular-nums;
 }
 .wall__row.is-max .wall__row-price { color: var(--ink-dim); }
 .wall__prep {
@@ -1369,10 +1235,7 @@ kbd.key {
 .wall__prep-text { display: flex; flex-direction: column; }
 .wall__prep-what {
   font-size: 1rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
   color: var(--ink-dim);
-  text-shadow: 1px 1px 0 #000;
 }
 .wall__btn {
   display: flex;
@@ -1384,10 +1247,6 @@ kbd.key {
 }
 .wall__btn-label {
   font-size: 1rem;
-  font-weight: 900;
-  font-style: italic;
-  letter-spacing: 0.08em;
-  font-variant-numeric: tabular-nums;
 }
 .wall__btn.is-bought { opacity: 0.55; }
 .wall__btn.is-bought .wall__btn-label { color: var(--ink-dim); }
@@ -1432,13 +1291,19 @@ kbd.key {
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.35);
   font-size: 1rem;
-  font-weight: 900;
-  font-style: italic;
-  letter-spacing: 0.04em;
 }
 .wall__chip-swatch { width: 0.75rem; height: 0.75rem; border-radius: 2px; box-shadow: 1px 1px 0 #000; }
 .wall__chip.is-beaten { opacity: 0.45; }
-.wall__chip.is-beaten .wall__chip-num::after { content: ' ✓'; }
+.wall__chip.is-beaten .wall__chip-num::after {
+  content: '';
+  display: inline-block;
+  width: 0.3em;
+  height: 0.6em;
+  margin-left: 0.4em;
+  border: solid currentColor;
+  border-width: 0 0.14em 0.14em 0;
+  transform: translateY(-0.1em) rotate(45deg);
+}
 .wall__chip.is-next { border-color: var(--ink); }
 /* GOALS in pictures (M8.9 R10): the rivals as their cars, the day's bars, the hunts as counters with their glyphs */
 .wall__chip { flex-direction: column; gap: 0.125rem; }
@@ -1455,7 +1320,7 @@ kbd.key {
 .wall__bar-fill { display: block; height: 100%; background: var(--ink); transform-origin: left center; }
 .wall__daily.is-done .wall__bar-fill { background: var(--money); }
 .wall__hunts { display: flex; gap: 1rem; margin-top: 0.25rem; }
-.wall__hunt { display: flex; align-items: center; gap: 0.375rem; font-size: 1rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+.wall__hunt { display: flex; align-items: center; gap: 0.375rem; font-size: 1rem; }
 .wall__hunt-glyph { width: 1.375rem; height: 1.375rem; fill: var(--ink); overflow: visible; }
 .wall__daily {
   display: grid;
@@ -1466,41 +1331,28 @@ kbd.key {
   background: color-mix(in srgb, var(--ink) 6%, transparent);
   border-radius: 4px;
   font-size: 1rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-shadow: 1px 2px 0 #000;
 }
-.wall__daily-progress { color: var(--ink-dim); font-variant-numeric: tabular-nums; }
-.wall__daily-reward { color: var(--money); font-variant-numeric: tabular-nums; }
+.wall__daily-progress { color: var(--ink-dim); }
+.wall__daily-reward { color: var(--money); }
 .wall__daily.is-done { opacity: 0.6; }
 .wall__daily.is-done .wall__daily-progress { color: var(--ink); }
 .wall__streak {
   margin-top: 0.25rem;
   font-size: 1rem;
-  font-weight: 900;
-  letter-spacing: 0.12em;
   color: var(--ink);
-  text-shadow: 1px 2px 0 #000;
 }
 .run__first {
   display: none;
   margin-top: 0.25rem;
   font-size: 1rem;
-  font-weight: 900;
-  font-style: italic;
-  letter-spacing: 0.06em;
   color: var(--ink);
-  text-shadow: 2px 2px 0 #000;
 }
 .run__first.is-visible { display: block; }
 .run__sentence {
   display: none;
   margin-top: 0.375rem;
   font-size: 1rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
   color: var(--ink);
-  text-shadow: 2px 2px 0 #000;
 }
 .run__sentence.is-visible { display: block; }
 .wall__footer {
@@ -1512,30 +1364,35 @@ kbd.key {
 .wall__hint {
   flex: 1;
   font-size: 1rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
   color: var(--ink-dim);
-  text-shadow: 1px 1px 0 #000;
 }
 .wall__bank { display: flex; align-items: baseline; gap: 0.375rem; }
-.wall__bank-label { font-size: 1rem; font-weight: 900; letter-spacing: 0.14em; color: var(--ink-dim); }
+.wall__bank-label { font-size: 1rem; color: var(--ink-dim); }
 .wall__bank-value {
   font-size: 1.25rem;
-  font-weight: 900;
-  font-style: italic;
   color: var(--money);
-  text-shadow: 2px 2px 0 #000;
-  font-variant-numeric: tabular-nums;
 }
 .wall__drive {
   padding: 0.4375rem 1rem;
   font-size: 1rem;
-  font-weight: 900;
-  font-style: italic;
-  letter-spacing: 0.1em;
+}
+.run__wall .wall__drive.is-focus { color: var(--outline); text-shadow: none; }
+/* the tabs and DRIVE OUT stand on plates at the panels' −8° (M8.9 R2): the button's box and its focus drawn by the
+   plate, the words upright over it */
+.run__wall button.wall__tab, .run__wall button.wall__drive { position: relative; isolation: isolate; background: none; border-color: transparent; box-shadow: none; }
+.run__wall .wall__tab::before, .run__wall .wall__drive::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  z-index: -1;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
   transform: skewX(-8deg);
 }
-.run__wall .wall__drive.is-focus { background: var(--ink); color: var(--outline); text-shadow: none; }
+.run__wall .wall__tab:hover::before, .run__wall .wall__drive:hover::before { border-color: color-mix(in srgb, var(--ink) 50%, transparent); }
+.run__wall .wall__tab.is-focus::before, .run__wall .wall__drive.is-focus::before { border-color: var(--ink); box-shadow: 0 0 0 2px #000, 3px 4px 0 rgba(0, 0, 0, 0.6); }
+.run__wall .wall__tab.is-current::before, .run__wall .wall__drive.is-focus::before { background: var(--ink); }
 
 /* the full-screen map (M5.5 slice 15): held on a key over the drive, the key to its glyphs on the right */
 .bigmap {
@@ -1543,7 +1400,6 @@ kbd.key {
   inset: 0;
   /* a sibling of the HUD, the job line and the run's layer, over all of them: the map is the screen while held */
   z-index: 40;
-  font-family: var(--font-display);
   display: none;
   flex-direction: column;
   align-items: center;
@@ -1560,25 +1416,16 @@ kbd.key {
 }
 .bigmap__title {
   font-size: 1.375rem;
-  font-weight: 900;
-  font-style: italic;
-  letter-spacing: 0.16em;
   color: var(--ink);
-  text-shadow: 2px 2px 0 #000;
 }
 .bigmap__hint {
   font-size: 1rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
   color: var(--ink-dim);
 }
 .bigmap__hunts {
   margin-left: auto;
   font-size: 1rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
   color: var(--ink);
-  text-shadow: 2px 2px 0 #000;
 }
 .bigmap__body {
   display: flex;
@@ -1610,8 +1457,52 @@ kbd.key {
 }
 .bigmap__word {
   font-size: 1rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
   color: var(--ink);
-  text-shadow: 1px 1px 0 #000;
 }
+
+/*
+ * One typeface, two styles (docs/M8.9_PLAN.md R2): the only rules that say how a text is set.
+ * - The label, the screen's default (everything 18 px and under: hints, a card's line, the wall's lines, legends,
+ *   names): Rubik Bold, upright, tracked 0.06 em, a 1.5 px outline.
+ * - The display (20 px and up: the numbers, the titles, the line's kind, the pays, a card's title): Rubik Black Italic
+ *   with a 2 px outline and the flat 2×3 shadow.
+ * No text is skewed: the italic carries the motion, the plates under the job card, the tabs and DRIVE OUT keep the
+ * panels' −8°. Numbers in tabular figures. Every outline is a ring of shadows: a text stroke eats into the glyphs
+ * wherever paint-order is not honoured on HTML text, and draws the faces' overlapping contours.
+ */
+#ui, .jobs__dist, .run__best {
+  font-family: var(--font);
+  font-weight: 700;
+  font-style: normal;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  text-shadow: var(--label-outline);
+  --star-shadow: none;
+}
+.loading, .hud__ticker, .hud__speed, .hud__popup.is-big, .hud__wrecked-title, .hud__skill-points, .hud__skill-mult, .hud__lap-current,
+.hud__pause-title, .hud__toast, .run__coins-value, .run__bag-value, .run__mult, .run__title, .cold__word, .jobs__line, .pay,
+.jobs__card-title, .jobs__card-pay, .wall__bank-value, .bigmap__title {
+  font-family: var(--font);
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  text-shadow: var(--display-outline), var(--display-shadow);
+  --star-shadow: drop-shadow(0.125rem 0.1875rem 0 var(--outline));
+}
+/* a button's words are the screen's, not the browser's (no weight of its own: the class rules still size it) */
+:where(#ui) button { font: inherit; letter-spacing: inherit; text-shadow: inherit; text-transform: inherit; }
+/* words on a light plate need no outline: the keycaps, the page's tab, DRIVE OUT in focus */
+kbd.key, .run__wall .wall__tab.is-current, .run__wall .wall__drive.is-focus { text-shadow: none; }
+/* the HUD's star in a line (hud/stars.ts): a letter's size and colour, outlined as the letters are, the display's shadow
+   under it in a display line */
+.star {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  margin: 0 0.02em;
+  vertical-align: -0.1em;
+  overflow: visible;
+  filter: var(--star-shadow, none);
+}
+.star path { fill: currentColor; stroke: var(--outline); stroke-width: 5; stroke-linejoin: round; paint-order: stroke; }

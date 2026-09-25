@@ -22,6 +22,7 @@ import {
 } from './minimap';
 import { SIGNALS } from '../../sim/palette';
 import { cssAlpha } from '../colors';
+import { fontReady } from '../fonts';
 import { label, labelAria, relabel, t } from '../lang';
 import { MINIMAP, bigMapProject, bigMapScale, clearSpot, mapHalf, yawFromQuat, type Box, type Vec2 } from './minimapModel';
 
@@ -486,8 +487,10 @@ export class BigMap {
     c.textAlign = 'center';
     c.textBaseline = 'middle';
     c.lineJoin = 'round';
-    const places = namePlaces(sim, size, (name) => c.measureText(name).width);
+    // measured and written in Rubik once it is in (M8.9 R2): a name placed by the fallback's width would sit wrong
+    const places = fontReady() ? namePlaces(sim, size, (name) => c.measureText(name).width) : [];
     for (const [i, d] of DISTRICTS.entries()) {
+      if (places.length === 0) break;
       const p = places[i] as Box;
       c.lineWidth = 3;
       c.strokeStyle = DARK;

@@ -1,8 +1,7 @@
 import type { SimWorld } from '../../sim';
 import { BALANCE } from '../../sim/balance';
+import { STAR, STAR_OUTLINE } from './stars';
 
-/** The HUD's star in its 24-unit box, clockwise from the top point. */
-const STAR = [12, 2, 15, 8.4, 22, 9.3, 16.9, 14.2, 18.2, 21.2, 12, 17.8, 5.8, 21.2, 7.1, 14.2, 2, 9.3, 9, 8.4];
 const STAR_TOP = 2;
 const STAR_FOOT = 21.2;
 /** The next star's fill is written in this many steps (a write per step, not per frame). */
@@ -67,7 +66,6 @@ export class HeatHud {
     this.root = document.createElement('div');
     this.root.className = 'hud__heat';
     this.root.setAttribute('role', 'img');
-    const outline = `M${STAR.slice(0, 2).join(' ')} ${STAR.slice(2).join(' ')}Z`;
     for (let i = 0; i < 5; i++) {
       const star = document.createElementNS(SVG, 'svg');
       star.setAttribute('viewBox', '0 0 24 24');
@@ -76,7 +74,7 @@ export class HeatHud {
       star.classList.add('hud__heat-star');
       const shape = document.createElementNS(SVG, 'path');
       shape.setAttribute('class', 'hud__heat-shape');
-      shape.setAttribute('d', outline);
+      shape.setAttribute('d', STAR_OUTLINE);
       const fill = document.createElementNS(SVG, 'path');
       fill.setAttribute('class', 'hud__heat-fill');
       star.append(shape, fill);

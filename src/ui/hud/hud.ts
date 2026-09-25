@@ -15,6 +15,7 @@ import {
 import { GaugeHud } from './gauge';
 import { Minimap } from '../map/minimap';
 import { HeatHud } from './heat';
+import { starText } from './stars';
 import { label, num, relabel, t } from '../lang';
 import { POP_SLOTS, Pops, TEACH_LINES, TopVoice, newSaid, speak, teachNow, topKind, topSeconds, type TeachState, type VoiceContext } from './voice';
 
@@ -319,7 +320,7 @@ export class Hud {
   }
 
   showToast(text: string, seconds = 1.5): void {
-    this.toast.textContent = text;
+    starText(this.toast, text);
     this.toast.classList.add('is-visible');
     this.toastTimer = seconds;
   }
@@ -367,7 +368,7 @@ export class Hud {
     const i = this.pops.push(said.text);
     const popup = this.popups[i];
     if (!popup) return;
-    popup.textContent = said.text;
+    starText(popup, said.text);
     popup.classList.toggle('is-gain', said.gain);
     popup.classList.toggle('is-big', said.big);
     popup.classList.add('is-on');
@@ -452,9 +453,9 @@ export class Hud {
       const cur = this.top.current;
       const on = cur !== null && cur.kind !== 'step' && cur.kind !== 'new';
       if (on && cur) {
-        this.tickerLevel.textContent = cur.lead;
+        starText(this.tickerLevel, cur.lead);
         this.tickerLevel.dataset['tone'] = cur.tone;
-        this.tickerText.textContent = cur.text;
+        starText(this.tickerText, cur.text);
       }
       this.ticker.classList.toggle('is-on', on);
     }

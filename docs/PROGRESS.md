@@ -11,6 +11,16 @@ duel's rival of either format drives a physical car near the player; Frank's car
 speed to wreck, the lane record one. Decided: after his word the gate's perf does not switch them off by itself; a
 failed budget goes to him with its numbers. Pin M8.8 22.5 (`driver.test.ts`).
 
+## 2026-09-25 — M8.9 slice 6: one typeface, two styles
+
+Done (R2): Rubik (OFL) in three woff2 faces, 50 KB (`public/fonts/`), cut from Google's variable TTFs (the static ones
+are gone) with the ranges in `ui/fonts.ts`, the display face preloaded. Two rules at the end of `styles.css` set every
+text: the label (Bold, upright, 0.06 em, 1.5 px ring) and the display (Black Italic, 2 px ring and a 2×3 shadow). The
+outline is a ring of shadows (a stroke eats glyphs where paint-order fails). No text skewed: the job card, tabs and
+DRIVE OUT keep −8° on `::before` plates. The ★ drawn inline (`hud/stars.ts`); the tiers' dots and the tick drawn in
+CSS; the maps write once the face is in. Pins M8.9 6.1–6.3, stills looked at; verify not run (Marcin: finish, no tests).
+Open: the door's `×2.6` keeps the English decimal point in Polish.
+
 ## 2026-09-25 — M8.8 slice 24: the budget's switch
 
 Done: the switch the budget decides with: `POLICE.physicalUnits` and `AI.pool` (now settable, read when the world is

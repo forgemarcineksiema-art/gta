@@ -73,6 +73,11 @@ Why this and not another: the golden hour gives strong directional shadows (spee
   helmet a size down; the neon under the bike; no car part fits. Left in the
   street it stands among the traffic without its rider. The chase sits closer
   and lower behind a small body.
+- The delivery scooter (M8.8 slice 16): floorboard, a raked leg shield, a
+  round cowl and a headlight nacelle in the paint, 12-inch wheels, a red box
+  with a white lid on the rack; the rider upright, feet on the floorboard. In
+  the traffic a courier in a red jacket rides it (one instanced mesh for all);
+  parked or left, it stands empty.
 
 ## Street architecture (M2.1)
 

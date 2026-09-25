@@ -19,7 +19,7 @@ import { cloneTuning, type VehicleTuning } from '../vehicle/tuning';
 export type RivalBody = 'wagon' | 'pizza' | 'wrecker' | 'twin' | 'fakecop' | 'partybus' | 'lowrider' | 'limo' | 'bubble' | 'phantom' | 'chiefcar';
 /** The crazy cars (M8.8 phase F): hidden, one in each district, each the only one that does its thing. */
 export type CrazyBody = 'roller' | 'monster' | 'trolley';
-export type CivilianBody = 'sedan' | 'hatch' | 'estate' | 'suv' | 'pickup' | 'taxi' | 'truck' | 'bus' | 'icecream' | RivalBody | 'roadster' | 'sweeper' | 'hotdog' | CrazyBody;
+export type CivilianBody = 'sedan' | 'hatch' | 'estate' | 'suv' | 'pickup' | 'taxi' | 'truck' | 'bus' | 'icecream' | RivalBody | 'roadster' | 'sweeper' | 'hotdog' | CrazyBody | 'scooter';
 export type BodyId = CarId | CivilianBody;
 export const RIVAL_BODIES: readonly RivalBody[] = ['wagon', 'pizza', 'wrecker', 'twin', 'fakecop', 'partybus', 'lowrider', 'limo', 'bubble', 'phantom', 'chiefcar'];
 /** The civilian bodies from before M8.8, in their order. */
@@ -27,7 +27,7 @@ const FIRST_CIVILIANS: readonly CivilianBody[] = ['sedan', 'hatch', 'estate', 's
 /** The classes whose shells come first (their class index is their body index). */
 const FIRST_SHELLS: readonly CarId[] = ['muscle', 'compact', 'heavy', 'sports', 'police'];
 /** Every body added since, a class's shell or a civilian's, in the order it came: appended after the last. */
-const ADDED: readonly BodyId[] = ['offroad', 'roller', 'monster', 'trolley', 'moto'];
+const ADDED: readonly BodyId[] = ['offroad', 'roller', 'monster', 'trolley', 'moto', 'scooter'];
 export const CIVILIAN_BODIES: readonly CivilianBody[] = [...FIRST_CIVILIANS, ...ADDED.filter((id): id is CivilianBody => !(CAR_IDS as readonly BodyId[]).includes(id))];
 export const BODY_IDS: readonly BodyId[] = [...FIRST_SHELLS, ...FIRST_CIVILIANS, ...ADDED];
 
@@ -188,6 +188,21 @@ const CRAZY = {
   },
 } as const;
 
+/**
+ * The delivery scooter (M8.8 slice 16): the bike's class at 190 kg with its rider on 12-inch wheels, a single's 11 N·m
+ * through a long reduction: 0–50 in 4.9 s, 69 km/h on the rev limit in top, hardly any engine braking.
+ */
+function scooter(t: VehicleTuning): void {
+  t.wheelRadius = 0.23;
+  t.wheelWidth = 0.11;
+  t.torqueMax = 11;
+  t.engineBrakeTorque = 2;
+  t.idleRpm = 1500;
+  t.redlineRpm = 8000;
+  t.gearRatios = [2.4, 1.9, 1.6, 1.4, 1.25, 1.12];
+  t.finalDrive = 8.9;
+}
+
 /** Indexed like BODY_IDS. Sizes in metres; the profiles in render/bodyProfiles.ts are drawn on these wheels. */
 export const BODIES: readonly BodySpec[] = [
   ...FIRST_SHELLS.map(shell),
@@ -236,6 +251,8 @@ export const BODIES: readonly BodySpec[] = [
   civilian('trolley', 'compact', 0.4, 0.7, 0.8, 0.6, 180, 0, { paints: [PALETTE.chrome], tune: CRAZY.trolley }),
   // the motorbike's shell (slice 14)
   shell('moto'),
+  // the delivery scooter (slice 16): the bike's class in the traffic, a box on its back, a little under the limit
+  civilian('scooter', 'moto', 0.35, 0.9, 1.3, 0.1, 190, 0.9, { tune: scooter }),
 ];
 
 export const BODY_INDEX = Object.fromEntries(BODY_IDS.map((id, i) => [id, i])) as Record<BodyId, number>;

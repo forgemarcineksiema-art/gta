@@ -243,4 +243,21 @@ describe('garage', () => {
       expect(sim.carBody).toBe('muscle');
     } finally { sim.dispose(); }
   }, 60_000);
+
+  it('M8.8 16.3 the motorbike is bought at 36,000 and drives out on two wheels', async () => {
+    const sim = await createWorld({ map: 'playground' });
+    try {
+      const g = sim.garage;
+      expect(g.price('moto')).toBe(36_000);
+      sim.run.bank = 35_999;
+      expect(g.buy('moto')).toBe('cash');
+      sim.run.bank = 36_000;
+      expect(g.buy('moto')).toBe('ok');
+      expect(sim.run.bank).toBe(0);
+      expect(g.select('moto')).toBe(true);
+      g.applyToVehicle();
+      expect(sim.carId).toBe('moto');
+      expect(sim.vehicle.tuning.twoWheel).toBe(1);
+    } finally { sim.dispose(); }
+  });
 });

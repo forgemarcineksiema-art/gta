@@ -10,7 +10,7 @@ import { bodyTuning } from '../../src/sim/traffic/bodies';
 import { PedPose, type Pedestrians } from '../../src/sim/traffic/Pedestrians';
 import { AgentState, type Traffic } from '../../src/sim/traffic/Traffic';
 import type { LanePose } from '../../src/sim/traffic/lanes';
-import { createWorld, kmh, run, runUntil } from './helpers';
+import { createWorld, kmh, run, runUntil, upness } from './helpers';
 
 const pose: LanePose = { x: 0, z: 0, yaw: 0 };
 
@@ -192,6 +192,40 @@ describe('car-swap', () => {
       sim.garage.tiers.muscle[0] = 3;
       takeTaxi(60);
       expect(sim.vehicle.tuning.torqueMax).toBe(bodyTuning('taxi').torqueMax * (BALANCE.tiers.power[3] as number));
+    } finally { sim.dispose(); }
+  }, 60_000);
+
+  it('M8.8 16.2 a swap onto a scooter hands over the speed and the two-wheel tuning; it rides on upright', async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
+    const traffic = sim.traffic as Traffic;
+    const lane = streetLane(traffic, 160);
+    traffic.lanes.positionAt(lane, 40, 0, pose);
+    sim.vehicle.teleport({ x: pose.x, y: 1, z: pose.z }, pose.yaw);
+    const yaw = pose.yaw;
+    run(sim, 0.5);
+    const agent = traffic.spawnAt(lane, 40, 'scooter', AgentState.Kinematic, -2.5);
+    traffic.speed[agent] = 11;
+    traffic.pace[agent] = 1;
+    traffic.bad[agent] = 0;
+    try {
+      run(sim, 1, () => { push(sim, yaw, 11); });
+      expect(sim.life.state.swapCandidate).toBe(agent);
+      const agentSpeed = traffic.speed[agent];
+      sim.controls.swap = true;
+      sim.step();
+      expect(sim.carBody).toBe('scooter');
+      expect(sim.carId).toBe('moto');
+      expect(sim.vehicle.tuning).toEqual(bodyTuning('scooter'));
+      expect(sim.vehicle.tuning.twoWheel).toBe(1);
+      expect(Math.abs(sim.vehicle.telemetry.speed - agentSpeed)).toBeLessThan(agentSpeed * 0.1 + 0.3);
+      let falls = 0;
+      run(sim, 3, (_t, c, s) => {
+        c.throttle = kmh(s) < 40 ? 0.5 : 0.1;
+        if (s.vehicle.tumbleLeft > 0) falls++;
+      });
+      expect(falls).toBe(0);
+      expect(upness(sim)).toBeGreaterThan(0.9);
+      expect(kmh(sim)).toBeGreaterThan(30);
     } finally { sim.dispose(); }
   }, 60_000);
 });

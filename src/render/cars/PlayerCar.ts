@@ -10,7 +10,7 @@ import { ASPHALT, CAR_IDS, CAR_PRESETS, CITY_COLORS, DIRT, GRASS, KIT, PALETTE, 
 import { CAR_PROFILES } from './carProfiles';
 import { BODY_PROFILES } from './bodyProfiles';
 import { buildCarMesh, restHeight, wheelGeometry, type CarMesh } from './carMesh';
-import { buildBikeMesh } from './bikeMesh';
+import { bikeShapeOf, buildBikeMesh } from './bikeMesh';
 import { buildFlame, buildNeon, setNeonColours, spoilerGeometry, topperGeometry } from './kitMesh';
 import { lowriderBounce } from '../traffic/TrafficView';
 import { placeFromBuffer } from '../shapes';
@@ -70,7 +70,7 @@ export class PlayerCar {
     const classes: Partial<Record<CarId, CarMesh>> = {};
     for (const id of CAR_IDS) {
       const t = id === sim.carId ? sim.vehicle.tuning : CAR_PRESETS[id];
-      const mesh = t.twoWheel > 0 ? buildBikeMesh(t, CAR_PROFILES[id].paint) : buildCarMesh(t, CAR_PROFILES[id]);
+      const mesh = t.twoWheel > 0 ? buildBikeMesh(t, CAR_PROFILES[id].paint, bikeShapeOf(id)) : buildCarMesh(t, CAR_PROFILES[id]);
       scene.add(mesh.root);
       for (const w of mesh.wheels) scene.add(w);
       const visible = id === sim.carId;
@@ -210,7 +210,7 @@ export class PlayerCar {
     if (!mesh) {
       // built in a colour no fixed part uses, so a respray finds the paint alone (a white truck keeps a white box)
       const t = bodyTuning(body);
-      mesh = t.twoWheel > 0 ? buildBikeMesh(t, SENTINEL_PAINT) : buildCarMesh(t, BODY_PROFILES[body], SENTINEL_PAINT);
+      mesh = t.twoWheel > 0 ? buildBikeMesh(t, SENTINEL_PAINT, bikeShapeOf(body)) : buildCarMesh(t, BODY_PROFILES[body], SENTINEL_PAINT);
       mesh.root.visible = false;
       this.scene.add(mesh.root);
       for (const w of mesh.wheels) {

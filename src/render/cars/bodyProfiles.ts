@@ -787,11 +787,42 @@ export const TROLLEY: CarProfile = {
 };
 
 /** Every body's profile: the player's five classes, the city's eight, the hidden truck and the wanted board's cars. */
+/**
+ * The delivery scooter's shell (M8.8 slice 16): its footprint in the tables, 1.8 m. The scooter, its rider and its box
+ * are drawn by bikeMesh.ts.
+ */
+export const SCOOTER: CarProfile = {
+  name: 'scooter',
+  sections: [
+    { z: 0.9, floor: 0.4, belt: 0.6, roof: 0.64, hwFloor: 0.1, hwBelt: 0.14, hwRoof: 0.1 },
+    { z: 0.4, floor: 0.3, belt: 0.9, roof: 0.96, hwFloor: 0.18, hwBelt: 0.23, hwRoof: 0.18 },
+    { z: -0.1, floor: 0.3, belt: 0.36, roof: 0.38, hwFloor: 0.16, hwBelt: 0.16, hwRoof: 0.16 },
+    { z: -0.9, floor: 0.47, belt: 0.77, roof: 0.87, hwFloor: 0.2, hwBelt: 0.2, hwRoof: 0.15 },
+  ],
+  glassSides: [0, 0],
+  glassTops: [],
+  aPillar: -1,
+  cPillar: -1,
+  pillars: [],
+  doorSeams: [],
+  handleZ: 0,
+  headlight: { width: 0.12, height: 0.07, y: 1.06, inset: 0.05 },
+  taillight: { width: 0.12, height: 0.05, y: 0.68, inset: 0.02 },
+  grille: null,
+  bumperHeight: 0.04,
+  lipSpoiler: false,
+  mirrors: false,
+  exhausts: 1,
+  wheelInset: 0,
+  wheelStyle: 'compact',
+  paint: PALETTE.carBlue,
+};
+
 export const BODY_PROFILES: Record<BodyId, CarProfile> = {
   ...CAR_PROFILES,
   sedan: SEDAN, hatch: HATCH, estate: ESTATE, suv: SUV, pickup: PICKUP, taxi: TAXI, truck: TRUCK, bus: BUS, icecream: ICECREAM,
   wagon: WAGON, pizza: PIZZA, wrecker: WRECKER, twin: TWIN, fakecop: FAKECOP, partybus: PARTYBUS,
   lowrider: LOWRIDER, limo: LIMO, bubble: BUBBLE, phantom: PHANTOM, chiefcar: CHIEFCAR,
   roadster: ROADSTER, sweeper: SWEEPER, hotdog: HOTDOG,
-  roller: ROLLER, monster: MONSTER, trolley: TROLLEY,
+  roller: ROLLER, monster: MONSTER, trolley: TROLLEY, scooter: SCOOTER,
 };

@@ -48,7 +48,7 @@ const ROCKET: EngineVoice = { pulses: 1, saw: 0.14, square: 0.1, sub: 0.1, grit:
 export const CLASS_VOICES: Readonly<Record<CarId, EngineVoice>> = { muscle: V8, compact: FOUR, heavy: DIESEL, sports: SIX, police: V8, offroad: BIG_SIX, moto: TWIN };
 
 /** The bodies with a voice of their own. */
-export const OWN_VOICES: Readonly<Partial<Record<BodyId, EngineVoice>>> = { bubble: TWO_STROKE, trolley: ROCKET };
+export const OWN_VOICES: Readonly<Partial<Record<BodyId, EngineVoice>>> = { bubble: TWO_STROKE, trolley: ROCKET, scooter: TWO_STROKE };
 
 export function voiceOf(body: BodyId): EngineVoice {
   return OWN_VOICES[body] ?? CLASS_VOICES[bodySpec(body).car];

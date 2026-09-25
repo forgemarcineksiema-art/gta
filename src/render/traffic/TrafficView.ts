@@ -13,7 +13,7 @@ import { AgentState, type Traffic } from '../../sim/traffic/Traffic';
 import { BODIES } from '../../sim/traffic/bodies';
 import { BODY_PROFILES } from '../cars/bodyProfiles';
 import { buildBodyGeometry, paintMaskMaterial } from '../cars/bodyMesh';
-import { bikeTrafficGeometry } from '../cars/bikeMesh';
+import { bikeShapeOf, bikeTrafficGeometry, riderTrafficGeometry } from '../cars/bikeMesh';
 import { FADE, blocks, fadeTarget, stepFade } from '../camera/fade';
 
 export class TrafficView {
@@ -22,6 +22,11 @@ export class TrafficView {
   private readonly packed: Int16Array[];
   private readonly counts: Int32Array;
   private readonly wrote: Uint8Array;
+  /** Per body, 1 for a two-wheeler (M8.8 slice 16): a driven one carries a courier, drawn from `riders`. */
+  private readonly twoWheel: Uint8Array;
+  /** The couriers, an instanced mesh per two-wheeled body built with its first rider, and how many ride this frame. */
+  private readonly riders: Array<THREE.InstancedMesh | null>;
+  private readonly riderCounts: Int32Array;
   private readonly scratchM = new THREE.Matrix4();
   private readonly scratchP = new THREE.Vector3();
   private readonly scratchQ = new THREE.Quaternion();
@@ -40,6 +45,28 @@ export class TrafficView {
     this.counts = new Int32Array(BODY_IDS.length);
     this.wrote = new Uint8Array(BODY_IDS.length);
     this.meshes = BODY_IDS.map(() => null);
+    this.twoWheel = Uint8Array.from(BODY_IDS, (id) => (bodyTuning(id).twoWheel > 0 ? 1 : 0));
+    this.riders = BODY_IDS.map(() => null);
+    this.riderCounts = new Int32Array(BODY_IDS.length);
+  }
+
+  /** The couriers on a two-wheeled body, built the first time one rides. */
+  private riderFor(b: number): THREE.InstancedMesh {
+    const built = this.riders[b];
+    if (built) return built;
+    const id = BODY_IDS[b] as BodyId;
+    const geometry = riderTrafficGeometry(bikeShapeOf(id));
+    geometry.setAttribute('aFade', new THREE.InstancedBufferAttribute(new Float32Array(this.traffic.capacity).fill(1), 1));
+    const mesh = new THREE.InstancedMesh(geometry, this.material, this.traffic.capacity);
+    mesh.name = `traffic-${id}-rider`;
+    mesh.frustumCulled = false;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.count = 0;
+    mesh.visible = false;
+    this.scene.add(mesh);
+    this.riders[b] = mesh;
+    return mesh;
   }
 
   /** The body's mesh, built the first time a car of it is drawn. */
@@ -69,6 +96,13 @@ export class TrafficView {
     return n;
   }
 
+  /** How many two-wheeled bodies have their couriers' mesh built (M8.8 slice 16). */
+  get ridersBuilt(): number {
+    let n = 0;
+    for (const m of this.riders) if (m) n++;
+    return n;
+  }
+
   /**
    * `eye` is the camera and `target` the player's car: a car whose box meets the line between them, or within
    * `FADE.near` of the camera, is thinned (M8.6 D9).
@@ -80,6 +114,7 @@ export class TrafficView {
     const counts = this.counts;
     counts.fill(0);
     this.wrote.fill(0);
+    this.riderCounts.fill(0);
     for (let i = 0; i < traffic.capacity; i++) {
       if (traffic.state[i] === AgentState.Free || (!this.civilians && !traffic.police[i])) continue;
       const b = traffic.body[i] as number;
@@ -117,6 +152,14 @@ export class TrafficView {
       }
       this.fade[i] = fade;
       (mesh.geometry.getAttribute('aFade') as THREE.InstancedBufferAttribute).setX(n, fade);
+      // a courier rides a driven two-wheeler (M8.8 slice 16); a parked, left or wrecked one stands empty
+      const state = traffic.state[i];
+      if (this.twoWheel[b] === 1 && (state === AgentState.Kinematic || state === AgentState.Physical || state === AgentState.Disturbed)) {
+        const rider = this.riderFor(b), k = this.riderCounts[b] as number;
+        rider.setMatrixAt(k, this.scratchM);
+        (rider.geometry.getAttribute('aFade') as THREE.InstancedBufferAttribute).setX(k, fade);
+        this.riderCounts[b] = k + 1;
+      }
       if (repaint || pack[n] !== i) {
         const wrecked = traffic.state[i] === AgentState.Wrecked;
         this.color.setHex(wrecked ? PALETTE.charcoal : traffic.police[i] ? PALETTE.policeWhite : (traffic.paint[i] as number));
@@ -143,14 +186,24 @@ export class TrafficView {
       (mesh.geometry.getAttribute('aFade') as THREE.InstancedBufferAttribute).needsUpdate = true;
       if (this.wrote[b] === 1 && mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
+    for (let b = 0; b < this.riders.length; b++) {
+      const rider = this.riders[b];
+      if (!rider) continue;
+      const n = this.riderCounts[b] as number;
+      if (rider.visible !== n > 0) rider.visible = n > 0;
+      rider.count = n;
+      if (n === 0) continue;
+      rider.instanceMatrix.needsUpdate = true;
+      (rider.geometry.getAttribute('aFade') as THREE.InstancedBufferAttribute).needsUpdate = true;
+    }
     this.paintSerial = traffic.paintSerial;
   }
 }
 
-/** A body's instanced geometry: its loft, or a bike standing on its two wheels without its rider (M8.8 slice 15). */
+/** A body's instanced geometry: its loft, or a two-wheeler standing on its wheels without its rider (M8.8 slices 15–16). */
 export function trafficBodyGeometry(id: BodyId): THREE.BufferGeometry {
   const t = bodyTuning(id);
-  return t.twoWheel > 0 ? bikeTrafficGeometry(t) : buildBodyGeometry(BODY_PROFILES[id], t);
+  return t.twoWheel > 0 ? bikeTrafficGeometry(t, bikeShapeOf(id)) : buildBodyGeometry(BODY_PROFILES[id], t);
 }
 
 const LOWRIDER = BODY_INDEX.lowrider;

@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.8 slice 16: scooters in the traffic, the bike in the catalogue
+
+Done: `scooter` (SKUTER), the bike's class at 190 kg on 12-inch wheels, 11 N·m through a long reduction: 0–50 4.9 s,
+69 km/h on the rev limit, a 0.45 g turn leans 25°, the 45 km/h slalom never falls; the Bubble's two-stroke. 0.05 of a
+street's draw (4–5 %), twice in Crown Heights and on Coral Quay, never on the highway, at 0.9 of the limit; worth 6,000
+kept. Drawn from `bikeMesh.ts`'s shapes (sport, scooter): leg shield, cowl, a red box; a courier in red rides a driven
+one (the traffic's rider mesh, built with the first), a parked or left one stands empty. The model's ladder takes the
+bike after the 4×4 (straight after the van the 4×4 waited 10.5 min, past the 10.1 pin's 10). Pins M8.8 16.1
+(`bodies.test`), 16.2 (`swap.test`), 16.3 (`garage.test`); M7 6.2 counts the couriers' mesh.
+
 ## 2026-09-25 — M8.8 slice 15: the rider, the look
 
 Done: the bike drawn (`bikeMesh.ts`): a sport bike in blocks, paint on the tank, fairing, nose, tail and mudguard, its

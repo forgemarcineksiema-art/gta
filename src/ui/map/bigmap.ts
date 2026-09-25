@@ -6,7 +6,10 @@
  * streets and the overpasses' decks) and the pursuit: the units, the
  * helicopter, the search, a race's rivals. The game runs on under it. It
  * repaints at most every `REPAINT_MS` while shown and costs nothing hidden.
- * Reads sim state only; the radar's paths and glyphs are shared.
+ * Reads sim state only; the radar's paths, colours and glyphs are shared
+ * (docs/M8.9_PLAN.md R6): the rings' badges 12 px with their pictograms, the
+ * route 6 px, the player's ink arrow; the key lists only what is on the map
+ * now; each district's name sits clear of every icon.
  */
 import { BALANCE, BreakerState, CITY_HALF, DISTRICTS, PALETTE, type BreakerDesc, type JobKind, type SimWorld } from '../../sim';
 import { LANDMARKS, cityFootprints } from '../../sim/city/City';
@@ -20,14 +23,17 @@ import {
 import { SIGNALS } from '../../sim/palette';
 import { cssAlpha } from '../colors';
 import { label, labelAria, relabel, t } from '../lang';
-import { MINIMAP, bigMapProject, bigMapScale, yawFromQuat, type Vec2 } from './minimapModel';
+import { MINIMAP, bigMapProject, bigMapScale, clearSpot, yawFromQuat, type Box, type Vec2 } from './minimapModel';
 
 /** Repaint cadence while shown, ms: the units move, the map need not be smoother than the radar. */
 const REPAINT_MS = 66;
-/** The way's route on the full map, px (M8.7 D3); a click within `PICK_PX` of a ring's badge picks it (D7). */
-const ROUTE_PX = 4;
+/** The way's route on the full map, px (M8.7 D3; M8.9 R6), on a 2 px dark edge; a click within `PICK_PX` of a ring's badge picks it (D7). */
+const ROUTE_PX = 6;
 const PICK_PX = 14;
 const GLYPH = 7;
+/** A ring's badge, px (radius: 12 across, M8.9 R6), the goal's a quarter larger. */
+const RING_R = 6;
+const GOAL_R = 7.5;
 /**
  * The cover on the map: where the helicopter cannot see (DESIGN.md §13.10); a scaffold tower that brings down on the
  * chasers (M5.5 slice 18); a speed camera. None is money, the way, trouble or the police: ink (M8.9 R1).
@@ -44,6 +50,107 @@ const LEGEND_JOBS: ReadonlyArray<[JobKind, string]> = [
   ['delivery', 'DELIVERY'], ['order', 'STEAL TO ORDER'], ['escape', 'ESCAPE'], ['trial', 'TIME TRIAL'],
   ['race', 'STREET RACE'], ['rage', 'TAKEDOWN RAGE'], ['mayhem', 'MAYHEM'], ['duel', 'RIVAL'],
 ];
+
+/** A row of the key (docs/M8.9_PLAN.md R6): the player, a job kind, or a kind of mark. */
+export type LegendItem = 'you' | JobKind | 'garage' | 'cache' | 'camera' | 'breaker' | 'cover' | 'cops' | 'heli';
+
+/** What is on the map now, for the key. */
+export interface LegendState {
+  jobs: ReadonlySet<JobKind>;
+  caches: boolean;
+  cameras: boolean;
+  breakers: boolean;
+  cover: boolean;
+  cops: boolean;
+  heli: boolean;
+}
+
+/** The key's rows: only the kinds on the map now (the player and the garages always are). */
+export function legendItems(s: LegendState): LegendItem[] {
+  const out: LegendItem[] = ['you'];
+  for (const [kind] of LEGEND_JOBS) if (s.jobs.has(kind)) out.push(kind);
+  out.push('garage');
+  if (s.caches) out.push('cache');
+  if (s.cameras) out.push('camera');
+  if (s.breakers) out.push('breaker');
+  if (s.cover) out.push('cover');
+  if (s.cops) out.push('cops');
+  if (s.heli) out.push('heli');
+  return out;
+}
+
+/** What is on the map now: the rings shown and the goal's kind, the day's caches, the standing breakers, the pursuit. */
+export function legendState(sim: SimWorld): LegendState {
+  const jobs = new Set<JobKind>();
+  const j = sim.jobs;
+  if (!j.running && j.state === 'idle') for (const d of j.defs) if (d.kind !== 'fare' && j.shown(d)) jobs.add(d.kind);
+  const goal = sim.way?.goal;
+  const def = goal && goal.hasTarget && goal.id >= 0 ? j.defOf(goal.id) : null;
+  if (def && def.kind !== 'fare') jobs.add(def.kind);
+  const caches = sim.caches;
+  let cache = false;
+  if (caches) for (let k = 0; k < caches.today.length; k++) if (caches.found[k] !== 1) { cache = true; break; }
+  const breakers = sim.breakers;
+  let breaker = false;
+  if (breakers) for (let k = 0; k < breakers.descs.length; k++) if (breakers.state[k] === BreakerState.Standing) { breaker = true; break; }
+  let cops = false;
+  const police = sim.police;
+  if (police) for (let u = 0; u < police.units.length; u++) if ((police.units[u] as number) >= 0) { cops = true; break; }
+  return {
+    jobs, caches: cache, cameras: (sim.cameras?.descs.length ?? 0) > 0, breakers: breaker, cover: (sim.city?.covers.length ?? 0) > 0, cops,
+    heli: !!police?.heli.active,
+  };
+}
+
+/**
+ * The icons' boxes on a map `size` px across (docs/M8.9_PLAN.md R6): the landmarks, the garages, the cameras, the
+ * standing breakers, the day's caches, the rings shown and the goal's badge. The districts' names keep clear of them.
+ */
+export function mapIcons(sim: SimWorld, size: number): Box[] {
+  const s = bigMapScale(size, CITY_HALF);
+  const out: Box[] = [];
+  const tmp: Vec2 = { x: 0, y: 0 };
+  const put = (x: number, z: number, r: number): void => {
+    bigMapProject(tmp, x, z, size, s);
+    out.push({ x: tmp.x, y: tmp.y, hw: r, hh: r });
+  };
+  for (const l of LANDMARKS) put(l.x, l.z, GLYPH * 1.3);
+  for (const d of sim.run.dropOffs) put(d.door.x, d.door.z, GLYPH * 1.2);
+  for (const cam of sim.cameras?.descs ?? []) put(cam.x, cam.z, GLYPH * 0.8);
+  const breakers = sim.breakers;
+  if (breakers) for (let k = 0; k < breakers.descs.length; k++) {
+    if (breakers.state[k] !== BreakerState.Standing) continue;
+    const d = breakers.descs[k] as BreakerDesc;
+    put(d.x, d.z, GLYPH * 0.9);
+  }
+  const caches = sim.caches;
+  if (caches) for (let k = 0; k < caches.today.length; k++) {
+    if (caches.found[k] === 1) continue;
+    const spot = caches.spots[caches.today[k] as number];
+    if (spot) put(spot.x, spot.z, GLYPH * 0.7);
+  }
+  const jobs = sim.jobs;
+  if (!jobs.running && jobs.state === 'idle') for (const d of jobs.defs) if (jobs.shown(d)) put(d.x, d.z, RING_R + 1);
+  const goal = sim.way?.goal;
+  if (goal && goal.hasTarget) put(goal.x, goal.z, GOAL_R + 2);
+  return out;
+}
+
+/** The districts' names' font on a map `size` px across, px. */
+export function nameFontPx(size: number): number {
+  return Math.max(11, Math.round(size / 34));
+}
+
+/** Each district's name's box, clear of every icon (`width` measures a name at `nameFontPx`). */
+export function namePlaces(sim: SimWorld, size: number, width: (name: string) => number, icons: readonly Box[] = mapIcons(sim, size)): Box[] {
+  const s = bigMapScale(size, CITY_HALF);
+  const font = nameFontPx(size);
+  const tmp: Vec2 = { x: 0, y: 0 };
+  return DISTRICTS.map((d, i) => {
+    bigMapProject(tmp, i % 2 ? CITY_HALF / 2 : -CITY_HALF / 2, i >= 2 ? CITY_HALF / 2 : -CITY_HALF / 2, size, s);
+    return clearSpot(tmp.x, tmp.y, width(t(d.name)) / 2 + 3, font * 0.6, icons, size, font * 0.75, size / 5, { x: 0, y: 0, hw: 0, hh: 0 });
+  });
+}
 
 /** BILLBOARDS 12/50 · JUMPS 3/20 · CACHES 4/30: the hunts the map shows (the day's caches only when drawn). */
 export function huntsLine(sim: SimWorld): string {
@@ -72,6 +179,9 @@ export class BigMap {
   /** The three hunts' counts (DESIGN.md §17.2): off the driving screen, here and on the wall's GOALS page. */
   private readonly hunts: HTMLElement;
   private huntsText = '';
+  /** The key (M8.9 R6): its rows, written again when what is on the map changes. */
+  private readonly legendBox: HTMLElement;
+  private legendKey = '';
   /** The covered streets and the overpasses' decks as world rectangles (centre and half extents). */
   private readonly coverRects: Array<{ x: number; z: number; hx: number; hz: number }> = [];
   /** The island's blocks, parks and shallows (`cityFootprints`), built the first time the map is shown. */
@@ -97,9 +207,10 @@ export class BigMap {
     this.canvas = document.createElement('canvas');
     this.canvas.className = 'bigmap__canvas';
     this.canvas.setAttribute('role', 'img');
-    labelAria(this.canvas, 'Map of the island, north up. The yellow arrow is your car.');
+    labelAria(this.canvas, 'Map of the island, north up. The white arrow is your car.');
     const body = el('div', 'bigmap__body');
-    body.append(this.canvas, this.legend());
+    this.legendBox = el('div', 'bigmap__legend');
+    body.append(this.canvas, this.legendBox);
     this.canvas.addEventListener('pointerdown', (e) => this.pick(e));
     this.root.append(head, body);
     parent.appendChild(this.root);
@@ -131,6 +242,7 @@ export class BigMap {
     relabel(this.root);
     this.setKey(this.keyLabel);
     this.huntsText = '';
+    this.legendKey = '';
     this.lastPaint = -Infinity;
   }
 
@@ -187,6 +299,12 @@ export class BigMap {
       this.huntsText = text;
       this.hunts.textContent = text;
     }
+    const items = legendItems(legendState(sim));
+    const key = items.join();
+    if (key !== this.legendKey) {
+      this.legendKey = key;
+      this.fillLegend(items);
+    }
   }
 
   private resize(cssPx: number): void {
@@ -201,9 +319,10 @@ export class BigMap {
     }
   }
 
-  /** The key: one swatch per thing on the map, drawn with the map's own glyphs. */
-  private legend(): HTMLElement {
-    const box = el('div', 'bigmap__legend');
+  /** The key: one swatch per kind on the map now, drawn with the map's own glyphs. */
+  private fillLegend(items: readonly LegendItem[]): void {
+    const box = this.legendBox;
+    box.replaceChildren();
     const item = (word: string, draw: (c: CanvasRenderingContext2D) => void): void => {
       const row = el('div', 'bigmap__item');
       const swatch = document.createElement('canvas');
@@ -218,17 +337,19 @@ export class BigMap {
       row.append(swatch, label(el('span', 'bigmap__word'), word));
       box.appendChild(row);
     };
-    item('YOU', (c) => drawArrow(c, 9, 9, 0, 7));
-    // the job kinds by their pictograms (M8.7: no kind has a colour of its own)
-    for (const [kind, word] of LEGEND_JOBS) item(word, (c) => drawBadge(c, glyphIndex(KIND_GLYPH[kind]), 9, 9, 8, 0));
-    item('GARAGE', (c) => drawGlyph(c, 'garage', 9, 9, GLYPH, INK));
-    item('CACHE', (c) => drawGlyph(c, 'cache', 9, 9, GLYPH * 1.4, CACHE_COLOR));
-    item('SPEED CAMERA', (c) => drawGlyph(c, 'camera', 9, 9, GLYPH, CAMERA_COLOR));
-    item('PURSUIT BREAKER', (c) => drawGlyph(c, 'breaker', 9, 9, GLYPH * 0.8, BREAKER_COLOR));
-    item('COVER', (c) => { c.fillStyle = COVER_COLOR; c.strokeStyle = DARK; c.lineWidth = 1.5; c.fillRect(3, 5, 12, 8); c.strokeRect(3, 5, 12, 8); });
-    item('COPS', (c) => { this.unitDot(c, 9, 9, UNIT_LIT); });
-    item('HELICOPTER', (c) => drawHeli(c, 9, 9));
-    return box;
+    for (const it of items) {
+      const job = LEGEND_JOBS.find(([kind]) => kind === it);
+      // the job kinds by their pictograms (M8.7: no kind has a colour of its own)
+      if (job) item(job[1], (c) => drawBadge(c, glyphIndex(KIND_GLYPH[job[0]]), 9, 9, 8, 0));
+      else if (it === 'you') item('YOU', (c) => drawArrow(c, 9, 9, 0, 7));
+      else if (it === 'garage') item('GARAGE', (c) => drawGlyph(c, 'garage', 9, 9, GLYPH, INK));
+      else if (it === 'cache') item('CACHE', (c) => drawGlyph(c, 'cache', 9, 9, GLYPH * 1.4, CACHE_COLOR));
+      else if (it === 'camera') item('SPEED CAMERA', (c) => drawGlyph(c, 'camera', 9, 9, GLYPH, CAMERA_COLOR));
+      else if (it === 'breaker') item('PURSUIT BREAKER', (c) => drawGlyph(c, 'breaker', 9, 9, GLYPH * 0.8, BREAKER_COLOR));
+      else if (it === 'cover') item('COVER', (c) => { c.fillStyle = COVER_COLOR; c.strokeStyle = DARK; c.lineWidth = 1.5; c.fillRect(3, 5, 12, 8); c.strokeRect(3, 5, 12, 8); });
+      else if (it === 'cops') item('COPS', (c) => { this.unitDot(c, 9, 9, UNIT_LIT); });
+      else if (it === 'heli') item('HELICOPTER', (c) => drawHeli(c, 9, 9));
+    }
   }
 
   /** The footprints as paths, once (a few hundred rectangles; the city's lot plans, not its chunks). */
@@ -347,7 +468,7 @@ export class BigMap {
       c.lineCap = 'round';
       c.lineJoin = 'round';
       c.strokeStyle = DARK;
-      c.lineWidth = (ROUTE_PX + 3) / s;
+      c.lineWidth = (ROUTE_PX + 4) / s;
       c.stroke();
       c.strokeStyle = ROUTE;
       c.lineWidth = ROUTE_PX / s;
@@ -355,13 +476,14 @@ export class BigMap {
     }
     c.restore();
 
-    // Screen space from here: glyphs and words stay upright.
-    c.font = `900 ${Math.max(11, Math.round(size / 34))}px ${FONT}`;
+    // Screen space from here: glyphs and words stay upright. The districts' names first, each clear of every icon
+    c.font = `900 ${nameFontPx(size)}px ${FONT}`;
     c.textAlign = 'center';
     c.textBaseline = 'middle';
     c.lineJoin = 'round';
+    const places = namePlaces(sim, size, (name) => c.measureText(name).width);
     for (const [i, d] of DISTRICTS.entries()) {
-      const p = this.at(i % 2 ? CITY_HALF / 2 : -CITY_HALF / 2, i >= 2 ? CITY_HALF / 2 : -CITY_HALF / 2, s);
+      const p = places[i] as Box;
       c.lineWidth = 3;
       c.strokeStyle = DARK;
       const name = t(d.name);
@@ -393,13 +515,13 @@ export class BigMap {
       for (const d of jobs.defs) {
         if (!jobs.shown(d)) continue;
         const p = this.at(d.x, d.z, s);
-        drawBadge(c, glyphOf(d), p.x, p.y, GLYPH * 1.05, closed ? 2 : 0);
+        drawBadge(c, glyphOf(d), p.x, p.y, RING_R, closed ? 2 : 0);
       }
     }
     // the goal's badge: where the route ends
     if (way && way.goal.hasTarget) {
       const g = this.at(way.goal.x, way.goal.z, s);
-      drawBadge(c, goalGlyph(way.goal, (id: number) => jobs.defOf(id)), g.x, g.y, GLYPH * 1.3, 1);
+      drawBadge(c, goalGlyph(way.goal, (id: number) => jobs.defOf(id)), g.x, g.y, GOAL_R, 1);
     }
     // the pursuit's units, lit in a chase; a race's rivals; the helicopter
     const police = sim.police, traffic = sim.traffic;
@@ -415,7 +537,7 @@ export class BigMap {
         for (const agent of jobs.race.rivals) {
           if (agent < 0) continue;
           const p = this.at(traffic.x[agent] as number, traffic.z[agent] as number, s);
-          this.unitDot(c, p.x, p.y, RIVAL);
+          drawArrow(c, p.x, p.y, -(traffic.yaw[agent] as number), MINIMAP.rivalPx, RIVAL);
         }
       }
       if (police.heli.active) {
@@ -427,6 +549,6 @@ export class BigMap {
     const pos = sim.transforms.currPos, q = sim.transforms.currRot, i = sim.vehicle.slot;
     const yaw = yawFromQuat(q[i * 4] as number, q[i * 4 + 1] as number, q[i * 4 + 2] as number, q[i * 4 + 3] as number);
     const me = this.at(pos[i * 3] as number, pos[i * 3 + 2] as number, s);
-    drawArrow(c, me.x, me.y, -yaw, MINIMAP.arrowPx);
+    drawArrow(c, me.x, me.y, -yaw, 10);
   }
 }

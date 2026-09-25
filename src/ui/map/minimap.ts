@@ -1,17 +1,24 @@
 /**
  * Heading-up radar minimap on a 2D canvas: roads from the road graph cached as
- * world-space paths, district tints, landmark glyphs that clamp to the rim when
- * out of range, the car arrow and a rotating compass. Reads sim state only.
- * Repaints at most every `MINIMAP.repaintMs` and never while nothing moved, so
- * a parked or paused game costs no canvas work. The maths is in `minimapModel`.
+ * world-space paths, district tints, the car arrow and a rotating compass. It
+ * answers three questions (docs/M8.9_PLAN.md R6): where to go (the route, the
+ * goal's badge, the rings as dots), where the police are (the units, the
+ * search, the helicopter, a race's rivals), where to bank (the nearest garage,
+ * while the bag holds money or the line says BANK IT or BUY). The landmarks,
+ * the other garages, the far caches, the cameras, the cover and the breakers
+ * are the full map's. Reads sim state only. Repaints at most every
+ * `MINIMAP.repaintMs` and never while nothing moved, so a parked or paused game
+ * costs no canvas work. The maths is in `minimapModel`.
  */
 import { BALANCE, CITY_HALF, DISTRICTS, PALETTE, districtAt, type JobDef, type SimWorld } from '../../sim';
-import { LANDMARKS } from '../../sim/city/City';
 import { GLYPHS, GLYPH_ORDER, NO_GLYPH, digitSlot, glyphOf, goalGlyph, numberGlyphs, type GlyphId } from '../../sim/glyphs';
 import { SIGNALS } from '../../sim/palette';
 import { INK as INK_COLOR, MONEY, OFF, POLICE, TROUBLE, WAY, cssAlpha } from '../colors';
 import { labelAria, relabel, t } from '../lang';
-import { MINIMAP, advance, buildRoadLayers, clampToRim, drawInShare, project, routeStop, yawFromQuat, type MinimapState, type Vec2 } from './minimapModel';
+import {
+  MINIMAP, advance, buildRoadLayers, clampToRim, drawInShare, garageShown, nearestDoor, project, radarMarks, radarScale, routeStop, yawFromQuat,
+  type MinimapState, type RadarState, type Vec2,
+} from './minimapModel';
 
 export type MarkerKind = 'tower' | 'tank' | 'glasshouse' | 'hotel' | 'garage' | 'job' | 'cache' | 'camera' | 'breaker';
 /**
@@ -36,15 +43,18 @@ export const UNIT_LIT = POLICE;
 export const UNIT_BEAT = OFF;
 export const SEARCH_FILL = cssAlpha(SIGNALS.police, 0.22);
 export const SEARCH_EDGE = cssAlpha(SIGNALS.police, 0.7);
-/** The authored loop and the highway: the big roads, pale (no yellow since M8.9: yellow is money). */
-export const LOOP = '#ffe9a8';
+/**
+ * The roads (M8.9 R6): the streets mid-grey on the dark ground, the authored loop and the highway wider and pale (no
+ * yellow: yellow is money); the route's cyan is the brightest line of the disc.
+ */
+export const LOOP = cssAlpha(SIGNALS.ink, 0.6);
 export const HIGHWAY = LOOP;
 /** The way's cyan (DESIGN.md §20.3 rule 6): the route and the goal's ring, and nothing else on the maps. */
 export const ROUTE = WAY;
 /** A closed ring's grey: the police on the player (M8.7 D9); its pictogram's slate. */
 export const CLOSED = OFF;
 export const SLATE = '#4a4a55';
-export const GRID = cssAlpha(SIGNALS.ink, 0.85);
+export const GRID = cssAlpha(SIGNALS.ink, 0.4);
 const RIM = cssAlpha(SIGNALS.ink, 0.45);
 const PANEL = SIGNALS.outline;
 export const WATER = rgba(mix(PALETTE.water, PANEL, 0.3), 0.96);
@@ -257,8 +267,19 @@ export function drawBadge(c: CanvasRenderingContext2D, glyph: number, x: number,
   drawOutline(c, glyph, x, y, r * 1.35, state === 2 ? SLATE : DARK);
 }
 
-/** The player's arrow at a screen point, turned `angle` from screen up. */
-export function drawArrow(c: CanvasRenderingContext2D, x: number, y: number, angle: number, a: number): void {
+/** An open or closed ring on the radar (M8.9 R6): a dot, ink or grey, with a dark edge. */
+export function ringDot(c: CanvasRenderingContext2D, x: number, y: number, r: number, closed: boolean): void {
+  c.beginPath();
+  c.arc(x, y, r, 0, Math.PI * 2);
+  c.fillStyle = closed ? CLOSED : INK;
+  c.fill();
+  c.lineWidth = 1.5;
+  c.strokeStyle = DARK;
+  c.stroke();
+}
+
+/** An arrow at a screen point, turned `angle` from screen up: the player's in ink, a race rival's in red. */
+export function drawArrow(c: CanvasRenderingContext2D, x: number, y: number, angle: number, a: number, color: string = INK): void {
   c.save();
   c.translate(x, y);
   c.rotate(angle);
@@ -273,7 +294,7 @@ export function drawArrow(c: CanvasRenderingContext2D, x: number, y: number, ang
   c.strokeStyle = DARK;
   c.stroke();
   // the player in ink (yellow is money since M8.9)
-  c.fillStyle = INK;
+  c.fillStyle = color;
   c.fill();
   c.restore();
 }
@@ -301,8 +322,15 @@ export class Minimap {
   /** World-space paths built once; one transform per repaint draws the visible ones. The full-screen map shares them. */
   readonly paths: MapPaths;
   private markers: readonly MinimapMarker[];
-  /** The landmarks and drop-offs; idle job markers are appended when the jobs change. */
+  /** Markers set from outside (none by default); the rings and the caches are appended when they change. */
   private base: readonly MinimapMarker[];
+  /** The garages' doors: the nearest one's house is on the rim while there is money to bank (M8.9 R6). */
+  private readonly doors: ReadonlyArray<{ x: number; z: number }>;
+  /** What the last paint drew, as `RADAR` bits (the model's), and the state it read. */
+  private drawnMask = 0;
+  private readonly radar: RadarState = {
+    route: false, goal: false, rings: 0, zone: false, units: 0, search: false, heli: false, rivals: 0, bag: 0, goalKind: 'none', goalAtGarage: false, cachesNear: 0,
+  };
   private jobSerial = -1;
   /** A def by id for the goal's badge (bound once). */
   private readonly defOf = (id: number): JobDef | null => this.sim?.jobs.defOf(id) ?? null;
@@ -347,7 +375,7 @@ export class Minimap {
     this.canvas = document.createElement('canvas');
     this.canvas.className = 'minimap__canvas';
     this.canvas.setAttribute('role', 'img');
-    labelAria(this.canvas, 'Radar map. Up is your direction of travel. The yellow arrow is your car; the cyan line is the way to your goal.');
+    labelAria(this.canvas, 'Radar map. Up is your direction of travel. The white arrow is your car; the cyan line is the way to your goal.');
     this.wrap.append(this.label, this.landmark, this.canvas);
     parent.appendChild(this.wrap);
     const ctx = this.canvas.getContext('2d');
@@ -355,11 +383,9 @@ export class Minimap {
     this.ctx = ctx;
 
     this.paths = buildMapPaths(sim);
-    // the landmarks, then the three drop-offs: where a run can end is always on the rim
-    this.base = [
-      ...LANDMARKS.map((l, i): MinimapMarker => ({ x: l.x, z: l.z, kind: GLYPH_KINDS[i] ?? 'tower', color: INK })),
-      ...sim.run.dropOffs.map((d): MinimapMarker => ({ x: d.door.x, z: d.door.z, kind: 'garage', color: INK })),
-    ];
+    // the landmarks and the other garages are the full map's (M8.9 R6)
+    this.base = [];
+    this.doors = sim.run.dropOffs.map((d) => ({ x: d.door.x, z: d.door.z }));
     this.markers = this.base;
 
     if (typeof ResizeObserver !== 'undefined') {
@@ -369,7 +395,12 @@ export class Minimap {
     window.addEventListener('resize', this.onResize);
   }
 
-  /** Replace the points of interest (landmarks by default). */
+  /** What the last paint drew, as `RADAR` bits (`minimapModel.ts`). */
+  get drawn(): number {
+    return this.drawnMask;
+  }
+
+  /** Replace the points of interest (none by default). */
   setMarkers(markers: readonly MinimapMarker[]): void {
     this.base = markers;
     this.markers = markers;
@@ -413,6 +444,8 @@ export class Minimap {
     if (!this.shown) return;
     // units move on their own: while any is on the map the radar repaints at its own cadence
     if (sim.police && sim.police.count > 0) this.dirty = true;
+    // the nearest garage comes and goes with the bag
+    if ((sim.run.bag > 0) !== (this.radar.bag > 0)) this.dirty = true;
     if (this.measure) {
       this.measure = false;
       this.resize(this.canvas.clientWidth);
@@ -434,8 +467,8 @@ export class Minimap {
     const closed = sim.pursuit.state !== 'idle' && !sim.coldOpen.active;
     if (jobs.serial !== this.jobSerial || cacheSerial !== this.cacheSerial || closed !== this.closedRings) {
       this.closedRings = closed;
-      // the live rings while no job runs (inside the circle only; the goal's badge is the way's); the day's caches
-      // still to find as gold dots inside the circle (M5.5)
+      // the live rings while no job runs (inside the circle only, as dots; the goal's badge is the way's); the day's
+      // caches still to find as gold dots, only near (M5.5; M8.9 R6)
       this.jobSerial = jobs.serial;
       this.cacheSerial = cacheSerial;
       const running = jobs.running;
@@ -537,6 +570,8 @@ export class Minimap {
     // Only paths within reach of the visible disc are stroked (casing pass, then fills).
     const reach = this.state.radiusM + casing;
     const highwayVisible = paths.highwayRing > 0 && Math.max(Math.abs(x), Math.abs(z)) >= paths.highwayRing - reach - highW / 2;
+    const k = radarScale(size);
+    const st = this.radar;
     c.strokeStyle = DARK;
     this.strokeGrid(x, z, reach + gridW / 2, gridW + casing);
     if (highwayVisible) { c.lineWidth = highW + casing; c.stroke(paths.highwayPath); }
@@ -554,7 +589,8 @@ export class Minimap {
     }
     // a zone job's edge (M5.5 slice 12)
     const zoneJob = this.sim?.jobs.running;
-    if (zoneJob && this.sim?.jobs.state === 'active' && (zoneJob.kind === 'rage' || zoneJob.kind === 'mayhem')) {
+    st.zone = !!zoneJob && this.sim?.jobs.state === 'active' && (zoneJob.kind === 'rage' || zoneJob.kind === 'mayhem');
+    if (zoneJob && st.zone) {
       c.beginPath();
       c.arc(zoneJob.x, zoneJob.z, BALANCE.jobs.zone.radius, 0, Math.PI * 2);
       c.lineWidth = 3 / s;
@@ -563,7 +599,8 @@ export class Minimap {
     }
     // the search: where they last saw you, growing as they look (get away from it)
     const pursuit = this.sim?.pursuit;
-    if (pursuit && pursuit.state === 'lost') {
+    st.search = !!pursuit && pursuit.state === 'lost';
+    if (pursuit && st.search) {
       c.beginPath();
       c.arc(pursuit.lastX, pursuit.lastZ, pursuit.searchRadius, 0, Math.PI * 2);
       c.fillStyle = SEARCH_FILL;
@@ -574,7 +611,8 @@ export class Minimap {
     }
     // the way's route (M8.7 D3): over the roads, under the rings, the units and the car
     const way = this.sim?.way;
-    if (way && way.count > 1) {
+    st.route = !!way && way.count > 1;
+    if (way && st.route) {
       const pts = way.points, stop = this.stop;
       routeStop(pts, way.count, drawInShare(this.paintNow - this.routeChanged), stop);
       c.beginPath();
@@ -584,39 +622,71 @@ export class Minimap {
       c.lineCap = 'round';
       c.lineJoin = 'round';
       c.strokeStyle = DARK;
-      c.lineWidth = (MINIMAP.routePx + MINIMAP.routeEdgePx * 2) / s;
+      c.lineWidth = ((MINIMAP.routePx + MINIMAP.routeEdgePx * 2) * k) / s;
       c.stroke();
       c.strokeStyle = ROUTE;
-      c.lineWidth = MINIMAP.routePx / s;
+      c.lineWidth = (MINIMAP.routePx * k) / s;
       c.stroke();
     }
     c.restore();
 
-    // Screen space from here: glyphs stay upright.
-    const rimR = R - MINIMAP.rimInset;
+    // Screen space from here: glyphs stay upright, every size the disc's scale's (M8.9 R6: 720p's, 0.85 at 800×450).
+    const rimR = R - MINIMAP.rimInset * k;
+    const near2 = MINIMAP.cacheNearM * MINIMAP.cacheNearM;
+    st.rings = 0;
+    st.cachesNear = 0;
     for (const m of this.markers) {
+      // a cache only near: beyond it, the full map's
+      if (m.kind === 'cache' && (m.x - x) ** 2 + (m.z - z) ** 2 > near2) continue;
       project(this.tmp, m.x, m.z, x, z, h, s, px, py);
       if (m.local && (this.tmp.x - ccx) ** 2 + (this.tmp.y - ccy) ** 2 > rimR * rimR) continue;
       const clamped = clampToRim(this.tmp, px, py, this.tmp.x, this.tmp.y, ccx, ccy, rimR);
-      if (m.kind === 'job') drawBadge(c, m.glyph ?? 0, this.tmp.x, this.tmp.y, MINIMAP.badgePx, m.state ?? 0);
-      else drawGlyph(c, m.kind, this.tmp.x, this.tmp.y, clamped ? MINIMAP.glyphPx * 0.75 : MINIMAP.glyphPx, m.color);
-      if (clamped) this.chevron(this.tmp.x, this.tmp.y, Math.atan2(this.tmp.x - px, py - this.tmp.y), m.color);
+      if (m.kind === 'job') {
+        // a ring is a dot: ink open, grey closed (its pictogram is the full map's and the sign's)
+        ringDot(c, this.tmp.x, this.tmp.y, MINIMAP.ringPx * k, m.state === 2);
+        st.rings++;
+      } else {
+        drawGlyph(c, m.kind, this.tmp.x, this.tmp.y, (m.kind === 'cache' ? 6.5 : MINIMAP.glyphPx) * k * (clamped ? 0.75 : 1), m.color);
+        if (m.kind === 'cache') st.cachesNear++;
+      }
+      if (clamped) this.chevron(this.tmp.x, this.tmp.y, Math.atan2(this.tmp.x - px, py - this.tmp.y), m.color, k);
+    }
+
+    // where to bank: the nearest garage's house, on the rim when away, while there is money to bank
+    const sim = this.sim;
+    const goal = way?.goal ?? null;
+    const door = nearestDoor(this.doors, x, z);
+    st.bag = sim?.run.bag ?? 0;
+    st.goalKind = goal?.kind ?? 'none';
+    // the goal at a garage's door says it already (its badge is the house)
+    st.goalAtGarage = !!goal && goal.hasTarget && goal.door >= 0;
+    const d = this.doors[door];
+    if (d && garageShown(st.bag, st.goalKind) && !st.goalAtGarage) {
+      project(this.tmp, d.x, d.z, x, z, h, s, px, py);
+      const clamped = clampToRim(this.tmp, px, py, this.tmp.x, this.tmp.y, ccx, ccy, rimR);
+      drawGlyph(c, 'garage', this.tmp.x, this.tmp.y, MINIMAP.glyphPx * k * (clamped ? 0.85 : 1), INK);
+      if (clamped) this.chevron(this.tmp.x, this.tmp.y, Math.atan2(this.tmp.x - px, py - this.tmp.y), INK, k);
     }
 
     // the goal's badge (M8.7 D3): white in a cyan ring at the route's end, on the rim with a chevron when past it
-    if (way && way.goal.hasTarget) {
-      project(this.tmp, way.goal.x, way.goal.z, x, z, h, s, px, py);
+    st.goal = !!goal && goal.hasTarget;
+    if (goal && st.goal) {
+      project(this.tmp, goal.x, goal.z, x, z, h, s, px, py);
       const clamped = clampToRim(this.tmp, px, py, this.tmp.x, this.tmp.y, ccx, ccy, rimR);
-      drawBadge(c, goalGlyph(way.goal, this.defOf), this.tmp.x, this.tmp.y, MINIMAP.goalPx, 1);
-      if (clamped) this.chevron(this.tmp.x, this.tmp.y, Math.atan2(this.tmp.x - px, py - this.tmp.y), ROUTE);
+      drawBadge(c, goalGlyph(goal, this.defOf), this.tmp.x, this.tmp.y, MINIMAP.goalPx * k, 1);
+      if (clamped) this.chevron(this.tmp.x, this.tmp.y, Math.atan2(this.tmp.x - px, py - this.tmp.y), ROUTE, k);
     }
 
-    // the police: every unit inside the circle, lit in a chase
-    const sim = this.sim;
+    // the police: every unit inside the circle, blue in a chase and flashing red and blue while they see the player
+    // (the stars' light bar), grey on the beat
+    st.units = 0;
+    st.rivals = 0;
+    st.heli = false;
     const police = sim?.police, traffic = sim?.traffic;
     if (sim && police && traffic) {
-      const lit = sim.pursuit.state !== 'idle';
-      c.fillStyle = lit ? UNIT_LIT : UNIT_BEAT;
+      const state = sim.pursuit.state;
+      const flash = state === 'active' && Math.floor(this.paintNow / 250) % 2 === 1;
+      c.fillStyle = state === 'idle' ? UNIT_BEAT : flash ? RIVAL : UNIT_LIT;
       c.strokeStyle = DARK;
       c.lineWidth = 1.5;
       for (let u = 0; u < police.units.length; u++) {
@@ -625,44 +695,44 @@ export class Minimap {
         project(this.tmp, traffic.x[agent] as number, traffic.z[agent] as number, x, z, h, s, px, py);
         if ((this.tmp.x - ccx) ** 2 + (this.tmp.y - ccy) ** 2 > rimR * rimR) continue;
         c.beginPath();
-        c.arc(this.tmp.x, this.tmp.y, 3.5, 0, Math.PI * 2);
+        c.arc(this.tmp.x, this.tmp.y, MINIMAP.unitPx * k, 0, Math.PI * 2);
         c.fill();
         c.stroke();
+        st.units++;
       }
-      // a street race's rivals (M5.5 slice 11): lime dots; none for the Ghost (M6)
+      // a street race's rivals (M5.5 slice 11): small red arrows the way they drive; none for the Ghost (M6)
       const rivals = sim.jobs.race.running && !sim.jobs.race.hidden ? sim.jobs.race.rivals : null;
       if (rivals) {
-        c.fillStyle = RIVAL;
-        for (let k = 0; k < rivals.length; k++) {
-          const agent = rivals[k] as number;
+        for (let r = 0; r < rivals.length; r++) {
+          const agent = rivals[r] as number;
           if (agent < 0) continue;
           project(this.tmp, traffic.x[agent] as number, traffic.z[agent] as number, x, z, h, s, px, py);
           if ((this.tmp.x - ccx) ** 2 + (this.tmp.y - ccy) ** 2 > rimR * rimR) continue;
-          c.beginPath();
-          c.arc(this.tmp.x, this.tmp.y, 3.5, 0, Math.PI * 2);
-          c.fill();
-          c.stroke();
+          drawArrow(c, this.tmp.x, this.tmp.y, -((traffic.yaw[agent] as number) - h), MINIMAP.rivalPx * k, RIVAL);
+          st.rivals++;
         }
       }
       // the helicopter (M5.5 slice 9): a square with a cross for its rotor, clamped to the rim when away
       const heli = police.heli;
       if (heli.active) {
         project(this.tmp, heli.x, heli.z, x, z, h, s, px, py);
-        clampToRim(this.tmp, px, py, this.tmp.x, this.tmp.y, ccx, ccy, rimR - 6);
+        clampToRim(this.tmp, px, py, this.tmp.x, this.tmp.y, ccx, ccy, rimR - 6 * k);
         drawHeli(c, this.tmp.x, this.tmp.y);
+        st.heli = true;
       }
     }
 
-    drawArrow(c, px, py, -(yaw - h), MINIMAP.arrowPx);
+    drawArrow(c, px, py, -(yaw - h), MINIMAP.arrowPx * k);
+    this.drawnMask = radarMarks(st);
 
-    // Compass: a world direction with yaw phi sits at screen angle h - phi, so N, E, S, W are at h + k * 90 deg.
-    c.font = `800 11px ${FONT}`;
+    // Compass: a world direction with yaw phi sits at screen angle h - phi, so N, E, S, W are at h + q * 90 deg.
+    c.font = `800 ${Math.round(11 * k)}px ${FONT}`;
     c.textAlign = 'center';
     c.textBaseline = 'middle';
-    for (let k = 0; k < 4; k++) {
-      const ang = h + (k * Math.PI) / 2;
+    for (let q = 0; q < 4; q++) {
+      const ang = h + (q * Math.PI) / 2;
       const sx = Math.sin(ang), cy = Math.cos(ang);
-      if (k === 0) {
+      if (q === 0) {
         const nx = ccx + sx * (R - 9), ny = ccy - cy * (R - 9);
         c.lineWidth = 3;
         c.strokeStyle = DARK;
@@ -711,10 +781,10 @@ export class Minimap {
     }
   }
 
-  /** A small chevron outside a clamped glyph, pointing along the bearing from the car. */
-  private chevron(x: number, y: number, angle: number, color: string): void {
+  /** A small chevron outside a clamped glyph, pointing along the bearing from the car; `k` the disc's scale. */
+  private chevron(x: number, y: number, angle: number, color: string, k: number): void {
     const c = this.ctx;
-    const g = MINIMAP.glyphPx;
+    const g = MINIMAP.glyphPx * k;
     c.save();
     c.translate(x, y);
     c.rotate(angle);

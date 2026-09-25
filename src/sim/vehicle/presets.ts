@@ -228,6 +228,8 @@ export const CAR_PRESETS: Record<CarId, VehicleTuning> = {
     grassRoll: 1.5,
     dirtGrip: 1.0,
     dirtRoll: 1.2,
+    sandGrip: 1.0,
+    sandRoll: 1.2,
     slipAngPeakDeg: 9,
     powerOversteer: 0.06,
     driftMaxAngleDeg: 28,

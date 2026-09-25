@@ -6,7 +6,7 @@
  * topper on the helmet. Reads sim state only.
  */
 import * as THREE from 'three';
-import { ASPHALT, CAR_IDS, CAR_PRESETS, CITY_COLORS, DIRT, GRASS, KIT, PALETTE, bodySpec, bodyTuning, isShell, type BodyId, type CarId, type SimEvent, type SimWorld, type VehicleTelemetry } from '../../sim';
+import { ASPHALT, CAR_IDS, CAR_PRESETS, CITY_COLORS, DIRT, GRASS, KIT, PALETTE, SAND, bodySpec, bodyTuning, isShell, type BodyId, type CarId, type SimEvent, type SimWorld, type VehicleTelemetry } from '../../sim';
 import { CAR_PROFILES } from './carProfiles';
 import { BODY_PROFILES } from './bodyProfiles';
 import { buildCarMesh, restHeight, wheelGeometry, type CarMesh } from './carMesh';
@@ -223,7 +223,7 @@ export class PlayerCar {
     let ground: number = ASPHALT;
     if (!puff) for (const w of wheels) if (!w.isFront && w.grounded && w.surface !== ASPHALT) ground = w.surface;
     const worn = this.wornIn('smoke');
-    const colour = ground === GRASS ? PALETTE.grass : ground === DIRT ? CITY_COLORS.soil : worn >= 0 ? (KIT[worn]?.colour ?? -1) : -1;
+    const colour = ground === GRASS ? PALETTE.grass : ground === DIRT ? CITY_COLORS.soil : ground === SAND ? PALETTE.sand : worn >= 0 ? (KIT[worn]?.colour ?? -1) : -1;
     const car = this.mesh.root;
     this.tmpFwd.set(0, 0, 1).applyQuaternion(car.quaternion);
     this.tyreAcc += 28 * dt;

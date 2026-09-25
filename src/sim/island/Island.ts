@@ -8,10 +8,11 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { GROUPS_SOLID, GROUPS_TERRAIN, GROUPS_WATER } from '../collision';
 import type { SpawnPoint } from '../playground';
 import { SEA } from '../city/sea';
+import type { SurfaceReader } from '../city/surface';
 import type { TrackDef, TrackSample } from '../track';
 import { catmullRom, resample, type P2 } from './geom';
-import { Ground, HALF_WIDTH, WATERLINE, basinQuays } from './ground';
-import { BOUNDS, CIRCUS, COAST, HIGHWAY, causeway, islet } from './plan';
+import { FOOT, Ground, HALF_WIDTH, type CoastKind } from './ground';
+import { BOUNDS, CIRCUS, HIGHWAY } from './plan';
 
 /** A chunk of the ground: its side (m) and the height field's cell (m). The chunks cover the plan's bounds. */
 export const CHUNK = 250;
@@ -22,8 +23,12 @@ export const CHUNKS_Z = Math.ceil((BOUNDS.z1 - BOUNDS.z0) / CHUNK);
 /** The chunks' first corner: the bounds widened to whole chunks round the origin. */
 export const CHUNK_X0 = -(CHUNKS_X * CHUNK) / 2;
 export const CHUNK_Z0 = -(CHUNKS_Z * CHUNK) / 2;
-/** The wall at the coast: its height over the waterline and its thickness (m); pieces about this long. */
-const WALL = { height: 4, half: 0.5, piece: 24 } as const;
+/**
+ * The island's wall (m): its height over the land at a steep edge (or over the sea at a beach), its half thickness,
+ * pieces about `piece` long. At a steep edge it stands on the land just behind the line; at a beach `shallows` out in
+ * the water, a hand deep, so a car wades into the surf before it meets it.
+ */
+const WALL = { height: 4, half: 0.5, piece: 24, shallows: 6 } as const;
 /**
  * The lean a plumb ray takes on the island (Vehicle.plumbTilt): Rapier's height field misses a ray cast exactly straight
  * down (measured: most such rays pass through), and a lean this small moves nothing.
@@ -34,6 +39,8 @@ export const PREFETCH_COLUMNS = 4;
 
 export class Island {
   readonly ground = new Ground();
+  /** What the wheels read (M8.10 slice 3): the ground's cover at a point. */
+  readonly surface: SurfaceReader = { at: (x, z) => this.ground.surface(x, z) };
   readonly spawns: SpawnPoint[];
   /** The highway's loop as the bot's and the lap timer's track. */
   readonly route: TrackDef;
@@ -197,36 +204,48 @@ export class Island {
   }
 
   /**
-   * The island's wall: pieces along the coast, the causeway's and the islet's shores and the basin's quays, from the
-   * sea's floor to `WALL.height` over the waterline; none where a road on the ground crosses the shore.
+   * The island's wall along every shore (the coast, the basin's quays, the causeway's and the islet's), a piece a stretch
+   * of one kind: at a steep edge on the land just behind its line, `WALL.height` over the land's top; at a beach out in
+   * the shallows, `WALL.height` over the sea; none where a road on the ground crosses the shore.
    */
   private walls(): void {
     const roads = this.ground.roads;
     const crossed = (x: number, z: number): boolean => roads.some((r) => r.pts.some((p) => Math.hypot(p[0] - x, p[1] - z) < HALF_WIDTH[r.cls] + 4));
-    const chain = (poly: readonly P2[], closed: boolean): void => {
-      const n = poly.length, last = closed ? n : n - 1;
-      let a = poly[0] as P2, run = 0;
-      for (let k = 1; k <= last; k++) {
-        const b = poly[k % n] as P2;
-        run += Math.hypot(b[0] - (poly[(k - 1) % n] as P2)[0], b[1] - (poly[(k - 1) % n] as P2)[1]);
-        if (run < WALL.piece && k < last) continue;
-        const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2, len = Math.hypot(b[0] - a[0], b[1] - a[1]);
-        if (len > 0.5 && !crossed(mx, mz)) {
-          const yaw = Math.atan2(b[0] - a[0], b[1] - a[1]);
-          const bottom = -4, top = WATERLINE + WALL.height;
-          this.world.createCollider(RAPIER.ColliderDesc.cuboid(WALL.half, (top - bottom) / 2, len / 2 + 0.3)
-            .setTranslation(mx, (top + bottom) / 2, mz)
-            .setRotation({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) })
-            .setCollisionGroups(GROUPS_SOLID).setRestitution(0.5));
+    for (const line of this.ground.coasts) {
+      const pts = line.pts, n = pts.length, segs = line.closed ? n : n - 1;
+      let from = 0;
+      while (from < segs) {
+        const kind = line.kinds[from] ?? 'rocks';
+        let to = from, run = 0;
+        while (to < segs && (line.kinds[to] ?? 'rocks') === kind && run < WALL.piece) {
+          const a = pts[to] as P2, b = pts[(to + 1) % n] as P2;
+          run += Math.hypot(b[0] - a[0], b[1] - a[1]);
+          to++;
         }
-        a = b;
-        run = 0;
+        this.wallPiece(pts[from] as P2, pts[to % n] as P2, kind, line.land, crossed);
+        from = to;
       }
-    };
-    chain(catmullRom(COAST, true, 6), true);
-    chain(causeway(), true);
-    chain(islet(), true);
-    chain(basinQuays(), false);
+    }
+  }
+
+  /** One piece of the wall from `a` to `b` along a shore of `kind`, its land on the `land` side. */
+  private wallPiece(a: P2, b: P2, kind: CoastKind, land: 1 | -1, crossed: (x: number, z: number) => boolean): void {
+    const dx = b[0] - a[0], dz = b[1] - a[1], len = Math.hypot(dx, dz);
+    if (len < 0.5) return;
+    // toward the land
+    const nx = (-dz / len) * land, nz = (dx / len) * land;
+    const beach = kind === 'beach';
+    const off = beach ? -WALL.shallows : WALL.half;
+    const mx = (a[0] + b[0]) / 2 + nx * off, mz = (a[1] + b[1]) / 2 + nz * off;
+    if (crossed(mx, mz)) return;
+    let top: number = SEA.level;
+    if (!beach) for (const f of [0, 0.5, 1]) top = Math.max(top, this.ground.height(a[0] + dx * f + nx * 1.5, a[1] + dz * f + nz * 1.5));
+    top += WALL.height;
+    const bottom = FOOT - 2, yaw = Math.atan2(dx, dz);
+    this.world.createCollider(RAPIER.ColliderDesc.cuboid(WALL.half, (top - bottom) / 2, len / 2 + 0.3)
+      .setTranslation(mx, (top + bottom) / 2, mz)
+      .setRotation({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) })
+      .setCollisionGroups(GROUPS_SOLID).setRestitution(0.5));
   }
 
   /** The spawns: the first minute's start at the summit, facing down Crown Avenue; the port, the beach, the runway. */

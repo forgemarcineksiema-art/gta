@@ -13,7 +13,9 @@ import { CITY_HALF } from './roads';
 export const ASPHALT = 0;
 export const GRASS = 1;
 export const DIRT = 2;
-export type SurfaceKind = typeof ASPHALT | typeof GRASS | typeof DIRT;
+/** The island's beaches (M8.10 slice 3): a grip between dirt's and the road's, dirt's drag. */
+export const SAND = 3;
+export type SurfaceKind = typeof ASPHALT | typeof GRASS | typeof DIRT | typeof SAND;
 
 /** What the wheels read: the surface at a point of the ground. */
 export interface SurfaceReader {

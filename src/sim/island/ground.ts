@@ -1,27 +1,41 @@
 /**
- * The island's ground (M8.10 slice 2, docs/M8.10_PLAN.md): its height at any point. The plan's hills; the main roads
- * graded into them (each road's profile smoothed to its class's grade, the ends it shares with another road at one
- * height); a beach's slope into the water; the shelf under the sea. Built once (the roads' profiles, a grid of the road
- * and coast segments near each cell, the land's mask); a read allocates nothing.
+ * The island's ground (M8.10 slices 2–3, docs/M8.10_PLAN.md): its height at any point and what covers it. The plan's
+ * hills; the main roads graded into them (each road's profile smoothed to its class's grade, the ends it shares with
+ * another road at one height); the coast: a beach sloping into the sea down to its level, a steep edge (a quay, a
+ * cliff, the rocks) keeping the land's height a physics cell out past its line and falling there under the water; the
+ * shelf under the sea. What covers it: the carriageways, the paved places and the port's aprons, the quarry's dirt, the
+ * beaches' sand, grass. Built once (the roads' profiles, a grid of the road and shore segments near each cell, the
+ * land's mask); a read allocates nothing.
  */
-import { catmullRom, circle, polylineLength, resample, type P2 } from './geom';
-import { BASIN, BOUNDS, COAST, COAST_PARTS, HIGHWAY, RINGS, ROADS, causeway, islet, naturalHeight, type PlanRoad, type RoadClass } from './plan';
+import { SEA } from '../city/sea';
+import { ASPHALT, DIRT, GRASS, SAND, type SurfaceKind } from '../city/surface';
+import { catmullRom, circle, inPolygon, polylineLength, resample, signedArea, type P2 } from './geom';
+import { BASIN, BOUNDS, COAST, COAST_PARTS, HIGHWAY, PLACES, RINGS, ROADS, causeway, islet, naturalHeight, type PlanRoad, type RoadClass } from './plan';
 
 /** A road's half width by class (m), its carriageway without the pavement. */
 export const HALF_WIDTH: Readonly<Record<RoadClass, number>> = { highway: 19, avenue: 12, street: 9, serpentine: 7, dirt: 5, taxiway: 12, ramp: 7 };
 /** The steepest a road's profile may run, by class (rise over run). */
 export const MAX_GRADE: Readonly<Record<RoadClass, number>> = { highway: 0.06, avenue: 0.1, street: 0.16, serpentine: 0.12, dirt: 0.18, taxiway: 0.02, ramp: 0.08 };
 /** The ground flat with the road this far past its edge, then blended back to the hill over `BLEND` (m). */
-const SHOULDER = 2;
-const BLEND = 12;
+export const SHOULDER = 2;
+export const BLEND = 12;
 /** A road's profile is sampled every `STEP` m and smoothed over ± `SMOOTH` samples. */
 const STEP = 6;
 const SMOOTH = 5;
-/** The water's edge, the sea floor, how far out the shelf falls to it, how far in a beach rises from it (m). */
-export const WATERLINE = 0.3;
+/**
+ * The coast (m): a steep edge keeps the land's height `LIP` out past its line (more than a physics cell, so the height
+ * field's fall is beyond the wall behind the line) and stands in water to `FOOT` beyond it; the shelf falls to
+ * `SEA_FLOOR` over `SHELF`; a beach rises from the sea's level over `BEACH` inland.
+ */
+const LIP = 2.4;
+export const FOOT = -3;
 const SEA_FLOOR = -4;
 const SHELF = 40;
 const BEACH = 20;
+/** How far in from a quay the port's apron is paved (m). */
+export const APRON = 14;
+/** How far a point's side of a steep edge is read, for the render's cut along it (m). */
+export const COAST_REACH = 12;
 /** The grid of segments near each cell (m), and the land's mask (m). */
 const CELL = 32;
 const MASK = 2;
@@ -30,6 +44,27 @@ const NEAR = 8;
 
 /** A road of the ground: its centreline and its profile's heights, one per point. */
 export interface GradedRoad { id: string; cls: RoadClass; pts: P2[]; h: number[]; closed: boolean }
+
+/** What a stretch of shore is: the plan's kinds; the basin's are quays, the causeway's rocks, the islet's a beach. */
+export type CoastKind = 'cliff' | 'quay' | 'bay' | 'beach' | 'rocks' | 'spit';
+export const COAST_KINDS: readonly CoastKind[] = ['cliff', 'quay', 'bay', 'beach', 'rocks', 'spit'];
+const BEACH_KIND = COAST_KINDS.indexOf('beach');
+const QUAY_KIND = COAST_KINDS.indexOf('quay');
+
+/** A shore: its points, each segment's kind, and the side its land lies on (+1 left of the way it runs, −1 right). */
+export interface CoastLine { pts: P2[]; closed: boolean; kinds: CoastKind[]; land: 1 | -1 }
+
+/** What the render reads at a point beside its height (`Ground.probe`). */
+export interface GroundProbe {
+  h: number;
+  /** The signed distance to the nearest steep edge (+ inland) within `COAST_REACH`; ± `COAST_REACH` beyond, by the mask. */
+  steep: number;
+  /** The kind of that edge (an index into `COAST_KINDS`), or -1 with none near. */
+  steepKind: number;
+  /** The distance past the nearest road's carriageway (negative on it); Infinity with no road near. */
+  road: number;
+  surface: SurfaceKind;
+}
 
 const smooth01 = (t: number): number => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 
@@ -102,6 +137,54 @@ function groundRoads(): Array<{ id: string; cls: RoadClass; pts: P2[]; closed: b
   return out.sort((a, b) => order.indexOf(a.cls) - order.indexOf(b.cls) || Number(b.closed) - Number(a.closed));
 }
 
+/**
+ * The shores: the island's coast opened at the basin's mouth (its two ends on the basin's corners), the basin's quays,
+ * the causeway's edges, the islet's beach. Each segment's kind from the plan's parts by its control span.
+ */
+function shores(): CoastLine[] {
+  const spanOf: number[] = [];
+  const ring = catmullRom(COAST, true, 6, spanOf);
+  const kindOf = (span: number): CoastKind => {
+    for (const p of COAST_PARTS) {
+      const inside = p.from <= p.to ? span >= p.from && span <= p.to : span >= p.from || span <= p.to;
+      if (inside) return p.kind;
+    }
+    return 'rocks';
+  };
+  const land = (poly: readonly P2[]): 1 | -1 => (signedArea(poly) > 0 ? 1 : -1);
+  const inMouth = (p: P2): boolean => p[0] > BASIN.x0 && p[0] < BASIN.x1 && p[1] > BASIN.z0 && p[1] < BASIN.z1;
+  // rotate the ring to start just past the mouth, then keep it up to the mouth
+  const n = ring.length;
+  let start = 0;
+  for (let i = 0; i < n; i++) if (inMouth(ring[i] as P2) && !inMouth(ring[(i + 1) % n] as P2)) start = (i + 1) % n;
+  const pts: P2[] = [], kinds: CoastKind[] = [];
+  for (let k = 0; k < n; k++) {
+    const i = (start + k) % n;
+    if (inMouth(ring[i] as P2)) break;
+    pts.push(ring[i] as P2);
+    kinds.push(kindOf(spanOf[i] ?? 0));
+  }
+  // the ends on the basin's corners, the nearer corner to each end
+  const corners: P2[] = [[BASIN.x0, BASIN.shore], [BASIN.x1, BASIN.shore]];
+  const nearer = (p: P2): P2 => (Math.hypot(p[0] - BASIN.x0, p[1] - BASIN.shore) < Math.hypot(p[0] - BASIN.x1, p[1] - BASIN.shore) ? corners[0] : corners[1]) as P2;
+  const first = pts[0] as P2, last = pts[pts.length - 1] as P2;
+  pts.unshift(nearer(first));
+  kinds.unshift('quay');
+  pts.push(nearer(last));
+  // (a segment's kind is its start point's: the last point's kind is the closing corner's, unused)
+  const quays = basinQuays();
+  const mid = quays[1] as P2, next = quays[2] as P2;
+  // the basin's land is away from its middle: the side of the inner end's segment opposite the basin's centre
+  const cx = (BASIN.x0 + BASIN.x1) / 2, cz = (BASIN.z0 + BASIN.z1) / 2;
+  const left = (next[0] - mid[0]) * (cz - mid[1]) - (next[1] - mid[1]) * (cx - mid[0]) > 0;
+  return [
+    { pts, closed: false, kinds, land: land(ring) },
+    { pts: quays, closed: false, kinds: ['quay', 'quay', 'quay'], land: left ? -1 : 1 },
+    { pts: causeway().slice(), closed: true, kinds: causeway().map(() => 'rocks' as const), land: land(causeway()) },
+    { pts: islet().slice(), closed: true, kinds: islet().map(() => 'beach' as const), land: land(islet()) },
+  ];
+}
+
 /** Fill a closed polygon into the mask by rows (the even-odd rule), with `value`. */
 function fillPolygon(mask: Uint8Array, nx: number, nz: number, poly: readonly P2[], value: number): void {
   const xs: number[] = [];
@@ -121,26 +204,32 @@ function fillPolygon(mask: Uint8Array, nx: number, nz: number, poly: readonly P2
   }
 }
 
+interface Seg { a: P2; b: P2; ha: number; hb: number; hw: number; kind: number; reach: number; nx?: number; nz?: number }
+
 /** A list of segments in typed arrays, and for each grid cell the segments within reach of it. */
 class SegmentGrid {
   readonly ax: Float32Array; readonly az: Float32Array; readonly bx: Float32Array; readonly bz: Float32Array;
   readonly ha: Float32Array; readonly hb: Float32Array; readonly hw: Float32Array; readonly kind: Uint16Array;
+  /** A shore segment's normal toward its land (0 for a road's). */
+  readonly nx: Float32Array; readonly nz: Float32Array;
   readonly start: Int32Array; readonly items: Int32Array;
-  readonly nx = Math.ceil((BOUNDS.x1 - BOUNDS.x0) / CELL);
-  readonly nz = Math.ceil((BOUNDS.z1 - BOUNDS.z0) / CELL);
-  constructor(segs: ReadonlyArray<{ a: P2; b: P2; ha: number; hb: number; hw: number; kind: number; reach: number }>) {
+  readonly cols = Math.ceil((BOUNDS.x1 - BOUNDS.x0) / CELL);
+  readonly rows = Math.ceil((BOUNDS.z1 - BOUNDS.z0) / CELL);
+  constructor(segs: readonly Seg[]) {
     const n = segs.length;
     this.ax = new Float32Array(n); this.az = new Float32Array(n); this.bx = new Float32Array(n); this.bz = new Float32Array(n);
     this.ha = new Float32Array(n); this.hb = new Float32Array(n); this.hw = new Float32Array(n); this.kind = new Uint16Array(n);
-    const lists: number[][] = Array.from({ length: this.nx * this.nz }, () => []);
+    this.nx = new Float32Array(n); this.nz = new Float32Array(n);
+    const lists: number[][] = Array.from({ length: this.cols * this.rows }, () => []);
     segs.forEach((s, k) => {
       this.ax[k] = s.a[0]; this.az[k] = s.a[1]; this.bx[k] = s.b[0]; this.bz[k] = s.b[1];
       this.ha[k] = s.ha; this.hb[k] = s.hb; this.hw[k] = s.hw; this.kind[k] = s.kind;
+      this.nx[k] = s.nx ?? 0; this.nz[k] = s.nz ?? 0;
       const i0 = Math.max(0, Math.floor((Math.min(s.a[0], s.b[0]) - s.reach - BOUNDS.x0) / CELL));
-      const i1 = Math.min(this.nx - 1, Math.floor((Math.max(s.a[0], s.b[0]) + s.reach - BOUNDS.x0) / CELL));
+      const i1 = Math.min(this.cols - 1, Math.floor((Math.max(s.a[0], s.b[0]) + s.reach - BOUNDS.x0) / CELL));
       const j0 = Math.max(0, Math.floor((Math.min(s.a[1], s.b[1]) - s.reach - BOUNDS.z0) / CELL));
-      const j1 = Math.min(this.nz - 1, Math.floor((Math.max(s.a[1], s.b[1]) + s.reach - BOUNDS.z0) / CELL));
-      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) (lists[j * this.nx + i] as number[]).push(k);
+      const j1 = Math.min(this.rows - 1, Math.floor((Math.max(s.a[1], s.b[1]) + s.reach - BOUNDS.z0) / CELL));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) (lists[j * this.cols + i] as number[]).push(k);
     });
     this.start = new Int32Array(lists.length + 1);
     let total = 0;
@@ -149,32 +238,36 @@ class SegmentGrid {
     this.items = new Int32Array(total);
     lists.forEach((l, c) => this.items.set(l, this.start[c]));
   }
-  /** The cell's first and past-last item, or [0, 0] outside the grid. */
+  /** The cell's index, or -1 outside the grid. */
   cell(x: number, z: number): number {
     const i = Math.floor((x - BOUNDS.x0) / CELL), j = Math.floor((z - BOUNDS.z0) / CELL);
-    return i < 0 || j < 0 || i >= this.nx || j >= this.nz ? -1 : j * this.nx + i;
+    return i < 0 || j < 0 || i >= this.cols || j >= this.rows ? -1 : j * this.cols + i;
   }
 }
-
-/** Coast segments' kinds: a steep edge (a quay, a cliff, rocks, the spit) or a gentle one (a beach, the bay's beach). */
-const STEEP = 0;
-const GENTLE = 1;
 
 export class Ground {
   /** The roads graded into the ground, in the order they were graded. */
   readonly roads: GradedRoad[] = [];
+  /** The shores, for the island's wall and the coast's look. */
+  readonly coasts: CoastLine[];
   private readonly roadGrid: SegmentGrid;
   private readonly coastGrid: SegmentGrid;
+  /** Per road: 1 when it is paved (every class but dirt). */
+  private readonly paved: Uint8Array;
   /** Land (1) or water (0) every `MASK` m over the plan's bounds. */
   private readonly mask: Uint8Array;
   private readonly maskNx = Math.ceil((BOUNDS.x1 - BOUNDS.x0) / MASK);
   private readonly maskNz = Math.ceil((BOUNDS.z1 - BOUNDS.z0) / MASK);
+  /** The shores near the point being read: the nearest's distance and kind, the nearest steep one's and its side, the nearest beach's and quay's distances. */
+  private readonly shore = { d: Infinity, kind: 0, steep: Infinity, side: 1, steepKind: -1, beach: Infinity, quay: Infinity };
+  /** The roads near the point being read (no allocation per read), and the nearest carriageway's edge. */
+  private readonly near = { road: new Int32Array(NEAR), d: new Float64Array(NEAR), h: new Float64Array(NEAR), w: new Float64Array(NEAR) };
+  private edge = Infinity;
 
   constructor() {
     // the land: the island less the basin, the causeway, the islet
     this.mask = new Uint8Array(this.maskNx * this.maskNz);
-    const coast = catmullRom(COAST, true, 6);
-    fillPolygon(this.mask, this.maskNx, this.maskNz, coast, 1);
+    fillPolygon(this.mask, this.maskNx, this.maskNz, catmullRom(COAST, true, 6), 1);
     fillPolygon(this.mask, this.maskNx, this.maskNz, causeway(), 1);
     fillPolygon(this.mask, this.maskNx, this.maskNz, islet(), 1);
     for (let j = 0; j < this.maskNz; j++) for (let i = 0; i < this.maskNx; i++) {
@@ -195,42 +288,25 @@ export class Ground {
       const h = profile(r.pts, r.cls, r.closed, r.closed ? null : endHeight(first), r.closed ? null : endHeight(last));
       this.roads.push({ id: r.id, cls: r.cls, pts: r.pts, h, closed: r.closed });
     }
-    const segs: Array<{ a: P2; b: P2; ha: number; hb: number; hw: number; kind: number; reach: number }> = [];
+    this.paved = Uint8Array.from(this.roads, (r) => (r.cls === 'dirt' ? 0 : 1));
+    const segs: Seg[] = [];
     this.roads.forEach((road, r) => {
       const n = road.pts.length, last = road.closed ? n : n - 1, hw = HALF_WIDTH[road.cls];
       // a road segment's kind is its road's index: where two roads overlap, each road counts once, by its nearest segment
       for (let i = 0; i < last; i++) segs.push({ a: road.pts[i] as P2, b: road.pts[(i + 1) % n] as P2, ha: road.h[i] as number, hb: road.h[(i + 1) % n] as number, hw, kind: r, reach: hw + SHOULDER + BLEND });
     });
     this.roadGrid = new SegmentGrid(segs);
-    // the coast's segments by kind: the island's by its parts, the causeway's steep, the islet's gentle
-    const coastSegs: Array<{ a: P2; b: P2; ha: number; hb: number; hw: number; kind: number; reach: number }> = [];
-    const spanKind = (span: number): number => {
-      for (const p of COAST_PARTS) {
-        const inside = p.from <= p.to ? span >= p.from && span <= p.to : span >= p.from || span <= p.to;
-        if (inside) return p.kind === 'beach' ? GENTLE : STEEP;
+    // the shores' segments by kind, each with its normal toward the land
+    this.coasts = shores();
+    const coastSegs: Seg[] = [];
+    for (const line of this.coasts) {
+      const n = line.pts.length, last = line.closed ? n : n - 1;
+      for (let i = 0; i < last; i++) {
+        const a = line.pts[i] as P2, b = line.pts[(i + 1) % n] as P2, l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+        coastSegs.push({ a, b, ha: 0, hb: 0, hw: 0, kind: COAST_KINDS.indexOf(line.kinds[i] ?? 'rocks'), reach: SHELF, nx: (-(b[1] - a[1]) / l) * line.land, nz: ((b[0] - a[0]) / l) * line.land });
       }
-      return STEEP;
-    };
-    let span = 0, acc = 0;
-    const spans: number[] = [];
-    for (let i = 0; i < COAST.length; i++) {
-      const a = COAST[i] as P2, b = COAST[(i + 1) % COAST.length] as P2;
-      const steps = Math.max(2, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 6));
-      for (let k = 0; k < steps; k++) spans.push(i);
     }
-    for (let i = 0; i < coast.length; i++) {
-      span = spans[i] ?? span;
-      coastSegs.push({ a: coast[i] as P2, b: coast[(i + 1) % coast.length] as P2, ha: 0, hb: 0, hw: 0, kind: spanKind(span), reach: SHELF });
-      acc++;
-    }
-    const ring = (poly: readonly P2[], kind: number): void => {
-      for (let i = 0; i < poly.length; i++) coastSegs.push({ a: poly[i] as P2, b: poly[(i + 1) % poly.length] as P2, ha: 0, hb: 0, hw: 0, kind, reach: SHELF });
-    };
-    ring(causeway(), STEEP);
-    ring(islet(), GENTLE);
-    ring(basinQuays(), STEEP);
     this.coastGrid = new SegmentGrid(coastSegs);
-    void acc;
   }
 
   /** Land or water, by the mask (2 m). */
@@ -239,33 +315,51 @@ export class Ground {
     return i >= 0 && j >= 0 && i < this.maskNx && j < this.maskNz && this.mask[j * this.maskNx + i] === 1;
   }
 
-  /** The distance to the nearest coast segment within `reach` (any kind, or gentle only), else Infinity. */
-  private coastDistance(x: number, z: number, reach: number, gentleOnly: boolean): number {
-    const g = this.coastGrid, c = g.cell(x, z);
-    if (c < 0) return Infinity;
-    let best = reach;
+  /** The shores within the shelf's reach of (x, z), into `shore`. */
+  private nearestShore(x: number, z: number): void {
+    const sh = this.shore, g = this.coastGrid, c = g.cell(x, z);
+    sh.d = sh.steep = sh.beach = sh.quay = Infinity;
+    sh.kind = 0;
+    sh.side = 1;
+    sh.steepKind = -1;
+    if (c < 0) return;
     for (let k = g.start[c] as number, end = g.start[c + 1] as number; k < end; k++) {
       const s = g.items[k] as number;
-      if (gentleOnly && g.kind[s] !== GENTLE) continue;
       const ax = g.ax[s] as number, az = g.az[s] as number, dx = (g.bx[s] as number) - ax, dz = (g.bz[s] as number) - az;
       const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1)));
       const d = Math.hypot(x - ax - dx * t, z - az - dz * t);
-      if (d < best) best = d;
+      const kind = g.kind[s] as number;
+      if (d < sh.d) { sh.d = d; sh.kind = kind; }
+      if (kind === BEACH_KIND) {
+        if (d < sh.beach) sh.beach = d;
+        continue;
+      }
+      if (d < sh.steep) {
+        sh.steep = d;
+        sh.steepKind = kind;
+        // which side of the segment's line: toward its land or the sea (the two segments meeting at a corner agree there)
+        sh.side = (x - ax) * (g.nx[s] as number) + (z - az) * (g.nz[s] as number) >= 0 ? 1 : -1;
+      }
+      if (kind === QUAY_KIND && d < sh.quay) sh.quay = d;
     }
-    return best < reach ? best : Infinity;
   }
 
   /** The ground's height at (x, z), m over the sea. */
   height(x: number, z: number): number {
+    this.nearestShore(x, z);
+    const sh = this.shore;
     let h: number;
     if (this.onLand(x, z)) {
       h = naturalHeight(x, z);
-      const d = this.coastDistance(x, z, BEACH, true);
-      if (d < BEACH) h = WATERLINE + (h - WATERLINE) * smooth01(d / BEACH);
-    } else {
-      const d = this.coastDistance(x, z, SHELF, false);
-      h = d < SHELF ? SEA_FLOOR + (WATERLINE - SEA_FLOOR) * (1 - smooth01(d / SHELF)) : SEA_FLOOR;
-    }
+      if (sh.beach < BEACH) h = SEA.level + (h - SEA.level) * smooth01(sh.beach / BEACH);
+    } else if (sh.steep < LIP && sh.steep <= sh.beach) {
+      // past a steep edge's line the land's height holds over a physics cell: the fall is beyond the wall
+      h = naturalHeight(x, z);
+    } else if (sh.d < SHELF) {
+      const top = sh.kind === BEACH_KIND ? SEA.level : FOOT;
+      h = top + (SEA_FLOOR - top) * smooth01(sh.d / SHELF);
+    } else h = SEA_FLOOR;
+    this.edge = Infinity;
     const g = this.roadGrid, c = g.cell(x, z);
     if (c < 0) return h;
     // each road near the point by its nearest segment: its distance, its profile's height there, its weight
@@ -277,6 +371,7 @@ export class Ground {
       const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1)));
       const d = Math.hypot(x - ax - dx * t, z - az - dz * t);
       const reach = (g.hw[s] as number) + SHOULDER;
+      if (d - (g.hw[s] as number) < this.edge) this.edge = d - (g.hw[s] as number);
       if (d >= reach + BLEND) continue;
       const road = g.kind[s] as number;
       let slot = 0;
@@ -303,8 +398,44 @@ export class Ground {
     return weight > 0 ? h + (sum / weight - h) * most : h;
   }
 
-  /** The roads near the point being read (no allocation per read). */
-  private readonly near = { road: new Int32Array(NEAR), d: new Float64Array(NEAR), h: new Float64Array(NEAR), w: new Float64Array(NEAR) };
+  /** The height and what the render reads at (x, z): the steep edge's side and distance, the carriageway's, the surface. */
+  probe(x: number, z: number, out: GroundProbe): GroundProbe {
+    out.h = this.height(x, z);
+    const sh = this.shore;
+    out.steep = sh.steep < COAST_REACH ? sh.side * sh.steep : this.onLand(x, z) ? COAST_REACH : -COAST_REACH;
+    out.steepKind = sh.steep < COAST_REACH ? sh.steepKind : -1;
+    out.road = this.edge;
+    out.surface = this.surface(x, z);
+    return out;
+  }
+
+  /**
+   * What covers the ground at (x, z), for the wheels: a carriageway (paving wins where a dirt track meets a paved road),
+   * the paved places and the port's aprons, the quarry's dirt, the beaches' and the islet's sand, else grass; the sea's
+   * floor is sand.
+   */
+  surface(x: number, z: number): SurfaceKind {
+    const g = this.roadGrid, c = g.cell(x, z);
+    let dirt = false;
+    if (c >= 0) {
+      for (let k = g.start[c] as number, end = g.start[c + 1] as number; k < end; k++) {
+        const s = g.items[k] as number;
+        const ax = g.ax[s] as number, az = g.az[s] as number, dx = (g.bx[s] as number) - ax, dz = (g.bz[s] as number) - az;
+        const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1)));
+        if (Math.hypot(x - ax - dx * t, z - az - dz * t) > (g.hw[s] as number)) continue;
+        if (this.paved[g.kind[s] as number] === 1) return ASPHALT;
+        dirt = true;
+      }
+    }
+    if (dirt) return DIRT;
+    if (!this.onLand(x, z)) return SAND;
+    if (inPolygon(x, z, PLACES.quarry)) return DIRT;
+    if (paved(x, z)) return ASPHALT;
+    this.nearestShore(x, z);
+    if (this.shore.quay < APRON) return ASPHALT;
+    if (this.shore.beach < BEACH || onBeach(x, z) || inPolygon(x, z, islet())) return SAND;
+    return GRASS;
+  }
 
   /** The nearest point on a graded road to (x, z): where it is, its height and heading. */
   nearestRoad(x: number, z: number, out: { x: number; y: number; z: number; yaw: number }): number {
@@ -331,4 +462,27 @@ export class Ground {
     const r = this.roads.find((q) => q.id === id);
     return r ? polylineLength(r.pts) : 0;
   }
+}
+
+/** The paved places: the yards, the runway and the hangars' aprons, the lots, the summit's plaza. */
+function paved(x: number, z: number): boolean {
+  const inRect = (r: { x0: number; z0: number; x1: number; z1: number }): boolean => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1;
+  if (Math.hypot(x - PLACES.summitPlaza.x, z - PLACES.summitPlaza.z) < PLACES.summitPlaza.r) return true;
+  if (inRect(PLACES.runway) || inRect(PLACES.railYard) || inRect(PLACES.carPark) || inRect(PLACES.headquarters) || inRect(PLACES.donutShop)) return true;
+  for (const r of PLACES.containerYards) if (inRect(r)) return true;
+  for (const r of PLACES.hangars) if (inRect(r)) return true;
+  return false;
+}
+
+/** On a beach's sand: within half its width of one of the plan's beaches. */
+function onBeach(x: number, z: number): boolean {
+  for (const b of PLACES.beaches) {
+    const half = b.width / 2;
+    for (let i = 0; i + 1 < b.points.length; i++) {
+      const a = b.points[i] as P2, c = b.points[i + 1] as P2, dx = c[0] - a[0], dz = c[1] - a[1];
+      const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / (dx * dx + dz * dz || 1)));
+      if (Math.hypot(x - a[0] - dx * t, z - a[1] - dz * t) < half) return true;
+    }
+  }
+  return false;
 }

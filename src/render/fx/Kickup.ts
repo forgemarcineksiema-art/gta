@@ -7,7 +7,7 @@
  * on the road is the player car's own (PlayerCar.emitTyreSmoke).
  */
 import * as THREE from 'three';
-import { CITY_COLORS, DIRT, GRASS, PALETTE, type VehicleTelemetry, type WheelState } from '../../sim';
+import { CITY_COLORS, DIRT, GRASS, PALETTE, SAND, type VehicleTelemetry, type WheelState } from '../../sim';
 import type { Smoke } from './Smoke';
 import type { Sparks } from './Sparks';
 
@@ -42,6 +42,7 @@ export const DUST = {
   dirt: mixHex(CITY_COLORS.soil, PALE, 0.4),
   grass: mixHex(mixHex(PALETTE.grass, CITY_COLORS.soil, 0.5), PALE, 0.3),
   road: mixHex(PALETTE.concrete, PALE, 0.35),
+  sand: mixHex(PALETTE.sand, PALE, 0.35),
   spray: 0xeef8fc,
 };
 
@@ -74,7 +75,7 @@ export class Kickup {
     const n = Math.min(wheels.length, drawn.length, 8);
     for (let k = 0; k < n; k++) {
       const w = wheels[k] as GroundWheel, d = drawn[k] as THREE.Object3D;
-      const onDirt = w.surface === DIRT || w.surface === GRASS;
+      const onDirt = w.surface === DIRT || w.surface === GRASS || w.surface === SAND;
       if (!w.grounded || (!w.water && !onDirt)) { this.acc[k] = 0; continue; }
       const x = d.position.x, z = d.position.z, y = w.contact.y;
       // out from under the car: the cushion blows every way from its middle
@@ -104,7 +105,7 @@ export class Kickup {
         const back = 0.5 + slip * 3, side = (this.rnd() - 0.5) * 1.6;
         const vx = vel.x * 0.3 - fx * back + (hover ? ox * 1.5 : fz * side);
         const vz = vel.z * 0.3 - fz * back + (hover ? oz * 1.5 : -fx * side);
-        smoke.kick('dust', x - fx * 0.25, y + 0.05, z - fz * 0.25, vx, 0.4 + this.rnd() * 0.8, vz, (grass ? 0.7 : 1) * (0.55 + 0.45 * Math.max(moving, slip)), grass ? DUST.grass : DUST.dirt);
+        smoke.kick('dust', x - fx * 0.25, y + 0.05, z - fz * 0.25, vx, 0.4 + this.rnd() * 0.8, vz, (grass ? 0.7 : 1) * (0.55 + 0.45 * Math.max(moving, slip)), grass ? DUST.grass : w.surface === SAND ? DUST.sand : DUST.dirt);
       }
     }
     this.land(wheels, tm, hover, drawn, car, vel, smoke, sparks);
@@ -147,7 +148,7 @@ export class Kickup {
         const a = base + (this.rnd() - 0.5) * 2.2, out = 1.5 + 3 * s + this.rnd();
         const vx = vel.x * 0.4 + Math.cos(a) * out, vz = vel.z * 0.4 + Math.sin(a) * out;
         if (w.water) smoke.kick('spray', x, y + 0.05, z, vx, 2 + this.rnd() * 2 + 3 * s, vz, 1, DUST.spray);
-        else smoke.kick('dust', x, y + 0.05, z, vx, 0.3 + this.rnd() * (0.6 + s), vz, 0.7 + 0.3 * s, w.surface === DIRT ? DUST.dirt : w.surface === GRASS ? DUST.grass : DUST.road);
+        else smoke.kick('dust', x, y + 0.05, z, vx, 0.3 + this.rnd() * (0.6 + s), vz, 0.7 + 0.3 * s, w.surface === DIRT ? DUST.dirt : w.surface === GRASS ? DUST.grass : w.surface === SAND ? DUST.sand : DUST.road);
       }
     }
     // the floor meets the road: a landing past the suspension's travel scrapes the chassis

@@ -115,3 +115,14 @@ export const SIGNALS = {
   off: 0x8d8a96,
   outline: 0x160e28,
 } as const;
+
+/**
+ * The island's ground (M8.10 slice 3): the grass by height, from the lowland's green to the hill's dry gold; the golf's
+ * fairway; the verges beside the roads; the rock of the steep and the cliffs; the beaches' wet sand at the water; the
+ * quays' paving and walls; the sea's floor.
+ */
+export const ISLAND_COLORS = {
+  lowland: 0x7c9f5e, meadow: 0x8aa55b, upland: 0xa0a65a, dryGrass: 0xb5a75e, summit: 0xc3aa68,
+  fairway: 0x74b556, verge: 0x93a66a, rock: 0x8a8075, cliff: 0x776c63, wetSand: 0xb99b69, dirt: 0x9a7b55,
+  paving: 0xb1aa9e, quayWall: 0x8c867c, seabed: 0x2f6f7f,
+} as const;

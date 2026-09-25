@@ -2,6 +2,17 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.10 slice 3: the ground's look and the coast
+
+Done: the ground drawn a mesh a chunk (`island/GroundView.ts`: an RTIN over 65×65 points, tight under the roads and at
+the water, loose on the hills; 366 triangles a chunk at the median, 1,518 at most), cut along the steep shores and hung
+with their faces, skirted at the chunks' borders, coloured by height, sand, dirt and verges; the roads follow it with
+skirts, the paved places are slabs; bollards on the quays, a parapet on the cliffs and the bay, boulders on the rocks.
+The coast: a beach meets the sea at its level (a car wades 6 m into the surf to the wall), a steep edge keeps the land a
+physics cell past its line (the wall behind it rises with the land: the cliff tops were open), a car under the sea a
+second goes back to the road; the wheels read SAND (0.85, dirt's drag), the quarry's dirt, the paving. Found: on grass a
+handbraked car crept down pin 2.2's hill, so a braked wheel at a crawl now holds where it stopped (`Vehicle`, `HOLD`).
+
 ## 2026-09-25 — M8.10 slice 2: the ground with heights
 
 Done: `?map=island` drives. The ground (`island/ground.ts`) is the plan's hills with the main roads graded in (each

@@ -10,7 +10,7 @@ export type P2 = readonly [number, number];
  * A Catmull-Rom curve through `points`, sampled every `spacing` m or so (each span its own count of samples). Open: the
  * first and last points are kept; closed: the curve returns to its first point without repeating it.
  */
-export function catmullRom(points: readonly P2[], closed: boolean, spacing: number): [number, number][] {
+export function catmullRom(points: readonly P2[], closed: boolean, spacing: number, spanOf?: number[]): [number, number][] {
   const n = points.length;
   const at = (i: number): P2 => (closed ? points[((i % n) + n) % n] : points[Math.max(0, Math.min(n - 1, i))]) as P2;
   const out: [number, number][] = [];
@@ -23,6 +23,8 @@ export function catmullRom(points: readonly P2[], closed: boolean, spacing: numb
       const f = (a: number, b: number, c: number, d: number): number =>
         0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3);
       out.push([f(p0[0], p1[0], p2[0], p3[0]), f(p0[1], p1[1], p2[1], p3[1])]);
+      // the control span each point starts, when asked (the coast's kinds are named by span)
+      spanOf?.push(i);
     }
   }
   if (!closed) {
@@ -96,6 +98,16 @@ export function polygonArea(poly: readonly P2[]): number {
     a += (q[0] + p[0]) * (q[1] - p[1]);
   }
   return Math.abs(a) / 2;
+}
+
+/** The closed polygon's signed area (m²): positive when its inside lies left of the way it runs (left of +x is +z). */
+export function signedArea(poly: readonly P2[]): number {
+  let a = 0;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const p = poly[j] as P2, q = poly[i] as P2;
+    a += p[0] * q[1] - q[0] * p[1];
+  }
+  return a / 2;
 }
 
 /** Distance from (x, z) to the polyline. */

@@ -24,7 +24,7 @@ import type { VehicleControls } from '../controls';
 import * as M from '../math';
 import type { Vec3 } from '../math';
 import type { TransformBuffer } from '../transforms';
-import { ASPHALT, DIRT, GRASS, type SurfaceKind, type SurfaceReader } from '../city/surface';
+import { ASPHALT, DIRT, GRASS, SAND, type SurfaceKind, type SurfaceReader } from '../city/surface';
 import type { VehicleTuning } from './tuning';
 
 const WHEEL_FR = 0;
@@ -34,6 +34,11 @@ const WHEEL_RL = 3;
 const WHEEL_SUBSTEPS = 2;
 /** A rise in a wheel's contact this big in one step (m) is a thing met, climbed at `climbSlope`; a smaller one is the road. */
 const CLIMB_STEP = 0.1;
+/**
+ * A braked wheel holds below this crawl (m/s) and pulls back to where it stopped over about `settle` s (M8.10 slice 3):
+ * a 12 % slope leaves it a centimetre or two off that point.
+ */
+const HOLD = { speed: 0.3, settle: 0.25 } as const;
 const RPM_PER_RAD_S = 60 / (2 * Math.PI);
 
 export interface WheelState {
@@ -67,7 +72,7 @@ export interface WheelState {
   lateralSpeed: number;
   /** Rolling angle for the visual wheel. */
   spin: number;
-  /** The ground under it (M8.8 slice 9): `ASPHALT`, `GRASS` or `DIRT`; asphalt in the air. */
+  /** The ground under it (M8.8 slice 9): `ASPHALT`, `GRASS`, `DIRT` or the island's `SAND`; asphalt in the air. */
   surface: SurfaceKind;
   /** The collider its ray stands on (a car's, under the monster truck's wheels: M8.8 slice 12), -1 in the air. */
   hitHandle: number;
@@ -75,6 +80,13 @@ export interface WheelState {
   water: boolean;
   /** The ray's length to its contact last step (m; the whole ray in the air): the climb's memory. */
   rayD: number;
+  /**
+   * A wheel the brake holds still at a crawl grips where it stopped, as a tyre's static friction does (M8.10 slice 3: a
+   * car parked on the island's hills): whether it holds, and the ground's point it holds to (world x, z).
+   */
+  held: boolean;
+  heldX: number;
+  heldZ: number;
   /** Transform slot for the renderer. */
   slot: number;
 }
@@ -344,6 +356,9 @@ export class Vehicle {
         hitHandle: -1,
         water: false,
         rayD: 0,
+        held: false,
+        heldX: 0,
+        heldZ: 0,
         slot: transforms.allocate(),
       });
     }
@@ -836,13 +851,14 @@ export class Vehicle {
         w.spin += w.omega * dt;
         w.surface = ASPHALT;
         w.tyreForce = 0;
+        w.held = false;
         continue;
       }
-      // the ground under the tyre (M8.8 slice 9): grass and dirt take grip and drag at the tyre
+      // the ground under the tyre (M8.8 slice 9): grass, dirt and the island's sand take grip and drag at the tyre
       const ground = this.ground ? this.ground.at(w.contact.x, w.contact.z) : ASPHALT;
       w.surface = ground;
-      const groundGrip = ground === GRASS ? t.grassGrip : ground === DIRT ? t.dirtGrip : 1;
-      const groundRoll = ground === GRASS ? t.grassRoll : ground === DIRT ? t.dirtRoll : 1;
+      const groundGrip = ground === GRASS ? t.grassGrip : ground === DIRT ? t.dirtGrip : ground === SAND ? t.sandGrip : 1;
+      const groundRoll = ground === GRASS ? t.grassRoll : ground === DIRT ? t.dirtRoll : ground === SAND ? t.sandRoll : 1;
 
       // wheel frame on the contact plane (fronts steered; right = -steer about up)
       if (w.isFront && w.steer !== 0) {
@@ -900,6 +916,18 @@ export class Vehicle {
       if (w.slipRatio < minSlipRatio) minSlipRatio = w.slipRatio;
       // rolling resistance (on a load capped at twice the static share, so a landing spike does not brake the car)
       fLong -= Math.sign(vFwd) * Math.min(Math.abs(vFwd) * 200, t.rollingResistance * groundRoll * Math.min(w.load, 0.5 * t.mass * 9.81));
+
+      // a wheel the brake holds still at a crawl grips where it stopped (static friction; the slip model alone lets a
+      // braked car creep down a slope): pulled back to that point, its crawl stopped in a step, within the friction's
+      // limit, past which it slides and lets go
+      if (brakeTorque > 0 && w.omega === 0 && Math.abs(vFwd) < HOLD.speed && Math.abs(vLat) < HOLD.speed) {
+        if (!w.held) { w.held = true; w.heldX = w.contact.x; w.heldZ = w.contact.z; }
+        const dx = w.contact.x - w.heldX, dz = w.contact.z - w.heldZ;
+        const k = wheelMass / dt;
+        fLong = -k * (vFwd + (dx * s.wheelFwd.x + dz * s.wheelFwd.z) / HOLD.settle);
+        fLat = -k * (vLat + (dx * s.wheelRight.x + dz * s.wheelRight.z) / HOLD.settle);
+        if (Math.hypot(fLat, fLong) > muLoad) w.held = false;
+      } else w.held = false;
 
       // --- friction circle
       const mag = Math.hypot(fLat, fLong);
@@ -1225,6 +1253,7 @@ export class Vehicle {
       w.omega = 0;
       w.steer = 0;
       w.slipRatio = 0;
+      w.held = false;
     }
     this.writeTransforms(true);
   }

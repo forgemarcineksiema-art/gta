@@ -169,6 +169,9 @@ export interface VehicleTuning {
   grassRoll: number;
   dirtGrip: number;
   dirtRoll: number;
+  /** The island's sand (M8.10 slice 3): its grip and its rolling resistance, factors on asphalt's. */
+  sandGrip: number;
+  sandRoll: number;
   /** Load sensitivity: grip per N drops by this fraction per unit of load above the static share (weight transfer costs total grip). */
   loadSensitivity: number;
   /** Fraction (0 contact patch .. 1 centre of mass) at which tyre forces are applied. Arcade roll control. */
@@ -383,6 +386,9 @@ export const DEFAULT_TUNING: VehicleTuning = {
   grassRoll: 7,
   dirtGrip: 0.8,
   dirtRoll: 5,
+  // the beach holds a little better than dirt and drags as dirt does (docs/M8.10_PLAN.md slice 3)
+  sandGrip: 0.85,
+  sandRoll: 5,
   loadSensitivity: 0.15,
   tireForceHeight: 0.85,
 

@@ -19,7 +19,7 @@ import { Roadblocks } from './police/Roadblocks';
 import { Cameras } from './city/cameras';
 import { Jumps } from './city/jumps';
 import { Stash, cityToys } from './city/stash';
-import { SLIPWAY, SLIPWAYS, slipwayTop } from './city/sea';
+import { SEA, SLIPWAY, SLIPWAYS, slipwayTop } from './city/sea';
 import { BREAKER, BREAKERS, Breakers } from './city/breakers';
 import { createControls, type VehicleControls } from './controls';
 import { EventLog } from './events';
@@ -67,6 +67,8 @@ export const FIXED_DT = 1 / 60;
 export const FIXED_HZ = 60;
 /** Below this height the car has fallen off the world and is respawned. */
 const KILL_Y = -25;
+/** A car whose middle is this far under the sea's surface is under the water (m): past its axles in the shallows. */
+const SUNK = 0.9;
 /** The street furniture keeps this far from a hidden car's spot and from the donut shop's middle (m, M8 D7). */
 const PARKED_CAR_RING = 3.5;
 const DONUT_SHOP_RING = 3.6;
@@ -132,6 +134,8 @@ export class SimWorld {
   /** The hand-drawn island (M8.10); null on the grid city and the playground. */
   readonly island: Island | null;
   private readonly roadReset: SpawnPoint = { name: 'nearest-road', position: { x: 0, y: 1, z: 0 }, yaw: 0 };
+  /** Steps the car has been under the island's sea. */
+  private drowned = 0;
   readonly world: RAPIER.World;
   readonly transforms = new TransformBuffer(1024);
   readonly events = new EventLog();
@@ -283,8 +287,8 @@ export class SimWorld {
     const tuning = opts.tuning ?? cloneTuning(CAR_PRESETS[this.carId]);
     this.vehicle = new Vehicle(this.world, this.transforms, tuning, spawn.position, spawn.yaw);
     if (this.island) this.vehicle.plumbTilt = PLUMB_TILT;
-    // the wheels read the city's ground (M8.8 slice 9); the playground is asphalt everywhere
-    this.vehicle.ground = this.city?.surface ?? null;
+    // the wheels read the city's ground (M8.8 slice 9) or the island's (M8.10 slice 3); the playground is asphalt everywhere
+    this.vehicle.ground = this.city?.surface ?? this.island?.surface ?? null;
     this.garage = new Garage(this);
     this.board = new Board(this);
     this.board.teasers = opts.teasers ?? true;
@@ -501,6 +505,13 @@ export class SimWorld {
     if (pos.y < KILL_Y) {
       this.vehicle.teleport(nearest.position, nearest.yaw);
       this.respawned = true;
+    }
+    // the island's sea (M8.10 slice 3): a car under the water a second goes back to the nearest road, as a fall does
+    this.drowned = this.island && this.vehicle.tuning.hover <= 0 && pos.y < SEA.level - SUNK ? this.drowned + 1 : 0;
+    if (this.drowned > FIXED_HZ) {
+      this.vehicle.teleport(nearest.position, nearest.yaw);
+      this.respawned = true;
+      this.drowned = 0;
     }
     if (reset) this.lapTimer.reset();
     this.tick++;

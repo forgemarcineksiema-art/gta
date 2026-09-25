@@ -21,19 +21,26 @@ export class BootWatch {
   private since: number;
   private readonly start: number;
 
-  /** `now` in seconds. */
-  constructor(now: number) {
+  /** `now` in seconds; `onEnter` hears every phase entered (the loading bar, M8.9 R12). */
+  constructor(now: number, private readonly onEnter: (watch: BootWatch) => void = () => {}) {
     this.start = now;
     this.since = now;
+    onEnter(this);
   }
 
   enter(phase: BootPhase, now: number): void {
     this.phase = phase;
     this.since = now;
+    this.onEnter(this);
   }
 
   get current(): BootPhase {
     return this.phase;
+  }
+
+  /** The loading bar's share (M8.9 R12): the phases entered, over all of them. */
+  get progress(): number {
+    return (BOOT_PHASES.indexOf(this.phase) + 1) / BOOT_PHASES.length;
   }
 
   /** The loading screen's words at `now`, and whether a click retries. */

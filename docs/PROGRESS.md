@@ -12,6 +12,16 @@ sits in the basket (boxes in the pedestrians' colours), the boost's flame at the
 a rocket's roar for a voice, a countdown for a clue; on a corner of the Crown Tower's plaza. ONLY IT: RIDES A ROCKET
 (TYLKO ON: JEŹDZI NA RAKIECIE). Pins M8.8 13.1, 13.3, 13.4 (`trolley.test.ts`), 13.2 long (bodies.long).
 
+## 2026-09-25 — M8.9 slice 11: the words, the pause, the loading, the cards
+
+Done (R11, R12): KÓŁKO for a job's ring and STREFA for a zone (ROZBIJAJ AUTA W STREFIE, GOTOWE · KÓŁKO JEST NA MAPIE),
+R is OD NOWA (RESET in English), OSŁONA became UKRYCIE; every line in capitals (`#ui` sets them, the Polish table has no
+lower case the screen shows: the hints, the resume line, WEŹ AUTO · OD NOWA, the landmarks, KM/H); the busted card says
+NACIŚNIJ DOWOLNY KLAWISZ with no keycap. The pause in its order (PAUZA, the resume line, the sound, the settings, every
+key: the swap and the sound joined the list, the build small); the loading screen on the sky's three stops with a thin
+bar over the boot's phases (`BootWatch.progress`); WRAK at 20 %, over the debris. The look suite shoots `pause`,
+`loading`, `wreck`. Pins M8.9 11.1–11.3. Stills and verify green.
+
 ## 2026-09-25 — M8.8 slice 12: the monster truck
 
 Done: `monster` (the 4×4's class, 4.2 t, 0.95 m wheels on 0.8 m springs, the chassis' underside 1.8 m up, so a car

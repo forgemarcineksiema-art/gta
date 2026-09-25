@@ -128,7 +128,7 @@ export class RunHud {
     this.anyKey = k.any;
     this.swapKey = k.swap;
     this.ticketKey.textContent = k.swap;
-    for (const p of this.prompts) p.replaceChildren(el('kbd', 'key', k.any), el('span', 'run__prompt-label', t('ANY KEY')));
+    for (const p of this.prompts) p.replaceChildren(el('span', 'run__prompt-label', t('PRESS ANY KEY')));
   }
 
   /** The language changed (DESIGN.md §19): the labels, the prompt, and the card or the totals up now. */

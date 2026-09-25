@@ -378,7 +378,8 @@ export class Hud {
     // radar paints its own canvas at its own cadence, off the layout path.
     this.frameIndex++;
     // the corners (DESIGN.md §17.2): one mask for the frame; the district's name has its own clock
-    const placeAge = tickPlace(this.place, sim.city ? districtAt(sim.probe.x, sim.probe.z) : null, sim.run.state, dt);
+    // the intro's caption holds the name's clock: it shows after the caption, in a quiet moment (M8.9 R5)
+    const placeAge = tickPlace(this.place, sim.city ? districtAt(sim.probe.x, sim.probe.z) : null, sim.run.state, dt, sim.coldOpen.caption !== null);
     const hitAge = tickHit(this.hit, sim.life.state.damage, dt);
     const m = drive(readDrive(sim, placeAge, this.driveState, hitAge));
     if (m !== this.mask) {

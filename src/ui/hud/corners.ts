@@ -188,6 +188,7 @@ export interface KeyHints {
   swap: string;
   map: string;
   horn: string;
+  mute: string;
 }
 
 /**
@@ -218,10 +219,12 @@ export function hintRows(k: KeyHints): Array<{ keys: string[]; label: string }> 
     { keys: [k.throttle, k.steerLeft, k.brake, k.steerRight], label: t('drive') },
     { keys: [k.handbrake], label: t('drift (or brake + turn)') },
     { keys: [k.boost], label: t('boost') },
+    { keys: [k.swap], label: t('swap cars') },
     { keys: [k.reset], label: t('reset') },
     { keys: [k.camera], label: t('camera') },
     { keys: [k.map], label: t('map (hold)') },
     { keys: [k.horn], label: t('horn') },
+    { keys: [k.mute], label: t('sound') },
     { keys: [k.pause], label: t('pause') },
   ];
   if (k.debug !== '') rows.push({ keys: [k.debug], label: t('tuning') });

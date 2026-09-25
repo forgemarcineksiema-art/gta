@@ -9,20 +9,21 @@
   <body>
     <canvas id="game" tabindex="0"></canvas>
     <div id="ui"></div>
-    <div id="loading" class="loading">WCZYTYWANIE</div>
+    <div id="loading" class="loading"><span class="loading__text">WCZYTYWANIE</span><div class="loading__bar"><div class="loading__fill"></div></div></div>
     <script>
       (function () {
         // the loading screen speaks the game's default language, Polish (DESIGN.md §19); English with ?lang=en
         var english = /[?&]lang=en(&|$)/.test(location.search);
+        var text = document.querySelector('#loading .loading__text');
         if (english) {
           document.documentElement.lang = 'en';
-          document.getElementById('loading').textContent = 'LOADING';
+          if (text) text.textContent = 'LOADING';
         }
         // M7 slice 7: if the game's own script never ran (a request that failed), offer a retry the player clicks
         setTimeout(function () {
           var g = window.__game, l = document.getElementById('loading');
           if ((g && g.started) || !l || l.classList.contains('is-hidden') || l.classList.contains('is-retry')) return;
-          l.textContent = english ? 'STILL LOADING · CLICK TO RETRY' : 'WCIĄŻ WCZYTUJĘ · KLIKNIJ, BY SPRÓBOWAĆ ZNOWU';
+          (text || l).textContent = english ? 'STILL LOADING · CLICK TO RETRY' : 'WCIĄŻ WCZYTUJĘ · KLIKNIJ, BY SPRÓBOWAĆ ZNOWU';
           l.classList.add('is-retry');
           l.addEventListener('click', function () { location.reload(); });
         }, 25000);

@@ -281,10 +281,11 @@ export const PLACES = {
   duck: Wp(650, 565),
   canal: Ws([[-60, -240], [40, -262], [250, -298], [460, -304], [650, -286], [930, -270]]),
   canalWidth: 32,
-  railway: Ws([[760, -515], [185, -515]]),
+  /** The freight line between its two goods sheds (slice 9): the east one short of the highway, the west one past the harbour road. */
+  railway: Ws([[740, -515], [72, -515]]),
   railYard: Wrect({ x0: 200, z0: -541, x1: 440, z1: -489 }),
-  /** The level crossings: where the streets cross the railway. */
-  crossings: Ws([[280, -515], [460, -515], [640, -515], [760, -515]]),
+  /** The level crossings: where the harbour road and the streets cross the railway. */
+  crossings: Ws([[171, -515], [280, -515], [460, -515], [640, -515]]),
   beaches: [
     { points: Ws([[505, 796], [300, 792], [100, 784], [-100, 792], [-300, 782], [-470, 772]]), width: 70 },
     { points: Ws([[370, 486], [360, 600], [394, 680]]), width: 46 },

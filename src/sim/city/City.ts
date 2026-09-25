@@ -21,6 +21,7 @@ import { BLOCK, CITY_HALF, HIGHWAY_HALF, HIGHWAY_LANE_OFFSETS, OVERPASS_NODES, R
 import { overpassStatics } from './overpass';
 import { SurfaceMap } from './surface';
 import { SEA, SEA_TRIAL, SLIPWAY, SLIPWAYS, buoyStatics, slipwayGaps, slipwayStatics, wallPieces } from './sea';
+import { portCrane, waterworks } from '../island/places/worksKit';
 
 export const DISTRICTS = [
   { id: 'crown', name: 'CROWN HEIGHTS', color: 0xb497d6, accent: ACCENTS.crown, landmark: 'Crown Tower' },
@@ -525,14 +526,8 @@ export class City {
         box(px, 103, pz, 6, 3, 6, d.accent);
         box(px, 115, pz, 0.4, 9, 0.4, d.accent);
       } else if (d.id === 'foundry') {
-        for (const a of [-8, 8]) for (const b of [-8, 8]) box(px + a, 15, pz + b, 1, 15, 1, d.accent, 'building');
-        cylinder(px, 34, pz, 14, 6, d.color);
-        box(px, 40.5, pz, 14, 0.5, 14, d.accent);
-        // The works chimney: the tallest thing in the north-east, striped at the top.
-        cylinder(px + 30, 33, pz - 30, 2.4, 33, CITY_COLORS.brick);
-        cylinder(px + 30, 62, pz - 30, 2.6, 1.5, d.accent);
-        cylinder(px + 30, 66, pz - 30, 2.6, 1.5, PALETTE.laneMark);
-        box(px + 30, 3, pz - 30, 4, 3, 4, CITY_COLORS.brick, 'building');
+        // the Waterworks (moved to the island's Sunset Works, M8.10 slice 9: one builder for both)
+        waterworks(architecture, px, pz, d.accent, d.color);
       } else if (d.id === 'gardens') {
         box(px, 5, pz, 18, 5, 18, d.accent, 'building');
         for (const side of [-1, 1]) for (const bay of [-12, -6, 0, 6, 12]) {
@@ -606,14 +601,8 @@ export class City {
    * sills and crossbeams, the cab, and the boom out over the seawall. Drawn only.
    */
   private crane(architecture: Architecture): void {
-    const box = architecture.box.bind(architecture), orange = PALETTE.carOrange, x = MEGA.x, z = MEGA.z - 8;
-    for (const side of [-1, 1]) {
-      for (const end of [-7, 7]) box(x + side * 7.5, 11, z + end, 0.6, 11, 0.6, orange);
-      box(x + side * 7.5, 22.3, z, 0.7, 0.7, 7.7, orange);
-    }
-    for (const end of [-7, 7]) box(x, 22.9, z + end, 8.2, 0.6, 0.6, orange);
-    box(x + 2, 20.6, z, 1.5, 1.2, 1.6, PALETTE.charcoal);
-    box(x + 22, 24.2, z, 30, 0.6, 1.3, orange);
+    // (moved to the island's port, M8.10 slice 9: one builder for both)
+    portCrane(architecture, MEGA.x, MEGA.z - 8);
   }
 
   /** Coral Quay's seawall edge: paved promenade, palms and masts (its benches are props). */

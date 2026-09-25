@@ -44,8 +44,10 @@ function candidates(): Array<{ district: DistrictId; pts: P2[] }> {
   const line = (district: DistrictId, a: readonly [number, number], b: readonly [number, number]): void => { out.push({ district, pts: resample(W([a, b]), SAMPLE) }); };
   for (const x of [-110, -200, -290, -380, -470, -560, -650, -740]) line('crown', [x, -40], [x, -800]);
   for (const z of [-140, -230, -320, -410, -500, -590, -680]) line('crown', [-40, z], [-900, z]);
-  for (const x of [100, 280, 460, 640, 760]) line('foundry', [x, -40], [x, -760]);
-  for (const z of [-120, -270, -420, -570]) line('foundry', [40, z], [900, z]);
+  // (slice 9: none along the dry canal nor across it at the airfield's dip, the quay's road clear of the basin's cranes;
+  // the streets run on across the railway, its level crossings)
+  for (const x of [100, 280, 460, 640]) line('foundry', [x, -40], [x, -760]);
+  for (const z of [-120, -210, -420, -540]) line('foundry', [40, z], [900, z]);
   for (const x of [100, 220, 340, 460, 580, 700]) line('marina', [x, 0], [x, 760]);
   for (const z of [60, 180, 300, 420]) line('marina', [60, z], [880, z]);
   // the Gardens: two crescents round the botanic garden, radials out from its parkway
@@ -84,7 +86,7 @@ function build(): Streets {
     if (Math.hypot(x - SUMMIT.x, z - SUMMIT.z) < 100 || Math.hypot(x - GARDEN.x, z - GARDEN.z) < 190) return false;
     if (inPolygon(x, z, quarry) || distanceToPolyline(x, z, [...quarry, quarry[0] as P2]) < 15) return false;
     if (inPolygon(x, z, golf) || inPolygon(x, z, BAY) || distanceToPolyline(x, z, [...BAY, BAY[0] as P2]) < 25) return false;
-    if (inRect(x, z, BASIN, 12) || inRect(x, z, PLACES.railYard, 6) || PLACES.containerYards.some((r) => inRect(x, z, r, 8))) return false;
+    if (inRect(x, z, BASIN, 12) || PLACES.containerYards.some((r) => inRect(x, z, r, 8))) return false;
     if (inRect(x, z, { x0: PLACES.hotel.x - PLACES.hotel.hx, x1: PLACES.hotel.x + PLACES.hotel.hx, z0: PLACES.hotel.z - PLACES.hotel.hz, z1: PLACES.hotel.z + PLACES.hotel.hz }, 6)) return false;
     const st = PLACES.stadium;
     if (((x - st.x) / (st.rx + 18)) ** 2 + ((z - st.z) / (st.rz + 18)) ** 2 < 1) return false;

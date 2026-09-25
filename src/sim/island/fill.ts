@@ -80,7 +80,8 @@ export function reserved(x: number, z: number): boolean {
   if (Math.abs(x - P.hotel.x) < P.hotel.hx + 8 && Math.abs(z - P.hotel.z) < P.hotel.hz + 8) return true;
   if (near(P.waterworks, 45) || near(P.lighthouse, 25) || near(P.controlTower, 20) || near(P.megaRamp, 50) || near(P.ferrisWheel, 30)) return true;
   if (P.cranes.some(([cx, cz]) => Math.hypot(x - cx, z - cz) < 35)) return true;
-  if (toLine(P.canal) < P.canalWidth / 2 + 8 || toLine(P.railway) < 12) return true;
+  // (the railway: its goods sheds' walls 6 m each side of the line, slice 9)
+  if (toLine(P.canal) < P.canalWidth / 2 + 8 || toLine(P.railway) < 8) return true;
   return false;
 }
 

@@ -15,6 +15,7 @@ import { inPolygon, type P2 } from './geom';
 import { ASPHALT, GRASS } from '../city/surface';
 import { PROP_LINES, chunkProps, type PropDesc, type PropPlace } from '../city/props';
 import { FOOT, Ground, HALF_WIDTH, type CoastKind, type GroundProbe } from './ground';
+import { LaneIndex } from '../city/laneIndex';
 import { buildNetwork } from './network';
 import { DECK, structures, type Piece, type Structure } from './structures';
 import { PAVEMENT, roadSurfaces, type RoadSurfaces } from './surfaces';
@@ -22,6 +23,8 @@ import { fillIsland, inLot, type IslandFill } from './fill';
 import { buildPlaces, type Place } from './places';
 import type { GardensPlace } from './places/gardens';
 import { buildServices, serviceSpots, siteRect, type ServiceSite } from './services';
+import { garageRect, hotelGarageSite, islandGarages } from './cover';
+import { GARAGE, hideoutSign, toDropOff, type DropOff } from '../city/cover';
 import type { StaticDesc } from '../scene';
 import { BOUNDS, CIRCUS, highwayLoop, islet } from './plan';
 import { shoreOpen } from './shapes';
@@ -70,16 +73,22 @@ export class Island {
   readonly route: TrackDef;
   /** The main roads' lanes (M8.10 slice 4): the grid's `RoadGraph`, for the traffic, the police, the bot and the way. */
   readonly network = buildNetwork(this.ground);
+  /** The lanes by their bounds: the nearest lane or point on one, a height counting its gap (slice 14). */
+  private readonly laneIndex = new LaneIndex(this.network.graph);
   /** The highway's structures (M8.10 slice 6a): the viaduct, the bay bridge, the overpasses, the tunnel. */
   readonly structures: Structure[] = structures((this.network.lines[0] as { pts: RoadPoint[] }).pts, highwayLoop(6).span);
   /** The roads' surfaces (M8.10 slice 6b): the strips, the junctions, the pavements and their kerbs, the paint, the bays. */
   readonly surfaces: RoadSurfaces = roadSurfaces(this.ground, this.network.graph, (x, z) => { const [i, j] = Island.chunkOf(x, z); return Island.chunkIndex(i, j); });
   /** The drive-throughs (M8.10 slice 16): their sites, beside their roads; the sim's `Services` serves the car in their bays. */
   readonly services: ServiceSite[] = serviceSpots(this.ground);
-  /** The lots, their buildings and the palms (M8.10 slice 7a), off the drive-throughs' sites. */
-  readonly fill: IslandFill = fillIsland(this.ground, this.surfaces, (x, z) => { const [i, j] = Island.chunkOf(x, z); return Island.chunkIndex(i, j); }, this.services.map(siteRect));
+  /** The Coral Hotel's garage (M8.10 slice 14): the third of the run's garages, on the Quay's road north of the hotel. */
+  readonly hotelGarage: DropOff = hotelGarageSite(this.ground);
+  /** The lots, their buildings and the palms (M8.10 slice 7a), off the drive-throughs' sites and the hotel's garage. */
+  readonly fill: IslandFill = fillIsland(this.ground, this.surfaces, (x, z) => { const [i, j] = Island.chunkOf(x, z); return Island.chunkIndex(i, j); }, [...this.services.map(siteRect), garageRect(this.hotelGarage)]);
   /** Each district's places (M8.10 slices 8–12): their statics in `fill.chunks`, the ones that move stepped here. */
   readonly places: Place[];
+  /** The run's three garages (M8.10 slice 14), the hideout first: their kerbs and lanes; the props keep off their doors. */
+  readonly garages: DropOff[];
   /** The chunks with a height field in the physics, by index. */
   readonly active = new Map<number, RAPIER.Collider>();
   /** Each physics chunk's kerbs, buildings and trunks, with its height field. */
@@ -90,6 +99,7 @@ export class Island {
   private readonly propLists = new Map<number, PropDesc[]>();
   private readonly junctionReaches = new Map<object, number>();
   private readonly probeScratch: GroundProbe = { h: 0, steep: 0, steepKind: -1, road: Infinity, surface: GRASS };
+  private readonly garageFrame = { along: 0, across: 0 };
   loaded = 0;
   unloaded = 0;
   /** Chunks whose heights were worked out when the ring needed them, not ahead (the start's ring, or a prefetch late). */
@@ -105,7 +115,6 @@ export class Island {
   private readonly heights = new Map<number, Float32Array>();
   /** The chunk whose heights are being worked out ahead, and how many of its columns are done. */
   private ahead: { index: number; done: number; h: Float32Array } | null = null;
-  private readonly scratch = { x: 0, y: 0, z: 0, yaw: 0 };
 
   constructor(readonly world: RAPIER.World) {
     this.walls();
@@ -126,8 +135,9 @@ export class Island {
       return list;
     };
     this.places = buildPlaces({ ground: this.ground, network: this.network, surfaces: this.surfaces, fill: this.fill, world, statics });
-    // the drive-throughs (slice 16): fuel, repair, paint
+    // the drive-throughs (slice 16): fuel, repair, paint; the run's three garages (slice 14)
     buildServices(this.ground, this.services, statics);
+    this.garages = islandGarages(this, statics);
   }
 
   /** Run the places that move (a train, a barrier, a wheel), a fixed step. */
@@ -194,6 +204,15 @@ export class Island {
       if (p.road > PROP_LINES.walkers.middle - PROP_LINES.walkers.half && p.road < PROP_LINES.walkers.middle + PROP_LINES.walkers.half) return true;
     }
     for (const jn of this.surfaces.junctions) if (Math.hypot(jn.x - x, jn.z - z) < this.junctionReach(jn)) return true;
+    // a garage and its apron out to the kerb (the car rolls in over it), its sign's pole (slice 14)
+    const r = Math.max(hx, hz), frame = this.garageFrame;
+    for (const g of this.garages) {
+      if (Math.hypot(g.x - x, g.z - z) > GARAGE.depth + g.toKerb + 10) continue;
+      toDropOff(g, x, z, frame);
+      if (frame.along > -GARAGE.depth / 2 - g.toKerb - 0.5 - r && frame.along < GARAGE.depth / 2 + r && Math.abs(frame.across) < GARAGE.width / 2 + 1 + r) return true;
+      const sign = hideoutSign(g);
+      if (Math.hypot(sign.poleX - x, sign.poleZ - z) < 0.5 + r) return true;
+    }
     return this.fill.lots.some((l) => Math.hypot(l.x - x, l.z - z) < Math.hypot(l.hx, l.hz) + 2 && inLot(l, x, z, Math.max(hx, hz) + 0.3));
   }
 
@@ -354,14 +373,16 @@ export class Island {
   }
 
   /** Where a car put back on the road goes: the nearest graded road, its height, its heading (written into `out`). */
-  nearestRoad(x: number, z: number, out: SpawnPoint): SpawnPoint {
-    const p = this.scratch;
-    this.ground.nearestRoad(x, z, p);
-    out.position.x = p.x;
-    out.position.y = p.y + 1;
-    out.position.z = p.z;
-    out.yaw = p.yaw;
-    return out;
+  nearestRoad(x: number, z: number, out: SpawnPoint, y = 0.5): SpawnPoint {
+    return this.laneIndex.nearestRoad(x, z, out, y);
+  }
+
+  /**
+   * The lane nearest a point (M8.10 slice 14); with the road's height under it given, a lane over or under counts its
+   * height gap: the street, not the deck over it or the tunnel under it.
+   */
+  nearestLane(x: number, z: number, y?: number): number {
+    return this.laneIndex.nearestLane(x, z, y);
   }
 
   /**

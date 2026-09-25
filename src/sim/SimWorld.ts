@@ -15,6 +15,7 @@ const SOLID_ONLY = interactionGroups(0xffff, GROUP_DEFAULT);
 import { City, type PropRing } from './city/City';
 import { Island, PLUMB_TILT } from './island/Island';
 import { islandStreets } from './island/streetMap';
+import { islandCover } from './island/cover';
 import { Services } from './island/services';
 import { coverSites, type CoverSites } from './city/cover';
 import { Roadblocks } from './police/Roadblocks';
@@ -315,7 +316,8 @@ export class SimWorld {
     this.pursuit.descriptor.body = this.carId;
     this.pursuit.descriptor.paint = this.carPaint;
     this.pursuit.descriptor.police = policeLiveried(this.carId);
-    this.cover = this.city ? coverSites(this.city) : null;
+    // the garages, the roadblock sites, the parked patrols' places, the cameras: the grid's or the island's (slice 14)
+    this.cover = this.city ? coverSites(this.city) : this.island ? islandCover(this.island) : null;
     this.police = this.traffic ? new Police(this) : null;
     // a crime in a unit's sight pays double and makes the player wanted (DESIGN.md §13.3)
     this.heat.seen = () => this.police?.crimeSeen() ?? false;
@@ -410,7 +412,7 @@ export class SimWorld {
     } else if (this.island) {
       const pos = this.vehicle.body.translation(this.scratchPos);
       if (this.controls.reset || this.tick % 6 === 0 || this.vehicle.telemetry.groundedWheels === 0) {
-        const nearest = this.island.nearestRoad(pos.x, pos.z, this.roadReset);
+        const nearest = this.island.nearestRoad(pos.x, pos.z, this.roadReset, pos.y);
         this.vehicle.resetPose.position = nearest.position;
         this.vehicle.resetPose.yaw = nearest.yaw;
       }
@@ -488,7 +490,8 @@ export class SimWorld {
     // before the run: a delivery into a garage pays the bag before the door can drop the job
     this.breakers?.step(this.probe, FIXED_DT);
     this.skill.step(FIXED_DT);
-    if (this.traffic) this.stash.step(this.probe);
+    // (the island's hidden cars and finds stand at their places from slice 15; till then none)
+    if (this.traffic && this.city) this.stash.step(this.probe);
     this.donuts?.step(this.probe);
     this.fares.step(this.probe, FIXED_DT);
     if (this.controls.horn) {
@@ -512,18 +515,23 @@ export class SimWorld {
       const r = t.body.rotation(this.scratchRot);
       this.transforms.write(t.slot, p.x, p.y, p.z, r.x, r.y, r.z, r.w);
     }
-    // keep the reset target on the nearest spawn point and catch falls
+    // keep the reset target on the nearest spawn point (the grid's and the island's road, 10 times a second at the
+    // step's top) and catch falls
     const pos = this.vehicle.body.translation(this.scratchPos);
-    const nearest = this.nearestSpawn(pos.x, pos.z, pos.y);
-    this.vehicle.resetPose.position = nearest.position;
-    this.vehicle.resetPose.yaw = nearest.yaw;
+    if (!this.city && !this.island) {
+      const nearest = this.nearestSpawn(pos.x, pos.z, pos.y);
+      this.vehicle.resetPose.position = nearest.position;
+      this.vehicle.resetPose.yaw = nearest.yaw;
+    }
     if (pos.y < KILL_Y) {
+      const nearest = this.nearestSpawn(pos.x, pos.z, pos.y);
       this.vehicle.teleport(nearest.position, nearest.yaw);
       this.respawned = true;
     }
     // the island's sea (M8.10 slice 3): a car under the water a second goes back to the nearest road, as a fall does
     this.drowned = this.island && this.vehicle.tuning.hover <= 0 && pos.y < SEA.level - SUNK ? this.drowned + 1 : 0;
     if (this.drowned > FIXED_HZ) {
+      const nearest = this.nearestSpawn(pos.x, pos.z, pos.y);
       this.vehicle.teleport(nearest.position, nearest.yaw);
       this.respawned = true;
       this.drowned = 0;
@@ -571,7 +579,7 @@ export class SimWorld {
 
   nearestSpawn(x: number, z: number, y = 0.5): SpawnPoint {
     if (this.city) return this.city.nearestRoad(x, z, this.roadReset, y);
-    if (this.island) return this.island.nearestRoad(x, z, this.roadReset);
+    if (this.island) return this.island.nearestRoad(x, z, this.roadReset, y);
     let best = this.spawns[0] as SpawnPoint;
     let bestD = Infinity;
     for (const s of this.spawns) {

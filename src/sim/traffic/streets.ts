@@ -38,6 +38,11 @@ export interface StreetMap {
   readonly byKm: boolean;
   /** The level crossings (the island's railway): the cars stop short of one while it is shut. */
   readonly crossings: readonly LevelStop[];
+  /**
+   * The lane nearest a point, -1 with none; with the road's height under it given (`groundAt` for the street), a lane
+   * over or under counts its height gap: the street, not a deck over it.
+   */
+  nearestLane(x: number, z: number, y?: number): number;
 }
 
 /**
@@ -92,5 +97,6 @@ export function cityStreets(city: City): StreetMap {
     half: CITY_HALF,
     byKm: false,
     crossings: [],
+    nearestLane: (x, z, y) => city.nearestLane(x, z, y),
   };
 }

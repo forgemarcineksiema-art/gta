@@ -75,5 +75,6 @@ export function islandStreets(island: Island): StreetMap {
     byKm: true,
     // the Works' level crossings, shut while the freight train comes (slice 9)
     crossings: (island.places.find((p) => p.id === 'works') as WorksPlace | undefined)?.crossings ?? [],
+    nearestLane: (x, z, y) => island.nearestLane(x, z, y),
   };
 }

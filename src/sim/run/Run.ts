@@ -335,14 +335,14 @@ export class Run {
     if (this.door) {
       const g = GARAGE;
       this.pos.x = site.door.x;
-      this.pos.y = g.doorHeight / 2;
+      this.pos.y = site.y + g.doorHeight / 2;
       this.pos.z = site.door.z;
       this.door.setTranslation(this.pos);
       this.door.setRotation(M.quatSetAxisAngle(this.quat, 0, 1, 0, site.yaw));
       this.door.setEnabled(true);
     }
     // after the heat reset, so nothing counts these; the bag's events were read at the top of the step
-    this.sim.events.push('door', this.dropOff, site.door.x, 0, site.door.z, this.dropOff);
+    this.sim.events.push('door', this.dropOff, site.door.x, site.y, site.door.z, this.dropOff);
     this.sim.events.push('banked', this.lastBanked, site.x, 0, site.z, this.dropOff);
   }
 

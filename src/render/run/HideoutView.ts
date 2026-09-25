@@ -75,7 +75,7 @@ export class HideoutView {
     for (const site of sim.run.dropOffs) {
       for (const geometry of [this.propsGeometry, this.boardGeometry, this.roomGeometry, this.roomGlowGeometry]) {
         const props = new THREE.Mesh(geometry, geometry === this.roomGlowGeometry ? this.glowMaterial : this.material);
-        props.position.set(site.x, GARAGE.floorTop, site.z);
+        props.position.set(site.x, site.y + GARAGE.floorTop, site.z);
         props.rotation.y = site.yaw;
         props.castShadow = false;
         props.receiveShadow = false;
@@ -88,7 +88,7 @@ export class HideoutView {
     for (const site of sim.run.dropOffs) {
       const mesh = new THREE.Mesh(this.geometry, this.material);
       // the panel hangs from the lintel: its top edge is the geometry's origin
-      mesh.position.set(site.door.x, GARAGE.doorHeight, site.door.z);
+      mesh.position.set(site.door.x, site.y + GARAGE.doorHeight, site.door.z);
       mesh.rotation.y = site.yaw;
       mesh.visible = false;
       mesh.castShadow = false;
@@ -155,9 +155,10 @@ export function signGeometries(sites: readonly DropOff[]): Array<[THREE.BufferGe
   return sites.map((site) => {
     const sign = hideoutSign(site);
     const place = (g: THREE.BufferGeometry, y: number): THREE.BufferGeometry => g.rotateY(sign.yaw).translate(sign.x, y, sign.z);
-    const bottom = sign.y - s.panel / 2;
+    // the pole from its street's height (the grid's 0, the island's hill) up to the panel
+    const bottom = sign.y - s.panel / 2, tall = bottom - site.y;
     const frame = merge([
-      paint(place(new THREE.BoxGeometry(s.pole * 2, bottom, s.pole * 2), bottom / 2), PALETTE.graphite),
+      paint(place(new THREE.BoxGeometry(s.pole * 2, tall, s.pole * 2), site.y + tall / 2), PALETTE.graphite),
       paint(place(new THREE.BoxGeometry(s.width + 0.4, s.panel + 0.4, s.depth), sign.y), PALETTE.graphite),
     ]);
     const glow = merge([

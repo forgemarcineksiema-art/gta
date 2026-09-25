@@ -69,7 +69,7 @@ export class CameraDirector {
     // the door shut: from the corner to the showroom
     this.shutFor = this.shutFor < 0 ? 0 : this.shutFor + dt;
     this.site.x = site.x;
-    this.site.y = GARAGE.floorTop;
+    this.site.y = site.y + GARAGE.floorTop;
     this.site.z = site.z;
     this.site.yaw = site.yaw;
     const s = showroomShot(this.site, radius, height, aspect, fovY, this.shot);

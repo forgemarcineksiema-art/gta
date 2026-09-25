@@ -9,7 +9,7 @@
  * the wheels' ground, drawn apart so it casts its shadow; a wall is `building`).
  */
 import { Architecture, buildingHeight } from '../../city/architecture';
-import { GARAGE, hideoutStatics, type DropOff } from '../../city/cover';
+import { GARAGE, type DropOff } from '../../city/cover';
 import { SEA } from '../../city/sea';
 import { ACCENTS, CITY_COLORS, ISLAND_COLORS, PALETTE } from '../../palette';
 import { mulberry32 } from '../../random';
@@ -285,21 +285,13 @@ export function hqBays(): Array<{ x: number; z: number; yaw: number }> {
 export function hideoutSite(): DropOff {
   const fx = Math.sin(HIDEOUT.yaw), fz = Math.cos(HIDEOUT.yaw), half = GARAGE.depth / 2;
   return {
-    name: 'hideout', x: HIDEOUT.x, z: HIDEOUT.z, yaw: HIDEOUT.yaw,
+    name: 'hideout', x: HIDEOUT.x, y: HIDEOUT.floor, z: HIDEOUT.z, yaw: HIDEOUT.yaw,
     door: { x: HIDEOUT.x - fx * half, z: HIDEOUT.z - fz * half, yaw: HIDEOUT.yaw, width: GARAGE.doorWidth, height: GARAGE.doorHeight },
     entry: { across: GARAGE.entryAcross, along: GARAGE.entryAlong },
+    // (its kerb and its approach lane the island's cover works out, slice 14)
+    toKerb: 0,
     approachLane: -1,
-    lot: { name: 'hideout', cx: 0, cz: 0, sx: 1, sz: 1, ox: 40, oz: 40, setback: 1.3 },
   };
-}
-
-/** The hideout's garage (the grid's walls, roof and floor) on its pad. */
-function hideout(ctx: PlaceContext): void {
-  const list = ctx.statics(HIDEOUT.x, HIDEOUT.z);
-  for (const st of hideoutStatics(hideoutSite())) {
-    st.position.y += HIDEOUT.floor;
-    list.push(st);
-  }
 }
 
 /** The arcade over the x 290 street: steel columns on both pavements, a glazed roof following the street's fall. */
@@ -392,7 +384,7 @@ export function crownPlaces(ctx: PlaceContext): Place[] {
   const roof = carPark(ctx);
   const landingRoof = landing(ctx);
   headquarters(ctx);
-  hideout(ctx);
+  // (the hideout's garage the island's garages build on its pad, its floor flush with its street's pavement: slice 14)
   arcade(ctx);
   const edge = quarryKicker(ctx);
   cliffRocks(ctx);

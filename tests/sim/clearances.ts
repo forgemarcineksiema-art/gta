@@ -138,7 +138,7 @@ export class Clearances {
     for (const d of this.doors) {
       toDropOff(d, q.x, q.z, this.frame);
       const front = -GARAGE.depth / 2;
-      if (this.frame.along > front - d.lot.setback - 4.5 && this.frame.along < front && Math.abs(this.frame.across) < GARAGE.doorWidth / 2 + 1) why.push(`${at}: before the ${d.name}'s door`);
+      if (this.frame.along > front - d.toKerb && this.frame.along < front && Math.abs(this.frame.across) < GARAGE.doorWidth / 2 + 1) why.push(`${at}: before the ${d.name}'s door`);
     }
     for (const b of this.boards) {
       const box = runOutFootprint(b);

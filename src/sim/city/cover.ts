@@ -75,17 +75,21 @@ export interface DoorPose {
 
 export interface DropOff {
   name: DropOffName;
-  /** Garage floor centre. */
+  /** Garage floor centre, and the ground its floor stands on (the grid's 0; the island's, its street's height). */
   x: number;
+  y: number;
   z: number;
   /** Inward: from the door toward the back wall. */
   yaw: number;
   door: DoorPose;
   /** Entry box half extents in the drop-off frame, around the centre. */
   entry: { across: number; along: number };
+  /** From the door out to its street's kerb (m): the setback and the pavement. */
+  toKerb: number;
   /** The carriageway lane that runs past the door with the door on its kerb side; -1 before `coverSites`. */
   approachLane: number;
-  lot: DropOffLot;
+  /** The grid's lot it stands on (its generator's); none on the island. */
+  lot?: DropOffLot;
 }
 
 /**
@@ -183,10 +187,12 @@ export function dropOffFor(lot: DropOffLot): DropOff {
   return {
     name: lot.name,
     x: cxw,
+    y: 0,
     z: czw,
     yaw,
     door: { x: cxw - ix * half, z: czw - iz * half, yaw, width: GARAGE.doorWidth, height: GARAGE.doorHeight },
     entry: { across: GARAGE.entryAcross, along: GARAGE.entryAlong },
+    toKerb: lot.setback + 4.5,
     approachLane: -1,
     lot,
   };
@@ -331,9 +337,9 @@ export function hideoutSign(site: DropOff): HideoutSign {
   const fx = Math.sin(site.yaw), fz = Math.cos(site.yaw);
   // right of the inward axis: the street's direction past the door
   const rx = -fz, rz = fx;
-  const along = -GARAGE.depth / 2 - (site.lot.setback + 4.5 - HIDEOUT_SIGN.kerb);
+  const along = -GARAGE.depth / 2 - (site.toKerb - HIDEOUT_SIGN.kerb);
   const x = site.x + fx * along + rx * HIDEOUT_SIGN.beside, z = site.z + fz * along + rz * HIDEOUT_SIGN.beside;
-  return { poleX: x, poleZ: z, x, y: HIDEOUT_SIGN.height, z, yaw: Math.atan2(rx, rz) };
+  return { poleX: x, poleZ: z, x, y: site.y + HIDEOUT_SIGN.height, z, yaw: Math.atan2(rx, rz) };
 }
 
 /** Along (inward) and across coordinates of a world point in a drop-off's frame. */

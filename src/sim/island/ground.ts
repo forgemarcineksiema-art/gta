@@ -469,6 +469,8 @@ export class Ground {
   private readonly paved: Uint8Array;
   /** Per road: 1 when it crosses the sea on bridges (the taxiways to the causeway): no bank over the water past its deck. */
   private readonly bridged: Uint8Array;
+  /** The floors dug into the ground after the roads (`dig`). */
+  private readonly floors: Array<{ x: number; z: number; c: number; s: number; hx: number; hz: number; y: number }> = [];
   /** Per district crossing (`districtStreets().junctions`): 1 where it is on a main road (a T, no flat). */
   readonly crossingOnMain: Uint8Array;
   /** The tunnel's line from mouth to mouth, its floor's height at each point, and the box round its trench. */
@@ -721,6 +723,25 @@ export class Ground {
 
   /** The ground's surface at (x, z), m over the sea: the hill whole over the tunnel (what is drawn, and its lid). */
   surfaceHeight(x: number, z: number): number {
+    const h = this.raw(x, z);
+    for (const f of this.floors) {
+      const dx = x - f.x, dz = z - f.z;
+      if (Math.abs(dx * f.s + dz * f.c) <= f.hz && Math.abs(dx * f.c - dz * f.s) <= f.hx) return Math.min(h, f.y);
+    }
+    return h;
+  }
+
+  /**
+   * Dig the ground under a turned rectangle (its middle, the way its length runs, its half width and half length) down
+   * to `y`, after the roads are graded: a garage's floor flush with its street's pavement (M8.10 slice 14), its walls
+   * over the edge.
+   */
+  dig(x: number, z: number, yaw: number, hx: number, hz: number, y: number): void {
+    this.floors.push({ x, z, c: Math.cos(yaw), s: Math.sin(yaw), hx, hz, y });
+  }
+
+  /** The ground's surface before anything is dug into it. */
+  private raw(x: number, z: number): number {
     this.nearestShore(x, z);
     const sh = this.shore;
     let h: number;

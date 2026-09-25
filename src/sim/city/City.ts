@@ -17,9 +17,10 @@ import { gateLine, layoutCoins, placeCoins, type CoinDesc, type CoinPoint } from
 import { buildRoadMarkings } from './markings';
 import { MARKET, PROP_LINES, chunkProps, type FootwayRun, type PropContext, type PropDesc, type PropPlace, type PropSpot } from './props';
 import { signalPoles, signalledNodes } from './signals';
-import { BLOCK, CITY_HALF, HIGHWAY_HALF, HIGHWAY_LANE_OFFSETS, OVERPASS_NODES, ROAD_HALF, buildCityRoute, buildRoadGraph, distanceToPolyline, highwayHeightAt, projectOnLane, underOverpass, type Lane, type RoadPoint, type SpecialRoad } from './roads';
+import { BLOCK, CITY_HALF, HIGHWAY_HALF, HIGHWAY_LANE_OFFSETS, OVERPASS_NODES, ROAD_HALF, buildCityRoute, buildRoadGraph, distanceToPolyline, highwayHeightAt, underOverpass, type RoadPoint, type SpecialRoad } from './roads';
 import { overpassStatics } from './overpass';
 import { SurfaceMap } from './surface';
+import { LaneIndex } from './laneIndex';
 import { SEA, SEA_TRIAL, SLIPWAY, SLIPWAYS, buoyStatics, slipwayGaps, slipwayStatics, wallPieces } from './sea';
 import { portCrane, waterworks } from '../island/places/worksKit';
 
@@ -204,12 +205,8 @@ export class City {
   readonly graph = buildRoadGraph();
   readonly roadMarkings = buildRoadMarkings(this.graph, districtAt);
   readonly route = buildCityRoute(this.graph);
-  /** Axis-aligned bounds per lane, so the reset projection skips distant lanes. */
-  private readonly laneBounds = this.graph.lanes.map((lane) => {
-    const b = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity };
-    for (const pt of lane.points) { b.minX = Math.min(b.minX, pt.x); b.maxX = Math.max(b.maxX, pt.x); b.minZ = Math.min(b.minZ, pt.z); b.maxZ = Math.max(b.maxZ, pt.z); }
-    return b;
-  });
+  /** The lanes by their bounds, so the reset projection skips distant lanes. */
+  private readonly laneIndex = new LaneIndex(this.graph);
   /** Recently generated chunk descriptors: render tiles reload often at the fog edge. */
   private readonly chunkCache = new Map<string, CityChunk>();
   private readonly frames = new Map<string, { cum: number[]; nx: number[]; nz: number[]; total: number }>();
@@ -1059,36 +1056,15 @@ export class City {
 
   /** Project onto the closest driveable lane instead of resetting to a distant junction. */
   nearestRoad(x: number, z: number, out: SpawnPoint, y = 0.5): SpawnPoint {
-    let best = Infinity;
-    const hit: { x: number; z: number; yaw: number; y?: number } = { x: 0, z: 0, yaw: 0 };
-    for (let i = 0; i < this.graph.lanes.length; i++) {
-      const b = this.laneBounds[i] as { minX: number; maxX: number; minZ: number; maxZ: number };
-      const dx = Math.max(b.minX - x, 0, x - b.maxX), dz = Math.max(b.minZ - z, 0, z - b.maxZ);
-      if (dx * dx + dz * dz >= best) continue;
-      // the height gap counts: under a bridge the street is nearer than the deck over it
-      const dist = projectOnLane(this.graph.lanes[i] as Lane, x, z, hit, y - 0.5);
-      if (dist < best) { best = dist; out.position.x = hit.x; out.position.z = hit.z; out.position.y = 1 + (hit.y ?? 0); out.yaw = hit.yaw; }
-    }
-    return out;
+    return this.laneIndex.nearestRoad(x, z, out, y);
   }
 
-  /** The lane whose polyline is closest to a point, through the lane bounds; -1 with no lanes. */
   /**
    * The lane nearest a point; with the road height under it given (M5.5 gate), a lane over or under counts its
    * height gap, so a car on the street under an overpass is not on the highway above it.
    */
   nearestLane(x: number, z: number, y?: number): number {
-    let best = Infinity;
-    let found = -1;
-    const hit = { x: 0, z: 0, yaw: 0 };
-    for (let i = 0; i < this.graph.lanes.length; i++) {
-      const b = this.laneBounds[i] as { minX: number; maxX: number; minZ: number; maxZ: number };
-      const dx = Math.max(b.minX - x, 0, x - b.maxX), dz = Math.max(b.minZ - z, 0, z - b.maxZ);
-      if (dx * dx + dz * dz >= best) continue;
-      const dist = projectOnLane(this.graph.lanes[i] as Lane, x, z, hit, y);
-      if (dist < best) { best = dist; found = i; }
-    }
-    return found;
+    return this.laneIndex.nearestLane(x, z, y);
   }
 
   /** Cached generation: the last 16 chunks asked for, resident physics chunks first. */
@@ -1327,7 +1303,7 @@ export class City {
       for (const site of doors) {
         toDropOff(site, x, z, frame);
         const front = -GARAGE.depth / 2;
-        if (frame.along > front - site.lot.setback - 4.5 - PROP_KEEP.doorOut - br && frame.along < front + PROP_KEEP.doorOut + br
+        if (frame.along > front - site.toKerb - PROP_KEEP.doorOut - br && frame.along < front + PROP_KEEP.doorOut + br
           && Math.abs(frame.across) < GARAGE.doorWidth / 2 + PROP_KEEP.door + br) return true;
       }
       // a billboard's run-out and its line of coins in from the lane; on the highway's outer verge any stretch may

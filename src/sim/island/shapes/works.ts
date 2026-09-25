@@ -194,7 +194,8 @@ function lift(x: number, z: number): number {
 let pads: { waterworks: number; scrapyard: number } | null = null;
 function padLevels(): { waterworks: number; scrapyard: number } {
   if (pads) return pads;
-  const w = PLACES.waterworks, sx = (SCRAPYARD.x0 + SCRAPYARD.x1) / 2, sz = (SCRAPYARD.z0 + SCRAPYARD.z1) / 2;
+  // the scrapyard's at its door's, on its street's height: the garage's floor meets the pavement (slice 14)
+  const w = PLACES.waterworks, [sx, sz] = SCRAPYARD.door;
   pads = { waterworks: naturalHeight(w.x, w.z) + lift(w.x, w.z), scrapyard: naturalHeight(sx, sz) + lift(sx, sz) };
   return pads;
 }

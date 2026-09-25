@@ -9,7 +9,7 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import { Architecture, CITY_COLORS } from '../../city/architecture';
 import { DISTRICTS } from '../../city/City';
-import { DROP_OFF_LOTS, GARAGE, hideoutStatics, type DropOff } from '../../city/cover';
+import { GARAGE, type DropOff } from '../../city/cover';
 import { GROUPS_SOLID } from '../../collision';
 import { ACCENTS, ISLAND_COLORS, PALETTE } from '../../palette';
 import { IDENTITY_QUAT, type Quat, type StaticDesc } from '../../scene';
@@ -409,15 +409,13 @@ export function worksPlaces(ctx: PlaceContext): Place[] {
   const scrapyard = scrapyardGarage();
   function scrapyardGarage(): DropOff {
     const [dx, dz] = SCRAPYARD.door, yaw = 0, y = ground.surfaceHeight(dx, dz + GARAGE.depth / 2);
+    // (its kerb and its approach lane the island's cover works out, slice 14)
     const site: DropOff = {
-      name: 'scrapyard', x: dx, z: dz + GARAGE.depth / 2, yaw,
+      name: 'scrapyard', x: dx, y, z: dz + GARAGE.depth / 2, yaw,
       door: { x: dx, z: dz, yaw, width: GARAGE.doorWidth, height: GARAGE.doorHeight },
-      entry: { across: GARAGE.entryAcross, along: GARAGE.entryAlong }, approachLane: -1,
-      lot: DROP_OFF_LOTS.find((l) => l.name === 'scrapyard') ?? (DROP_OFF_LOTS[0] as (typeof DROP_OFF_LOTS)[number]),
+      entry: { across: GARAGE.entryAcross, along: GARAGE.entryAlong }, toKerb: 0, approachLane: -1,
     };
-    const list = ctx.statics(site.x, site.z), start = list.length;
-    list.push(...hideoutStatics(site));
-    for (let i = start; i < list.length; i++) (list[i] as StaticDesc).position.y += y;
+    // (the garage itself the island's garages build, its floor flush with its street's pavement: slice 14)
     // the yard's fence, a gate before the door; the wrecks piled in it, a gantry over one pile, tyres
     const fence = (x0: number, z0: number, x1: number, z1: number): void => {
       const l = Math.hypot(x1 - x0, z1 - z0), mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;

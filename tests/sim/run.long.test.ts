@@ -4,7 +4,7 @@
  * unchanged from `run.test.ts` in M5.1.
  */
 import { describe, expect, it } from 'vitest';
-import { GARAGE, dropOffFor, hideoutStatics } from '../../src/sim/city/cover';
+import { GARAGE, dropOffFor, hideoutStatics, type DropOffLot } from '../../src/sim/city/cover';
 import type { StaticDesc } from '../../src/sim';
 import { type Traffic } from '../../src/sim/traffic/Traffic';
 import { createWorld } from './helpers';
@@ -35,9 +35,10 @@ describe('the run (long)', () => {
         const sites = sim.run.dropOffs;
         expect(sites.map((s) => s.name)).toEqual(['hideout', 'scrapyard', 'hotel']);
         for (const site of sites) {
-          expect(dropOffFor(site.lot)).toEqual({ ...site, approachLane: -1 });
+          const lot = site.lot as DropOffLot;
+          expect(dropOffFor(lot)).toEqual({ ...site, approachLane: -1 });
           const own = new Set(hideoutStatics(site).map((st) => JSON.stringify(st)));
-          const chunk = sim.city!.generate(site.lot.cx, site.lot.cz);
+          const chunk = sim.city!.generate(lot.cx, lot.cz);
           // every garage piece is in its chunk
           for (const key of own) expect(chunk.statics.some((st) => JSON.stringify(st) === key)).toBe(true);
           const fx = Math.sin(site.yaw), fz = Math.cos(site.yaw);

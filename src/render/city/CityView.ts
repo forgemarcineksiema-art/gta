@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { BLOCK, CITY_HALF, PALETTE, PROP_KINDS, PropState, propFootprint, type City, type CityChunk, type PropDesc, type PropKind, type Props, type StaticDesc } from '../../sim';
 import { SHADOW_HALF, fadeShadowEdges } from '../shadows';
 import { fadeRoadPaint } from './roadPaint';
+import { FACADE_TAGS, GLOW, lightCity, windowGlow } from './glow';
 import { gableGeometry, prismGeometry } from '../geometry';
 import { propStatics } from '../props/propMesh';
 import { QUALITY, type QualityTier } from '../quality';
@@ -123,6 +124,8 @@ export class GeometryBuild {
   private readonly normals: Float32Array;
   private readonly colors: Float32Array;
   private readonly paint: Uint8Array;
+  /** Per vertex: its glow (a lit window, a lamp head) and whether it is a facade's (darker at the foot), M8.9 R9. */
+  private readonly look: Uint8Array;
   private cursor = 0;
   private index = 0;
   private shadowVertices = 0;
@@ -153,6 +156,7 @@ export class GeometryBuild {
     }
     this.positions = new Float32Array(count * 3); this.normals = new Float32Array(count * 3); this.colors = new Float32Array(count * 3);
     this.paint = new Uint8Array(count * 4);
+    this.look = new Uint8Array(count * 2);
   }
 
   /** Fill up to `budget` statics; returns true once every static is written. */
@@ -183,6 +187,9 @@ export class GeometryBuild {
       const gableShape = shape.kind === 'gable';
       const [r, g, b] = rgb(st.color);
       const underlay = st.paint ? rgb(st.paint.underlay) : null;
+      // a lit window by its place, a lamp's head; a facade darker at its foot (M8.9 R9)
+      const glow = st.tag === 'glazing' ? windowGlow(st.position.x, st.position.y, st.position.z) : st.tag === 'glow' ? GLOW.lamp : 0;
+      const glowByte = Math.round(glow * 255), facadeByte = st.tag !== undefined && FACADE_TAGS.has(st.tag) ? 255 : 0;
       sourcesOf(st);
       for (const src of sourceList) {
         const sp = src.p, sn = src.n, n = sp.length;
@@ -209,6 +216,9 @@ export class GeometryBuild {
           positions[index] = px + lx; positions[index + 1] = py + ly; positions[index + 2] = pz + lz;
           normals[index] = nx; normals[index + 1] = ny; normals[index + 2] = nz;
           colors[index] = r; colors[index + 1] = g; colors[index + 2] = b;
+          const li = index / 3 * 2;
+          this.look[li] = glowByte;
+          this.look[li + 1] = facadeByte;
           if (underlay && st.paint) {
             const pi = index / 3 * 4;
             this.paint[pi] = Math.round(underlay[0] * 255);
@@ -231,6 +241,7 @@ export class GeometryBuild {
     out.setAttribute('normal', new THREE.BufferAttribute(this.normals, 3));
     out.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
     out.setAttribute('roadPaint', new THREE.BufferAttribute(this.paint, 4, true));
+    out.setAttribute('cityLook', new THREE.BufferAttribute(this.look, 2, true));
     out.computeBoundingSphere();
     out.userData['shadowVertices'] = this.shadowVertices;
     out.userData['props'] = { ids: Int32Array.from(this.propIds), start: Uint32Array.from(this.propStart), count: Uint32Array.from(this.propCount) } satisfies PropRanges;
@@ -295,6 +306,7 @@ export class CityView {
   constructor(private readonly scene: THREE.Scene, private readonly city: City, private readonly props: Props | null = null) {
     fadeShadowEdges(this.material);
     fadeRoadPaint(this.material);
+    lightCity(this.material);
     for (let z = -3; z <= 3; z++) for (let x = -3; x <= 3; x++) this.tiles.push({ key: `${x},${z}`, x, z, parts: null, groups: null, queue: [], build: null });
     const sea = new THREE.Mesh(new THREE.PlaneGeometry(5000, 5000), new THREE.MeshLambertMaterial({ color: 0x3fa7c9 }));
     sea.rotation.x = -Math.PI / 2; sea.position.y = -0.5; scene.add(sea);

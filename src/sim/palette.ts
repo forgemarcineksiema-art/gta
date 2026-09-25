@@ -3,7 +3,8 @@
  * so the renderer can use vertex colours / one material and the game reads as one style.
  */
 export const PALETTE = {
-  asphalt: 0x3a3a46,
+  /** A notch bluer since M8.9 (R8): the warm light and the cars stand off it. */
+  asphalt: 0x3c3f52,
   asphaltLight: 0x4a4a58, asphaltBay: 0x5a5969,
   laneMark: 0xf2e9d8,
   roadWhite: 0xd4d0bf, roadYellow: 0xe6bb63,
@@ -14,7 +15,7 @@ export const PALETTE = {
   sand: 0xd9b57a,
   /** The ice-cream truck's scoop and cone (M5.5 slice 16). */
   iceCream: 0xf4a6c4, wafer: 0xd49a55,
-  grass: 0x879b74,
+  grass: 0x819b68,
   water: 0x3fa7c9,
   glass: 0x9fd8ff,
   ramp: 0xe5533d,
@@ -50,10 +51,15 @@ export const PALETTE = {
   policeWhite: 0xf7f3ea,
   policeBlue: 0x1d4ed8,
 
-  skyTop: 0x706c9b,
-  skyHorizon: 0xe5b6a5,
-  sun: 0xffe3ba,
-  fog: 0xd9b8ac,
+  /**
+   * The golden hour (M8.9 R8): the sky hot peach at the horizon, rose a few degrees up, deep violet from 15° up; the
+   * sun warm gold; the fog the horizon's colour, so the far city dissolves into the sky.
+   */
+  skyTop: 0x3d3a7a,
+  skyMid: 0xd9849a,
+  skyHorizon: 0xffb487,
+  sun: 0xffcf8f,
+  fog: 0xffb487,
 } as const;
 
 export type PaletteKey = keyof typeof PALETTE;
@@ -78,9 +84,17 @@ export const PED_COLORS = {
   uniform: 0x3f6fb6, navy: 0x1f2a44, badge: 0xe6bb63, ticket: 0xf2efe6,
 } as const;
 
+/** The facades' colours, a third more saturated since M8.9 (R8: the city was grey at the golden hour); chalk and trim kept. */
 export const CITY_COLORS = {
-  stone: 0xd4cbbd, chalk: 0xe3d8c4, lavender: 0xb1a8ba, brick: 0xad7864,
-  peach: 0xd7ae9c, mint: 0x91aca3, trim: 0xe2d9c9, roof: 0x62636c,
-  window: 0x526a76, windowLight: 0x82979c, shop: 0x415963,
-  soil: 0x8a9278, yard: 0x9a9991, hedge: 0x657f64, leaves: 0x849b70,
+  stone: 0xd4c8b6, chalk: 0xe3d8c4, lavender: 0xaea3ba, brick: 0xad684e,
+  peach: 0xd7a28a, mint: 0x89aca0, trim: 0xe2d9c9, roof: 0x5f606c,
+  window: 0x476676, windowLight: 0x7a969c, shop: 0x375663,
+  soil: 0x889270, yard: 0x9a998e, hedge: 0x5d7f5c, leaves: 0x7d9b63,
 } as const;
+
+/**
+ * The districts' accents on their canopies, rails, fascias and props (M8.9 R8): a clean, strong colour each, the
+ * Crown's gold, the Works' teal, the Gardens' flower pink, the Quay's aqua (they were muted: 0xf5cd75, 0x5daeb5, 0x8bb583,
+ * 0x67c9ce). The pedestrians' clothes keep their own tints.
+ */
+export const ACCENTS = { crown: 0xf2b53a, foundry: 0x1fa9a6, gardens: 0xee6f9a, marina: 0x2cc4c9 } as const;

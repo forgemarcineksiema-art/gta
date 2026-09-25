@@ -12,6 +12,37 @@ Bubble 0–100 in 3.7 s (4.3), the Phantom 228 km/h (204). The card says BEST AT
 car: NAJTWARDSZA, NAJSZYBSZY, `PL_BEST`). Pins M8.8 5.1–5.2 (long, run once here), 5.3; bodies 4.1 leaves the Twin and
 the Phantom their own numbers. Verify green.
 
+## 2026-09-25 — M8.9 slice 3: the city lit at dusk, with depth
+
+Done (R9): `render/city/glow.ts` gives the city's one material a `cityLook` attribute (a byte of glow, a byte of
+"facade") and a hook chained after the road paint's: after the light and before the fog it adds a warm glow and shades a
+facade by its height. A quarter of the upper windows lit (the draw is the window's place to the decimetre, so the same
+city lights the same windows), six in ten shop windows, the lamp heads (a `glow` part of the lamp prop; a knocked lamp
+goes dark); the facades 0.8 at the ground to 1 at 12 m, times a contact band of 0.7 in the lowest 0.4 m. No vertex, draw
+or light added. Stills: the lit windows and shop fronts read at 1280×720; the districts' numbers as slice 2's. Pins M8.9
+3.1–3.4. Verify green.
+
+## 2026-09-25 — M8.9 slice 2: the golden hour
+
+Done (R8): the sun at 32° on its old bearing (was 51°; at the plan's 25° the streets sat in shade and read as night),
+warm gold `#ffcf8f` at 2.4; the fill a lavender sky over a warm ground bounce at 1.5, shadows 0.85; the sky in three
+stops on a 5°-ring dome (peach at the horizon, rose at 5°, deep violet from 15°), the fog and the background the
+horizon's; `CITY_COLORS` a third more saturated, the asphalt bluer, `ACCENTS` one table for the districts' canopies,
+rails and props (gold, teal, flower pink, aqua; were literals in City.ts and propMesh.ts). The look suite reads the
+saturation on lit pixels only and the near-black share (a dark frame read colourful). Stills, the four districts: S
+0.31–0.40 (0.19–0.20 before), over 0.5 16–30 % (4–6), band 0.26–0.32, behind the HUD 0.08–0.10 (0.25–0.36), near black
+1 %. Pins M8.9 2.1–2.3. Verify green.
+
+## 2026-09-25 — M8.9 slice 1: the look suite and the before set
+
+Done: `e2e/look.spec.ts` (`npm run look`) shoots the plan's twelve states and the four districts' calm drives, reads the
+world's numbers from the WebGL canvas alone in the frame's own task (mean saturation, the share over 0.5, the facades'
+band, the luminance behind the HUD, the clipped share instead of "a sunlit chalk channel", which no frame can find by
+itself) and the HUD's from the DOM (texts under 13 px, the top centre); `LOOK_STATES` picks, `LOOK_SIZES=all` adds the
+small and the big screen, `LOOK_GATE=1` asserts §1.2. The before set (0.8.7 with slice 0) is in `screens/look/before/`:
+the districts at S 0.193–0.202, 3.6–5.6 % over 0.5, band 0.19–0.22, behind the HUD 0.25–0.36, clipped ≤ 0.5 %; the heli
+frame S 0.176, behind the HUD 0.41. Runs on this worktree's port (4238).
+
 ## 2026-09-25 — M8.8 slice 4: every body its own mass; any body at the start
 
 Done: `bodyTuning` scales every body that is not a shell to its own mass, each force with it (the trucks' and buses'

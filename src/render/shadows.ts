@@ -1,7 +1,12 @@
 import * as THREE from 'three';
 
 export const SHADOW_HALF = 140;
-export const SUN_OFFSET = new THREE.Vector3(-180, 270, -120);
+/**
+ * The sun's place from the car (m): its bearing as since M2, low at the golden hour, 32° over the horizon (M8.9 R8; it
+ * was 51°, a midday angle; at 25° the streets sat in their buildings' shade and read as night). The long shadows past
+ * the map's half extent fade out (`fadeShadowEdges`).
+ */
+export const SUN_OFFSET = new THREE.Vector3(-180, 135, -120);
 const direction = SUN_OFFSET.clone().normalize();
 const right = new THREE.Vector3(0, 1, 0).cross(direction).normalize();
 const up = direction.clone().cross(right).normalize();

@@ -5,9 +5,13 @@
  * instanced mesh built from the same parts, so both are one model.
  */
 import { CITY_COLORS, PALETTE, PROP_TYPES, quatFromYaw, type PropDesc, type PropKind, type StaticDesc } from '../../sim';
+import { ACCENTS } from '../../sim/palette';
 
-/** One part: a box (half extents) or a cylinder (`hx` its radius, `hy` its half height, six or eight sides). */
-export interface PropPart { shape: 'box' | 'cylinder'; x: number; y: number; z: number; hx: number; hy: number; hz: number; color: number; sides?: number }
+/**
+ * One part: a box (half extents) or a cylinder (`hx` its radius, `hy` its half height, six or eight sides); `glow` for a
+ * part lit at dusk while it stands (a lamp's head, M8.9 R9).
+ */
+export interface PropPart { shape: 'box' | 'cylinder'; x: number; y: number; z: number; hx: number; hy: number; hz: number; color: number; sides?: number; glow?: boolean }
 
 const box = (x: number, y: number, z: number, hx: number, hy: number, hz: number, color: number): PropPart => ({ shape: 'box', x, y, z, hx, hy, hz, color });
 const cyl = (x: number, y: number, z: number, r: number, hh: number, color: number, sides = 6): PropPart => ({ shape: 'cylinder', x, y, z, hx: r, hy: hh, hz: r, color, sides });
@@ -17,8 +21,8 @@ const TRUNK = 0x8b7966;
 const STAKE = PALETTE.wafer;
 const WOOD = CITY_COLORS.brick;
 /** Crown Heights' accent: the terraces' umbrellas, the newsstand's awning; the Quay's, the fish stalls'. */
-const CROWN = 0xf5cd75;
-const QUAY = 0x67c9ce;
+const CROWN = ACCENTS.crown;
+const QUAY = ACCENTS.marina;
 /** Fresh pine (pallets, crates, lobster pots) and a flamingo's pink. */
 const PINE = 0xc9a26b;
 const PINK = PALETTE.iceCream;
@@ -30,7 +34,7 @@ const MODELS: Partial<Record<PropKind, readonly PropPart[]>> = {
     box(0, 0.25, 0, 0.14, 0.25, 0.14, PALETTE.graphite),
     box(0, 4.1, 0, 0.08, 3.85, 0.08, POLE),
     box(0, 7.9, 0.6, 0.05, 0.05, 0.62, POLE),
-    box(0, 7.83, 1.3, 0.2, 0.09, 0.38, PALETTE.laneMark),
+    { ...box(0, 7.83, 1.3, 0.2, 0.09, 0.38, PALETTE.laneMark), glow: true },
   ],
   // a young street tree: a thin trunk between two stakes, a six-sided crown
   sapling: [
@@ -225,6 +229,7 @@ export function propStatics(p: PropDesc, out: StaticDesc[]): void {
     const position = { x: p.x + cos * part.x + sin * part.z, y: part.y, z: p.z - sin * part.x + cos * part.z };
     const shape = part.shape === 'box' ? { kind: 'box' as const, hx: part.hx, hy: part.hy, hz: part.hz }
       : { kind: 'cylinder' as const, radius: part.hx, halfHeight: part.hy, ...(part.sides ? { sides: part.sides } : {}) };
-    out.push({ shape, position, rotation, color: part.color, tag: tall ? 'prop' : 'prop-low', detailOnly: !tall, prop: p.id });
+    // a lit part is tagged for the city's glow (a tall prop's part, so it casts as 'prop' does)
+    out.push({ shape, position, rotation, color: part.color, tag: part.glow ? 'glow' : tall ? 'prop' : 'prop-low', detailOnly: !tall, prop: p.id });
   }
 }

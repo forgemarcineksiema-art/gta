@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.8 slice 4: every body its own mass; any body at the start
+
+Done: `bodyTuning` scales every body that is not a shell to its own mass, each force with it (the trucks' and buses'
+rule since M5.5, now every body's): a Bubble is 550 kg in the player's hands as on the street, a taxi 1,450; a shell and
+a rival on a shell stay their preset bitwise. `?body=<id>` and `SimWorldOptions.body` start the player in any body
+(`SimWorld.setBody`; DEV). `tests/sim/bodyMeasure.ts` measures a body; the long `bodies.long.test.ts` measured all 28
+once here (every body's 0–100 within 1 % of its class's) and writes `perf/bodies.json` for the report. Pins M8.8 4.1,
+4.3 (bodies.test; 19.4's taxi mass moved to its own); 4.2 long. Verify green.
+
 ## 2026-09-25 — M8.8 slice 3: what a car is for, on its card
 
 Done: every CARS card says its class's job in one quiet word under the name (`ROLE_WORDS` and `cardLine(body)` in

@@ -8,7 +8,7 @@
 import { HIDDEN_CARS } from '../../src/sim/city/stash';
 import { describe, expect, it } from 'vitest';
 import type { SimWorld } from '../../src/sim';
-import { BODIES, BODY_INDEX, CIVILIAN_BODIES, bodySpec, isRivalBody, pickBody, type CivilianBody, type RoadKind } from '../../src/sim/traffic/bodies';
+import { BODIES, BODY_IDS, BODY_INDEX, CIVILIAN_BODIES, bodySpec, bodyTuning, isRivalBody, isShell, pickBody, type CivilianBody, type RoadKind } from '../../src/sim/traffic/bodies';
 import { AgentState, type Traffic } from '../../src/sim/traffic/Traffic';
 import { TRAFFIC } from '../../src/sim/traffic/tuning';
 import { CAR_IDS, CAR_PRESETS } from '../../src/sim/vehicle/presets';
@@ -162,8 +162,33 @@ describe('traffic\'s own bodies', () => {
       expect(sim.carId).toBe('muscle');
       expect(sim.carPaint).toBe(PALETTE.coin);
       expect(sim.pursuit.descriptor.paint).toBe(PALETTE.coin);
-      expect(sim.vehicle.tuning.mass).toBe(CAR_PRESETS.muscle.mass);
+      // at its own mass since M8.8 slice 4 (was the muscle class's)
+      expect(sim.vehicle.tuning.mass).toBe(bodySpec('taxi').mass);
       expect(BODY_INDEX.taxi).toBeGreaterThanOrEqual(CAR_IDS.length);
     } finally { sim.dispose(); }
   }, 60_000);
+});
+
+describe('every body at its own mass (M8.8 slice 4)', () => {
+  it('M8.8 4.3 the Bubble is 550 kg in the player\'s hands, the SUV 1,900; every non-shell body its own mass', () => {
+    expect(bodyTuning('bubble').mass).toBe(550);
+    expect(bodyTuning('suv').mass).toBe(1900);
+    for (const body of BODY_IDS) if (!isShell(body)) expect(bodyTuning(body).mass, body).toBe(bodySpec(body).mass);
+  });
+
+  it('M8.8 4.1 a shell and a rival on a shell drive as their class\'s preset, bitwise', () => {
+    for (const body of ['muscle', 'compact', 'heavy', 'sports', 'police', 'twin', 'phantom', 'fakecop', 'chiefcar'] as const) {
+      expect(bodyTuning(body), body).toEqual(CAR_PRESETS[bodySpec(body).car]);
+    }
+  });
+
+  it('M8.8 4.3 a world started in a body drives it: its class, its paint, its mass', async () => {
+    const sim = await createWorld({ spawn: 'straight', body: 'bubble' });
+    try {
+      expect(sim.carBody).toBe('bubble');
+      expect(sim.carId).toBe('compact');
+      expect(sim.carPaint).toBe(bodySpec('bubble').paints[0]);
+      expect(sim.vehicle.tuning.mass).toBe(550);
+    } finally { sim.dispose(); }
+  });
 });

@@ -63,6 +63,7 @@ do not change with the calendar.
 | `/?traffic=0.5&peds=2` | traffic and pedestrian density scales (default 1; `0` removes them) |
 | `/?life=0` | no traffic, no pedestrians: the M2 sandbox |
 | `/?car=compact` | vehicle class: `muscle` (default), `compact`, `heavy` (also buttons in the panel) |
+| `/?body=bubble` | any vehicle by its body id (`src/sim/traffic/bodies.ts`), at its own mass with its class's upgrades: the new ones before their stash or price exists (M8.8 slice 4); turns the cold open off |
 | `/?map=playground` | the M1 playground and handling instruments |
 | `/?spawn=ramps` | playground spawns: `lot`, `straight`, `straight-far`, `kerbs`, `slalom`, `skidpad`, `ramps`, `bigjump`, `walls`, `track` |
 | `/?spawn=track&dev=1` | the test track: lap timer, best-lap ghost, telemetry graph, save recording / load ghost in the panel |

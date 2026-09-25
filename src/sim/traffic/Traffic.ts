@@ -230,6 +230,8 @@ export class Traffic {
   readonly damage: Float32Array;
   /** Set on the step a car was wrecked by its own damage or one big contact (not by a caller): Life reads it for takedowns. */
   readonly justWrecked: Uint8Array;
+  /** Flattened by the steamroller (M8.8 slice 11): a wreck drawn squashed, never lent a body again (nothing to hit). */
+  readonly flat: Uint8Array;
   /** 1 = the light bar is on (parked patrols near the player at heat 3+, roadblock cars); the view reads it. */
   readonly lights: Uint8Array;
   /** Collider handle of the player's chassis, so contacts can be attributed. The world refreshes it every step. */
@@ -443,6 +445,7 @@ export class Traffic {
     this.prevSpeed = new Float32Array(n);
     this.damage = new Float32Array(n);
     this.justWrecked = new Uint8Array(n);
+    this.flat = new Uint8Array(n);
     this.lights = new Uint8Array(n);
     this.wobble = new Float32Array(n);
     this.turn = new Uint8Array(n);
@@ -1176,6 +1179,7 @@ export class Traffic {
     this.wreckedFor[agent] = 0;
     this.damage[agent] = 0;
     this.justWrecked[agent] = 0;
+    this.flat[agent] = 0;
     this.lastPlayerContactTick[agent] = -100000;
     this.shift[agent] = 0;
     this.passAgent[agent] = -1;
@@ -1949,7 +1953,7 @@ export class Traffic {
     let best = -1;
     let bestD = Infinity;
     for (let i = 0; i < this.capacity; i++) {
-      if ((this.agentBody[i] as number) >= 0) continue;
+      if ((this.agentBody[i] as number) >= 0 || this.flat[i] === 1) continue;
       const st = this.state[i];
       if (st !== AgentState.Kinematic && st !== AgentState.Wrecked && st !== AgentState.Abandoned && st !== AgentState.Parked) continue;
       const dx = (this.x[i] as number) - player.x;
@@ -2222,6 +2226,38 @@ export class Traffic {
     body.setAngvel(this.ang, true);
   }
 
+  /**
+   * Flattened (M8.8 slice 11: the steamroller's drum): a wreck squashed flat where it stood, its lent body given back
+   * and never lent again, so the roller drives on over it. False when it already was (or is no car).
+   */
+  flatten(i: number): boolean {
+    if (this.state[i] === AgentState.Free || this.flat[i] === 1) return false;
+    const slot = this.agentBody[i] as number;
+    if (slot >= 0) {
+      // where its body stood, flat on the ground at its heading (a pancake has no lean)
+      const body = this.bodies[slot] as RAPIER.RigidBody;
+      body.translation(this.pos);
+      this.x[i] = this.pos.x;
+      this.z[i] = this.pos.z;
+      const yaw = M.yawOf(body.rotation(this.rot));
+      this.yaw[i] = yaw;
+      const q = M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, yaw), k = i * 4;
+      this.poseQ[k] = q.x;
+      this.poseQ[k + 1] = q.y;
+      this.poseQ[k + 2] = q.z;
+      this.poseQ[k + 3] = q.w;
+      // on the road under it (the highway's deck or the street)
+      const lane = this.lane[i] as number;
+      this.y[i] = lane >= 0 ? this.lanes.heightAt(lane, this.s[i] as number) : 0;
+      this.posed[i] = 1;
+    }
+    this.wreck(i);
+    this.releaseBody(i);
+    this.flat[i] = 1;
+    this.paintSerial++;
+    return true;
+  }
+
   /** The agent is a wreck from now on: a stopped obstacle until it despawns. */
   wreck(i: number): void {
     if (this.state[i] === AgentState.Wrecked) return;
@@ -2422,6 +2458,7 @@ export class Traffic {
     this.releaseHolds(i);
     this.state[i] = AgentState.Free;
     this.posed[i] = 0;
+    this.flat[i] = 0;
     this.parkedCiv[i] = 0;
     this.parkBay[i] = -1;
     this.police[i] = 0;

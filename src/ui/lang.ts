@@ -8,8 +8,8 @@
  * The module starts in English, the code's own language, so the pure tests read what the code writes; the app sets
  * the player's language before it builds the screen.
  */
-import { BEST_AT, BODY_WORDS, ROLE_WORDS, bodySpec, english, englishNumber, fill, type BodyId, type Holes, type Lang } from '../sim';
-import { PL, PL_BEST, PL_GENDER, PL_PAINT } from './pl';
+import { BEST_AT, BODY_WORDS, ONLY_IT, ROLE_WORDS, bodySpec, english, englishNumber, fill, type BodyId, type Holes, type Lang } from '../sim';
+import { PL, PL_BEST, PL_GENDER, PL_ONLY_IT, PL_PAINT } from './pl';
 
 /** A language named in itself: the settings row shows it so, in either language. */
 export const LANG_NAMES: Readonly<Record<Lang, string>> = { pl: 'POLSKI', en: 'ENGLISH' };
@@ -65,10 +65,15 @@ export function paintedCar(paint: string, car: string): string {
 }
 
 /**
- * The line under a car's name on the wall (M8.8 slices 3, 5): a trophy's BEST AT, in Polish agreeing with the car
- * (NAJTWARDSZA laweta, NAJSZYBSZY fantom), else what its class is for.
+ * The line under a car's name on the wall (M8.8 slices 3, 5, 11): a crazy car's ONLY IT (TYLKO ON: ROZJEŻDŻA AUTA,
+ * the pronoun the car's), a trophy's BEST AT, in Polish agreeing with the car (NAJTWARDSZA laweta, NAJSZYBSZY fantom),
+ * else what its class is for.
  */
 export function carLine(body: BodyId): string {
+  const only = ONLY_IT[body];
+  if (only) {
+    return current === 'pl' ? `${PL_ONLY_IT[FORM[PL_GENDER[BODY_WORDS[body]] ?? 'm']]}: ${t(only)}` : t('ONLY IT: {thing}', { thing: t(only) });
+  }
   const best = BEST_AT[body];
   if (!best) return t(ROLE_WORDS[bodySpec(body).car]);
   const forms = current === 'pl' ? PL_BEST[best] : undefined;

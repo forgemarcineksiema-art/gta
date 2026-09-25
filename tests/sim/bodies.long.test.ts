@@ -6,6 +6,7 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { ONLY_IT } from '../../src/sim/jobs/catalog';
 import { BODY_IDS, bodySpec, bodyTuning, isShell, type BodyId } from '../../src/sim/traffic/bodies';
 import { driftHeld, grip80, measureBody, pulse60, wallDamage, type BodyRow } from './bodyMeasure';
 import { createWorld, fullThrottle, kmh, position, run, runUntil, upness } from './helpers';
@@ -27,18 +28,20 @@ function best(rows: Row[], value: (r: Row) => number, least = false, keep: (r: R
 
 describe('every body measured', () => {
   it('M8.8 4.2 every body\'s 0-100 within ±10 % of its class\'s; 5.1 each trophy the best at its thing; 4.4 the table', async () => {
-    const rows: Row[] = [];
+    const all: Row[] = [];
     for (const body of BODY_IDS) {
       const t = bodyTuning(body);
-      rows.push({
+      all.push({
         ...(await measureBody(body)),
         drift: await driftHeld(body), pulse: await pulse60(body), grip: await grip80(body), wall: await wallDamage(body),
         mass: t.mass, boost: 1 / t.boostDrain,
       });
     }
     mkdirSync(new URL('../../perf/', import.meta.url), { recursive: true });
-    writeFileSync(new URL('../../perf/bodies.json', import.meta.url), JSON.stringify(rows, null, 1));
-    const of = new Map(rows.map((r) => [r.body, r]));
+    writeFileSync(new URL('../../perf/bodies.json', import.meta.url), JSON.stringify(all, null, 1));
+    const of = new Map(all.map((r) => [r.body, r]));
+    // the crazy cars (M8.8 phase F) do one thing no other car does, not a car's things better: measured, not ranked
+    const rows = all.filter((r) => !ONLY_IT[r.body]);
     for (const r of rows) {
       if (isShell(r.body) || DRIVERS.includes(r.body)) continue;
       const cls = of.get(bodySpec(r.body).car) as Row;

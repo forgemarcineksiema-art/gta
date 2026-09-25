@@ -84,10 +84,13 @@ export const BEST_AT: Partial<Record<BodyId, string>> = {
   fakecop: 'CLEARING THE ROAD', limo: 'GETTING BUSTED', chiefcar: 'DISGUISE',
 };
 
-/** The line under a car's name on the wall (M8.8 slices 3, 5): a trophy's BEST AT, else what its class is for. */
+/** A crazy car's one trick, no other car's (M8.8 phase F): its card's ONLY IT line. */
+export const ONLY_IT: Partial<Record<BodyId, string>> = { roller: 'FLATTENS CARS' };
+
+/** The line under a car's name on the wall (M8.8 slices 3, 5, 11): a crazy car's ONLY IT, a trophy's BEST AT, else what its class is for. */
 export function cardLine(body: BodyId): string {
-  const best = BEST_AT[body];
-  return best ? `BEST AT: ${best}` : ROLE_WORDS[(BODIES[BODY_IDS.indexOf(body)] as (typeof BODIES)[number]).car];
+  const only = ONLY_IT[body], best = BEST_AT[body];
+  return only ? `ONLY IT: ${only}` : best ? `BEST AT: ${best}` : ROLE_WORDS[(BODIES[BODY_IDS.indexOf(body)] as (typeof BODIES)[number]).car];
 }
 /** What the radio calls a body. */
 export const BODY_WORDS: Record<BodyId, string> = {
@@ -95,6 +98,7 @@ export const BODY_WORDS: Record<BodyId, string> = {
   wagon: 'WAGON', pizza: 'PIZZA HATCH', wrecker: 'WRECKER', twin: 'TWIN', fakecop: 'FAKE CRUISER', partybus: 'PARTY BUS',
   lowrider: 'LOWRIDER', limo: 'GOLD LIMO', bubble: 'BUBBLE', phantom: 'PHANTOM', chiefcar: "CHIEF'S CRUISER",
   roadster: 'ROADSTER', sweeper: 'STREET SWEEPER', hotdog: 'HOT-DOG VAN',
+  roller: 'STEAMROLLER',
 };
 
 /** A trial's medal times from its bronze limit (M5.5 slice 10): gold, silver, bronze, seconds. */

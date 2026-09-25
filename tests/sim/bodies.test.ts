@@ -202,7 +202,9 @@ describe('every body at its own mass (M8.8 slice 4)', () => {
 
 describe('M8.8 slice 10: the 4×4 in every table', () => {
   it('M8.8 10.4 its shell comes after the civilians and is read by its class; its descriptor unpacks to it; every class table has its row', async () => {
-    expect(BODY_IDS[BODY_IDS.length - 1]).toBe('offroad');
+    // appended right after the last body before it, never renumbered (the steamroller came after it, slice 11)
+    expect(BODY_IDS.indexOf('offroad')).toBe(BODY_IDS.indexOf('hotdog') + 1);
+    expect(BODIES.map((b) => b.id)).toEqual([...BODY_IDS]);
     expect(isShell('offroad')).toBe(true);
     expect(isShell('suv')).toBe(false);
     expect([bodySpec('suv').car, bodySpec('pickup').car]).toEqual(['offroad', 'offroad']);

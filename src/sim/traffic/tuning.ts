@@ -238,6 +238,8 @@ export const TRAFFIC: TrafficTuning = {
       // the wanted board's cars (M6) are never traffic
       wagon: 0, pizza: 0, wrecker: 0, twin: 0, fakecop: 0, partybus: 0, lowrider: 0, limo: 0, bubble: 0, phantom: 0, chiefcar: 0,
       roadster: 0, sweeper: 0, hotdog: 0,
+      // the crazy cars (M8.8 phase F) are hidden, never traffic
+      roller: 0,
     },
     places: {
       crown: { taxi: 4 },

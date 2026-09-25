@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.8 slice 11: the pancake and the steamroller
+
+Done: `Traffic.flatten` wrecks a record where it stands, flat at its heading, gives back its lent body and never lends
+it again (nothing to hit); the render draws it a quarter high and a tenth wider (`traffic.flat`), a `flatten` event plays
+a crunch and a two-note sag. The steamroller (`roller`, the van's class, 9 t, 33 km/h flat out) flattens every car its
+front drum meets (`BodySpec.drum`, `Life.flattenStep`, a ground-rectangle overlap test): a driver climbs out shaking a
+fist, a unit is a takedown, a roadblock's car breaches the block and pays. Hidden on the Works' yard by the giant ball,
+a slow low chug for a clue; its card ONLY IT: FLATTENS CARS (TYLKO ON: ROZJEŻDŻA AUTA). Bodies added since M8.8 are
+appended in the order they came (`ADDED`). The crazy cars are measured, not ranked, in bodies.long. Pins M8.8 11.1–11.5.
+
 ## 2026-09-25 — M8.8 slice 10: the 4×4 class
 
 Done: a sixth class, `offroad` (4×4, TERENÓWKA; OFF-ROAD, TEREN): 1,950 kg, 4WD, 360 N·m to 6,000 rpm, 0.42 m wheels on

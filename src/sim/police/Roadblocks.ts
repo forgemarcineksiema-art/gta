@@ -116,7 +116,10 @@ export class Roadblocks {
       this.release();
       return;
     }
-    if (this.sawhorseUp && this.touches(probe, this.sawhorseX, this.sawhorseZ, this.yaw, t.sawhorseWidth / 2, SAWHORSE_DEPTH / 2)) {
+    // a car of the block flattened by the steamroller (M8.8 slice 11) breaches it as the sawhorse does
+    const a0 = this.agents[0], a1 = this.agents[1];
+    const flattened = (a0 >= 0 && this.traffic.flat[a0] === 1) || (a1 >= 0 && this.traffic.flat[a1] === 1);
+    if (flattened || (this.sawhorseUp && this.touches(probe, this.sawhorseX, this.sawhorseZ, this.yaw, t.sawhorseWidth / 2, SAWHORSE_DEPTH / 2))) {
       // through the weak point: planks fly, a little speed goes, the bag pays, and the cars pull out
       this.sawhorseUp = false;
       this.broken++;

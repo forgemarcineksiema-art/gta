@@ -102,7 +102,11 @@ export class TrafficView {
       this.scratchQ.normalize();
       // Neon Niko's lowrider hops on its hydraulics while it waits (M6)
       if (b === LOWRIDER) this.scratchP.y += lowriderBounce(this.clock, traffic.speed[i] as number, i);
+      // a car the steamroller flattened (M8.8 slice 11): a quarter of its height, a tenth wider and longer
+      const flat = traffic.flat[i] === 1;
+      if (flat) this.scratchS.set(FLAT_SPREAD, FLAT_HEIGHT, FLAT_SPREAD);
       mesh.setMatrixAt(n, this.scratchM.compose(this.scratchP, this.scratchQ, this.scratchS));
+      if (flat) this.scratchS.set(1, 1, 1);
       let fade = 1;
       if (eye && target) {
         const p = this.scratchP, q = this.scratchQ, spec = BODIES[b] as (typeof BODIES)[number];
@@ -143,6 +147,9 @@ export class TrafficView {
 }
 
 const LOWRIDER = BODY_INDEX.lowrider;
+/** A flattened car's scale (M8.8 slice 11): its height, and its width and length. */
+const FLAT_HEIGHT = 0.25;
+const FLAT_SPREAD = 1.1;
 
 /** The lowrider's hop (M6): up to 7 cm, twice a second, only while it stands still; `phase` offsets one car from another. */
 export function lowriderBounce(time: number, speed: number, phase: number): number {

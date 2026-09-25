@@ -17,14 +17,19 @@ import { cloneTuning, type VehicleTuning } from '../vehicle/tuning';
 
 /** The wanted board's cars (M6, DESIGN.md §14.3): the ten rivals' and the Chief's, never spawned as traffic. */
 export type RivalBody = 'wagon' | 'pizza' | 'wrecker' | 'twin' | 'fakecop' | 'partybus' | 'lowrider' | 'limo' | 'bubble' | 'phantom' | 'chiefcar';
-export type CivilianBody = 'sedan' | 'hatch' | 'estate' | 'suv' | 'pickup' | 'taxi' | 'truck' | 'bus' | 'icecream' | RivalBody | 'roadster' | 'sweeper' | 'hotdog';
+/** The crazy cars (M8.8 phase F): hidden, one in each district, each the only one that does its thing. */
+export type CrazyBody = 'roller';
+export type CivilianBody = 'sedan' | 'hatch' | 'estate' | 'suv' | 'pickup' | 'taxi' | 'truck' | 'bus' | 'icecream' | RivalBody | 'roadster' | 'sweeper' | 'hotdog' | CrazyBody;
 export type BodyId = CarId | CivilianBody;
 export const RIVAL_BODIES: readonly RivalBody[] = ['wagon', 'pizza', 'wrecker', 'twin', 'fakecop', 'partybus', 'lowrider', 'limo', 'bubble', 'phantom', 'chiefcar'];
-export const CIVILIAN_BODIES: readonly CivilianBody[] = ['sedan', 'hatch', 'estate', 'suv', 'pickup', 'taxi', 'truck', 'bus', 'icecream', ...RIVAL_BODIES, 'roadster', 'sweeper', 'hotdog'];
-/** The classes whose shells come first (their class index is their body index); the later ones' come after the civilians. */
+/** The civilian bodies from before M8.8, in their order. */
+const FIRST_CIVILIANS: readonly CivilianBody[] = ['sedan', 'hatch', 'estate', 'suv', 'pickup', 'taxi', 'truck', 'bus', 'icecream', ...RIVAL_BODIES, 'roadster', 'sweeper', 'hotdog'];
+/** The classes whose shells come first (their class index is their body index). */
 const FIRST_SHELLS: readonly CarId[] = ['muscle', 'compact', 'heavy', 'sports', 'police'];
-const LATER_SHELLS: readonly CarId[] = CAR_IDS.filter((id) => !FIRST_SHELLS.includes(id));
-export const BODY_IDS: readonly BodyId[] = [...FIRST_SHELLS, ...CIVILIAN_BODIES, ...LATER_SHELLS];
+/** Every body added since, a class's shell or a civilian's, in the order it came: appended after the last. */
+const ADDED: readonly BodyId[] = ['offroad', 'roller'];
+export const CIVILIAN_BODIES: readonly CivilianBody[] = [...FIRST_CIVILIANS, ...ADDED.filter((id): id is CivilianBody => !(CAR_IDS as readonly BodyId[]).includes(id))];
+export const BODY_IDS: readonly BodyId[] = [...FIRST_SHELLS, ...FIRST_CIVILIANS, ...ADDED];
 
 /** Traffic's paints (the order cards name them in jobs/catalog.ts). */
 export const CIVILIAN_PAINTS: readonly number[] = [
@@ -68,6 +73,8 @@ export interface BodySpec {
   unreported?: boolean;
   /** A race rival's acceleration (m/s², its lane follower's), from its car's 0–60 (M8.8 slice 6); absent, the traffic's. */
   aiAccel?: number;
+  /** The steamroller's front drum (M8.8 slice 11): half its width and its length along the car (m); a record it touches is flattened. */
+  drum?: { halfWidth: number; length: number };
 }
 
 function shell(id: CarId): BodySpec {
@@ -116,6 +123,19 @@ const TROPHY = {
   phantom: (t: VehicleTuning): void => { t.torqueMax *= 1.1; t.drag *= 0.6; t.gearRatios = [3.85, 2.88, 2.15, 1.61, 1.12, 0.85]; },
 } as const;
 
+/** The crazy cars' own numbers on their class, after the mass (M8.8 phase F). */
+const CRAZY = {
+  /** The steamroller: 9 t on the van's drivetrain, geared to a walking giant's 35 km/h (the rev limit in third and up). */
+  roller: (t: VehicleTuning): void => {
+    t.torqueMax *= 0.45;
+    t.gearRatios = [9.5, 7.2, 6.0, 6.0, 6.0, 6.0];
+    t.maxSteerDegHigh = 12;
+    t.steerRate = 3;
+    t.boostTorqueMul = 1.15;
+    t.boostThrust *= 0.3;
+  },
+} as const;
+
 /** Indexed like BODY_IDS. Sizes in metres; the profiles in render/bodyProfiles.ts are drawn on these wheels. */
 export const BODIES: readonly BodySpec[] = [
   ...FIRST_SHELLS.map(shell),
@@ -152,8 +172,11 @@ export const BODIES: readonly BodySpec[] = [
   civilian('roadster', 'muscle', 0.84, 2.2, 2.9, 1.5, 1100, 1, { paints: [PALETTE.carRed] }),
   civilian('sweeper', 'heavy', 1.1, 2.9, 3.2, 1.86, 3200, 0.8, { paints: [PALETTE.carWhite], big: true, stretch: true }),
   civilian('hotdog', 'heavy', 1.08, 2.8, 3.3, 1.86, 2600, 0.85, { paints: [PALETTE.coin], big: true, stretch: true }),
-  // the classes added since, in their own shells (the 4×4, M8.8 slice 10)
-  ...LATER_SHELLS.map(shell),
+  // appended since, in the order they came (ADDED): the 4×4's shell (M8.8 slice 10)
+  shell('offroad'),
+  // the steamroller (slice 11), hidden in the Works' yard: a van's drivetrain under 9 t, 35 km/h flat out, a front drum
+  // 1.5 m across and 1.9 m wide that flattens whatever it touches
+  civilian('roller', 'heavy', 1.05, 2.9, 3.3, 1.9, 9000, 0, { paints: [PALETTE.coin], big: true, stretch: true, tune: CRAZY.roller, drum: { halfWidth: 0.95, length: 1.5 } }),
 ];
 
 export const BODY_INDEX = Object.fromEntries(BODY_IDS.map((id, i) => [id, i])) as Record<BodyId, number>;

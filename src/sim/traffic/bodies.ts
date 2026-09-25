@@ -50,6 +50,10 @@ export interface BodySpec {
   hops: number;
   /** Long and tall (the trucks, the buses, the limo): the traffic's box stands higher. The tuning scales every body to its mass (M8.8 slice 4). */
   stretch: boolean;
+  /** A trophy's own numbers on its class, applied after the mass (M8.8 slice 5): each is the best in the game at one thing. */
+  tune?: (t: VehicleTuning) => void;
+  /** The player's damage is divided by this (M8.8 slice 5: the Wrecker's twice, as in its hunt); 1 when absent. */
+  armour?: number;
 }
 
 function shell(id: CarId): BodySpec {
@@ -65,10 +69,38 @@ function civilian(id: CivilianBody, car: CarId, halfWidth: number, halfLength: n
 }
 
 /** A rival's car on a class's own shell's footprint (the Twin, the Fake Cruiser, the Phantom, the Chief's Cruiser). */
-function onShell(id: RivalBody, car: CarId, paint: number): BodySpec {
+function onShell(id: RivalBody, car: CarId, paint: number, more: Partial<BodySpec> = {}): BodySpec {
   const p = CAR_PRESETS[car];
-  return civilian(id, car, p.chassisHalfExtents.x, p.chassisHalfExtents.z, p.wheelBase, p.trackWidth, p.mass, 1, { paints: [paint] });
+  return civilian(id, car, p.chassisHalfExtents.x, p.chassisHalfExtents.z, p.wheelBase, p.trackWidth, p.mass, 1, { paints: [paint], ...more });
 }
+
+/**
+ * The trophies' own numbers (M8.8 slice 5, R2: the car you beat is the car you get), each the best in the game at one
+ * thing, measured by `tests/sim/bodies.long.test.ts` against every other body.
+ */
+const TROPHY = {
+  /** #10 Granny's hot-rodded estate, a blower through the bonnet: the widest held drift. */
+  wagon: (t: VehicleTuning): void => { t.torqueMax *= 1.2; t.driftThrottlePush *= 1.2; t.driftMaxAngleDeg = 45; },
+  /** #9 Pepperoni Pete's hatch, the bad driver's weave: the quickest to change direction. */
+  pizza: (t: VehicleTuning): void => { t.steerRate *= 1.5; t.muFront *= 1.08; t.maxSteerDegHigh = 10; t.inertiaScale = { x: 1, y: 0.65, z: 1 }; },
+  /** #7 the Twins' coupé under its wing: the most grip in a corner. */
+  twin: (t: VehicleTuning): void => { t.muFront *= 1.08; t.muRear *= 1.08; t.downforce *= 1.3; },
+  /** #5 Big Bernie's bus at race pace: 6.5 t on the lightest drag, the hardest thing to meet. */
+  partybus: (t: VehicleTuning): void => { t.drag *= 0.7; },
+  /** #4 Neon Niko's lowrider, low, slow, then suddenly not: the longest boost. */
+  lowrider: (t: VehicleTuning): void => { t.boostDrain *= 0.6; },
+  /** #2 Professor Pip's microcar, absurdly fast: 550 kg on a motorbike's engine, the quickest to 100, short-geared. */
+  bubble: (t: VehicleTuning): void => {
+    t.torqueMax *= 2;
+    t.drag *= 1.6;
+    t.redlineRpm = 9000;
+    t.gearRatios = [3.4, 2.45, 1.85, 1.45, 1.15, 0.95];
+    t.maxSteerDegHigh = 4.5;
+    t.steerRate = 5;
+  },
+  /** #1 the Ghost's phantom, lights off round the loop: the highest top speed. */
+  phantom: (t: VehicleTuning): void => { t.torqueMax *= 1.1; t.drag *= 0.6; t.gearRatios = [3.85, 2.88, 2.15, 1.61, 1.12, 0.85]; },
+} as const;
 
 /** Indexed like BODY_IDS. Sizes in metres; the profiles in render/bodyProfiles.ts are drawn on these wheels. */
 export const BODIES: readonly BodySpec[] = [
@@ -84,17 +116,18 @@ export const BODIES: readonly BodySpec[] = [
   // the hidden car (M5.5 slice 16): never drawn by the spawner (its share is 0), stashed by city/stash.ts
   civilian('icecream', 'heavy', 1.12, 2.9, 3.4, 1.9, 2800, 0.85, { paints: [CITY_COLORS.mint], big: true, stretch: true }),
   // the wanted board's cars (M6 slices 1, 4–5): never spawned (share 0), raced or hunted in a duel, won into the garage
-  civilian('wagon', 'muscle', 0.92, 2.42, 2.85, 1.6, 1450, 1, { paints: [CITY_COLORS.lavender] }),
-  civilian('pizza', 'compact', 0.87, 2.05, 2.55, 1.52, 1150, 1, { paints: [PALETTE.carRed] }),
-  civilian('wrecker', 'heavy', 0.98, 2.7, 3.3, 1.72, 2100, 1, { paints: [PALETTE.carOrange] }),
-  onShell('twin', 'sports', CITY_COLORS.mint),
+  civilian('wagon', 'muscle', 0.92, 2.42, 2.85, 1.6, 1450, 1, { paints: [CITY_COLORS.lavender], tune: TROPHY.wagon }),
+  civilian('pizza', 'compact', 0.87, 2.05, 2.55, 1.52, 1150, 1, { paints: [PALETTE.carRed], tune: TROPHY.pizza }),
+  // #8 Tow Truck Tina's wrecker keeps the hunt's twice the armour: the toughest car in the game
+  civilian('wrecker', 'heavy', 0.98, 2.7, 3.3, 1.72, 2100, 1, { paints: [PALETTE.carOrange], armour: 2 }),
+  onShell('twin', 'sports', CITY_COLORS.mint, { tune: TROPHY.twin }),
   onShell('fakecop', 'police', PALETTE.policeWhite),
   // Big Bernie's bus races: it overtakes where the city's buses keep their lane
-  civilian('partybus', 'heavy', 1.27, 6.0, 6.6, 2.24, 6500, 1, { paints: [PALETTE.carMagenta], big: true, stretch: true }),
-  civilian('lowrider', 'sports', 0.95, 2.55, 3.1, 1.62, 1500, 1, { paints: [PALETTE.carBlue] }),
+  civilian('partybus', 'heavy', 1.27, 6.0, 6.6, 2.24, 6500, 1, { paints: [PALETTE.carMagenta], big: true, stretch: true, tune: TROPHY.partybus }),
+  civilian('lowrider', 'sports', 0.95, 2.55, 3.1, 1.62, 1500, 1, { paints: [PALETTE.carBlue], tune: TROPHY.lowrider }),
   civilian('limo', 'muscle', 0.95, 3.4, 4.6, 1.62, 2400, 1, { paints: [PALETTE.carGold], stretch: true }),
-  civilian('bubble', 'compact', 0.72, 1.45, 1.75, 1.2, 550, 1, { paints: [PALETTE.carLime] }),
-  onShell('phantom', 'sports', PALETTE.carBlack),
+  civilian('bubble', 'compact', 0.72, 1.45, 1.75, 1.2, 550, 1, { paints: [PALETTE.carLime], tune: TROPHY.bubble }),
+  onShell('phantom', 'sports', PALETTE.carBlack, { tune: TROPHY.phantom }),
   onShell('chiefcar', 'police', PALETTE.policeWhite),
   // three more hidden cars (M6 slice 9), stashed like the ice-cream truck: a roadster, a street sweeper, a hot-dog van
   civilian('roadster', 'muscle', 0.84, 2.2, 2.9, 1.5, 1100, 1, { paints: [PALETTE.carRed] }),
@@ -151,6 +184,7 @@ export function bodyTuning(body: BodyId): VehicleTuning {
     t.mass = spec.mass;
     for (const key of MASS_SCALED) t[key] *= k;
   }
+  spec.tune?.(t);
   return t;
 }
 

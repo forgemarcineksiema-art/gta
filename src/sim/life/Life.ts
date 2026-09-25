@@ -4,7 +4,7 @@
  */
 import { BALANCE } from '../balance';
 import { BILLBOARD_BOTTOM, BILLBOARD_HEIGHT } from '../city/collectibles';
-import { isShell } from '../traffic/bodies';
+import { bodySpec, isShell } from '../traffic/bodies';
 import type { VehicleControls } from '../controls';
 import { DAMAGE, ECONOMY, SWAP } from '../economy';
 import * as M from '../math';
@@ -181,7 +181,8 @@ export class Life {
     const tm = this.sim.vehicle.telemetry;
     const over = tm.impact - DAMAGE.threshold;
     if (over <= 0) return;
-    const delta = over * DAMAGE.perMetrePerSecond * (kind === 'traffic' ? this.trafficFactor(tm.hitHandle) : 1);
+    // a body's own armour (M8.8 slice 5: the Wrecker's twice) takes its share of every hit
+    const delta = over * DAMAGE.perMetrePerSecond * (kind === 'traffic' ? this.trafficFactor(tm.hitHandle) : 1) / (bodySpec(this.sim.carBody).armour ?? 1);
     st.damage = Math.min(1, st.damage + delta);
     let stage = 0;
     for (let k = 0; k < DAMAGE.stages.length; k++) if (st.damage >= (DAMAGE.stages[k] as number)) stage = k + 1;

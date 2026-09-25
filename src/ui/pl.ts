@@ -390,6 +390,14 @@ export const PL: Readonly<Record<string, string>> = {
   'RAM': 'TARAN',
   'SPEED': 'PRĘDKOŚĆ',
   'DISGUISE': 'PRZEBRANIE',
+  // a trophy's BEST AT (M8.8 slice 5): the English line's words; the Polish line agrees with the car (PL_BEST below)
+  'BEST AT: {thing}': 'NAJLEPSZY W: {thing}',
+  'DRIFTS': 'DRIFT',
+  'AGILITY': 'ZWINNOŚĆ',
+  'TOUGHNESS': 'WYTRZYMAŁOŚĆ',
+  'RAMMING': 'TARANOWANIE',
+  'ACCELERATION': 'PRZYSPIESZENIE',
+  'TOP SPEED': 'PRĘDKOŚĆ MAKSYMALNA',
 
   // the districts and their landmarks (sim/city/City.ts)
   'CROWN HEIGHTS': 'KORONNE WZGÓRZA',
@@ -531,4 +539,19 @@ export const PL_PAINT: Readonly<Record<string, readonly [string, string, string]
   'RED': ['CZERWONY', 'CZERWONA', 'CZERWONE'],
   'YELLOW': ['ŻÓŁTY', 'ŻÓŁTA', 'ŻÓŁTE'],
   'ODD': ['NIETYPOWY', 'NIETYPOWA', 'NIETYPOWE'],
+};
+
+/**
+ * A trophy's BEST AT line by its English thing (M8.8 slice 5): masculine, feminine, neuter, as the car is (PL_GENDER).
+ * DRIFT and NITRO are the game's own words for the drift and the boost.
+ */
+export const PL_BEST: Readonly<Record<string, readonly [string, string, string]>> = {
+  'DRIFTS': ['NAJLEPSZY W DRIFCIE', 'NAJLEPSZA W DRIFCIE', 'NAJLEPSZE W DRIFCIE'],
+  'AGILITY': ['NAJZWINNIEJSZY', 'NAJZWINNIEJSZA', 'NAJZWINNIEJSZE'],
+  'TOUGHNESS': ['NAJTWARDSZY', 'NAJTWARDSZA', 'NAJTWARDSZE'],
+  'GRIP': ['NAJLEPIEJ TRZYMA SIĘ DROGI', 'NAJLEPIEJ TRZYMA SIĘ DROGI', 'NAJLEPIEJ TRZYMA SIĘ DROGI'],
+  'RAMMING': ['NAJMOCNIEJ TARANUJE', 'NAJMOCNIEJ TARANUJE', 'NAJMOCNIEJ TARANUJE'],
+  'BOOST': ['NAJDŁUŻSZE NITRO', 'NAJDŁUŻSZE NITRO', 'NAJDŁUŻSZE NITRO'],
+  'ACCELERATION': ['NAJSZYBCIEJ PRZYSPIESZA', 'NAJSZYBCIEJ PRZYSPIESZA', 'NAJSZYBCIEJ PRZYSPIESZA'],
+  'TOP SPEED': ['NAJSZYBSZY', 'NAJSZYBSZA', 'NAJSZYBSZE'],
 };

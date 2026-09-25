@@ -5,6 +5,7 @@
  * it runs in Node tests. The painter (`minimap.ts`) draws what this computes.
  */
 import { HIGHWAY_HALF, ROAD_HALF, type RoadGraph, type RoadPoint } from '../../sim/city/roads';
+import type { GoalKind } from '../../sim/run/goal';
 
 export const MINIMAP = {
   /** Visible world radius in metres at rest and at `zoomTopKmh`. */
@@ -30,19 +31,102 @@ export const MINIMAP = {
   rimInset: 16,
   /** A position jump above this (m) snaps heading and zoom instead of easing (teleports, resets). */
   snapJumpM: 80,
+  /** The sizes below are at 720p (docs/M8.9_PLAN.md R6) and scale with the disc (`radarScale`). The garage's house, px. */
   glyphPx: 8,
-  arrowPx: 11,
+  /** The player's arrow: its half-length, px (the arrow is 1.66 of it: 14 px). */
+  arrowPx: 8.5,
   /**
-   * The way's route (docs/M8.7_PLAN.md D3): its line, px, on a dark edge `routeEdgePx` wider on each side; drawn in
-   * from the car over `drawInMs` when the goal or the route changes, still otherwise. The goal's badge, px (radius),
-   * and every other sign's: 6.5 with its edge is 14.5 px across, the gate's floor at 800×450 (DESIGN §20.5).
+   * The way's route (docs/M8.7_PLAN.md D3; M8.9 R6): its line, px, on a dark edge `routeEdgePx` wider on each side,
+   * the brightest line of the disc; drawn in from the car over `drawInMs` when the goal or the route changes. The
+   * goal's badge, px (radius: 20 across); an open or closed ring is a dot of `ringPx` radius (6 across).
    */
-  routePx: 5,
+  routePx: 6,
   routeEdgePx: 2,
   drawInMs: 500,
-  goalPx: 7,
-  badgePx: 6.5,
+  goalPx: 10,
+  ringPx: 3,
+  /** A unit's dot and a race rival's arrow, px (radius, half-length). */
+  unitPx: 3.5,
+  rivalPx: 5,
+  /** A cache shows on the radar only this near (m); beyond it, on the full map. */
+  cacheNearM: 80,
 } as const;
+
+/** The disc's size in rem (`--minimap-size`, the HUD's scale, M8.9 R3): 165.6 px at 720p. */
+export const RADAR_REM = 10.35;
+export const RADAR_BASE_PX = RADAR_REM * 16;
+
+/** The radar's sizes' factor for a disc of `discPx` CSS px: 1 at 720p, 0.85 at 800×450. */
+export function radarScale(discPx: number): number {
+  return discPx > 0 ? discPx / RADAR_BASE_PX : 1;
+}
+
+/**
+ * What the radar draws (docs/M8.9_PLAN.md R6), a bit each; it answers three questions: where to go (the route, the
+ * goal, the rings, a zone), where the police are (the units, the search, the helicopter, a race's rivals), where to
+ * bank (the nearest garage). The landmarks, the other garages, the caches beyond `cacheNearM`, the cameras, the
+ * cover and the breakers are the full map's.
+ */
+export const RADAR = {
+  route: 1 << 0, goal: 1 << 1, rings: 1 << 2, zone: 1 << 3, units: 1 << 4, search: 1 << 5, heli: 1 << 6, rivals: 1 << 7,
+  garage: 1 << 8, cache: 1 << 9, player: 1 << 10, north: 1 << 11,
+} as const;
+export type RadarMark = keyof typeof RADAR;
+
+/** What a paint of the radar reads. */
+export interface RadarState {
+  route: boolean;
+  goal: boolean;
+  rings: number;
+  zone: boolean;
+  units: number;
+  search: boolean;
+  heli: boolean;
+  rivals: number;
+  bag: number;
+  goalKind: GoalKind;
+  /** The goal is a garage's door already (its badge, the house, says it). */
+  goalAtGarage: boolean;
+  /** Unfound caches within `cacheNearM`. */
+  cachesNear: number;
+}
+
+/** The nearest garage's house: while the bag holds money, or the line says BANK IT or BUY. */
+export function garageShown(bag: number, goalKind: GoalKind): boolean {
+  return bag > 0 || goalKind === 'bank' || goalKind === 'buy';
+}
+
+/** The marks a paint draws, as `RADAR` bits (the painter records them: the pins read what it drew). */
+export function radarMarks(s: RadarState): number {
+  let m = RADAR.player | RADAR.north;
+  if (s.route) m |= RADAR.route;
+  if (s.goal) m |= RADAR.goal;
+  if (s.rings > 0) m |= RADAR.rings;
+  if (s.zone) m |= RADAR.zone;
+  if (s.units > 0) m |= RADAR.units;
+  if (s.search) m |= RADAR.search;
+  if (s.heli) m |= RADAR.heli;
+  if (s.rivals > 0) m |= RADAR.rivals;
+  if (garageShown(s.bag, s.goalKind) && !s.goalAtGarage) m |= RADAR.garage;
+  if (s.cachesNear > 0) m |= RADAR.cache;
+  return m;
+}
+
+/** The names of a mask's marks, in `RADAR`'s order. */
+export function radarNames(mask: number): RadarMark[] {
+  return (Object.keys(RADAR) as RadarMark[]).filter((k) => (mask & RADAR[k]) !== 0);
+}
+
+/** The index of the nearest of `doors` to (x, z), -1 for none. */
+export function nearestDoor(doors: ReadonlyArray<{ x: number; z: number }>, x: number, z: number): number {
+  let best = -1, bestD = Infinity;
+  for (let i = 0; i < doors.length; i++) {
+    const d = doors[i] as { x: number; z: number };
+    const dd = (d.x - x) ** 2 + (d.z - z) ** 2;
+    if (dd < bestD) { bestD = dd; best = i; }
+  }
+  return best;
+}
 
 export interface Segment { x0: number; z0: number; x1: number; z1: number }
 export interface Polyline { points: RoadPoint[]; width: number }
@@ -212,5 +296,46 @@ export function bigMapScale(size: number, half: number, margin = 25): number {
 export function bigMapProject(out: Vec2, x: number, z: number, size: number, scale: number): Vec2 {
   out.x = size / 2 - x * scale;
   out.y = size / 2 - z * scale;
+  return out;
+}
+
+/** A box on a map, px: its centre and half extents. */
+export interface Box {
+  x: number;
+  y: number;
+  hw: number;
+  hh: number;
+}
+
+/** The bearings a name tries, degrees from up: the sides first (a name moves along its line before off it). */
+const BEARINGS = [90, 270, 60, 120, 300, 240, 30, 150, 330, 210, 0, 180];
+
+/** Whether two boxes overlap. */
+export function boxesMeet(a: Box, b: Box): boolean {
+  return Math.abs(a.x - b.x) < a.hw + b.hw && Math.abs(a.y - b.y) < a.hh + b.hh;
+}
+
+/**
+ * A name's place on the full map (docs/M8.9_PLAN.md R6): the first spot round `x`, `y` (rings `step` px apart, twelve
+ * bearings each, out to `reach`) where a box `hw` × `hh` half extents meets no icon and stays inside `size`; the spot
+ * itself when none is free. Writes `out`.
+ */
+export function clearSpot(x: number, y: number, hw: number, hh: number, icons: readonly Box[], size: number, step: number, reach: number, out: Box): Box {
+  out.hw = hw;
+  out.hh = hh;
+  for (let r = 0; r <= reach; r += step) {
+    const n = r === 0 ? 1 : BEARINGS.length;
+    for (let k = 0; k < n; k++) {
+      const a = ((BEARINGS[k] as number) * Math.PI) / 180;
+      out.x = x + Math.sin(a) * r;
+      out.y = y - Math.cos(a) * r * 0.6;
+      if (out.x - hw < 0 || out.x + hw > size || out.y - hh < 0 || out.y + hh > size) continue;
+      let free = true;
+      for (const icon of icons) if (boxesMeet(out, icon)) { free = false; break; }
+      if (free) return out;
+    }
+  }
+  out.x = x;
+  out.y = y;
   return out;
 }

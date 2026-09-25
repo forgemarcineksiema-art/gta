@@ -1,9 +1,23 @@
 /**
  * Heading-up minimap model: road layers from the graph, the projection that
  * turns the direction of travel to screen-up, heading/zoom easing and the rim
- * clamp for markers out of range. Pure math in Node, no canvas.
+ * clamp for markers out of range. Pure math in Node, no canvas. The radar and
+ * the full map (M8.9 slice 10, docs/M8.9_PLAN.md R6): what the radar draws,
+ * the route the brightest line, the sizes in the scale, the garage with the
+ * money, the key of what is there, the names clear of the icons.
  */
+import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
+import { SIGNALS } from '../../src/sim/palette';
+import type { JobKind } from '../../src/sim';
+import { hudScale, rootFontPx } from '../../src/ui/scale';
+import { setLang } from '../../src/ui/lang';
+import { GRID, HIGHWAY, LOOP, ROUTE } from '../../src/ui/map/minimap';
+import { legendItems, mapIcons, namePlaces, nameFontPx, type LegendState } from '../../src/ui/map/bigmap';
+import {
+  RADAR, RADAR_REM, boxesMeet, garageShown, radarMarks, radarNames, radarScale, type RadarState,
+} from '../../src/ui/map/minimapModel';
+import { createWorld } from '../sim/helpers';
 import { buildRoadGraph } from '../../src/sim/city/roads';
 import { MINIMAP, advance, bigMapProject, bigMapScale, buildRoadLayers, clampToRim, drawInShare, project, routeStop, wrapAngle, type MinimapState, type Vec2 } from '../../src/ui/map/minimapModel';
 import { CITY_HALF } from '../../src/sim/city/roads';
@@ -114,5 +128,104 @@ describe('minimap model', () => {
     routeStop(pts, 3, 1, out);
     expect(out.count).toBe(2);
     expect([out.x, out.z]).toEqual([30, 10]);
+  });
+});
+
+/** A colour string (`#rrggbb` or `rgba(r, g, b, a)`) over the radar's dark ground, as sRGB 0..255. */
+function over(color: string): [number, number, number] {
+  const ground = [(SIGNALS.outline >> 16) & 255, (SIGNALS.outline >> 8) & 255, SIGNALS.outline & 255];
+  const m = /rgba\((\d+), (\d+), (\d+), ([\d.]+)\)/.exec(color);
+  const [r, g, b, a] = m ? [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4])] : [parseInt(color.slice(1, 3), 16), parseInt(color.slice(3, 5), 16), parseInt(color.slice(5, 7), 16), 1];
+  return [r * a + (ground[0] as number) * (1 - a), g * a + (ground[1] as number) * (1 - a), b * a + (ground[2] as number) * (1 - a)];
+}
+
+/** Relative luminance of an sRGB triple. */
+function luminance([r, g, b]: [number, number, number]): number {
+  const lin = (v: number): number => { const c = v / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+const CALM: RadarState = {
+  route: true, goal: true, rings: 3, zone: false, units: 0, search: false, heli: false, rivals: 0, bag: 0, goalKind: 'take', goalAtGarage: false, cachesNear: 0,
+};
+
+describe('the radar and the full map (M8.9 slice 10)', () => {
+  test('M8.9 10.1 the radar draws only R6\'s kinds: where to go, where the police are, where to bank', () => {
+    expect(radarNames(radarMarks(CALM))).toEqual(['route', 'goal', 'rings', 'player', 'north']);
+    expect(radarNames(radarMarks({ ...CALM, rings: 0, units: 4, search: true, heli: true, rivals: 3 })))
+      .toEqual(['route', 'goal', 'units', 'search', 'heli', 'rivals', 'player', 'north']);
+    expect(radarNames(radarMarks({ ...CALM, bag: 1200, cachesNear: 1 }))).toEqual(['route', 'goal', 'rings', 'garage', 'cache', 'player', 'north']);
+    // twelve kinds and no more: the landmarks, the other garages, the cameras, the cover and the breakers are the full map's
+    expect(Object.keys(RADAR)).toEqual(['route', 'goal', 'rings', 'zone', 'units', 'search', 'heli', 'rivals', 'garage', 'cache', 'player', 'north']);
+    const painter = readFileSync('src/ui/map/minimap.ts', 'utf8');
+    const radar = painter.slice(painter.indexOf('export class Minimap'));
+    for (const word of ['LANDMARKS', "'camera'", "'breaker'", 'covers', "'tower'"]) expect(radar.includes(word), word).toBe(false);
+  });
+
+  test('M8.9 10.2 the route is the brightest line of the disc', () => {
+    const route = luminance(over(ROUTE));
+    for (const road of [GRID, HIGHWAY, LOOP]) expect(route, road).toBeGreaterThan(luminance(over(road)) * 1.25);
+    // the streets mid-grey, the big roads paler, none yellow
+    expect(luminance(over(GRID))).toBeLessThan(luminance(over(HIGHWAY)));
+    for (const road of [GRID, HIGHWAY, LOOP]) {
+      const [r, g, b] = over(road);
+      expect(Math.max(r, g, b) - Math.min(r, g, b), road).toBeLessThan(24);
+    }
+  });
+
+  test('M8.9 10.3 the goal\'s badge 20 px and the route 6 px at 720p; at least 17 and 5 at 800×450', () => {
+    const css = readFileSync('src/ui/styles.css', 'utf8');
+    expect(css).toContain(`--minimap-size: ${RADAR_REM}rem;`);
+    const at = (h: number): { badge: number; route: number } => {
+      const k = radarScale(RADAR_REM * rootFontPx(h));
+      return { badge: 20 * k, route: 6 * k };
+    };
+    expect(at(720)).toEqual({ badge: 20, route: 6 });
+    expect(hudScale(450)).toBe(0.85);
+    expect(at(450).badge).toBeGreaterThanOrEqual(17);
+    expect(at(450).route).toBeGreaterThanOrEqual(5);
+    const model = readFileSync('src/ui/map/minimapModel.ts', 'utf8');
+    expect(/goalPx: 10,/.test(model) && /routePx: 6,/.test(model)).toBe(true);
+  });
+
+  test('M8.9 10.4 the nearest garage on the rim only with money in the bag or a BANK IT or BUY goal, once', () => {
+    expect(garageShown(0, 'take')).toBe(false);
+    expect(garageShown(0, 'rival')).toBe(false);
+    expect(garageShown(1, 'take')).toBe(true);
+    expect(garageShown(0, 'bank')).toBe(true);
+    expect(garageShown(0, 'buy')).toBe(true);
+    expect(radarMarks({ ...CALM, bag: 5000 }) & RADAR.garage).not.toBe(0);
+    // the goal at a door says it already: no second house
+    expect(radarMarks({ ...CALM, goalKind: 'bank', goalAtGarage: true }) & RADAR.garage).toBe(0);
+  });
+
+  test('M8.9 10.5 the full map\'s key lists only the kinds on the map now', () => {
+    const none: LegendState = { jobs: new Set<JobKind>(), caches: false, cameras: false, breakers: false, cover: false, cops: false, heli: false };
+    expect(legendItems(none)).toEqual(['you', 'garage']);
+    expect(legendItems({ ...none, jobs: new Set<JobKind>(['race', 'delivery']), cameras: true, cops: true }))
+      .toEqual(['you', 'delivery', 'race', 'garage', 'camera', 'cops']);
+    const all: LegendState = { jobs: new Set<JobKind>(['delivery', 'order', 'escape', 'trial', 'race', 'rage', 'mayhem', 'duel']), caches: true, cameras: true, breakers: true, cover: true, cops: true, heli: true };
+    expect(legendItems(all).length).toBe(16);
+  });
+
+  test('M8.9 10.6 no district name\'s box over an icon\'s, at two map sizes in both languages', async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
+    try {
+      for (const lang of ['en', 'pl'] as const) {
+        setLang(lang);
+        for (const size of [420, 700]) {
+          const icons = mapIcons(sim, size);
+          expect(icons.length).toBeGreaterThan(10);
+          // the width of a name as the map's black face sets it, a little generous
+          const font = nameFontPx(size);
+          const names = namePlaces(sim, size, (name) => name.length * font * 0.68, icons);
+          for (const [i, box] of names.entries()) {
+            for (const icon of icons) expect(boxesMeet(box, icon), `${lang} ${size} name ${i}`).toBe(false);
+          }
+        }
+      }
+    } finally {
+      setLang('en');
+    }
   });
 });

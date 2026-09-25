@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.9 slice 10: the radar and the full map
+
+Done (R6): the radar answers where to go, where the police are, where to bank: streets mid-grey, the loop and the
+highway pale, the route cyan 6 px (the brightest line), the goal's badge 20 px, rings as 6 px dots, units blue flashing
+red with the stars while seen, a race's rivals as red arrows, the nearest garage only with money in the bag or a BANK
+IT / BUY goal not already at a door, caches within 80 m, a 14 px ink arrow; every size in the disc's scale
+(`radarScale`). Landmarks, the other garages, far caches, cameras, cover and breakers are the full map's, whose badges
+are 12 px, route 6, key only what is on it now, and districts' names at a spot clear of every icon (`clearSpot`). The
+painter records what it drew (`RADAR` bits). Pins M8.9 10.1–10.6. Stills and verify green.
+
 ## 2026-09-25 — M8.9 slice 9: one moment, one message
 
 Done (R5): `TopVoice` (`ui/hud/voice.ts`) gives the goal line one more: the caption and the job's card (and its result)

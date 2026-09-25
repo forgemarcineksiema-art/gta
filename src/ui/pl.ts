@@ -193,6 +193,9 @@ export const PL: Readonly<Record<string, string>> = {
   'HELICOPTER': 'HELIKOPTER',
   'Map of the island, north up. The yellow arrow is your car.': 'Mapa wyspy, północ u góry. Żółta strzałka to twoje auto.',
   'Radar map. Up is your direction of travel. The yellow arrow is your car; the cyan line is the way to your goal.': 'Radar. U góry jest kierunek jazdy. Żółta strzałka to twoje auto, turkusowa linia to droga do celu.',
+  // the player's arrow is ink since M8.9 (yellow is money)
+  'Map of the island, north up. The white arrow is your car.': 'Mapa wyspy, północ u góry. Biała strzałka to twoje auto.',
+  'Radar map. Up is your direction of travel. The white arrow is your car; the cyan line is the way to your goal.': 'Radar. U góry jest kierunek jazdy. Biała strzałka to twoje auto, turkusowa linia to droga do celu.',
 
   // the run: the busted card and the wall's TOTALS (run.ts, totals.ts)
   'BUSTED': 'WPADKA',

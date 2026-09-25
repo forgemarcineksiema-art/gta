@@ -1215,6 +1215,10 @@ kbd.key {
   box-shadow: 0 0 0 2px #000, 3px 4px 0 rgba(0, 0, 0, 0.6);
 }
 .run__wall button[hidden] { display: none; }
+/* every card its picture (M8.9 R10): the atlas' cell, three-quarters from the front; the swatch until it comes */
+.wall__pic { display: none; width: 100%; height: auto; aspect-ratio: 16 / 10; }
+.wall__card.has-pic .wall__pic { display: block; }
+.wall__card.has-pic .wall__card-swatch { display: none; }
 .wall__tabs {
   display: flex;
   gap: 0.25rem;

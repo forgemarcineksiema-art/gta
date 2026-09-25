@@ -12,6 +12,15 @@ one (the traffic's rider mesh, built with the first), a parked or left one stand
 bike after the 4×4 (straight after the van the 4×4 waited 10.5 min, past the 10.1 pin's 10). Pins M8.8 16.1
 (`bodies.test`), 16.2 (`swap.test`), 16.3 (`garage.test`); M7 6.2 counts the couriers' mesh.
 
+## 2026-09-25 — M8.9 slice 14: the pictures
+
+Done (R10): `render/cars/thumbs.ts` draws an atlas of 160×100 cells, one per body and per kit item, at the session's
+first door, three a frame while the wall is up and never while the run drives (`ThumbQueue`); a car in its paint
+three-quarters from the front (built for its shot and freed: the atlas keeps it; a respray draws it again), the car's
+kit on a grey car, the neon, the flames, the smoke and the horns as swatches in their shapes (the flame is the glyph).
+Drawn at twice the size into a render target and scaled down; the wall's cards draw their cells (`Pictures`, the ui's
+shape of it) and show them in place of the swatch. Pins M8.9 14.1–14.3. Stills and verify green.
+
 ## 2026-09-25 — M8.8 slice 15: the rider, the look
 
 Done: the bike drawn (`bikeMesh.ts`): a sport bike in blocks, paint on the tank, fairing, nose, tail and mudguard, its

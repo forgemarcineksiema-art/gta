@@ -254,6 +254,8 @@ export class App {
       driveOut: () => this.driveOut(),
     };
     this.garageUi = new GarageUi(this.runHud.wall, sim, actions);
+    // every card its picture (M8.9 R10): the render's atlas, read by the wall
+    if (this.renderer.thumbs) this.garageUi.setPictures(this.renderer.thumbs);
     this.coldOpenHud = new ColdOpenHud(uiRoot);
     this.jobsHud = new JobsHud(uiRoot);
     // one moment, one message (M8.9 R5): the step and NEW cards wait in the top's voice with the news

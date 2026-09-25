@@ -54,6 +54,8 @@ export interface DriveState {
   combo: boolean;
   /** Seconds since the district's name changed, or since a new run started. */
   placeAge: number;
+  /** The intro's caption is up: it speaks alone, and the district's name waits for a quiet moment (M8.9 R5). */
+  caption: boolean;
 }
 
 /** Seconds the district's name shows after a change or a new run (GTA's rule: the radar answers where, the name is news). */
@@ -82,7 +84,7 @@ export function drive(s: DriveState): number {
     m |= DRIVE.bag;
     if (s.multiplier > 1) m |= DRIVE.mult;
   }
-  if (s.placeAge < PLACE_SECONDS) m |= DRIVE.place;
+  if (s.placeAge < PLACE_SECONDS && !s.caption) m |= DRIVE.place;
   return m;
 }
 
@@ -97,11 +99,14 @@ export function newPlaceClock(): PlaceClock {
   return { place: null, run: 'running', age: 0 };
 }
 
-/** One frame: back to 0 in a new district or at a new run (the drive-out, the busted card closed), else older by `dt`. */
-export function tickPlace(c: PlaceClock, place: unknown, run: RunState, dt: number): number {
+/**
+ * One frame: back to 0 in a new district or at a new run (the drive-out, the busted card closed), else older by `dt`;
+ * held at 0 while `hold` (the intro's caption speaks: the name comes after it).
+ */
+export function tickPlace(c: PlaceClock, place: unknown, run: RunState, dt: number, hold = false): number {
   const fresh = run !== c.run && run === 'running' && (c.run === 'door' || c.run === 'busted');
   c.run = run;
-  if (fresh || place !== c.place) {
+  if (fresh || hold || place !== c.place) {
     c.place = place;
     c.age = 0;
   } else {
@@ -128,6 +133,16 @@ export function tickHit(c: HitClock, damage: number, dt: number): number {
   return c.age;
 }
 
+/**
+ * Where the swap prompt shows (docs/M8.9_PLAN.md R5): a car alongside while driving puts it at the bottom centre;
+ * while the ticket fills it is on the ticket, one block with it (only the ticket speaks); the intro's own caption
+ * teaches the swap, so no prompt then.
+ */
+export function promptPlace(candidate: boolean, ticket: boolean, swapCaption: boolean): 'bottom' | 'ticket' | 'none' {
+  if (!candidate || swapCaption) return 'none';
+  return ticket ? 'ticket' : 'bottom';
+}
+
 /** The combo's ×, from ×2 (M8.9 R4): ×1 multiplies nothing, so it says nothing. */
 export function comboMult(multiplier: number): string {
   return multiplier >= 2 ? `×${num(multiplier)}` : '';
@@ -140,7 +155,7 @@ export function driveNames(mask: number): DriveElement[] {
 
 /** A fresh state: a new run on the test track. */
 export function newDriveState(): DriveState {
-  return { city: false, run: 'running', bag: 0, multiplier: 1, damage: 0, stage: 0, hitAge: Infinity, combo: false, placeAge: 0 };
+  return { city: false, run: 'running', bag: 0, multiplier: 1, damage: 0, stage: 0, hitAge: Infinity, combo: false, placeAge: 0, caption: false };
 }
 
 /** The world into `out` (the district's and the hit's ages are the caller's: it keeps the clocks). */
@@ -154,6 +169,7 @@ export function readDrive(sim: SimWorld, placeAge: number, out: DriveState, hitA
   out.hitAge = hitAge;
   out.combo = sim.skill.points > 0;
   out.placeAge = placeAge;
+  out.caption = sim.coldOpen.caption !== null;
   return out;
 }
 
@@ -174,7 +190,29 @@ export interface KeyHints {
   horn: string;
 }
 
-/** The key hints' rows: the keys and the word (the player's language); the tuning row only when the panel is on (D9). */
+/**
+ * The key hints on the top (docs/M8.9_PLAN.md R5): four in one row (drive, boost, the map, pause) for `HINT_SECONDS`
+ * of an otherwise empty top, in the profile's first `HINT_SESSIONS` sessions; the full list is the pause screen's.
+ */
+export const HINT_SECONDS = 8;
+export const HINT_SESSIONS = 2;
+
+/** Whether this session shows the four hints: its number counts from 1. */
+export function hintsWanted(session: number): boolean {
+  return session >= 1 && session <= HINT_SESSIONS;
+}
+
+/** The four hints, in one row. */
+export function hintRow(k: KeyHints): Array<{ keys: string[]; label: string }> {
+  return [
+    { keys: [k.throttle, k.steerLeft, k.brake, k.steerRight], label: t('drive') },
+    { keys: [k.boost], label: t('boost') },
+    { keys: [k.map], label: t('map (hold)') },
+    { keys: [k.pause], label: t('pause') },
+  ];
+}
+
+/** The full list of keys, for the pause screen: the keys and the word (the player's language); the tuning row only when the panel is on (D9). */
 export function hintRows(k: KeyHints): Array<{ keys: string[]; label: string }> {
   const rows = [
     { keys: [k.throttle, k.steerLeft, k.brake, k.steerRight], label: t('drive') },

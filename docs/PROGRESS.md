@@ -12,6 +12,16 @@ way driven (`Vehicle`, rises over 0.1 m only), and the crushed car takes up the 
 and roll to 0.3). Across a sedan at 30 km/h: 0.66 m up, 22° at most, down on four wheels. Straddled lengthwise a car
 passes between its wheels. On the Gardens' park strip between two jumps. Pins M8.8 12.1–12.4, the card in 11.5.
 
+## 2026-09-25 — M8.9 slice 9: one moment, one message
+
+Done (R5): `TopVoice` (`ui/hud/voice.ts`) gives the goal line one more: the caption and the job's card (and its result)
+take it, the rest waits in order (warning, the stars, news, a teaching line, the step card, NEW), a line 4 s at most
+(the clock stops under the intro's caption), a card for its turn; the step and NEW cards wait out a running job. The
+ticket speaks alone: no line, no pop, the swap prompt on the ticket (E POŻYCZ); the disguise's clock shows after the
+borrow. Four hints for 8 s in sessions 1–2, the full list on the pause; three teaching lines once per profile; a card is
+a title, one line (≤ 34, both languages) and its number; cards 2.5 s. Decided: `taught` and `sessions` join v6 as the
+language did (no version bump while M8.8's build shares the save). Pins M8.9 9.1–9.6. Stills and verify green.
+
 ## 2026-09-25 — M8.8 slice 11: the pancake and the steamroller
 
 Done: `Traffic.flatten` wrecks a record where it stands, flat at its heading, gives back its lent body and never lends

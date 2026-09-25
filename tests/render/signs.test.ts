@@ -164,13 +164,13 @@ describe('the signs (M8.7 slice 3)', () => {
     expect(css).not.toMatch(/jobs__card\[data-kind='(order|escape|duel|delivery)'\]/);
   });
 
-  it('M8.7 4.2 a kind brought out has its NEW card: its name, what it asks, where to look, in both languages', () => {
+  it('M8.7 4.2 a kind brought out has its NEW card: its name and what it asks (its badge is the sign to look for, M8.9 R5), in both languages', () => {
     setLang('en');
-    expect(newCardWords('race')).toEqual({ title: 'NEW: STREET RACE', sub: 'FIRST TO THE FINISH · ANY ROUTE', limit: 'LOOK FOR ITS SIGN' });
+    expect(newCardWords('race')).toEqual({ title: 'NEW: STREET RACE', sub: 'FIRST TO THE FINISH · ANY ROUTE' });
     setLang('pl');
     const pl = newCardWords('race');
     expect(pl.title).toBe('NOWOŚĆ: WYŚCIG ULICZNY');
-    expect(pl.limit).toBe('SZUKAJ JEGO ZNAKU');
+    expect(pl.sub).toBe('PIERWSZY NA METĘ · DOWOLNA TRASA');
     for (const kind of ['trial', 'rage', 'mayhem', 'escape', 'order'] as const) expect(newCardWords(kind).sub).not.toBe('');
   });
 });

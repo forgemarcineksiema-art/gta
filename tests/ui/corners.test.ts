@@ -13,8 +13,8 @@
 import { describe, expect, it } from 'vitest';
 import { GLYPHS, type GlyphId } from '../../src/sim/glyphs';
 import {
-  DAMAGE_STANDS, DRIVE, HIT_SECONDS, PLACE_SECONDS, comboMult, devTools, drive, driveNames, hintRows, newDriveState, newHitClock, newPlaceClock, tickHit,
-  tickPlace, type DriveState, type KeyHints,
+  DAMAGE_STANDS, DRIVE, HINT_SECONDS, HIT_SECONDS, PLACE_SECONDS, comboMult, devTools, drive, driveNames, hintRow, hintRows, hintsWanted, newDriveState,
+  newHitClock, newPlaceClock, tickHit, tickPlace, type DriveState, type KeyHints,
 } from '../../src/ui/hud/corners';
 import { GAUGE, arcDash, arcPath } from '../../src/ui/hud/gauge';
 import { doorLines } from '../../src/ui/hud/totals';
@@ -178,5 +178,19 @@ describe('the corners finished (M8.9 slice 8)', () => {
     } finally {
       setLang('en');
     }
+  });
+});
+
+describe('the key hints (M8.9 slice 9)', () => {
+  it('M8.9 9.4 four hints in one row (drive, boost, the map, pause), in the profile\'s first two sessions only; the pause lists them all', () => {
+    const row = hintRow(KEYS);
+    expect(row.map((r) => r.label)).toEqual(['drive', 'boost', 'map (hold)', 'pause']);
+    expect(row[0]?.keys).toEqual(['W', 'A', 'S', 'D']);
+    expect([0, 1, 2, 3, 10].map(hintsWanted)).toEqual([false, true, true, false, false]);
+    expect(HINT_SECONDS).toBe(8);
+    // the pause screen's list has every key, the four among them
+    const all = hintRows({ ...KEYS, debug: '' }).map((r) => r.label);
+    expect(all.length).toBeGreaterThanOrEqual(8);
+    for (const r of row) expect(all).toContain(r.label);
   });
 });

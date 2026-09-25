@@ -8,7 +8,7 @@
  */
 import { STEP, type RunState, type SimWorld } from '../../sim';
 import { BALANCE } from '../../sim/balance';
-import { DRIVE, drive, newDriveState, readDrive } from './corners';
+import { DRIVE, drive, newDriveState, promptPlace, readDrive } from './corners';
 import { glyphIcon } from '../glyph';
 import { label, labelAria, num, relabel, t } from '../lang';
 import { cardLines, countsLine, doorLines, nextLine, type Line } from './totals';
@@ -33,6 +33,11 @@ export class RunHud {
   private readonly bar: HTMLElement;
   /** The ticket book's three lines of ink. */
   private readonly barLines: HTMLElement[];
+  /** A car alongside while the ticket fills (M8.9 R5): its prompt on the ticket, one block (E BORROW). */
+  private readonly ticketPrompt: HTMLElement;
+  private readonly ticketKey: HTMLElement;
+  private readonly ticketWord: HTMLElement;
+  private ticketMode = '';
   private readonly card: HTMLElement;
   private readonly cardLines: HTMLElement;
   /** The panel behind the shut door: the garage's tabs and pages are added to it by `GarageUi`. */
@@ -50,6 +55,7 @@ export class RunHud {
   private readonly prompts: HTMLElement[] = [];
   /** The key the prompts name, kept to say it again in a new language. */
   private anyKey = '';
+  private swapKey = 'E';
   private shownBag = 0;
   private fromBag = 0;
   private toBag = 0;
@@ -88,7 +94,11 @@ export class RunHud {
       pad.appendChild(line);
       return ink;
     });
-    this.bar.append(pad);
+    this.ticketPrompt = el('div', 'run__ticket-prompt');
+    this.ticketKey = el('kbd', 'key', 'E');
+    this.ticketWord = el('span', 'run__ticket-word', '');
+    this.ticketPrompt.append(this.ticketKey, this.ticketWord);
+    this.bar.append(pad, this.ticketPrompt);
     this.card = el('div', 'run__card');
     this.cardLines = el('div', 'run__lines');
     this.card.append(label(el('div', 'run__title run__title--danger'), 'BUSTED'), this.cardLines, this.prompt());
@@ -113,16 +123,19 @@ export class RunHud {
     this.update(sim, 0);
   }
 
-  /** The key that closes the card and opens the door: any; the label names one the player knows. */
-  setKeys(k: { any: string }): void {
+  /** The key that closes the card and opens the door: any; the label names one the player knows. The swap key: the ticket's prompt. */
+  setKeys(k: { any: string; swap: string }): void {
     this.anyKey = k.any;
+    this.swapKey = k.swap;
+    this.ticketKey.textContent = k.swap;
     for (const p of this.prompts) p.replaceChildren(el('kbd', 'key', k.any), el('span', 'run__prompt-label', t('ANY KEY')));
   }
 
   /** The language changed (DESIGN.md §19): the labels, the prompt, and the card or the totals up now. */
   relabel(sim: SimWorld): void {
     relabel(this.root);
-    this.setKeys({ any: this.anyKey });
+    this.setKeys({ any: this.anyKey, swap: this.swapKey });
+    this.ticketMode = '';
     if (sim.run.state === 'busted') this.fillCard(sim);
     else if (sim.run.state === 'door') this.fillWall(sim);
   }
@@ -186,6 +199,14 @@ export class RunHud {
     if (barVisible !== this.barVisible) {
       this.barVisible = barVisible;
       this.bar.classList.toggle('is-visible', barVisible);
+    }
+    // a car alongside: its prompt on the ticket (the intro's own caption teaches the swap)
+    const c = sim.life.state.swapCandidate;
+    const mode = promptPlace(c >= 0, barVisible, sim.coldOpen.caption === 'swap') !== 'ticket' ? '' : sim.traffic?.police[c] === 1 ? 'BORROW' : 'SWAP';
+    if (mode !== this.ticketMode) {
+      this.ticketMode = mode;
+      this.ticketPrompt.classList.toggle('is-on', mode !== '');
+      if (mode !== '') this.ticketWord.textContent = t(mode);
     }
     if (barVisible) {
       const bar = Math.round(run.bustedProgress * 200);

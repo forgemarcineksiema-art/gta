@@ -79,6 +79,8 @@ export const ROLE_WORDS: Record<CarId, string> = { muscle: 'DRIFT', compact: 'CI
 /** A trophy's one thing, the best in the game at it (M8.8 R2, slice 5): its card's BEST AT line. */
 export const BEST_AT: Partial<Record<BodyId, string>> = {
   wagon: 'DRIFTS', pizza: 'AGILITY', wrecker: 'TOUGHNESS', twin: 'GRIP', partybus: 'RAMMING', lowrider: 'BOOST', bubble: 'ACCELERATION', phantom: 'TOP SPEED',
+  // the three with connections (slice 6): the disco bar, the uncle, the car nobody reports
+  fakecop: 'CLEARING THE ROAD', limo: 'GETTING BUSTED', chiefcar: 'DISGUISE',
 };
 
 /** The line under a car's name on the wall (M8.8 slices 3, 5): a trophy's BEST AT, else what its class is for. */

@@ -54,6 +54,14 @@ export interface BodySpec {
   tune?: (t: VehicleTuning) => void;
   /** The player's damage is divided by this (M8.8 slice 5: the Wrecker's twice, as in its hunt); 1 when absent. */
   armour?: number;
+  /** The Fake Cruiser's disco bar (M8.8 slice 6): lit, so the civilians ahead pull over for the player in it. */
+  lit?: boolean;
+  /** The gold limo (M8.8 slice 6): busted in it, the Mayor pays and three quarters of the bag stay, as with the lawyer. */
+  bribes?: boolean;
+  /** The Chief's Cruiser (M8.8 slice 6): nobody reports it missing, so its disguise runs no dispatcher's clock. */
+  unreported?: boolean;
+  /** A race rival's acceleration (m/s², its lane follower's), from its car's 0–60 (M8.8 slice 6); absent, the traffic's. */
+  aiAccel?: number;
 }
 
 function shell(id: CarId): BodySpec {
@@ -116,19 +124,23 @@ export const BODIES: readonly BodySpec[] = [
   // the hidden car (M5.5 slice 16): never drawn by the spawner (its share is 0), stashed by city/stash.ts
   civilian('icecream', 'heavy', 1.12, 2.9, 3.4, 1.9, 2800, 0.85, { paints: [CITY_COLORS.mint], big: true, stretch: true }),
   // the wanted board's cars (M6 slices 1, 4–5): never spawned (share 0), raced or hunted in a duel, won into the garage
-  civilian('wagon', 'muscle', 0.92, 2.42, 2.85, 1.6, 1450, 1, { paints: [CITY_COLORS.lavender], tune: TROPHY.wagon }),
-  civilian('pizza', 'compact', 0.87, 2.05, 2.55, 1.52, 1150, 1, { paints: [PALETTE.carRed], tune: TROPHY.pizza }),
+  // a race rival's acceleration is its car's (16.7 m/s over its 0–60 on the playground, M8.8 slice 6): the duel shows the car
+  civilian('wagon', 'muscle', 0.92, 2.42, 2.85, 1.6, 1450, 1, { paints: [CITY_COLORS.lavender], tune: TROPHY.wagon, aiAccel: 7.1 }),
+  civilian('pizza', 'compact', 0.87, 2.05, 2.55, 1.52, 1150, 1, { paints: [PALETTE.carRed], tune: TROPHY.pizza, aiAccel: 6.9 }),
   // #8 Tow Truck Tina's wrecker keeps the hunt's twice the armour: the toughest car in the game
-  civilian('wrecker', 'heavy', 0.98, 2.7, 3.3, 1.72, 2100, 1, { paints: [PALETTE.carOrange], armour: 2 }),
-  onShell('twin', 'sports', CITY_COLORS.mint, { tune: TROPHY.twin }),
-  onShell('fakecop', 'police', PALETTE.policeWhite),
+  civilian('wrecker', 'heavy', 0.98, 2.7, 3.3, 1.72, 2100, 1, { paints: [PALETTE.carOrange], armour: 2, aiAccel: 4.2 }),
+  onShell('twin', 'sports', CITY_COLORS.mint, { tune: TROPHY.twin, aiAccel: 7.9 }),
+  // #6 Fake Frank's disco bar clears the road ahead; the units know his car, so it is no disguise (slice 1)
+  onShell('fakecop', 'police', PALETTE.policeWhite, { lit: true, aiAccel: 5.3 }),
   // Big Bernie's bus races: it overtakes where the city's buses keep their lane
-  civilian('partybus', 'heavy', 1.27, 6.0, 6.6, 2.24, 6500, 1, { paints: [PALETTE.carMagenta], big: true, stretch: true, tune: TROPHY.partybus }),
-  civilian('lowrider', 'sports', 0.95, 2.55, 3.1, 1.62, 1500, 1, { paints: [PALETTE.carBlue], tune: TROPHY.lowrider }),
-  civilian('limo', 'muscle', 0.95, 3.4, 4.6, 1.62, 2400, 1, { paints: [PALETTE.carGold], stretch: true }),
-  civilian('bubble', 'compact', 0.72, 1.45, 1.75, 1.2, 550, 1, { paints: [PALETTE.carLime], tune: TROPHY.bubble }),
-  onShell('phantom', 'sports', PALETTE.carBlack, { tune: TROPHY.phantom }),
-  onShell('chiefcar', 'police', PALETTE.policeWhite),
+  civilian('partybus', 'heavy', 1.27, 6.0, 6.6, 2.24, 6500, 1, { paints: [PALETTE.carMagenta], big: true, stretch: true, tune: TROPHY.partybus, aiAccel: 4.2 }),
+  civilian('lowrider', 'sports', 0.95, 2.55, 3.1, 1.62, 1500, 1, { paints: [PALETTE.carBlue], tune: TROPHY.lowrider, aiAccel: 7.9 }),
+  // #3 the Mayor's Nephew's limo: his uncle pays when you are caught in it
+  civilian('limo', 'muscle', 0.95, 3.4, 4.6, 1.62, 2400, 1, { paints: [PALETTE.carGold], stretch: true, bribes: true, aiAccel: 6.0 }),
+  civilian('bubble', 'compact', 0.72, 1.45, 1.75, 1.2, 550, 1, { paints: [PALETTE.carLime], tune: TROPHY.bubble, aiAccel: 7.1 }),
+  onShell('phantom', 'sports', PALETTE.carBlack, { tune: TROPHY.phantom, aiAccel: 8.7 }),
+  // the Chief's own car: nobody reports it missing
+  onShell('chiefcar', 'police', PALETTE.policeWhite, { unreported: true }),
   // three more hidden cars (M6 slice 9), stashed like the ice-cream truck: a roadster, a street sweeper, a hot-dog van
   civilian('roadster', 'muscle', 0.84, 2.2, 2.9, 1.5, 1100, 1, { paints: [PALETTE.carRed] }),
   civilian('sweeper', 'heavy', 1.1, 2.9, 3.2, 1.86, 3200, 0.8, { paints: [PALETTE.carWhite], big: true, stretch: true }),

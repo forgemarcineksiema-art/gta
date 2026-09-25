@@ -105,4 +105,18 @@ describe('M8.8 slice 3: what a car is for', () => {
       for (const thing of Object.values(BEST_AT)) expect(PL_BEST[thing]?.length, thing).toBe(3);
     } finally { setLang('en'); }
   });
+
+  it('M8.8 6.2 the three with connections say theirs; busted in the limo, the card names the Mayor', () => {
+    try {
+      setLang('en');
+      expect(carLine('fakecop')).toBe('BEST AT: CLEARING THE ROAD');
+      expect(carLine('limo')).toBe('BEST AT: GETTING BUSTED');
+      expect(carLine('chiefcar')).toBe('BEST AT: DISGUISE');
+      expect(cardLines({ lastBag: 40_000, lastFine: 30_000, lastLawyer: false, lastUncle: true, bank: 30_000 })[0]!.label)
+        .toBe('BAG 40,000 · THE MAYOR KEEPS 3/4');
+      setLang('pl');
+      expect(carLine('limo')).toBe('NAJLEPSZA NA WPADKĘ');
+      expect(carLine('fakecop')).toBe('NAJLEPIEJ TORUJE DROGĘ');
+    } finally { setLang('en'); }
+  });
 });

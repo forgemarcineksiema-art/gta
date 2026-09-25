@@ -13,6 +13,15 @@ it names money; the news' lead by its tone (the stars red, the radio blue, the r
 blue while seen. The +n stays till slice 8's meter. The look's chase is the skilled bot at three stars. Pins M8.9
 5.1–5.5. Verify green; stills: the flash, the blue radio, the white tabs.
 
+## 2026-09-25 — M8.8 slice 6: the three with connections; the rival at its car's pace
+
+Done: the Fake Cruiser's disco bar pulls the road ahead over as a lit unit does (`BodySpec.lit`, `Traffic.playerLit`);
+busted in the gold limo the Mayor pays: three quarters, the lawyer or not, the card says THE MAYOR KEEPS 3/4
+(`bribes`, `Run.lastUncle`; the lawyer is still spent at the run's end, as at any door); the Chief's Cruiser runs no
+dispatcher's clock (`unreported`), a seen crime still blows it. A duel's rival pulls away at its car's rate
+(`aiAccel`, 16.7 m/s over the body's measured 0–60; in place of the unit's ×1.5): the Bubble 7.1 m/s², the Wrecker and
+the Party Bus 4.2 (their hunts start slower). BEST AT: CLEARING THE ROAD, GETTING BUSTED, DISGUISE. Pins M8.8 6.1–6.4.
+
 ## 2026-09-25 — M8.9 slice 4: the sun and the clouds
 
 Done (R9's sky): the sun's disc and a wide warm halo (an additive fan and ring) on the light's bearing but low, at 9°, in

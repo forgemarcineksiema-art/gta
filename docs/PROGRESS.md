@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.8: the physical police and rivals on (Marcin's word)
+
+Marcin: "Włącz fizyczne radiowozy i rywali". The units were on since slice 23 (a bot's chase at three and five stars
+in the scratch: a physical unit the whole chase, 2.2 and 3.5 of them on average, 4 at most), the races' rivals since
+slice 22; the hunts' rivals were lane records (their takedown needed a lent body, which slice 23 made needless). Now a
+duel's rival of either format drives a physical car near the player; Frank's car takes two rams at 16 m/s over his
+speed to wreck, the lane record one. Decided: after his word the gate's perf does not switch them off by itself; a
+failed budget goes to him with its numbers. Pin M8.8 22.5 (`driver.test.ts`).
+
 ## 2026-09-25 — M8.8 slice 24: the budget's switch
 
 Done: the switch the budget decides with: `POLICE.physicalUnits` and `AI.pool` (now settable, read when the world is

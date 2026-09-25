@@ -453,7 +453,9 @@ export class Jobs {
     const cars: Array<readonly [BodyId, number]> = rival.paints.map((paint) => [rival.body, paint] as const);
     const pace = b.pace[d.level] ?? 1, band = b.band[d.level] ?? [0.8, 1.2];
     const tw = rival.twist;
-    const twists = { twins: tw === 'twins', breakers: tw === 'breakers', hidden: tw === 'ghost' };
+    // a duel's rival drives a physical car near the player (M8.8 slice 22; a hunt's too since its hits are sensed on
+    // the car, slice 23, Marcin's word 2026-09-25)
+    const twists = { twins: tw === 'twins', breakers: tw === 'breakers', hidden: tw === 'ghost', physical: true };
     if (rival.format === 'hunt') {
       // the rival drives home with a bag: wreck their car first
       this.remaining = h.seconds;
@@ -461,8 +463,7 @@ export class Jobs {
       this.race.start(d.targetX, d.targetZ, this.sim.probe, { cars, pace: pace * h.pace, band, lead: h.lead, armour, ...twists });
     } else {
       this.remaining = d.limitSeconds;
-      // a race's rival drives a physical car near the player (M8.8 slice 22)
-      this.race.start(d.targetX, d.targetZ, this.sim.probe, { cars, pace, band, physical: true, ...twists });
+      this.race.start(d.targetX, d.targetZ, this.sim.probe, { cars, pace, band, ...twists });
     }
     this.twist(tw);
   }

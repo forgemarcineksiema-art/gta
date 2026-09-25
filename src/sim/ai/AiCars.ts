@@ -2,7 +2,7 @@
  * The AI cars (M8.8 slices 22–23): a pool of `Vehicle`s, parked and switched off, that take over traffic records near
  * the player and drive them on the car model:
  *
- * - a physical race's rivals (a duel's) within `AI.physicalRadius` m of the player, given back to their lanes past
+ * - a duel's rivals (a race's or a hunt's) within `AI.physicalRadius` m of the player, given back to their lanes past
  *   `AI.releaseRadius`, as a lent body is, or when one has stalled off its lane for `AI.stallSeconds` out of sight;
  *   each drives its record's way to the finish: its lane, the race's exit off it and the one after, at the race's pace;
  * - on a chase, the `POLICE.physicalUnits` units nearest the player within `AI.unitRadius` m: along their plan's lanes

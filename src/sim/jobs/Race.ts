@@ -36,7 +36,7 @@ export interface RaceField {
   twins?: boolean;
   breakers?: boolean;
   hidden?: boolean;
-  /** Its rivals drive physical cars within `AI.physicalRadius` of the player (M8.8 slice 22: a duel's race). */
+  /** Its rivals drive physical cars within `AI.physicalRadius` of the player (M8.8 slice 22: a duel's, a race or a hunt). */
   physical?: boolean;
 }
 

@@ -1,6 +1,6 @@
 /**
- * The AI driver (M8.8 slice 22): the track bot's method in the sim, driving any `Vehicle` along a path; a duel's race
- * rival near the player drives a physical car of its body with it, handed back to its lane when far. Its race against
+ * The AI driver (M8.8 slice 22): the track bot's method in the sim, driving any `Vehicle` along a path; a duel's rival
+ * (a race's or a hunt's) near the player drives a physical car of its body with it, handed back to its lane when far. Its race against
  * the lane rival and the flips at junctions are the long pins (driver.long.test.ts). Slice 23: on a chase the units
  * nearest the player drive physical police cars; the police long pins (23.1) run with them.
  */
@@ -8,10 +8,11 @@ import { describe, expect, it } from 'vitest';
 import { TrackBot } from '../../src/app/trackBot';
 import { Driver } from '../../src/sim/ai/Driver';
 import { AI } from '../../src/sim/ai/AiCars';
+import { RIVALS } from '../../src/sim/board/rivals';
 import { POLICE } from '../../src/sim/police/tuning';
 import { CHAIN_ALL } from '../../src/sim/run/goal';
 import { TRAFFIC } from '../../src/sim/traffic/tuning';
-import type { Traffic } from '../../src/sim/traffic/Traffic';
+import { AgentState, type Traffic } from '../../src/sim/traffic/Traffic';
 import { createWorld, run } from './helpers';
 
 describe('M8.8 slice 22: the AI driver', () => {
@@ -73,6 +74,47 @@ describe('M8.8 slice 22: the AI driver', () => {
       run(sim, 0.5);
       expect(traffic.puppet[agent]).toBe(0);
       expect(sim.ai!.carOf(agent)).toBeNull();
+    } finally { sim.dispose(); }
+  }, 60_000);
+
+  it('M8.8 22.5 a hunt\'s rival near the player drives a physical car; rammed, it is wrecked on it and the hunt is won', async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 0, record: false });
+    try {
+      sim.police!.dispatching = false;
+      sim.run.chain = CHAIN_ALL;
+      // Frank's hunt, the rivals before him beaten
+      const level = RIVALS.findIndex((r) => r.format === 'hunt' && r.twist === 'disguise');
+      sim.board.beaten = (1 << level) - 1;
+      sim.board.force = true;
+      const d = sim.jobs.defs.find((k) => k.kind === 'duel' && k.level === level)!;
+      const lx = Math.cos(d.yaw), lz = -Math.sin(d.yaw);
+      sim.city?.sync(d.x - lx * 3, d.z - lz * 3, true);
+      sim.vehicle.teleport({ x: d.x - lx * 3, y: 0.8, z: d.z - lz * 3 }, d.yaw);
+      sim.vehicle.setVelocity(0, 0, 0);
+      run(sim, 0.3);
+      expect(sim.jobs.race.physical).toBe(true);
+      const traffic = sim.traffic!, agent = sim.jobs.race.rivals[0]!;
+      expect(agent).toBeGreaterThanOrEqual(0);
+      const behind = (gap: number, over: number): void => {
+        const yaw = traffic.yaw[agent] as number, fx = Math.sin(yaw), fz = Math.cos(yaw), v = (traffic.speed[agent] as number) + over;
+        sim.vehicle.teleport({ x: (traffic.x[agent] as number) - fx * gap, y: (traffic.y[agent] as number) + 0.8, z: (traffic.z[agent] as number) - fz * gap }, yaw);
+        sim.vehicle.setVelocity(fx * v, 0, fz * v);
+      };
+      // on its tail, then rams from 7 m behind at 16 m/s over its speed till its car is a wreck
+      run(sim, 1, () => behind(20, 0));
+      let rams = 0, physical = 0;
+      while (rams < 16 && traffic.state[agent] !== AgentState.Wrecked) {
+        run(sim, 0.5, () => behind(20, 0));
+        if (traffic.puppet[agent] === 1) physical++;
+        behind(7, 16);
+        rams++;
+        run(sim, 0.7);
+      }
+      console.log(`[rival] Frank's hunt: wrecked after ${rams} rams, ${physical} on the physical car`);
+      expect(physical).toBe(rams);
+      expect(traffic.state[agent]).toBe(AgentState.Wrecked);
+      expect(sim.ai!.carOf(agent)).toBeNull();
+      expect(sim.board.isBeaten(level)).toBe(true);
     } finally { sim.dispose(); }
   }, 60_000);
 

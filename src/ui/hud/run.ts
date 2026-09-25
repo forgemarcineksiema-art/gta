@@ -1,13 +1,15 @@
 /**
- * The run on the HUD (docs/STYLE.md, the run HUD): the bag under the stars
- * with the multiplier the run is earning, the bank under it (the road coins
- * land in it, M8.5 D1), the busted bar while it fills, the
+ * The run on the HUD (docs/STYLE.md, the run HUD): the money block under the
+ * stars (docs/M8.9_PLAN.md R4), the bank first with its coin (the road coins
+ * land in it, M8.5 D1), the bag under it with its sack and the multiplier the
+ * run is earning, so the bank never jumps; the busted bar while it fills, the
  * busted card and the wall of totals behind a shut door. Yellow is money that
  * is not yours yet. DOM writes only on change; reads sim state only.
  */
 import { STEP, type RunState, type SimWorld } from '../../sim';
 import { BALANCE } from '../../sim/balance';
 import { DRIVE, drive, newDriveState, readDrive } from './corners';
+import { glyphIcon } from '../glyph';
 import { label, labelAria, num, relabel, t } from '../lang';
 import { cardLines, countsLine, doorLines, nextLine, type Line } from './totals';
 
@@ -64,15 +66,17 @@ export class RunHud {
 
   constructor(parent: HTMLElement, sim: SimWorld) {
     this.root = el('div', 'run');
+    // the money block: the bank, in ink with the coin (a road coin is in it the moment it is picked), then the bag
+    const block = el('div', 'run__money');
+    this.bankRow = el('div', 'run__coins');
+    this.bankValue = el('span', 'run__coins-value', '0');
+    this.bankRow.append(glyphIcon('coin', 'run__glyph run__glyph--coin'), this.bankValue);
     this.bag = el('div', 'run__bag');
     this.bagValue = el('span', 'run__bag-value', '0');
     this.mult = el('span', 'run__mult', '×1');
-    this.bag.append(this.bagValue, this.mult);
+    this.bag.append(glyphIcon('sack', 'run__glyph run__glyph--sack'), this.bagValue, this.mult);
     labelAria(this.bag, 'Bag');
-    // the bank under the bag, white, with the coin: a road coin is in it the moment it is picked
-    this.bankRow = el('div', 'run__coins');
-    this.bankValue = el('span', 'run__coins-value', '0');
-    this.bankRow.append(el('span', 'run__coin-glyph'), this.bankValue);
+    block.append(this.bankRow, this.bag);
     // the busted bar is the officer's ticket book (M5.5 slice 18): three lines written as it fills
     this.bar = el('div', 'run__busted');
     const pad = el('div', 'run__ticket');
@@ -102,7 +106,7 @@ export class RunHud {
     title.append(this.wallTitle, this.wallBest);
     page.append(title, this.wallLines, this.wallSentence, this.wallFirst, this.wallCounts);
     this.wall.append(page);
-    this.root.append(this.bag, this.bankRow, this.bar, this.card, this.wall);
+    this.root.append(block, this.bar, this.card, this.wall);
     parent.appendChild(this.root);
     this.bag.classList.toggle('is-visible', sim.city !== null);
     this.bankRow.classList.toggle('is-visible', sim.city !== null);
@@ -128,7 +132,7 @@ export class RunHud {
     const m = drive(readDrive(sim, 0, this.driveState));
     if (m !== this.mask) {
       this.mask = m;
-      // hidden, never removed: the bag keeps its place so the bank under it never jumps
+      // hidden, never removed: the bag under the bank keeps its place, so the pops' lane under it never jumps
       this.bag.classList.toggle('is-hidden', (m & DRIVE.bag) === 0);
       this.mult.classList.toggle('is-hidden', (m & DRIVE.mult) === 0);
       this.bankRow.classList.toggle('is-hidden', (m & DRIVE.bank) === 0);

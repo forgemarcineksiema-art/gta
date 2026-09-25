@@ -198,6 +198,8 @@ export const PL: Readonly<Record<string, string>> = {
   'THE MAYOR KEEPS 3/4': 'BURMISTRZ RATUJE 3/4',
   'YOU KEEP HALF': 'ZOSTAJE CI POŁOWA',
   'BANK': 'BANK',
+  // the combo's name over its points (M8.9 R4)
+  'COMBO': 'KOMBO',
   'FIRST NEW CAR: {price} · IT IS YOURS IN CARS': 'PIERWSZE NOWE AUTO: {price} · STAĆ CIĘ · ZAKŁADKA AUTA',
   'FIRST NEW CAR: {price} · YOU HAVE {bank}': 'PIERWSZE NOWE AUTO: {price} · MASZ {bank}',
   'NEXT: {step} · STEP {n} OF {of}': 'DALEJ: {step} · KROK {n} Z {of}',

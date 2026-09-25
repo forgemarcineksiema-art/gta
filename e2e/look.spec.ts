@@ -251,6 +251,8 @@ for (const [w, h] of SIZES) {
       await adv(page, 200);
       if (await page.evaluate(() => window.__game!.sim.pursuit.state === 'active' && window.__game!.sim.run.state === 'running')) break;
     }
+    // a bag in play, so the money block shows whole: the bank, the bag and its ×
+    await page.evaluate(() => { const run = window.__game!.sim.run; run.bag = Math.max(run.bag, 18_500); });
     await adv(page, 1500);
     await snap(page, 'chase3');
   });

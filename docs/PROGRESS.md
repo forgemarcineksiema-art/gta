@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.9 slice 8: the corners and the gauge
+
+Done (R4): the stars without their panel, outlined, the next one filling from its foot (`heatFill`, 24 steps; the `+n`
+went); the money block under them, the bank (the coin) then the bag (the sack, its × from ×1.3), the pops' lane under
+it; the combo named KOMBO, its × from ×2; `ui/hud/gauge.ts`, a round dial of 150 px at 720p on the radar's dark disc:
+the speed, km/h, the boost's 270° arc in ink (a pulse when full, white while boosting, the flame at its start), the
+damage's inner arc in red for 3 s after a hit and standing from the third stage (NITRO and USZKODZENIA went). The sack,
+the coin and the flame are `sim/glyphs.ts` outlines, drawn by `ui/glyph.ts`; the wall's sum drops ×1. The chase still
+now carries a bag; screens' life frame sets stage 3. Pins M8.9 8.1–8.5. Stills and verify green.
+
 ## 2026-09-25 — M8.9 slice 7: the HUD on one scale (slice 6, the typeface, waits for the font's download)
 
 Done (R3): every size of the screen's rules is in rem (a one-off rewrite; borders, shadows, radii and the dev panel keep

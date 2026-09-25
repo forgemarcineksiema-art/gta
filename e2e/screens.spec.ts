@@ -132,8 +132,9 @@ for (const [w, h] of SIZES) {
       const sim = window.__game?.sim;
       const traffic = sim?.traffic;
       if (!sim || !traffic) return false;
-      sim.life.state.damage = 0.6;
-      sim.life.state.stage = 2;
+      // the third stage: the damage's arc stands (M8.9 R4; below it, it shows only for a moment after a hit)
+      sim.life.state.damage = 0.9;
+      sim.life.state.stage = 3;
       if (sim.life.state.swapCandidate < 0) {
         const p = sim.vehicle.body.translation();
         const out = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };

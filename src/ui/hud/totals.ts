@@ -35,12 +35,16 @@ export interface CardResult {
   bank: number;
 }
 
-/** The door: `BAG 32,500 ×2.6 … +84,500`, the double and the fence named in it; nothing when the bag was empty. */
+/**
+ * The door: `BAG 32,500 ×2.6 … +84,500`, the double and the fence named in it; nothing when the bag was empty. No
+ * ×1 (docs/M8.9_PLAN.md R4): as on the HUD, the × says something only when it multiplies.
+ */
 export function doorLines(r: DoorResult): Line[] {
   if (r.lastBag <= 0) return [];
   const doubled = r.lastDoubled ? ` ${t('DOUBLED')}` : '';
+  const times = r.lastMultiplier > 1 ? ` ×${num(r.lastMultiplier)}` : '';
   const fence = r.lastFence ? ` (${t('BAG BONUS')} +${num(BALANCE.prep.fenceBonus)})` : '';
-  return [{ label: `${t('BAG {cash}', { cash: Math.round(r.lastBag) })}${doubled} ×${num(r.lastMultiplier)}${fence}`, value: `+${money(r.lastBanked)}`, strong: true }];
+  return [{ label: `${t('BAG {cash}', { cash: Math.round(r.lastBag) })}${doubled}${times}${fence}`, value: `+${money(r.lastBanked)}`, strong: true }];
 }
 
 /** The card: the bag, what is kept of it, and the bank (the card has no footer). */

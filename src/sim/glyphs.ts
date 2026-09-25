@@ -18,7 +18,9 @@ export interface GlyphShape {
 }
 
 export type GlyphId = 'parcel' | 'key' | 'siren' | 'watch' | 'flag' | 'crash' | 'hammer' | 'taxi' | 'house' | 'star'
-  | 'd0' | 'd1' | 'd2' | 'd3' | 'd4' | 'd5' | 'd6' | 'd7' | 'd8' | 'd9';
+  | 'd0' | 'd1' | 'd2' | 'd3' | 'd4' | 'd5' | 'd6' | 'd7' | 'd8' | 'd9'
+  // the HUD's own (docs/M8.9_PLAN.md R4): the bag's sack, the bank's coin, the boost's flame; not signs, so not in GLYPH_ORDER
+  | 'sack' | 'coin' | 'flame';
 
 /** A regular polygon's points (a circle at `n` sides), clockwise from the top. */
 function circle(cx: number, cy: number, r: number, n = 20): number[] {
@@ -145,6 +147,23 @@ export const GLYPHS: Readonly<Record<GlyphId, readonly GlyphShape[]>> = {
   d7: digit(DIGIT_SEGMENTS[7] as string, 0.18, 0.1, 0.64, 0.9),
   d8: digit(DIGIT_SEGMENTS[8] as string, 0.18, 0.1, 0.64, 0.9),
   d9: digit(DIGIT_SEGMENTS[9] as string, 0.18, 0.1, 0.64, 0.9),
+  // the bag: a sack tied at the neck (the gap between its top and its body is the string)
+  sack: [
+    { outer: [0.3, 0.08, 0.42, 0.16, 0.5, 0.1, 0.58, 0.16, 0.7, 0.08, 0.63, 0.22, 0.6, 0.28, 0.4, 0.28, 0.37, 0.22] },
+    { outer: [0.4, 0.32, 0.6, 0.32, 0.74, 0.42, 0.85, 0.56, 0.89, 0.71, 0.84, 0.85, 0.7, 0.93, 0.5, 0.95, 0.3, 0.93, 0.16, 0.85, 0.11, 0.71, 0.15, 0.56, 0.26, 0.42] },
+  ],
+  // the bank: a coin, its rim and its face
+  coin: [
+    { outer: circle(0.5, 0.5, 0.44, 28), holes: [circle(0.5, 0.5, 0.33, 28)] },
+    { outer: circle(0.5, 0.5, 0.24, 20) },
+  ],
+  // the boost: a flame with a lick on its left and its core cut out
+  flame: [
+    {
+      outer: [0.5, 0.04, 0.62, 0.2, 0.74, 0.34, 0.84, 0.5, 0.86, 0.64, 0.8, 0.78, 0.68, 0.9, 0.5, 0.95, 0.32, 0.9, 0.2, 0.78, 0.14, 0.64, 0.16, 0.5, 0.24, 0.38, 0.3, 0.46, 0.34, 0.3, 0.42, 0.18],
+      holes: [[0.5, 0.5, 0.58, 0.62, 0.62, 0.72, 0.58, 0.82, 0.5, 0.86, 0.42, 0.82, 0.38, 0.72, 0.42, 0.62]],
+    },
+  ],
 };
 
 /** Each job kind's pictogram; a rival's is its number (`numberGlyphs`), the Chief's the star. */

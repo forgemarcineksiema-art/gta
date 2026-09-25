@@ -206,6 +206,8 @@ export class Vehicle {
   gripMul = 1;
   /** A constant sideways force at the rear axle, N, + to the right (a puncture pulling the car); 0 is none. */
   lateralPull = 0;
+  /** Outside factor on the engine's torque (a hurt car's, M8.8 slice 7); 1 is a sound engine. */
+  torqueMul = 1;
   /** Body slip angle of the previous step, radians (drift controller damping). */
   private bodySlipPrev = 0;
   /** Drift side (+1 right) and the rate-limited commanded angle in degrees (+ = right). */
@@ -713,7 +715,7 @@ export class Vehicle {
     // engine torque at the crank
     let crankTorque = 0;
     if (drivePedal > 0 && !shifting && wheelRpm < t.redlineRpm) {
-      crankTorque = drivePedal * t.torqueMax * torqueCurve(t, Math.max(t.idleRpm, wheelRpm)) * (this.boosting ? t.boostTorqueMul : 1);
+      crankTorque = drivePedal * t.torqueMax * this.torqueMul * torqueCurve(t, Math.max(t.idleRpm, wheelRpm)) * (this.boosting ? t.boostTorqueMul : 1);
       if (this.gear === -1 && absFwd > t.maxReverseSpeed) crankTorque = 0;
     } else if (drivePedal === 0) {
       crankTorque = -t.engineBrakeTorque * (wheelRpm / t.redlineRpm);

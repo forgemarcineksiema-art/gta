@@ -44,6 +44,9 @@ export class Life {
   private readonly takenDown: Uint8Array;
   /** A spike strip punctured the tyres: grip down and a pull at the rear until a swap, the door or a fresh car. */
   spiked = false;
+  /** The pulls at the rear axle (N, + right) the vehicle takes the sum of: the puncture's and the hurt car's (M8.8 slice 7). */
+  private spikePull = 0;
+  private hurtPull = 0;
   /** The player's velocity before this step's physics, for closing speeds. */
   private prevVx = 0;
   private prevVz = 0;
@@ -189,7 +192,28 @@ export class Life {
     if (stage === st.stage) return;
     st.stage = stage as LifeState['stage'];
     this.sim.events.push('damage', stage, tm.contactX, tm.contactY, tm.contactZ, -1);
+    this.hurt(stage, tm.contactX, tm.contactZ);
     if (stage >= 4) this.wreck();
+  }
+
+  /**
+   * The car says it is hurt (M8.8 slice 7): from stage 2 the engine gives its share of the torque and the car pulls
+   * toward the side of the hit at (`x`, `z`) that raised the stage; mild, and nothing on the screen.
+   */
+  hurt(stage: number, x: number, z: number): void {
+    const h = DAMAGE.handling;
+    const v = this.sim.vehicle;
+    v.torqueMul = h.torque[stage] ?? 1;
+    const p = v.body.translation(this.proj);
+    const yaw = M.yawOf(v.body.rotation(this.rot));
+    const right = (x - p.x) * -Math.cos(yaw) + (z - p.z) * Math.sin(yaw) >= 0 ? 1 : -1;
+    // a push to the right at the rear swings the nose left: the hit's side takes the opposite sign
+    this.hurtPull = -right * (h.pull[stage] ?? 0) * v.tuning.mass;
+    this.pull();
+  }
+
+  private pull(): void {
+    this.sim.vehicle.lateralPull = this.spikePull + this.hurtPull;
   }
 
   /**
@@ -214,14 +238,16 @@ export class Life {
     if (this.spiked) return;
     this.spiked = true;
     this.sim.vehicle.gripMul = POLICE.spike.grip;
-    this.sim.vehicle.lateralPull = side * POLICE.spike.pull;
+    this.spikePull = side * POLICE.spike.pull;
+    this.pull();
   }
 
   /** New tyres: the door, a swap, a fresh car. */
   mend(): void {
     this.spiked = false;
     this.sim.vehicle.gripMul = 1;
-    this.sim.vehicle.lateralPull = 0;
+    this.spikePull = 0;
+    this.pull();
   }
 
   private wreck(): void {
@@ -238,6 +264,8 @@ export class Life {
 
   /** A fresh car: no damage, no wreck, new tyres (a reset, a swap, a respawn, the garage's drive-out). */
   heal(): void {
+    this.hurtPull = 0;
+    this.sim.vehicle.torqueMul = 1;
     this.mend();
     const st = this.state;
     st.damage = 0;
@@ -342,6 +370,8 @@ export class Life {
     let stage = 0;
     for (let k = 0; k < DAMAGE.stages.length; k++) if (st.damage >= (DAMAGE.stages[k] as number)) stage = k + 1;
     st.stage = stage as LifeState['stage'];
+    // a tired engine, but no hit to pull toward
+    this.sim.vehicle.torqueMul = DAMAGE.handling.torque[stage] ?? 1;
   }
 
   skipSlowMo(): void {

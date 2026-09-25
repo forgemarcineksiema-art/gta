@@ -369,7 +369,7 @@ export class App {
       const p = sim.vehicle.body.translation();
       return JSON.stringify({
         axes: '+Y up, +Z north, +X west; metres', mode: this.paused ? 'paused' : 'driving',
-        map: sim.city ? 'city' : 'playground', seed: sim.city?.seed,
+        map: sim.city ? 'city' : sim.island ? 'island' : 'playground', seed: sim.city?.seed,
         carId: sim.carId,
         damage: { value: sim.life.state.damage, stage: sim.life.state.stage, wrecked: sim.life.state.wrecked },
         heat: { points: sim.heat.points, level: sim.heat.level },
@@ -473,7 +473,9 @@ export class App {
     const bodyParam = params.get('body');
     const body = (BODY_IDS as readonly string[]).includes(bodyParam ?? '') ? (bodyParam as BodyId) : undefined;
     const citySpawns = ['city', 'crown', 'foundry', 'gardens', 'marina', 'highway'];
-    const map = params.get('map') === 'playground' || params.get('bot') === 'track' || (spawn && !citySpawns.includes(spawn)) ? 'playground' : 'city';
+    // `map=island` (M8.10): the hand-drawn island, until its switch the grid stays the game's
+    const map = params.get('map') === 'island' ? 'island'
+      : params.get('map') === 'playground' || params.get('bot') === 'track' || (spawn && !citySpawns.includes(spawn)) ? 'playground' : 'city';
     const seed = Number(params.get('seed') ?? '42');
     const lifeOff = params.get('life') === '0';
     const traffic = lifeOff ? 0 : densityParam(params.get('traffic'));

@@ -1,0 +1,264 @@
+/**
+ * The island for driving (M8.10 slice 2, docs/M8.10_PLAN.md): the ground as a height field a chunk at a time round the
+ * car, the coast as the island's wall, the sea's surface for the hovercraft, the spawns and the highway's loop as its
+ * track. What the grid's `City` gives the rest of the sim comes to the island slice by slice; until the switch it is
+ * `?map=island`.
+ */
+import RAPIER from '@dimforge/rapier3d-compat';
+import { GROUPS_SOLID, GROUPS_TERRAIN, GROUPS_WATER } from '../collision';
+import type { SpawnPoint } from '../playground';
+import { SEA } from '../city/sea';
+import type { TrackDef, TrackSample } from '../track';
+import { catmullRom, resample, type P2 } from './geom';
+import { Ground, HALF_WIDTH, WATERLINE, basinQuays } from './ground';
+import { BOUNDS, CIRCUS, COAST, HIGHWAY, causeway, islet } from './plan';
+
+/** A chunk of the ground: its side (m) and the height field's cell (m). The chunks cover the plan's bounds. */
+export const CHUNK = 250;
+export const FIELD = 2;
+const CELLS = CHUNK / FIELD;
+export const CHUNKS_X = Math.ceil((BOUNDS.x1 - BOUNDS.x0) / CHUNK);
+export const CHUNKS_Z = Math.ceil((BOUNDS.z1 - BOUNDS.z0) / CHUNK);
+/** The chunks' first corner: the bounds widened to whole chunks round the origin. */
+export const CHUNK_X0 = -(CHUNKS_X * CHUNK) / 2;
+export const CHUNK_Z0 = -(CHUNKS_Z * CHUNK) / 2;
+/** The wall at the coast: its height over the waterline and its thickness (m); pieces about this long. */
+const WALL = { height: 4, half: 0.5, piece: 24 } as const;
+/**
+ * The lean a plumb ray takes on the island (Vehicle.plumbTilt): Rapier's height field misses a ray cast exactly straight
+ * down (measured: most such rays pass through), and a lean this small moves nothing.
+ */
+export const PLUMB_TILT = 1e-4;
+/** The heights of the chunks round the physics ring are worked out ahead, this many columns a step (126 heights each). */
+export const PREFETCH_COLUMNS = 4;
+
+export class Island {
+  readonly ground = new Ground();
+  readonly spawns: SpawnPoint[];
+  /** The highway's loop as the bot's and the lap timer's track. */
+  readonly route: TrackDef;
+  /** The chunks with a height field in the physics, by index. */
+  readonly active = new Map<number, RAPIER.Collider>();
+  loaded = 0;
+  unloaded = 0;
+  /** Chunks whose heights were worked out when the ring needed them, not ahead (the start's ring, or a prefetch late). */
+  late = 0;
+  /** Heights worked out, all told (the prefetch's bound a step is `PREFETCH_COLUMNS` columns of them). */
+  worked = 0;
+  private cx = Number.NaN;
+  private cz = Number.NaN;
+  /** The ring's chunks the physics wants; whether this step built one. */
+  private readonly want = new Set<number>();
+  private built = false;
+  /** Each chunk's heights once worked out (the ground never changes): 64 kB a chunk. */
+  private readonly heights = new Map<number, Float32Array>();
+  /** The chunk whose heights are being worked out ahead, and how many of its columns are done. */
+  private ahead: { index: number; done: number; h: Float32Array } | null = null;
+  private readonly scratch = { x: 0, y: 0, z: 0, yaw: 0 };
+
+  constructor(readonly world: RAPIER.World) {
+    this.walls();
+    // the sea's surface for the hovercraft's rays, and the world's edge beyond it
+    const hx = (BOUNDS.x1 - BOUNDS.x0) / 2, hz = (BOUNDS.z1 - BOUNDS.z0) / 2;
+    world.createCollider(RAPIER.ColliderDesc.cuboid(hx, 0.5, hz).setTranslation(0, SEA.level - 0.5, 0).setCollisionGroups(GROUPS_WATER));
+    for (const [x, z, sx, sz] of [[BOUNDS.x0, 0, 1, hz], [BOUNDS.x1, 0, 1, hz], [0, BOUNDS.z0, hx, 1], [0, BOUNDS.z1, hx, 1]] as const) {
+      world.createCollider(RAPIER.ColliderDesc.cuboid(sx, 6, sz).setTranslation(x, 2, z).setCollisionGroups(GROUPS_SOLID).setRestitution(0.5));
+    }
+    this.spawns = this.spawnPoints();
+    this.route = this.highwayTrack();
+  }
+
+  /** A chunk's index from its column and row, and a point's chunk. */
+  static chunkIndex(i: number, j: number): number {
+    return j * CHUNKS_X + i;
+  }
+  static chunkOf(x: number, z: number): [number, number] {
+    return [Math.max(0, Math.min(CHUNKS_X - 1, Math.floor((x - CHUNK_X0) / CHUNK))), Math.max(0, Math.min(CHUNKS_Z - 1, Math.floor((z - CHUNK_Z0) / CHUNK)))];
+  }
+
+  /**
+   * Keep the 3×3 chunks round (x, z) in the physics: a chunk's height field built as it enters (the chunk under the car
+   * at once, the ring's others one a step), freed as it leaves. `force` builds the whole ring now (the start, a jump).
+   */
+  sync(x: number, z: number, force = false): void {
+    const [ci, cj] = Island.chunkOf(x, z);
+    if (force || ci !== this.cx || cj !== this.cz) {
+      this.cx = ci;
+      this.cz = cj;
+      this.want.clear();
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+        const i = ci + di, j = cj + dj;
+        if (i < 0 || j < 0 || i >= CHUNKS_X || j >= CHUNKS_Z) continue;
+        this.want.add(Island.chunkIndex(i, j));
+      }
+      for (const [k, collider] of this.active) {
+        if (this.want.has(k)) continue;
+        this.world.removeCollider(collider, false);
+        this.active.delete(k);
+        this.unloaded++;
+      }
+      this.load(Island.chunkIndex(ci, cj));
+    }
+    for (const k of this.want) {
+      if (this.active.has(k)) continue;
+      this.load(k);
+      if (!force) break;
+    }
+  }
+
+  private load(k: number): void {
+    if (this.active.has(k)) return;
+    this.active.set(k, this.buildChunk(k % CHUNKS_X, Math.floor(k / CHUNKS_X)));
+    this.loaded++;
+    this.built = true;
+  }
+
+  /** Work out a chunk's heights from column `from` up to (not including) `to`, into `h`. */
+  private columns(index: number, h: Float32Array, from: number, to: number): void {
+    const x0 = CHUNK_X0 + (index % CHUNKS_X) * CHUNK, z0 = CHUNK_Z0 + Math.floor(index / CHUNKS_X) * CHUNK, n = CELLS + 1;
+    for (let col = from; col < to; col++) for (let row = 0; row < n; row++) h[row + col * n] = this.ground.height(x0 + col * FIELD, z0 + row * FIELD);
+    this.worked += Math.max(0, to - from) * n;
+  }
+
+  /** A chunk's heights: (CELLS + 1)² every `FIELD` m, column-major, the rows along z and the columns along x. */
+  chunkHeights(i: number, j: number): Float32Array {
+    const index = Island.chunkIndex(i, j);
+    let h = this.heights.get(index);
+    if (!h) {
+      h = new Float32Array((CELLS + 1) * (CELLS + 1));
+      const done = this.ahead?.index === index ? this.ahead.done : 0;
+      if (done > 0 && this.ahead) h.set(this.ahead.h.subarray(0, done * (CELLS + 1)));
+      this.columns(index, h, done, CELLS + 1);
+      this.heights.set(index, h);
+      this.late++;
+      if (this.ahead?.index === index) this.ahead = null;
+    }
+    return h;
+  }
+
+  /**
+   * Work out the heights of the chunks round the physics ring ahead of the car, `PREFETCH_COLUMNS` columns a step, the
+   * nearest missing chunk of the 5×5 round (x, z) first, so a chunk that enters the ring finds them done.
+   */
+  prefetch(x: number, z: number): void {
+    // a step that built a height field works nothing out ahead
+    if (this.built) {
+      this.built = false;
+      return;
+    }
+    if (!this.ahead) {
+      const [ci, cj] = Island.chunkOf(x, z);
+      let best = -1, bestD = Infinity;
+      for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) {
+        const i = ci + di, j = cj + dj;
+        if (i < 0 || j < 0 || i >= CHUNKS_X || j >= CHUNKS_Z) continue;
+        const index = Island.chunkIndex(i, j);
+        if (this.heights.has(index)) continue;
+        const d = Math.hypot(CHUNK_X0 + (i + 0.5) * CHUNK - x, CHUNK_Z0 + (j + 0.5) * CHUNK - z);
+        if (d < bestD) { bestD = d; best = index; }
+      }
+      if (best < 0) return;
+      this.ahead = { index: best, done: 0, h: new Float32Array((CELLS + 1) * (CELLS + 1)) };
+    }
+    const a = this.ahead, to = Math.min(CELLS + 1, a.done + PREFETCH_COLUMNS);
+    this.columns(a.index, a.h, a.done, to);
+    a.done = to;
+    if (a.done === CELLS + 1) {
+      this.heights.set(a.index, a.h);
+      this.ahead = null;
+    }
+  }
+
+  /** A chunk's height field, centred on the chunk, from its heights (worked out now if the prefetch has not). */
+  buildChunk(i: number, j: number): RAPIER.Collider {
+    const x0 = CHUNK_X0 + i * CHUNK, z0 = CHUNK_Z0 + j * CHUNK;
+    const h = this.chunkHeights(i, j);
+    const desc = RAPIER.ColliderDesc.heightfield(CELLS, CELLS, h, { x: CHUNK, y: 1, z: CHUNK })
+      .setTranslation(x0 + CHUNK / 2, 0, z0 + CHUNK / 2)
+      .setFriction(1)
+      .setCollisionGroups(GROUPS_TERRAIN);
+    return this.world.createCollider(desc);
+  }
+
+  /** The ground's height at a point. */
+  heightAt(x: number, z: number): number {
+    return this.ground.height(x, z);
+  }
+
+  /** Where a car put back on the road goes: the nearest graded road, its height, its heading (written into `out`). */
+  nearestRoad(x: number, z: number, out: SpawnPoint): SpawnPoint {
+    const p = this.scratch;
+    this.ground.nearestRoad(x, z, p);
+    out.position.x = p.x;
+    out.position.y = p.y + 1;
+    out.position.z = p.z;
+    out.yaw = p.yaw;
+    return out;
+  }
+
+  /**
+   * The island's wall: pieces along the coast, the causeway's and the islet's shores and the basin's quays, from the
+   * sea's floor to `WALL.height` over the waterline; none where a road on the ground crosses the shore.
+   */
+  private walls(): void {
+    const roads = this.ground.roads;
+    const crossed = (x: number, z: number): boolean => roads.some((r) => r.pts.some((p) => Math.hypot(p[0] - x, p[1] - z) < HALF_WIDTH[r.cls] + 4));
+    const chain = (poly: readonly P2[], closed: boolean): void => {
+      const n = poly.length, last = closed ? n : n - 1;
+      let a = poly[0] as P2, run = 0;
+      for (let k = 1; k <= last; k++) {
+        const b = poly[k % n] as P2;
+        run += Math.hypot(b[0] - (poly[(k - 1) % n] as P2)[0], b[1] - (poly[(k - 1) % n] as P2)[1]);
+        if (run < WALL.piece && k < last) continue;
+        const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2, len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        if (len > 0.5 && !crossed(mx, mz)) {
+          const yaw = Math.atan2(b[0] - a[0], b[1] - a[1]);
+          const bottom = -4, top = WATERLINE + WALL.height;
+          this.world.createCollider(RAPIER.ColliderDesc.cuboid(WALL.half, (top - bottom) / 2, len / 2 + 0.3)
+            .setTranslation(mx, (top + bottom) / 2, mz)
+            .setRotation({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) })
+            .setCollisionGroups(GROUPS_SOLID).setRestitution(0.5));
+        }
+        a = b;
+        run = 0;
+      }
+    };
+    chain(catmullRom(COAST, true, 6), true);
+    chain(causeway(), true);
+    chain(islet(), true);
+    chain(basinQuays(), false);
+  }
+
+  /** The spawns: the first minute's start at the summit, facing down Crown Avenue; the port, the beach, the runway. */
+  private spawnPoints(): SpawnPoint[] {
+    const at = (name: string, x: number, z: number, toX: number, toZ: number): SpawnPoint => ({
+      name, position: { x, y: this.ground.height(x, z) + 1, z }, yaw: Math.atan2(toX - x, toZ - z),
+    });
+    // world axes (+X west, +Z north): the summit's ring's south-east point, facing the centre down Crown Avenue
+    return [
+      at('island', 400, 347, CIRCUS.x, CIRCUS.z),
+      at('port', -180, 520, CIRCUS.x, CIRCUS.z),
+      at('beach', 300, -752, 0, -752),
+      at('runway', -1025, 480, -1025, 0),
+    ];
+  }
+
+  /** The highway's loop sampled every 3 m, as the grid's route is. */
+  private highwayTrack(): TrackDef {
+    const pts: P2[] = [];
+    for (const piece of HIGHWAY) {
+      const sampled = piece.smooth ? catmullRom(piece.points, false, 3) : resample(piece.points, 3);
+      pts.push(...sampled.slice(0, -1));
+    }
+    const samples: TrackSample[] = [];
+    let s = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i] as P2, prev = pts[(i + pts.length - 1) % pts.length] as P2, next = pts[(i + 1) % pts.length] as P2;
+      const a = Math.atan2(p[0] - prev[0], p[1] - prev[1]), b = Math.atan2(next[0] - p[0], next[1] - p[1]);
+      samples.push({ x: p[0], z: p[1], yaw: Math.atan2(next[0] - prev[0], next[1] - prev[1]), curvature: Math.atan2(Math.sin(b - a), Math.cos(b - a)) / 3, s });
+      s += Math.hypot(next[0] - p[0], next[1] - p[1]);
+    }
+    const first = samples[0] as TrackSample;
+    return { samples, gates: [], origin: { x: 0, z: 0 }, width: 2 * HALF_WIDTH.highway, length: s, start: { x: first.x, z: first.z, yaw: first.yaw } };
+  }
+}

@@ -13,6 +13,7 @@ import { PlayerCar } from './cars/PlayerCar';
 import { Billboards } from './city/Billboards';
 import { BreakerView } from './city/BreakerView';
 import { CityView } from './city/CityView';
+import { IslandView } from './island/IslandView';
 import { RampView } from './city/RampView';
 import { SignalView } from './city/SignalView';
 import { buildSkyline } from './city/skyline';
@@ -73,6 +74,8 @@ function orphanWholeBufferUpdates(gl: WebGLRenderingContext | WebGL2RenderingCon
 
 export class Renderer {
   readonly cityView: CityView | null;
+  /** The hand-drawn island's ground, roads and sea (M8.10, `?map=island`). */
+  readonly islandView: IslandView | null;
   readonly billboards: Billboards | null;
   readonly trafficView: TrafficView | null;
   readonly pedView: PedView | null;
@@ -148,6 +151,7 @@ export class Renderer {
     this.sky = new Sky(this.scene);
 
     this.cityView = sim.city ? new CityView(this.scene, sim.city, sim.props) : null;
+    this.islandView = sim.island ? new IslandView(this.scene, sim.island) : null;
     this.propsView = sim.props ? new PropsView(this.scene, sim) : null;
     this.billboards = sim.collectibles ? new Billboards(this.scene) : null;
     this.coinsView = sim.coins ? new Coins(this.scene) : null;
@@ -174,6 +178,10 @@ export class Renderer {
     if (this.cityView) {
       const p = sim.vehicle.body.translation();
       this.cityView.sync(p.x, p.z, this.quality, true);
+    }
+    if (this.islandView) {
+      const p = sim.vehicle.body.translation();
+      this.islandView.sync(p.x, p.z, this.quality, true);
     }
     for (const d of sim.dynamics) this.shapes.addDynamic(d);
     this.player = new PlayerCar(this.scene, sim);
@@ -275,6 +283,7 @@ export class Renderer {
     const snap = sim.respawned || this.lastCarPos.distanceToSquared(carPos) > 80 * 80;
     this.lastCarPos.copy(carPos);
     this.cityView?.sync(carPos.x, carPos.z, this.quality, snap);
+    this.islandView?.sync(carPos.x, carPos.z, this.quality, snap);
     if (this.cityView && dt > 0 && dt <= 0.25) this.adaptQuality(dt);
     this.carVel.set(tm.vx, tm.vy, tm.vz);
 
@@ -317,6 +326,7 @@ export class Renderer {
   dispose(): void {
     this.fx.dispose();
     this.cityView?.dispose();
+    this.islandView?.dispose();
     this.policeView.dispose();
     this.hideoutView?.dispose();
     this.coinsView?.dispose();

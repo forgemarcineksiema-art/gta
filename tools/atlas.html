@@ -12,7 +12,10 @@ const cv = document.getElementById('atlas');
 cv.width = MW + PANEL; cv.height = MH;
 const g = cv.getContext('2d');
 const FONT = "'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
-const X = (x) => x - B.x0, Y = (z) => z - B.z0;
+// the world's axes are +X west and +Z north: the map draws −x to the right and −z down, as the game's full map does
+const X = (x) => B.x1 - x, Y = (z) => B.z1 - z;
+/** A world rectangle (minima and maxima) on the map. */
+const rectOf = (r) => [X(r.x1), Y(r.z1), r.x1 - r.x0, r.z1 - r.z0];
 let seed = 7;
 const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
 const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
@@ -43,8 +46,8 @@ function drawBase() {
   trace(A.bay, true); g.fillStyle = 'rgba(110,215,220,0.45)'; g.fill();
   seed = 11;
   for (let i = 0; i < 170; i++) {
-    const x = 380 + rnd() * 720, z = 300 + rnd() * 480;
-    if (onLand(x, z) || (x > 460 && x < 660 && z < 470)) continue;
+    const x = -(380 + rnd() * 720), z = -(300 + rnd() * 480);
+    if (onLand(x, z) || (x < -460 && x > -660 && z > -470)) continue;
     let near = false; for (const p of A.bay) if (Math.hypot(p[0] - x, p[1] - z) < 90) near = true; for (const p of A.islet) if (Math.hypot(p[0] - x, p[1] - z) < 60) near = true;
     if (!near) continue;
     g.save(); g.translate(X(x), Y(z)); g.rotate(rnd() * 3); g.beginPath(); g.ellipse(0, 0, 4 + rnd() * 9, 3 + rnd() * 6, 0, 0, 7);
@@ -56,9 +59,10 @@ function drawBase() {
   for (let j = 0; j < H.nz - 1; j++) for (let i = 0; i < H.nx - 1; i++) {
     const h = H.values[j * H.nx + i]; if (h < 0) continue;
     let c = bands[0][1]; for (const [bh, bc] of bands) if (h >= bh) c = bc;
+    // the light from the map's upper left: the world's +X and +Z
     const hx = Math.max(0, H.values[j * H.nx + i + 1]), hz = Math.max(0, H.values[(j + 1) * H.nx + i]);
-    const k = Math.max(0.78, Math.min(1.16, 1 - ((hx - h) / H.cell + (hz - h) / H.cell) * 1.6));
-    g.fillStyle = rgb(c, k); g.fillRect(X(B.x0 + i * H.cell), Y(B.z0 + j * H.cell), H.cell + 0.6, H.cell + 0.6);
+    const k = Math.max(0.78, Math.min(1.16, 1 + ((hx - h) / H.cell + (hz - h) / H.cell) * 1.6));
+    g.fillStyle = rgb(c, k); g.fillRect(X(B.x0 + (i + 1) * H.cell), Y(B.z0 + (j + 1) * H.cell), H.cell + 0.6, H.cell + 0.6);
   }
   // the districts' light washes, round each district's middle
   const D = A.districts, sums = D.ids.map(() => [0, 0, 0]);
@@ -70,7 +74,7 @@ function drawBase() {
     w.addColorStop(0, `rgba(${cr},${cg},${cb},0.26)`); w.addColorStop(1, `rgba(${cr},${cg},${cb},0)`); g.fillStyle = w; g.fillRect(X(x - r), Y(z - r), 2 * r, 2 * r);
   });
   // the port's basin and its quays
-  g.fillStyle = '#2f8fb0'; g.fillRect(X(A.basin.x0), Y(A.basin.z0), A.basin.x1 - A.basin.x0, A.basin.z1 - A.basin.z0);
+  g.fillStyle = '#2f8fb0'; g.fillRect(...rectOf(A.basin));
   g.lineWidth = 5; g.strokeStyle = '#d8d2c4'; g.beginPath(); g.moveTo(X(A.basin.x0), Y(A.basin.z0)); g.lineTo(X(A.basin.x0), Y(A.basin.z1)); g.lineTo(X(A.basin.x1), Y(A.basin.z1)); g.lineTo(X(A.basin.x1), Y(A.basin.z0)); g.stroke();
   // beaches, golf, quarry, parks
   g.lineCap = 'round';
@@ -100,19 +104,21 @@ function drawBase() {
   // the canal, the rails, the container yards, the buildings of their own
   trace(P.canal, false); g.lineCap = 'butt'; g.lineWidth = P.canalWidth; g.strokeStyle = '#8f887f'; g.stroke(); g.lineWidth = P.canalWidth - 8; g.strokeStyle = '#b9b2a6'; g.stroke(); g.lineWidth = 4; g.strokeStyle = '#4aa3c4'; g.stroke();
   const rails = (a, b) => { g.beginPath(); g.moveTo(X(a[0]), Y(a[1])); g.lineTo(X(b[0]), Y(b[1])); g.lineWidth = 3; g.strokeStyle = '#4a4552'; g.stroke(); const l = Math.hypot(b[0] - a[0], b[1] - a[1]); for (let d = 0; d < l; d += 8) { g.fillStyle = '#4a4552'; g.fillRect(X(a[0] + (b[0] - a[0]) * d / l) - 0.8, Y(a[1] + (b[1] - a[1]) * d / l) - 4, 1.6, 8); } };
-  rails(P.railway[0], P.railway[1]); for (const dz of [-26, -13, 13]) rails([P.railYard.x0, -515 + dz], [P.railYard.x1, -515 + dz]);
+  const rz = P.railway[0][1];
+  rails(P.railway[0], P.railway[1]); for (const dz of [-26, -13, 13]) rails([P.railYard.x0, rz + dz], [P.railYard.x1, rz + dz]);
+  for (const [x, z] of P.crossings) { g.fillStyle = '#e8384f'; g.fillRect(X(x) - 9, Y(z) - 11, 4, 22); g.fillRect(X(x) + 5, Y(z) - 11, 4, 22); }
   seed = 9;
   for (const y of P.containerYards) for (let z = y.z0; z < y.z1; z += 9) for (let x = y.x0; x < y.x1; x += 15) {
     if (rnd() < 0.18 || !onLand(x + 6, z + 3)) continue;
     g.fillStyle = ['#e5533d', '#2b6cb0', '#f0a93b', '#3d9970', '#8e5bb5', '#d8d2c4'][(rnd() * 6) | 0]; g.fillRect(X(x), Y(z), 12.5, 6);
   }
-  for (const [r, fill] of [[P.carPark, '#9d98a8'], [P.headquarters, '#2b4fb5'], [P.donutShop, '#ef8fbe']]) { g.fillStyle = 'rgba(30,22,40,0.3)'; g.fillRect(X(r.x0) + 5, Y(r.z0) + 7, r.x1 - r.x0, r.z1 - r.z0); g.fillStyle = fill; g.fillRect(X(r.x0), Y(r.z0), r.x1 - r.x0, r.z1 - r.z0); g.lineWidth = 1.5; g.strokeStyle = '#1a1330'; g.strokeRect(X(r.x0), Y(r.z0), r.x1 - r.x0, r.z1 - r.z0); }
+  for (const [r, fill] of [[P.carPark, '#9d98a8'], [P.headquarters, '#2b4fb5'], [P.donutShop, '#ef8fbe']]) { const [rx, ry, rw2, rh] = rectOf(r); g.fillStyle = 'rgba(30,22,40,0.3)'; g.fillRect(rx + 5, ry + 7, rw2, rh); g.fillStyle = fill; g.fillRect(rx, ry, rw2, rh); g.lineWidth = 1.5; g.strokeStyle = '#1a1330'; g.strokeRect(rx, ry, rw2, rh); }
   g.restore();
   // the causeway and the islet
   trace(A.causeway, true); g.fillStyle = '#9db57c'; g.fill(); g.lineWidth = 4; g.strokeStyle = '#d8d2c4'; g.stroke();
-  const rw = P.runway; g.fillStyle = '#4a4a58'; g.fillRect(X(rw.x0), Y(rw.z0), rw.x1 - rw.x0, rw.z1 - rw.z0);
+  const rw = P.runway; g.fillStyle = '#4a4a58'; g.fillRect(...rectOf(rw));
   g.fillStyle = '#f7f3ea'; for (let z = rw.z0 + 20; z < rw.z1 - 20; z += 34) g.fillRect(X((rw.x0 + rw.x1) / 2) - 1, Y(z), 2.5, 16);
-  for (const hg of P.hangars) { g.fillStyle = '#9aa6b4'; g.fillRect(X(hg.x0), Y(hg.z0), hg.x1 - hg.x0, hg.z1 - hg.z0); g.strokeStyle = '#1a1330'; g.lineWidth = 1.2; g.strokeRect(X(hg.x0), Y(hg.z0), hg.x1 - hg.x0, hg.z1 - hg.z0); }
+  for (const hg of P.hangars) { g.fillStyle = '#9aa6b4'; g.fillRect(...rectOf(hg)); g.strokeStyle = '#1a1330'; g.lineWidth = 1.2; g.strokeRect(...rectOf(hg)); }
   g.beginPath(); g.arc(X(P.controlTower.x), Y(P.controlTower.z), 9, 0, 7); g.fillStyle = '#f7f3ea'; g.fill(); g.stroke();
   g.fillStyle = '#e5533d'; g.fillRect(X(P.megaRamp.x) - 17, Y(P.megaRamp.z) - 14, 34, 28); g.strokeRect(X(P.megaRamp.x) - 17, Y(P.megaRamp.z) - 14, 34, 28);
   trace(A.islet, true); g.fillStyle = '#e6c98f'; g.fill();
@@ -158,8 +164,8 @@ function drawBase() {
   g.beginPath(); g.ellipse(X(st.x), Y(st.z), st.rx - 16, st.rz - 15, 0, 0, 7); g.fillStyle = '#4a4a58'; g.fill();
   g.beginPath(); g.ellipse(X(st.x), Y(st.z), st.rx - 38, st.rz - 35, 0, 0, 7); g.fillStyle = '#7fbf6a'; g.fill();
   g.lineCap = 'butt';
-  for (const x of P.marinaPiers) { g.fillStyle = '#c9b89a'; g.fillRect(X(x) - 2.5, Y(372), 5, 92); }
-  const pp = P.pleasurePier; g.fillStyle = '#c9b89a'; g.fillRect(X(pp.x0), Y(pp.z0), pp.x1 - pp.x0, pp.z1 - pp.z0);
+  for (const pier of P.marinaPiers) { trace([pier.from, pier.to], false); g.lineWidth = 5; g.strokeStyle = '#c9b89a'; g.stroke(); }
+  g.fillStyle = '#c9b89a'; g.fillRect(...rectOf(P.pleasurePier));
   g.beginPath(); g.arc(X(P.ferrisWheel.x), Y(P.ferrisWheel.z), 20, 0, 7); g.lineWidth = 3; g.strokeStyle = '#f7f3ea'; g.stroke();
   g.beginPath(); g.arc(X(P.lighthouse.x), Y(P.lighthouse.z), 10, 0, 7); g.fillStyle = '#f7f3ea'; g.fill(); g.lineWidth = 4; g.strokeStyle = '#e8384f'; g.stroke();
   g.beginPath(); g.ellipse(X(P.duck.x), Y(P.duck.z), 17, 12, 0, 0, 7); g.fillStyle = '#ffd23f'; g.fill(); g.beginPath(); g.arc(X(P.duck.x + 12), Y(P.duck.z - 8), 7.5, 0, 7); g.fill();
@@ -205,7 +211,7 @@ function mark(kind, px, py, r) {
 }
 
 /** The district names off the places at the districts' middles (the summit, the botanic garden, the hotel). */
-const NAME_SHIFT = { crown: [30, 210], foundry: [0, -60], gardens: [150, 280], marina: [-110, -190] };
+const NAME_SHIFT = { crown: [-30, -210], foundry: [0, 60], gardens: [-150, -280], marina: [110, 190] };
 function landmark(kind, x, z) {
   const px = X(x), py = Y(z);
   g.save(); g.lineWidth = 3; g.strokeStyle = '#1a1330';
@@ -222,15 +228,17 @@ function drawIslandWords() {
   for (const [id, [x, z]] of Object.entries(A.middles)) text(DISTRICTS[id].name, x + NAME_SHIFT[id][0], z + NAME_SHIFT[id][1], 46, { weight: 900, spacing: 5, fill: DISTRICTS[id].color, outline: 10 });
   for (const gr of A.placed.garages) mark('garage', X(gr.at[0]), Y(gr.at[1]), 12);
   const place = (s, x, z, o = {}) => text(s, x, z, o.size || 19, { weight: 800, ...o });
-  place('Wieża Koronna · szczyt', P.towerTop.x, P.towerTop.z - 100, { fill: '#f5cd75' });
-  place('Wodociągi', P.waterworks.x, P.waterworks.z + 40, { fill: '#9fe3f2' });
-  place('Palmiarnia · ogród botaniczny', P.glasshouse.x, P.glasshouse.z + 40, { fill: '#e9f7e0' });
-  place('Hotel Koral', P.hotel.x, P.hotel.z - 44, { size: 18, fill: '#ffd1d8' });
+  // offsets in world metres: up the map is +z, right is −x
+  place('Wieża Koronna · szczyt', P.towerTop.x, P.towerTop.z + 100, { fill: '#f5cd75' });
+  place('Wodociągi', P.waterworks.x, P.waterworks.z - 40, { fill: '#9fe3f2' });
+  place('Palmiarnia · ogród botaniczny', P.glasshouse.x, P.glasshouse.z - 40, { fill: '#e9f7e0' });
+  place('Hotel Koral', P.hotel.x, P.hotel.z + 44, { size: 18, fill: '#ffd1d8' });
   place('STADION', P.stadium.x, P.stadium.z, { size: 17 });
-  place('kamieniołom', -700, -512, { size: 16, fill: '#fff0d8' });
-  place('lotnisko', P.runway.x0 - 20, P.runway.z0 + 250, { size: 16, rot: -1.5708 });
-  place('wysepka', 1034, 420, { size: 15, fill: '#fff3b0' });
-  place('OBWODNICA', -150, 698, { size: 13, spacing: 3, fill: '#2a2438', outline: 0, weight: 900 });
+  const qc = P.quarry.reduce((a, p) => [a[0] + p[0] / P.quarry.length, a[1] + p[1] / P.quarry.length], [0, 0]);
+  place('kamieniołom', qc[0], qc[1], { size: 16, fill: '#fff0d8' });
+  place('lotnisko', P.runway.x1 + 20, (P.runway.z0 + P.runway.z1) / 2, { size: 16, rot: -1.5708 });
+  const ic = A.islet.reduce((a, p) => [a[0] + p[0] / A.islet.length, a[1] + p[1] / A.islet.length], [0, 0]);
+  place('wysepka', ic[0], ic[1] - 60, { size: 15, fill: '#fff3b0' });
 }
 
 function drawPlaced() {
@@ -271,7 +279,8 @@ function drawPanel() {
 drawBase();
 if (MODE === 'placed') drawPlaced(); else drawIslandWords();
 drawPanel();
-const bx = X(B.x0 + 30), by = Y(B.z1 - 25); g.fillStyle = '#f7f3ea'; g.fillRect(bx, by, 500, 4); text('500 m', B.x0 + 280, B.z1 - 48, 20, { weight: 800 });
+// the scale bar in the map's lower left (the world's +X, −Z corner)
+const bx = X(B.x1 - 30), by = Y(B.z0 + 25); g.fillStyle = '#f7f3ea'; g.fillRect(bx, by, 500, 4); text('500 m', B.x1 - 280, B.z0 + 48, 20, { weight: 800 });
 window.ATLAS_DONE = true;
 </script>
 </body></html>

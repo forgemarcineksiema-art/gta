@@ -197,6 +197,11 @@ export class Vehicle {
   readonly wheels: WheelState[] = [];
   readonly slot: number;
   tuning: VehicleTuning;
+  /**
+   * How far a plumb suspension ray leans (M8.10 slice 2): Rapier's height field misses a ray cast exactly straight down,
+   * so on the island (`SimWorld` sets it) a plumb ray leans by this much; 0 on the grid and the playground.
+   */
+  plumbTilt = 0;
 
   /** Ramped steering input in [-1, 1] before the sensitivity curve. */
   steerRaw = 0;
@@ -472,8 +477,12 @@ export class Vehicle {
     // on two wheels (M8.8 slice 14) the rays go straight down, so a lean never lifts them off the road; the hovercraft's
     // cushion (slice 18) too, so its springs never push it along
     const twoWheel = t.twoWheel > 0, hover = t.hover > 0, plumb = twoWheel || hover;
-    if (plumb) M.set(s.rayDir, 0, -1, 0);
-    else M.scale(s.rayDir, s.up, -1);
+    if (plumb) M.set(s.rayDir, this.plumbTilt, -1, this.plumbTilt);
+    else {
+      M.scale(s.rayDir, s.up, -1);
+      // a height field misses a ray that is exactly plumb (the island's ground, M8.10 slice 2)
+      if (Math.abs(s.rayDir.x) + Math.abs(s.rayDir.z) < this.plumbTilt) { s.rayDir.x += this.plumbTilt; s.rayDir.z += this.plumbTilt; }
+    }
     const rayLen = t.suspensionRestLength + t.wheelRadius;
     // the hovercraft's cushion stands on the sea too (M8.8 slice 19); no other car's ray meets it
     const rayGroups = hover ? QUERY_HOVER : QUERY_NOT_PROP;
@@ -1023,9 +1032,9 @@ export class Vehicle {
         this.ray.origin.x = s.pos.x;
         this.ray.origin.y = s.pos.y;
         this.ray.origin.z = s.pos.z;
-        this.ray.dir.x = 0;
+        this.ray.dir.x = this.plumbTilt;
         this.ray.dir.y = -1;
-        this.ray.dir.z = 0;
+        this.ray.dir.z = this.plumbTilt;
         const hit = this.world.castRayAndGetNormal(this.ray, 14, true, undefined, rayGroups, undefined, body);
         if (hit) {
           const gap = Math.max(0, hit.timeOfImpact - (t.suspensionRestLength + t.wheelRadius));

@@ -1,4 +1,4 @@
-/** M8.10 slice 0: the island's plan as data (docs/M8.10_PLAN.md, DESIGN §21). */
+/** M8.10 slice 0: the island's plan as data (docs/M8.10_PLAN.md, its §1 the design). */
 import { describe, expect, it } from 'vitest';
 import { catmullRom, inPolygon, polylineLength, selfCrossing, type P2 } from '../../../src/sim/island/geom';
 import {
@@ -39,8 +39,9 @@ describe('M8.10 slice 0: the plan', () => {
       ...JOBS.flatMap((j, i): Array<[string, P2]> => [[`job ${i}`, j.at], ...(j.to ? [[`job ${i} to`, j.to] as [string, P2]] : [])]),
       ...RIVAL_RINGS.map((r): [string, P2] => [`rival ${r.rival}`, r.at]),
       ...GARAGES.map((g): [string, P2] => [g.name, g.at]),
-      ...JUMPS.filter((j) => !(j.kind === 'gap' && j.at[1] > 400 && j.at[0] > 460)).map((j, i): [string, P2] => [`jump ${i}`, j.at]),
-      ...CAMERAS.filter((c) => !(c[0] > 515 && c[0] < 852 && c[1] > 600)).map((c, i): [string, P2] => [`camera ${i}`, c]),
+      // the piers' gap is over the water; a camera on the bay bridge too (world axes: +X west, +Z north)
+      ...JUMPS.filter((j) => !(j.kind === 'gap' && j.at[1] < -400 && j.at[0] < -460)).map((j, i): [string, P2] => [`jump ${i}`, j.at]),
+      ...CAMERAS.filter((c) => !(c[0] < -515 && c[0] > -852 && c[1] < -600)).map((c, i): [string, P2] => [`camera ${i}`, c]),
       ...COVERS.filter((c) => c.kind !== 'viaduct').map((c): [string, P2] => [`cover ${c.kind}`, c.at]),
       ...BREAKERS.map((b): [string, P2] => [`breaker ${b.kind}`, b.at]),
       ...ROADBLOCK_SITES.map((r, i): [string, P2] => [`roadblock ${i}`, r]),
@@ -63,7 +64,7 @@ describe('M8.10 slice 0: the plan', () => {
     expect(water.filter(([, p]) => onLand(p[0], p[1])).map(([name]) => name)).toEqual([]);
   });
 
-  it('0.5 what stands where: DESIGN §21.4\'s counts', () => {
+  it('0.5 what stands where: the plan §1.4\'s counts', () => {
     expect(JOBS.length).toBe(28);
     for (const [kind, n] of [['delivery', 6], ['order', 6], ['escape', 4], ['trial', 4], ['race', 4], ['rage', 2], ['mayhem', 2]] as const) expect(count(JOBS, (j) => j.kind === kind)).toBe(n);
     expect(RIVAL_RINGS.map((r) => r.rival).sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
@@ -87,11 +88,17 @@ describe('M8.10 slice 0: the plan', () => {
     for (let x = -900; x <= 900; x += 50) for (let z = -800; z <= 800; z += 50) if (onLand(x, z)) expect(naturalHeight(x, z)).toBeLessThanOrEqual(naturalHeight(SUMMIT.x, SUMMIT.z));
     // the botanic garden and Palm Avenue in Palm Gardens, the bay in Coral Quay, the port in Sunset Works
     expect(districtOf(GARDEN.x, GARDEN.z)).toBe('gardens');
-    expect(districtOf(-60, 600)).toBe('gardens');
+    // Palm Avenue's lower half (world axes)
+    expect(districtOf(60, -600)).toBe('gardens');
     const bayMiddle = BAY.reduce((a, p) => [a[0] + p[0] / BAY.length, a[1] + p[1] / BAY.length], [0, 0]);
     expect(districtOf(bayMiddle[0], bayMiddle[1])).toBe('marina');
     expect(onLand(bayMiddle[0], bayMiddle[1])).toBe(false);
-    expect(districtOf(370, -560)).toBe('foundry');
+    expect(districtOf(-370, 560)).toBe('foundry');
+    // the map's orientation: Crown Heights up and to the left (north-west: +Z and +X in the world), the bay down right
+    expect(SUMMIT.z).toBeGreaterThan(0);
+    expect(SUMMIT.x).toBeGreaterThan(0);
+    expect(bayMiddle[0]).toBeLessThan(0);
+    expect(bayMiddle[1]).toBeLessThan(0);
     for (const g of GARAGES) expect(districtOf(g.at[0], g.at[1])).toBe({ hideout: 'crown', scrapyard: 'foundry', hotel: 'marina' }[g.name]);
   });
 

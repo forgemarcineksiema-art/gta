@@ -13,6 +13,7 @@ import { GROUP_DEFAULT, interactionGroups } from './collision';
 /** A query that meets the solid statics only (buildings, walls, roofs), not kerbs, ramps or the ground. */
 const SOLID_ONLY = interactionGroups(0xffff, GROUP_DEFAULT);
 import { City, type PropRing } from './city/City';
+import { Island, PLUMB_TILT } from './island/Island';
 import { coverSites, type CoverSites } from './city/cover';
 import { Roadblocks } from './police/Roadblocks';
 import { Cameras } from './city/cameras';
@@ -79,7 +80,8 @@ export function initPhysics(): Promise<void> {
 }
 
 export interface SimWorldOptions {
-  map?: 'city' | 'playground';
+  /** The grid city, the handling playground, or the hand-drawn island (M8.10, `?map=island` until its switch). */
+  map?: 'city' | 'playground' | 'island';
   seed?: number;
   tuning?: VehicleTuning;
   spawn?: string;
@@ -127,6 +129,8 @@ export interface GhostPose {
 
 export class SimWorld {
   readonly city: City | null;
+  /** The hand-drawn island (M8.10); null on the grid city and the playground. */
+  readonly island: Island | null;
   private readonly roadReset: SpawnPoint = { name: 'nearest-road', position: { x: 0, y: 1, z: 0 }, yaw: 0 };
   readonly world: RAPIER.World;
   readonly transforms = new TransformBuffer(1024);
@@ -232,12 +236,15 @@ export class SimWorld {
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
     this.world.timestep = FIXED_DT;
     this.city = opts.map === 'city' ? new City(this.world, opts.seed) : null;
-    this.layout = this.city ? { statics: [], props: cityToys(), spawns: this.city.spawns, track: this.city.route, groundSize: 1575 } : buildPlayground(this.world);
+    this.island = opts.map === 'island' ? new Island(this.world) : null;
+    this.layout = this.city ? { statics: [], props: cityToys(), spawns: this.city.spawns, track: this.city.route, groundSize: 1575 }
+      : this.island ? { statics: [], props: [], spawns: this.island.spawns, track: this.island.route, groundSize: 2300 }
+      : buildPlayground(this.world);
     this.statics = this.layout.statics;
     this.spawns = this.layout.spawns;
     this.track = this.layout.track;
     this.lapTimer = new LapTimer(this.track);
-    this.recorder = (opts.record ?? !this.city) ? new Recorder() : null;
+    this.recorder = (opts.record ?? (!this.city && !this.island)) ? new Recorder() : null;
 
     for (const p of this.layout.props) {
       const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
@@ -267,12 +274,15 @@ export class SimWorld {
       this.transforms.writeBoth(slot, p.position.x, p.position.y, p.position.z, p.rotation.x, p.rotation.y, p.rotation.z, p.rotation.w);
     }
 
-    this.spawnName = opts.spawn ?? (this.city ? 'city' : 'lot');
+    this.spawnName = opts.spawn ?? (this.city ? 'city' : this.island ? 'island' : 'lot');
     const spawn = this.spawns.find((s) => s.name === this.spawnName) ?? this.spawns[0];
     if (!spawn) throw new Error('map has no spawn points');
+    // the island's ground under the car before it is placed (M8.10)
+    this.island?.sync(spawn.position.x, spawn.position.z, true);
     this.carId = opts.car ?? 'muscle';
     const tuning = opts.tuning ?? cloneTuning(CAR_PRESETS[this.carId]);
     this.vehicle = new Vehicle(this.world, this.transforms, tuning, spawn.position, spawn.yaw);
+    if (this.island) this.vehicle.plumbTilt = PLUMB_TILT;
     // the wheels read the city's ground (M8.8 slice 9); the playground is asphalt everywhere
     this.vehicle.ground = this.city?.surface ?? null;
     this.garage = new Garage(this);
@@ -385,6 +395,15 @@ export class SimWorld {
         this.vehicle.resetPose.yaw = nearest.yaw;
       }
       this.city.sync(pos.x, pos.z);
+    } else if (this.island) {
+      const pos = this.vehicle.body.translation(this.scratchPos);
+      if (this.controls.reset || this.tick % 6 === 0 || this.vehicle.telemetry.groundedWheels === 0) {
+        const nearest = this.island.nearestRoad(pos.x, pos.z, this.roadReset);
+        this.vehicle.resetPose.position = nearest.position;
+        this.vehicle.resetPose.yaw = nearest.yaw;
+      }
+      this.island.sync(pos.x, pos.z);
+      this.island.prefetch(pos.x, pos.z);
     }
     this.transforms.swap();
     this.respawned = false;
@@ -526,6 +545,7 @@ export class SimWorld {
 
   nearestSpawn(x: number, z: number, y = 0.5): SpawnPoint {
     if (this.city) return this.city.nearestRoad(x, z, this.roadReset, y);
+    if (this.island) return this.island.nearestRoad(x, z, this.roadReset);
     let best = this.spawns[0] as SpawnPoint;
     let bestD = Infinity;
     for (const s of this.spawns) {

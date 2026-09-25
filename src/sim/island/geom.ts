@@ -32,6 +32,19 @@ export function catmullRom(points: readonly P2[], closed: boolean, spacing: numb
   return out;
 }
 
+/** Straight segments resampled every `step` m or so (both ends kept). */
+export function resample(points: readonly P2[], step: number): [number, number][] {
+  const out: [number, number][] = [];
+  for (let i = 0; i + 1 < points.length; i++) {
+    const a = points[i] as P2, b = points[i + 1] as P2;
+    const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / step));
+    for (let k = 0; k < n; k++) out.push([a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n]);
+  }
+  const last = points[points.length - 1] as P2;
+  out.push([last[0], last[1]]);
+  return out;
+}
+
 /** A circle as a closed polygon of `n` points, counter-clockwise on the map (clockwise in x, z). */
 export function circle(cx: number, cz: number, r: number, n = 48): [number, number][] {
   const out: [number, number][] = [];

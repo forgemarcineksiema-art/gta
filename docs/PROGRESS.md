@@ -2,6 +2,18 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-25 — M8.10 slice 2: the ground with heights
+
+Done: `?map=island` drives. The ground (`island/ground.ts`) is the plan's hills with the main roads graded in (each
+profile smoothed to its class's grade, a T's end at the road it meets, two roads' surfaces blended where they overlap),
+beaches sloping into the water and a shelf under the sea; `Island` keeps a 3×3 of height fields round the car (heights
+worked out ahead, a field built one a step), the coast's wall, the sea for the hovercraft; `IslandView` draws it plainly.
+Found: the world is +X west, +Z north, so the plan now turns the sketches' numbers a half turn (its map matches them);
+Rapier's height field misses a plumb ray, so the wheels lean 1e-4 on the island only (`Vehicle.plumbTilt`). Pins 2.1–2.5;
+2.5 counts a step's work, as its wall clock read 25 ms under the suite's load against 1.6 ms alone. The island's design
+moved from DESIGN §21 into its plan's §1 (one file, as he keeps a design talk); CLAUDE.md is this session's now.
+Looked at once: no errors, down Crown Avenue at 126 km/h; the roads' edges are jagged over the coarse ground (slice 3).
+
 ## 2026-09-25 — M8.10 slice 1: the atlas
 
 Done: `npm run atlas` draws the island as the sim knows it: `tests/atlas/island.test.ts` (ATLAS=1, out of the quick set

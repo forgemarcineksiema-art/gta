@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-26 — M8.10 slice 17: the island on the radar and the full map
+
+Done: `ui/map/islandShape.ts` works out the island's map once (the land less the basin, the districts' tints and their
+names' places, the lots' blocks, the parks, the pond, the streets, the main roads, the highway's loop, the decks over the
+crossings and the tunnel as cover, the four landmarks, the reach past the causeway); the radar and the full map draw it,
+and the island's HUD shows the radar, the stars, the bag, the bank and the district's name. Pins 17.1–17.2. Before it,
+the review's two fixes: the kerb slabs listed by 8 m cell (a walker's foot read every piece of nine chunks each step:
+6 ms a step with walkers, now 0.5, pin 6.6), and pin 6a.4 starting on the highway (it started in the sea and counted on
+the reset landing on the highway). The build's profile, warm: grading 0.3 s, network 0.2, surfaces 0.4, fill 0.2.
+
 ## 2026-09-25 — M8.10 after the merge: crossings, passages, decks
 
 Done: the traffic stops short of a shut level crossing and goes over once it opens (pin 13.4, long); the highway

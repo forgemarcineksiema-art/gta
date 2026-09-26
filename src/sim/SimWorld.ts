@@ -314,10 +314,9 @@ export class SimWorld {
     // the coins on the grid's streets or the island's (M8.10 slice 15), each over its road
     const map = this.traffic?.streets;
     this.coins = this.traffic && map ? new Coins(this.city, this.traffic.lanes, (x, z) => map.groundAt(x, z)) : null;
-    // the island's arcs over its jumps and lines through its billboards, laid a chunk's at a time
-    if (this.island && this.coins && map) {
-      for (const [index, points] of islandCoinLines(this.island, map.graph, (x, z) => Island.chunkIndex(...Island.chunkOf(x, z)))) this.coins.layChunk(index, points);
-    }
+    // the island's arcs over its jumps and lines through its billboards, laid a chunk's at a time (from its bake)
+    const coinLines = this.island && map ? (this.island.worldBake?.coins ?? islandCoinLines(this.island, map.graph, (x, z) => Island.chunkIndex(...Island.chunkOf(x, z)))) : null;
+    if (coinLines && this.coins) for (const [index, points] of coinLines) this.coins.layChunk(index, points);
     this.life = new Life(this, opts.damage ?? this.city !== null);
     this.heat = new Heat(this.events, this.traffic);
     this.heat.set(opts.heat ?? 0);
@@ -353,7 +352,7 @@ export class SimWorld {
     this.fares = new Fares(this, this.events);
     this.skill = new Skill(this);
     this.stash = new Stash(this);
-    if (this.island && !baked && this.cover) this.island.worldBake = { seed, jobs: islandDefs, cover: this.cover, stash: this.stash.spots };
+    if (this.island && !baked && this.cover && coinLines) this.island.worldBake = { seed, jobs: islandDefs, cover: this.cover, stash: this.stash.spots, coins: coinLines };
     this.ticket = new TicketOfficer(this);
     this.breakers = this.city && this.traffic ? new Breakers(this) : this.island && this.traffic ? new Breakers(this, this.island.breakers) : null;
     this.donuts = (this.city || this.island) && this.traffic ? new DonutShop(this, this.island?.donutShop) : null;

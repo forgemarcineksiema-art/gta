@@ -37,6 +37,7 @@ import type { CoverSites } from '../city/cover';
 import type { HiddenCar } from '../city/stash';
 import type { StashSpot } from './finds';
 import type { JobDef } from '../jobs/catalog';
+import type { CoinPoint } from '../city/coins';
 import type { BillboardDesc } from '../city/collectibles';
 import type { BreakerDesc } from '../city/breakers';
 import { kerbsideKickers, type Kicker } from './jumps';
@@ -44,6 +45,7 @@ import { kerbsideGates, type BillboardSite } from './billboards';
 import { buildStunts, inKeep, kerbsideBlocked, stuntSites, type StuntSites } from './stunts';
 import { atSlipway, islandSlipways, seaStatics, type IslandSlipway } from './slipways';
 import { marketSpots } from './market';
+import { readView, type ViewReadings } from './views';
 
 /** A chunk of the ground: its side (m) and the height field's cell (m). The chunks cover the plan's bounds. */
 export const CHUNK = 250;
@@ -128,6 +130,8 @@ export interface IslandBake {
   /** Each chunk's heights in `HEIGHT_STEP`s, column by column, each after the first as the step from the one before. */
   heights: Map<number, Int16Array>;
   props: Map<number, PropDesc[]>;
+  /** Each chunk's ground read on its view's grid (`readView`). */
+  views: Map<number, ViewReadings>;
   /** What the world worked out from the island (`IslandWorldBake`), when it was made. */
   world: IslandWorldBake | null;
   /** The sources' key it was made from (`tools/islandKey.mjs`; the game checks it, the sim does not read it). */
@@ -143,6 +147,8 @@ export interface IslandWorldBake {
   jobs: JobDef[];
   cover: CoverSites;
   stash: Record<HiddenCar, StashSpot>;
+  /** The coins' arcs over the jumps and lines into the billboards, by chunk. */
+  coins: Map<number, CoinPoint[]>;
 }
 
 export class Island {
@@ -214,6 +220,8 @@ export class Island {
   private readonly propLists = new Map<number, PropDesc[]>();
   /** Each chunk's statics once made (`statics`). */
   private readonly staticLists = new Map<number, StaticDesc[]>();
+  /** Each chunk's ground read on its view's grid once read (`viewReadings`), or from the bake. */
+  private readonly views = new Map<number, ViewReadings>();
   /** The roads' surfaces' triangles once made (`surfaceMeshes`). */
   private meshes: Map<number, SurfaceChunk> | null = null;
   private readonly junctionReaches = new Map<object, number>();
@@ -276,6 +284,7 @@ export class Island {
         this.heights.set(k, h);
       }
       for (const [k, list] of bake.props) this.propLists.set(k, list);
+      for (const [k, v] of bake.views) this.views.set(k, v);
       this.propsBaked = true;
       this.worldBake = bake.world;
       return;
@@ -350,6 +359,16 @@ export class Island {
       this.staticLists.set(index, list);
     }
     return list;
+  }
+
+  /** A chunk's ground read on its view's grid (the render's ground), read the first time it is asked for, or baked. */
+  viewReadings(index: number): ViewReadings {
+    let v = this.views.get(index);
+    if (!v) {
+      v = readView(this.ground, CHUNK_X0 + (index % CHUNKS_X) * CHUNK, CHUNK_Z0 + Math.floor(index / CHUNKS_X) * CHUNK, CHUNK);
+      this.views.set(index, v);
+    }
+    return v;
   }
 
   /** The roads' surfaces' triangles a chunk (the render's), made from their data the first time they are asked for. */
@@ -433,7 +452,8 @@ export class Island {
         let prev = 0;
         for (let i = 0; i < h.length; i++) { const q = Math.round((h[i] as number) / HEIGHT_STEP); d[i] = q - prev; prev = q; }
         return [k, d];
-      })), props: new Map(this.propLists), world: this.worldBake,
+      })), props: new Map(this.propLists), views: new Map(Array.from({ length: CHUNKS_X * CHUNKS_Z }, (_, k) => [k, this.viewReadings(k)] as const)),
+      world: this.worldBake,
     };
   }
 

@@ -9,15 +9,16 @@
  */
 import * as THREE from 'three';
 import { ASPHALT, DIRT, GRASS, ISLAND_COLORS, PALETTE, SAND, SEA } from '../../sim';
-import { BLEND, COAST_KINDS, FOOT, SHOULDER, type GroundProbe } from '../../sim/island/ground';
+import { BLEND, COAST_KINDS, FOOT, SHOULDER } from '../../sim/island/ground';
 import { CHUNK, CHUNKS_X, CHUNKS_Z, CHUNK_X0, CHUNK_Z0, Island } from '../../sim/island/Island';
 import { canalEdge } from '../../sim/island/shapes/works';
-import { LAID, LAWN, gardensGround } from '../../sim/island/shapes/gardens';
+import { LAID, LAWN } from '../../sim/island/shapes/gardens';
+import { VIEW_GRID } from '../../sim/island/views';
 import { DECK } from '../../sim/island/structures';
 import { Rtin } from './rtin';
 
-/** The mesh's grid: points a side of a chunk, and the step between them (m). */
-export const GRID = 65;
+/** The mesh's grid: points a side of a chunk (the sim's view grid: the island reads the ground on it), and the step between them (m). */
+export const GRID = VIEW_GRID;
 const STEP = CHUNK / (GRID - 1);
 /** Columns of a chunk's points read a frame: a chunk in about six frames. */
 const COLUMNS = 12;
@@ -48,17 +49,26 @@ const FACE: Readonly<Record<string, number>> = {
 };
 
 /** A chunk's points being read: its column and row, the next column to read, what each point holds (`laid`: the Gardens' marks, `gardensGround`). */
-interface Reading { i: number; j: number; col: number; h: Float32Array; cut: Float32Array; kind: Int8Array; road: Float32Array; surface: Uint8Array; laid: Uint8Array }
+interface Reading { i: number; j: number; col: number; h: Float32Array; cut: Float32Array; kind: Int8Array; road: Float32Array; surface: Uint8Array; laid: Uint8Array; steep: Float32Array }
 
 /** A chunk's ground as arrays: three corners a triangle, a colour a corner, and its count. */
 export interface ChunkMesh { positions: Float32Array; colors: Uint8Array; triangles: number }
+
+/** The island's heights span this (m): a chunk's bounding sphere reaches over it (the tower's top the highest). */
+const LOWEST = -12;
+const HIGHEST = 180;
+
+/** A sphere round chunk `k` and every height on the island: its meshes' bound for the camera's culling. */
+export function chunkSphere(k: number): THREE.Sphere {
+  const x = CHUNK_X0 + ((k % CHUNKS_X) + 0.5) * CHUNK, z = CHUNK_Z0 + (Math.floor(k / CHUNKS_X) + 0.5) * CHUNK;
+  return new THREE.Sphere(new THREE.Vector3(x, (LOWEST + HIGHEST) / 2, z), Math.hypot(CHUNK * 0.75, (HIGHEST - LOWEST) / 2));
+}
 
 export class GroundView {
   readonly group = new THREE.Group();
   private readonly chunks = new Map<number, THREE.Mesh>();
   private readonly material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
   private readonly rtin = new Rtin(GRID);
-  private readonly probe: GroundProbe = { h: 0, steep: 0, steepKind: -1, road: Infinity, surface: GRASS };
   private readonly above = new Float32Array(GRID * GRID);
   private readonly below = new Float32Array(GRID * GRID);
   /** Each point's colour (`cornerColour`). */
@@ -131,6 +141,8 @@ export class GroundView {
     geometry.setAttribute('position', new THREE.BufferAttribute(m.positions, 3));
     geometry.setAttribute('color', new THREE.BufferAttribute(m.colors, 3, true));
     geometry.computeVertexNormals();
+    // (its bound from the chunk's, not three's two passes over every vertex)
+    geometry.boundingSphere = chunkSphere(Island.chunkIndex(i, j));
     const mesh = new THREE.Mesh(geometry, this.material);
     mesh.receiveShadow = true;
     mesh.matrixAutoUpdate = false;
@@ -146,26 +158,29 @@ export class GroundView {
     this.chunks.delete(k);
   }
 
+  /** A chunk's points from the island's readings of its ground on the view's grid (M8.10 slice 18: baked). */
   private startReading(i: number, j: number): Reading {
-    const n = GRID * GRID;
-    return { i, j, col: 0, h: new Float32Array(n), cut: new Float32Array(n), kind: new Int8Array(n), road: new Float32Array(n), surface: new Uint8Array(n), laid: new Uint8Array(n) };
+    const n = GRID * GRID, v = this.island.viewReadings(Island.chunkIndex(i, j));
+    const r: Reading = { i, j, col: 0, h: new Float32Array(n), cut: new Float32Array(n), kind: new Int8Array(n), road: new Float32Array(n), surface: new Uint8Array(n), laid: new Uint8Array(n), steep: new Float32Array(n) };
+    let h = 0, s = 0, d = 0;
+    for (let k = 0; k < n; k++) {
+      h += v.h[k] as number; s += v.steep[k] as number; d += v.road[k] as number;
+      r.h[k] = h / 100; r.steep[k] = s / 100; r.road[k] = d / 100;
+      r.kind[k] = v.kind[k] as number; r.surface[k] = v.surface[k] as number; r.laid[k] = v.laid[k] as number;
+    }
+    return r;
   }
 
-  /** Read the chunk's points up to column `to` (not included). */
+  /** The chunk's points' cuts up to column `to` (not included). */
   private readColumns(r: Reading, to: number): void {
-    const x0 = CHUNK_X0 + r.i * CHUNK, z0 = CHUNK_Z0 + r.j * CHUNK, p = this.probe, ground = this.island.ground;
+    const x0 = CHUNK_X0 + r.i * CHUNK, z0 = CHUNK_Z0 + r.j * CHUNK;
     for (let c = r.col; c < to; c++) for (let row = 0; row < GRID; row++) {
       const k = row * GRID + c;
-      ground.probe(x0 + c * STEP, z0 + row * STEP, p);
-      r.h[k] = p.h;
       // kept: the land behind a steep shore's line, and a road's bank out over the water; not the hill in a tunnel's mouth,
       // nor the dry canal (its concrete lining is drawn over its channel, slice 9)
       const x = x0 + c * STEP, z = z0 + row * STEP, mouth = this.inMouth(x, z), canal = canalEdge(x, z);
-      r.cut[k] = mouth ? -5 : Math.min(canal, Math.max(p.steep, BANK - p.road));
-      r.kind[k] = mouth || canal < 0 ? IN_MOUTH : p.steepKind;
-      r.road[k] = p.road;
-      r.surface[k] = p.surface;
-      r.laid[k] = gardensGround(x, z);
+      r.cut[k] = mouth ? -5 : Math.min(canal, Math.max(r.steep[k] as number, BANK - (r.road[k] as number)));
+      if (mouth || canal < 0) r.kind[k] = IN_MOUTH;
     }
     r.col = to;
   }

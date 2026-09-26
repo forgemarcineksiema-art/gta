@@ -113,7 +113,8 @@ export class LaneTables {
       this.limit[i] = kind ? KIND_LIMIT[kind](tuning) : limitFor(lane, graph, tuning);
       this.offset[i] = lane.offset;
       this.toNode[i] = lane.to;
-      this.sample(i, (this.length[i] as number) * 0.5, 0, this.scratch);
+      // (its middle's place only: its heights on the island are worked out when the lane is first driven, not here)
+      this.sample(i, (this.length[i] as number) * 0.5, 0, this.scratch, false);
       this.midX[i] = this.scratch.x;
       this.midZ[i] = this.scratch.z;
       this.uturnOf[i] = findUturn(lane, graph);
@@ -311,7 +312,7 @@ export class LaneTables {
     return hit;
   }
 
-  private sample(lane: number, s: number, offset: number, out: LanePose): void {
+  private sample(lane: number, s: number, offset: number, out: LanePose, height = true): void {
     const lanePts = (this.graph.lanes[lane] as Lane).points;
     const base = this.cumStart[lane] as number;
     const n = this.pointCount[lane] as number;
@@ -329,6 +330,7 @@ export class LaneTables {
     const z = a.z + (b.z - a.z) * t;
     const yaw = Math.atan2(b.x - a.x, b.z - a.z);
     applyOffset(x, z, yaw, offset, out);
+    if (!height) return;
     const ys = this.roadAt && !(this.graph.lanes[lane] as Lane).highway ? this.heights(lane) : null;
     if (ys) {
       // on the island's drawn road: between its heights on the lane's line

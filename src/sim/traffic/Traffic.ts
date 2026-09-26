@@ -1169,12 +1169,14 @@ export class Traffic {
    * A stopped police car at a point, off the lane graph: solid when near the
    * player (a lent body like any obstacle), a swap candidate, and counted by
    * the busted rule. Roadblocks and parked patrols (slice 6) and the busted
-   * and door-race pins use it.
+   * and door-race pins use it. On the ground there, or on the road's surface
+   * `y` with its `grade` along the car when given (a roadblock on a deck or in
+   * the tunnel, M8.10 slice 15a).
    */
-  spawnParkedPolice(x: number, z: number, yaw: number, kind: 'police' | 'sports' | 'heavy', player: PlayerProbe | null = null, near = 0, cosHalf = 1): number {
+  spawnParkedPolice(x: number, z: number, yaw: number, kind: 'police' | 'sports' | 'heavy', player: PlayerProbe | null = null, near = 0, cosHalf = 1, y = Number.NaN, grade = 0): number {
     const i = player ? this.claim(player, near, cosHalf) : this.findFree();
     if (i < 0) return -1;
-    this.placeAtPoint(i, x, z, yaw, BODY_INDEX[kind], AgentState.Parked, PLAYER_PAINT.police);
+    this.placeAtPoint(i, x, z, yaw, BODY_INDEX[kind], AgentState.Parked, PLAYER_PAINT.police, y, grade);
     this.police[i] = 1;
     return i;
   }
@@ -1206,7 +1208,7 @@ export class Traffic {
     this.state[agent] = AgentState.Physical;
   }
 
-  private placeAtPoint(i: number, x: number, z: number, yaw: number, body: number, state: AgentState, paint: number): void {
+  private placeAtPoint(i: number, x: number, z: number, yaw: number, body: number, state: AgentState, paint: number, y = Number.NaN, grade = 0): void {
     this.state[i] = state;
     this.parkedCiv[i] = 0;
     this.parkBay[i] = -1;
@@ -1238,10 +1240,11 @@ export class Traffic {
     this.justWrecked[i] = 0;
     this.lastPlayerContactTick[i] = -100000;
     this.paintSerial++;
-    // on the ground where it stands (the grid's 0; a bay on the island's hill, nose up or down its slope)
+    // on the ground where it stands (the grid's 0; a bay on the island's hill, nose up or down its slope), or on the road
+    // given (a deck, the tunnel's floor: the ground there is the sea's floor or the hill over it)
     const fx = Math.sin(yaw) * 2, fz = Math.cos(yaw) * 2;
-    this.y[i] = this.streets.groundAt(x, z);
-    this.grade[i] = (this.streets.groundAt(x + fx, z + fz) - this.streets.groundAt(x - fx, z - fz)) / 4;
+    this.y[i] = Number.isNaN(y) ? this.streets.groundAt(x, z) : y;
+    this.grade[i] = Number.isNaN(y) ? (this.streets.groundAt(x + fx, z + fz) - this.streets.groundAt(x - fx, z - fz)) / 4 : grade;
     this.posed[i] = 0;
     this.tipFor[i] = 0;
     const q = M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, yaw);

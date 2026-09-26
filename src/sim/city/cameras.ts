@@ -15,6 +15,13 @@ import { quatFromYaw, type StaticDesc } from '../scene';
 import type { PlayerProbe } from '../traffic/Traffic';
 import type { CameraSite } from './cover';
 
+/**
+ * How far under or over the camera's road a car's middle may be and still cross its line (m): a car on its road or off a
+ * crest over it, not one on the street under a deck (7 m down) nor on a deck over the road.
+ */
+const REACH_BELOW = -2;
+const REACH_ABOVE = 5;
+
 export interface CameraDesc {
   id: number;
   /** The line's centre on the road and the road's heading. */
@@ -26,22 +33,25 @@ export interface CameraDesc {
   poleX: number;
   poleZ: number;
   limitMs: number;
+  /** The road's surface at the line and the pole's foot (the grid's flat 0; the island's deck, pavement or verge). */
+  y: number;
+  poleY: number;
 }
 
 /** Ten sites become ten cameras, in the sites' order (deterministic: the sites are). */
 export function placeCameras(sites: readonly CameraSite[], count: number): CameraDesc[] {
-  return sites.slice(0, count).map((s, id) => ({ id, x: s.x, z: s.z, yaw: s.yaw, halfWidth: s.halfWidth, poleX: s.poleX, poleZ: s.poleZ, limitMs: s.limitMs }));
+  return sites.slice(0, count).map((s, id) => ({ id, x: s.x, z: s.z, yaw: s.yaw, halfWidth: s.halfWidth, poleX: s.poleX, poleZ: s.poleZ, limitMs: s.limitMs, y: s.y, poleY: s.poleY }));
 }
 
-/** The pole on the verge and the head over the road's edge, facing the traffic; no collider (tag decor). */
+/** The pole on the verge and the head over the road's edge, facing the traffic, standing on the pole's foot; no collider (tag decor). */
 export function cameraStatics(c: CameraDesc): StaticDesc[] {
-  const q = quatFromYaw(c.yaw);
+  const q = quatFromYaw(c.yaw), y = c.poleY;
   // toward the road from the pole
   const tx = c.x - c.poleX, tz = c.z - c.poleZ, len = Math.hypot(tx, tz) || 1;
   return [
-    { shape: { kind: 'box', hx: 0.12, hy: 3, hz: 0.12 }, position: { x: c.poleX, y: 3, z: c.poleZ }, rotation: q, color: PALETTE.steel, tag: 'decor' },
-    { shape: { kind: 'box', hx: 0.07, hy: 0.07, hz: 0.07 }, position: { x: c.poleX + tx / len * 0.8, y: 5.9, z: c.poleZ + tz / len * 0.8 }, rotation: q, color: PALETTE.steel, tag: 'decor' },
-    { shape: { kind: 'box', hx: 0.35, hy: 0.28, hz: 0.45 }, position: { x: c.poleX + tx / len * 1.4, y: 5.6, z: c.poleZ + tz / len * 1.4 }, rotation: q, color: PALETTE.ink, tag: 'decor' },
+    { shape: { kind: 'box', hx: 0.12, hy: 3, hz: 0.12 }, position: { x: c.poleX, y: y + 3, z: c.poleZ }, rotation: q, color: PALETTE.steel, tag: 'decor' },
+    { shape: { kind: 'box', hx: 0.07, hy: 0.07, hz: 0.07 }, position: { x: c.poleX + tx / len * 0.8, y: y + 5.9, z: c.poleZ + tz / len * 0.8 }, rotation: q, color: PALETTE.steel, tag: 'decor' },
+    { shape: { kind: 'box', hx: 0.35, hy: 0.28, hz: 0.45 }, position: { x: c.poleX + tx / len * 1.4, y: y + 5.6, z: c.poleZ + tz / len * 1.4 }, rotation: q, color: PALETTE.ink, tag: 'decor' },
   ];
 }
 
@@ -76,15 +86,17 @@ export class Cameras {
       const side = along >= 0 ? 1 : -1;
       const was = this.side[i] as number;
       this.side[i] = side;
-      // a crossing: the side changed between two steps, near the line and on the road
-      if (was === 0 || was === side || Math.abs(along) > 8 || Math.abs(across) > cam.halfWidth) continue;
+      // a crossing: the side changed between two steps, near the line and on the road: at its height too, so a car on the
+      // street under a deck (M8.10 slice 15a: the island's overpass) crosses nothing
+      const up = probe.y - cam.y;
+      if (was === 0 || was === side || Math.abs(along) > 8 || Math.abs(across) > cam.halfWidth || up < REACH_BELOW || up > REACH_ABOVE) continue;
       if (this.active[i] === 0) continue;
       const over = (probe.speed - cam.limitMs) * 3.6;
       if (over <= c.overKmh || (this.rest[i] as number) > 0) continue;
       this.rest[i] = c.cooldown;
       this.lastFlashId = cam.id;
       this.flashes++;
-      events.push('camera', Math.round(over), cam.x, 5.6, cam.z, cam.id);
+      events.push('camera', Math.round(over), cam.x, cam.y + 5.6, cam.z, cam.id);
     }
   }
 }

@@ -2,7 +2,7 @@
  * The island's cover (M8.10 slice 14, docs/M8.10_PLAN.md §1.4): the three garages the run banks at, the hideout under
  * the tower first, the scrapyard's in the Works and the Coral Hotel's on the Quay, each its floor flush with the
  * pavement before its door, the ground under it dug to it, its kerb and the lane that runs past its door; the roadblock
- * sites, the parked patrols' places and the cameras (their own slices' lists). The same `CoverSites` the grid's
+ * sites, the parked patrols' places and the cameras (slice 15a, `police.ts`). The same `CoverSites` the grid's
  * `coverSites` gives the run, the police and the dailies.
  */
 import { GARAGE, hideoutStatics, type CoverSites, type DailyCover, type DropOff } from '../city/cover';
@@ -13,6 +13,7 @@ import { HALF_WIDTH, type Ground } from './ground';
 import type { Island } from './Island';
 import { GARAGES } from './plan';
 import { hideoutSite } from './places/crown';
+import { islandChokepoints, islandParkedJunctions } from './police';
 import type { WorksPlace } from './places/works';
 import { PAVEMENT } from './surfaces';
 
@@ -100,15 +101,20 @@ export function islandGarages(island: Island, statics: (x: number, z: number) =>
   });
 }
 
-/** The island's cover: its three garages; the roadblock sites, the parked patrols' places and the cameras their slices'. */
+/**
+ * The island's cover: its three garages, the hideout first; the roadblock sites, the parked patrols' places and the ten
+ * cameras (slice 15a); today's order over each list, every site manned until a date is set (as the grid's).
+ */
 export function islandCover(island: Island): CoverSites {
-  const dropOffs = island.garages;
+  const dropOffs = island.garages, hideout = dropOffs[0] as DropOff;
+  const chokepoints = islandChokepoints(island), parked = islandParkedJunctions(island, hideout), cameras = island.policeSites.cameras;
+  const order = (n: number): Int16Array => Int16Array.from({ length: n }, (_, i) => i);
   const daily: DailyCover = {
     seed: 0,
-    order: { chokepoints: new Int16Array(0), parked: new Int16Array(0), cameras: new Int16Array(0) },
-    chokepoints: new Uint8Array(0),
-    parked: new Uint8Array(0),
-    cameras: new Uint8Array(0),
+    order: { chokepoints: order(chokepoints.length), parked: order(parked.length), cameras: order(cameras.length) },
+    chokepoints: new Uint8Array(chokepoints.length).fill(1),
+    parked: new Uint8Array(parked.length).fill(1),
+    cameras: new Uint8Array(cameras.length).fill(1),
   };
-  return { hideout: dropOffs[0] as DropOff, dropOffs, chokepoints: [], parkedJunctions: [], cameraSites: [], daily };
+  return { hideout, dropOffs, chokepoints, parkedJunctions: parked, cameraSites: cameras, daily };
 }

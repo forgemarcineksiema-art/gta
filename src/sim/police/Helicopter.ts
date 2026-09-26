@@ -14,10 +14,13 @@ import { QUERY_NOT_PROP } from '../collision';
 import type { EventLog } from '../events';
 import type { PlayerProbe } from '../traffic/Traffic';
 import { CITY_HALF } from '../city/roads';
+import { SEA } from '../city/sea';
 import { POLICE, type PoliceTuning } from './tuning';
 
 /** The radio's line when it arrives (the `dispatch` event's value, next to Pursuit's DISPATCH). */
 export const DISPATCH_AIR = 4;
+/** How fast the aircraft climbs or sinks to keep its altitude over the island's hill (m/s). */
+const CLIMB = 20;
 
 export class Helicopter {
   /** On duty: flying in, tracking or searching. */
@@ -38,6 +41,13 @@ export class Helicopter {
   lostFor = 0;
   private sweep = 0;
   private readonly ray = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
+  /**
+   * The island's (M8.10 slice 15a): the ground's height at a point, which the aircraft keeps its altitude over (under it
+   * and under the car, the sea at least: the grid's flat 0 without it); and whether a car's middle at a point is under
+   * one of the plan's covers (a glass roof, a crane's gantry, a stand's seats hide it as a solid roof does).
+   */
+  groundAt: ((x: number, z: number) => number) | null = null;
+  covered: ((x: number, y: number, z: number) => boolean) | null = null;
 
   /** `half`: the map's half side, the farthest out it comes in from (the grid's city, the island). */
   constructor(private readonly world: RAPIER.World, private readonly events: EventLog, private readonly half: number = CITY_HALF, private readonly tuning: PoliceTuning = POLICE) {}
@@ -78,7 +88,9 @@ export class Helicopter {
     this.vz += az * k;
     this.x += this.vx * dt;
     this.z += this.vz * dt;
-    this.y = h.altitude;
+    // its altitude over the ground under it and under the car (the grid's: always its altitude)
+    const height = h.altitude + this.floor(player);
+    this.y = Math.abs(height - this.y) <= CLIMB * dt ? height : this.y + Math.sign(height - this.y) * CLIMB * dt;
     if (Math.hypot(this.vx, this.vz) > 1) this.yaw = Math.atan2(this.vx, this.vz);
     // the beam turns to its target at its rate, never beyond its reach from under the aircraft
     const rx = lx - this.x, rz = lz - this.z, reach = Math.hypot(rx, rz);
@@ -86,8 +98,8 @@ export class Helicopter {
     const turn = Math.min(1, h.lightRate * dt);
     this.lightX += (lx - this.lightX) * turn;
     this.lightZ += (lz - this.lightZ) * turn;
-    // seen: the spot on the car and nothing solid between the aircraft and it
-    if (Math.hypot(player.x - this.lightX, player.z - this.lightZ) <= h.spot && this.clear(player)) this.sees = true;
+    // seen: the spot on the car, nothing solid between the aircraft and it, and no cover over it
+    if (Math.hypot(player.x - this.lightX, player.z - this.lightZ) <= h.spot && this.clear(player) && !(this.covered?.(player.x, player.y, player.z) ?? false)) this.sees = true;
     this.lostFor = this.sees ? 0 : this.lostFor + dt;
     return this.sees;
   }
@@ -109,7 +121,7 @@ export class Helicopter {
     this.x = player.x * out;
     this.z = player.z * out;
     if (r < 1) { this.x = h.arriveFrom; this.z = 0; }
-    this.y = h.altitude;
+    this.y = h.altitude + this.floor(player);
     this.vx = 0;
     this.vz = 0;
     // the light starts under the aircraft and swings onto the car as it closes
@@ -120,6 +132,12 @@ export class Helicopter {
     this.active = true;
     this.arrivals++;
     this.events.push('dispatch', DISPATCH_AIR, this.x, this.y, this.z, -1);
+  }
+
+  /** What its altitude is over: the ground under it and under the car, the sea at least (the grid's flat 0). */
+  private floor(player: PlayerProbe): number {
+    if (!this.groundAt) return 0;
+    return Math.max(SEA.level, this.groundAt(this.x, this.z), this.groundAt(player.x, player.z));
   }
 
   /** Nothing solid (a roof, a deck, a building) between the aircraft and the car. */

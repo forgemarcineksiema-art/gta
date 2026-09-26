@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PALETTE, POLICE, type SimWorld } from '../../sim';
+import { ROAD_LIFT } from '../../sim/island/surfaces';
 
 export class RoadblockView {
   private readonly sawhorse: THREE.Mesh;
@@ -32,9 +33,12 @@ export class RoadblockView {
     if (!rb) return;
     if (rb.serial !== this.serial) {
       this.serial = rb.serial;
-      this.sawhorse.position.set(rb.sawhorseX, 0, rb.sawhorseZ);
+      // on the road's surface (the grid's 0; the island's deck, tunnel floor or ground, its strips a hand over it: M8.10
+      // slice 15a)
+      const lift = sim.island ? ROAD_LIFT : 0;
+      this.sawhorse.position.set(rb.sawhorseX, rb.y + lift, rb.sawhorseZ);
       this.sawhorse.rotation.y = rb.yaw;
-      this.spike.position.set(rb.spikeX, 0, rb.spikeZ);
+      this.spike.position.set(rb.spikeX, rb.spikeY + lift, rb.spikeZ);
       this.spike.rotation.y = rb.spikeYaw;
     }
     if (this.sawhorse.visible !== rb.sawhorseUp) this.sawhorse.visible = rb.sawhorseUp;

@@ -95,15 +95,20 @@ export interface DropOff {
 /**
  * Where a roadblock can stand (slice 6): a point on a lane's centre, the lane and
  * the distance along it, and the spike strip's centre `spikeBefore` m before it
- * across the open side (the other highway lane, or the oncoming lane of a street).
+ * across the open side (the other highway lane, or the oncoming lane of a street);
+ * the road's surface at both (the grid's flat 0; the island's deck, tunnel floor
+ * or ground, M8.10 slice 15a).
  */
-export interface Chokepoint { id: number; x: number; z: number; yaw: number; lane: number; s: number; spikeX: number; spikeZ: number }
+export interface Chokepoint { id: number; x: number; z: number; yaw: number; lane: number; s: number; spikeX: number; spikeZ: number; y: number; spikeY: number }
 
 /** A parked patrol's place: on an approach lane to a grid junction, at the kerb, facing the crossing. */
 export interface ParkedJunction { node: number; lane: number; s: number; offset: number; x: number; z: number; yaw: number }
 
-/** A speed camera's line across a road (both directions), its pole beside it, and the road's limit (m/s). */
-export interface CameraSite { x: number; z: number; yaw: number; halfWidth: number; poleX: number; poleZ: number; limitMs: number }
+/**
+ * A speed camera's line across a road (both directions), its pole beside it, and the road's limit (m/s); the road's
+ * surface at the line and the pole's foot (the grid's flat 0; the island's deck, pavement or verge, M8.10 slice 15a).
+ */
+export interface CameraSite { x: number; z: number; yaw: number; halfWidth: number; poleX: number; poleZ: number; limitMs: number; y: number; poleY: number }
 
 /**
  * Today's police (docs/M5_PLAN.md slice 6, DESIGN.md §8): the date seeds an
@@ -249,7 +254,7 @@ function chokepoints(graph: RoadGraph): Chokepoint[] {
     const at = (s: number): void => {
       const p = laneAt(lane, s);
       const q = laneAt(lane, Math.max(0, s - POLICE.roadblock.spikeBefore), spikeRight);
-      out.push({ id: out.length, x: p.x, z: p.z, yaw: p.yaw, lane: lane.id, s, spikeX: q.x, spikeZ: q.z });
+      out.push({ id: out.length, x: p.x, z: p.z, yaw: p.yaw, lane: lane.id, s, spikeX: q.x, spikeZ: q.z, y: 0, spikeY: 0 });
     };
     // not on an overpass's ramp or deck (M5.5 slice 8): a roadblock stands on the ground
     if (lane.highway) for (let s = CHOKE_END; s <= len - CHOKE_END; s += CHOKE_PITCH) if (laneAt(lane, s).y < 0.05) at(s);
@@ -292,7 +297,7 @@ export function cameraSites(graph: RoadGraph): CameraSite[] {
     const side = HIGHWAY_HALF + 2;
     // the pole on the outer verge: away from the city centre
     const ox = Math.abs(x) === ring ? Math.sign(x) * side : 0, oz = Math.abs(z) === ring ? Math.sign(z) * side : 0;
-    out.push({ x, z, yaw, halfWidth: HIGHWAY_HALF, poleX: x + ox, poleZ: z + oz, limitMs: LIMIT_HIGHWAY });
+    out.push({ x, z, yaw, halfWidth: HIGHWAY_HALF, poleX: x + ox, poleZ: z + oz, limitMs: LIMIT_HIGHWAY, y: 0, poleY: 0 });
   }
   // the two Crown diagonals are one straight line from the highway to the highway through the tower junction
   const avenue = graph.special.filter((r) => r.kind === 'avenue');
@@ -307,7 +312,7 @@ export function cameraSites(graph: RoadGraph): CameraSite[] {
       const x = start.x + dx * d, z = start.z + dz * d;
       // the pole on the right-hand verge (right of the heading is (-dz, dx)), clear of the carriageway
       const side = a.halfWidth + 2;
-      out.push({ x, z, yaw, halfWidth: a.halfWidth, poleX: x - dz * side, poleZ: z + dx * side, limitMs: LIMIT_AVENUE });
+      out.push({ x, z, yaw, halfWidth: a.halfWidth, poleX: x - dz * side, poleZ: z + dx * side, limitMs: LIMIT_AVENUE, y: 0, poleY: 0 });
     }
   }
   return out;

@@ -175,7 +175,7 @@ export class SimWorld {
   readonly ticket: TicketOfficer;
   /** The pursuit breakers (M5.5 slice 18): the city's scaffold towers; null off the city. */
   readonly breakers: Breakers | null;
-  /** The donut shop's cruisers (M5.5 slice 18); null off the city. */
+  /** The donut shop's cruisers (M5.5 slice 18; the island's by its roundabout, M8.10 slice 15a); null on the playground. */
   readonly donuts: DonutShop | null;
   /** The first run's script; inactive until `start()`. */
   readonly coldOpen: ColdOpen;
@@ -336,7 +336,7 @@ export class SimWorld {
     this.stash = new Stash(this);
     this.ticket = new TicketOfficer(this);
     this.breakers = this.city && this.traffic ? new Breakers(this) : null;
-    this.donuts = this.city && this.traffic ? new DonutShop(this) : null;
+    this.donuts = (this.city || this.island) && this.traffic ? new DonutShop(this, this.island?.donutShop) : null;
     this.run = new Run(this);
     this.coldOpen = new ColdOpen(this);
     this.dailies = new Dailies(this);

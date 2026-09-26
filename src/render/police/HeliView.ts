@@ -8,7 +8,7 @@
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { PALETTE, type SimWorld } from '../../sim';
+import { PALETTE, SEA, type SimWorld } from '../../sim';
 
 function part(g: THREE.BufferGeometry, color: number, x: number, y: number, z: number): THREE.BufferGeometry {
   const out = g.index ? g.toNonIndexed() : g;
@@ -130,10 +130,12 @@ export class HeliView {
     this.tailRotor.rotation.x += dt * 60;
     this.blink += dt;
     this.barMaterial.color.setHex(Math.floor(this.blink * 3) % 2 === 0 ? 0xff3b5c : PALETTE.policeBlue);
-    // the light lands on the car's road (the deck it drives, the ground elsewhere)
+    // the light lands on the car's road (the deck it drives, the ground elsewhere; the island's hill or its sea, M8.10
+    // slice 15a)
     const spot = this.sim.police?.tuning.heli.spot ?? 14;
     const near = Math.hypot(this.sim.probe.x - heli.lightX, this.sim.probe.z - heli.lightZ) < spot * 2;
-    const groundY = near ? Math.max(0.06, this.sim.probe.y - 0.45) : 0.06;
+    const island = this.sim.island, under = island ? Math.max(SEA.level, island.ground.surfaceHeight(heli.lightX, heli.lightZ)) + 0.06 : 0.06;
+    const groundY = near ? Math.max(under, this.sim.probe.y - 0.45) : under;
     this.spot.position.set(heli.lightX, groundY, heli.lightZ);
     this.spot.scale.setScalar(spot);
     (this.spot.material as THREE.MeshBasicMaterial).opacity = heli.sees ? 0.3 : 0.18;

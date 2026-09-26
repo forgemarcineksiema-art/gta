@@ -42,7 +42,7 @@ import type { SimWorld } from '../SimWorld';
 import { COIN_HEIGHT, polyLine, routeLine, type CoinPoint } from '../city/coins';
 import { SEA, SEA_TRIAL } from '../city/sea';
 import { alongLane, laneChain } from '../city/route';
-import type { Lane } from '../city/roads';
+import { projectOnLane, type Lane } from '../city/roads';
 import { AgentState, type PlayerProbe } from '../traffic/Traffic';
 import type { BodyId } from '../traffic/bodies';
 import { trialMedal, unpackDescriptor, type JobDef } from './catalog';
@@ -52,6 +52,10 @@ import { pointTarget } from './place';
 export type { JobDef, JobKind } from './catalog';
 
 export type JobState = 'idle' | 'hunting' | 'active' | 'done' | 'failed';
+
+/** The Nephew's escort on a lane too short for it: tried on up to this many more lanes within this of the car (m). */
+const ESCORT_LANES = 4;
+const ESCORT_REACH = 60;
 
 /** The kinds the chain's step `step` brings out (M8.7 D10), in the order their NEW cards show. */
 export function kindsRevealedBy(step: number): JobDef['kind'][] {
@@ -104,6 +108,9 @@ export class Jobs {
   /** An `escape` event was read this step. */
   private escaped = false;
   private readonly routePoints: CoinPoint[] = [];
+  /** The lanes the Nephew's escort was tried on beyond the car's own, and a projection's scratch. */
+  private readonly escorted: number[] = [];
+  private readonly escortHit: { x: number; z: number; yaw: number; y?: number } = { x: 0, z: 0, yaw: 0 };
 
   constructor(private readonly sim: SimWorld, defs: JobDef[]) {
     this.defs = defs;
@@ -154,7 +161,7 @@ export class Jobs {
     if (co.active) return d.id === co.job;
     // a sea trial's ring is a hovercraft's (M8.8 slice 20)
     return d.id !== co.job && this.revealed(d.kind) && (d.kind !== 'duel' || this.sim.board.live(d.level))
-      && (!d.route || this.sim.vehicle.tuning.hover > 0);
+      && (!d.hover || this.sim.vehicle.tuning.hover > 0);
   }
 
   /** A marker the player can start now (M8.7 D9): shown, and not while the police are on the player; the cold open's own in its chase too. */
@@ -225,7 +232,8 @@ export class Jobs {
     }
     if (d.kind === 'race') this.race.step(probe);
     if (d.kind === 'rage' || d.kind === 'mayhem') {
-      this.inZone = (d.x - probe.x) ** 2 + (d.z - probe.z) ** 2 <= BALANCE.jobs.zone.radius ** 2;
+      // the zone round its middle (the grid's ring; the island's place, its ring at the nearest corner: M8.10 slice 14)
+      this.inZone = (d.targetX - probe.x) ** 2 + (d.targetZ - probe.z) ** 2 <= BALANCE.jobs.zone.radius ** 2;
       if (this.zoneCount >= d.level) {
         // the quota reached: the pay with the time bonus
         const paid = Math.round(d.payout * (1 + BALANCE.jobs.timeBonus * Math.max(0, this.remaining) / d.limitSeconds));
@@ -480,11 +488,27 @@ export class Jobs {
     else if (tw === 'disguise') traffic.badge[a] = 1;
     else if (tw === 'escort' && sim.police) {
       sim.pursuit.force(BALANCE.jobs.escape.radioSeconds);
-      const city = sim.city, p = sim.probe;
-      if (!city) return;
-      const lane = city.nearestLane(p.x, p.z, p.y - 0.5);
-      const s = alongLane(city.graph.lanes[lane] as Lane, p.x, p.z).s;
-      sim.police.escort(lane, s, BALANCE.board.escort);
+      // the escort on the road under the car (half a metre under its middle): the grid's or the island's, never a deck
+      // over it or the tunnel under it (M8.10 slice 14)
+      const streets = traffic.streets, graph = streets.graph, p = sim.probe;
+      const lane = streets.nearestLane(p.x, p.z, p.y - 0.5);
+      if (lane < 0) return;
+      const s = alongLane(graph.lanes[lane] as Lane, p.x, p.z).s;
+      let placed = sim.police.escort(lane, s, BALANCE.board.escort);
+      // a lane too short for them all (the island's hill's blocks): the rest on the lanes round the car at its road's
+      // height, the nearest first
+      for (let k = 0; placed < BALANCE.board.escort && k < ESCORT_LANES; k++) {
+        let next = -1, nextD = ESCORT_REACH * ESCORT_REACH;
+        for (const l of graph.lanes) {
+          if (l.id === lane || this.escorted.includes(l.id)) continue;
+          const d = projectOnLane(l, p.x, p.z, this.escortHit, p.y - 0.5);
+          if (d < nextD) { nextD = d; next = l.id; }
+        }
+        if (next < 0) break;
+        this.escorted.push(next);
+        placed += sim.police.escort(next, alongLane(graph.lanes[next] as Lane, p.x, p.z).s, BALANCE.board.escort - placed);
+      }
+      this.escorted.length = 0;
     } else if (tw === 'heli' && sim.police) {
       sim.pursuit.force(BALANCE.jobs.escape.radioSeconds);
       sim.police.heli.overhead(sim.probe);

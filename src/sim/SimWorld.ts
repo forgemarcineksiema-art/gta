@@ -42,6 +42,7 @@ import { DONUT_SHOP, DonutShop } from './police/Donuts';
 import { Jobs } from './jobs/Jobs';
 import { Fares } from './jobs/Fares';
 import { jobsFor, seaTrial } from './jobs/place';
+import { islandJobs } from './island/jobs';
 import { AiCars } from './ai/AiCars';
 import { Garage } from './garage/Garage';
 import { Board } from './board/Board';
@@ -327,8 +328,10 @@ export class SimWorld {
     this.cameras = this.cover ? new Cameras(this.cover.cameraSites, this.cover.daily.cameras) : null;
     // the kickers, then the mega-ramp (M8.8 slice 21)
     this.jumps = this.city ? new Jumps(this, [...this.city.jumps, this.city.megaRamp]) : null;
-    // the generator's sixteen markers (docs/M5_PLAN.md D4); the cold open adds its own as id 0
-    this.jobs = new Jobs(this, this.city && this.traffic ? jobsFor(this.city, opts.seed ?? 42, this.traffic.lanes) : []);
+    // the generator's sixteen markers (docs/M5_PLAN.md D4); the cold open adds its own as id 0; the island's plan's
+    // 28 rings and 11 rivals (M8.10 slice 14)
+    this.jobs = new Jobs(this, this.city && this.traffic ? jobsFor(this.city, opts.seed ?? 42, this.traffic.lanes)
+      : this.island && this.traffic ? islandJobs(this.island, this.traffic.streets, this.traffic.lanes, opts.seed ?? 42) : []);
     // the sea trial (M8.8 slice 20), after the generator's, before the way learns the rings
     if (this.city && this.traffic) this.jobs.add(seaTrial());
     this.fares = new Fares(this, this.events);
@@ -342,8 +345,19 @@ export class SimWorld {
     this.dailies = new Dailies(this);
     this.caches = this.coins ? new Caches(this) : null;
     this.jobs.revealAll = opts.reveal ?? false;
-    this.way = this.city && this.traffic ? new Way(this, this.city.graph, this.traffic.lanes) : null;
-    this.ai = this.city && this.traffic ? new AiCars(this) : null;
+    // the way and the AI cars on the grid's streets or the island's (M8.10 slice 14: there a place is reached from the
+    // lanes at its ground's height, never a deck's over it)
+    this.way = streets && this.traffic ? new Way(this, streets.graph, this.traffic.lanes, this.island ? (x, z) => streets.groundAt(x, z) : undefined) : null;
+    this.ai = streets && this.traffic ? new AiCars(this) : null;
+    // the island's props keep off every ring and job's end, as the grid's (M8 D7)
+    if (this.island) {
+      const r = BALANCE.jobs.markerRadius;
+      for (const d of this.jobs.defs) {
+        this.island.propRings.push({ x: d.x, z: d.z, r: d.kind === 'duel' ? BALANCE.board.ringRadius : r });
+        // (an escape has no end; a zone's is its middle, no place a car stops)
+        if (d.kind !== 'escape' && d.kind !== 'rage' && d.kind !== 'mayhem') this.island.propRings.push({ x: d.targetX, z: d.targetZ, r });
+      }
+    }
     if (this.city) {
       // what the street furniture keeps out of (M8 D7): every job's ring and its end, the stash's cars, the
       // breakers' towers, the donut shop; the cold open's route, the first time a chunk near it asks, with the things

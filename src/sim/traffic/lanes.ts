@@ -44,7 +44,7 @@ interface Connection {
   /** The road's height at the lane's end and at the next one's start (the grid's 0; the island's hills). */
   y0: number;
   y1: number;
-  /** The road's surface under each of its points (the island's, `roadAt`), or null (the grid's: from `y0` to `y1`). */
+  /** The road's surface under each of its points (the island's, `roadAt`, worked out when first read), or null (the grid's: from `y0` to `y1`). */
   ys: Float32Array | null;
   cum: Float32Array;
   length: number;
@@ -388,8 +388,9 @@ export class LaneTables {
     out.yaw = Math.atan2(x1 - x0, z1 - z0);
     // across the junction on its road's surface (the island's, under its points), else from the one lane's height to
     // the other's (the grid's flat at 0)
-    if (conn.ys) {
-      const y0 = conn.ys[seg] as number, y1 = conn.ys[seg + 1] as number;
+    const ys = this.roadAt ? this.connectionHeights(conn) : null;
+    if (ys) {
+      const y0 = ys[seg] as number, y1 = ys[seg + 1] as number;
       out.y = y0 + (y1 - y0) * t;
       out.grade = (y1 - y0) / (c1 - c0 || 1);
       return;
@@ -435,14 +436,19 @@ export class LaneTables {
         cum[i] = (cum[i - 1] as number) + Math.hypot(dx, dz);
       }
     }
-    let ys: Float32Array | null = null;
-    if (this.roadAt) {
-      ys = new Float32Array(SAMPLES + 1);
-      for (let i = 0; i <= SAMPLES; i++) ys[i] = this.roadAt(pts[i * 2] as number, pts[i * 2 + 1] as number);
-    }
-    const conn: Connection = { pts, cum, length: cum[SAMPLES] as number, y0: a.points[a.points.length - 1]?.y ?? 0, y1: b.points[0]?.y ?? 0, ys };
+    // (the road's heights under it are read the first time a car is placed on it: a length alone needs none)
+    const conn: Connection = { pts, cum, length: cum[SAMPLES] as number, y0: a.points[a.points.length - 1]?.y ?? 0, y1: b.points[0]?.y ?? 0, ys: null };
     this.connections.set(key, conn);
     return conn;
+  }
+
+  /** A junction curve's road heights under its points (the island's, `roadAt`), worked out the first time they are read. */
+  private connectionHeights(conn: Connection): Float32Array {
+    if (conn.ys) return conn.ys;
+    const ys = new Float32Array(SAMPLES + 1), roadAt = this.roadAt as (x: number, z: number) => number;
+    for (let i = 0; i <= SAMPLES; i++) ys[i] = roadAt(conn.pts[i * 2] as number, conn.pts[i * 2 + 1] as number);
+    conn.ys = ys;
+    return ys;
   }
 }
 

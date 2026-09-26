@@ -93,6 +93,11 @@ export class Island {
   readonly active = new Map<number, RAPIER.Collider>();
   /** Each physics chunk's kerbs, buildings and trunks, with its height field. */
   private readonly chunkColliders = new Map<number, RAPIER.Collider[]>();
+  /**
+   * Circles the props keep out of (M8.10 slice 14): the job rings and their ends, set before the first chunk's props are
+   * worked out (the world's jobs are placed before its props' runtime).
+   */
+  readonly propRings: Array<{ x: number; z: number; r: number }> = [];
   /** The props' runtime's hooks (M8.10 slice 7b): a chunk's props known and its posts made as it loads; its posts freed. */
   onPropsLoad: ((index: number) => void) | null = null;
   onPropsUnload: ((index: number) => void) | null = null;
@@ -206,6 +211,8 @@ export class Island {
     for (const jn of this.surfaces.junctions) if (Math.hypot(jn.x - x, jn.z - z) < this.junctionReach(jn)) return true;
     // a garage and its apron out to the kerb (the car rolls in over it), its sign's pole (slice 14)
     const r = Math.max(hx, hz), frame = this.garageFrame;
+    // a job's ring or end (slice 14)
+    for (const q of this.propRings) if (Math.hypot(q.x - x, q.z - z) < q.r + r) return true;
     for (const g of this.garages) {
       if (Math.hypot(g.x - x, g.z - z) > GARAGE.depth + g.toKerb + 10) continue;
       toDropOff(g, x, z, frame);

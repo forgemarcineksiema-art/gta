@@ -112,7 +112,12 @@ export class Way implements GoalChooser {
   private readonly proj: LaneProjection = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };
   private readonly pose: LanePose = { x: 0, z: 0, yaw: 0 };
 
-  constructor(private readonly sim: SimWorld, graph: RoadGraph, private readonly lanes: LaneTables) {
+  /**
+   * `groundAt`: the ground's height at a point (the island's, M8.10 slice 14): a ring, a door or a point is reached
+   * only from the lanes at its ground's height, never a deck over it (the viaduct, a bridge) or the tunnel under it;
+   * none (the grid's) reads them in plan alone, as it always has.
+   */
+  constructor(private readonly sim: SimWorld, graph: RoadGraph, private readonly lanes: LaneTables, private readonly groundAt?: (x: number, z: number) => number) {
     const n = (this.n = lanes.laneCount);
     this.len = lanes.length;
     this.lanePoints = graph.lanes.map((lane) => lane.points);
@@ -547,15 +552,17 @@ export class Way implements GoalChooser {
     this.count++;
   }
 
-  /** The lanes within `reach` m of a point (the eight nearest), else the nearest one. */
+  /** The lanes within `reach` m of a point (the eight nearest), else the nearest one; with the ground's height, those at it. */
   private reachOf(x: number, z: number, out: Reach): void {
     const reach = BALANCE.way.reach;
     out.count = 0;
     let nearest = -1, nearestD = Infinity, nearestS = 0;
+    const ground = this.groundAt ? this.groundAt(x, z) : 0;
     for (let i = 0; i < this.n; i++) {
       const box = this.boxDistance(i, x, z);
       if (box > reach && box > nearestD) continue;
       this.lanes.project(i, x, z, this.proj);
+      if (this.groundAt && Math.abs(this.pointHeight(i, this.proj.s) - ground) > LANE_HEIGHT) continue;
       const d = this.proj.dist;
       if (d < nearestD) { nearestD = d; nearest = i; nearestS = this.proj.s; }
       if (d > reach) continue;
@@ -578,6 +585,21 @@ export class Way implements GoalChooser {
       out.leg[0] = nearestD;
       out.count = 1;
     }
+  }
+
+  /** A lane's own height `s` m along it (its points', the deck's or the tunnel's where it leaves the ground). */
+  private pointHeight(lane: number, s: number): number {
+    const pts = this.lanePoints[lane] ?? [];
+    let at = 0;
+    for (let k = 1; k < pts.length; k++) {
+      const a = pts[k - 1] as RoadPoint, b = pts[k] as RoadPoint, len = Math.hypot(b.x - a.x, b.z - a.z);
+      if (at + len >= s || k === pts.length - 1) {
+        const t = len > 0 ? Math.max(0, Math.min(1, (s - at) / len)) : 0;
+        return (a.y ?? 0) + ((b.y ?? 0) - (a.y ?? 0)) * t;
+      }
+      at += len;
+    }
+    return pts[0]?.y ?? 0;
   }
 
   private boxDistance(i: number, x: number, z: number): number {

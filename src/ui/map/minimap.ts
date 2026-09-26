@@ -589,12 +589,12 @@ export class Minimap {
       c.lineWidth = highW;
       c.stroke(paths.highwayPath);
     }
-    // a zone job's edge (M5.5 slice 12)
+    // a zone job's edge (M5.5 slice 12) round its middle (its target: the grid's ring, the island's place)
     const zoneJob = this.sim?.jobs.running;
     st.zone = !!zoneJob && this.sim?.jobs.state === 'active' && (zoneJob.kind === 'rage' || zoneJob.kind === 'mayhem');
     if (zoneJob && st.zone) {
       c.beginPath();
-      c.arc(zoneJob.x, zoneJob.z, BALANCE.jobs.zone.radius, 0, Math.PI * 2);
+      c.arc(zoneJob.targetX, zoneJob.targetZ, BALANCE.jobs.zone.radius, 0, Math.PI * 2);
       c.lineWidth = 3 / s;
       c.strokeStyle = ROUTE;
       c.stroke();

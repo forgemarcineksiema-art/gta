@@ -446,10 +446,10 @@ export class BigMap {
       c.strokeRect(r.x - r.hx, r.z - r.hz, r.hx * 2, r.hz * 2);
     }
     const jobs = sim.jobs, running = jobs.running;
-    // a zone job's edge
+    // a zone job's edge round its middle (its target: the grid's ring, the island's place)
     if (running && jobs.state === 'active' && (running.kind === 'rage' || running.kind === 'mayhem')) {
       c.beginPath();
-      c.arc(running.x, running.z, BALANCE.jobs.zone.radius, 0, Math.PI * 2);
+      c.arc(running.targetX, running.targetZ, BALANCE.jobs.zone.radius, 0, Math.PI * 2);
       c.lineWidth = 3 / s;
       c.strokeStyle = ROUTE;
       c.stroke();

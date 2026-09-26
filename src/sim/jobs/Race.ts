@@ -71,7 +71,8 @@ export class Race {
   private readonly done: Uint8Array;
 
   constructor(private readonly sim: SimWorld) {
-    const lanes = sim.city?.graph.lanes ?? [];
+    // the grid's streets or the island's (M8.10 slice 14)
+    const lanes = sim.traffic?.streets.graph.lanes ?? [];
     this.dist = new Float64Array(lanes.length);
     this.done = new Uint8Array(lanes.length);
     this.preds = lanes.map(() => []);
@@ -80,14 +81,17 @@ export class Race {
 
   /** The rivals on the road ahead, the way to the finish worked out once; a duel brings its own field. */
   start(finishX: number, finishZ: number, probe: PlayerProbe, duel?: RaceField): void {
-    const city = this.sim.city, traffic = this.sim.traffic;
-    if (!city || !traffic) return;
+    const traffic = this.sim.traffic;
+    if (!traffic) return;
+    const streets = traffic.streets;
     this.stop();
     this.finishX = finishX;
     this.finishZ = finishZ;
-    this.field(city.nearestLane(finishX, finishZ, 0));
-    const lane = city.nearestLane(probe.x, probe.z, probe.y - 0.5);
-    const s0 = alongLane(city.graph.lanes[lane] as Lane, probe.x, probe.z).s;
+    // the finish on the ground's road (the grid's 0, the island's hills), never a deck over it; the grid on the road under the car
+    this.field(streets.nearestLane(finishX, finishZ, streets.groundAt(finishX, finishZ)));
+    const lane = streets.nearestLane(probe.x, probe.z, probe.y - 0.5);
+    if (lane < 0) return;
+    const s0 = alongLane(streets.graph.lanes[lane] as Lane, probe.x, probe.z).s;
     const len = traffic.lanes.length[lane] as number;
     const r = BALANCE.jobs.race;
     const cars = duel ? duel.cars : FIELD;
@@ -237,13 +241,12 @@ export class Race {
 
   /** Dijkstra backward from the finish: each lane's distance from its start to the finish point. */
   private field(finishLane: number): void {
-    const city = this.sim.city;
     const traffic = this.sim.traffic;
-    if (!city || !traffic || finishLane < 0) return;
+    if (!traffic || finishLane < 0) return;
     const lanes = traffic.lanes;
     this.dist.fill(Infinity);
     this.done.fill(0);
-    this.dist[finishLane] = alongLane(city.graph.lanes[finishLane] as Lane, this.finishX, this.finishZ).s;
+    this.dist[finishLane] = alongLane(traffic.streets.graph.lanes[finishLane] as Lane, this.finishX, this.finishZ).s;
     for (;;) {
       let lane = -1, d = Infinity;
       for (let i = 0; i < this.dist.length; i++) if (this.done[i] === 0 && (this.dist[i] as number) < d) { d = this.dist[i] as number; lane = i; }

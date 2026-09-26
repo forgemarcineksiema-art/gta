@@ -284,7 +284,7 @@ export class Life {
     const keep = 1 - ECONOMY.billboardSpeedLoss;
     v.setVelocity(tm.vx * keep, tm.vy, tm.vz * keep);
     const board = c.descOf(id);
-    this.sim.events.push('billboard', ECONOMY.billboardBoost, board ? board.x : this.sim.probe.x, BILLBOARD_BOTTOM + BILLBOARD_HEIGHT / 2, board ? board.z : this.sim.probe.z, id);
+    this.sim.events.push('billboard', ECONOMY.billboardBoost, board ? board.x : this.sim.probe.x, (board?.y ?? 0) + BILLBOARD_BOTTOM + BILLBOARD_HEIGHT / 2, board ? board.z : this.sim.probe.z, id);
     // the fiftieth (M5.5 slice 14): the hunt's reward for the set, into the bank through the ring
     if (c.smashedCount === c.total) this.sim.events.push('hunt', BALANCE.hunts.billboards, this.sim.probe.x, 0, this.sim.probe.z, 1);
   }

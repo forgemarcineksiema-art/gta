@@ -123,8 +123,8 @@ export function onStrip(st: Strip, s: number, o: number, out: { x: number; y: nu
   return out;
 }
 
-/** The roads' surfaces on the island's ground and network; `chunkOf` names a point's chunk. */
-export function roadSurfaces(ground: Ground, graph: RoadGraph, chunkOf: (x: number, z: number) => number): RoadSurfaces {
+/** The roads' surfaces on the island's ground and network; `chunkOf` names a point's chunk; no bay where `noBay` says. */
+export function roadSurfaces(ground: Ground, graph: RoadGraph, chunkOf: (x: number, z: number) => number, noBay: (x: number, z: number) => boolean = () => false): RoadSurfaces {
   const chunks = new Map<number, SurfaceChunk>(), kerbs = new Map<number, Piece[]>();
   const tri = (ax: number, ay: number, az: number, bx: number, by: number, bz: number, cx: number, cy: number, cz: number, colour: number): void => {
     const key = chunkOf((ax + bx + cx) / 3, (az + bz + cz) / 3);
@@ -467,7 +467,8 @@ export function roadSurfaces(ground: Ground, graph: RoadGraph, chunkOf: (x: numb
           if (group % style.every !== 0) continue;
           const mid = d + PARKING.length / 2;
           onStrip(st, mid, o, corner);
-          if (!ground.onLand(corner.x, corner.z) || ground.nearOtherRoad(corner.x, corner.z, st.road, 2)) continue;
+          // (none where a kicker or a gate stands in the kerbside strip: slice 15)
+          if (!ground.onLand(corner.x, corner.z) || ground.nearOtherRoad(corner.x, corner.z, st.road, 2) || noBay(corner.x, corner.z)) continue;
           const k = segmentAt(st, mid), yaw = Math.atan2((st.x[k + 1] as number) - (st.x[k] as number), (st.z[k + 1] as number) - (st.z[k] as number));
           // a car in it faces the way its side's traffic runs: +s on the right, −s on the left
           parking.push({ road: st.id, x: corner.x, z: corner.z, yaw: side > 0 ? yaw : yaw + Math.PI, width: PARKING.width, length: PARKING.length });

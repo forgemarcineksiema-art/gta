@@ -25,6 +25,8 @@ export interface BillboardDesc {
   /** Bottom edge above the ground, m. */
   bottom: number;
   paint: number;
+  /** The ground's (or the deck's) height the posts stand on (M8.10 slice 15: the island's); the grid's are at 0. */
+  y?: number;
 }
 
 export const BILLBOARD_TOTAL = 50;
@@ -230,15 +232,25 @@ function describe(index: number, slotIndex: number, slot: Slot): BillboardDesc {
   };
 }
 
+/** A car's middle smashes an island's panel between this far under its posts' foot and this far over its top (m). */
+const PANEL_BELOW = 2;
+const PANEL_ABOVE = 2;
+
 export class Collectibles {
   readonly smashed = new Uint8Array(49 * SLOTS_PER_CHUNK);
   smashedCount = 0;
   readonly total = BILLBOARD_TOTAL;
 
-  constructor(private readonly city: City) {}
+  /**
+   * The grid's, from its generated chunks round the player; or the island's fixed fifty (M8.10 slice 15), all known
+   * from the start, each at its height.
+   */
+  constructor(private readonly city: City | null, private readonly fixed: readonly BillboardDesc[] = []) {}
 
-  /** The descriptor of a billboard id among the generated chunks, or null. */
+  /** The descriptor of a billboard id among the generated chunks (or the island's), or null. */
   descOf(id: number): BillboardDesc | null {
+    for (const b of this.fixed) if (b.id === id) return b;
+    if (!this.city) return null;
     for (const entry of this.city.active.values()) {
       for (const b of entry.chunk.billboards) if (b.id === id) return b;
     }
@@ -248,31 +260,41 @@ export class Collectibles {
   /** Returns the id smashed this step or -1: the player's footprint against the panels of the loaded chunks around it. */
   step(player: PlayerProbe, minSpeed: number): number {
     if (player.speed < minSpeed) return -1;
+    const hit = this.smash(player, this.fixed);
+    if (hit >= 0 || !this.city) return hit;
+    for (const entry of this.city.active.values()) {
+      const id = this.smash(player, entry.chunk.billboards);
+      if (id >= 0) return id;
+    }
+    return -1;
+  }
+
+  /** The first of `boards` the player's footprint crosses (smashed now), or -1. */
+  private smash(player: PlayerProbe, boards: readonly BillboardDesc[]): number {
     const fx = Math.sin(player.yaw);
     const fz = Math.cos(player.yaw);
     const rx = -fz;
     const rz = fx;
-    for (const entry of this.city.active.values()) {
-      const boards = entry.chunk.billboards;
-      for (let b = 0; b < boards.length; b++) {
-        const board = boards[b] as BillboardDesc;
-        if (this.smashed[board.id]) continue;
-        const dx = board.x - player.x;
-        const dz = board.z - player.z;
-        if (dx * dx + dz * dz > 20 * 20) continue;
-        // five points along the panel, each tested against the chassis footprint with a small margin
-        const ax = Math.cos(board.yaw), az = -Math.sin(board.yaw); // along the panel = left of its normal
-        const pitch = board.width / 4;
-        for (let k = -2; k <= 2; k++) {
-          const px = board.x + ax * k * pitch - player.x;
-          const pz = board.z + az * k * pitch - player.z;
-          const along = px * fx + pz * fz;
-          const side = px * rx + pz * rz;
-          if (Math.abs(along) <= player.halfLength + 0.3 && Math.abs(side) <= player.halfWidth + 0.3) {
-            this.smashed[board.id] = 1;
-            this.smashedCount++;
-            return board.id;
-          }
+    for (let b = 0; b < boards.length; b++) {
+      const board = boards[b] as BillboardDesc;
+      if (this.smashed[board.id]) continue;
+      const dx = board.x - player.x;
+      const dz = board.z - player.z;
+      if (dx * dx + dz * dz > 20 * 20) continue;
+      // an island's panel at its height: not from a deck over it or a street under it
+      if (board.y !== undefined && (player.y < board.y - PANEL_BELOW || player.y > board.y + board.bottom + board.height + PANEL_ABOVE)) continue;
+      // five points along the panel, each tested against the chassis footprint with a small margin
+      const ax = Math.cos(board.yaw), az = -Math.sin(board.yaw); // along the panel = left of its normal
+      const pitch = board.width / 4;
+      for (let k = -2; k <= 2; k++) {
+        const px = board.x + ax * k * pitch - player.x;
+        const pz = board.z + az * k * pitch - player.z;
+        const along = px * fx + pz * fz;
+        const side = px * rx + pz * rz;
+        if (Math.abs(along) <= player.halfLength + 0.3 && Math.abs(side) <= player.halfWidth + 0.3) {
+          this.smashed[board.id] = 1;
+          this.smashedCount++;
+          return board.id;
         }
       }
     }

@@ -154,6 +154,8 @@ export class Renderer {
     this.islandView = sim.island ? new IslandView(this.scene, sim.island) : null;
     this.propsView = sim.props ? new PropsView(this.scene, sim) : null;
     this.billboards = sim.collectibles ? new Billboards(this.scene) : null;
+    // the island's fifty are known from the start (M8.10 slice 15)
+    if (sim.island) this.billboards?.add(sim.island.billboards);
     this.coinsView = sim.coins ? new Coins(this.scene) : null;
     if (this.cityView) {
       const boards = this.billboards, coins = this.coinsView;
@@ -169,9 +171,10 @@ export class Renderer {
     this.markerView = new MarkerView(this.scene, sim, this.camera);
     this.roadblockView = sim.roadblocks ? new RoadblockView(this.scene) : null;
     this.signalView = sim.traffic ? new SignalView(this.scene, sim) : null;
-    this.breakerView = sim.breakers ? new BreakerView(this.scene, sim.breakers.descs.length) : null;
+    this.breakerView = sim.breakers ? new BreakerView(this.scene, sim.breakers.descs) : null;
     if (sim.donuts) this.scene.add(buildDonutShop());
-    this.rampView = sim.jumps ? new RampView(this.scene, sim) : null;
+    // the grid's kickers on its flat ground; the island's are its places' and its chunks' statics (M8.10 slice 15)
+    this.rampView = sim.jumps && sim.city ? new RampView(this.scene, sim) : null;
     if (sim.city) this.scene.add(buildSkyline(sim.city));
     this.shapes = new ShapesView(this.scene, sim.statics);
     this.setQuality(this.quality);

@@ -41,7 +41,7 @@ function launch(degrees: readonly number[]): Array<{ along: number; y: number }>
 
 /** The mega-ramp as a jump (slice 15 counts it and slows its apex): its heights over the runway's ground. */
 export function megaJump(id: number): JumpDesc {
-  return { id, x: MEGA.x, z: MEGA.z, yaw: MEGA.yaw, length: -(MEGA_LAUNCH[0] as { along: number }).along, height: LIP_HEIGHT, profile: MEGA_LAUNCH, halfWidth: MEGA.halfWidth };
+  return { id, x: MEGA.x, z: MEGA.z, yaw: MEGA.yaw, length: -(MEGA_LAUNCH[0] as { along: number }).along, height: LIP_HEIGHT, profile: MEGA_LAUNCH, halfWidth: MEGA.halfWidth, mega: true };
 }
 
 /** The runway (the plan's), its line and its ends: the threshold at its northern end, the ramp's foot at its southern. */

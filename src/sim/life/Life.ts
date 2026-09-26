@@ -372,8 +372,9 @@ export class Life {
     this.sim.vehicle.engineCut = true;
     const p = this.sim.vehicle.body.translation(this.proj);
     this.sim.events.push('wrecked', 1, p.x, p.y, p.z, -1);
-    // the rings rule: part of the bag bursts out on the lane ahead, ten seconds to scramble it back
-    this.sim.run.spill(p.x, p.z, M.yawOf(this.sim.vehicle.body.rotation(this.rot)));
+    // the rings rule: part of the bag bursts out on the lane ahead, ten seconds to scramble it back (the lane at the
+    // wreck's own level: not a deck over it)
+    this.sim.run.spill(p.x, p.z, M.yawOf(this.sim.vehicle.body.rotation(this.rot)), p.y);
   }
 
   /** A fresh car: no damage, no wreck, new tyres (a reset, a swap, a respawn, the garage's drive-out). */
@@ -440,8 +441,11 @@ export class Life {
     const v = this.sim.vehicle;
     const p = v.body.translation(this.proj);
     const oldYaw = M.yawOf(v.body.rotation(this.rot));
+    // the road the player's car is on: the grid's flat 0; on the island the ground, or what its wheels stand on (a
+    // roof, a deck: M8.10 slice 15), so the car left there stays there and the taken one is driven off at its height
+    const road = this.roadUnder(p.x, p.z);
     this.oldPose.x = p.x;
-    this.oldPose.y = p.y;
+    this.oldPose.y = road;
     this.oldPose.z = p.z;
     this.oldPose.yaw = oldYaw;
     // an order's wanted car taken: its clock starts before the record becomes the car left behind
@@ -460,7 +464,7 @@ export class Life {
     v.applyTuning();
     // as high over the taken car's road as the player's car was over its own (the grid's flat: the same height); `p`
     // is `proj`, read before it is moved
-    const over = p.y - traffic.streets.groundAt(p.x, p.z);
+    const over = p.y - road;
     this.proj.x = h.x;
     this.proj.y = h.y - 0.03 + over;
     this.proj.z = h.z;
@@ -478,6 +482,22 @@ export class Life {
     // identity (docs/DESIGN.md §2.5): a swap no unit saw loses them, and they box the car you left
     const police = this.sim.police;
     if (this.sim.pursuit.onSwap(police?.crimeSeen() ?? false, h.kind, this.sim.carPaint, h.body, h.police)) police?.box(this.oldPose.x, this.oldPose.z, oldYaw);
+  }
+
+  /**
+   * The road under the player's car at (x, z): the street map's ground (the grid's flat 0); on the island where its
+   * grounded wheels touch (a roof, a deck over the ground: M8.10 slice 15), the ground's with none down.
+   */
+  private roadUnder(x: number, z: number): number {
+    const ground = this.sim.traffic?.streets.groundAt(x, z) ?? 0;
+    if (!this.sim.island) return ground;
+    let sum = 0, n = 0;
+    for (const w of this.sim.vehicle.wheels) {
+      if (!w.grounded) continue;
+      sum += w.contact.y;
+      n++;
+    }
+    return n > 0 ? sum / n : ground;
   }
 
   /** Set the damage directly (the cold open's beat-up van); the stage follows, silently, and a wreck is never set this way. */

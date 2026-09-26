@@ -209,14 +209,14 @@ export class Run {
     if (amount > 0 && Number.isFinite(amount)) this.bank += amount;
   }
 
-  /** A wreck: `spill.share` of the bag leaves it as a pool of coins on the lane ahead (Life calls this). */
-  spill(x: number, z: number, yaw: number): void {
+  /** A wreck: `spill.share` of the bag leaves it as a pool of coins on the lane ahead (Life calls this); `y` the wreck's height. */
+  spill(x: number, z: number, yaw: number, y = Number.NaN): void {
     const coins = this.sim.coins;
     if (!coins || this.state === 'door' || this.state === 'busted') return;
     const amount = Math.round(this.bag * BALANCE.spill.share);
     if (amount <= 0) return;
     this.bag -= amount;
-    coins.spill(x, z, yaw, amount, this.sim.events);
+    coins.spill(x, z, yaw, amount, this.sim.events, y);
   }
 
   /** Any key at the busted card: drive on where you stand, heat 0. */

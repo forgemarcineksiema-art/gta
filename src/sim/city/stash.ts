@@ -11,10 +11,15 @@
  * A parked record is placed when the player comes within `range` m and freed
  * by the traffic's own despawn; the city's toys (the giant ball in the Works
  * yard) live here too. No allocation per step.
+ *
+ * On the island (M8.10 slice 15) each stands where the plan puts it
+ * (`island/finds.ts`), left there as a car on open ground, at its own height
+ * where that is not the ground's (the trolley on the car park's roof).
  */
 import { BALANCE } from '../balance';
 import { districtAt } from './City';
 import type { ParkingBay } from './markings';
+import { islandStash, type StashSpot } from '../island/finds';
 import { PALETTE } from '../palette';
 import { IDENTITY_QUAT } from '../scene';
 import type { PropSpawn } from '../playground';
@@ -84,8 +89,8 @@ export class Stash {
   readonly found = new Set<HiddenCar>();
   /** Each hidden car's traffic record while it stands at its spot, -1 otherwise (`HIDDEN_CARS` order). */
   readonly agents = new Int16Array(HIDDEN_CARS.length).fill(-1);
-  /** Where each stands. */
-  readonly spots: Record<HiddenCar, { x: number; z: number; yaw: number }>;
+  /** Where each stands (on the island, at its own height where that is not the ground's). */
+  readonly spots: Record<HiddenCar, StashSpot>;
   /** Bumps when a car is found (the wall's card appears). */
   serial = 0;
   /** The bays of the three are kept free of parked civilians from the first step. */
@@ -94,7 +99,9 @@ export class Stash {
   constructor(private readonly sim: SimWorld) {
     const markers = sim.jobs.defs.map((d) => ({ x: d.x, z: d.z }));
     for (const site of sim.cover?.dropOffs ?? []) markers.push({ x: site.door.x, z: site.door.z });
-    this.spots = sim.city ? stashSpots(sim.city.roadMarkings.parking, markers) : { ...STASH_SPOTS, roadster: { x: 0, z: 0, yaw: 0 }, sweeper: { x: 0, z: 0, yaw: 0 }, hotdog: { x: 0, z: 0, yaw: 0 } };
+    this.spots = sim.city ? stashSpots(sim.city.roadMarkings.parking, markers)
+      : sim.island ? islandStash(sim.island)
+        : { ...STASH_SPOTS, roadster: { x: 0, z: 0, yaw: 0 }, sweeper: { x: 0, z: 0, yaw: 0 }, hotdog: { x: 0, z: 0, yaw: 0 } };
   }
 
   /** A hidden car is found the moment the player drives it; the stash keeps each unfound one standing near the player. */
@@ -102,11 +109,11 @@ export class Stash {
     const sim = this.sim, traffic = sim.traffic;
     if (!traffic) return;
     if (!this.reserved) {
-      // no civilian parks in a hidden car's bay
+      // no civilian parks in a hidden car's bay (the island's stand off the kerbs)
       this.reserved = true;
       for (let k = 0; k < HIDDEN_CARS.length; k++) {
         const id = HIDDEN_CARS[k] as HiddenCar;
-        if (id in STASH_SPOTS) continue;
+        if (id in STASH_SPOTS || sim.island) continue;
         const spot = this.spots[id];
         traffic.reserveBayAt(spot.x, spot.z);
       }
@@ -126,9 +133,11 @@ export class Stash {
       if (this.found.has(id) || (this.agents[k] as number) >= 0) continue;
       const spot = this.spots[id];
       if (Math.hypot(probe.x - spot.x, probe.z - spot.z) > BALANCE.stash.range) continue;
-      // the ice-cream truck and the crazy cars stand on open ground as cars left there; the others are parked in their
-      // bays like the street's own parked cars (an abandoned car at a kerb has the traffic slow and swing round it)
-      this.agents[k] = traffic.spawnProp(spot.x, spot.z, spot.yaw, id, id in STASH_SPOTS ? AgentState.Abandoned : AgentState.Parked, bodySpec(id).paints[0] as number);
+      // the ice-cream truck and the crazy cars stand on open ground as cars left there, as all the island's do; the
+      // others are parked in their bays like the street's own parked cars (an abandoned car at a kerb has the traffic slow
+      // and swing round it)
+      const left = id in STASH_SPOTS || sim.island !== null;
+      this.agents[k] = traffic.spawnProp(spot.x, spot.z, spot.yaw, id, left ? AgentState.Abandoned : AgentState.Parked, bodySpec(id).paints[0] as number, spot.y);
     }
   }
 

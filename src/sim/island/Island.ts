@@ -25,9 +25,13 @@ import type { GardensPlace } from './places/gardens';
 import { buildServices, serviceSpots, siteRect, type ServiceSite } from './services';
 import { garageRect, hotelGarageSite, islandGarages } from './cover';
 import { GARAGE, hideoutSign, toDropOff, type DropOff } from '../city/cover';
+import type { ColdOpenKeep, PropRing } from '../city/City';
+import type { PropSpot } from '../city/props';
 import type { StaticDesc } from '../scene';
 import { BOUNDS, CIRCUS, highwayLoop, islet } from './plan';
 import { shoreOpen } from './shapes';
+import { atSlipway, islandSlipways, seaStatics, type IslandSlipway } from './slipways';
+import { marketSpots } from './market';
 
 /** A chunk of the ground: its side (m) and the height field's cell (m). The chunks cover the plan's bounds. */
 export const CHUNK = 250;
@@ -58,6 +62,11 @@ const FOUNDRY_SETBACK = 7;
 const GRID_PAVEMENT = 4.5;
 /** The tunnel's lid over its trench (slice 8): its half width across the tunnel and its mesh's step across (m). */
 const LID = { half: 24, step: 3 } as const;
+/**
+ * The street furniture's keep-outs from the world (slice 15, the grid's M8 D7): a car's half width and room either side
+ * of the cold open's route (m), as the grid's.
+ */
+const KEEP_ROUTE = 1.6;
 
 export class Island {
   readonly ground = new Ground();
@@ -89,6 +98,14 @@ export class Island {
   readonly places: Place[];
   /** The run's three garages (M8.10 slice 14), the hideout first: their kerbs and lanes; the props keep off their doors. */
   readonly garages: DropOff[];
+  /** The slipways (M8.10 slice 15): the marina's and the beach's ramps down to the sea, the island's wall a gate at each. */
+  readonly slipways: IslandSlipway[];
+  /**
+   * What the street furniture keeps out of that the world knows (slice 15, the grid's M8 D7): the jobs' rings, the hidden
+   * cars, the slipways' heads; the cold open's route and what it drives through; the mayhem zones' markets' stalls.
+   */
+  private propKeepOut: { rings: ReadonlyArray<PropRing>; route: () => ColdOpenKeep; markets: readonly PropSpot[] } | null = null;
+  private propRoute: ColdOpenKeep | null = null;
   /** The chunks with a height field in the physics, by index. */
   readonly active = new Map<number, RAPIER.Collider>();
   /** Each physics chunk's kerbs, buildings and trunks, with its height field. */
@@ -117,6 +134,8 @@ export class Island {
   private ahead: { index: number; done: number; h: Float32Array } | null = null;
 
   constructor(readonly world: RAPIER.World) {
+    // the slipways first (slice 15): the ground dug under a quay's ramp, the wall a gate at each
+    this.slipways = islandSlipways(this.ground);
     this.walls();
     // the sea's surface for the hovercraft's rays, and the world's edge beyond it
     const hx = (BOUNDS.x1 - BOUNDS.x0) / 2, hz = (BOUNDS.z1 - BOUNDS.z0) / 2;
@@ -138,6 +157,8 @@ export class Island {
     // the drive-throughs (slice 16): fuel, repair, paint; the run's three garages (slice 14)
     buildServices(this.ground, this.services, statics);
     this.garages = islandGarages(this, statics);
+    // the slipways' ramps and the sea trial's buoys (slice 15)
+    for (const st of seaStatics(this.slipways)) statics(st.position.x, st.position.z).push(st);
   }
 
   /** Run the places that move (a train, a barrier, a wheel), a fixed step. */
@@ -167,13 +188,46 @@ export class Island {
       const x = l.x - fx * back, z = l.z - fz * back;
       return x >= x0 && x < x0 + CHUNK && z >= z0 && z < z0 + CHUNK ? [{ kind: 'yard', x, z, dx: Math.cos(l.yaw), dz: -Math.sin(l.yaw), half: l.hx, nx: fx, nz: fz }] : [];
     });
-    // the places' own things at their spots: the Gardens' back fences across their shortcuts (slice 10)
+    // the places' own things at their spots: the Gardens' back fences across their shortcuts (slice 10), the mayhem
+    // zones' markets' stalls (slice 15)
+    const inChunk = (s: { x: number; z: number }): boolean => s.x >= x0 && s.x < x0 + CHUNK && s.z >= z0 && s.z < z0 + CHUNK;
     const gardens = this.places.find((p) => p.id === 'gardens') as GardensPlace | undefined;
-    const spots = (gardens?.fences ?? []).filter((s) => s.x >= x0 && s.x < x0 + CHUNK && s.z >= z0 && s.z < z0 + CHUNK);
+    const spots = [...(gardens?.fences ?? []), ...(this.propKeepOut?.markets ?? [])].filter(inChunk);
     if (spots.length > 0) places.unshift({ kind: 'spots', x: x0, z: z0, dx: 1, dz: 0, half: 0, nx: 0, nz: 1, spots });
-    list = chunkProps(i, j, { seed: PROP_SEED, runs, places, blocked: (x, z, yaw, hx, hz) => this.propBlocked(x, z, yaw, hx, hz) }, index);
+    // the world's keep-outs near the chunk (slice 15): its circles, the cold open's route and the things it drives through
+    const keep = this.keepNear(x0, z0);
+    const through = (this.propRoute?.spots ?? []).filter(inChunk);
+    if (through.length > 0) places.unshift({ kind: 'route', x: x0, z: z0, dx: 1, dz: 0, half: 0, nx: 0, nz: 1, spots: through });
+    list = chunkProps(i, j, { seed: PROP_SEED, runs, places, blocked: (x, z, yaw, hx, hz, onRoute) => this.propBlocked(x, z, yaw, hx, hz, onRoute, keep) }, index);
     this.propLists.set(index, list);
     return list;
+  }
+
+  /**
+   * What the street furniture keeps out of that the world knows (M8.10 slice 15, the grid's `City.setPropKeepOut`): the
+   * rings (a job's and its end, a hidden car's, a slipway's head), the cold open's route with the things it drives
+   * through, worked out the first time a chunk asks, and the mayhem zones, whose markets stand round their rings. Set by
+   * the world before a chunk's props are placed; every chunk's are placed again after.
+   */
+  setPropKeepOut(rings: ReadonlyArray<PropRing>, route: () => ColdOpenKeep, markets: ReadonlyArray<{ x: number; z: number }> = []): void {
+    const probe = this.probeScratch, edge = (x: number, z: number): number => this.ground.probe(x, z, probe).road;
+    this.propKeepOut = { rings, route, markets: marketSpots(markets, this.surfaces.footways, edge) };
+    this.propRoute = null;
+    this.propLists.clear();
+  }
+
+  /** The keep-outs reaching into a chunk (its corner x0, z0): the rings and the route's segments (x0 z0 x1 z1) near it. */
+  private keepNear(x0: number, z0: number): { rings: PropRing[]; route: number[] } {
+    const keep = this.propKeepOut, reach = 20;
+    if (!keep) return { rings: [], route: [] };
+    const near = (x: number, z: number): boolean => x > x0 - reach && x < x0 + CHUNK + reach && z > z0 - reach && z < z0 + CHUNK + reach;
+    const rings = keep.rings.filter((r) => near(r.x, r.z));
+    const samples = (this.propRoute ??= keep.route()).samples, route: number[] = [];
+    for (let k = 0; k + 1 < samples.length; k++) {
+      const p = samples[k] as { x: number; z: number }, q = samples[k + 1] as { x: number; z: number };
+      if (near(p.x, p.z) || near(q.x, q.z)) route.push(p.x, p.z, q.x, q.z);
+    }
+    return { rings, route };
   }
 
   /** Where a prop stands: on its pavement (the top of the kerb's slab the wheels ride there) or on the ground past it. */
@@ -193,15 +247,24 @@ export class Island {
 
   /**
    * Whether a prop's footprint (its middle, the way its +Z faces, half extents) stands where nothing may: a
-   * carriageway, a junction, a lot, the water, or the walkers' band down the pavement.
+   * carriageway, a junction, a lot, the water, the walkers' band down the pavement, or the world's keep-outs near its
+   * chunk (`keep`: a ring, the cold open's route). `onRoute`: a thing the cold open drives through, which the route and
+   * the walkers' band do not keep out (as the grid's).
    */
-  private propBlocked(x: number, z: number, yaw: number, hx: number, hz: number): boolean {
+  private propBlocked(x: number, z: number, yaw: number, hx: number, hz: number, onRoute?: 'loose' | 'solid', keep?: { rings: readonly PropRing[]; route: readonly number[] }): boolean {
     const c = Math.cos(yaw), s = Math.sin(yaw), p = this.probeScratch;
     for (const [a, b] of [[0, 0], [-1, -1], [1, -1], [1, 1], [-1, 1]] as const) {
       const px = x + c * hx * a + s * hz * b, pz = z - s * hx * a + c * hz * b;
       if (!this.ground.onLand(px, pz) || this.ground.nearOtherRoad(px, pz, -1, 0.2)) return true;
       this.ground.probe(px, pz, p);
-      if (p.road > PROP_LINES.walkers.middle - PROP_LINES.walkers.half && p.road < PROP_LINES.walkers.middle + PROP_LINES.walkers.half) return true;
+      if (!onRoute && p.road > PROP_LINES.walkers.middle - PROP_LINES.walkers.half && p.road < PROP_LINES.walkers.middle + PROP_LINES.walkers.half) return true;
+    }
+    if (keep) {
+      const br = Math.hypot(hx, hz);
+      for (const ring of keep.rings) if (Math.hypot(x - ring.x, z - ring.z) < ring.r + br) return true;
+      if (!onRoute) for (let k = 0; k + 3 < keep.route.length; k += 4) {
+        if (segmentDistance(x, z, keep.route[k] as number, keep.route[k + 1] as number, keep.route[k + 2] as number, keep.route[k + 3] as number) < KEEP_ROUTE + br) return true;
+      }
     }
     for (const jn of this.surfaces.junctions) if (Math.hypot(jn.x - x, jn.z - z) < this.junctionReach(jn)) return true;
     // a garage and its apron out to the kerb (the car rolls in over it), its sign's pole (slice 14)
@@ -395,22 +458,25 @@ export class Island {
     const crossed = (x: number, z: number): boolean => roads.some((r) => r.pts.some((p) => Math.hypot(p[0] - x, p[1] - z) < HALF_WIDTH[r.cls] + 4));
     for (const line of this.ground.coasts) {
       const pts = line.pts, n = pts.length, segs = line.closed ? n : n - 1;
+      const midX = (i: number): number => ((pts[i] as P2)[0] + (pts[(i + 1) % n] as P2)[0]) / 2, midZ = (i: number): number => ((pts[i] as P2)[1] + (pts[(i + 1) % n] as P2)[1]) / 2;
       // none where a place's deck leaves the shore (a pier's root: slices 8–12)
-      const open = (i: number): boolean => shoreOpen(((pts[i] as P2)[0] + (pts[(i + 1) % n] as P2)[0]) / 2, ((pts[i] as P2)[1] + (pts[(i + 1) % n] as P2)[1]) / 2);
+      const open = (i: number): boolean => shoreOpen(midX(i), midZ(i));
+      // a gate across a slipway's mouth (slice 15): the hovercraft goes down to the sea there, every other car stops
+      const slip = (i: number): boolean => atSlipway(this.slipways, midX(i), midZ(i));
       // the islet's is a gate (M8.10 slice 12): every car stops in its surf, the hovercraft comes ashore
       const mid = pts.reduce((m, p) => [m[0] + p[0] / n, m[1] + p[1] / n], [0, 0]);
       const groups = line.closed && inPolygon(mid[0], mid[1], islet()) ? GROUPS_GATE : GROUPS_SOLID;
       let from = 0;
       while (from < segs) {
         if (open(from)) { from++; continue; }
-        const kind = line.kinds[from] ?? 'rocks';
+        const kind = line.kinds[from] ?? 'rocks', gate = slip(from);
         let to = from, run = 0;
-        while (to < segs && (line.kinds[to] ?? 'rocks') === kind && run < WALL.piece && !open(to)) {
+        while (to < segs && (line.kinds[to] ?? 'rocks') === kind && run < WALL.piece && !open(to) && slip(to) === gate) {
           const a = pts[to] as P2, b = pts[(to + 1) % n] as P2;
           run += Math.hypot(b[0] - a[0], b[1] - a[1]);
           to++;
         }
-        this.wallPiece(pts[from] as P2, pts[to % n] as P2, kind, line.land, crossed, groups);
+        this.wallPiece(pts[from] as P2, pts[to % n] as P2, kind, line.land, crossed, gate ? GROUPS_GATE : groups);
         from = to;
       }
     }
@@ -524,4 +590,11 @@ export class Island {
     const first = samples[0] as TrackSample;
     return { samples, gates: [], origin: { x: 0, z: 0 }, width: 2 * HALF_WIDTH.highway, length: s, start: { x: first.x, z: first.z, yaw: first.yaw } };
   }
+}
+
+/** Distance from (px, pz) to the segment a–b. */
+function segmentDistance(px: number, pz: number, ax: number, az: number, bx: number, bz: number): number {
+  const dx = bx - ax, dz = bz - az;
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / (dx * dx + dz * dz || 1)));
+  return Math.hypot(px - ax - dx * t, pz - az - dz * t);
 }

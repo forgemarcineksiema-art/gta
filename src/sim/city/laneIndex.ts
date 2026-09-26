@@ -33,6 +33,21 @@ export class LaneIndex {
     return found;
   }
 
+  /**
+   * The lane nearest (x, y, z) running along (dx, dz) there (its heading within 60° of it), -1 with none within `reach` m,
+   * its height gap counted: a trial's point on its road (M8.10 slice 15).
+   */
+  laneAlong(x: number, z: number, y: number, dx: number, dz: number, reach = Infinity): number {
+    const l = Math.hypot(dx, dz) || 1;
+    let best = reach * reach, found = -1;
+    for (let i = 0; i < this.graph.lanes.length; i++) {
+      if (this.outside(i, x, z) >= best) continue;
+      const dist = projectOnLane(this.graph.lanes[i] as Lane, x, z, this.hit, y);
+      if (dist < best && (Math.sin(this.hit.yaw) * dx + Math.cos(this.hit.yaw) * dz) / l >= 0.5) { best = dist; found = i; }
+    }
+    return found;
+  }
+
   /** The nearest point on any lane to a car at (x, y, z), a metre over it and facing along it: where a reset puts it. */
   nearestRoad(x: number, z: number, out: SpawnPoint, y = 0.5): SpawnPoint {
     let best = Infinity;

@@ -108,7 +108,7 @@ export class Island {
   /** The police's places that stand (M8.10 slice 15a): the cameras' poles, the pergola and the warehouse passage, the donut shop. */
   readonly policeSites: PoliceSites = policeSites(this.ground, this.network, (x, z) => this.standAt(x, z));
   /** Where the jumps' kickers, the billboards and the breakers stand (M8.10 slice 15), before the lots keep off them. */
-  readonly stuntSites: StuntSites = stuntSites(this.ground, this.surfaces, this.kerbside, this.kerbsideGates);
+  readonly stuntSites: StuntSites = stuntSites(this.ground, this.surfaces, this.kerbside, this.kerbsideGates, this.policeSites.cameras.map((c) => ({ x: c.poleX, z: c.poleZ })));
   /** The lots, their buildings and the palms (M8.10 slice 7a), off the drive-throughs' sites, the hotel's garage, the police's places and the slice 15 sites. */
   readonly fill: IslandFill = fillIsland(this.ground, this.surfaces, (x, z) => { const [i, j] = Island.chunkOf(x, z); return Island.chunkIndex(i, j); }, [...this.services.map(siteRect), garageRect(this.hotelGarage), ...this.policeSites.keep, ...this.stuntSites.keep]);
   /** Each district's places (M8.10 slices 8–12): their statics in `fill.chunks`, the ones that move stepped here. */
@@ -539,6 +539,11 @@ export class Island {
    */
   nearestLane(x: number, z: number, y?: number): number {
     return this.laneIndex.nearestLane(x, z, y);
+  }
+
+  /** The lane nearest (x, y, z) running along (dx, dz), -1 with none within `reach` m (`LaneIndex.laneAlong`). */
+  laneAlong(x: number, z: number, y: number, dx: number, dz: number, reach?: number): number {
+    return this.laneIndex.laneAlong(x, z, y, dx, dz, reach);
   }
 
   /**

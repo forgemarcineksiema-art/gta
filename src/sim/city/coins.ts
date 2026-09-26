@@ -110,12 +110,16 @@ function push(out: CoinPoint[], p: Pt, y: number, lane: number, value: number, p
 }
 
 /**
- * Over a ramp: `arcCoins` coins in the flight of a car launched at `arc.speed`, the cap on the landing; `base` the
- * height the ramp's foot stands on (the grid's 0), the flight measured from it.
+ * Over a ramp: `arcCoins` coins in the flight of a car launched at `arc.speed`, the cap on the landing; `ground` the
+ * height under a point (the grid's 0, the island's hills: M8.10 slice 15), the ramp standing on it, the flight from its
+ * lip until it meets it.
  */
-function arc(jd: JumpDesc, out: CoinPoint[], base: number): void {
+function arc(jd: JumpDesc, out: CoinPoint[], ground: GroundAt): void {
   const c = BALANCE.coin;
   const fx = Math.sin(jd.yaw), fz = Math.cos(jd.yaw);
+  const floor = (a: number): number => ground(jd.x + fx * a, jd.z + fz * a);
+  // the ground under the lip: the island's foot stands at its `y` (a roof's, a deck's), the ground's rise to the lip on it
+  const lip = jd.y === undefined ? floor(0) : jd.y + floor(0) - floor(-jd.length);
   const profile = rampProfile(jd);
   const surface = (a: number): number => {
     for (let i = 0; i + 1 < profile.length; i++) {
@@ -128,20 +132,25 @@ function arc(jd: JumpDesc, out: CoinPoint[], base: number): void {
   const v2 = c.arc.speed * c.arc.speed / (1 + tan * tan);
   const flight = (a: number): number => jd.height + a * tan - c.arc.gravity * a * a / (2 * v2);
   const at = (a: number): Pt => ({ x: jd.x + fx * a, z: jd.z + fz * a });
+  const up = (a: number): boolean => lip + flight(a) > floor(a) + 0.3 && a < ARC_REACH;
   let phase = 0;
   let a = c.pitch;
-  for (let laid = 0; flight(a) > 0.3 && laid < c.arcCoins; a += c.pitch, laid++) push(out, at(a), base + Math.max(surface(a), flight(a)) + COIN_HEIGHT, -1, c.value, phase++);
-  while (flight(a) > 0.3) a += c.pitch;
-  push(out, at(a + c.pitch), base + COIN_HEIGHT, -1, c.cap, phase);
+  for (let laid = 0; up(a) && laid < c.arcCoins; a += c.pitch, laid++) push(out, at(a), Math.max(floor(a) + surface(a), lip + flight(a)) + COIN_HEIGHT, -1, c.value, phase++);
+  while (up(a)) a += c.pitch;
+  const cap = at(a + c.pitch);
+  push(out, cap, ground(cap.x, cap.z) + COIN_HEIGHT, -1, c.cap, phase);
 }
 
+/** An arc's flight is followed this far past its lip at most (m). */
+const ARC_REACH = 400;
+
 /**
- * The static layout from the seed: an arc over every ramp, each over the ground its foot stands on (`base`, the grid's
- * 0). The gate lines are placed per chunk with their billboards.
+ * The static layout from the seed: an arc over every ramp, over the ground under it (`ground`, the grid's 0). The gate
+ * lines are placed per chunk with their billboards.
  */
-export function layoutCoins(jumps: readonly JumpDesc[], base: (jd: JumpDesc) => number = () => 0): CoinPoint[] {
+export function layoutCoins(jumps: readonly JumpDesc[], ground: GroundAt = FLAT): CoinPoint[] {
   const out: CoinPoint[] = [];
-  for (const jd of jumps) arc(jd, out, base(jd));
+  for (const jd of jumps) arc(jd, out, ground);
   return out;
 }
 
@@ -261,21 +270,24 @@ export function routeLine(graph: RoadGraph, chain: readonly number[], s0: number
 }
 
 /**
- * A line of coins over open water (M8.8 slice 20, the sea trial): runs of the route's straight count along each leg of
- * `points`, `y` their centres' height, the cap on the last point.
+ * A line of coins point to point (M8.8 slice 20, the sea trial; M8.10 slice 15, the dry canal): runs of the route's
+ * straight count along each leg of `points`, `y` their centres' height or its reader, the cap on the last point.
  */
-export function polyLine(points: readonly Pt[], y: number, out: CoinPoint[]): void {
-  const c = BALANCE.coin, r = c.route, pitch = c.pitch;
+export function polyLine(points: readonly Pt[], y: number | ((x: number, z: number) => number), out: CoinPoint[]): void {
+  const c = BALANCE.coin, r = c.route, pitch = c.pitch, at = (x: number, z: number): number => typeof y === 'number' ? y : y(x, z);
   let phase = 0;
   for (let i = 0; i + 1 < points.length; i++) {
     const a = points[i] as Pt, b = points[i + 1] as Pt;
     const length = Math.hypot(b.x - a.x, b.z - a.z), ux = (b.x - a.x) / length, uz = (b.z - a.z) / length;
     for (let s = r.straightEvery / 2; s + (r.straight - 1) * pitch <= length; s += r.straightEvery) {
-      for (let k = 0; k < r.straight; k++) push(out, { x: a.x + ux * (s + k * pitch), z: a.z + uz * (s + k * pitch) }, y, TAG_LANE.route, c.value, phase++);
+      for (let k = 0; k < r.straight; k++) {
+        const x = a.x + ux * (s + k * pitch), z = a.z + uz * (s + k * pitch);
+        push(out, { x, z }, at(x, z), TAG_LANE.route, c.value, phase++);
+      }
     }
   }
   const last = points[points.length - 1];
-  if (last) push(out, last, y, TAG_LANE.route, c.cap, phase);
+  if (last) push(out, last, at(last.x, last.z), TAG_LANE.route, c.cap, phase);
 }
 
 export class Coins {

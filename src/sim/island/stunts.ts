@@ -11,8 +11,8 @@ import type { StaticDesc } from '../scene';
 import { billboardDescs, billboardKeep, billboardSites, gateBlocked, type BillboardSite } from './billboards';
 import { breakerDescs, breakerKeep, breakerSites, type BreakerSite } from './breakers';
 import type { Ground } from './ground';
-import { freeKickers, islandJumps, kickerStatics, onKicker, type Kicker } from './jumps';
-import type { Keep } from './keep';
+import { freeKickers, islandJumps, kickerStatics, type Kicker } from './jumps';
+import { inKeep, type Keep } from './keep';
 import type { Place } from './places';
 import type { CrownPlace } from './places/crown';
 import { quayPlace } from './places/quay';
@@ -58,10 +58,10 @@ function placeLips(): Map<number, { x: number; z: number; yaw: number }> {
   ]);
 }
 
-export function stuntSites(ground: Ground, surfaces: RoadSurfaces, kerbside: readonly Kicker[], gates: readonly BillboardSite[]): StuntSites {
+export function stuntSites(ground: Ground, surfaces: RoadSurfaces, kerbside: readonly Kicker[], gates: readonly BillboardSite[], poles: ReadonlyArray<{ x: number; z: number }> = []): StuntSites {
   const kickers = [...kerbside, ...freeKickers()].sort((a, b) => a.jump - b.jump);
   const jumpKeep = kickers.map((k) => kickerKeep(k, RUN_UP, LANDING, 1));
-  const breakers = breakerSites(ground, surfaces, jumpKeep);
+  const breakers = breakerSites(ground, surfaces, jumpKeep, poles);
   const fallKeep = breakers.map(breakerKeep);
   const lips = placeLips();
   for (const k of kickers) lips.set(k.jump, k);
@@ -70,9 +70,9 @@ export function stuntSites(ground: Ground, surfaces: RoadSurfaces, kerbside: rea
   return { kickers, breakers, billboards, keep: [...jumpKeep, ...fallKeep, ...runOuts], props: [...jumpKeep, ...fallKeep], solid: runOuts };
 }
 
-/** Whether a kerbside bay would stand in a kerbside kicker's or gate's way. */
+/** Whether a kerbside bay's corner would stand in a kerbside kicker's way (its run-up, itself, its landing) or a gate's. */
 export function kerbsideBlocked(kickers: readonly Kicker[], gates: readonly BillboardSite[], x: number, z: number): boolean {
-  return kickers.some((k) => onKicker(k, x, z, 3)) || gateBlocked(gates, x, z);
+  return kickers.some((k) => inKeep(kickerKeep(k, RUN_UP, LANDING, 1), x, z, 1)) || gateBlocked(gates, x, z);
 }
 
 /** What the slice built once the places stand. */

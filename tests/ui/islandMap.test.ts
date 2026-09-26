@@ -37,12 +37,13 @@ describe('M8.10 slice 17: the island\'s map', () => {
     expect(shape.blocks).toHaveLength(island.fill.lots.length);
     const lot = island.fill.lots[0];
     if (lot) expect(inPolygon(lot.x + 0.1, lot.z + 0.1, rectCorners(shape.blocks[0] as (typeof shape.blocks)[number]))).toBe(true);
-    // every road the ground graded: the streets and the others, the highway's loop whole, its decks as cover
+    // every road the ground graded: the streets and the others, the highway's loop whole; the covers' boxes
     expect(shape.streets.length + shape.roads.length).toBe(island.ground.roads.filter((r) => r.cls !== 'highway').length);
     expect(shape.streets.length).toBeGreaterThan(30);
     expect(shape.highway.closed).toBe(true);
     expect(shape.highway.pts.length).toBeGreaterThan(500);
-    expect(shape.decks.length).toBeGreaterThan(10);
+    expect(shape.covers.length).toBe(island.covers.reduce((n, c) => n + c.boxes.length, 0));
+    expect(shape.covers.length).toBeGreaterThan(10);
     // the landmarks at their places
     expect(shape.landmarks.map((l) => l.kind)).toEqual(['tower', 'tank', 'glasshouse', 'hotel']);
     expect(shape.landmarks[3]).toMatchObject({ x: PLACES.hotel.x, z: PLACES.hotel.z });

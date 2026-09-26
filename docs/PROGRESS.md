@@ -2,6 +2,34 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-26 — M8.10 after the second merge: what it found
+
+Fixed: the Quay's sweep ran through the Coral Hotel's podium and its wing (seven bays inside it; the jams the jobs'
+agent saw): it now passes north of the hotel and bends past its end, as the sketch draws it. The sea trial was shown
+to every car (no hovercraft flag) and its ring hung over the quay's edge (5.5 m in now). The island's road trials laid
+their coins at sea level: the serpentine's and the highway's run over their lanes, the canal's over its floor. The
+island's static coins: an arc over each of the 20 jumps, a line into each of the 42 verge and street billboards. The
+kerbside bays keep off the kickers' run-ups and landings (a rival waited in one), a breaker off a camera's pole; the
+full map draws the plan's 13 covers. The grid's zone edge stood 14 m in the air (its lift scaled with its radius).
+
+## 2026-09-26 — M8.10 slice 14: garages, jobs, rivals, the first minute
+
+Done: the three garages (the hideout, the scrapyard, the hotel's) flush with their pavements; the plan's 28 rings at
+kerb corners seen from two streets, their routes, clocks and pay from the lanes at the ground's height; the trials down
+the serpentine, over the viaduct and the bay bridge, round the garden, through the canal; the 11 rivals in their bays,
+the Chief in the HQ's yard. The cold open runs the first minute: from the summit down Crown Avenue through its
+billboard, round the roundabout, the delivery on the avenue's lower half, into the hotel's garage (1266 m). Pins 14.0–
+14.3, 14b.1–14b.9, 14c.1; the bot's pace (100 s), the scripted runs and the balance (delivery #1's limit) at the gate.
+
+## 2026-09-26 — M8.10 slices 15a and 15c: the police's places, the finds
+
+Done (two agents, merged): six roadblock sites that cannot be driven round, 56 parked patrols' kerbs, ten cameras on
+the plan's roads, 13 covers the helicopter cannot see into, the donut shop by the roundabout; each at its road's
+height (a deck, the tunnel's floor). The finds: 60 cache spots, 30 a day; the hidden cars and the fleet's finds at the
+plan's spots (the trolley on the car park's roof, the hovercraft at the marina's slipway), two slipways, the sea trial
+on the eleven buoys, the mayhem zones' markets. Pins 15a.1–15a.5, 15.1–15.2. For the gate: police.long's two pins fail
+as at 156d1c8; a taller body swapped in drops from the old car's height (grid too).
+
 ## 2026-09-26 — M8.10 slice 15b: jumps, billboards, breakers on the island
 
 Done: 20 jumps (`island/jumps.ts`): the places' own and 12 kickers; Crown Avenue's three and the hill's street's in the

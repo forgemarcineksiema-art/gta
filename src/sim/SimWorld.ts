@@ -14,6 +14,7 @@ import { GROUP_DEFAULT, interactionGroups } from './collision';
 const SOLID_ONLY = interactionGroups(0xffff, GROUP_DEFAULT);
 import { City, type PropRing } from './city/City';
 import { Island, PLUMB_TILT } from './island/Island';
+import { islandCoinLines } from './island/coinLines';
 import { islandStreets } from './island/streetMap';
 import { islandCover } from './island/cover';
 import { Services } from './island/services';
@@ -34,7 +35,7 @@ import { Life } from './life/Life';
 import { Heat } from './heat/Heat';
 import { Police } from './police/Police';
 import { Pursuit } from './police/Pursuit';
-import { ColdOpen, coldOpenRoute, coldOpenSpots } from './run/ColdOpen';
+import { ColdOpen, coldOpenRouteOf, coldOpenSpots } from './run/ColdOpen';
 import { Run } from './run/Run';
 import { Way } from './run/way';
 import { Skill } from './run/Skill';
@@ -311,6 +312,10 @@ export class SimWorld {
     // the coins on the grid's streets or the island's (M8.10 slice 15), each over its road
     const map = this.traffic?.streets;
     this.coins = this.traffic && map ? new Coins(this.city, this.traffic.lanes, (x, z) => map.groundAt(x, z)) : null;
+    // the island's arcs over its jumps and lines through its billboards, laid a chunk's at a time
+    if (this.island && this.coins && map) {
+      for (const [index, points] of islandCoinLines(this.island, map.graph, (x, z) => Island.chunkIndex(...Island.chunkOf(x, z)))) this.coins.layChunk(index, points);
+    }
     this.life = new Life(this, opts.damage ?? this.city !== null);
     this.heat = new Heat(this.events, this.traffic);
     this.heat.set(opts.heat ?? 0);
@@ -373,8 +378,7 @@ export class SimWorld {
       for (const s of SLIPWAYS) rings.push({ ...slipwayTop(s), r: SLIPWAY.clear });
       const city = this.city;
       city.setPropKeepOut(rings, () => {
-        const loop = city.spawns.find((s) => s.name === 'loop'), hideout = this.run.dropOffs[0];
-        const route = loop && hideout ? coldOpenRoute(this, loop.position.x, loop.position.z, hideout) : null;
+        const route = coldOpenRouteOf(this);
         return route ? { samples: route.samples, spots: coldOpenSpots(route) } : { samples: [], spots: [] };
       }, this.jobs.defs.filter((d) => d.kind === 'mayhem').map((d) => ({ x: d.x, z: d.z })));
     }
@@ -392,8 +396,7 @@ export class SimWorld {
       for (const b of this.breakers?.descs ?? []) rings.push({ x: b.x, z: b.z, r: Math.hypot(BREAKER.halfWidth, BREAKER.halfDepth) + BREAKER.clear });
       for (const s of this.island.slipways) rings.push({ ...slipwayHead(s), r: SLIPWAY.clear });
       this.island.setPropKeepOut(rings, () => {
-        const loop = this.spawns.find((s) => s.name === 'loop'), hideout = this.run.dropOffs[0];
-        const route = loop && hideout ? coldOpenRoute(this, loop.position.x, loop.position.z, hideout) : null;
+        const route = coldOpenRouteOf(this);
         return route ? { samples: route.samples, spots: coldOpenSpots(route) } : { samples: [], spots: [] };
       }, this.jobs.defs.filter((d) => d.kind === 'mayhem').map((d) => ({ x: d.x, z: d.z })));
     }
@@ -657,9 +660,14 @@ export class SimWorld {
   /** Teleport the player to a named spawn (dev panel / tests). */
   spawnAt(name: string): void {
     const s = this.spawns.find((sp) => sp.name === name);
-    if (!s) return;
-    this.vehicle.teleport(s.position, s.yaw);
+    if (s) this.spawnAtPoint(s);
+  }
+
+  /** Teleport the player to a point, facing its way, the ground under it loaded first (the island's cold open's start). */
+  spawnAtPoint(s: SpawnPoint): void {
     this.city?.sync(s.position.x, s.position.z, true);
+    this.island?.sync(s.position.x, s.position.z, true);
+    this.vehicle.teleport(s.position, s.yaw);
     this.lapTimer.reset();
     this.respawned = true;
   }

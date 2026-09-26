@@ -200,7 +200,7 @@ const PALM_SKETCH: readonly P2[] = [[0, -10], [18, 150], [10, 350], [-20, 550], 
 export const HARBOUR_ROAD: readonly P2[] = Ws(HARBOUR_SKETCH);
 export const PALM_AVENUE: readonly P2[] = Ws(PALM_SKETCH);
 /** The Quay's sweep round the bay's north and west shores, then under the highway to the beach road's east end. */
-export const QUAY_SWEEP: readonly P2[] = Ws([[720, 392], [640, 322], [520, 312], [410, 345], [335, 430], [310, 560], [318, 640], [300, 700], [260, 750]]);
+export const QUAY_SWEEP: readonly P2[] = Ws([[720, 392], [710, 338], [684, 308], [620, 304], [520, 312], [410, 345], [335, 430], [310, 560], [318, 640], [300, 700], [260, 750]]);
 export const ROADS: readonly PlanRoad[] = [
   road('crown-avenue-up', 'avenue', 'ground', false, [[-32, -74], [-406, -352]]),
   road('crown-avenue-down', 'avenue', 'ground', false, [[33, -27], [520, 312]]),

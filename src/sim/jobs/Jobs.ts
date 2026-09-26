@@ -42,7 +42,7 @@ import type { SimWorld } from '../SimWorld';
 import { COIN_HEIGHT, polyLine, routeLine, type CoinPoint } from '../city/coins';
 import { SEA, SEA_TRIAL } from '../city/sea';
 import { alongLane, laneChain } from '../city/route';
-import { projectOnLane, type Lane } from '../city/roads';
+import { projectOnLane, type Lane, type RoadGraph } from '../city/roads';
 import { AgentState, type PlayerProbe } from '../traffic/Traffic';
 import type { BodyId } from '../traffic/bodies';
 import { trialMedal, unpackDescriptor, type JobDef } from './catalog';
@@ -60,6 +60,32 @@ const ESCORT_REACH = 60;
 export function kindsRevealedBy(step: number): JobDef['kind'][] {
   const order: JobDef['kind'][] = ['race', 'trial', 'rage', 'mayhem', 'escape', 'order'];
   return order.filter((k) => (BALANCE.reveal as Partial<Record<string, number>>)[k] === step);
+}
+
+/** An island trial's point on its lane: within this far of it, the height gap counted (a road's half, and some), m. */
+const TRAIL_REACH = 9;
+
+/** The lanes from `from` on to `to` by the fewest links (both included), searched `depth` links deep; null past it. */
+function laneHops(graph: RoadGraph, from: number, to: number, depth = 16): number[] | null {
+  const prev = new Map<number, number>([[from, -1]]);
+  let ring = [from];
+  for (let d = 0; d < depth && ring.length > 0; d++) {
+    const next: number[] = [];
+    for (const u of ring) {
+      for (const v of (graph.lanes[u] as Lane).next) {
+        if (prev.has(v)) continue;
+        prev.set(v, u);
+        if (v === to) {
+          const out: number[] = [];
+          for (let w = to; w >= 0; w = prev.get(w) as number) out.push(w);
+          return out.reverse();
+        }
+        next.push(v);
+      }
+    }
+    ring = next;
+  }
+  return null;
 }
 
 export class Jobs {
@@ -432,8 +458,11 @@ export class Jobs {
       this.inZone = true;
       return;
     }
-    // the coins along the way (DESIGN.md §13.5); the cold open lays its own line; a sea trial's run buoy to buoy
-    if (d.route) this.laySea(d.route, d.targetX, d.targetZ);
+    // the coins along the way (DESIGN.md §13.5); the cold open lays its own line; a sea trial's run buoy to buoy; an
+    // island trial's over the lanes through its points, the dry canal's (no lane in it) point to point over its floor
+    const island = this.sim.island;
+    if (d.route && !d.hover && island && this.layTrail(d)) return;
+    if (d.route) this.layPoints(d.route, d.targetX, d.targetZ, d.hover || !island ? SEA.level + COIN_HEIGHT : (x, z) => island.ground.surfaceHeight(x, z) + COIN_HEIGHT);
     else if (d.id !== this.sim.coldOpen.job) this.layRoute(d.x, d.z, d.targetX, d.targetZ);
   }
 
@@ -592,15 +621,62 @@ export class Jobs {
     this.routePoints.length = 0;
   }
 
-  /** A sea trial's coins (M8.8 slice 20): buoy to buoy over the water, the cap on the finish. */
-  private laySea(route: ReadonlyArray<{ x: number; z: number }>, targetX: number, targetZ: number): void {
+  /**
+   * A trial's coins point to point (M8.8 slice 20): a sea trial's buoy to buoy over the water, the dry canal's over its
+   * floor (M8.10 slice 15); `y` their centres' height, or its reader; the cap on the finish.
+   */
+  private layPoints(route: ReadonlyArray<{ x: number; z: number }>, targetX: number, targetZ: number, y: number | ((x: number, z: number) => number)): void {
     const coins = this.sim.coins;
     if (!coins) return;
     coins.clearExtra('route');
     this.routePoints.length = 0;
-    polyLine([...route, { x: targetX, z: targetZ }], SEA.level + COIN_HEIGHT, this.routePoints);
+    polyLine([...route, { x: targetX, z: targetZ }], y, this.routePoints);
     coins.addExtra(this.routePoints, 'route');
     this.routePoints.length = 0;
+  }
+
+  /**
+   * An island trial's coins over its road (M8.10 slice 15): the lanes through its points in order, each point's lane the
+   * one running on to the next at the road's height there (the serpentine's way down, the highway's decks), laid as a
+   * job's route; false, nothing laid, off a road (a point without its road's height: the dry canal's) or when a point
+   * has no lane within `TRAIL_REACH` m.
+   */
+  private layTrail(d: JobDef): boolean {
+    const coins = this.sim.coins, island = this.sim.island, graph = this.sim.traffic?.streets.graph, route = d.route;
+    if (!coins || !island || !graph || !route || route.length === 0 || route.some((p) => p.y === undefined)) return false;
+    const pts: Array<{ x: number; y?: number; z: number }> = [...route, { x: d.targetX, z: d.targetZ }];
+    // the ring's lane: the nearest running toward the first point, at the ground's height (the ring stands at a corner)
+    const first = pts[0] as { x: number; z: number };
+    const start = island.laneAlong(d.x, d.z, island.ground.surfaceHeight(d.x, d.z), first.x - d.x, first.z - d.z);
+    if (start < 0) return false;
+    const chain = [start];
+    let y = island.ground.surfaceHeight(d.x, d.z);
+    for (let k = 0; k < pts.length; k++) {
+      const p = pts[k] as { x: number; y?: number; z: number }, a = k > 0 ? pts[k - 1] as { x: number; z: number } : d, b = pts[k + 1] ?? p;
+      // its way on: the chord from the point before to the one after (a bend's tangent), the finish's from the one before
+      y = p.y ?? y;
+      // a point in a junction (no lane through it) is passed on the way to the next; the finish (often at the road's end,
+      // in its junction) on the nearest lane its way
+      const end = k === pts.length - 1, lane = island.laneAlong(p.x, p.z, y, b.x - a.x, b.z - a.z, end ? Infinity : TRAIL_REACH);
+      if (lane < 0) {
+        if (end) return false;
+        continue;
+      }
+      const last = chain[chain.length - 1] as number;
+      if (lane !== last) {
+        const leg = laneHops(graph, last, lane);
+        if (!leg) return false;
+        for (let i = 1; i < leg.length; i++) chain.push(leg[i] as number);
+      }
+    }
+    coins.clearExtra('route');
+    const s0 = alongLane(graph.lanes[start] as Lane, d.x, d.z).s;
+    const sEnd = alongLane(graph.lanes[chain[chain.length - 1] as number] as Lane, d.targetX, d.targetZ).s;
+    this.routePoints.length = 0;
+    routeLine(graph, chain, s0, sEnd, { x: d.targetX, z: d.targetZ }, this.routePoints);
+    coins.addExtra(this.routePoints, 'route');
+    this.routePoints.length = 0;
+    return true;
   }
 
   /** The wanted car: kept while it is the class and paint and still a driving civilian, else found again. */

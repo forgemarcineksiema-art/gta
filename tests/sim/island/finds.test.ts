@@ -4,10 +4,11 @@
  * zones' markets, and the street furniture kept off what the world places.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { BALANCE, HIDDEN_CARS, bodySpec, clearControls, type SimWorld } from '../../../src/sim';
+import { BALANCE, CHAIN_ALL, HIDDEN_CARS, bodySpec, clearControls, type SimWorld } from '../../../src/sim';
 import { COIN_HEIGHT, ISLAND_COIN_CHUNKS, gateLine } from '../../../src/sim/city/coins';
 import { BILLBOARD_WIDTH } from '../../../src/sim/city/collectibles';
 import { propFootprint } from '../../../src/sim/city/props';
+import { projectOnLane } from '../../../src/sim/city/roads';
 import { SEA, SLIPWAY } from '../../../src/sim/city/sea';
 import { inLot } from '../../../src/sim/island/fill';
 import { CHUNKS_X, CHUNKS_Z, Island } from '../../../src/sim/island/Island';
@@ -48,7 +49,7 @@ describe('M8.10 slice 15: the finds', () => {
     expect(gap).toBeGreaterThan(120);
     expect(Object.keys(sim.stash.spots).sort()).toEqual([...HIDDEN_CARS].sort());
     expect(island.slipways.map((s) => s.kind)).toEqual(['quay', 'beach']);
-    const trial = sim.jobs.defs.filter((d) => d.route);
+    const trial = sim.jobs.defs.filter((d) => d.hover);
     expect(trial.length).toBe(1);
     expect(trial[0]?.route?.map((b) => [b.x, b.z])).toEqual(BUOYS.map((b) => [b[0], b[1]]));
     // a buoy drawn on the sea's surface at each
@@ -105,7 +106,7 @@ describe('M8.10 slice 15: the finds', () => {
       if (s.kind === 'quay') expect(rampAt(s, s.line)).toBeCloseTo(first.y, 6);
     }
     // the trial's ring ashore at the marina's top, its buoys and its finish on the water
-    const trial = sim.jobs.defs.find((d) => d.route)!;
+    const trial = sim.jobs.defs.find((d) => d.hover)!;
     expect(island.ground.onLand(trial.x, trial.z)).toBe(true);
     expect(Math.hypot(trial.x - ring.x, trial.z - ring.z)).toBeLessThan(1e-6);
     for (const b of [...trial.route!, { x: trial.targetX, z: trial.targetZ }]) expect(island.ground.onLand(b.x, b.z), `${b.x}, ${b.z}`).toBe(false);
@@ -181,6 +182,35 @@ describe('M8.10 slice 15: the finds', () => {
     expect(coins.step({ ...probe, y: coin.y - 0.5 }, 0, sim.events)).toBe(coin.value);
     expect(coins.picked[coin.id]).toBe(1);
     coins.chunks.delete(index);
+  });
+
+  it('15.2 an island trial\'s coins over its road: the serpentine\'s down its hairpins and the highway\'s over its decks on their lanes, the canal\'s over its floor', () => {
+    const coins = sim.coins!, graph = sim.traffic!.streets.graph, hit: { x: number; z: number; yaw: number; y?: number } = { x: 0, z: 0, yaw: 0 };
+    sim.run.chain = CHAIN_ALL;
+    for (const id of [17, 18, 20]) {
+      const d = sim.jobs.defs.find((q) => q.id === id)!;
+      island.sync(d.x, d.z, true);
+      sim.vehicle.teleport({ x: d.x, y: island.standAt(d.x, d.z) + 0.9, z: d.z }, d.yaw);
+      sim.vehicle.setVelocity(0, 0, 0);
+      for (let i = 0; i < 60 && sim.jobs.active !== id; i++) { clearControls(sim.controls); sim.controls.brake = 1; sim.step(); }
+      expect(sim.jobs.active, `#${id}`).toBe(id);
+      const route = coins.extra.filter((c) => c.lane === -5), runs = route.slice(0, -1);
+      expect(runs.length, `#${id}`).toBeGreaterThan(30);
+      let over = 0;
+      for (const c of runs) {
+        const at = `#${id}'s coin at ${c.x.toFixed(0)}, ${c.z.toFixed(0)}`;
+        over = Math.max(over, c.y - COIN_HEIGHT - ground(c.x, c.z));
+        if (id === 20) { expect(Math.abs(c.y - COIN_HEIGHT - ground(c.x, c.z)), at).toBeLessThan(0.15); continue; }
+        // on a lane, at its height
+        projectOnLane(graph.lanes[island.nearestLane(c.x, c.z, c.y - COIN_HEIGHT)]!, c.x, c.z, hit, c.y - COIN_HEIGHT);
+        expect(Math.hypot(hit.x - c.x, hit.z - c.z), at).toBeLessThan(0.5);
+        expect(Math.abs((hit.y ?? 0) + COIN_HEIGHT - c.y), at).toBeLessThan(0.15);
+      }
+      // the serpentine's down the hill; the highway's up on the viaduct and the bridge
+      if (id === 17) expect(Math.max(...runs.map((c) => c.y)) - Math.min(...runs.map((c) => c.y))).toBeGreaterThan(20);
+      if (id === 18) expect(over).toBeGreaterThan(8);
+      sim.jobs.abandon();
+    }
   });
 
   it('15.2 the street furniture keeps off the hidden cars and the slipways\' heads; the mayhem zones\' markets stand at the kerb round their rings', () => {

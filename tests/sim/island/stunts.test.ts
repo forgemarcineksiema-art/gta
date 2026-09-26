@@ -1,7 +1,8 @@
 /** M8.10 slice 15: the jumps, the billboards and the breakers on the island (docs/M8.10_PLAN.md §1.4). */
 import RAPIER from '@dimforge/rapier3d-compat';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { BREAKER, BreakerState, PROP_TYPES, clearControls, type SimWorld } from '../../../src/sim';
+import { BALANCE, BREAKER, BreakerState, PROP_TYPES, clearControls, type SimWorld } from '../../../src/sim';
+import { COIN_HEIGHT } from '../../../src/sim/city/coins';
 import type { JumpDesc } from '../../../src/sim/city/jumps';
 import { QUERY_NOT_PROP } from '../../../src/sim/collision';
 import { inLot } from '../../../src/sim/island/fill';
@@ -140,7 +141,7 @@ describe('M8.10 slice 15: jumps, billboards, breakers', () => {
     console.log(`15.3 airtimes at the design speeds: ${times.join(', ')}`);
   }, 120_000);
 
-  it('15.4 the lots, the props and the places\' walls keep off the jumps\' ways, the breakers and the billboards\' run-outs (a loose prop may stand in a run-out)', () => {
+  it('15.4 the lots, the props, the places\' walls, the kerbside bays and the cameras keep off the jumps\' ways, the breakers and the billboards\' run-outs (a loose prop may stand in a run-out)', () => {
     const sites = island.stuntSites;
     for (const l of island.fill.lots) for (const k of sites.keep) {
       // a lot's corners and middle outside every kept rectangle
@@ -172,6 +173,11 @@ describe('M8.10 slice 15: jumps, billboards, breakers', () => {
         expect(inKeep(k, st.position.x, st.position.z, r), `a wall at ${st.position.x.toFixed(0)}, ${st.position.z.toFixed(0)}`).toBe(false);
       }
     }
+    // the kerbside bays (and the cars waiting in them, the rivals' among them) off the kickers' ways; no camera's pole
+    // where a jump runs, a breaker falls or a billboard's run-out goes
+    const ways = sites.keep.slice(0, sites.kickers.length);
+    for (const b of island.surfaces.parking) expect(ways.some((k) => inKeep(k, b.x, b.z, 1)), `a bay at ${b.x.toFixed(0)}, ${b.z.toFixed(0)}`).toBe(false);
+    for (const c of island.policeSites.cameras) expect(sites.keep.some((k) => inKeep(k, c.poleX, c.poleZ, 0.6)), `a camera's pole at ${c.poleX.toFixed(0)}, ${c.poleZ.toFixed(0)}`).toBe(false);
   }, 60_000);
 
   it('15.5 a car smashes a street billboard at its height and a breaker falls across its road at its height', () => {
@@ -216,4 +222,30 @@ describe('M8.10 slice 15: jumps, billboards, breakers', () => {
     expect((top ?? 0) - road).toBeGreaterThan(1);
     expect((top ?? 0) - road).toBeLessThan(2);
   }, 60_000);
+
+  it('15.6 the coins over the jumps and into the billboards: an arc past each lip, a line into each verge\'s and street\'s panel ending on it; each over the ground, in its chunk', () => {
+    const coins = sim.coins, c = BALANCE.coin;
+    expect(coins).not.toBeNull();
+    if (!coins) return;
+    const all = [...coins.chunks.values()].flat(), ground = (x: number, z: number): number => island.ground.surfaceHeight(x, z);
+    for (const [index, list] of coins.chunks) {
+      for (const q of list) {
+        expect(q.y - COIN_HEIGHT - ground(q.x, q.z), `a coin at ${q.x.toFixed(0)}, ${q.z.toFixed(0)}`).toBeGreaterThanOrEqual(-0.01);
+        expect(Island.chunkIndex(...Island.chunkOf(q.x, q.z))).toBe(index);
+      }
+    }
+    // an arc on each jump's line past its lip, its coins in the air a car flies through
+    for (const jd of island.jumps) {
+      const fx = Math.sin(jd.yaw), fz = Math.cos(jd.yaw);
+      const arc = all.filter((q) => { const along = (q.x - jd.x) * fx + (q.z - jd.z) * fz; return along > 0 && along < 90 && Math.abs((q.x - jd.x) * fz - (q.z - jd.z) * fx) < 0.01; });
+      expect(arc.length, `jump ${jd.id}`).toBeGreaterThanOrEqual(c.arcCoins + 1);
+      expect(Math.max(...arc.map((q) => q.y - ground(q.x, q.z))), `jump ${jd.id}`).toBeGreaterThan(COIN_HEIGHT + 2);
+    }
+    // a cap on every verge's and street's panel, its run before it along the way through it
+    island.billboards.forEach((b, id) => {
+      if (island.stuntSites.billboards[id]?.kind === 'landing') return;
+      expect(all.some((q) => q.value === c.cap && Math.hypot(q.x - b.x, q.z - b.z) < 0.01), `the billboard ${id}`).toBe(true);
+      expect(all.filter((q) => q.value === c.value && Math.hypot(q.x - b.x, q.z - b.z) < 45).length, `the billboard ${id}`).toBeGreaterThanOrEqual(c.gateCoins);
+    });
+  });
 });

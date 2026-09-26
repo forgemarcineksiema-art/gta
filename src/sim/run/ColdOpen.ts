@@ -15,6 +15,10 @@
  * ends it at once. Busted and the arrest are off while it runs. Once ended it
  * never starts again in this world (`seen`), and the save counts it shown from
  * its start, so it plays once per profile.
+ * On the island (M8.10 slice 14) the same script runs the first minute: from the
+ * summit by the tower down Crown Avenue through its billboard, round the centre's
+ * roundabout, to a delivery on the avenue's lower half and into the Coral Hotel's
+ * garage.
  * Never writes controls, never blocks input.
  */
 import { BALANCE } from '../balance';
@@ -27,9 +31,11 @@ import { GARAGE } from '../city/cover';
 import { alongLane, crawlInto, garageEntry, junctionCurve, laneAt, laneLength, laneSpan, resample, type Pt } from '../city/route';
 import type { Lane, RoadGraph } from '../city/roads';
 import type { SimEvent } from '../events';
+import { FIRST_MINUTE_STEPS } from '../island/plan';
 import type { SimWorld } from '../SimWorld';
 import type { TrackSample } from '../track';
 import { AgentState } from '../traffic/Traffic';
+import { firstMinuteRoute } from './firstMinute';
 
 export type ColdOpenVerb = 'steer' | 'swap' | 'boost' | 'smash' | 'takedown' | 'deliver' | 'escape';
 export const COLD_OPEN_VERBS: readonly ColdOpenVerb[] = ['steer', 'swap', 'boost', 'smash', 'takedown', 'deliver', 'escape'];
@@ -51,6 +57,10 @@ export interface ColdOpenRoute {
   gate: BillboardDesc | null;
   /** The route distance where the garage entry leaves the lane. */
   entryS: number;
+  /** The garage it ends in: the grid's hideout, the island's hotel. */
+  door: DropOff;
+  /** The café's things on the footway past the gate (the grid's; the island's gate stands in a kerbside strip). */
+  footway: boolean;
 }
 
 export class ColdOpen {
@@ -95,13 +105,14 @@ export class ColdOpen {
   /** At boot when the session has not seen it: the van, heat 1, the candidate, the route's coins and marker. */
   start(): void {
     const sim = this.sim;
-    const city = sim.city, traffic = sim.traffic, coins = sim.coins;
-    if (this.seen || this.active || !city || !traffic || !coins) return;
-    const spawn = city.spawns.find((s) => s.name === 'loop');
-    const hideout = sim.run.dropOffs[0];
-    if (!spawn || !hideout) return;
-    const route = coldOpenRoute(sim, spawn.position.x, spawn.position.z, hideout);
+    const traffic = sim.traffic, coins = sim.coins;
+    if (this.seen || this.active || !traffic || !coins) return;
+    const route = coldOpenRouteOf(sim);
     if (!route) return;
+    const hideout = route.door, first = route.samples[0] as TrackSample;
+    // the grid's loop spawn; the island's route's start, on its ground
+    const spawn = sim.city?.spawns.find((s) => s.name === 'loop')
+      ?? { name: 'first minute', position: { x: first.x, y: (sim.island?.ground.height(first.x, first.z) ?? 0) + 1, z: first.z }, yaw: first.yaw };
     const c = BALANCE.coldOpen;
     this.route = route;
     this.active = true;
@@ -115,7 +126,7 @@ export class ColdOpen {
     this.progressS = 0;
 
     // a beat-up van already rolling, with the heat on
-    sim.spawnAt('loop');
+    sim.spawnAtPoint(spawn);
     sim.setCar('heavy');
     sim.life.setDamage(c.damage);
     sim.vehicle.setVelocity(Math.sin(spawn.yaw) * c.startSpeed, 0, Math.cos(spawn.yaw) * c.startSpeed);
@@ -128,8 +139,9 @@ export class ColdOpen {
     if (sim.heat.points < c.heat) sim.heat.add(c.heat - sim.heat.points);
 
     // the candidate: a muscle car ahead beside the lane, held until it is alongside and taken
-    const lane = city.nearestLane(spawn.position.x, spawn.position.z);
-    const s0 = alongLane(city.graph.lanes[lane] as Lane, spawn.position.x, spawn.position.z).s;
+    const streets = traffic.streets, x = spawn.position.x, z = spawn.position.z;
+    const lane = streets.nearestLane(x, z, sim.island ? streets.groundAt(x, z) : undefined);
+    const s0 = alongLane(streets.graph.lanes[lane] as Lane, x, z).s;
     this.candidate = traffic.spawnAt(lane, s0 + c.candidateAhead, 'muscle', AgentState.Kinematic, c.candidateOffset);
     if (this.candidate >= 0) traffic.speed[this.candidate] = c.startSpeed;
     this.candidateLeft = c.candidateHold;
@@ -366,11 +378,57 @@ export function coldOpenRoute(sim: SimWorld, x: number, z: number, hideout: Drop
   for (let i = 0; i < entryAt; i++) entryS += Math.hypot((raw[i + 1] as Pt).x - (raw[i] as Pt).x, (raw[i + 1] as Pt).z - (raw[i] as Pt).z);
   // a driver (the bot) brakes to a crawl through the door on the last pass, not the first
   crawlInto(samples, hideout, entryS);
-  let m = Math.min(samples.length - 1, Math.round(BALANCE.coldOpen.markerAt / 3));
+  const marker = markerFrom(graph, samples, Math.round(BALANCE.coldOpen.markerAt / 3));
+  return { samples, markerX: marker.x, markerZ: marker.z, markerYaw: marker.yaw, markerS: marker.s, gateS, gate, entryS, door: hideout, footway: true };
+}
+
+/** The marker: the sample at `m` or the first after it clear of every junction box. */
+function markerFrom(graph: RoadGraph, samples: readonly TrackSample[], m: number): TrackSample {
+  let i = Math.min(samples.length - 1, m);
   const nearNode = (q: TrackSample): boolean => graph.nodes.some((n) => (n.x - q.x) ** 2 + (n.z - q.z) ** 2 < JUNCTION_CLEAR * JUNCTION_CLEAR);
-  while (m < samples.length - 1 && nearNode(samples[m] as TrackSample)) m++;
-  const marker = samples[m] as TrackSample;
-  return { samples, markerX: marker.x, markerZ: marker.z, markerYaw: marker.yaw, markerS: marker.s, gateS, gate, entryS };
+  while (i < samples.length - 1 && nearNode(samples[i] as TrackSample)) i++;
+  return samples[i] as TrackSample;
+}
+
+/**
+ * The island's (M8.10 slice 14): the first minute's route into the hotel's garage, swerved through the middle of the
+ * billboard at its step (the grid's gate's plateau and ramps), the marker at the delivery's step out of the junction
+ * boxes; null without the garage or the route.
+ */
+function islandColdOpenRoute(sim: SimWorld): ColdOpenRoute | null {
+  const island = sim.island, graph = sim.traffic?.streets.graph, garage = sim.run.dropOffs.find((d) => d.name === 'hotel');
+  if (!island || !graph || !garage) return null;
+  const route = firstMinuteRoute(graph, garage);
+  if (!route) return null;
+  const at = FIRST_MINUTE_STEPS.find((s) => s.step === 'billboard')?.at;
+  const gate = at ? island.billboards.find((b) => Math.hypot(b.x - at[0], b.z - at[1]) < 20) ?? null : null;
+  let samples = route.samples, gateS = -1;
+  if (gate) {
+    // its middle's offset square to the route where the route passes it
+    let q = samples[0] as TrackSample, best = Infinity;
+    for (const s of samples) { const d = (s.x - gate.x) ** 2 + (s.z - gate.z) ** 2; if (d < best) { best = d; q = s; } }
+    const lateral = (gate.x - q.x) * Math.cos(q.yaw) - (gate.z - q.z) * Math.sin(q.yaw), c = BALANCE.coldOpen;
+    const raw: Pt[] = samples.map((s) => {
+      const d = Math.abs(s.s - q.s) - c.gatePlateau / 2, t = d <= 0 ? 1 : d >= c.gateRamp ? 0 : 1 - d / c.gateRamp, w = t * t * (3 - 2 * t);
+      return { x: s.x + Math.cos(s.yaw) * lateral * w, z: s.z - Math.sin(s.yaw) * lateral * w };
+    });
+    samples = resample(raw);
+    best = Infinity;
+    for (const s of samples) { const d = (s.x - gate.x) ** 2 + (s.z - gate.z) ** 2; if (d < best) { best = d; gateS = s.s; } }
+  }
+  crawlInto(samples, garage, route.entryS);
+  const marker = markerFrom(graph, samples, Math.round(route.steps.delivery / 3));
+  return { samples, markerX: marker.x, markerZ: marker.z, markerYaw: marker.yaw, markerS: marker.s, gateS, gate, entryS: route.entryS, door: garage, footway: false };
+}
+
+/**
+ * The map's cold open route: the grid's round the hideout's block from its loop spawn, the island's first minute into
+ * the hotel's garage (M8.10 slice 14); null on another map.
+ */
+export function coldOpenRouteOf(sim: SimWorld): ColdOpenRoute | null {
+  if (sim.island) return islandColdOpenRoute(sim);
+  const loop = sim.city?.spawns.find((s) => s.name === 'loop'), hideout = sim.run.dropOffs[0];
+  return loop && hideout ? coldOpenRoute(sim, loop.position.x, loop.position.z, hideout) : null;
 }
 
 /**
@@ -386,7 +444,7 @@ const FOOTWAY_RUN = { tables: [3.2, 7], chair: 1.05, newsbox: 9.8, bin: 12.2, ki
 export function coldOpenSpots(route: ColdOpenRoute): PropSpot[] {
   const out: PropSpot[] = [];
   const samples = route.samples;
-  if (!route.gate || route.gateS < 0 || samples.length < 2) return out;
+  if (!route.footway || !route.gate || route.gateS < 0 || samples.length < 2) return out;
   const at = (past: number, kind: PropKind, across = 0, facing = across === 0): void => {
     const s = route.gateS + past;
     let i = 0;
@@ -437,20 +495,21 @@ function gateOn(sim: SimWorld, lane: Lane): BillboardDesc | null {
  */
 function routeCoins(sim: SimWorld, route: ColdOpenRoute, hideout: DropOff): Array<Pt & { value?: number }> {
   const city = sim.city;
-  if (!city) return [];
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
   for (const s of route.samples) {
     minX = Math.min(minX, s.x); maxX = Math.max(maxX, s.x); minZ = Math.min(minZ, s.z); maxZ = Math.max(maxZ, s.z);
   }
+  // the static coins by the route: the grid's arcs (its gates' lines lie in their chunks' lists, placeCoins), the
+  // island's arcs and gate lines (M8.10 slice 15)
   const existing: Pt[] = [];
-  for (const c of city.coinLayout) {
+  const statics = city ? city.coinLayout : [...(sim.coins?.chunks.values() ?? [])].flat();
+  for (const c of statics) {
     if (c.x < minX - 6 || c.x > maxX + 6 || c.z < minZ - 6 || c.z > maxZ + 6) continue;
     for (const s of route.samples) {
       if (Math.abs(s.x - c.x) < 6 && Math.abs(s.z - c.z) < 6) { existing.push(c); break; }
     }
   }
-  // the gate's own line lies in its chunk's list (placeCoins)
-  if (route.gate) existing.push(...(gateLine(city.graph, route.gate) ?? []));
+  if (city && route.gate) existing.push(...(gateLine(city.graph, route.gate) ?? []));
   const out: Array<Pt & { value?: number }> = [];
   const pitch = BALANCE.coldOpen.coinPitch;
   const r = BALANCE.coin.route;

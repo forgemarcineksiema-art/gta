@@ -23,7 +23,7 @@ export { Breakers, BREAKERS, BREAKER, BreakerState, type BreakerDesc } from './c
 export { DonutShop, DONUT_SHOP } from './police/Donuts';
 export { goalFor, newGoal, copyGoal, chainStep, CHAIN_STEPS, CHAIN_ALL, STEP, NEAREST, type Goal, type GoalKind, type GoalChooser } from './run/goal';
 export { Way, type Reach } from './run/way';
-export { ColdOpen, COLD_OPEN_VERBS, coldOpenRoute, type ColdOpenVerb, type ColdOpenRoute } from './run/ColdOpen';
+export { ColdOpen, COLD_OPEN_VERBS, coldOpenRoute, coldOpenRouteOf, type ColdOpenVerb, type ColdOpenRoute } from './run/ColdOpen';
 export { Jobs, kindsRevealedBy, type JobDef, type JobKind, type JobState } from './jobs/Jobs';
 export { ORDER_KINDS, CAR_WORDS, ROLE_WORDS, BEST_AT, ONLY_IT, cardLine, BODY_WORDS, MEDAL_WORDS, PLACE_WORDS, orderPaints, packDescriptor, unpackDescriptor, paintName, trialMedal, trialTimes } from './jobs/catalog';
 export { BODIES, BODY_IDS, BODY_INDEX, CIVILIAN_BODIES, RIVAL_BODIES, bodySpec, bodyTuning, isShell, isRivalBody, pickBody, type BodyId, type BodySpec, type CivilianBody, type RivalBody } from './traffic/bodies';

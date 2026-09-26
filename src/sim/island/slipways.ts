@@ -40,8 +40,9 @@ export interface IslandSlipway {
 export const RAMP = { grade: 1 / 6, inland: 2, foot: -1.2, dig: 4, digTo: -4, lift: 0.04, step: 3, back: 3, past: 10, thick: 0.3, kerb: 0.4, body: 8 } as const;
 /** The wall opens to a gate this far either side of a ramp's width, from the top out past the beach's wall (m). */
 const MOUTH = { side: 3, out: 12 } as const;
-/** The sea trial's ring: on the marina's axis this far back from the shore's line (the grid's 4 in from its wall), m. */
-export const RING_BACK = 4;
+/** The sea trial's ring: on the marina's axis this far back from the shore's line (the grid's 4 in from its wall; the
+ *  quay's edge falls away over a metre or two, so its 4 m ring stands whole on the top), m. */
+export const RING_BACK = 5.5;
 /** Its finish: off the beach's slipway, this far out past the shore's line (the grid's 24.5 off its east slipway), m. */
 export const FINISH_OUT = 25;
 
@@ -162,6 +163,6 @@ export function islandSeaTrial(slipways: readonly IslandSlipway[]): Omit<JobDef,
   const tr = BALANCE.jobs.trial;
   return {
     kind: 'trial', x: ring.x, z: ring.z, yaw: Math.atan2(from.nx, from.nz), targetX: finish.x, targetZ: finish.z, level: 0, descriptor: -1,
-    payout: tr.pay[2] as number, limitSeconds: Math.round(length / (tr.speeds[0] as number)), heat: 0, route: buoys,
+    payout: tr.pay[2] as number, limitSeconds: Math.round(length / (tr.speeds[0] as number)), heat: 0, route: buoys, hover: true,
   };
 }

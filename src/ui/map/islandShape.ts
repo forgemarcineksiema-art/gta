@@ -1,8 +1,8 @@
 /**
  * The island as the radar and the full map draw it (M8.10 slice 17, docs/M8.10_PLAN.md): its land (the coast, the
  * causeway, the islet) less the port's basin, the golf's pond, the parks (the botanic garden, the golf), the lots'
- * blocks, the districts' tints and where their names sit, its streets, its main roads, the highway's loop and the decks
- * it lifts over the crossings, the four landmarks, and how far the map reaches. Plain data from the sim's island, worked
+ * blocks, the districts' tints and where their names sit, its streets, its main roads, the highway's loop, the covers
+ * the helicopter cannot see into, the four landmarks, and how far the map reaches. Plain data from the sim's island, worked
  * out once (the canvases make their paths of it; the pins read it without a DOM).
  */
 import type { P2 } from '../../sim/island/geom';
@@ -10,7 +10,6 @@ import { HALF_WIDTH } from '../../sim/island/ground';
 import type { Island } from '../../sim/island/Island';
 import { BASIN, PLACES, causeway, coastline, districtOf, islet, onLand, type DistrictId } from '../../sim/island/plan';
 import { POND } from '../../sim/island/shapes/gardens';
-import { DECK } from '../../sim/island/structures';
 
 /** A turned rectangle: its middle, the way its length runs, its half width and half length. */
 export interface MapRect { x: number; z: number; yaw: number; hx: number; hz: number }
@@ -30,8 +29,8 @@ export interface IslandMapShape {
   streets: MapLine[];
   roads: MapLine[];
   highway: MapLine;
-  /** The decks the highway lifts over the crossings and the tunnel's roof: cover from the helicopter. */
-  decks: MapRect[];
+  /** The plan's covers' boxes (M8.10 slice 15a): where the helicopter cannot see a car. */
+  covers: MapRect[];
   landmarks: Array<{ kind: 'tower' | 'tank' | 'glasshouse' | 'hotel'; x: number; z: number }>;
   /** The map's half extent (m): every point of the land inside it, and a margin of sea. */
   half: number;
@@ -94,11 +93,7 @@ export function islandMapShape(island: Island): IslandMapShape {
   }
   const loop = (island.network.lines[0] as { pts: Array<{ x: number; z: number }> }).pts;
   const highway: MapLine = { pts: loop.map((p): P2 => [p.x, p.z]), width: HALF_WIDTH.highway * 2, closed: true };
-  const decks: MapRect[] = [];
-  for (const s of island.structures) {
-    if (s.kind !== 'overpass' && s.kind !== 'tunnel') continue;
-    for (const p of s.pieces) decks.push({ x: p.x, z: p.z, yaw: p.yaw, hx: DECK.half, hz: p.length / 2 });
-  }
+  const covers = island.covers.flatMap((c) => c.boxes.map((b): MapRect => ({ x: b.x, z: b.z, yaw: b.yaw, hx: b.hx, hz: b.hz })));
   const B = BASIN, pond = POND as { x: number; z: number; rx: number; rz: number };
   return {
     land,
@@ -110,7 +105,7 @@ export function islandMapShape(island: Island): IslandMapShape {
     streets,
     roads,
     highway,
-    decks,
+    covers,
     landmarks: [
       { kind: 'tower', x: PLACES.towerTop.x, z: PLACES.towerTop.z },
       { kind: 'tank', x: PLACES.waterworks.x, z: PLACES.waterworks.z },

@@ -35,9 +35,10 @@ export interface JobDef {
   /**
    * A trial's waypoints off the lanes' shortest way, in order: a sea trial's buoys (M8.8 slice 20); the island's trials
    * down the serpentine, along the highway and through the dry canal (M8.10 slice 14). Each counts when passed within
-   * `SEA_TRIAL.reach` m, the finish only after the last; its coins and the way's line run point to point.
+   * `SEA_TRIAL.reach` m, the finish only after the last; the way's line runs point to point, the coins over the lanes
+   * through them where the points carry their road's height `y`, else point to point (the sea's, the canal's).
    */
-  route?: ReadonlyArray<{ x: number; z: number }>;
+  route?: ReadonlyArray<{ x: number; y?: number; z: number }>;
   /** Its ring is shown only to a hovercraft (the sea trial). */
   hover?: boolean;
 }

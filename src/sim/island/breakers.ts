@@ -68,7 +68,7 @@ function nearest(road: GradedRoad, x: number, z: number): { d: number; s: number
  * of its kind, on the point's side of the road, mid-block (the highway's where it runs on the ground), clear of the
  * jumps' ways (`keep`).
  */
-export function breakerSites(ground: Ground, surfaces: RoadSurfaces, keep: readonly Keep[]): BreakerSite[] {
+export function breakerSites(ground: Ground, surfaces: RoadSurfaces, keep: readonly Keep[], poles: ReadonlyArray<{ x: number; z: number }> = []): BreakerSite[] {
   const loop = highwayLoop(6);
   const onDeck = (x: number, z: number): boolean => {
     let bi = 0, bd = Infinity;
@@ -99,7 +99,10 @@ export function breakerSites(ground: Ground, surfaces: RoadSurfaces, keep: reado
       if (!ground.onLand(x, z) || ground.nearOtherRoad(x, z, ground.roads.indexOf(road), CLEAR_OF_ROADS)) continue;
       if (road.cls !== 'highway' && loop.pts.some((q) => Math.hypot(q[0] - x, q[1] - z) < HALF_WIDTH.highway + CLEAR_OF_ROADS)) continue;
       if (keep.some((q) => inKeep(q, x, z, 4))) continue;
-      return { x, z, nx: -rx, nz: -rz, kind: b.kind, paved: rule.paved };
+      // nothing standing where it falls (a camera's pole)
+      const site: BreakerSite = { x, z, nx: -rx, nz: -rz, kind: b.kind, paved: rule.paved }, fall = breakerKeep(site);
+      if (poles.some((q) => inKeep(fall, q.x, q.z, 1))) continue;
+      return site;
     }
     throw new Error(`breakers: no spot for ${b.kind} by ${road.id}`);
   });

@@ -142,13 +142,6 @@ export function freeKickers(): Kicker[] {
   ];
 }
 
-/** Whether (x, z) is on a kicker's footprint, its run-out past the lip and `margin` m round it. */
-export function onKicker(k: Kicker, x: number, z: number, margin: number): boolean {
-  const fx = Math.sin(k.yaw), fz = Math.cos(k.yaw), dx = x - k.x, dz = z - k.z;
-  const along = dx * fx + dz * fz, across = dx * fz - dz * fx;
-  return along > -k.length - margin && along < k.length + margin && Math.abs(across) < k.half + margin;
-}
-
 /**
  * A kicker's statics along the ground under it: each piece of the grid's profile a slab from the ground's height at
  * its ends plus the profile's there, drawn thick down into the ground (so its body stands on a slope), a thin twin for

@@ -101,7 +101,7 @@ export function legendState(sim: SimWorld): LegendState {
   if (police) for (let u = 0; u < police.units.length; u++) if ((police.units[u] as number) >= 0) { cops = true; break; }
   return {
     jobs, caches: cache, cameras: (sim.cameras?.descs.length ?? 0) > 0, breakers: breaker,
-    cover: (sim.city?.covers.length ?? 0) > 0 || (sim.island ? islandMapShapeOf(sim.island).decks.length > 0 : false), cops,
+    cover: (sim.city?.covers.length ?? 0) > 0 || (sim.island ? islandMapShapeOf(sim.island).covers.length > 0 : false), cops,
     heli: !!police?.heli.active,
   };
 }
@@ -207,7 +207,7 @@ export class BigMap {
   private legendKey = '';
   /** The covered streets and the overpasses' decks as world rectangles (centre and half extents). */
   private readonly coverRects: Array<{ x: number; z: number; hx: number; hz: number }> = [];
-  /** The island's cover: its decks, turned (M8.10 slice 17). */
+  /** The island's cover: its covers' boxes, turned (M8.10 slice 17). */
   private readonly coverTurned = new Path2D();
   /** The island's blocks, parks and shallows (`cityFootprints`), built the first time the map is shown. */
   private ground: { blocks: Path2D; parks: Path2D; shallows: Path2D } | null = null;
@@ -246,8 +246,8 @@ export class BigMap {
       const along = COVER.length / 2, across = COVER.half;
       this.coverRects.push(c.axis === 'x' ? { x: c.x, z: c.z, hx: along, hz: across } : { x: c.x, z: c.z, hx: across, hz: along });
     }
-    // the island's: the decks the highway lifts over the crossings and the tunnel's roof, turned as they run (M8.10 slice 17)
-    if (sim.island) for (const d of islandMapShapeOf(sim.island).decks) {
+    // the island's: the plan's covers' boxes, turned as they stand (M8.10 slices 15a and 17)
+    if (sim.island) for (const d of islandMapShapeOf(sim.island).covers) {
       rectCorners(d).forEach(([x, z], k) => (k === 0 ? this.coverTurned.moveTo(x, z) : this.coverTurned.lineTo(x, z)));
       this.coverTurned.closePath();
     }

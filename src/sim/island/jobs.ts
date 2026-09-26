@@ -436,7 +436,7 @@ function garageTarget(graph: RoadGraph, site: DropOff): IslandTarget {
  * A trial's way off the lanes' shortest: its points in turn and its finish; where it is joined (its first point, on its
  * road at the road's height: a deck's, the tunnel's) and its metres from there to the finish.
  */
-export interface Run { route: Array<{ x: number; z: number }>; finish: { x: number; z: number }; from: { x: number; y: number; z: number }; along: number }
+export interface Run { route: Array<{ x: number; y?: number; z: number }>; finish: { x: number; z: number }; from: { x: number; y: number; z: number }; along: number }
 
 /** A line of the network or the canal's: its points (with their heights), their stations, whether it closes on itself. */
 interface Line { pts: ReadonlyArray<{ x: number; y?: number; z: number }>; s: readonly number[]; closed: boolean }
@@ -491,8 +491,8 @@ export function roadRun(island: Island, road: string, ring: { x: number; z: numb
     dir = on <= back ? 1 : -1;
     run = dir > 0 ? ahead : total - ahead;
   }
-  const route: Array<{ x: number; z: number }> = [];
-  for (let k = ROAD_STEP; k < run - ROAD_STEP / 4; k += ROAD_STEP) { const p = pointOf(line, s0 + dir * k); route.push({ x: p.x, z: p.z }); }
+  const route: Array<{ x: number; y: number; z: number }> = [];
+  for (let k = ROAD_STEP; k < run - ROAD_STEP / 4; k += ROAD_STEP) route.push(pointOf(line, s0 + dir * k));
   const finish = pointOf(line, s0 + dir * run), first = route.length > 0 ? ROAD_STEP : run;
   return { route, finish: { x: finish.x, z: finish.z }, from: pointOf(line, s0 + dir * first), along: run - first };
 }

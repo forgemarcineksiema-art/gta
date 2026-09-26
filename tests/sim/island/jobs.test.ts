@@ -37,7 +37,7 @@ function onRoad(pts: readonly P2[], closed: boolean, x: number, z: number): { d:
 
 describe('M8.10 slice 14: the jobs, the rivals and the way on the island', () => {
   let sim: SimWorld, island: Island, traffic: Traffic;
-  const rings = (): JobDef[] => sim.jobs.defs.filter((d) => d.kind !== 'duel');
+  const rings = (): JobDef[] => sim.jobs.defs.filter((d) => d.kind !== 'duel' && !d.hover);
   const duels = (): JobDef[] => sim.jobs.defs.filter((d) => d.kind === 'duel');
   // the island's build takes seconds, more under a full run's load
   beforeAll(async () => {
@@ -55,7 +55,8 @@ describe('M8.10 slice 14: the jobs, the rivals and the way on the island', () =>
     rings().forEach((d) => expect(d.kind, `#${d.id}`).toBe((JOBS[d.id - 1] as { kind: string }).kind));
     expect(duels().map((d) => d.level)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     expect(duels().map((d) => d.id)).toEqual([29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39]);
-    expect(new Set(sim.jobs.defs.map((d) => d.id)).size).toBe(39);
+    expect(sim.jobs.defs.filter((d) => d.hover).map((d) => d.id)).toEqual([40]);
+    expect(new Set(sim.jobs.defs.map((d) => d.id)).size).toBe(40);
   });
 
   it('14.1 every ring at a kerb corner seen from two streets: past both carriageways, off every road and deck, nothing a car hits on the way in, near its plan point', () => {

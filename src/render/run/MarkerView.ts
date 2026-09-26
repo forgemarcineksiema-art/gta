@@ -234,7 +234,8 @@ export class MarkerView {
       if (island) this.layZone(sim, running);
       else {
         this.zone.position.set(running.targetX, 0, running.targetZ);
-        this.zone.scale.setScalar(BALANCE.jobs.zone.radius);
+        // round in the ground's plane only: its lift stays a lift (a scale of all three raised it the radius times)
+        this.zone.scale.set(BALANCE.jobs.zone.radius, 1, BALANCE.jobs.zone.radius);
       }
     }
 

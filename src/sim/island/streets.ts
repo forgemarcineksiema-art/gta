@@ -7,7 +7,7 @@
  * the road it meets (a T), and loses any tail that meets nothing: no street ends in a field. Plan-time: it allocates,
  * built once.
  */
-import { catmullRom, circle, distanceToPolyline, inPolygon, resample, type P2 } from './geom';
+import { NearIndex, catmullRom, circle, inPolygon, resample, type P2 } from './geom';
 import { BASIN, BAY, GARDEN, PLACES, RINGS, ROADS, SUMMIT, coastline, districtOf, highwayLoop, naturalHeight, onLand, type DistrictId, type PlanRoad, type RoadClass } from './plan';
 
 /** Candidates are sampled this often (m); a kept run shorter than `MIN_RUN` goes; an end runs on up to `REACH` to meet a road. */
@@ -79,13 +79,19 @@ function build(): Streets {
   const main = mainLines(), coast = coastline();
   const quarry = PLACES.quarry, golf = PLACES.golf;
   const inRect = (x: number, z: number, r: { x0: number; z0: number; x1: number; z1: number }, m: number): boolean => x > r.x0 - m && x < r.x1 + m && z > r.z0 - m && z < r.z1 + m;
+  // what a street keeps clear of, by its distance: the coast, the highway, the main roads, the quarry's and the bay's
+  // edges (listed by cell: a candidate's every point asks)
+  const clear = new NearIndex([
+    { pts: coast, reach: COAST_GAP }, { pts: main.highway, reach: HIGHWAY_GAP },
+    ...main.roads.map((r) => ({ pts: r.pts, reach: r.half + ROAD_GAP })),
+    { pts: [...quarry, quarry[0] as P2], reach: 15 }, { pts: [...BAY, BAY[0] as P2], reach: 25 },
+  ], 64);
   const keep = (district: DistrictId, x: number, z: number): boolean => {
     if (districtOf(x, z) !== district || !onLand(x, z)) return false;
-    if (distanceToPolyline(x, z, coast) < COAST_GAP || distanceToPolyline(x, z, main.highway) < HIGHWAY_GAP) return false;
-    for (const r of main.roads) if (distanceToPolyline(x, z, r.pts) < r.half + ROAD_GAP) return false;
+    if (clear.near(x, z)) return false;
     if (Math.hypot(x - SUMMIT.x, z - SUMMIT.z) < 100 || Math.hypot(x - GARDEN.x, z - GARDEN.z) < 190) return false;
-    if (inPolygon(x, z, quarry) || distanceToPolyline(x, z, [...quarry, quarry[0] as P2]) < 15) return false;
-    if (inPolygon(x, z, golf) || inPolygon(x, z, BAY) || distanceToPolyline(x, z, [...BAY, BAY[0] as P2]) < 25) return false;
+    if (inPolygon(x, z, quarry)) return false;
+    if (inPolygon(x, z, golf) || inPolygon(x, z, BAY)) return false;
     if (inRect(x, z, BASIN, 12) || PLACES.containerYards.some((r) => inRect(x, z, r, 8))) return false;
     if (inRect(x, z, { x0: PLACES.hotel.x - PLACES.hotel.hx, x1: PLACES.hotel.x + PLACES.hotel.hx, z0: PLACES.hotel.z - PLACES.hotel.hz, z1: PLACES.hotel.z + PLACES.hotel.hz }, 6)) return false;
     const st = PLACES.stadium;

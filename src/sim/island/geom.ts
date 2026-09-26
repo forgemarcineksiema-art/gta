@@ -118,6 +118,47 @@ export function signedArea(poly: readonly P2[]): number {
   return a / 2;
 }
 
+/**
+ * Polylines' segments listed by cell, each line with its own reach: whether a point is nearer than its reach to any of
+ * them. The same answer as each line's `distanceToPolyline` below its reach, read from the few segments listed in the
+ * point's cell (each segment is listed in every cell its bounds, grown by its reach, touch).
+ */
+export class NearIndex {
+  private readonly cells = new Map<number, number[]>();
+  /** Each segment's ends and its reach, five numbers a segment. */
+  private readonly segs: number[] = [];
+
+  constructor(lines: ReadonlyArray<{ pts: readonly P2[]; reach: number }>, private readonly cell: number) {
+    for (const { pts, reach } of lines) for (let i = 0; i + 1 < pts.length; i++) {
+      const a = pts[i] as P2, b = pts[i + 1] as P2, s = this.segs.length / 5;
+      this.segs.push(a[0], a[1], b[0], b[1], reach);
+      const i0 = Math.floor((Math.min(a[0], b[0]) - reach) / cell), i1 = Math.floor((Math.max(a[0], b[0]) + reach) / cell);
+      const j0 = Math.floor((Math.min(a[1], b[1]) - reach) / cell), j1 = Math.floor((Math.max(a[1], b[1]) + reach) / cell);
+      for (let ci = i0; ci <= i1; ci++) for (let cj = j0; cj <= j1; cj++) {
+        const key = this.key(ci, cj), list = this.cells.get(key);
+        if (list) list.push(s); else this.cells.set(key, [s]);
+      }
+    }
+  }
+
+  /** Whether (x, z) is nearer than its reach to any segment. */
+  near(x: number, z: number): boolean {
+    const list = this.cells.get(this.key(Math.floor(x / this.cell), Math.floor(z / this.cell)));
+    if (!list) return false;
+    const g = this.segs;
+    for (const s of list) {
+      const ax = g[s * 5] as number, az = g[s * 5 + 1] as number, dx = (g[s * 5 + 2] as number) - ax, dz = (g[s * 5 + 3] as number) - az;
+      const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1)));
+      if (Math.hypot(x - ax - dx * t, z - az - dz * t) < (g[s * 5 + 4] as number)) return true;
+    }
+    return false;
+  }
+
+  private key(i: number, j: number): number {
+    return (i + 4096) * 8192 + (j + 4096);
+  }
+}
+
 /** Distance from (x, z) to the polyline. */
 export function distanceToPolyline(x: number, z: number, pts: readonly P2[]): number {
   let best = Infinity;

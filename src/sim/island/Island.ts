@@ -435,8 +435,19 @@ export class Island {
    * the shallows, `WALL.height` over the sea; none where a road on the ground crosses the shore.
    */
   private walls(): void {
-    const roads = this.ground.roads;
-    const crossed = (x: number, z: number): boolean => roads.some((r) => r.pts.some((p) => Math.hypot(p[0] - x, p[1] - z) < HALF_WIDTH[r.cls] + 4));
+    // a road's points within its half width and 4 m of a piece's middle: listed by cell (the reach under the cell's side)
+    const CELL = 32, near = new Map<number, Array<[number, number, number]>>(), key = (i: number, j: number): number => (i + 4096) * 8192 + (j + 4096);
+    for (const r of this.ground.roads) for (const p of r.pts) {
+      const k = key(Math.floor(p[0] / CELL), Math.floor(p[1] / CELL)), list = near.get(k), entry: [number, number, number] = [p[0], p[1], HALF_WIDTH[r.cls] + 4];
+      if (list) list.push(entry); else near.set(k, [entry]);
+    }
+    const crossed = (x: number, z: number): boolean => {
+      const ci = Math.floor(x / CELL), cj = Math.floor(z / CELL);
+      for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
+        for (const [px, pz, r] of near.get(key(i, j)) ?? []) if (Math.hypot(px - x, pz - z) < r) return true;
+      }
+      return false;
+    };
     for (const line of this.ground.coasts) {
       const pts = line.pts, n = pts.length, segs = line.closed ? n : n - 1;
       // none where a place's deck leaves the shore (a pier's root: slices 8–12)

@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-26 — M8.10 slice 18: the island by default
+
+Done: the island is the game's world (`src/app/world.ts`); the grid behind `?map=grid` or its spawns, the playground as
+before; the first minute is the island's cold open; a profile back on the island starts 3 m out of the hideout's door.
+The save's v7: a grid save keeps its bank, garage, board and settings, and starts the grid's hunts over (its
+billboards, ramps, the day's caches, the trials' medals: their ids are other places on the island). Re-baked, with
+that reason: save 0.2 (M6: the medals now reset at v7) and M8.5 0.2 (the version). The verify's build bakes first.
+Pins 18.1–18.2. At the gate: the suites and the perf on the island (the city suite's time to control is the island's).
+
 ## 2026-09-26 — M8.10 slice 18, first part: the island's bake
 
 Measured in the browser (unthrottled, `?map=island`): the island took 5.8 s to control against the grid's 1.3 s (its

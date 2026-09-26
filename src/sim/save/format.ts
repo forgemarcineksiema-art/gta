@@ -17,7 +17,7 @@ import { BODY_IDS, type BodyId } from '../traffic/bodies';
 import { CAR_IDS, type CarId } from '../vehicle/presets';
 import { DEFAULT_SETTINGS, LANGS, QUALITY_SETTINGS, type Settings } from '../settings';
 
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 
 export type Tiers = [number, number, number];
 
@@ -69,7 +69,7 @@ export interface SaveCareer {
 }
 
 export interface SaveDoc {
-  v: 6;
+  v: 7;
   /** The cold open was shown (started, completed or skipped): never again for this profile. */
   seen: boolean;
   /** Everything the player owns in money: the road coins are in it since v6 (M8.5 D1). */
@@ -131,7 +131,7 @@ export type SaveV1 = SaveDoc;
 
 function defaults(): SaveDoc {
   return {
-    v: 6,
+    v: 7,
     seen: false,
     bank: 0,
     car: 'muscle',
@@ -278,6 +278,9 @@ const MIGRATIONS: Record<number, (raw: Record<string, unknown>) => Record<string
     delete out['coins'];
     return out;
   },
+  // M8.10: the island is the game's; the grid's hunts were its own places (its billboards, its ramps, the day's caches'
+  // spots, its trials' medals): on the island they start over; the bank, the garage and the board carry on
+  6: (raw) => ({ ...raw, v: 7, smashed: '', jumps: '', medals: '', caches: { date: '', found: '' } }),
 };
 
 /** Walks the table from the document's version to `SAVE_VERSION`, then keeps every valid field. Unknown or newer versions give the defaults. */
@@ -392,7 +395,7 @@ function sanitize(raw: Record<string, unknown>): SaveDoc {
  */
 export function collect(sim: SimWorld, into: SaveDoc): void {
   const run = sim.run, garage = sim.garage, dailies = sim.dailies;
-  into.v = 6;
+  into.v = 7;
   // shown once per profile: a cold open that has started counts, so a reload mid-way never repeats it
   into.seen = sim.coldOpen.seen || sim.coldOpen.active;
   into.bank = run.bank;

@@ -1,7 +1,7 @@
 /**
  * The island's bake (M8.10 slice 18): the world made on the island as the game makes it, its island baked (every
  * chunk's heights and props, what the world worked out from it) and written gzipped to `public/island.bin`, its key to
- * `public/island.key`. Run by `npm run bake` (BAKE=1), never by the quick set; it pins nothing (`island/bake.test.ts` does).
+ * `output/island.key`. Run by `npm run bake` (BAKE=1), never by the quick set; it pins nothing (`island/bake.test.ts` does).
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
@@ -15,7 +15,8 @@ it('bakes the island', async () => {
   const sim = new SimWorld({ map: 'island', seed: 42 });
   const bake = { ...(sim.island as Island).toBake(), key: process.env['BAKE_KEY'] ?? '' };
   mkdirSync('public', { recursive: true });
+  mkdirSync('output', { recursive: true });
   writeFileSync('public/island.bin', gzipSync(pack(bake), { level: 9 }));
-  writeFileSync('public/island.key', bake.key);
+  writeFileSync('output/island.key', bake.key);
   sim.dispose();
 }, 300_000);

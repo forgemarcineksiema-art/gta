@@ -324,6 +324,7 @@ export class Island {
     // the drive-throughs (slice 16): fuel, repair, paint; the run's three garages (slice 14)
     buildServices(this.ground, this.services, statics);
     this.garages = islandGarages(this, statics);
+    this.spawns.push(this.hideoutSpawn());
     // the police's places (slice 15a): the cameras' poles, the pergola and the warehouse passage, the donut shop's kiosk;
     // the covers, the places' own and those
     buildPoliceSites(this, statics);
@@ -895,6 +896,12 @@ export class Island {
       at('beach', 300, -752, 0, -752),
       at('runway', -1025, 480, -1025, 0),
     ];
+  }
+
+  /** Where a profile back on the island starts (M8.10 slice 18): 3 m out of the hideout's door, facing its street. */
+  private hideoutSpawn(): SpawnPoint {
+    const g = this.garages[0] as DropOff, x = g.door.x - Math.sin(g.yaw) * 3, z = g.door.z - Math.cos(g.yaw) * 3;
+    return { name: 'hideout', position: { x, y: this.standAt(x, z) + 1, z }, yaw: g.yaw + Math.PI };
   }
 
   /** The highway's loop sampled every 3 m, as the grid's route is. */

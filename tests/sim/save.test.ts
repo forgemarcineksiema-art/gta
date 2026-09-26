@@ -23,7 +23,7 @@ function filled(smashedIds: number[]): SaveV1 {
   const ramps = new Uint8Array(20);
   for (const k of [1, 7, 19]) ramps[k] = 1;
   return {
-    v: 6,
+    v: 7,
     seen: true,
     bank: 123456,
     car: 'sports',
@@ -191,7 +191,8 @@ describe('save format', () => {
     expect(save.tiers).toEqual({ compact: [1, 2, 0] });
     expect(save.streak.topper).toBe(true);
     expect(save.chain).toBe(63);
-    expect(save.medals).toBe('32');
+    // (the grid's trials' medals carried to v6; the island's switch at v7 starts its own trials over, M8.10 slice 18)
+    expect(save.medals).toBe('');
     // the coins folded in at v6
     expect(save.bank).toBe(4376);
     expect('hidden' in save).toBe(false);
@@ -220,7 +221,7 @@ describe('save format', () => {
   it('M8.5 0.2 an M8 document (v5) folds its coins into the bank; v6 writes no coins and reads back equal', () => {
     const v5: Record<string, unknown> = { ...(JSON.parse(serialize(filled([4]))) as Record<string, unknown>), v: 5, bank: 1_000, coins: 7_890 };
     const save = migrate(v5);
-    expect(save.v).toBe(6);
+    expect(save.v).toBe(SAVE_VERSION);
     expect(save.bank).toBe(8_890);
     expect('coins' in save).toBe(false);
     const text = serialize(save);

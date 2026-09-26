@@ -14,7 +14,8 @@ const stages = [
   ['typecheck:sim', 'npx', ['tsc', '--noEmit', '-p', 'tsconfig.sim.json']],
   ['lint', 'npx', ['eslint', '.', '--max-warnings=0']],
   ['test', 'npx', ['vitest', 'run']],
-  ['build', 'npx', ['vite', 'build']],
+  // the island's bake first (M8.10 slice 18: skipped while it is of these sources), the game's world since the switch
+  ['build', 'npm', ['run', 'build']],
   ['smoke', 'npx', ['playwright', 'test', 'e2e/smoke.spec.ts']],
   ['budget', 'node', ['tools/budget.mjs']],
 ];

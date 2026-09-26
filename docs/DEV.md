@@ -42,7 +42,9 @@ do not change with the calendar.
 
 | URL | What |
 |---|---|
-| `/` | seeded 1.575 km square city; automatic rendering quality; the cold open once per profile (the save's `seen`) |
+| `/` | the island (M8.10 slice 18: the hand-drawn plan, the rest from the seed, made from its bake `public/island.bin`); automatic rendering quality; the first minute once per profile (the save's `seen`), a profile back at the hideout |
+| `/?map=grid` | the seeded 1.575 km square city (the game's world until the island's switch, kept for the gate's A/B); its spawns (`crown`, `loop`…) make it too |
+| `/?map=island&bake=1` | the island from its bake on the dev server (5173 builds it from its plan: the bake is stale while the sim is edited) |
 | `/?fresh=1` | a new profile: the save's key is cleared before boot (the cold open follows) |
 | `/?coldopen=1` | force the cold open; `?coldopen=0` skips it |
 | `/?lang=en` | the screen's language for the session: `pl` (the default) or `en`, over the pick in the settings until the player picks again; the text-checking suites (`game`, `heat`, `screens`) read `en` (DESIGN.md §19) |
@@ -99,6 +101,9 @@ npm run look         # M8.9: the look's states and the four districts at 1280x72
                      # LOOK_SIZES=all adds 800x450 and 1920x1080, LOOK_GATE=1 asserts M8.9's targets (the gate's run only)
 npm run atlas        # M8.10: the island drawn from above as the sim builds it (tests/atlas, ATLAS=1, then tools/atlas.html
                      # headless) -> output/atlas/island.png (the island, its names) and placed.png (what stands where), ~15 s
+npm run bake         # M8.10 slice 18: the island built once and packed into public/island.bin (gzipped, 2.6 MB) for the
+                     # game to load; keyed by a hash of src/sim (output/island.key), skipped while current; `npm run build`
+                     # and the verify's build run it first, ~15 s when it runs
 ```
 
 The whole-map check is accelerated fixed-step driving with sampled rendering;

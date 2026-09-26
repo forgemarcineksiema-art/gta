@@ -30,6 +30,7 @@ import { GarageUi, type GarageActions } from '../ui/wall/garage';
 import { routeToDropOff } from './doorRoute';
 import { BotDriver } from './bot';
 import { loadIslandBake } from './islandBake';
+import { worldMap } from './world';
 import { BotPolicy } from './botPolicy';
 import { JobBot } from './jobBot';
 import { AgentState } from '../sim/traffic/Traffic';
@@ -426,9 +427,10 @@ export class App {
 
   static async boot(canvas: HTMLCanvasElement): Promise<App> {
     const params = new URLSearchParams(location.search);
-    // the island's bake on its way beside the physics' start (M8.10 slice 18); the dev server's edits make it stale, so
-    // `npm run dev` builds the island from its plan unless `bake=1`
-    const bakeRequest = params.get('map') === 'island' && (!import.meta.env.DEV || params.get('bake') === '1') ? loadIslandBake(__ISLAND_KEY__) : null;
+    // the world (M8.10 slice 18: the island is the game's, the grid behind `map=grid`); the island's bake on its way beside
+    // the physics' start; the dev server's edits make it stale, so `npm run dev` builds the island unless `bake=1`
+    const map = worldMap(params);
+    const bakeRequest = map === 'island' && (!import.meta.env.DEV || params.get('bake') === '1') ? loadIslandBake(__ISLAND_KEY__) : null;
     // the screen's language (DESIGN.md §19): the parameter or the default until the save says the player's pick
     setLang(resolveLang(params.get('lang'), ''));
     document.documentElement.lang = lang();
@@ -476,16 +478,13 @@ export class App {
     // `body=<id>` (M8.8 slice 4): start in any vehicle, the new ones before their stash or price exists
     const bodyParam = params.get('body');
     const body = (BODY_IDS as readonly string[]).includes(bodyParam ?? '') ? (bodyParam as BodyId) : undefined;
-    const citySpawns = ['city', 'crown', 'foundry', 'gardens', 'marina', 'highway'];
-    // `map=island` (M8.10): the hand-drawn island, until its switch the grid stays the game's
-    const map = params.get('map') === 'island' ? 'island'
-      : params.get('map') === 'playground' || params.get('bot') === 'track' || (spawn && !citySpawns.includes(spawn)) ? 'playground' : 'city';
     const seed = Number(params.get('seed') ?? '42');
     const lifeOff = params.get('life') === '0';
     const traffic = lifeOff ? 0 : densityParam(params.get('traffic'));
     const peds = lifeOff ? 0 : densityParam(params.get('peds'));
-    // the first run of a session is the cold open; the world is built at its spawn so the chunks load once
-    const coldOpen = map === 'city' && coldOpenWanted(params, save);
+    // the first run of a session is the cold open (the grid's round its block, the island's first minute); the world is
+    // built at its spawn so the chunks load once
+    const coldOpen = map !== 'playground' && coldOpenWanted(params, save);
     // forced (`coldopen=1`): shown even to a profile that has seen it
     if (coldOpen) save.seen = false;
     const islandBake = bakeRequest ? await bakeRequest : null;
@@ -497,7 +496,8 @@ export class App {
       traffic,
       peds,
       heat: Math.max(0, Math.min(100, Number(params.get('heat') ?? 0) * 20)),
-      ...(spawn ? { spawn } : coldOpen ? { spawn: 'loop' } : {}),
+      // a profile back on the island starts at the hideout (M8.10 slice 18: a grid save's too); a measured run where it is
+      ...(spawn ? { spawn } : coldOpen ? (map === 'city' ? { spawn: 'loop' } : {}) : map === 'island' && !params.has('bot') ? { spawn: 'hideout' } : {}),
       ...(car ? { car } : {}),
       ...(body ? { body } : {}),
       save,

@@ -21,8 +21,10 @@
           document.documentElement.lang = 'en';
           if (text) text.textContent = 'LOADING';
         }
-        // the island's bake (M8.10 slice 18) on its way with the game's scripts, not after them
-        if (/[?&]map=island(&|$)/.test(location.search)) {
+        // the island's bake (M8.10 slice 18) on its way with the game's scripts, not after them: the island is the game's
+        // world but where a page asks for the grid (its map or its spawns) or the playground (src/app/world.ts)
+        var q = location.search;
+        if (/[?&]map=island(&|$)/.test(q) || !(/[?&]map=(grid|city|playground)(&|$)/.test(q) || /[?&]spawn=/.test(q) && !/[?&]spawn=(island|port|beach|runway|hideout)(&|$)/.test(q) || /[?&]bot=track(&|$)/.test(q))) {
           var bake = document.createElement('link');
           bake.rel = 'preload';
           bake.as = 'fetch';

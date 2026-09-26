@@ -24,6 +24,8 @@ import { buildPlaces, type Place } from './places';
 import type { GardensPlace } from './places/gardens';
 import { buildServices, serviceSpots, siteRect, type ServiceSite } from './services';
 import { garageRect, hotelGarageSite, islandGarages } from './cover';
+import { buildPoliceSites, islandCovers, policeSites, propKept, underCover, type IslandCover, type PoliceSites } from './police';
+import type { DonutSite } from '../police/Donuts';
 import { GARAGE, hideoutSign, toDropOff, type DropOff } from '../city/cover';
 import type { StaticDesc } from '../scene';
 import { BOUNDS, CIRCUS, highwayLoop, islet } from './plan';
@@ -85,12 +87,16 @@ export class Island {
   readonly services: ServiceSite[] = serviceSpots(this.ground);
   /** The Coral Hotel's garage (M8.10 slice 14): the third of the run's garages, on the Quay's road north of the hotel. */
   readonly hotelGarage: DropOff = hotelGarageSite(this.ground);
-  /** The lots, their buildings and the palms (M8.10 slice 7a), off the drive-throughs' sites and the hotel's garage. */
-  readonly fill: IslandFill = fillIsland(this.ground, this.surfaces, (x, z) => { const [i, j] = Island.chunkOf(x, z); return Island.chunkIndex(i, j); }, [...this.services.map(siteRect), garageRect(this.hotelGarage)]);
+  /** The police's places that stand (M8.10 slice 15a): the cameras' poles, the pergola and the warehouse passage, the donut shop. */
+  readonly policeSites: PoliceSites = policeSites(this.ground, this.network, (x, z) => this.standAt(x, z));
+  /** The lots, their buildings and the palms (M8.10 slice 7a), off the drive-throughs' sites, the hotel's garage and the police's places. */
+  readonly fill: IslandFill = fillIsland(this.ground, this.surfaces, (x, z) => { const [i, j] = Island.chunkOf(x, z); return Island.chunkIndex(i, j); }, [...this.services.map(siteRect), garageRect(this.hotelGarage), ...this.policeSites.keep]);
   /** Each district's places (M8.10 slices 8–12): their statics in `fill.chunks`, the ones that move stepped here. */
   readonly places: Place[];
   /** The run's three garages (M8.10 slice 14), the hideout first: their kerbs and lanes; the props keep off their doors. */
   readonly garages: DropOff[];
+  /** The plan's thirteen covers (M8.10 slice 15a): where the helicopter cannot see a car. */
+  readonly covers: IslandCover[];
   /** The chunks with a height field in the physics, by index. */
   readonly active = new Map<number, RAPIER.Collider>();
   /** Each physics chunk's kerbs, buildings and trunks, with its height field. */
@@ -145,6 +151,20 @@ export class Island {
     // the drive-throughs (slice 16): fuel, repair, paint; the run's three garages (slice 14)
     buildServices(this.ground, this.services, statics);
     this.garages = islandGarages(this, statics);
+    // the police's places (slice 15a): the cameras' poles, the pergola and the warehouse passage, the donut shop's kiosk;
+    // the covers, the places' own and those
+    buildPoliceSites(this, statics);
+    this.covers = islandCovers(this);
+  }
+
+  /** The donut shop by the centre's roundabout (M8.10 slice 15a): its kiosk, its two bays, the lane the units head for. */
+  get donutShop(): DonutSite {
+    return this.policeSites.donut;
+  }
+
+  /** Whether a car's middle at a point is under one of the plan's covers (M8.10 slice 15a: the helicopter's light). */
+  covered(x: number, y: number, z: number): boolean {
+    return underCover(this.covers, x, y, z);
   }
 
   /** Run the places that move (a train, a barrier, a wheel), a fixed step. */
@@ -257,6 +277,8 @@ export class Island {
       const sign = hideoutSign(g);
       if (Math.hypot(sign.poleX - x, sign.poleZ - z) < 0.5 + r) return true;
     }
+    // a camera's pole, the donut shop's kiosk, under the pergola or the warehouse passage (slice 15a)
+    if (propKept(this.policeSites, x, z, r)) return true;
     return this.fill.lots.some((l) => Math.hypot(l.x - x, l.z - z) < Math.hypot(l.hx, l.hz) + 2 && inLot(l, x, z, Math.max(hx, hz) + 0.3));
   }
 

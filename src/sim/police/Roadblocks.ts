@@ -28,6 +28,15 @@ const FOOTPRINT = 7;
 const ATTEMPT_SECONDS = 0.5;
 /** The sawhorse's depth along the road (m) and the car's reach past its footprint. */
 const SAWHORSE_DEPTH = 0.6;
+/**
+ * The island's heights (M8.10 slice 15a): the driver's eye over the car's middle (the grid's roads are flat, its eye
+ * 1.3 m over them); how far under or over the block's road a car's middle may be and still meet it (m: not a car on the
+ * street under a deck, nor on the serpentine over the tunnel); a lane is the player's road within this of the car.
+ */
+const EYE = 0.75;
+const REACH_BELOW = -2;
+const REACH_ABOVE = 3;
+const ON_LANE = 4;
 
 export class Roadblocks {
   /** 0 or 1. */
@@ -43,6 +52,9 @@ export class Roadblocks {
   spikeZ = 0;
   /** The strip lies across the road: its long axis is perpendicular to this heading. */
   spikeYaw = 0;
+  /** The road's surface at the block and at the strip (the grid's flat 0; the island's deck, tunnel floor or ground). */
+  y = 0;
+  spikeY = 0;
   spikeUp = false;
   /** +1 or -1: the side the punctured car pulls to, fixed per strip. */
   spikeSide = 1;
@@ -99,7 +111,7 @@ export class Roadblocks {
   raise(site: Chokepoint): void {
     if (this.active === 1) this.release();
     this.place(site, this.sim.probe);
-    if (this.active === 1) this.sim.events.push('dispatch', 1, site.x, 0, site.z, -1);
+    if (this.active === 1) this.sim.events.push('dispatch', 1, site.x, site.y, site.z, -1);
   }
 
   /** Take the block down now (the run ended). */
@@ -119,7 +131,9 @@ export class Roadblocks {
     // a car of the block flattened by the steamroller (M8.8 slice 11) breaches it as the sawhorse does
     const a0 = this.agents[0], a1 = this.agents[1];
     const flattened = (a0 >= 0 && this.traffic.flat[a0] === 1) || (a1 >= 0 && this.traffic.flat[a1] === 1);
-    if (flattened || (this.sawhorseUp && this.touches(probe, this.sawhorseX, this.sawhorseZ, this.yaw, t.sawhorseWidth / 2, SAWHORSE_DEPTH / 2))) {
+    // on the block's road: not on the street under its deck
+    const onRoad = probe.y - this.y > REACH_BELOW && probe.y - this.y < REACH_ABOVE;
+    if (flattened || (onRoad && this.sawhorseUp && this.touches(probe, this.sawhorseX, this.sawhorseZ, this.yaw, t.sawhorseWidth / 2, SAWHORSE_DEPTH / 2))) {
       // through the weak point: planks fly, a little speed goes, the bag pays, and the cars pull out
       this.sawhorseUp = false;
       this.broken++;
@@ -127,11 +141,12 @@ export class Roadblocks {
       const tm = v.telemetry;
       const keep = 1 - t.sawhorseLoss;
       v.setVelocity(tm.vx * keep, tm.vy, tm.vz * keep);
-      events.push('roadblock', 1, this.sawhorseX, 0.8, this.sawhorseZ, -1);
+      events.push('roadblock', 1, this.sawhorseX, this.y + 0.8, this.sawhorseZ, -1);
       this.release();
       return;
     }
-    if (this.spikeUp && !this.sim.life.spiked && this.touches(probe, this.spikeX, this.spikeZ, this.spikeYaw, t.spikeLength / 2, t.spikeDepth / 2)) {
+    const onStrip = probe.y - this.spikeY > REACH_BELOW && probe.y - this.spikeY < REACH_ABOVE;
+    if (onStrip && this.spikeUp && !this.sim.life.spiked && this.touches(probe, this.spikeX, this.spikeZ, this.spikeYaw, t.spikeLength / 2, t.spikeDepth / 2)) {
       this.sim.life.puncture(this.spikeSide);
     }
   }
@@ -157,6 +172,8 @@ export class Roadblocks {
     for (let i = 0; i < lanes.laneCount; i++) {
       if (Math.hypot((lanes.midX[i] as number) - probe.x, (lanes.midZ[i] as number) - probe.z) > (lanes.length[i] as number) / 2 + 25) continue;
       lanes.project(i, probe.x, probe.z, this.projection);
+      // the road under the car, not a deck over it or a street under it
+      if (Math.abs(lanes.heightAt(i, this.projection.s) - probe.y) > ON_LANE) continue;
       const cost = this.projection.dist + (1 - Math.cos(this.projection.yaw - probe.yaw)) * 20;
       if (cost < best) { best = cost; lane = i; s0 = this.projection.s; }
     }
@@ -201,13 +218,15 @@ export class Roadblocks {
     return best;
   }
 
-  /** Out of the view cone, or behind a building from the driver's eye. */
+  /** Out of the view cone, or behind a building (or the island's hill, a tunnel's wall) from the driver's eye. */
   private hidden(site: Chokepoint, probe: PlayerProbe, cosHalf: number): boolean {
     if (this.traffic.outOfView(site.x, site.z, FOOTPRINT, probe, POLICE.viewNear, cosHalf)) return true;
-    const dx = site.x - probe.x, dz = site.z - probe.z, dy = 1 - 1.3;
+    // from the driver's eye (1.3 m over the grid's flat roads; the island's over the car) to a metre over the block's road
+    const eye = this.sim.island ? probe.y + EYE : 1.3;
+    const dx = site.x - probe.x, dz = site.z - probe.z, dy = site.y + 1 - eye;
     const len = Math.hypot(dx, dy, dz);
     this.ray.origin.x = probe.x;
-    this.ray.origin.y = 1.3;
+    this.ray.origin.y = eye;
     this.ray.origin.z = probe.z;
     this.ray.dir.x = dx / len;
     this.ray.dir.y = dy / len;
@@ -222,10 +241,12 @@ export class Roadblocks {
     // right of the road's heading is (-fz, fx); the cars stand along the lane either side of the gap, facing the player
     const rx = -fz, rz = fx;
     const half = t.gap / 2;
+    // on the road's surface (a deck's, the tunnel's floor: not the ground under or over it), down its grade toward the player
+    const lanes = this.traffic.lanes, grade = -(lanes.heightAt(site.lane, site.s + 2) - lanes.heightAt(site.lane, site.s - 2)) / 4;
     for (let k = 0; k < 2; k++) {
       const side = k === 0 ? -1 : 1;
       const x = site.x + rx * side * half, z = site.z + rz * side * half;
-      const agent = this.traffic.spawnParkedPolice(x, z, site.yaw + Math.PI, 'police', probe, POLICE.viewNear, cosHalf);
+      const agent = this.traffic.spawnParkedPolice(x, z, site.yaw + Math.PI, 'police', probe, POLICE.viewNear, cosHalf, site.y, grade);
       this.agents[k] = agent;
       if (agent >= 0) this.traffic.lights[agent] = 1;
     }
@@ -236,6 +257,8 @@ export class Roadblocks {
     this.serial++;
     this.x = site.x;
     this.z = site.z;
+    this.y = site.y;
+    this.spikeY = site.spikeY;
     this.yaw = site.yaw;
     this.sawhorseX = site.x;
     this.sawhorseZ = site.z;

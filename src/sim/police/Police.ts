@@ -231,6 +231,13 @@ export class Police {
   constructor(sim: SimWorld) {
     if (!sim.traffic) throw new Error('Police requires traffic');
     this.heli = new Helicopter(sim.world, sim.events, sim.traffic.streets.half);
+    // the island's (M8.10 slice 15a): the aircraft keeps its altitude over the hill, a car under one of the plan's covers
+    // is hidden from its light
+    const island = sim.island;
+    if (island) {
+      this.heli.groundAt = (x, z) => island.ground.surfaceHeight(x, z);
+      this.heli.covered = (x, y, z) => island.covered(x, y, z);
+    }
     this.sim = sim;
     this.traffic = sim.traffic;
     this.graph = sim.traffic.streets.graph;
@@ -276,8 +283,9 @@ export class Police {
     }
     const extents = CAR_PRESETS.police.chassisHalfExtents;
     this.radius = Math.hypot(extents.x, extents.z);
-    // the donut shop's field, once: the units that stand down head there
-    this.route(DONUT, DONUT_SHOP.laneX, DONUT_SHOP.laneZ, DONUT_SHOP.laneYaw);
+    // the donut shop's field, once: the units that stand down head there (the grid's shop or the island's)
+    const donut = sim.island?.donutShop ?? DONUT_SHOP;
+    this.route(DONUT, donut.laneX, donut.laneZ, donut.laneYaw);
   }
 
   /** Runs before Traffic.step; never steps traffic or physics itself. */

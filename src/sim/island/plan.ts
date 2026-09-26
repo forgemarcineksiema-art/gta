@@ -369,7 +369,8 @@ export type CoverKind = 'tunnel' | 'viaduct' | 'bridge' | 'stadium' | 'carpark' 
 /** The thirteen places the helicopter cannot see into. */
 export const COVERS: ReadonlyArray<{ kind: CoverKind; at: P2 }> = ([
   ['tunnel', [-560, -560]], ['viaduct', [375, -640]],
-  ['bridge', [40, -262]], ['bridge', [280, -300]], ['bridge', [460, -304]], ['bridge', [640, -287]], ['bridge', [760, -278]],
+  // the fifth bridge the highway's over the canal's east end (slice 9's note: the sketch's 760 has no road)
+  ['bridge', [40, -262]], ['bridge', [280, -300]], ['bridge', [460, -304]], ['bridge', [640, -287]], ['bridge', [806, -277]],
   ['stadium', [610, 110]], ['carpark', [-245, -175]], ['arcade', [-335, -490]], ['pergola', [-150, 292]], ['warehouse', [430, 358]], ['cranes', [370, -570]],
 ] as ReadonlyArray<readonly [CoverKind, P2]>).map(([kind, at]) => ({ kind, at: W(at) }));
 

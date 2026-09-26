@@ -35,7 +35,7 @@ export const DUCK = {
   body: { radius: 2.8, half: 2.6 }, head: { radius: 2.4, x: 3.4, y: 3.8 },
 } as const;
 /** The stands (m): the seats' front row over the concourse and their top row, in rows, round the oval in segments. */
-const SEATS = { low: 4.5, high: 13, rows: 4, segments: 56 } as const;
+export const SEATS = { low: 4.5, high: 13, rows: 4, segments: 56 } as const;
 /** The tunnel's half width through the west stand (its road's carriageway and pavements, m). */
 const TUNNEL_HALF = 12;
 /** The decks (m): the boards' thickness, the railings' height and half thickness, the piles' spacing. */

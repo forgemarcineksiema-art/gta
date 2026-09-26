@@ -2,13 +2,14 @@
  * The donut shop (M5.5 slice 18): a pink kiosk with a serving window and a
  * striped awning, and over it on a pole a giant donut standing on its edge,
  * iced pink on its upper half with a few sprinkles. One merged mesh, static,
- * facing the street it stands on (north, +Z).
+ * at its site facing the street it stands on (the grid's north, +Z; the
+ * island's by the centre's roundabout, on its ground: M8.10 slice 15a).
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { DONUT_SHOP, PALETTE } from '../../sim';
+import { PALETTE } from '../../sim';
 
-export function buildDonutShop(): THREE.Mesh {
+export function buildDonutShop(site: { x: number; y: number; z: number; yaw: number }): THREE.Mesh {
   const parts: THREE.BufferGeometry[] = [];
   const add = (g: THREE.BufferGeometry, color: number | ((x: number, y: number, z: number) => number)): void => {
     const geo = g.index ? g.toNonIndexed() : g;
@@ -43,7 +44,8 @@ export function buildDonutShop(): THREE.Mesh {
   for (const g of parts) g.dispose();
   const mesh = new THREE.Mesh(merged, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
   mesh.name = 'donut-shop';
-  mesh.position.set(DONUT_SHOP.x, 0, DONUT_SHOP.z);
+  mesh.position.set(site.x, site.y, site.z);
+  mesh.rotation.y = site.yaw;
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   return mesh;

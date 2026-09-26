@@ -17,6 +17,7 @@
 import { BALANCE, RIVALS, type JobDef, type SimWorld } from '../../sim';
 import { SIGNALS } from '../../sim/palette';
 import { glyphIndex, glyphOf } from '../../sim/glyphs';
+import { ringGround } from '../../sim/island/jobs';
 
 export const SIGN_OPEN = 0;
 export const SIGN_GOAL = 1;
@@ -42,7 +43,9 @@ export const GOAL_PULSE = 0.16;
 export interface SignList {
   count: number;
   x: Float32Array;
+  /** Over `base`: the ground's height under it (the grid's 0; the island's hills, a car's road, a door's floor). */
   y: Float32Array;
+  base: Float32Array;
   z: Float32Array;
   state: Uint8Array;
   /** `GLYPH_ORDER` index (`sim/glyphs.ts`), or minus a rival's poster number (its digits). */
@@ -57,6 +60,10 @@ export interface RingList {
   count: number;
   x: Float32Array;
   z: Float32Array;
+  /** The ground's plane under it (M8.10 slice 14): its height at the middle, its rise per metre along x and z (the grid's 0). */
+  base: Float32Array;
+  sx: Float32Array;
+  sz: Float32Array;
   scale: Float32Array;
   state: Uint8Array;
 }
@@ -66,41 +73,82 @@ export interface SignView { x: number; z: number; dirX: number; dirZ: number }
 
 export function newSignList(capacity: number): SignList {
   return {
-    count: 0, x: new Float32Array(capacity), y: new Float32Array(capacity), z: new Float32Array(capacity),
+    count: 0, x: new Float32Array(capacity), y: new Float32Array(capacity), base: new Float32Array(capacity), z: new Float32Array(capacity),
     state: new Uint8Array(capacity), glyph: new Int16Array(capacity), pole: new Uint8Array(capacity), def: new Int16Array(capacity),
   };
 }
 
 export function newRingList(capacity: number): RingList {
-  return { count: 0, x: new Float32Array(capacity), z: new Float32Array(capacity), scale: new Float32Array(capacity), state: new Uint8Array(capacity) };
+  return {
+    count: 0, x: new Float32Array(capacity), z: new Float32Array(capacity), base: new Float32Array(capacity), sx: new Float32Array(capacity), sz: new Float32Array(capacity),
+    scale: new Float32Array(capacity), state: new Uint8Array(capacity),
+  };
 }
 
-function addSign(out: SignList, x: number, y: number, z: number, state: number, glyph: number, pole: boolean, def = -1): void {
+function addSign(out: SignList, x: number, y: number, z: number, state: number, glyph: number, pole: boolean, def = -1, base = 0): void {
   if (out.count >= out.x.length) return;
   const i = out.count++;
   out.def[i] = def;
   out.x[i] = x;
   out.y[i] = y;
+  out.base[i] = base;
   out.z[i] = z;
   out.state[i] = state;
   out.glyph[i] = glyph;
   out.pole[i] = pole ? 1 : 0;
 }
 
-function addRing(out: RingList, x: number, z: number, scale: number, state: number): void {
+function addRing(out: RingList, x: number, z: number, scale: number, state: number, plane: RingPlane = FLAT): void {
   if (out.count >= out.x.length) return;
   const i = out.count++;
   out.x[i] = x;
   out.z[i] = z;
+  out.base[i] = plane.y;
+  out.sx[i] = plane.sx;
+  out.sz[i] = plane.sz;
   out.scale[i] = scale;
   out.state[i] = state;
 }
 
 const scratch = { x: 0, z: 0 };
 
+/** The ground's plane under a ring: its height at the middle and its rise per metre along x and z. */
+export interface RingPlane { readonly y: number; readonly sx: number; readonly sz: number }
+const FLAT: RingPlane = { y: 0, sx: 0, sz: 0 };
+/** Each job's ring's plane and its end's, worked out the first time they are drawn (a ring never moves). */
+const planes = new WeakMap<JobDef, { ring: RingPlane; end: RingPlane | null }>();
+
+/** A ring on the island stands this far over its ground's plane, past the ground's strays from it (m): clear of a pavement's top. */
+export const RING_LIFT = 0.1;
+
 /**
- * Fills `signs` and `rings` for this frame. `time` drives the pulse and the bob; `view` the hunt's sighting rule
- * (null: always sighted); `carAt` interpolates a traffic record's position (false: not drawn).
+ * The plane a job's ring lies on (M8.10 slice 14): the island's ground under it, fitted through its middle and edge
+ * (`ringGround`), raised by the most the ground strays from it and `RING_LIFT`, so no part of the ring sinks into a
+ * slope or under a pavement; or its end's (`end`: the target a running job's ring stands on); the grid's flat 0.
+ */
+export function ringPlane(sim: SimWorld, d: JobDef, end = false): RingPlane {
+  const island = sim.island;
+  if (!island) return FLAT;
+  let known = planes.get(d);
+  if (!known) {
+    known = { ring: plane(ringGround(island, d.x, d.z, { y: 0, sx: 0, sz: 0, bent: 0 })), end: null };
+    planes.set(d, known);
+  }
+  if (!end) return known.ring;
+  known.end ??= plane(ringGround(island, d.targetX, d.targetZ, { y: 0, sx: 0, sz: 0, bent: 0 }));
+  return known.end;
+}
+const plane = (g: { y: number; sx: number; sz: number; bent: number }): RingPlane => ({ y: g.y + g.bent + RING_LIFT, sx: g.sx, sz: g.sz });
+
+/** The ground's height under a sign at (x, z): the island's drawn ground, the grid's 0. */
+function groundUnder(sim: SimWorld, x: number, z: number): number {
+  return sim.island ? sim.island.ground.surfaceHeight(x, z) : 0;
+}
+
+/**
+ * Fills `signs` and `rings` for this frame, each over the ground under it (the island's worked out once a ring,
+ * `ringPlane`). `time` drives the pulse and the bob; `view` the hunt's sighting rule (null: always sighted); `carAt`
+ * interpolates a traffic record's position (false: not drawn).
  */
 export function collectSigns(sim: SimWorld, time: number, view: SignView | null, carAt: (agent: number, out: { x: number; z: number }) => boolean,
   signs: SignList, rings: RingList): void {
@@ -119,11 +167,13 @@ export function collectSigns(sim: SimWorld, time: number, view: SignView | null,
       const state = closed ? SIGN_CLOSED : d.id === goalRing ? SIGN_GOAL : SIGN_OPEN;
       const wide = d.kind === 'duel' ? BALANCE.board.ringRadius / BALANCE.jobs.markerRadius : 1;
       const pulse = state === SIGN_CLOSED ? 1 : 1 + (state === SIGN_GOAL ? GOAL_PULSE : PULSE) * wave;
-      addRing(rings, d.x, d.z, wide * pulse, state);
+      // on the ground under it (the island's slopes: M8.10 slice 14)
+      const plane = ringPlane(sim, d);
+      addRing(rings, d.x, d.z, wide * pulse, state, plane);
       const up = state === SIGN_GOAL ? bob : 0;
       // a rival's sign floats over the car parked in its ring; the others stand on their poles
-      if (d.kind === 'duel') addSign(signs, d.x, FLOAT_Y + up, d.z, state, glyphOf(d), false, i);
-      else addSign(signs, d.x, SIGN_Y + up, d.z, state, glyphOf(d), true, i);
+      if (d.kind === 'duel') addSign(signs, d.x, FLOAT_Y + up, d.z, state, glyphOf(d), false, i, plane.y);
+      else addSign(signs, d.x, SIGN_Y + up, d.z, state, glyphOf(d), true, i, plane.y);
     }
   } else {
     const running = jobs.running;
@@ -134,25 +184,34 @@ export function collectSigns(sim: SimWorld, time: number, view: SignView | null,
         // the wanted car, within its range and in front of the camera: the key over its roof (a sighting, not a radar)
         const agent = jobs.wantedAgent;
         if (agent >= 0 && carAt(agent, scratch) && sighted(sim, scratch.x, scratch.z, view)) {
-          addSign(signs, scratch.x, FLOAT_Y + bob, scratch.z, SIGN_GOAL, glyphIndex('key'), false);
+          addSign(signs, scratch.x, FLOAT_Y + bob, scratch.z, SIGN_GOAL, glyphIndex('key'), false, -1, carBase(sim, agent));
         }
       } else if (hunt) {
         const agent = jobs.race.rivals[0] ?? -1;
-        if (agent >= 0 && carAt(agent, scratch)) addSign(signs, scratch.x, FLOAT_Y + bob, scratch.z, SIGN_GOAL, glyphOf(running), false);
+        if (agent >= 0 && carAt(agent, scratch)) addSign(signs, scratch.x, FLOAT_Y + bob, scratch.z, SIGN_GOAL, glyphOf(running), false, -1, carBase(sim, agent));
       } else if (!zone && jobs.target(scratch)) {
-        addRing(rings, scratch.x, scratch.z, 1 + GOAL_PULSE * wave, SIGN_GOAL);
-        addSign(signs, scratch.x, FLOAT_Y + bob, scratch.z, SIGN_GOAL, glyphOf(running), false);
+        const plane = ringPlane(sim, running, true);
+        addRing(rings, scratch.x, scratch.z, 1 + GOAL_PULSE * wave, SIGN_GOAL, plane);
+        addSign(signs, scratch.x, FLOAT_Y + bob, scratch.z, SIGN_GOAL, glyphOf(running), false, -1, plane.y);
       }
     }
   }
-  // a door the way leads to: the house over its opening
+  // a door the way leads to: the house over its opening, over its floor
   if (goal && goal.hasTarget && goal.door >= 0) {
-    const door = sim.run.dropOffs[goal.door]?.door;
-    if (door) addSign(signs, door.x, DOOR_Y + bob, door.z, SIGN_GOAL, glyphIndex('house'), false);
+    const site = sim.run.dropOffs[goal.door];
+    if (site) addSign(signs, site.door.x, DOOR_Y + bob, site.door.z, SIGN_GOAL, glyphIndex('house'), false, -1, site.y);
   }
   // a fare's hailer: the taxi over them
   const hailer = sim.fares.hailer, peds = sim.peds;
-  if (hailer >= 0 && peds) addSign(signs, peds.x[hailer] as number, FLOAT_Y, peds.z[hailer] as number, SIGN_OPEN, glyphIndex('taxi'), false);
+  if (hailer >= 0 && peds) {
+    const x = peds.x[hailer] as number, z = peds.z[hailer] as number;
+    addSign(signs, x, FLOAT_Y, z, SIGN_OPEN, glyphIndex('taxi'), false, -1, groundUnder(sim, x, z));
+  }
+}
+
+/** The road under a traffic car (its record's height: a deck's, a hill's): the island's; the grid's flat 0. */
+function carBase(sim: SimWorld, agent: number): number {
+  return sim.island && sim.traffic ? (sim.traffic.y[agent] as number) : 0;
 }
 
 /** The pay shows over an open sign within this of the car (m, M8.7 D5). */

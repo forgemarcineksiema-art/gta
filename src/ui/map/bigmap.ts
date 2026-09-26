@@ -497,10 +497,10 @@ export class BigMap {
       c.stroke(this.coverTurned);
     }
     const jobs = sim.jobs, running = jobs.running;
-    // a zone job's edge
+    // a zone job's edge round its middle (its target: the grid's ring, the island's place)
     if (running && jobs.state === 'active' && (running.kind === 'rage' || running.kind === 'mayhem')) {
       c.beginPath();
-      c.arc(running.x, running.z, BALANCE.jobs.zone.radius, 0, Math.PI * 2);
+      c.arc(running.targetX, running.targetZ, BALANCE.jobs.zone.radius, 0, Math.PI * 2);
       c.lineWidth = 3 / s;
       c.strokeStyle = ROUTE;
       c.stroke();

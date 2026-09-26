@@ -21,6 +21,7 @@ import type { SimWorld } from '../SimWorld';
 import { bodyTuning, type BodyId } from '../traffic/bodies';
 import { AgentState, type PlayerProbe, type Traffic } from '../traffic/Traffic';
 import { Vehicle } from '../vehicle/Vehicle';
+import { PLUMB_TILT } from '../island/Island';
 import type { VehicleTuning } from '../vehicle/tuning';
 import { Driver } from './Driver';
 
@@ -101,6 +102,12 @@ export class AiCars {
     this.nearD = new Float32Array(POLICE.physicalUnits);
     for (let k = 0; k < AI.pool + POLICE.physicalUnits; k++) {
       const vehicle = new Vehicle(sim.world, sim.transforms, bodyTuning('muscle'), PARK, 0);
+      // on the island's ground as the player's car is (M8.10 slice 14): its plumb rays leaning (a height field misses
+      // a ray straight down) and its wheels reading the ground's cover; the grid's cars keep theirs
+      if (sim.island) {
+        vehicle.plumbTilt = PLUMB_TILT;
+        vehicle.ground = sim.island.surface;
+      }
       vehicle.body.setEnabled(false);
       this.cars.push({ vehicle, driver: new Driver(), agent: -1, role: '', body: '', lane: -1, next: -1, stalled: 0, lateral: 0 });
     }
@@ -173,8 +180,9 @@ export class AiCars {
 
   /** After the physics: each car's transforms; its record drawn where it is, on the lane it is on, its hits sensed. */
   postStep(): void {
-    const traffic = this.sim.traffic, graph = this.sim.city?.graph;
-    if (!traffic || !graph) return;
+    const traffic = this.sim.traffic;
+    if (!traffic) return;
+    const graph = traffic.streets.graph;
     for (const car of this.cars) {
       const a = car.agent;
       if (a < 0) continue;
@@ -273,9 +281,9 @@ export class AiCars {
    * unit's its plan's, then straight on), laid again at a new lane or near its end.
    */
   private path(car: AiCar, traffic: Traffic): void {
-    const graph = this.sim.city?.graph, a = car.agent;
+    const graph = traffic.streets.graph, a = car.agent;
     const lane = traffic.lane[a] as number;
-    if (!graph || lane < 0) return;
+    if (lane < 0) return;
     const next = this.exit(car, lane, traffic);
     if (lane === car.lane && next === car.next && car.driver.left > AI.pathLeft) return;
     car.lane = lane;

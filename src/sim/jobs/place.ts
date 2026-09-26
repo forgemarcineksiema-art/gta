@@ -29,6 +29,7 @@ import { BLOCK, HIGHWAY_HALF, ROAD_HALF, distanceToPolyline, type Lane } from '.
 import { mulberry32 } from '../random';
 import { SEA_TRIAL, SLIPWAYS, slipwayTop, type Slipway } from '../city/sea';
 import type { LaneTables } from '../traffic/lanes';
+import type { StreetMap } from '../traffic/streets';
 import { BAKED_JOBS } from './baked';
 import { ORDER_KINDS, orderPaints, packDescriptor, type JobDef, type JobKind } from './catalog';
 
@@ -131,8 +132,11 @@ export function palmFence(city: City): { x: number; z: number } {
   return fallback;
 }
 
+/** What a lane path reads of a map: its lanes and the lane nearest a point (the grid's `City`, or a street map). */
+export type LaneMap = Pick<StreetMap, 'graph' | 'nearestLane'>;
+
 /** A drop-off as a job's end: 4 m inside its door (any car through the opening passes within the ring), on its approach lane. */
-export function dropOffTarget(city: City, site: DropOff): JobTarget {
+export function dropOffTarget(city: LaneMap, site: DropOff): JobTarget {
   const fx = Math.sin(site.yaw), fz = Math.cos(site.yaw);
   const approach = city.graph.lanes[site.approachLane] as Lane;
   return {
@@ -144,7 +148,7 @@ export function dropOffTarget(city: City, site: DropOff): JobTarget {
 }
 
 /** A point's nearest lane as a job's end. */
-export function pointTarget(city: City, x: number, z: number): JobTarget {
+export function pointTarget(city: LaneMap, x: number, z: number): JobTarget {
   const lane = city.nearestLane(x, z);
   return { x, z, lane, s: alongLane(city.graph.lanes[lane] as Lane, x, z).s };
 }
@@ -153,10 +157,13 @@ export function pointTarget(city: City, x: number, z: number): JobTarget {
  * The drive from a point to a target along the lanes: the shortest chain from
  * the point's nearest lane (U-turns included), its length in metres with the
  * junction curves, and its time at the lanes' limits (a curve at the slower of
- * its two lanes').
+ * its two lanes'). With the road's height under the point (`y`), its lane is the
+ * one at that height, never a deck over it (M8.10: the island's hills); without,
+ * the nearest in plan (the grid's placement, baked).
  */
-export function lanePathTo(city: City, lanes: LaneTables, x: number, z: number, target: JobTarget): { length: number; time: number } {
-  const start = city.nearestLane(x, z);
+export function lanePathTo(city: LaneMap, lanes: LaneTables, x: number, z: number, target: JobTarget, y?: number): { length: number; time: number } {
+  const start = city.nearestLane(x, z, y);
+  if (start < 0) return { length: Infinity, time: Infinity };
   const s0 = alongLane(city.graph.lanes[start] as Lane, x, z).s;
   const chain = start === target.lane && target.s >= s0 ? [start] : laneChain(city.graph, start, target.lane);
   if (chain.length === 0) return { length: Infinity, time: Infinity };
@@ -219,7 +226,7 @@ export function seaTrial(): Omit<JobDef, 'id'> {
   }
   return {
     kind: 'trial', x: top.x, z: top.z, yaw: 0, targetX: SEA_TRIAL.finish.x, targetZ: SEA_TRIAL.finish.z, level: 0, descriptor: -1,
-    payout: tr.pay[2] as number, limitSeconds: Math.round(length / (tr.speeds[0] as number)), heat: 0, route: SEA_TRIAL.buoys,
+    payout: tr.pay[2] as number, limitSeconds: Math.round(length / (tr.speeds[0] as number)), heat: 0, route: SEA_TRIAL.buoys, hover: true,
   };
 }
 

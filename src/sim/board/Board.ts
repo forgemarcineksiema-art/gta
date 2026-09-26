@@ -9,12 +9,15 @@
  * allocation per step.
  */
 import { BALANCE } from '../balance';
-import { districtAt } from '../city/City';
 import type { JobDef } from '../jobs/catalog';
 import type { SimWorld } from '../SimWorld';
 import { AgentState, type PlayerProbe } from '../traffic/Traffic';
 import { BODY_INDEX } from '../traffic/bodies';
 import { CHIEF, RIVALS, type Req, type RivalDef } from './rivals';
+
+/** A turf's junction keeps its district this far round it (m): one on a street bounding the district is not the turf's. */
+const TURF_EDGE = 15;
+const TURF_PROBE: ReadonlyArray<readonly [number, number]> = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]];
 
 export class Board {
   /** The rivals beaten, a bit each by `RIVALS` index (bit 10 the Chief). */
@@ -151,8 +154,8 @@ export class Board {
    * at their bay for the duel), out of the player's sight.
    */
   private tease(probe: PlayerProbe, n: number, dt: number): void {
-    const traffic = this.sim.traffic, city = this.sim.city;
-    if (!traffic || !city) return;
+    const traffic = this.sim.traffic;
+    if (!traffic) return;
     const r = n >= 0 ? RIVALS[n] : undefined;
     let a = this.teaser;
     // the record went (the traffic's despawn, a wreck's clean-up) or is another car now
@@ -221,17 +224,22 @@ export class Board {
     if (pick >= 0) traffic.route(a, pick);
   }
 
-  /** The lanes of a district whose both ends are its own junctions (none on the streets that bound it). */
+  /**
+   * The lanes of a district whose both ends are its own junctions (none on the streets that bound it: a junction whose
+   * district differs `TURF_EDGE` m off it, as the grid's on its axes; the grid's streets or the island's, M8.10 slice 14).
+   */
   private turf(id: string): Uint8Array | null {
-    const city = this.sim.city;
-    if (!city) return null;
+    const streets = this.sim.traffic?.streets;
+    if (!streets) return null;
     this.turfLanes ??= new Map();
     let lanes = this.turfLanes.get(id);
     if (!lanes) {
-      const graph = city.graph;
+      const graph = streets.graph;
       const inside = (node: number): boolean => {
         const nd = graph.nodes[node];
-        return nd !== undefined && nd.x !== 0 && nd.z !== 0 && districtAt(nd.x, nd.z).id === id;
+        if (!nd) return false;
+        for (const [dx, dz] of TURF_PROBE) if (streets.district(nd.x + dx * TURF_EDGE, nd.z + dz * TURF_EDGE) !== id) return false;
+        return true;
       };
       lanes = new Uint8Array(graph.lanes.length);
       for (let l = 0; l < graph.lanes.length; l++) {

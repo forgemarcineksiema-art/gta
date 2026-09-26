@@ -99,8 +99,10 @@ export class Fares {
 
   /** In they hop: the destination, the clock (with the chain's carry), the pay, and whether they are hot. */
   private pickUp(h: number, probe: PlayerProbe): void {
-    const sim = this.sim, city = sim.city, traffic = sim.traffic, peds = sim.peds, f = BALANCE.fares;
-    if (!city || !traffic || !peds) return;
+    const sim = this.sim, traffic = sim.traffic, peds = sim.peds, f = BALANCE.fares;
+    if (!traffic || !peds) return;
+    // the grid's streets or the island's (M8.10 slice 14)
+    const streets = traffic.streets;
     const x = peds.x[h] as number, z = peds.z[h] as number;
     // a lane's middle 250–750 m off in a straight line, 300–900 m by path, picked by the fare's own dice
     let target: { x: number; z: number; lane: number; s: number } | null = null, length = 0;
@@ -112,9 +114,12 @@ export class Fares {
       const lx = lanes.midX[lane] as number, lz = lanes.midZ[lane] as number;
       const straight = Math.hypot(lx - x, lz - z);
       if (straight < near * 0.8 || straight > far * 0.8) continue;
-      if ((city.graph.lanes[lane] as Lane).highway && lanes.heightAt(lane, (lanes.length[lane] as number) / 2) > 0.05) continue;
+      // a place on the ground: never the highway's deck over a street (the grid's overpasses, the island's viaduct
+      // and bridge) nor its tunnel under the hill
+      if ((streets.graph.lanes[lane] as Lane).highway && Math.abs(lanes.heightAt(lane, (lanes.length[lane] as number) / 2) - streets.groundAt(lx, lz)) > 0.5) continue;
       const t = { x: lx, z: lz, lane, s: (lanes.length[lane] as number) / 2 };
-      const p = lanePathTo(city, lanes, x, z, t);
+      // from the walker's pavement: the lanes at its height (the grid's, as it always did, in plan)
+      const p = lanePathTo(streets, lanes, x, z, t, sim.island ? streets.footAt(x, z) : undefined);
       if (p.length < near || p.length > far) continue;
       target = t;
       length = p.length;

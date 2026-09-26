@@ -13,7 +13,7 @@ import { BALANCE, FIXED_DT, type JobDef, type SimWorld } from '../../sim';
 import { SIGNALS } from '../../sim/palette';
 import { GLYPHS, GLYPH_ORDER, digitSlot, glyphIndex, numberGlyphs, type GlyphShape } from '../../sim/glyphs';
 import {
-  SIGN_COLORS, SIGN_GOAL, SIGN_MIN, SIGN_SIZE, SIGN_Y, collectSigns, newRingList, newSignList, signFold, signScale, signShare, type SignView,
+  SIGN_COLORS, SIGN_GOAL, SIGN_MIN, SIGN_SIZE, SIGN_Y, collectSigns, newRingList, newSignList, ringPlane, signFold, signScale, signShare, type RingPlane, type SignView,
 } from './signs';
 
 /** The way's cyan a taken ring lights in for `FLASH` s, growing by `FLASH_GROW` (M8.7 D8); a zone's edge wears it too. */
@@ -29,6 +29,10 @@ const DEPTH = 0.03;
 const POLE = 0x6d6d78;
 /** A kind brought out by the chain (M8.7 D10): its signs rise from the ground over `RISE` s. */
 const RISE = 0.6;
+/** The island's zone edge (M8.10 slice 14): its segments round, its half width (the grid's band's), its lift over the ground (m). */
+const ZONE_SEGMENTS = 128;
+const ZONE_HALF = 1.2;
+const ZONE_LIFT = 0.3;
 const REVEALED_KINDS = Object.keys(BALANCE.reveal) as JobDef['kind'][];
 
 /** A state's colours, the open ones for anything unknown. */
@@ -78,11 +82,21 @@ export class MarkerView {
   private readonly ringList;
   /** A zone job's edge on the ground (M5.5 slice 12): a thin ring its radius round the marker. */
   private readonly zone: THREE.Mesh;
-  /** The jobs' state last frame, and the taken ring's flash. */
+  /**
+   * The island's zone edge (M8.10 slice 14): the band laid along the ground's heights round the zone's middle, laid
+   * again when another zone runs (`zoneFor`, the def it was laid for).
+   */
+  private readonly zoneGround: THREE.Mesh;
+  private zoneFor: JobDef | null = null;
+  /** The jobs' state last frame, and the taken ring's flash, on its ground's plane. */
   private lastState = '';
   private flashX = 0;
   private flashZ = 0;
+  private flashPlane: RingPlane = { y: 0, sx: 0, sz: 0 };
   private flashUntil = -1;
+  /** A ring's turn onto its ground's plane (reused). */
+  private readonly qTilt = new THREE.Quaternion();
+  private readonly normal = new THREE.Vector3();
   /** Each digit's place on a sign, by the number's length (1 or 2) and the digit; a rival's number's digits (0..10). */
   private readonly digitLocal: THREE.Matrix4[][];
   private readonly numbers: number[][];
@@ -145,6 +159,17 @@ export class MarkerView {
     this.zone.visible = false;
     this.zone.frustumCulled = false;
     scene.add(this.zone);
+    const band = new THREE.BufferGeometry();
+    band.setAttribute('position', new THREE.BufferAttribute(new Float32Array((ZONE_SEGMENTS + 1) * 2 * 3), 3).setUsage(THREE.DynamicDrawUsage));
+    const index: number[] = [];
+    // each segment's inner (even) and outer (odd) points, wound to face up
+    for (let k = 0; k < ZONE_SEGMENTS; k++) index.push(2 * k, 2 * k + 2, 2 * k + 1, 2 * k + 1, 2 * k + 2, 2 * k + 3);
+    band.setIndex(index);
+    this.geometries.push(band);
+    this.zoneGround = new THREE.Mesh(band, this.zone.material);
+    this.zoneGround.visible = false;
+    this.zoneGround.frustumCulled = false;
+    scene.add(this.zoneGround);
   }
 
   update(sim: SimWorld, alpha: number): void {
@@ -152,12 +177,13 @@ export class MarkerView {
     this.sim = sim;
     this.alpha = alpha;
     const time = sim.time + alpha * FIXED_DT;
-    // a job taken: its ring lights up where it was
+    // a job taken: its ring lights up where it was, on its ground
     if (this.lastState === 'idle' && jobs.state !== 'idle') {
       const d = jobs.defOf(jobs.active);
       if (d && d.kind !== 'fare') {
         this.flashX = d.x;
         this.flashZ = d.z;
+        this.flashPlane = ringPlane(sim, d);
         this.flashUntil = sim.time + FLASH;
       }
     }
@@ -181,28 +207,35 @@ export class MarkerView {
     const signs = this.signs, rings = this.ringList;
     collectSigns(sim, time, view, this.carAt, signs, rings);
 
-    // the rings on the road, and the one just taken
+    // the rings on the road, and the one just taken: each on the ground's plane under it (the grid's flat 0)
     let n = 0;
     for (let i = 0; i < rings.count; i++) {
-      this.put(this.rings, n, rings.x[i] as number, 0, rings.z[i] as number, rings.scale[i] as number, this.qIdentity);
+      this.put(this.rings, n, rings.x[i] as number, rings.base[i] as number, rings.z[i] as number, rings.scale[i] as number, this.tilt(rings.sx[i] as number, rings.sz[i] as number));
       this.rings.setColorAt(n, this.color.setHex(stateColours(rings.state[i] as number).ring));
       n++;
     }
     const flash = this.flashUntil - sim.time;
     if (flash > 0) {
-      this.put(this.rings, n, this.flashX, 0, this.flashZ, 1 + FLASH_GROW * (1 - flash / FLASH), this.qIdentity);
+      const f = this.flashPlane;
+      this.put(this.rings, n, this.flashX, f.y, this.flashZ, 1 + FLASH_GROW * (1 - flash / FLASH), this.tilt(f.sx, f.sz));
       this.rings.setColorAt(n, this.color.setHex(CYAN));
       n++;
     }
     this.finish(this.rings, n);
 
-    // a zone job's edge
+    // a zone job's edge round its middle (its target: the grid's ring, the island's place); on the island laid along the
+    // ground's heights
     const running = jobs.running;
     const zone = running !== null && jobs.state === 'active' && (running.kind === 'rage' || running.kind === 'mayhem');
-    if (this.zone.visible !== zone) this.zone.visible = zone;
+    const island = sim.island !== null;
+    if (this.zone.visible !== (zone && !island)) this.zone.visible = zone && !island;
+    if (this.zoneGround.visible !== (zone && island)) this.zoneGround.visible = zone && island;
     if (zone && running) {
-      this.zone.position.set(running.x, 0, running.z);
-      this.zone.scale.setScalar(BALANCE.jobs.zone.radius);
+      if (island) this.layZone(sim, running);
+      else {
+        this.zone.position.set(running.targetX, 0, running.targetZ);
+        this.zone.scale.setScalar(BALANCE.jobs.zone.radius);
+      }
     }
 
     // the signs: each turned to the camera about the vertical; one grown past a share of the screen folds away with its
@@ -213,9 +246,9 @@ export class MarkerView {
     const fovY = perspective?.isPerspectiveCamera ? THREE.MathUtils.degToRad(perspective.fov) : 0;
     let poles = 0, shown = 0;
     for (let i = 0; i < signs.count; i++) {
-      const x = signs.x[i] as number, z = signs.z[i] as number;
+      const x = signs.x[i] as number, z = signs.z[i] as number, base = signs.base[i] as number;
       const rise = this.rise(jobs.defs[signs.def[i] as number], time);
-      const y = (signs.y[i] as number) * rise;
+      const y = base + (signs.y[i] as number) * rise;
       const depth = cam ? (x - cam.position.x) * this.dir.x + (y - cam.position.y) * this.dir.y + (z - cam.position.z) * this.dir.z : 0;
       const goal = signs.state[i] === SIGN_GOAL ? SIGN_MIN.goal : 1;
       const fold = fovY > 0 ? signFold(signShare(SIGN_SIZE * goal, depth, fovY)) : 1;
@@ -230,7 +263,7 @@ export class MarkerView {
       this.rims.setColorAt(shown, this.color.setHex(colours.rim));
       shown++;
       if (signs.pole[i] === 1) {
-        this.p.set(x, 0, z);
+        this.p.set(x, base, z);
         this.s.set(1, rise * fold, 1);
         this.m.compose(this.p, this.qIdentity, this.s);
         this.poles.setMatrixAt(poles++, this.m);
@@ -305,6 +338,35 @@ export class MarkerView {
     this.s.set(scale, scale, scale);
     this.m.compose(this.p, this.q, this.s);
     mesh.setMatrixAt(i, this.m);
+  }
+
+  /** The turn that lays a flat ring on a plane rising `sx` and `sz` per metre along x and z (none on the flat). */
+  private tilt(sx: number, sz: number): THREE.Quaternion {
+    if (sx === 0 && sz === 0) return this.qIdentity;
+    return this.qTilt.setFromUnitVectors(this.up, this.normal.set(-sx, 1, -sz).normalize());
+  }
+
+  /**
+   * The island's zone edge (M8.10 slice 14): a band `ZONE_HALF` m each side of the zone's radius round its middle, each
+   * point `ZONE_LIFT` m over the ground's surface, laid when a zone starts (not every frame: the ground never changes).
+   */
+  private layZone(sim: SimWorld, d: JobDef): void {
+    if (this.zoneFor === d) return;
+    this.zoneFor = d;
+    const island = sim.island;
+    if (!island) return;
+    const attr = this.zoneGround.geometry.getAttribute('position') as THREE.BufferAttribute, pos = attr.array as Float32Array;
+    const r = BALANCE.jobs.zone.radius;
+    for (let k = 0; k <= ZONE_SEGMENTS; k++) {
+      const a = (k / ZONE_SEGMENTS) * Math.PI * 2, c = Math.cos(a), s = Math.sin(a);
+      for (const [j, rr] of [[0, r - ZONE_HALF], [1, r + ZONE_HALF]] as const) {
+        const x = d.targetX + c * rr, z = d.targetZ + s * rr, o = (2 * k + j) * 3;
+        pos[o] = x;
+        pos[o + 1] = island.ground.surfaceHeight(x, z) + ZONE_LIFT;
+        pos[o + 2] = z;
+      }
+    }
+    attr.needsUpdate = true;
   }
 
   private put(mesh: THREE.InstancedMesh, i: number, x: number, y: number, z: number, scale: number, q: THREE.Quaternion): void {

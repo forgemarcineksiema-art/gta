@@ -307,9 +307,22 @@ export const PLACE_RINGS: readonly PlanRing[] = [
 // ---------------------------------------------------------------- what stands where (the plan's §1.4, placed.jpg)
 
 export type RingKind = Exclude<JobKind, 'fare' | 'duel'>;
-/** A job's ring, and where its job leads (a delivery's drop, an order's fence, a trial's finish), if anywhere. */
-export interface PlanJob { kind: RingKind; at: P2; to?: P2; level?: number }
+/**
+ * A job's ring, and where its job leads (a delivery's drop, an order's fence, a trial's or a race's finish), if
+ * anywhere. `along`: a trial's way, passed point by point (M8.10 slice 14): one road's (the network's line by its id),
+ * the way round a loop that passes nearest `via`; or the dry canal's channel, which no lane runs down.
+ */
+export interface PlanJob { kind: RingKind; at: P2; to?: P2; level?: number; along?: string; via?: P2 }
 const job = (kind: RingKind, at: P2, to?: P2, level?: number): PlanJob => ({ kind, at: W(at), ...(to ? { to: W(to) } : {}), ...(level !== undefined ? { level } : {}) });
+/** A trial run along one road or the canal (`PlanJob.along`), round a loop by `via`. */
+const along = (j: PlanJob, road: string, via?: P2): PlanJob => ({ ...j, along: road, ...(via ? { via: W(via) } : {}) });
+/**
+ * The 28 rings (M8.10 slice 14 placed each at its nearest kerb corner, `island/jobs.ts`): the trials down the
+ * serpentine's hairpins, over the viaduct and the bay bridge, round the botanic garden and through the canal; the races
+ * through the stadium's tunnel round its oval, over the hill into the quarry, along the coast to the lighthouse and over
+ * the port on the viaduct; the zones round the container maze, the stadium's car park, the market street and the beach
+ * promenade (their rings at the nearest corners).
+ */
 export const JOBS: readonly PlanJob[] = [
   job('delivery', [-470, -505], [150, -610]),
   job('delivery', [460, -410], [-250, 745]),
@@ -327,14 +340,14 @@ export const JOBS: readonly PlanJob[] = [
   job('escape', [-380, -400], undefined, 3),
   job('escape', [650, -590], undefined, 3),
   job('escape', [200, 752], undefined, 4),
-  job('trial', [-560, -400], [-784, -150]),
-  job('trial', [160, -545], [0, 700]),
+  along(job('trial', [-560, -400], [-760, -200]), 'serpentine'),
+  along(job('trial', [160, -545], [0, 700]), 'highway', [375, -640]),
   job('trial', [-470, 130], [-470, 470]),
-  job('trial', [-60, -240], [900, -272]),
-  job('race', [500, 150]),
-  job('race', [-110, -310]),
-  job('race', [-60, 752]),
-  job('race', [215, -560]),
+  along(job('trial', [-60, -240], [900, -272]), 'canal'),
+  job('race', [500, 150], [690, 178]),
+  job('race', [-110, -310], [-714, -520]),
+  job('race', [-60, 752], [834, 746]),
+  job('race', [215, -560], [720, -612]),
   job('rage', [620, -700]),
   job('rage', [720, 30]),
   job('mayhem', [-380, -220]),

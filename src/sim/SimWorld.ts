@@ -43,6 +43,7 @@ import { DONUT_SHOP, DonutShop } from './police/Donuts';
 import { Jobs } from './jobs/Jobs';
 import { Fares } from './jobs/Fares';
 import { jobsFor, seaTrial } from './jobs/place';
+import { islandJobs } from './island/jobs';
 import { AiCars } from './ai/AiCars';
 import { Garage } from './garage/Garage';
 import { Board } from './board/Board';
@@ -331,8 +332,10 @@ export class SimWorld {
     this.cameras = this.cover ? new Cameras(this.cover.cameraSites, this.cover.daily.cameras) : null;
     // the kickers, then the mega-ramp (M8.8 slice 21)
     this.jumps = this.city ? new Jumps(this, [...this.city.jumps, this.city.megaRamp]) : this.island ? new Jumps(this, this.island.jumps) : null;
-    // the generator's sixteen markers (docs/M5_PLAN.md D4); the cold open adds its own as id 0
-    this.jobs = new Jobs(this, this.city && this.traffic ? jobsFor(this.city, opts.seed ?? 42, this.traffic.lanes) : []);
+    // the generator's sixteen markers (docs/M5_PLAN.md D4); the cold open adds its own as id 0; the island's plan's
+    // 28 rings and 11 rivals (M8.10 slice 14)
+    this.jobs = new Jobs(this, this.city && this.traffic ? jobsFor(this.city, opts.seed ?? 42, this.traffic.lanes)
+      : this.island && this.traffic ? islandJobs(this.island, this.traffic.streets, this.traffic.lanes, opts.seed ?? 42) : []);
     // the sea trial (M8.8 slice 20), after the generator's, before the way learns the rings
     if (this.city && this.traffic) this.jobs.add(seaTrial());
     // the island's, from the marina's slipway round the bay and the lighthouse to the beach's (M8.10 slice 15)
@@ -349,8 +352,10 @@ export class SimWorld {
     this.dailies = new Dailies(this);
     this.caches = this.coins ? new Caches(this) : null;
     this.jobs.revealAll = opts.reveal ?? false;
-    this.way = this.city && this.traffic ? new Way(this, this.city.graph, this.traffic.lanes) : null;
-    this.ai = this.city && this.traffic ? new AiCars(this) : null;
+    // the way and the AI cars on the grid's streets or the island's (M8.10 slice 14: there a place is reached from the
+    // lanes at its ground's height, never a deck's over it)
+    this.way = streets && this.traffic ? new Way(this, streets.graph, this.traffic.lanes, this.island ? (x, z) => streets.groundAt(x, z) : undefined) : null;
+    this.ai = streets && this.traffic ? new AiCars(this) : null;
     if (this.city) {
       // what the street furniture keeps out of (M8 D7): every job's ring and its end, the stash's cars, the
       // breakers' towers, the donut shop; the cold open's route, the first time a chunk near it asks, with the things
@@ -380,7 +385,8 @@ export class SimWorld {
       const rings: PropRing[] = [];
       for (const d of this.jobs.defs) {
         rings.push({ x: d.x, z: d.z, r: d.kind === 'duel' ? BALANCE.board.ringRadius : r });
-        rings.push({ x: d.targetX, z: d.targetZ, r });
+        // (an escape has no end; a zone's is its middle, where its market stands, no place a car stops)
+        if (d.kind !== 'escape' && d.kind !== 'rage' && d.kind !== 'mayhem') rings.push({ x: d.targetX, z: d.targetZ, r });
       }
       for (const spot of Object.values(this.stash.spots)) rings.push({ x: spot.x, z: spot.z, r: PARKED_CAR_RING });
       for (const b of this.breakers?.descs ?? []) rings.push({ x: b.x, z: b.z, r: Math.hypot(BREAKER.halfWidth, BREAKER.halfDepth) + BREAKER.clear });

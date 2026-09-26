@@ -6,7 +6,7 @@ import { inPolygon } from '../../../src/sim/island/geom';
 import type { Island } from '../../../src/sim/island/Island';
 import { MEGA, RAMP_FOOT, type AirfieldPlace } from '../../../src/sim/island/places/airfield';
 import { PLACES, ROADS, islet } from '../../../src/sim/island/plan';
-import { createWorld } from '../helpers';
+import { createWorld, islandStatics } from '../helpers';
 import { flyTo } from './seaRoute';
 
 const RUNWAY = PLACES.runway, AXIS = (RUNWAY.x0 + RUNWAY.x1) / 2;
@@ -20,7 +20,7 @@ describe('M8.10 slice 12: the airfield and the islet', () => {
     island = sim.island as Island;
   }, 60_000);
   afterAll(() => sim.dispose());
-  const statics = (): StaticDesc[] => [...island.fill.chunks.values()].flat();
+  const statics = (): StaticDesc[] => islandStatics(island);
 
   it('12.1 the runway\'s straight: 650 m or more on one line from its threshold over the ramp\'s lip, level, paved and clear to the ramp\'s foot', () => {
     const g = island.ground, north = RUNWAY.z1 - 1, y0 = g.surfaceHeight(AXIS, north);

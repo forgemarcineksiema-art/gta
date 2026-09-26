@@ -13,7 +13,7 @@ import {
 } from '../../../src/sim/island/shapes/gardens';
 import { KERB, ROAD_LIFT } from '../../../src/sim/island/surfaces';
 import { PropState } from '../../../src/sim/props/Props';
-import { createWorld } from '../helpers';
+import { createWorld, islandStatics } from '../helpers';
 
 describe('M8.10 slice 10: Palm Gardens', () => {
   let sim: SimWorld;
@@ -123,7 +123,7 @@ describe('M8.10 slice 10: Palm Gardens', () => {
       return Math.abs(r - PATH.loop) < PATH.half + pad || (r < PATH.end && Math.abs(Math.abs(z - GARDEN.z) - PATH.chord) < PATH.half + pad);
     };
     let solids = 0;
-    for (const list of island.fill.chunks.values()) for (const st of list) {
+    for (const st of islandStatics(island)) {
       if (st.tag !== 'trunk' && st.tag !== 'building') continue;
       if (Math.hypot(st.position.x - GARDEN.x, st.position.z - GARDEN.z) > PATH.end) continue;
       solids++;
@@ -141,7 +141,7 @@ describe('M8.10 slice 10: Palm Gardens', () => {
       expect(g.surface(x, z)).toBe(ASPHALT);
       expect(top - g.surfaceHeight(GLASSHOUSE.x + Math.cos(k * 0.785) * 70, GLASSHOUSE.z + Math.sin(k * 0.785) * 70), 'over the garden').toBeGreaterThan(1.5);
     }
-    const hall = [...island.fill.chunks.values()].flat().find((st) => st.tag === 'building' && st.shape.kind === 'box' && st.shape.hx === GLASSHOUSE.half && Math.hypot(st.position.x - GLASSHOUSE.x, st.position.z - GLASSHOUSE.z) < 0.01);
+    const hall = islandStatics(island).find((st) => st.tag === 'building' && st.shape.kind === 'box' && st.shape.hx === GLASSHOUSE.half && Math.hypot(st.position.x - GLASSHOUSE.x, st.position.z - GLASSHOUSE.z) < 0.01);
     expect(hall).toBeDefined();
     if (hall?.shape.kind === 'box') expect(Math.abs(hall.position.y - hall.shape.hy - top)).toBeLessThan(0.01);
   });

@@ -169,7 +169,7 @@ describe('M8.10 slice 15a: the police\'s places', () => {
       }
       // its pole in the chunk's statics, standing on its foot
       const [i, j] = Island.chunkOf(c.poleX, c.poleZ);
-      expect(island.fill.chunks.get(Island.chunkIndex(i, j))?.some((st) => Math.abs(st.position.x - c.poleX) < 0.01 && Math.abs(st.position.z - c.poleZ) < 0.01 && Math.abs(st.position.y - (c.poleY + 3)) < 0.01), at).toBe(true);
+      expect(island.statics(Island.chunkIndex(i, j)).some((st) => Math.abs(st.position.x - c.poleX) < 0.01 && Math.abs(st.position.z - c.poleZ) < 0.01 && Math.abs(st.position.y - (c.poleY + 3)) < 0.01), at).toBe(true);
     }
     // the east straight's, on the highway's deck over the taxiway
     const cam = cams.descs.find((c) => g.onLand(c.x, c.z) && c.y - g.height(c.x, c.z) > 4) as CameraDesc;

@@ -29,6 +29,7 @@ import { BootWatch } from './bootWatch';
 import { GarageUi, type GarageActions } from '../ui/wall/garage';
 import { routeToDropOff } from './doorRoute';
 import { BotDriver } from './bot';
+import { loadIslandBake } from './islandBake';
 import { BotPolicy } from './botPolicy';
 import { JobBot } from './jobBot';
 import { AgentState } from '../sim/traffic/Traffic';
@@ -425,6 +426,9 @@ export class App {
 
   static async boot(canvas: HTMLCanvasElement): Promise<App> {
     const params = new URLSearchParams(location.search);
+    // the island's bake on its way beside the physics' start (M8.10 slice 18); the dev server's edits make it stale, so
+    // `npm run dev` builds the island from its plan unless `bake=1`
+    const bakeRequest = params.get('map') === 'island' && (!import.meta.env.DEV || params.get('bake') === '1') ? loadIslandBake(__ISLAND_KEY__) : null;
     // the screen's language (DESIGN.md §19): the parameter or the default until the save says the player's pick
     setLang(resolveLang(params.get('lang'), ''));
     document.documentElement.lang = lang();
@@ -484,8 +488,11 @@ export class App {
     const coldOpen = map === 'city' && coldOpenWanted(params, save);
     // forced (`coldopen=1`): shown even to a profile that has seen it
     if (coldOpen) save.seen = false;
+    const islandBake = bakeRequest ? await bakeRequest : null;
+    bootTimings['bake'] = performance.now();
     const sim = new SimWorld({
       map,
+      ...(islandBake ? { islandBake } : {}),
       seed: Number.isFinite(seed) ? seed : 42,
       traffic,
       peds,

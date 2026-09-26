@@ -216,7 +216,7 @@ export class Blockers {
     if (list) return list;
     list = [];
     const g = this.island.ground;
-    for (const st of this.island.fill.chunks.get(index) ?? []) {
+    for (const st of this.island.statics(index)) {
       const b = footprint(st);
       if (!b) continue;
       if (st.tag === 'kerb') {

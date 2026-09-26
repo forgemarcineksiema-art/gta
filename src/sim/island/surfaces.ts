@@ -2,8 +2,9 @@
  * The roads' surfaces (M8.10 slice 6b, docs/M8.10_PLAN.md): each road's strip a hair over the ground, broken at every
  * junction where one polygon from its arms' edges takes over; the pavements on their 14 cm kerbs along the town's
  * roads, stopping at the crossings' corners (and the kerbs' pieces the wheels climb); the paint: the centre and lane
- * lines, the edge lines, the stop lines, the zebra crossings, the arrows, the parking bays. Worked out once, as the
- * render's triangles a chunk; no Three.js.
+ * lines, the edge lines, the stop lines, the zebra crossings, the arrows, the parking bays. Worked out once
+ * (`roadSurfaces`: all the ground it reads kept in the data, so the island's bake keeps them), the render's triangles a
+ * chunk made from that (`surfaceMeshes`); no Three.js.
  */
 import { PARKING, PARKING_STYLE, type ParkingBay } from '../city/markings';
 import type { FootwayRun } from '../city/props';
@@ -65,13 +66,21 @@ export interface Strip {
   s: number[];
   /** Per segment: drawn (outside the junctions' boxes and the decks). */
   drawn: boolean[];
+  /** Per segment: its pavements (1 the right one, 2 the left one); where none, the strip's edge hangs its skirt. */
+  walk: number[];
+  /** Per point: the ground at the pavement's outer edge, the right then the left (NaN where no pavement reaches). */
+  out: number[];
 }
 /** A junction's rim point: where it is and, on an arm, its road's strip, station and offset. */
 export interface RimPoint { x: number; y: number; z: number; strip: number; s: number; o: number }
-export interface Junction { x: number; y: number; z: number; rim: RimPoint[] }
+/**
+ * A junction: its middle, its rim, and per rim point its fan's points on the ground: the spoke's middle to it, to the
+ * next, the chord's middle between them (x, y, z each).
+ */
+export interface Junction { x: number; y: number; z: number; rim: RimPoint[]; fan: number[] }
 export type PaintKind = 'centre' | 'lane' | 'edge' | 'stop' | 'zebra' | 'arrow' | 'bay';
 /** A quad of paint on a strip: its corners' stations and offsets, and heights. */
-export interface Paint { kind: PaintKind; strip: number; s: number[]; o: number[]; y: number[] }
+export interface Paint { kind: PaintKind; strip: number; s: number[]; o: number[]; y: number[]; colour: number }
 /** A chunk's surfaces: three corners a triangle, a colour a triangle. */
 export interface SurfaceChunk { positions: number[]; colors: number[] }
 export interface RoadSurfaces {
@@ -81,7 +90,6 @@ export interface RoadSurfaces {
   parking: ParkingBay[];
   /** The kerbs' pieces a chunk: the pavement's band, its middle at its top. */
   kerbs: Map<number, Piece[]>;
-  chunks: Map<number, SurfaceChunk>;
   /** The pavements as the grid's footway runs (straight, from the road's edge outward), for the props' lines. */
   footways: FootwayRun[];
 }
@@ -125,24 +133,13 @@ export function onStrip(st: Strip, s: number, o: number, out: { x: number; y: nu
 
 /** The roads' surfaces on the island's ground and network; `chunkOf` names a point's chunk; no bay where `noBay` says. */
 export function roadSurfaces(ground: Ground, graph: RoadGraph, chunkOf: (x: number, z: number) => number, noBay: (x: number, z: number) => boolean = () => false): RoadSurfaces {
-  const chunks = new Map<number, SurfaceChunk>(), kerbs = new Map<number, Piece[]>();
-  const tri = (ax: number, ay: number, az: number, bx: number, by: number, bz: number, cx: number, cy: number, cz: number, colour: number): void => {
-    const key = chunkOf((ax + bx + cx) / 3, (az + bz + cz) / 3);
-    let c = chunks.get(key);
-    if (!c) { c = { positions: [], colors: [] }; chunks.set(key, c); }
-    c.positions.push(ax, ay, az, bx, by, bz, cx, cy, cz);
-    c.colors.push(colour);
-  };
-  const quad = (a: readonly number[], b: readonly number[], c: readonly number[], d: readonly number[], colour: number): void => {
-    tri(a[0] as number, a[1] as number, a[2] as number, b[0] as number, b[1] as number, b[2] as number, c[0] as number, c[1] as number, c[2] as number, colour);
-    tri(a[0] as number, a[1] as number, a[2] as number, c[0] as number, c[1] as number, c[2] as number, d[0] as number, d[1] as number, d[2] as number, colour);
-  };
+  const kerbs = new Map<number, Piece[]>();
 
   // the strips' sections, on the ground's surface: one at each of the road's points, and between two where the ground
   // bends away from the straight line between them (a crest, a dip, a junction's edge) by more than `BEND`
   const strips: Strip[] = ground.roads.map((road, index) => {
     const hw = HALF_WIDTH[road.cls], n = road.pts.length, count = road.closed ? n + 1 : n;
-    const st: Strip = { road: index, id: road.id, cls: road.cls, hw, closed: road.closed, x: [], z: [], rx: [], rz: [], h: [], s: [], drawn: [] };
+    const st: Strip = { road: index, id: road.id, cls: road.cls, hw, closed: road.closed, x: [], z: [], rx: [], rz: [], h: [], s: [], drawn: [], walk: [], out: [] };
     const section = (x: number, z: number, rx: number, rz: number): number[] => ACROSS.map((f) => ground.surfaceHeight(x + rx * hw * f, z + rz * hw * f) + ROAD_LIFT);
     const push = (x: number, z: number, rx: number, rz: number, h: number[], drawn: boolean): void => {
       const k = st.x.length;
@@ -253,42 +250,33 @@ export function roadSurfaces(ground: Ground, graph: RoadGraph, chunkOf: (x: numb
     }
     if (rim.length < 2 * ACROSS.length) continue;
     rim.sort((a, b) => Math.atan2(a.z - nd.z, a.x - nd.x) - Math.atan2(b.z - nd.z, b.x - nd.x));
-    const j: Junction = { x: nd.x, y: ground.surfaceHeight(nd.x, nd.z) + ROAD_LIFT, z: nd.z, rim };
+    const j: Junction = { x: nd.x, y: ground.surfaceHeight(nd.x, nd.z) + ROAD_LIFT, z: nd.z, rim, fan: [] };
     junctions.push(j);
     // a fan from the middle, each triangle in four: the spokes' middles and the corners' chords on the ground
-    const colour = PALETTE.asphalt;
     const lifted = (x: number, z: number): number[] => [x, ground.surfaceHeight(x, z) + ROAD_LIFT, z];
     for (let i = 0; i < rim.length; i++) {
       const a = rim[i] as RimPoint, b = rim[(i + 1) % rim.length] as RimPoint;
-      const c = [j.x, j.y, j.z], pa = [a.x, a.y, a.z], pb = [b.x, b.y, b.z];
       const ma = lifted((j.x + a.x) / 2, (j.z + a.z) / 2), mb = lifted((j.x + b.x) / 2, (j.z + b.z) / 2);
       // along an arm's own section the chord is the strip's edge: straight, so the seam is exact
       const edge = a.strip === b.strip && a.s === b.s ? [(a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2] : lifted((a.x + b.x) / 2, (a.z + b.z) / 2);
-      tri(c[0] as number, c[1] as number, c[2] as number, ma[0] as number, ma[1] as number, ma[2] as number, mb[0] as number, mb[1] as number, mb[2] as number, colour);
-      tri(ma[0] as number, ma[1] as number, ma[2] as number, pa[0] as number, pa[1] as number, pa[2] as number, edge[0] as number, edge[1] as number, edge[2] as number, colour);
-      tri(ma[0] as number, ma[1] as number, ma[2] as number, edge[0] as number, edge[1] as number, edge[2] as number, mb[0] as number, mb[1] as number, mb[2] as number, colour);
-      tri(mb[0] as number, mb[1] as number, mb[2] as number, edge[0] as number, edge[1] as number, edge[2] as number, pb[0] as number, pb[1] as number, pb[2] as number, colour);
+      j.fan.push(...ma, ...mb, ...edge);
     }
   }
 
   // the strips and their pavements, and the pavements' footway runs (the props' lines, slice 7b)
   const footways: FootwayRun[] = [];
   for (const st of strips) {
-    const colour = st.cls === 'dirt' ? ISLAND_COLORS.dirt : st.cls === 'taxiway' ? PALETTE.concrete : PALETTE.asphalt;
     const paved = PAVED.has(st.cls), count = st.s.length;
     // the `i`-th point across section `k`
-    const pt = (k: number, i: number): number[] => {
-      const o = (ACROSS[i] as number) * st.hw;
-      return [(st.x[k] as number) + (st.rx[k] as number) * o, (st.h[k] as number[])[i] as number, (st.z[k] as number) + (st.rz[k] as number) * o];
-    };
-    const walked = [false, false], last = ACROSS.length - 1;
+    const pt = (k: number, i: number): number[] => stripPoint(st, k, i);
+    const last = ACROSS.length - 1;
+    st.out = new Array<number>(2 * count).fill(NaN);
     // each side's footway run being laid: straight while the pavement's edge keeps within `RUN_BEND` of its line
     const runs: Array<FootwayRun | null> = [null, null];
     const close = (w: number): void => { const r = runs[w]; if (r && r.length > 1) footways.push(r); runs[w] = null; };
     for (let k = 0; k + 1 < count; k++) {
-      if (!st.drawn[k]) { walked[0] = walked[1] = false; close(0); close(1); continue; }
-      // the bands as `heightOn` reads them
-      for (let i = 0; i < last; i++) quad(pt(k, i), pt(k + 1, i), pt(k + 1, i + 1), pt(k, i + 1), colour);
+      st.walk.push(0);
+      if (!st.drawn[k]) { close(0); close(1); continue; }
       for (const [side, e0, e1] of [[1, pt(k, 0), pt(k + 1, 0)], [-1, pt(k, last), pt(k + 1, last)]] as const) {
         const w = side > 0 ? 0 : 1;
         const outX0 = (st.x[k] as number) + (st.rx[k] as number) * side * (st.hw + PAVEMENT), outZ0 = (st.z[k] as number) + (st.rz[k] as number) * side * (st.hw + PAVEMENT);
@@ -308,23 +296,13 @@ export function roadSurfaces(ground: Ground, graph: RoadGraph, chunkOf: (x: numb
             runs[w] = { x: sx, z: sz, dx, dz, nx: -side * dz, nz: side * dx, length: l, along: st.s[k] as number, district: districtOf(sx, sz), street: st.cls === 'avenue' ? 'avenue' : 'grid', entrances: [] };
           }
         } else close(w);
-        if (!walk) {
-          walked[w] = false;
-          // the edge's skirt
-          quad(e0, [e0[0] as number, (e0[1] as number) - SKIRT, e0[2] as number], [e1[0] as number, (e1[1] as number) - SKIRT, e1[2] as number], e1, colour);
-          continue;
-        }
+        if (!walk) continue;
+        st.walk[k] = (st.walk[k] as number) | (w === 0 ? 1 : 2);
         const g0 = ground.surfaceHeight(outX0, outZ0), g1 = ground.surfaceHeight(outX1, outZ1);
+        st.out[2 * k + w] = g0;
+        st.out[2 * (k + 1) + w] = g1;
         const top0 = [e0[0] as number, (e0[1] as number) + KERB, e0[2] as number], top1 = [e1[0] as number, (e1[1] as number) + KERB, e1[2] as number];
         const out0 = [outX0, g0 + ROAD_LIFT + KERB, outZ0], out1 = [outX1, g1 + ROAD_LIFT + KERB, outZ1];
-        quad(top0, top1, out1, out0, ISLAND_COLORS.paving);
-        quad(e0, e1, top1, top0, PALETTE.kerb);
-        quad(out0, out1, [outX1, g1 - 0.3, outZ1], [outX0, g0 - 0.3, outZ0], PALETTE.kerb);
-        // its end where it starts after a gap, and where it stops before one (the next segment decides)
-        if (!walked[w]) quad(e0, top0, out0, [outX0, g0 - 0.3, outZ0], PALETTE.kerb);
-        walked[w] = true;
-        const ends = k + 2 >= count || !st.drawn[k + 1];
-        if (ends) quad(e1, top1, out1, [outX1, g1 - 0.3, outZ1], PALETTE.kerb);
         // the kerb's piece: the band's middle at its top
         const cx = ((e0[0] as number) + (e1[0] as number) + outX0 + outX1) / 4, cz = ((e0[2] as number) + (e1[2] as number) + outZ0 + outZ1) / 4;
         const ya = ((top0[1] as number) + (out0[1] as number)) / 2, yb = ((top1[1] as number) + (out1[1] as number)) / 2;
@@ -343,14 +321,12 @@ export function roadSurfaces(ground: Ground, graph: RoadGraph, chunkOf: (x: numb
   const paint: Paint[] = [], parking: ParkingBay[] = [];
   const corner = { x: 0, y: 0, z: 0 };
   const put = (kind: PaintKind, si: number, s: number[], o: number[], colour: number, lift = PAINT_LIFT): void => {
-    const st = strips[si] as Strip, y: number[] = [], v: number[][] = [];
+    const st = strips[si] as Strip, y: number[] = [];
     for (let i = 0; i < 4; i++) {
       onStrip(st, s[i] as number, o[i] as number, corner);
       y.push(corner.y + lift);
-      v.push([corner.x, corner.y + lift, corner.z]);
     }
-    paint.push({ kind, strip: si, s, o, y });
-    quad(v[0] as number[], v[1] as number[], v[2] as number[], v[3] as number[], colour);
+    paint.push({ kind, strip: si, s, o, y, colour });
   };
   // a line from `s0` to `s1`, `o` m right of the middle, split at the sections so it lies on the strip
   const line = (kind: PaintKind, si: number, s0: number, s1: number, o: number, width: number, colour: number): void => {
@@ -480,5 +456,86 @@ export function roadSurfaces(ground: Ground, graph: RoadGraph, chunkOf: (x: numb
       }
     }
   }
-  return { strips, junctions, paint, parking, kerbs, chunks, footways };
+  return { strips, junctions, paint, parking, kerbs, footways };
+}
+
+/** The `i`-th point across section `k` of a strip (x, its height there, z). */
+function stripPoint(st: Strip, k: number, i: number): number[] {
+  const o = (ACROSS[i] as number) * st.hw;
+  return [(st.x[k] as number) + (st.rx[k] as number) * o, (st.h[k] as number[])[i] as number, (st.z[k] as number) + (st.rz[k] as number) * o];
+}
+
+/**
+ * The render's triangles a chunk (`chunkOf` names a triangle's by its middle) from the surfaces' data, reading no ground:
+ * the junctions' fans, the strips' bands, their pavements on their kerbs (or their edges' skirts), the paint.
+ */
+export function surfaceMeshes(s: RoadSurfaces, chunkOf: (x: number, z: number) => number): Map<number, SurfaceChunk> {
+  const chunks = new Map<number, SurfaceChunk>();
+  const tri = (ax: number, ay: number, az: number, bx: number, by: number, bz: number, cx: number, cy: number, cz: number, colour: number): void => {
+    const key = chunkOf((ax + bx + cx) / 3, (az + bz + cz) / 3);
+    let c = chunks.get(key);
+    if (!c) { c = { positions: [], colors: [] }; chunks.set(key, c); }
+    c.positions.push(ax, ay, az, bx, by, bz, cx, cy, cz);
+    c.colors.push(colour);
+  };
+  const quad = (a: readonly number[], b: readonly number[], c: readonly number[], d: readonly number[], colour: number): void => {
+    tri(a[0] as number, a[1] as number, a[2] as number, b[0] as number, b[1] as number, b[2] as number, c[0] as number, c[1] as number, c[2] as number, colour);
+    tri(a[0] as number, a[1] as number, a[2] as number, c[0] as number, c[1] as number, c[2] as number, d[0] as number, d[1] as number, d[2] as number, colour);
+  };
+  // a fan from each junction's middle, each triangle in four: the spokes' middles and the corners' chords on the ground
+  for (const j of s.junctions) {
+    const colour = PALETTE.asphalt, rim = j.rim, f = j.fan;
+    for (let i = 0; i < rim.length; i++) {
+      const a = rim[i] as RimPoint, b = rim[(i + 1) % rim.length] as RimPoint, n = 9 * i;
+      const mx = f[n] as number, my = f[n + 1] as number, mz = f[n + 2] as number, nx = f[n + 3] as number, ny = f[n + 4] as number, nz = f[n + 5] as number;
+      const ex = f[n + 6] as number, ey = f[n + 7] as number, ez = f[n + 8] as number;
+      tri(j.x, j.y, j.z, mx, my, mz, nx, ny, nz, colour);
+      tri(mx, my, mz, a.x, a.y, a.z, ex, ey, ez, colour);
+      tri(mx, my, mz, ex, ey, ez, nx, ny, nz, colour);
+      tri(nx, ny, nz, ex, ey, ez, b.x, b.y, b.z, colour);
+    }
+  }
+  for (const st of s.strips) {
+    const colour = st.cls === 'dirt' ? ISLAND_COLORS.dirt : st.cls === 'taxiway' ? PALETTE.concrete : PALETTE.asphalt;
+    const count = st.s.length, last = ACROSS.length - 1, walked = [false, false];
+    for (let k = 0; k + 1 < count; k++) {
+      if (!st.drawn[k]) { walked[0] = walked[1] = false; continue; }
+      // the bands as `heightOn` reads them
+      for (let i = 0; i < last; i++) quad(stripPoint(st, k, i), stripPoint(st, k + 1, i), stripPoint(st, k + 1, i + 1), stripPoint(st, k, i + 1), colour);
+      for (const [side, e0, e1] of [[1, stripPoint(st, k, 0), stripPoint(st, k + 1, 0)], [-1, stripPoint(st, k, last), stripPoint(st, k + 1, last)]] as const) {
+        const w = side > 0 ? 0 : 1;
+        if (((st.walk[k] as number) & (w === 0 ? 1 : 2)) === 0) {
+          walked[w] = false;
+          // the edge's skirt
+          quad(e0, [e0[0] as number, (e0[1] as number) - SKIRT, e0[2] as number], [e1[0] as number, (e1[1] as number) - SKIRT, e1[2] as number], e1, colour);
+          continue;
+        }
+        const outX0 = (st.x[k] as number) + (st.rx[k] as number) * side * (st.hw + PAVEMENT), outZ0 = (st.z[k] as number) + (st.rz[k] as number) * side * (st.hw + PAVEMENT);
+        const outX1 = (st.x[k + 1] as number) + (st.rx[k + 1] as number) * side * (st.hw + PAVEMENT), outZ1 = (st.z[k + 1] as number) + (st.rz[k + 1] as number) * side * (st.hw + PAVEMENT);
+        const g0 = st.out[2 * k + w] as number, g1 = st.out[2 * (k + 1) + w] as number;
+        const top0 = [e0[0] as number, (e0[1] as number) + KERB, e0[2] as number], top1 = [e1[0] as number, (e1[1] as number) + KERB, e1[2] as number];
+        const out0 = [outX0, g0 + ROAD_LIFT + KERB, outZ0], out1 = [outX1, g1 + ROAD_LIFT + KERB, outZ1];
+        quad(top0, top1, out1, out0, ISLAND_COLORS.paving);
+        quad(e0, e1, top1, top0, PALETTE.kerb);
+        quad(out0, out1, [outX1, g1 - 0.3, outZ1], [outX0, g0 - 0.3, outZ0], PALETTE.kerb);
+        // its end where it starts after a gap, and where it stops before one (the next segment decides)
+        if (!walked[w]) quad(e0, top0, out0, [outX0, g0 - 0.3, outZ0], PALETTE.kerb);
+        walked[w] = true;
+        const ends = k + 2 >= count || !st.drawn[k + 1];
+        if (ends) quad(e1, top1, out1, [outX1, g1 - 0.3, outZ1], PALETTE.kerb);
+      }
+    }
+  }
+  // the paint, on its strip at its heights
+  const corner = { x: 0, y: 0, z: 0 }, v = [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]];
+  for (const p of s.paint) {
+    const st = s.strips[p.strip] as Strip;
+    for (let i = 0; i < 4; i++) {
+      onStrip(st, p.s[i] as number, p.o[i] as number, corner);
+      const q = v[i] as number[];
+      q[0] = corner.x; q[1] = p.y[i] as number; q[2] = corner.z;
+    }
+    quad(v[0] as number[], v[1] as number[], v[2] as number[], v[3] as number[], p.colour);
+  }
+  return chunks;
 }

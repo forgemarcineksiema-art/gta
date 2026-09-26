@@ -26,6 +26,8 @@ const PAVE_LIFT = 0.035;
 const PAVE_CELL = 8;
 /** The chunks within this of the car are built at the start; the rest a few columns a frame (m). */
 const SNAP_REACH = 400;
+/** The buildings and the roads' surfaces of the chunks within this of the car are built at the start; the rest a chunk a frame (m). */
+const SNAP_BUILT = 250;
 /** The standing props are drawn in the chunks whose middles are within this of the car (m). */
 const PROP_SIGHT = 420;
 /** The coast's things (m): bollards along a quay, a parapet's height and thickness, boulders along the rocks. */
@@ -33,13 +35,23 @@ const BOLLARD = { every: 10, radius: 0.22, height: 0.7, inset: 0.35 } as const;
 const PARAPET = { height: 0.9, half: 0.3, inset: 0.35 } as const;
 const BOULDER = { every: 4.5, min: 0.9, max: 2.6 } as const;
 
+/** How far chunk `k`'s middle is from (x, z) (m). */
+function far(k: number, x: number, z: number): number {
+  return Math.hypot(CHUNK_X0 + ((k % CHUNKS_X) + 0.5) * CHUNK - x, CHUNK_Z0 + (Math.floor(k / CHUNKS_X) + 0.5) * CHUNK - z);
+}
+
 export class IslandView {
   private readonly group = new THREE.Group();
   private readonly ground: GroundView;
   private readonly color = new THREE.Color();
-  /** The roads' surfaces' meshes and the buildings' by chunk. */
+  /** The roads' surfaces' meshes and the buildings' by chunk, made as they come in sight (`sync`), and which are made. */
   private readonly surfaceChunks = new Map<number, THREE.Mesh>();
   private readonly buildingChunks = new Map<number, THREE.Mesh>();
+  private readonly made = new Uint8Array(CHUNKS_X * CHUNKS_Z);
+  private readonly surfaceGroup = new THREE.Group();
+  private readonly buildingGroup = new THREE.Group();
+  private readonly surfaceMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1.5, polygonOffsetUnits: -3 });
+  private readonly buildingMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
   /** The places that move (slices 8–12). */
   private readonly views: PlaceView[];
   /** The standing props' meshes by chunk (slice 7b), and the props' serial they show. */
@@ -55,8 +67,9 @@ export class IslandView {
     this.group.add(sea);
     this.ground = new GroundView(island);
     this.group.add(this.ground.group);
-    this.group.add(this.surfaces());
-    this.group.add(this.buildings());
+    fadeRoadPaint(this.buildingMaterial);
+    lightCity(this.buildingMaterial);
+    this.group.add(this.surfaceGroup, this.buildingGroup);
     this.group.add(this.paving());
     this.group.add(this.structures());
     this.group.add(...this.coast());
@@ -127,32 +140,47 @@ export class IslandView {
     if (dirty) attr.needsUpdate = true;
   }
 
-  /** Build the ground's chunks within sight of (x, z), a few columns a frame (the near ones at once when `snap`). */
+  /**
+   * Build the chunks within sight of (x, z): the ground's a few columns a frame, the buildings' and the roads' surfaces'
+   * the nearest missing chunk a frame (M8.10 slice 18: the island's start builds only what is near); the near ones at
+   * once when `snap`.
+   */
   sync(x: number, z: number, quality: QualityTier, snap = false): void {
     const reach = QUALITY[quality].far + CHUNK * 0.75;
     if (snap) this.ground.sync(x, z, Math.min(reach, SNAP_REACH), true);
     this.ground.sync(x, z, reach);
-    for (const list of [this.surfaceChunks, this.buildingChunks]) for (const [k, mesh] of list) {
-      const i = k % CHUNKS_X, j = Math.floor(k / CHUNKS_X);
-      mesh.visible = Math.hypot(CHUNK_X0 + (i + 0.5) * CHUNK - x, CHUNK_Z0 + (j + 0.5) * CHUNK - z) < reach;
+    if (snap) {
+      for (let k = 0; k < this.made.length; k++) if (this.made[k] === 0 && far(k, x, z) < Math.min(reach, SNAP_BUILT)) this.make(k);
+    } else {
+      let next = -1, best = reach;
+      for (let k = 0; k < this.made.length; k++) {
+        if (this.made[k] === 1) continue;
+        const d = far(k, x, z);
+        if (d < best) { best = d; next = k; }
+      }
+      if (next >= 0) this.make(next);
     }
+    for (const [k, mesh] of this.surfaceChunks) mesh.visible = far(k, x, z) < reach;
+    for (const [k, mesh] of this.buildingChunks) mesh.visible = far(k, x, z) < reach;
   }
 
-  /** The lots' buildings, their plinths and the palms (the sim's fill, slice 7a), a mesh a chunk in the grid's kit. */
-  private buildings(): THREE.Group {
-    const g = new THREE.Group();
-    const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-    fadeRoadPaint(material);
-    lightCity(material);
-    for (const [k, list] of this.island.fill.chunks) {
-      const mesh = new THREE.Mesh(cityGeometry(list), material);
+  /** A chunk's meshes: its buildings, plinths and palms (the sim's fill, slice 7a, in the grid's kit) and its roads' surfaces. */
+  private make(k: number): void {
+    this.made[k] = 1;
+    const list = this.island.statics(k);
+    if (list.length > 0) {
+      const mesh = new THREE.Mesh(cityGeometry(list), this.buildingMaterial);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       mesh.matrixAutoUpdate = false;
       this.buildingChunks.set(k, mesh);
-      g.add(mesh);
+      this.buildingGroup.add(mesh);
     }
-    return g;
+    const surface = this.surface(k);
+    if (surface) {
+      this.surfaceChunks.set(k, surface);
+      this.surfaceGroup.add(surface);
+    }
   }
 
   dispose(): void {
@@ -168,29 +196,25 @@ export class IslandView {
   }
 
   /**
-   * The roads' surfaces (the sim's, slice 6b), a mesh a chunk: the strips a hair over the ground, the junctions, the
-   * pavements on their kerbs, the paint; each chunk shown within sight as the ground's are.
+   * A chunk's roads' surfaces (the sim's, slice 6b): the strips a hair over the ground, the junctions, the pavements on
+   * their kerbs, the paint; null where none.
    */
-  private surfaces(): THREE.Group {
-    const g = new THREE.Group(), c = this.color;
-    const material = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1.5, polygonOffsetUnits: -3 });
-    for (const [k, chunk] of this.island.surfaces.chunks) {
-      const col = new Float32Array(chunk.positions.length);
-      chunk.colors.forEach((hex, t) => {
-        c.setHex(hex);
-        for (let v = 0; v < 3; v++) col.set([c.r, c.g, c.b], t * 9 + v * 3);
-      });
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute(chunk.positions, 3));
-      geometry.setAttribute('color', new THREE.BufferAttribute(col, 3));
-      geometry.computeVertexNormals();
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.receiveShadow = true;
-      mesh.matrixAutoUpdate = false;
-      this.surfaceChunks.set(k, mesh);
-      g.add(mesh);
-    }
-    return g;
+  private surface(k: number): THREE.Mesh | null {
+    const chunk = this.island.surfaceMeshes().get(k), c = this.color;
+    if (!chunk) return null;
+    const col = new Float32Array(chunk.positions.length);
+    chunk.colors.forEach((hex, t) => {
+      c.setHex(hex);
+      for (let v = 0; v < 3; v++) col.set([c.r, c.g, c.b], t * 9 + v * 3);
+    });
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(chunk.positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    geometry.computeVertexNormals();
+    const mesh = new THREE.Mesh(geometry, this.surfaceMaterial);
+    mesh.receiveShadow = true;
+    mesh.matrixAutoUpdate = false;
+    return mesh;
   }
 
   /**

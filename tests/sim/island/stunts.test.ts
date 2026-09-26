@@ -12,7 +12,7 @@ import { inKeep } from '../../../src/sim/island/keep';
 import { BREAKERS, FIRST_MINUTE_STEPS, JUMPS } from '../../../src/sim/island/plan';
 import type { CrownPlace } from '../../../src/sim/island/places/crown';
 import { quayPlace } from '../../../src/sim/island/places/quay';
-import { createWorld } from '../helpers';
+import { createWorld, islandStatics } from '../helpers';
 
 /**
  * Straight at a jump from its run-up's start at `kmh`, held to its foot, then flat out: the jumps' own reading of the
@@ -159,7 +159,7 @@ describe('M8.10 slice 15: jumps, billboards, breakers', () => {
     }
     expect(props).toBeGreaterThan(2000);
     // nothing solid of the places' within a car's height in a kicker's run-up or a billboard's run-out (the landings: 15.3)
-    const solids = [...island.fill.chunks.values()].flat().filter((st) => st.tag === 'building' && st.shape.kind === 'box');
+    const solids = islandStatics(island).filter((st) => st.tag === 'building' && st.shape.kind === 'box');
     // (a run-up from its start to the kicker's foot: the kicker's own sides are its dress, the container yard's stack)
     const runUps = sites.kickers.map((j) => { const fx = Math.sin(j.yaw), fz = Math.cos(j.yaw), half = runUp(j.jump) / 2, mid = j.length + half; return { x: j.x - fx * mid, z: j.z - fz * mid, yaw: j.yaw, hx: j.half + 1, hz: half }; });
     // (a run-up on the ground under it, a billboard's run-out on what its posts stand on: a roof, a boardwalk)

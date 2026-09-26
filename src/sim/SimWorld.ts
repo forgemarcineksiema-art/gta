@@ -13,7 +13,7 @@ import { GROUP_DEFAULT, interactionGroups } from './collision';
 /** A query that meets the solid statics only (buildings, walls, roofs), not kerbs, ramps or the ground. */
 const SOLID_ONLY = interactionGroups(0xffff, GROUP_DEFAULT);
 import { City, type PropRing } from './city/City';
-import { Island, PLUMB_TILT } from './island/Island';
+import { Island, PLUMB_TILT, type IslandBake } from './island/Island';
 import { islandCoinLines } from './island/coinLines';
 import { islandStreets } from './island/streetMap';
 import { islandCover } from './island/cover';
@@ -91,6 +91,8 @@ export function initPhysics(): Promise<void> {
 export interface SimWorldOptions {
   /** The grid city, the handling playground, or the hand-drawn island (M8.10, `?map=island` until its switch). */
   map?: 'city' | 'playground' | 'island';
+  /** The island made from its bake (M8.10 slice 18: its builders' work done at the build), else built from its plan. */
+  islandBake?: IslandBake;
   seed?: number;
   tuning?: VehicleTuning;
   spawn?: string;
@@ -249,7 +251,7 @@ export class SimWorld {
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
     this.world.timestep = FIXED_DT;
     this.city = opts.map === 'city' ? new City(this.world, opts.seed) : null;
-    this.island = opts.map === 'island' ? new Island(this.world) : null;
+    this.island = opts.map === 'island' ? new Island(this.world, opts.islandBake) : null;
     this.layout = this.city ? { statics: [], props: cityToys(), spawns: this.city.spawns, track: this.city.route, groundSize: 1575 }
       : this.island ? { statics: [], props: [], spawns: this.island.spawns, track: this.island.route, groundSize: 2300 }
       : buildPlayground(this.world);
@@ -327,7 +329,9 @@ export class SimWorld {
     this.pursuit.descriptor.paint = this.carPaint;
     this.pursuit.descriptor.police = policeLiveried(this.carId);
     // the garages, the roadblock sites, the parked patrols' places, the cameras: the grid's or the island's (slice 14)
-    this.cover = this.city ? coverSites(this.city) : this.island ? islandCover(this.island) : null;
+    // the island's from its bake (M8.10 slice 18), else worked out and kept for it
+    const baked = this.island?.worldBake ?? null, seed = opts.seed ?? 42;
+    this.cover = this.city ? coverSites(this.city) : this.island ? (baked?.cover ?? islandCover(this.island)) : null;
     this.police = this.traffic ? new Police(this) : null;
     // a crime in a unit's sight pays double and makes the player wanted (DESIGN.md §13.3)
     this.heat.seen = () => this.police?.crimeSeen() ?? false;
@@ -339,8 +343,8 @@ export class SimWorld {
     this.jumps = this.city ? new Jumps(this, [...this.city.jumps, this.city.megaRamp]) : this.island ? new Jumps(this, this.island.jumps) : null;
     // the generator's sixteen markers (docs/M5_PLAN.md D4); the cold open adds its own as id 0; the island's plan's
     // 28 rings and 11 rivals (M8.10 slice 14)
-    this.jobs = new Jobs(this, this.city && this.traffic ? jobsFor(this.city, opts.seed ?? 42, this.traffic.lanes)
-      : this.island && this.traffic ? islandJobs(this.island, this.traffic.streets, this.traffic.lanes, opts.seed ?? 42) : []);
+    const islandDefs = this.island && this.traffic ? (baked && baked.seed === seed ? baked.jobs : islandJobs(this.island, this.traffic.streets, this.traffic.lanes, seed)) : [];
+    this.jobs = new Jobs(this, this.city && this.traffic ? jobsFor(this.city, seed, this.traffic.lanes) : islandDefs.slice());
     // the sea trial (M8.8 slice 20), after the generator's, before the way learns the rings
     if (this.city && this.traffic) this.jobs.add(seaTrial());
     // the island's, from the marina's slipway round the bay and the lighthouse to the beach's (M8.10 slice 15)
@@ -349,6 +353,7 @@ export class SimWorld {
     this.fares = new Fares(this, this.events);
     this.skill = new Skill(this);
     this.stash = new Stash(this);
+    if (this.island && !baked && this.cover) this.island.worldBake = { seed, jobs: islandDefs, cover: this.cover, stash: this.stash.spots };
     this.ticket = new TicketOfficer(this);
     this.breakers = this.city && this.traffic ? new Breakers(this) : this.island && this.traffic ? new Breakers(this, this.island.breakers) : null;
     this.donuts = (this.city || this.island) && this.traffic ? new DonutShop(this, this.island?.donutShop) : null;

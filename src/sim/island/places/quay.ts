@@ -56,9 +56,21 @@ export interface Duck {
   x: number; y: number; z: number; yaw: number;
   px: number; py: number; pz: number; pyaw: number;
 }
+/**
+ * What Coral Quay's running part is made from (the island's bake keeps it, M8.10 slice 18): the wheel's axle, the lamp's
+ * middle, the kickers, the gap.
+ */
+export interface QuayData {
+  id: 'quay';
+  wheel: { x: number; y: number; z: number };
+  lamp: { x: number; y: number; z: number };
+  kickers: Kicker[];
+  gap: { x0: number; x1: number; z: number; y: number };
+}
 /** Coral Quay's running part: the wheel's and the lamp's turns, the duck, the kickers, the gap. */
 export interface QuayPlace extends Place {
   readonly id: 'quay';
+  readonly data: QuayData;
   /** The wheel's axle (it turns about the world's x), its turn now and a step before (rad). */
   readonly wheel: { x: number; y: number; z: number; angle: number; prev: number };
   /** The lamp's middle and its heading now and a step before (rad). */
@@ -120,26 +132,31 @@ export function quayPlaces(ctx: PlaceContext): Place[] {
   const lampAt = lighthouse(kit);
   hotel(kit);
   stadium(kit, kickers);
+  return [makeQuay(ctx.world, { id: 'quay', wheel: wheelAt, lamp: lampAt, kickers, gap })];
+}
 
+/** Coral Quay's running part from its data (built, or baked): the wheel and the lamp turning, the duck afloat in the bay. */
+export function makeQuay(world: RAPIER.World, data: QuayData): QuayPlace {
   // the duck: a capsule of a body along its x, a ball of a head, afloat in the bay
   const home = PLACES.duck, y0 = SEA.level + DUCK.float;
-  const body = ctx.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(home.x, y0, home.z).enabledRotations(false, true, false)
+  const body = world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(home.x, y0, home.z).enabledRotations(false, true, false)
     .setAngularDamping(DUCK.yawDamping).setCanSleep(false));
   const bodyMass = DUCK.mass * 0.8;
-  ctx.world.createCollider(RAPIER.ColliderDesc.capsule(DUCK.body.half, DUCK.body.radius).setRotation({ x: 0, y: 0, z: Math.SQRT1_2, w: Math.SQRT1_2 })
+  world.createCollider(RAPIER.ColliderDesc.capsule(DUCK.body.half, DUCK.body.radius).setRotation({ x: 0, y: 0, z: Math.SQRT1_2, w: Math.SQRT1_2 })
     .setMass(bodyMass).setFriction(0.3).setRestitution(0.4).setCollisionGroups(GROUPS_PROP), body);
-  ctx.world.createCollider(RAPIER.ColliderDesc.ball(DUCK.head.radius).setTranslation(DUCK.head.x, DUCK.head.y, 0)
+  world.createCollider(RAPIER.ColliderDesc.ball(DUCK.head.radius).setTranslation(DUCK.head.x, DUCK.head.y, 0)
     .setMass(DUCK.mass - bodyMass).setFriction(0.3).setRestitution(0.4).setCollisionGroups(GROUPS_PROP), body);
   const duck: Duck = { body, home: { x: home.x, z: home.z }, x: home.x, y: y0, z: home.z, yaw: 0, px: home.x, py: y0, pz: home.z, pyaw: 0 };
-  const gravity = -ctx.world.gravity.y;
+  const gravity = -world.gravity.y;
   const at = { x: 0, y: 0, z: 0 }, vel = { x: 0, y: 0, z: 0 }, turn = { x: 0, y: 0, z: 0, w: 1 }, impulse = { x: 0, y: 0, z: 0 };
   let time = 0;
 
   const place: QuayPlace = {
     id: 'quay',
-    wheel: { ...wheelAt, angle: 0, prev: 0 },
-    lamp: { ...lampAt, angle: 0, prev: 0 },
-    duck, kickers, gap,
+    data,
+    wheel: { ...data.wheel, angle: 0, prev: 0 },
+    lamp: { ...data.lamp, angle: 0, prev: 0 },
+    duck, kickers: data.kickers, gap: data.gap,
     step(dt: number): void {
       time += dt;
       const w = place.wheel, l = place.lamp;
@@ -161,25 +178,16 @@ export function quayPlaces(ctx: PlaceContext): Place[] {
       body.applyImpulse(impulse, true);
     },
   };
-  return [place];
+  return place;
 }
 
 /** Clear the fill's palms out of the ways onto the Quay's decks (the Quay's sweep lines its verges with them). */
 function clearPalms(ctx: PlaceContext): void {
   // the boardwalk's west end and the pleasure pier's root, from the sweep's pavement (sketch rectangles)
   const ways = [{ x0: 330, x1: MARINA.walk.x0 + 12, z0: MARINA.walk.z - 6, z1: MARINA.walk.z + 6 }, { x0: 312, x1: MARINA.pleasure.x0 + 12, z0: 553, z1: 568 }];
-  const fill = ctx.fill;
-  for (let i = fill.palms.length - 1; i >= 0; i--) {
-    const p = fill.palms[i] as { x: number; z: number };
-    if (!ways.some((r) => -p.x > r.x0 && -p.x < r.x1 && -p.z > r.z0 && -p.z < r.z1)) continue;
-    // a palm's pieces all stand on its point (its trunk, its fronds, its crown)
-    const list = ctx.statics(p.x, p.z);
-    for (let k = list.length - 1; k >= 0; k--) {
-      const st = list[k] as StaticDesc;
-      if (Math.abs(st.position.x - p.x) < 1e-6 && Math.abs(st.position.z - p.z) < 1e-6) list.splice(k, 1);
-    }
-    fill.palms.splice(i, 1);
-  }
+  const fill = ctx.fill, out = (p: { x: number; z: number }): boolean => ways.some((r) => -p.x > r.x0 && -p.x < r.x1 && -p.z > r.z0 && -p.z < r.z1);
+  for (let i = fill.palms.length - 1; i >= 0; i--) if (out(fill.palms[i] as { x: number; z: number })) fill.palms.splice(i, 1);
+  for (let i = fill.trees.length - 1; i >= 0; i--) if (out(fill.trees[i] as { x: number; z: number })) fill.trees.splice(i, 1);
 }
 
 /**

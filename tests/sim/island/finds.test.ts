@@ -54,7 +54,7 @@ describe('M8.10 slice 15: the finds', () => {
     expect(trial[0]?.route?.map((b) => [b.x, b.z])).toEqual(BUOYS.map((b) => [b[0], b[1]]));
     // a buoy drawn on the sea's surface at each
     for (const [x, z] of BUOYS) {
-      const list = island.fill.chunks.get(Island.chunkIndex(...Island.chunkOf(x, z))) ?? [];
+      const list = island.statics(Island.chunkIndex(...Island.chunkOf(x, z)));
       expect(list.some((st) => st.position.x === x && st.position.z === z && Math.abs(st.position.y - (SEA.level + 0.35)) < 1e-6), `a buoy at ${x}, ${z}`).toBe(true);
     }
   });

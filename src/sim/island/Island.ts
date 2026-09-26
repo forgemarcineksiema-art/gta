@@ -14,13 +14,13 @@ import type { TrackDef, TrackSample } from '../track';
 import { inPolygon, type P2 } from './geom';
 import { ASPHALT, GRASS } from '../city/surface';
 import { PROP_LINES, PROP_TYPES, chunkProps, type PropDesc, type PropKind, type PropPlace } from '../city/props';
-import { FOOT, Ground, HALF_WIDTH, type CoastKind, type GroundProbe } from './ground';
+import { FOOT, Ground, HALF_WIDTH, type CoastKind, type GroundData, type GroundProbe } from './ground';
 import { LaneIndex } from '../city/laneIndex';
-import { buildNetwork } from './network';
+import { buildNetwork, type IslandNetwork } from './network';
 import { DECK, structures, type Piece, type Structure } from './structures';
-import { PAVEMENT, roadSurfaces, type RoadSurfaces } from './surfaces';
-import { fillIsland, inLot, type IslandFill } from './fill';
-import { buildPlaces, type Place } from './places';
+import { PAVEMENT, roadSurfaces, surfaceMeshes, type RoadSurfaces, type SurfaceChunk } from './surfaces';
+import { fillIsland, fillStatics, inLot, type IslandFill } from './fill';
+import { buildPlaces, placeData, placeFrom, type Place } from './places';
 import type { GardensPlace } from './places/gardens';
 import { buildServices, serviceSpots, siteRect, type ServiceSite } from './services';
 import { garageRect, hotelGarageSite, islandGarages } from './cover';
@@ -33,6 +33,10 @@ import type { StaticDesc } from '../scene';
 import { BOUNDS, CIRCUS, highwayLoop, islet } from './plan';
 import { shoreOpen } from './shapes';
 import type { JumpDesc } from '../city/jumps';
+import type { CoverSites } from '../city/cover';
+import type { HiddenCar } from '../city/stash';
+import type { StashSpot } from './finds';
+import type { JobDef } from '../jobs/catalog';
 import type { BillboardDesc } from '../city/collectibles';
 import type { BreakerDesc } from '../city/breakers';
 import { kerbsideKickers, type Kicker } from './jumps';
@@ -65,6 +69,8 @@ export const PLUMB_TILT = 1e-4;
 const KERB_CELL = 8;
 /** The heights of the chunks round the physics ring are worked out ahead, this many columns a step (126 heights each). */
 export const PREFETCH_COLUMNS = 4;
+/** The height field keeps its heights to this (m: its bake keeps them as whole steps, M8.10 slice 18). */
+export const HEIGHT_STEP = 0.01;
 /** The props' random stream's seed (the grid's world seed's role). */
 const PROP_SEED = 42;
 /** A Works lot's setback (fill.ts's rule) and the grid's pavement's width, which the grid's yards are laid from (m). */
@@ -78,8 +84,69 @@ const LID = { half: 24, step: 3 } as const;
  */
 const KEEP_ROUTE = 1.6;
 
+/**
+ * A collider the island stands for good (its wall, its sea, its structures): what its bake keeps to make it again, in
+ * the order it was made.
+ */
+export interface FixedCollider {
+  shape: { kind: 'cuboid'; hx: number; hy: number; hz: number } | { kind: 'trimesh'; verts: Float32Array; tris: Uint32Array };
+  x: number; y: number; z: number;
+  q: { x: number; y: number; z: number; w: number };
+  groups: number;
+  friction?: number;
+  restitution?: number;
+  /** One of the ground's own (the wheels read its cover): the tunnel's lid. */
+  ground?: boolean;
+}
+
+/**
+ * The island as its bake keeps it (M8.10 slice 18, `Island.toBake`): what the builders worked out, every chunk's heights
+ * and props, the colliders that stand for good; the running places' data (the train's, the duck's) to make them again.
+ */
+export interface IslandBake {
+  ground: GroundData;
+  network: IslandNetwork;
+  structures: Structure[];
+  kerbside: Kicker[];
+  kerbsideGates: BillboardSite[];
+  surfaces: RoadSurfaces;
+  services: ServiceSite[];
+  hotelGarage: DropOff;
+  policeSites: PoliceSites;
+  stuntSites: StuntSites;
+  fill: IslandFill;
+  slipways: IslandSlipway[];
+  fixed: FixedCollider[];
+  spawns: SpawnPoint[];
+  route: TrackDef;
+  places: unknown[];
+  garages: DropOff[];
+  covers: IslandCover[];
+  jumps: JumpDesc[];
+  billboards: BillboardDesc[];
+  breakers: BreakerDesc[];
+  /** Each chunk's heights in `HEIGHT_STEP`s, column by column, each after the first as the step from the one before. */
+  heights: Map<number, Int16Array>;
+  props: Map<number, PropDesc[]>;
+  /** What the world worked out from the island (`IslandWorldBake`), when it was made. */
+  world: IslandWorldBake | null;
+  /** The sources' key it was made from (`tools/islandKey.mjs`; the game checks it, the sim does not read it). */
+  key?: string;
+}
+
+/**
+ * What the world works out from the island (M8.10 slice 18), kept with its bake: the jobs' rings and ends for the seed
+ * they were placed with, the police's places and the garages, the hidden cars' spots.
+ */
+export interface IslandWorldBake {
+  seed: number;
+  jobs: JobDef[];
+  cover: CoverSites;
+  stash: Record<HiddenCar, StashSpot>;
+}
+
 export class Island {
-  readonly ground = new Ground();
+  readonly ground: Ground;
   /** What the wheels read (M8.10 slice 3): the ground's cover at a point. */
   readonly surface: SurfaceReader = {
     // on what is built over the ground (a deck, a pier, a pavement's kerb, a floor, a roof): the road's; else the cover
@@ -91,26 +158,28 @@ export class Island {
   /** The highway's loop as the bot's and the lap timer's track. */
   readonly route: TrackDef;
   /** The main roads' lanes (M8.10 slice 4): the grid's `RoadGraph`, for the traffic, the police, the bot and the way. */
-  readonly network = buildNetwork(this.ground);
+  readonly network: IslandNetwork;
   /** The lanes by their bounds: the nearest lane or point on one, a height counting its gap (slice 14). */
-  private readonly laneIndex = new LaneIndex(this.network.graph);
+  private readonly laneIndex: LaneIndex;
   /** The highway's structures (M8.10 slice 6a): the viaduct, the bay bridge, the overpasses, the tunnel. */
-  readonly structures: Structure[] = structures((this.network.lines[0] as { pts: RoadPoint[] }).pts, highwayLoop(6).span);
+  readonly structures: Structure[];
   /** The kickers and the billboards in the roads' kerbside strips (M8.10 slice 15): Crown Avenue's, the hill's street's; no bay under them. */
-  private readonly kerbside: Kicker[] = kerbsideKickers(this.ground);
-  private readonly kerbsideGates: BillboardSite[] = kerbsideGates(this.ground, this.kerbside);
+  private readonly kerbside: Kicker[];
+  private readonly kerbsideGates: BillboardSite[];
   /** The roads' surfaces (M8.10 slice 6b): the strips, the junctions, the pavements and their kerbs, the paint, the bays. */
-  readonly surfaces: RoadSurfaces = roadSurfaces(this.ground, this.network.graph, (x, z) => { const [i, j] = Island.chunkOf(x, z); return Island.chunkIndex(i, j); }, (x, z) => kerbsideBlocked(this.kerbside, this.kerbsideGates, x, z));
+  readonly surfaces: RoadSurfaces;
   /** The drive-throughs (M8.10 slice 16): their sites, beside their roads; the sim's `Services` serves the car in their bays. */
-  readonly services: ServiceSite[] = serviceSpots(this.ground);
+  readonly services: ServiceSite[];
   /** The Coral Hotel's garage (M8.10 slice 14): the third of the run's garages, on the Quay's road north of the hotel. */
-  readonly hotelGarage: DropOff = hotelGarageSite(this.ground);
+  readonly hotelGarage: DropOff;
   /** The police's places that stand (M8.10 slice 15a): the cameras' poles, the pergola and the warehouse passage, the donut shop. */
-  readonly policeSites: PoliceSites = policeSites(this.ground, this.network, (x, z) => this.standAt(x, z));
+  readonly policeSites: PoliceSites;
   /** Where the jumps' kickers, the billboards and the breakers stand (M8.10 slice 15), before the lots keep off them. */
-  readonly stuntSites: StuntSites = stuntSites(this.ground, this.surfaces, this.kerbside, this.kerbsideGates, this.policeSites.cameras.map((c) => ({ x: c.poleX, z: c.poleZ })));
+  readonly stuntSites: StuntSites;
   /** The lots, their buildings and the palms (M8.10 slice 7a), off the drive-throughs' sites, the hotel's garage, the police's places and the slice 15 sites. */
-  readonly fill: IslandFill = fillIsland(this.ground, this.surfaces, (x, z) => { const [i, j] = Island.chunkOf(x, z); return Island.chunkIndex(i, j); }, [...this.services.map(siteRect), garageRect(this.hotelGarage), ...this.policeSites.keep, ...this.stuntSites.keep]);
+  readonly fill: IslandFill;
+  /** The colliders that stand for good (the wall, the sea, the structures), in the order they were made (its bake's). */
+  private readonly fixed: FixedCollider[] = [];
   /** Each district's places (M8.10 slices 8–12): their statics in `fill.chunks`, the ones that move stepped here. */
   readonly places: Place[];
   /** The run's three garages (M8.10 slice 14), the hideout first: their kerbs and lanes; the props keep off their doors. */
@@ -131,6 +200,10 @@ export class Island {
    */
   private propKeepOut: { rings: ReadonlyArray<PropRing>; route: () => ColdOpenKeep; markets: readonly PropSpot[] } | null = null;
   private propRoute: ColdOpenKeep | null = null;
+  /** Every chunk's props came with the bake, placed under the world's own keep-outs: its first `setPropKeepOut` keeps them. */
+  private propsBaked = false;
+  /** What the world worked out from the island: set by the world as it is made, or from the bake. */
+  worldBake: IslandWorldBake | null = null;
   /** The chunks with a height field in the physics, by index. */
   readonly active = new Map<number, RAPIER.Collider>();
   /** Each physics chunk's kerbs, buildings and trunks, with its height field. */
@@ -139,6 +212,10 @@ export class Island {
   onPropsLoad: ((index: number) => void) | null = null;
   onPropsUnload: ((index: number) => void) | null = null;
   private readonly propLists = new Map<number, PropDesc[]>();
+  /** Each chunk's statics once made (`statics`). */
+  private readonly staticLists = new Map<number, StaticDesc[]>();
+  /** The roads' surfaces' triangles once made (`surfaceMeshes`). */
+  private meshes: Map<number, SurfaceChunk> | null = null;
   private readonly junctionReaches = new Map<object, number>();
   private readonly probeScratch: GroundProbe = { h: 0, steep: 0, steepKind: -1, road: Infinity, surface: GRASS };
   private readonly garageFrame = { along: 0, across: 0 };
@@ -163,15 +240,66 @@ export class Island {
   /** The chunk whose heights are being worked out ahead, and how many of its columns are done. */
   private ahead: { index: number; done: number; h: Float32Array } | null = null;
 
-  constructor(readonly world: RAPIER.World) {
-    // the slipways first (slice 15): the ground dug under a quay's ramp, the wall a gate at each
+  /**
+   * The island built from its plan, or made from its bake (M8.10 slice 18: the builders' work done once, at the build):
+   * the same data, the same colliders made in the same order, the running places made again.
+   */
+  constructor(readonly world: RAPIER.World, bake?: IslandBake) {
+    const chunkOf = (x: number, z: number): number => { const [i, j] = Island.chunkOf(x, z); return Island.chunkIndex(i, j); };
+    if (bake) {
+      this.ground = new Ground(bake.ground);
+      this.network = bake.network;
+      this.laneIndex = new LaneIndex(this.network.graph);
+      this.structures = bake.structures;
+      this.kerbside = bake.kerbside;
+      this.kerbsideGates = bake.kerbsideGates;
+      this.surfaces = bake.surfaces;
+      this.services = bake.services;
+      this.hotelGarage = bake.hotelGarage;
+      this.policeSites = bake.policeSites;
+      this.stuntSites = bake.stuntSites;
+      this.fill = bake.fill;
+      this.slipways = bake.slipways;
+      for (const d of bake.fixed) this.fix(d);
+      this.spawns = bake.spawns;
+      this.route = bake.route;
+      this.places = bake.places.map((p) => placeFrom(world, p));
+      this.garages = bake.garages;
+      this.covers = bake.covers;
+      this.jumps = bake.jumps;
+      this.billboards = bake.billboards;
+      this.breakers = bake.breakers;
+      for (const [k, d] of bake.heights) {
+        const h = new Float32Array(d.length);
+        let q = 0;
+        for (let i = 0; i < d.length; i++) { q += d[i] as number; h[i] = q * HEIGHT_STEP; }
+        this.heights.set(k, h);
+      }
+      for (const [k, list] of bake.props) this.propLists.set(k, list);
+      this.propsBaked = true;
+      this.worldBake = bake.world;
+      return;
+    }
+    this.ground = new Ground();
+    this.network = buildNetwork(this.ground);
+    this.laneIndex = new LaneIndex(this.network.graph);
+    this.structures = structures((this.network.lines[0] as { pts: RoadPoint[] }).pts, highwayLoop(6).span);
+    this.kerbside = kerbsideKickers(this.ground);
+    this.kerbsideGates = kerbsideGates(this.ground, this.kerbside);
+    this.surfaces = roadSurfaces(this.ground, this.network.graph, chunkOf, (x, z) => kerbsideBlocked(this.kerbside, this.kerbsideGates, x, z));
+    this.services = serviceSpots(this.ground);
+    this.hotelGarage = hotelGarageSite(this.ground);
+    this.policeSites = policeSites(this.ground, this.network, (x, z) => this.standAt(x, z));
+    this.stuntSites = stuntSites(this.ground, this.surfaces, this.kerbside, this.kerbsideGates, this.policeSites.cameras.map((c) => ({ x: c.poleX, z: c.poleZ })));
+    this.fill = fillIsland(this.ground, this.surfaces, [...this.services.map(siteRect), garageRect(this.hotelGarage), ...this.policeSites.keep, ...this.stuntSites.keep]);
+    // the slipways (slice 15): the ground dug under a quay's ramp, the wall a gate at each
     this.slipways = islandSlipways(this.ground);
     this.walls();
     // the sea's surface for the hovercraft's rays, and the world's edge beyond it
-    const hx = (BOUNDS.x1 - BOUNDS.x0) / 2, hz = (BOUNDS.z1 - BOUNDS.z0) / 2;
-    world.createCollider(RAPIER.ColliderDesc.cuboid(hx, 0.5, hz).setTranslation(0, SEA.level - 0.5, 0).setCollisionGroups(GROUPS_WATER));
+    const hx = (BOUNDS.x1 - BOUNDS.x0) / 2, hz = (BOUNDS.z1 - BOUNDS.z0) / 2, level = { x: 0, y: 0, z: 0, w: 1 };
+    this.fix({ shape: { kind: 'cuboid', hx, hy: 0.5, hz }, x: 0, y: SEA.level - 0.5, z: 0, q: level, groups: GROUPS_WATER });
     for (const [x, z, sx, sz] of [[BOUNDS.x0, 0, 1, hz], [BOUNDS.x1, 0, 1, hz], [0, BOUNDS.z0, hx, 1], [0, BOUNDS.z1, hx, 1]] as const) {
-      world.createCollider(RAPIER.ColliderDesc.cuboid(sx, 6, sz).setTranslation(x, 2, z).setCollisionGroups(GROUPS_SOLID).setRestitution(0.5));
+      this.fix({ shape: { kind: 'cuboid', hx: sx, hy: 6, hz: sz }, x, y: 2, z, q: level, groups: GROUPS_SOLID, restitution: 0.5 });
     }
     this.spawns = this.spawnPoints();
     this.route = this.highwayTrack();
@@ -208,6 +336,25 @@ export class Island {
   /** Whether a car's middle at a point is under one of the plan's covers (M8.10 slice 15a: the helicopter's light). */
   covered(x: number, y: number, z: number): boolean {
     return underCover(this.covers, x, y, z);
+  }
+
+  /**
+   * A chunk's statics, by its index (M8.10 slice 18): the fill's buildings, hedges and palms made from its lots the first
+   * time the chunk is asked for (its physics, its view), then the rest the builders placed in it.
+   */
+  statics(index: number): StaticDesc[] {
+    let list = this.staticLists.get(index);
+    if (!list) {
+      list = fillStatics(this.fill, index, (x, z) => Island.chunkIndex(...Island.chunkOf(x, z)));
+      for (const st of this.fill.chunks.get(index) ?? []) list.push(st);
+      this.staticLists.set(index, list);
+    }
+    return list;
+  }
+
+  /** The roads' surfaces' triangles a chunk (the render's), made from their data the first time they are asked for. */
+  surfaceMeshes(): Map<number, SurfaceChunk> {
+    return (this.meshes ??= surfaceMeshes(this.surfaces, (x, z) => Island.chunkIndex(...Island.chunkOf(x, z))));
   }
 
   /** Run the places that move (a train, a barrier, a wheel), a fixed step. */
@@ -262,7 +409,32 @@ export class Island {
     const probe = this.probeScratch, edge = (x: number, z: number): number => this.ground.probe(x, z, probe).road;
     this.propKeepOut = { rings, route, markets: marketSpots(markets, this.surfaces.footways, edge) };
     this.propRoute = null;
+    // the baked props were placed under these very keep-outs (the world's own, set once as it is made): kept
+    if (this.propsBaked) { this.propsBaked = false; return; }
     this.propLists.clear();
+  }
+
+  /**
+   * The island as its bake keeps it (M8.10 slice 18): every chunk's heights and props worked out first (the props under
+   * the world's keep-outs: the world is made before it is baked).
+   */
+  toBake(): IslandBake {
+    for (let j = 0; j < CHUNKS_Z; j++) for (let i = 0; i < CHUNKS_X; i++) {
+      this.chunkHeights(i, j);
+      this.props(Island.chunkIndex(i, j));
+    }
+    return {
+      ground: this.ground.toData(), network: this.network, structures: this.structures, kerbside: this.kerbside, kerbsideGates: this.kerbsideGates,
+      surfaces: this.surfaces, services: this.services, hotelGarage: this.hotelGarage, policeSites: this.policeSites, stuntSites: this.stuntSites,
+      fill: this.fill, slipways: this.slipways, fixed: this.fixed, spawns: this.spawns, route: this.route, places: this.places.map(placeData),
+      garages: this.garages, covers: this.covers, jumps: this.jumps, billboards: this.billboards, breakers: this.breakers,
+      heights: new Map([...this.heights].map(([k, h]) => {
+        const d = new Int16Array(h.length);
+        let prev = 0;
+        for (let i = 0; i < h.length; i++) { const q = Math.round((h[i] as number) / HEIGHT_STEP); d[i] = q - prev; prev = q; }
+        return [k, d];
+      })), props: new Map(this.propLists), world: this.worldBake,
+    };
   }
 
   /** The keep-outs reaching into a chunk (its corner x0, z0): the rings and the route's segments (x0 z0 x1 z1) near it. */
@@ -433,7 +605,7 @@ export class Island {
     const colliders = (this.surfaces.kerbs.get(k) ?? []).map((p) => this.slab(p, PAVEMENT / 2, 0.5, p.length / 2 + 0.2, 0, -0.5, 0, GROUPS_TERRAIN));
     // the chunk's statics by their tags, as the grid's: a building's (and a place's wall) solid, a kerb's (a ramp's
     // deck, a floor) the wheels' ground, a tree's trunk in the props' group
-    for (const st of this.fill.chunks.get(k) ?? []) {
+    for (const st of this.statics(k)) {
       const p = st.position, s = st.shape;
       if (st.tag === 'trunk' && s.kind === 'cylinder') {
         colliders.push(this.world.createCollider(RAPIER.ColliderDesc.cylinder(s.halfHeight, s.radius).setTranslation(p.x, p.y, p.z).setFriction(1).setRestitution(1).setCollisionGroups(GROUPS_PROP)));
@@ -459,7 +631,7 @@ export class Island {
   /** Work out a chunk's heights from column `from` up to (not including) `to`, into `h`. */
   private columns(index: number, h: Float32Array, from: number, to: number): void {
     const x0 = CHUNK_X0 + (index % CHUNKS_X) * CHUNK, z0 = CHUNK_Z0 + Math.floor(index / CHUNKS_X) * CHUNK, n = CELLS + 1;
-    for (let col = from; col < to; col++) for (let row = 0; row < n; row++) h[row + col * n] = this.ground.height(x0 + col * FIELD, z0 + row * FIELD);
+    for (let col = from; col < to; col++) for (let row = 0; row < n; row++) h[row + col * n] = Math.round(this.ground.height(x0 + col * FIELD, z0 + row * FIELD) / HEIGHT_STEP) * HEIGHT_STEP;
     this.worked += Math.max(0, to - from) * n;
   }
 
@@ -605,10 +777,23 @@ export class Island {
     if (!beach) for (const f of [0, 0.5, 1]) top = Math.max(top, this.ground.height(a[0] + dx * f + nx * 1.5, a[1] + dz * f + nz * 1.5));
     top += WALL.height;
     const bottom = FOOT - 2, yaw = Math.atan2(dx, dz);
-    this.world.createCollider(RAPIER.ColliderDesc.cuboid(WALL.half, (top - bottom) / 2, len / 2 + 0.3)
-      .setTranslation(mx, (top + bottom) / 2, mz)
-      .setRotation({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) })
-      .setCollisionGroups(groups).setRestitution(0.5));
+    this.fix({
+      shape: { kind: 'cuboid', hx: WALL.half, hy: (top - bottom) / 2, hz: len / 2 + 0.3 }, x: mx, y: (top + bottom) / 2, z: mz,
+      q: { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) }, groups, restitution: 0.5,
+    });
+  }
+
+  /** Make a collider that stands for good, and keep what it is for the bake. */
+  private fix(d: FixedCollider): RAPIER.Collider {
+    this.fixed.push(d);
+    const s = d.shape;
+    const desc = (s.kind === 'cuboid' ? RAPIER.ColliderDesc.cuboid(s.hx, s.hy, s.hz) : RAPIER.ColliderDesc.trimesh(s.verts, s.tris))
+      .setTranslation(d.x, d.y, d.z).setRotation(d.q).setCollisionGroups(d.groups);
+    if (d.friction !== undefined) desc.setFriction(d.friction);
+    if (d.restitution !== undefined) desc.setRestitution(d.restitution);
+    const collider = this.world.createCollider(desc);
+    if (d.ground === true) this.groundHandles.add(collider.handle);
+    return collider;
   }
 
   /**
@@ -616,14 +801,19 @@ export class Island {
    * the lid over its trench at the hill's surface (the roof's top at least), a face over each mouth up to the hill.
    */
   /** A box `hx, hy, hz` (half) at a piece's local offset, turned with it (`flat`: its heading only). */
-  private slab(p: Piece, hx: number, hy: number, hz: number, ox: number, oy: number, oz: number, groups: number, flat = false): RAPIER.Collider {
+  private slabPose(p: Piece, hx: number, hy: number, hz: number, ox: number, oy: number, oz: number, groups: number, flat = false): FixedCollider {
     const pitch = flat ? 0 : p.pitch;
     // the piece's frame: its climb (+Z turned up: a turn about +X by −pitch), then its heading about +Y
     const a = -pitch, y1 = oy * Math.cos(a) - oz * Math.sin(a), z1 = oy * Math.sin(a) + oz * Math.cos(a);
     const x2 = ox * Math.cos(p.yaw) + z1 * Math.sin(p.yaw), z2 = z1 * Math.cos(p.yaw) - ox * Math.sin(p.yaw);
     const cy = Math.cos(p.yaw / 2), sy = Math.sin(p.yaw / 2), cp = Math.cos(a / 2), sp = Math.sin(a / 2);
-    return this.world.createCollider(RAPIER.ColliderDesc.cuboid(hx, hy, hz).setTranslation(p.x + x2, p.y + y1, p.z + z2)
-      .setRotation({ x: cy * sp, y: sy * cp, z: -sy * sp, w: cy * cp }).setCollisionGroups(groups));
+    return { shape: { kind: 'cuboid', hx, hy, hz }, x: p.x + x2, y: p.y + y1, z: p.z + z2, q: { x: cy * sp, y: sy * cp, z: -sy * sp, w: cy * cp }, groups };
+  }
+
+  /** A kerb's slab under a piece of a chunk's pavement, made as the chunk loads. */
+  private slab(p: Piece, hx: number, hy: number, hz: number, ox: number, oy: number, oz: number, groups: number): RAPIER.Collider {
+    const d = this.slabPose(p, hx, hy, hz, ox, oy, oz, groups), s = d.shape as { hx: number; hy: number; hz: number };
+    return this.world.createCollider(RAPIER.ColliderDesc.cuboid(s.hx, s.hy, s.hz).setTranslation(d.x, d.y, d.z).setRotation(d.q).setCollisionGroups(groups));
   }
 
   /**
@@ -644,7 +834,7 @@ export class Island {
 
   private structureColliders(): void {
     const put = (p: Piece, hx: number, hy: number, hz: number, ox: number, oy: number, oz: number, groups: number, flat = false): void => {
-      this.slab(p, hx, hy, hz, ox, oy, oz, groups, flat);
+      this.fix(this.slabPose(p, hx, hy, hz, ox, oy, oz, groups, flat));
     };
     const lid: number[] = [], lidTris: number[] = [];
     for (const s of this.structures) {
@@ -668,7 +858,9 @@ export class Island {
         if (hill > roof + 0.5) put({ ...p, x: mx, y: roof, z: mz }, DECK.half + 4, (hill - roof) / 2, 0.5, 0, (hill - roof) / 2, 0, GROUPS_SOLID, true);
       }
     }
-    if (lidTris.length > 0) this.groundHandles.add(this.world.createCollider(RAPIER.ColliderDesc.trimesh(new Float32Array(lid), new Uint32Array(lidTris)).setFriction(1).setCollisionGroups(GROUPS_TERRAIN)).handle);
+    if (lidTris.length > 0) {
+      this.fix({ shape: { kind: 'trimesh', verts: new Float32Array(lid), tris: new Uint32Array(lidTris) }, x: 0, y: 0, z: 0, q: { x: 0, y: 0, z: 0, w: 1 }, groups: GROUPS_TERRAIN, friction: 1, ground: true });
+    }
   }
 
   /** The spawns: the first minute's start at the summit, facing down Crown Avenue; the port, the beach, the runway. */

@@ -458,6 +458,16 @@ class SegmentGrid {
   }
 }
 
+/** What the ground is built of (`Ground.toData`): all the rest is worked out from it again, quickly. */
+export interface GroundData {
+  roads: GradedRoad[];
+  coasts: CoastLine[];
+  crossingOnMain: Uint8Array;
+  tunnel: { pts: P2[]; floor: number[]; x0: number; x1: number; z0: number; z1: number } | null;
+  mask: Uint8Array;
+  floors: Array<{ x: number; z: number; c: number; s: number; hx: number; hz: number; y: number }>;
+}
+
 export class Ground {
   /** The roads graded into the ground, in the order they were graded. */
   readonly roads: GradedRoad[] = [];
@@ -485,9 +495,34 @@ export class Ground {
   private readonly near = { road: new Int32Array(NEAR), d: new Float64Array(NEAR), h: new Float64Array(NEAR), w: new Float64Array(NEAR), hw: new Float64Array(NEAR), give: new Float64Array(NEAR) };
   private edge = Infinity;
 
-  constructor() {
+  /** The ground built from the plan, or restored from its bake (`toData`: the island's bake, M8.10 slice 18). */
+  constructor(data?: GroundData) {
+    if (data) {
+      this.mask = data.mask;
+      this.roads.push(...data.roads);
+      this.crossingOnMain = data.crossingOnMain;
+      this.tunnel = data.tunnel;
+      this.floors.push(...data.floors);
+      this.coasts = data.coasts;
+    } else {
+      this.mask = new Uint8Array(this.maskNx * this.maskNz);
+      this.crossingOnMain = this.grade();
+      this.coasts = shores();
+    }
+    this.paved = Uint8Array.from(this.roads, (r) => (r.cls === 'dirt' ? 0 : 1));
+    this.bridged = Uint8Array.from(this.roads, (r) => (r.cls === 'taxiway' ? 1 : 0));
+    this.roadGrid = new SegmentGrid(this.roadSegs());
+    this.coastGrid = new SegmentGrid(this.coastSegs());
+  }
+
+  /** What the ground is built of, for its bake: the graded roads, the shores, the land's mask, the floors dug, the tunnel. */
+  toData(): GroundData {
+    return { roads: this.roads, coasts: this.coasts, crossingOnMain: this.crossingOnMain, tunnel: this.tunnel, mask: this.mask, floors: this.floors };
+  }
+
+  /** The land's mask filled, the roads graded into the ground, the tunnel's floor; the crossings held on a main road. */
+  private grade(): Uint8Array {
     // the land: the island less the basin, the causeway, the islet
-    this.mask = new Uint8Array(this.maskNx * this.maskNz);
     fillPolygon(this.mask, this.maskNx, this.maskNz, catmullRom(COAST, true, 6), 1);
     fillPolygon(this.mask, this.maskNx, this.maskNz, causeway(), 1);
     fillPolygon(this.mask, this.maskNx, this.maskNz, islet(), 1);
@@ -611,7 +646,7 @@ export class Ground {
       }
       this.roads.push({ id: r.id, cls: r.cls, pts: r.pts, h: profile(r.pts, r.cls, r.closed, pins), closed: r.closed });
     }
-    this.crossingOnMain = crossings?.held ?? new Uint8Array(junctions.length);
+    const held = crossings?.held ?? new Uint8Array(junctions.length);
     // the tunnel: its floor straight between the ground at its mouths, a trench under it in the ground the physics reads
     const t = stretches('tunnel')[0];
     if (t) {
@@ -624,8 +659,11 @@ export class Ground {
     }
     // the serpentine's hairpins lean in (slice 8)
     for (const r of this.roads) if (r.cls === 'serpentine') r.bank = banking(r, this.roads);
-    this.paved = Uint8Array.from(this.roads, (r) => (r.cls === 'dirt' ? 0 : 1));
-    this.bridged = Uint8Array.from(this.roads, (r) => (r.cls === 'taxiway' ? 1 : 0));
+    return held;
+  }
+
+  /** The roads' segments, for their cell index. */
+  private roadSegs(): Seg[] {
     const segs: Seg[] = [];
     this.roads.forEach((road, r) => {
       const n = road.pts.length, last = road.closed ? n : n - 1, hw = HALF_WIDTH[road.cls];
@@ -642,18 +680,20 @@ export class Ground {
         segs.push({ a: road.pts[i] as P2, b: road.pts[(i + 1) % n] as P2, ha: road.h[i] as number, hb: road.h[(i + 1) % n] as number, hw, kind: r, reach: hw + SHOULDER + BLEND, cap, ends, ba: road.bank?.[i] ?? 0, bb: road.bank?.[(i + 1) % n] ?? 0 });
       }
     });
-    this.roadGrid = new SegmentGrid(segs);
-    // the shores' segments by kind, each with its normal toward the land
-    this.coasts = shores();
-    const coastSegs: Seg[] = [];
+    return segs;
+  }
+
+  /** The shores' segments by kind, each with its normal toward the land. */
+  private coastSegs(): Seg[] {
+    const segs: Seg[] = [];
     for (const line of this.coasts) {
       const n = line.pts.length, last = line.closed ? n : n - 1;
       for (let i = 0; i < last; i++) {
         const a = line.pts[i] as P2, b = line.pts[(i + 1) % n] as P2, l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
-        coastSegs.push({ a, b, ha: 0, hb: 0, hw: 0, kind: COAST_KINDS.indexOf(line.kinds[i] ?? 'rocks'), reach: SHELF, nx: (-(b[1] - a[1]) / l) * line.land, nz: ((b[0] - a[0]) / l) * line.land });
+        segs.push({ a, b, ha: 0, hb: 0, hw: 0, kind: COAST_KINDS.indexOf(line.kinds[i] ?? 'rocks'), reach: SHELF, nx: (-(b[1] - a[1]) / l) * line.land, nz: ((b[0] - a[0]) / l) * line.land });
       }
     }
-    this.coastGrid = new SegmentGrid(coastSegs);
+    return segs;
   }
 
   /** Land or water, by the mask (2 m). */

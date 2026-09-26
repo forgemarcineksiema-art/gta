@@ -89,7 +89,7 @@ describe('M8.10 slice 6b: the roads\' surfaces', () => {
   it('6.4 a chunk\'s ground and roads\' surfaces together under 10,000 triangles', () => {
     const view = new GroundView(island);
     let most = 0, surfaces = 0;
-    for (const [k, c] of island.surfaces.chunks) {
+    for (const [k, c] of island.surfaceMeshes()) {
       const tris = c.colors.length + view.build(k % CHUNKS_X, Math.floor(k / CHUNKS_X)).triangles;
       most = Math.max(most, tris);
       surfaces = Math.max(surfaces, c.colors.length);

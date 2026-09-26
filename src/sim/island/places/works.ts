@@ -66,6 +66,27 @@ export interface LevelCrossing { road: string; x: number; z: number; ux: number;
 /** A bridge over the canal: its road, its deck's pieces (the road's top), the middle's deck and the canal's floor under it. */
 export interface Bridge { road: string; x: number; z: number; top: number; underside: number; floor: number }
 
+/**
+ * What the freight train is made from (the island's bake keeps it, M8.10 slice 18): the line's z, its height along x
+ * every metre from `x0`, the two sheds' parking places (the train's middle), its length, its run, its units' places.
+ */
+export interface TrainData {
+  z: number;
+  x0: number;
+  heights: Float32Array;
+  west: number;
+  east: number;
+  length: number;
+  run: { d: number; ta: number; sa: number; tc: number; t: number };
+  units: Array<Omit<TrainUnit, 'body'>>;
+}
+
+/** The line's height (the ground's under its middle) at x. */
+function rail(t: { x0: number; heights: Float32Array }, x: number): number {
+  const f = Math.max(0, Math.min(t.heights.length - 1.001, x - t.x0)), i = Math.floor(f);
+  return (t.heights[i] as number) + ((t.heights[i + 1] as number) - (t.heights[i] as number)) * (f - i);
+}
+
 /** The freight line and its train: the timetable's clock, where its middle is now and a step ago, its speed. */
 export class FreightTrain {
   readonly units: TrainUnit[] = [];
@@ -85,34 +106,51 @@ export class FreightTrain {
   speed = 0;
   private readonly at = { x: 0, y: 0, z: 0 };
 
-  constructor(world: RAPIER.World, ground: Ground, line: readonly P2[], west: number, east: number) {
-    this.z = (line[0] as P2)[1];
-    const xs = line.map((p) => p[0]);
-    this.x0 = Math.min(...xs) - 10;
-    const n = Math.ceil(Math.max(...xs) + 10 - this.x0) + 1;
-    this.heights = new Float32Array(n);
-    for (let i = 0; i < n; i++) this.heights[i] = ground.surfaceHeight(this.x0 + i, this.z);
-    this.west = west;
-    this.east = east;
-    this.length = CONSIST.reduce((s, u) => s + u.length, 0) + COUPLING * (CONSIST.length - 1);
+  /** The train's line over the ground and its units along it, from the sheds' places. */
+  static plan(ground: Ground, line: readonly P2[], west: number, east: number): TrainData {
+    const z = (line[0] as P2)[1], xs = line.map((p) => p[0]), x0 = Math.min(...xs) - 10;
+    const n = Math.ceil(Math.max(...xs) + 10 - x0) + 1, heights = new Float32Array(n);
+    for (let i = 0; i < n; i++) heights[i] = ground.surfaceHeight(x0 + i, z);
+    const length = CONSIST.reduce((s, u) => s + u.length, 0) + COUPLING * (CONSIST.length - 1);
     const d = Math.abs(west - east), ta = TRAIN.speed / TRAIN.accel, sa = (TRAIN.speed * ta) / 2, tc = (d - 2 * sa) / TRAIN.speed;
-    this.run = { d, ta, sa, tc, t: 2 * ta + tc };
     // the units from the west end (the world's +X) eastward
-    let along = this.length / 2;
+    const units: TrainData['units'] = [];
+    let along = length / 2;
     for (const u of CONSIST) {
-      const offset = along - u.length / 2;
+      units.push({ kind: u.kind, length: u.length, height: u.height, offset: along - u.length / 2, colour: u.colour });
       along -= u.length + COUPLING;
-      const body = world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(west + offset, this.railAt(west + offset) + TRAIN.ride + u.height / 2, this.z));
-      world.createCollider(RAPIER.ColliderDesc.cuboid(u.length / 2, u.height / 2, TRAIN.half).setCollisionGroups(GROUPS_SOLID).setFriction(0.8).setRestitution(0.2), body);
-      this.units.push({ kind: u.kind, length: u.length, height: u.height, offset, colour: u.colour, body });
     }
-    this.x = this.prevX = west;
+    return { z, x0, heights, west, east, length, run: { d, ta, sa, tc, t: 2 * ta + tc }, units };
+  }
+
+  /** The train on its line, its units' bodies in `world`, standing in the west shed. */
+  constructor(world: RAPIER.World, data: TrainData) {
+    this.z = data.z;
+    this.x0 = data.x0;
+    this.heights = data.heights;
+    this.west = data.west;
+    this.east = data.east;
+    this.length = data.length;
+    this.run = data.run;
+    for (const u of data.units) {
+      const body = world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(this.west + u.offset, this.railAt(this.west + u.offset) + TRAIN.ride + u.height / 2, this.z));
+      world.createCollider(RAPIER.ColliderDesc.cuboid(u.length / 2, u.height / 2, TRAIN.half).setCollisionGroups(GROUPS_SOLID).setFriction(0.8).setRestitution(0.2), body);
+      this.units.push({ ...u, body });
+    }
+    this.x = this.prevX = this.west;
+  }
+
+  /** What it is made from, for the island's bake. */
+  get data(): TrainData {
+    return {
+      z: this.z, x0: this.x0, heights: this.heights, west: this.west, east: this.east, length: this.length, run: this.run,
+      units: this.units.map((u) => ({ kind: u.kind, length: u.length, height: u.height, offset: u.offset, colour: u.colour })),
+    };
   }
 
   /** The line's height (the ground's under its middle) at x. */
   railAt(x: number): number {
-    const f = Math.max(0, Math.min(this.heights.length - 1.001, x - this.x0)), i = Math.floor(f);
-    return (this.heights[i] as number) + ((this.heights[i + 1] as number) - (this.heights[i] as number)) * (f - i);
+    return rail(this, x);
   }
 
   /** Distance covered `t` s into a run (m). */
@@ -147,9 +185,19 @@ export class FreightTrain {
   }
 }
 
+/** What Sunset Works' running part is made from (the island's bake keeps it): the train, the crossings, the bridges, the scrapyard. */
+export interface WorksData {
+  id: 'works';
+  train: TrainData;
+  crossings: LevelCrossing[];
+  bridges: Bridge[];
+  scrapyard: DropOff;
+}
 /** Sunset Works' running part: the train and the crossings' barriers; the bridges and the scrapyard for the pins and slice 14. */
 export interface WorksPlace extends Place {
   readonly id: 'works';
+  /** What it is made from, for the island's bake. */
+  readonly data: WorksData;
   readonly train: FreightTrain;
   readonly crossings: readonly LevelCrossing[];
   readonly bridges: readonly Bridge[];
@@ -304,7 +352,7 @@ export function worksPlaces(ctx: PlaceContext): Place[] {
   const lz = (line[0] as P2)[1], lineEnds = [Math.min(...line.map((p) => p[0])), Math.max(...line.map((p) => p[0]))] as const;
   const eastEnd = lineEnds[0], westEnd = lineEnds[1];
   const west = westEnd - SHED.length / 2, east = eastEnd + SHED.length / 2;
-  const train = new FreightTrain(ctx.world, ground, line, west, east);
+  const train = new FreightTrain(ctx.world, FreightTrain.plan(ground, line, west, east));
   track(eastEnd, westEnd, lz, true);
   for (const z of SIDINGS.z) track(SIDINGS.x0, SIDINGS.x1, z, false);
   /** A track from x0 to x1 along z: its ballast (the wheels' ground), sleepers and rails, flush across the roads. */
@@ -446,8 +494,14 @@ export function worksPlaces(ctx: PlaceContext): Place[] {
     return site;
   }
 
+  return [makeWorks(ctx.world, { id: 'works', train: train.data, crossings, bridges, scrapyard }, train)];
+}
+
+/** Sunset Works' running part from its data (built, or baked; `built` its train already on its line): the train, the barriers. */
+export function makeWorks(world: RAPIER.World, data: WorksData, built?: FreightTrain): WorksPlace {
+  const train = built ?? new FreightTrain(world, data.train), crossings = data.crossings;
   const place: WorksPlace = {
-    id: 'works', train, crossings, bridges, scrapyard,
+    id: 'works', data, train, crossings, bridges: data.bridges, scrapyard: data.scrapyard,
     step(dt: number): void {
       train.step(dt);
       const phase = ((train.time % TRAIN.period) + TRAIN.period) % TRAIN.period;
@@ -466,7 +520,7 @@ export function worksPlaces(ctx: PlaceContext): Place[] {
   };
   // the barriers as they stand at the start
   place.step?.(0);
-  return [place];
+  return place;
 }
 
 /** How far past the road's carriageway a barrier's post stands (m), on its pavement. */

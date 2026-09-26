@@ -95,7 +95,7 @@ function nearSolids(island: Island, x: number, z: number): StaticDesc[] {
   for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
     const i = ci + di, j = cj + dj;
     if (i < 0 || j < 0 || i >= CHUNKS_X || j >= CHUNKS_Z) continue;
-    for (const st of island.fill.chunks.get(Island.chunkIndex(i, j)) ?? []) if (st.tag === 'building' || st.tag === 'kerb' || st.tag === 'trunk') out.push(st);
+    for (const st of island.statics(Island.chunkIndex(i, j))) if (st.tag === 'building' || st.tag === 'kerb' || st.tag === 'trunk') out.push(st);
   }
   return out;
 }

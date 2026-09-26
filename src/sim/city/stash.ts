@@ -100,7 +100,7 @@ export class Stash {
     const markers = sim.jobs.defs.map((d) => ({ x: d.x, z: d.z }));
     for (const site of sim.cover?.dropOffs ?? []) markers.push({ x: site.door.x, z: site.door.z });
     this.spots = sim.city ? stashSpots(sim.city.roadMarkings.parking, markers)
-      : sim.island ? islandStash(sim.island)
+      : sim.island ? (sim.island.worldBake?.stash ?? islandStash(sim.island))
         : { ...STASH_SPOTS, roadster: { x: 0, z: 0, yaw: 0 }, sweeper: { x: 0, z: 0, yaw: 0 }, hotdog: { x: 0, z: 0, yaw: 0 } };
   }
 

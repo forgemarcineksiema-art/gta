@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-26 — M8.10 slice 18, first part: the island's bake
+
+Measured in the browser (unthrottled, `?map=island`): the island took 5.8 s to control against the grid's 1.3 s (its
+build 2.5 s, its render 1.55 s); at 4× CPU that is ~20 s against the brief's 6. Decided: the builders run once at the
+build (`npm run bake`, keyed by a hash of `src/sim`, run by `npm run build`) into `public/island.bin` (2.3 MB gzipped:
+the ground's data, the network, the surfaces' data, the lots, every chunk's heights to the cm and props, the jobs);
+the lots' 131 000 pieces and the roads' triangles are made from it a chunk at a time, and the view builds a chunk a
+frame. Now 2.8 s warm, 3.4–3.8 s cold (the grid 1.3 / 2.4): the render's terrain reads (0.3 s), the near buildings
+(0.2 s) and the shaders (0.5 s) are next. Pin 18.0: an island from its bake bakes the same bytes and drives the same.
+
 ## 2026-09-26 — M8.10 after the second merge: what it found
 
 Fixed: the Quay's sweep ran through the Coral Hotel's podium and its wing (seven bays inside it; the jams the jobs'

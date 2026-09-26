@@ -1,5 +1,7 @@
 node_modules/
 dist/
+public/island.bin
+public/island.key
 perf/*.json
 !perf/.gitkeep
 screens/

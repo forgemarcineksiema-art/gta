@@ -4,7 +4,8 @@
  * with a palm and a hedge in front, the Quay's pastel blocks of 20–25 m), each lot behind its road's pavement and off
  * every other road, lot, the sea and the plan's reserved places; on each a building of the grid's kit on a plinth down
  * to the lowest ground under it. The palms: Palm Avenue's, the Gardens' front gardens', the beach road's and the
- * Quay's front. Worked out once, as statics a chunk; no Three.js.
+ * Quay's front. The lots, the hedges and the palms worked out once; a chunk's statics made from them when first asked
+ * (`fillStatics`: the island's bake keeps the lots, not their 130 000 pieces, M8.10 slice 18); no Three.js.
  */
 import { Architecture } from '../city/architecture';
 import { GRASS } from '../city/surface';
@@ -23,11 +24,49 @@ export interface Lot {
   /** Its floor's height (the highest ground under it) and its plinth's foot (the lowest). */
   base: number; foot: number;
 }
+/** A front garden's hedge: its middle on the ground, the way its lot faces, its half length. */
+export interface Hedge { x: number; y: number; z: number; yaw: number; hx: number }
 export interface IslandFill {
   lots: Lot[];
+  /** Every palm on the island, the places' among them. */
   palms: Array<{ x: number; z: number }>;
-  /** The buildings', plinths' and trees' statics by chunk. */
+  /** The fill's own palms (the roads' and the front gardens'), on the ground at `y`, and the front gardens' hedges. */
+  trees: Array<{ x: number; y: number; z: number }>;
+  hedges: Hedge[];
+  /** The rest of the island's statics by chunk: the places', the drive-throughs', the garages', the police's, the stunts'. */
   chunks: Map<number, StaticDesc[]>;
+}
+
+/**
+ * The fill's statics in chunk `index` (`chunkOf` names a point's chunk): its lots' buildings, each on its plinth, built
+ * about the origin, turned and set on its ground; its hedges and its palms.
+ */
+export function fillStatics(fill: IslandFill, index: number, chunkOf: (x: number, z: number) => number): StaticDesc[] {
+  const list: StaticDesc[] = [], kit = new Architecture(list);
+  for (const lot of fill.lots) {
+    if (chunkOf(lot.x, lot.z) !== index) continue;
+    const start = list.length;
+    kit.building(0, 0, lot.hx, lot.hz, lot.district, 1, 1, lot.floors, lot.variant, ACCENTS[lot.district], false, true);
+    // the plinth from under the lowest ground up to the floor
+    kit.box(0, (lot.foot - lot.base - 0.4) / 2, 0, lot.hx + 0.05, (lot.base - lot.foot + 0.4) / 2, lot.hz + 0.05, CITY_COLORS.stone, 'building');
+    kit.rotateFrom(start, lot.x, lot.z, lot.yaw);
+    for (let i = start; i < list.length; i++) (list[i] as StaticDesc).position.y += lot.base;
+  }
+  for (const h of fill.hedges) {
+    if (chunkOf(h.x, h.z) !== index) continue;
+    const start = list.length;
+    kit.box(0, 0.5, 0, h.hx, 0.5, 0.6, CITY_COLORS.hedge);
+    kit.rotateFrom(start, h.x, h.z, h.yaw);
+    for (let i = start; i < list.length; i++) (list[i] as StaticDesc).position.y += h.y;
+  }
+  for (const t of fill.trees) {
+    if (chunkOf(t.x, t.z) !== index) continue;
+    const start = list.length;
+    kit.tree(0, 0, true);
+    kit.rotateFrom(start, t.x, t.z, 0);
+    for (let i = start; i < list.length; i++) (list[i] as StaticDesc).position.y += t.y;
+  }
+  return list;
 }
 
 /** Each district's rule (m): a lot's frontage and depth (half, least and most), its setback, the gap between lots. */
@@ -119,11 +158,10 @@ export function footprint(l: Pick<Lot, 'x' | 'z' | 'yaw' | 'hx' | 'hz'>): P2[] {
   return out;
 }
 
-/** The island's lots, buildings and palms along its roads' surfaces, off the `keep` sites; `chunkOf` names a point's chunk. */
-export function fillIsland(ground: Ground, surfaces: RoadSurfaces, chunkOf: (x: number, z: number) => number, keep: readonly Rect[] = [], seed = 1): IslandFill {
+/** The island's lots, hedges and palms along its roads' surfaces, off the `keep` sites. */
+export function fillIsland(ground: Ground, surfaces: RoadSurfaces, keep: readonly Rect[] = [], seed = 1): IslandFill {
   const rnd = stream(seed ^ 0x51f1);
-  const lots: Lot[] = [], palms: Array<{ x: number; z: number }> = [];
-  const chunks = new Map<number, StaticDesc[]>();
+  const lots: Lot[] = [], palms: Array<{ x: number; z: number }> = [], trees: IslandFill['trees'] = [], hedges: Hedge[] = [];
   const grid = new Map<string, Lot[]>();
   const CELL = 64;
   const cellKey = (x: number, z: number): string => `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
@@ -137,12 +175,6 @@ export function fillIsland(ground: Ground, surfaces: RoadSurfaces, chunkOf: (x: 
   const free = (x: number, z: number): boolean => ground.onLand(x, z) && ground.surface(x, z) === GRASS && !ground.nearOtherRoad(x, z, -1, PAVEMENT + CLEAR) && !reserved(x, z)
     && !keep.some((k) => inLot(k, x, z, KEEP_OFF));
   const p = { x: 0, y: 0, z: 0 };
-  const statics = (x: number, z: number): StaticDesc[] => {
-    const key = chunkOf(x, z);
-    let list = chunks.get(key);
-    if (!list) { list = []; chunks.set(key, list); }
-    return list;
-  };
 
   for (const st of surfaces.strips) {
     if (st.cls !== 'avenue' && st.cls !== 'street' && st.cls !== 'side') continue;
@@ -173,37 +205,19 @@ export function fillIsland(ground: Ground, surfaces: RoadSurfaces, chunkOf: (x: 
     }
   }
 
-  // the buildings, each on its plinth, built about the origin, turned and set on its ground
-  const accent = (d: DistrictId): number => ACCENTS[d];
+  // a house's front garden: a palm and a hedge
   for (const lot of lots) {
-    const list = statics(lot.x, lot.z), kit = new Architecture(list), start = list.length;
-    kit.building(0, 0, lot.hx, lot.hz, lot.district, 1, 1, lot.floors, lot.variant, accent(lot.district), false, true);
-    // the plinth from under the lowest ground up to the floor
-    kit.box(0, (lot.foot - lot.base - 0.4) / 2, 0, lot.hx + 0.05, (lot.base - lot.foot + 0.4) / 2, lot.hz + 0.05, CITY_COLORS.stone, 'building');
-    kit.rotateFrom(start, lot.x, lot.z, lot.yaw);
-    for (let i = start; i < list.length; i++) (list[i] as StaticDesc).position.y += lot.base;
-    // a house's front garden: a palm and a hedge
-    if (lot.district === 'gardens') {
-      const fx = Math.sin(lot.yaw), fz = Math.cos(lot.yaw), ux = Math.cos(lot.yaw), uz = -Math.sin(lot.yaw);
-      const px = lot.x - fx * (lot.hz + 3) + ux * lot.hx * 0.5, pz = lot.z - fz * (lot.hz + 3) + uz * lot.hx * 0.5;
-      if (free(px, pz)) palm(px, pz);
-      const hxp = lot.x - fx * (lot.hz + 1) - ux * lot.hx * 0.4, hzp = lot.z - fz * (lot.hz + 1) - uz * lot.hx * 0.4;
-      if (free(hxp, hzp)) {
-        const s = statics(hxp, hzp), k = new Architecture(s), from = s.length;
-        k.box(0, 0.5, 0, lot.hx * 0.45, 0.5, 0.6, CITY_COLORS.hedge);
-        k.rotateFrom(from, hxp, hzp, lot.yaw);
-        for (let i = from; i < s.length; i++) (s[i] as StaticDesc).position.y += ground.surfaceHeight(hxp, hzp);
-      }
-    }
+    if (lot.district !== 'gardens') continue;
+    const fx = Math.sin(lot.yaw), fz = Math.cos(lot.yaw), ux = Math.cos(lot.yaw), uz = -Math.sin(lot.yaw);
+    const px = lot.x - fx * (lot.hz + 3) + ux * lot.hx * 0.5, pz = lot.z - fz * (lot.hz + 3) + uz * lot.hx * 0.5;
+    if (free(px, pz)) palm(px, pz);
+    const hxp = lot.x - fx * (lot.hz + 1) - ux * lot.hx * 0.4, hzp = lot.z - fz * (lot.hz + 1) - uz * lot.hx * 0.4;
+    if (free(hxp, hzp)) hedges.push({ x: hxp, y: ground.surfaceHeight(hxp, hzp), z: hzp, yaw: lot.yaw, hx: lot.hx * 0.45 });
   }
   // a palm, clear of the lots (none on Crown's hill: R2)
   function palm(x: number, z: number): void {
     if (districtOf(x, z) === 'crown' || nearLots(x, z).some((o) => overlap(o, { x, z, yaw: 0, hx: 1.5, hz: 1.5 }, 0))) return;
-    const list = statics(x, z), kit = new Architecture(list), start = list.length;
-    kit.tree(0, 0, true);
-    kit.rotateFrom(start, x, z, 0);
-    const y = ground.surfaceHeight(x, z);
-    for (let i = start; i < list.length; i++) (list[i] as StaticDesc).position.y += y;
+    trees.push({ x, y: ground.surfaceHeight(x, z), z });
     palms.push({ x, z });
   }
   // the palms along the roads that have them, on both sides past the pavement
@@ -219,7 +233,7 @@ export function fillIsland(ground: Ground, surfaces: RoadSurfaces, chunkOf: (x: 
       }
     }
   }
-  return { lots, palms, chunks };
+  return { lots, palms, trees, hedges, chunks: new Map() };
 
   /** A lot `hx` × `hz` at station `at` of a strip, on its `side`, its front `setback` behind the pavement. */
   function placeLot(st: Strip, at: number, side: 1 | -1, hx: number, hz: number, setback: number, district: DistrictId, variant: number): Lot | null {

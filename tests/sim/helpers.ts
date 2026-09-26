@@ -1,4 +1,6 @@
 import { FIXED_HZ, SimWorld, clearControls, initPhysics, type SimWorldOptions, type VehicleControls } from '../../src/sim';
+import type { StaticDesc } from '../../src/sim/scene';
+import { CHUNKS_X, CHUNKS_Z, type Island } from '../../src/sim/island/Island';
 
 /**
  * A headless world; the rivals' teaser off unless asked for (the bot pins' traffic predates it, M7 slice 13), and every
@@ -7,6 +9,13 @@ import { FIXED_HZ, SimWorld, clearControls, initPhysics, type SimWorldOptions, t
 export async function createWorld(opts: SimWorldOptions = {}): Promise<SimWorld> {
   await initPhysics();
   return new SimWorld({ teasers: false, reveal: true, ...opts });
+}
+
+/** Every chunk's statics on the island (its lots' buildings made as they are asked for). */
+export function islandStatics(island: Island): StaticDesc[] {
+  const out: StaticDesc[] = [];
+  for (let k = 0; k < CHUNKS_X * CHUNKS_Z; k++) for (const st of island.statics(k)) out.push(st);
+  return out;
 }
 
 export type Script = (tick: number, c: VehicleControls, sim: SimWorld) => void;

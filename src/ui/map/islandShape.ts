@@ -8,7 +8,7 @@
 import type { P2 } from '../../sim/island/geom';
 import { HALF_WIDTH } from '../../sim/island/ground';
 import type { Island } from '../../sim/island/Island';
-import { BASIN, PLACES, causeway, coastline, districtOf, islet, onLand, type DistrictId } from '../../sim/island/plan';
+import { BASIN, PLACES, causeway, coastline, districtOf, islet, type DistrictId } from '../../sim/island/plan';
 import { POND } from '../../sim/island/shapes/gardens';
 
 /** A turned rectangle: its middle, the way its length runs, its half width and half length. */
@@ -72,7 +72,8 @@ export function islandMapShape(island: Island): IslandMapShape {
     };
     for (let x = -half; x < half; x += CELL) {
       const cx = x + CELL / 2, cz = z + CELL / 2;
-      const id = onLand(cx, cz) ? districtOf(cx, cz) : null;
+      // (the ground's land mask: the plan's polygons read point by point cost the boot a fifth of a second)
+      const id = island.ground.onLand(cx, cz) ? districtOf(cx, cz) : null;
       if (id) {
         const d = byId.get(id) ?? { runs: [], sx: 0, sz: 0, n: 0 };
         d.sx += cx; d.sz += cz; d.n++;
@@ -83,7 +84,7 @@ export function islandMapShape(island: Island): IslandMapShape {
     }
     close(half);
   }
-  const districts = [...byId.entries()].map(([id, d]) => ({ id, runs: d.runs, anchor: anchorOf(id, d.sx / d.n, d.sz / d.n) }));
+  const districts = [...byId.entries()].map(([id, d]) => ({ id, runs: d.runs, anchor: anchorOf(island, id, d.sx / d.n, d.sz / d.n) }));
   // the roads: the districts' streets narrow and grey, the rest of the town's roads wide and pale, the highway its loop
   const streets: MapLine[] = [], roads: MapLine[] = [];
   for (const r of island.ground.roads) {
@@ -117,7 +118,8 @@ export function islandMapShape(island: Island): IslandMapShape {
 }
 
 /** A district's name's point: its cells' middle, or (a middle off its land) the nearest of its own cells to it. */
-function anchorOf(id: DistrictId, x: number, z: number): P2 {
+function anchorOf(island: Island, id: DistrictId, x: number, z: number): P2 {
+  const onLand = (px: number, pz: number): boolean => island.ground.onLand(px, pz);
   if (onLand(x, z) && districtOf(x, z) === id) return [x, z];
   let best: P2 = [x, z], bd = Infinity;
   for (let r = CELL; r < 600; r += CELL) {

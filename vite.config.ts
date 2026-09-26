@@ -1,6 +1,8 @@
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { configDefaults, defineConfig } from 'vitest/config';
+import { islandKey } from './tools/islandKey.mjs';
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8')) as { version: string };
 
@@ -22,7 +24,8 @@ function buildStamp(): string {
 export default defineConfig({
   // CrazyGames serves the build from an arbitrary path inside an iframe: relative URLs only.
   base: './',
-  define: { __APP_VERSION__: JSON.stringify(buildStamp()) },
+  // the island's bake's key (M8.10 slice 18): the game loads `island.bin` only when it is of these sources
+  define: { __APP_VERSION__: JSON.stringify(buildStamp()), __ISLAND_KEY__: JSON.stringify(islandKey(fileURLToPath(new URL('.', import.meta.url)))) },
   build: {
     target: 'es2022',
     sourcemap: false,
@@ -51,6 +54,8 @@ export default defineConfig({
       ...(process.env.BALANCE === '1' || process.env.npm_lifecycle_event === 'balance' ? [] : ['tests/sim/balance.test.ts']),
       // The atlas's dump (M8.10) writes the island for `npm run atlas` (ATLAS=1); it pins nothing.
       ...(process.env.ATLAS === '1' ? [] : ['tests/atlas/**']),
+      // The island's bake (M8.10 slice 18) is written by `npm run bake` (BAKE=1); it pins nothing.
+      ...(process.env.BAKE === '1' ? [] : ['tests/bake/**']),
     ],
     environment: 'node',
     // Files share their worker's module graph: Rapier's WASM initialises once a worker, not once a file (the quick set

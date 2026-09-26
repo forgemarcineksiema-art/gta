@@ -25,8 +25,14 @@ const PUFF = 1;
 const SENTINEL_PAINT = 0x808182;
 
 export class PlayerCar {
-  /** One mesh per class; the one shown follows `sim.carBody` (car-swap). */
+  /**
+   * One mesh per class, each built the first time it is read (M8.10 slice 18: the driven one at the start, another when
+   * a car of its class is next to the player or the police's livery asks); the one shown follows `sim.carBody`.
+   */
   readonly classes: Record<CarId, CarMesh>;
+  private readonly built: Partial<Record<CarId, CarMesh>> = {};
+  /** The class the car started as, built with the car's own tuning. */
+  private readonly startCar: CarId;
   /** The mesh shown. */
   mesh: CarMesh;
   /** The city's bodies the player has taken (or is next to): built on first need, kept (M5.5 slice 19). */
@@ -81,24 +87,33 @@ export class PlayerCar {
   private readonly showUp = new THREE.Vector3(0, 1, 0);
 
   constructor(private readonly scene: THREE.Scene, private readonly sim: SimWorld) {
-    const classes: Partial<Record<CarId, CarMesh>> = {};
-    for (const id of CAR_IDS) {
-      const t = id === sim.carId ? sim.vehicle.tuning : CAR_PRESETS[id];
-      const mesh = t.twoWheel > 0 ? buildBikeMesh(t, CAR_PROFILES[id].paint, bikeShapeOf(id)) : buildCarMesh(t, CAR_PROFILES[id]);
-      scene.add(mesh.root);
-      for (const w of mesh.wheels) scene.add(w);
-      const visible = id === sim.carId;
-      mesh.root.visible = visible;
-      for (const w of mesh.wheels) w.visible = visible;
-      classes[id] = mesh;
-    }
-    this.classes = classes as Record<CarId, CarMesh>;
+    this.startCar = sim.carId;
+    const classes = {} as Record<CarId, CarMesh>;
+    for (const id of CAR_IDS) Object.defineProperty(classes, id, { enumerable: true, get: () => this.classMesh(id) });
+    this.classes = classes;
     this.carId = sim.carId;
     this.bodyId = sim.carId;
     this.mesh = this.classes[sim.carId];
-    for (const id of CAR_IDS) this.roofY[id] = roofOf(this.classes[id]);
+    this.mesh.root.visible = true;
+    for (const w of this.mesh.wheels) w.visible = true;
     this.seatTopper();
     this.fitKit(sim.carId);
+  }
+
+  /** A class's mesh, built hidden (in the garage's paint once it is applied) the first time it is wanted. */
+  private classMesh(id: CarId): CarMesh {
+    let mesh = this.built[id];
+    if (mesh) return mesh;
+    const t = id === this.startCar ? this.sim.vehicle.tuning : CAR_PRESETS[id];
+    mesh = t.twoWheel > 0 ? buildBikeMesh(t, CAR_PROFILES[id].paint, bikeShapeOf(id)) : buildCarMesh(t, CAR_PROFILES[id]);
+    this.scene.add(mesh.root);
+    for (const w of mesh.wheels) this.scene.add(w);
+    mesh.root.visible = false;
+    for (const w of mesh.wheels) w.visible = false;
+    if (this.garageSerial >= 0) mesh.setPaint(this.sim.garage.paintOf(id));
+    this.roofY[id] = roofOf(mesh);
+    this.built[id] = mesh;
+    return mesh;
   }
 
   /** The showroom's look (M8.9 R10): what the car shows in the room; null, what it wears. A flame or smoke newly looked at puffs. */
@@ -136,7 +151,7 @@ export class PlayerCar {
     if (this.sim.garage.serial !== this.garageSerial) {
       // a respray on the wall shows on the car behind the door at once
       this.garageSerial = this.sim.garage.serial;
-      for (const id of CAR_IDS) this.classes[id].setPaint(this.sim.garage.paintOf(id));
+      for (const id of CAR_IDS) this.built[id]?.setPaint(this.sim.garage.paintOf(id));
       // the shown car's own paint is set again below
       this.shownPaint = -1;
     }

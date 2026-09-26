@@ -151,8 +151,10 @@ export class PoliceView {
     for (const [id, style] of LIVERIES) this.kitOf[id] = kitFor(id, style, capacity);
     // two: a new Chief can come on while the last one's wreck still lies in the road
     this.chiefKit = kitFor('police', CHIEF_LIVERY, 2);
-    this.liveryFor('police');
   }
+
+  /** Frames drawn: the player's police livery is made ready half a second in (not at the start: M8.10 slice 18). */
+  private frames = 0;
 
   /** The player's livery on a class's mesh, built once; null for a class the police do not drive. */
   private liveryFor(id: CarId): PlayerLivery | null {
@@ -224,6 +226,8 @@ export class PoliceView {
   /** `fade` is the traffic's (M8.6 D9): a car thinned in the camera's way shows no livery, bar or lenses. */
   update(alpha: number, fade: Float32Array | null = null): void {
     const sim = this.sim, traffic = sim.traffic;
+    // a police car the player takes is in its colours at once, not built on the take
+    if (++this.frames === 30) this.liveryFor('police');
     this.updatePlayer();
     if (!traffic) return;
     this.live.fill(0);

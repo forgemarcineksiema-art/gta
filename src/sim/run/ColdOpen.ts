@@ -61,6 +61,8 @@ export interface ColdOpenRoute {
   door: DropOff;
   /** The café's things on the footway past the gate (the grid's; the island's gate stands in a kerbside strip). */
   footway: boolean;
+  /** The island's: the ground's height under the first sample (worked out with the route, kept with its bake). */
+  startY?: number;
 }
 
 export class ColdOpen {
@@ -112,7 +114,7 @@ export class ColdOpen {
     const hideout = route.door, first = route.samples[0] as TrackSample;
     // the grid's loop spawn; the island's route's start, on its ground
     const spawn = sim.city?.spawns.find((s) => s.name === 'loop')
-      ?? { name: 'first minute', position: { x: first.x, y: (sim.island?.ground.height(first.x, first.z) ?? 0) + 1, z: first.z }, yaw: first.yaw };
+      ?? { name: 'first minute', position: { x: first.x, y: (route.startY ?? sim.island?.ground.height(first.x, first.z) ?? 0) + 1, z: first.z }, yaw: first.yaw };
     const c = BALANCE.coldOpen;
     this.route = route;
     this.active = true;
@@ -395,9 +397,23 @@ function markerFrom(graph: RoadGraph, samples: readonly TrackSample[], m: number
  * billboard at its step (the grid's gate's plateau and ramps), the marker at the delivery's step out of the junction
  * boxes; null without the garage or the route.
  */
+/** The island's first minute's route as its bake keeps it (M8.10 slice 18): the route less its door, its gate by index. */
+export type ColdOpenBake = Omit<ColdOpenRoute, 'door' | 'gate'> & { gate: number };
+
+/** The island's route for the bake (null without one). */
+export function islandColdOpenBake(sim: SimWorld): ColdOpenBake | null {
+  const route = sim.island ? islandColdOpenRoute(sim) : null;
+  if (!route || !sim.island) return null;
+  const { door: _door, gate, ...rest } = route;
+  return { ...rest, gate: gate ? sim.island.billboards.indexOf(gate) : -1 };
+}
+
 function islandColdOpenRoute(sim: SimWorld): ColdOpenRoute | null {
   const island = sim.island, graph = sim.traffic?.streets.graph, garage = sim.run.dropOffs.find((d) => d.name === 'hotel');
   if (!island || !graph || !garage) return null;
+  // from the bake, its door and its gate put back
+  const baked = island.worldBake?.coldOpen;
+  if (baked) return { ...baked, samples: baked.samples.slice(), door: garage, gate: baked.gate >= 0 ? island.billboards[baked.gate] ?? null : null };
   const route = firstMinuteRoute(graph, garage);
   if (!route) return null;
   const at = FIRST_MINUTE_STEPS.find((s) => s.step === 'billboard')?.at;
@@ -417,8 +433,8 @@ function islandColdOpenRoute(sim: SimWorld): ColdOpenRoute | null {
     for (const s of samples) { const d = (s.x - gate.x) ** 2 + (s.z - gate.z) ** 2; if (d < best) { best = d; gateS = s.s; } }
   }
   crawlInto(samples, garage, route.entryS);
-  const marker = markerFrom(graph, samples, Math.round(route.steps.delivery / 3));
-  return { samples, markerX: marker.x, markerZ: marker.z, markerYaw: marker.yaw, markerS: marker.s, gateS, gate, entryS: route.entryS, door: garage, footway: false };
+  const marker = markerFrom(graph, samples, Math.round(route.steps.delivery / 3)), first = samples[0] as TrackSample;
+  return { samples, markerX: marker.x, markerZ: marker.z, markerYaw: marker.yaw, markerS: marker.s, gateS, gate, entryS: route.entryS, door: garage, footway: false, startY: island.ground.height(first.x, first.z) };
 }
 
 /**

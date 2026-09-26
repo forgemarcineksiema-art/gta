@@ -99,8 +99,9 @@ export class Thumbs {
   private readonly camera = new THREE.PerspectiveCamera(THUMBS.fov, THUMBS.w / THUMBS.h, 0.1, 100);
   private readonly pixels: Uint8Array;
   private readonly image: ImageData;
-  private readonly grey: CarMesh;
-  private readonly greyWheels: THREE.BufferGeometry;
+  /** The grey car the kit's pictures are shot on, built the first time one is drawn (not at the start: M8.10 slice 18). */
+  private greyCar: CarMesh | null = null;
+  private greyWheelGeometry: THREE.BufferGeometry | null = null;
   private readonly kitMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
   private readonly extra = new THREE.Mesh(new THREE.BufferGeometry(), this.kitMaterial);
   private readonly cells: number[] = [];
@@ -127,8 +128,14 @@ export class Thumbs {
     const sun = new THREE.DirectionalLight(0xffe2bc, 2.6);
     sun.position.set(4, 7, 5);
     this.scene.add(sun);
-    this.grey = buildCarMesh(bodyTuning('muscle'), BODY_PROFILES.muscle, THUMBS.grey);
-    this.greyWheels = (this.grey.wheels[0]?.children[0] as THREE.Mesh | undefined)?.geometry ?? new THREE.BufferGeometry();
+  }
+
+  private get grey(): CarMesh {
+    return (this.greyCar ??= buildCarMesh(bodyTuning('muscle'), BODY_PROFILES.muscle, THUMBS.grey));
+  }
+
+  private get greyWheels(): THREE.BufferGeometry {
+    return (this.greyWheelGeometry ??= (this.grey.wheels[0]?.children[0] as THREE.Mesh | undefined)?.geometry ?? new THREE.BufferGeometry());
   }
 
   /** A cell's size and the atlas' columns: where a cell stands. */

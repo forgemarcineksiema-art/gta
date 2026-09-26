@@ -98,7 +98,7 @@ export class GroundView {
    * Show the chunks within `reach` of (x, z), free the far ones, and keep building the nearest missing one a few columns
    * a frame (all of them now when `snap`).
    */
-  sync(x: number, z: number, reach: number, snap = false): void {
+  sync(x: number, z: number, reach: number, snap = false, seen: (x0: number, z0: number, x1: number, z1: number) => boolean = () => true): void {
     let best = -1, bestD = Infinity;
     for (let j = 0; j < CHUNKS_Z; j++) for (let i = 0; i < CHUNKS_X; i++) {
       const d = Math.hypot(CHUNK_X0 + (i + 0.5) * CHUNK - x, CHUNK_Z0 + (j + 0.5) * CHUNK - z), k = j * CHUNKS_X + i;
@@ -107,7 +107,8 @@ export class GroundView {
         mesh.visible = d < reach;
         if (d > reach + CHUNK) this.free(k);
       } else if (d < reach) {
-        if (snap) this.add(i, j, this.build(i, j));
+        // (at once when `snap` and in `seen`'s sight; the rest a few columns a frame)
+        if (snap && seen(CHUNK_X0 + i * CHUNK, CHUNK_Z0 + j * CHUNK, CHUNK_X0 + (i + 1) * CHUNK, CHUNK_Z0 + (j + 1) * CHUNK)) this.add(i, j, this.build(i, j));
         else if (d < bestD && !(this.reading && this.reading.i === i && this.reading.j === j)) { bestD = d; best = k; }
       }
     }

@@ -4,6 +4,8 @@
  * track. What the grid's `City` gives the rest of the sim comes to the island slice by slice; until the switch it is
  * `?map=island`.
  */
+import type { WayBake } from '../run/way';
+import type { ColdOpenBake } from '../run/ColdOpen';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { GROUPS_GATE, GROUPS_PROP, GROUPS_SOLID, GROUPS_TERRAIN, GROUPS_WATER } from '../collision';
 import type { SpawnPoint } from '../playground';
@@ -18,8 +20,8 @@ import { FOOT, Ground, HALF_WIDTH, type CoastKind, type GroundData, type GroundP
 import { LaneIndex } from '../city/laneIndex';
 import { buildNetwork, type IslandNetwork } from './network';
 import { DECK, structures, type Piece, type Structure } from './structures';
-import { PAVEMENT, roadSurfaces, surfaceMeshes, type RoadSurfaces, type SurfaceChunk } from './surfaces';
-import { fillIsland, fillStatics, inLot, type IslandFill } from './fill';
+import { PAVEMENT, roadSurfaces, surfaceChunk, surfaceIndex, surfaceMeshes, type RoadSurfaces, type SurfaceChunk, type SurfaceIndex } from './surfaces';
+import { fillIsland, fillStatics, inLot, type IslandFill, fillSolids } from './fill';
 import { buildPlaces, placeData, placeFrom, type Place } from './places';
 import type { GardensPlace } from './places/gardens';
 import { buildServices, serviceSpots, siteRect, type ServiceSite } from './services';
@@ -139,6 +141,26 @@ export interface IslandBake {
 }
 
 /**
+ * The bake in the sections it is written and read in (M8.10 slice 18: each read as it arrives, while the rest comes):
+ * its key first (a stale bake is known at once), then what the island is made of with what the world worked out, the
+ * fill, the heights, the roads' paint, the ground's readings for the view, the props. The sections share no object.
+ */
+export function bakeSections(bake: IslandBake): unknown[] {
+  const { key, world, fill, heights, views, props, surfaces, ...island } = bake;
+  const { paint, ...roads } = surfaces;
+  // (the world's with the island's: its cover holds the island's garages and cameras)
+  return [{ key }, { ...island, surfaces: roads, world }, { fill }, { heights }, { paint }, { views }, { props }];
+}
+
+/** The bake joined again from its sections (`bakeSections`', in order). */
+export function joinBake(sections: readonly unknown[]): IslandBake {
+  const bake = Object.assign({}, ...sections) as IslandBake & { paint?: RoadSurfaces['paint'] };
+  if (bake.paint) bake.surfaces = { ...bake.surfaces, paint: bake.paint };
+  delete bake.paint;
+  return bake;
+}
+
+/**
  * What the world works out from the island (M8.10 slice 18), kept with its bake: the jobs' rings and ends for the seed
  * they were placed with, the police's places and the garages, the hidden cars' spots.
  */
@@ -149,6 +171,10 @@ export interface IslandWorldBake {
   stash: Record<HiddenCar, StashSpot>;
   /** The coins' arcs over the jumps and lines into the billboards, by chunk. */
   coins: Map<number, CoinPoint[]>;
+  /** The way's links and reaches (`Way.bake`), once the way was made. */
+  way?: WayBake;
+  /** The first minute's route (`ColdOpenRoute` less its door, the hotel's garage, and its gate by its billboard's index). */
+  coldOpen?: ColdOpenBake | null;
 }
 
 export class Island {
@@ -204,7 +230,7 @@ export class Island {
    * What the street furniture keeps out of that the world knows (slice 15, the grid's M8 D7): the jobs' rings, the hidden
    * cars, the slipways' heads; the cold open's route and what it drives through; the mayhem zones' markets' stalls.
    */
-  private propKeepOut: { rings: ReadonlyArray<PropRing>; route: () => ColdOpenKeep; markets: readonly PropSpot[] } | null = null;
+  private propKeepOut: { rings: ReadonlyArray<PropRing>; route: () => ColdOpenKeep; markets: () => readonly PropSpot[] } | null = null;
   private propRoute: ColdOpenKeep | null = null;
   /** Every chunk's props came with the bake, placed under the world's own keep-outs: its first `setPropKeepOut` keeps them. */
   private propsBaked = false;
@@ -224,6 +250,9 @@ export class Island {
   private readonly views = new Map<number, ViewReadings>();
   /** The roads' surfaces' triangles once made (`surfaceMeshes`). */
   private meshes: Map<number, SurfaceChunk> | null = null;
+  /** The surfaces' triangles made a chunk at a time (M8.10 slice 18: the view's start makes the near ones alone). */
+  private surfaceIndexed: SurfaceIndex | null = null;
+  private readonly surfaceChunks = new Map<number, SurfaceChunk | null>();
   private readonly junctionReaches = new Map<object, number>();
   private readonly probeScratch: GroundProbe = { h: 0, steep: 0, steepKind: -1, road: Infinity, surface: GRASS };
   private readonly garageFrame = { along: 0, across: 0 };
@@ -362,6 +391,18 @@ export class Island {
     return list;
   }
 
+  /**
+   * A chunk's statics a collider stands for (M8.10 slice 18: the physics', made without the facades): the fill's
+   * envelopes, plinths and trunks, then the builders' (the places', the kerbs'); as `statics` has them, in its order.
+   */
+  solids(index: number): StaticDesc[] {
+    const whole = this.staticLists.get(index);
+    if (whole) return whole;
+    const list = fillSolids(this.fill, index, (x, z) => Island.chunkIndex(...Island.chunkOf(x, z)));
+    for (const st of this.fill.chunks.get(index) ?? []) list.push(st);
+    return list;
+  }
+
   /** A chunk's ground read on its view's grid (the render's ground), read the first time it is asked for, or baked. */
   viewReadings(index: number): ViewReadings {
     let v = this.views.get(index);
@@ -375,6 +416,18 @@ export class Island {
   /** The roads' surfaces' triangles a chunk (the render's), made from their data the first time they are asked for. */
   surfaceMeshes(): Map<number, SurfaceChunk> {
     return (this.meshes ??= surfaceMeshes(this.surfaces, (x, z) => Island.chunkIndex(...Island.chunkOf(x, z))));
+  }
+
+  /** A chunk's roads' surfaces' triangles, made alone the first time it is asked for (as `surfaceMeshes` makes it); null where none. */
+  surfaceMesh(index: number): SurfaceChunk | null {
+    let c = this.surfaceChunks.get(index);
+    if (c === undefined) {
+      const chunkOf = (x: number, z: number): number => Island.chunkIndex(...Island.chunkOf(x, z));
+      this.surfaceIndexed ??= surfaceIndex(this.surfaces, chunkOf);
+      c = this.meshes?.get(index) ?? surfaceChunk(this.surfaces, this.surfaceIndexed, index, chunkOf);
+      this.surfaceChunks.set(index, c);
+    }
+    return c;
   }
 
   /** Run the places that move (a train, a barrier, a wheel), a fixed step. */
@@ -408,13 +461,15 @@ export class Island {
     // zones' markets' stalls (slice 15)
     const inChunk = (s: { x: number; z: number }): boolean => s.x >= x0 && s.x < x0 + CHUNK && s.z >= z0 && s.z < z0 + CHUNK;
     const gardens = this.places.find((p) => p.id === 'gardens') as GardensPlace | undefined;
-    const spots = [...(gardens?.fences ?? []), ...(this.propKeepOut?.markets ?? [])].filter(inChunk);
+    const spots = [...(gardens?.fences ?? []), ...(this.propKeepOut?.markets() ?? [])].filter(inChunk);
     if (spots.length > 0) places.unshift({ kind: 'spots', x: x0, z: z0, dx: 1, dz: 0, half: 0, nx: 0, nz: 1, spots });
     // the world's keep-outs near the chunk (slice 15): its circles, the cold open's route and the things it drives through
     const keep = this.keepNear(x0, z0);
     const through = (this.propRoute?.spots ?? []).filter(inChunk);
     if (through.length > 0) places.unshift({ kind: 'route', x: x0, z: z0, dx: 1, dz: 0, half: 0, nx: 0, nz: 1, spots: through });
     list = chunkProps(i, j, { seed: PROP_SEED, runs, places, blocked: (x, z, yaw, hx, hz, onRoute, kind) => this.propBlocked(x, z, yaw, hx, hz, kind, onRoute, keep) }, index);
+    // where each stands, once, kept with the bake
+    for (const p of list) p.y = this.standAt(p.x, p.z);
     this.propLists.set(index, list);
     return list;
   }
@@ -426,8 +481,10 @@ export class Island {
    * the world before a chunk's props are placed; every chunk's are placed again after.
    */
   setPropKeepOut(rings: ReadonlyArray<PropRing>, route: () => ColdOpenKeep, markets: ReadonlyArray<{ x: number; z: number }> = []): void {
+    // (the markets' stalls' spots worked out the first time a chunk's props are: never where they are baked)
     const probe = this.probeScratch, edge = (x: number, z: number): number => this.ground.probe(x, z, probe).road;
-    this.propKeepOut = { rings, route, markets: marketSpots(markets, this.surfaces.footways, edge) };
+    let spots: readonly PropSpot[] | null = null;
+    this.propKeepOut = { rings, route, markets: () => (spots ??= marketSpots(markets, this.surfaces.footways, edge)) };
     this.propRoute = null;
     // the baked props were placed under these very keep-outs (the world's own, set once as it is made): kept
     if (this.propsBaked) { this.propsBaked = false; return; }
@@ -626,7 +683,7 @@ export class Island {
     const colliders = (this.surfaces.kerbs.get(k) ?? []).map((p) => this.slab(p, PAVEMENT / 2, 0.5, p.length / 2 + 0.2, 0, -0.5, 0, GROUPS_TERRAIN));
     // the chunk's statics by their tags, as the grid's: a building's (and a place's wall) solid, a kerb's (a ramp's
     // deck, a floor) the wheels' ground, a tree's trunk in the props' group
-    for (const st of this.statics(k)) {
+    for (const st of this.solids(k)) {
       const p = st.position, s = st.shape;
       if (st.tag === 'trunk' && s.kind === 'cylinder') {
         colliders.push(this.world.createCollider(RAPIER.ColliderDesc.cylinder(s.halfHeight, s.radius).setTranslation(p.x, p.y, p.z).setFriction(1).setRestitution(1).setCollisionGroups(GROUPS_PROP)));

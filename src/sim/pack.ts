@@ -237,3 +237,60 @@ export function unpack(bytes: Uint8Array): unknown {
   };
   return read(root);
 }
+
+/**
+ * Values packed one after another (M8.10 slice 18: the island's bake read as it arrives): each its bytes' length (4
+ * bytes) then `pack`'s bytes. An object shared between two is written in each: what is split must share nothing.
+ */
+export function packSections(values: readonly unknown[]): Uint8Array {
+  const parts = values.map(pack);
+  const out = new Uint8Array(parts.reduce((n, p) => n + 4 + p.length, 0)), view = new DataView(out.buffer);
+  let at = 0;
+  for (const p of parts) {
+    view.setUint32(at, p.length, true);
+    out.set(p, at + 4);
+    at += 4 + p.length;
+  }
+  return out;
+}
+
+/** `packSections`' bytes read as they come: `feed` each piece, and get back every section it completed, unpacked. */
+export class SectionReader {
+  private readonly pieces: Uint8Array[] = [];
+  private have = 0;
+
+  feed(piece: Uint8Array): unknown[] {
+    this.pieces.push(piece);
+    this.have += piece.length;
+    const out: unknown[] = [];
+    while (this.have >= 4) {
+      const head = this.bytes(4, false), n = new DataView(head.buffer, head.byteOffset, 4).getUint32(0, true);
+      if (this.have < 4 + n) break;
+      out.push(unpack(this.bytes(4 + n, true).subarray(4)));
+    }
+    return out;
+  }
+
+  /** Whether every byte fed was read. */
+  get done(): boolean {
+    return this.have === 0;
+  }
+
+  /** The first `n` bytes fed and not yet read (taken off when `take`). */
+  private bytes(n: number, take: boolean): Uint8Array {
+    const first = this.pieces[0] as Uint8Array;
+    if (first.length >= n && !take) return first.subarray(0, n);
+    const out = new Uint8Array(n);
+    let at = 0, i = 0;
+    while (at < n) {
+      const p = this.pieces[i] as Uint8Array, k = Math.min(p.length, n - at);
+      out.set(p.subarray(0, k), at);
+      at += k;
+      if (!take) { i++; continue; }
+      if (k === p.length) this.pieces.shift();
+      else this.pieces[0] = p.subarray(k);
+    }
+    if (take) this.have -= n;
+    return out;
+  }
+}

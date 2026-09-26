@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-26 — M8.10 slice 18: the island's start
+
+Measured as the city suite does (4× CPU, 20 Mbit): 6.2–6.4 s to control on the island, 4.6–4.8 on the grid. Now 4.2–4.7
+(the machine loaded; the grid 3.8–4.1): the scripts fetched first, then the bake, written in sections each read as it
+comes (18.6); the start's work kept with the bake (the way's reaches and links, the first minute's route and height,
+each prop's height); a chunk's surfaces made alone (18.5); the physics' colliders from a chunk's solids, no facades
+(18.7); at the start the view builds what is ahead of the car, the rest streams; the car classes, the ghost, the
+showroom's grey car and the police livery made when first wanted. Next toward 4 s: the shaders compiled during the
+bake's wait, the radar's first paint, the signs' glyphs (the look's files).
+
 ## 2026-09-26 — M8.10 slice 18: the island's triangles
 
 Measured (a still start, no traffic, as the city suite's tour): the island drew 111 calls / 572k triangles on low at

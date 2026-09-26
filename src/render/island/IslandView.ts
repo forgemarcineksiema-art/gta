@@ -26,8 +26,8 @@ import { placeViews, type PlaceView } from './places';
 /** The paved places' slabs: this far over the ground, under the roads' strips; a quad about this big (m). */
 const PAVE_LIFT = 0.035;
 const PAVE_CELL = 8;
-/** The chunks within this of the car are built at the start; the rest a few columns a frame (m). */
-const SNAP_REACH = 400;
+/** The ground's chunks within this of the car are built at the start; the rest a few columns a frame (m). */
+const SNAP_REACH = 300;
 /** The buildings and the roads' surfaces of the chunks within this of the car are built at the start (m); the rest, the nearest first, `BUILD_SLICE` statics a frame. */
 const SNAP_BUILT = 150;
 /** The standing props are drawn in the chunks whose middles are within this of the car (m), by the quality's tier. */
@@ -45,6 +45,12 @@ const BLOCK: Readonly<Record<QualityTier, number>> = { low: 140, high: 280 };
 const OWN = 3;
 /** A chunk whose middle is this much further than its reach loses its meshes, made again when it comes back (m). */
 const KEEP = CHUNK;
+/**
+ * At the start (`snap`) what the camera looks at is built at once, the rest streamed (M8.10 slice 18): a box is in its
+ * sight within this of the car (m), or with a corner or its middle within this of the car's heading (the cosine).
+ */
+const SNAP_NEAR = 60;
+const SNAP_SIGHT = Math.cos((80 * Math.PI) / 180);
 /** A quarter's placeholder while its level is built (never disposed). */
 const EMPTY = new THREE.BufferGeometry();
 EMPTY.userData['shadowVertices'] = 0;
@@ -96,6 +102,8 @@ export class IslandView {
   private building: { part: Part; level: number; build: GeometryBuild } | null = null;
   /** The quality's tier the view was last synced for (the props' sight). */
   private tier: QualityTier = 'low';
+  /** What the last sync's start would build at once (`sync`'s `seen`). */
+  private seen: (x0: number, z0: number, x1: number, z1: number) => boolean = () => true;
   /** Per chunk: its roads' surfaces drawn with their detail (the kerbs' faces, the paint), near. */
   private readonly detail = new Uint8Array(CHUNKS_X * CHUNKS_Z);
   /** The highway's structures and the coast's things by chunk: their triangles as built, then their meshes. */
@@ -143,7 +151,8 @@ export class IslandView {
     if (++this.frames > 1) this.later.shift()?.();
     for (const v of this.views) v.update?.(alpha, dt);
     if (!props) return;
-    let built = false;
+    // (none on the first frame: the start's frame is the player's first, M8.10 slice 18)
+    let built = this.frames === 1;
     for (let j = 0; j < CHUNKS_Z; j++) for (let i = 0; i < CHUNKS_X; i++) {
       const k = Island.chunkIndex(i, j), d = Math.hypot(CHUNK_X0 + (i + 0.5) * CHUNK - x, CHUNK_Z0 + (j + 0.5) * CHUNK - z);
       const mesh = this.propChunks.get(k), sight = PROP_SIGHT[this.tier];
@@ -151,7 +160,7 @@ export class IslandView {
       if (built || d >= sight) continue;
       const list: StaticDesc[] = [];
       for (const p of this.island.props(k)) {
-        const from = list.length, y = this.island.standAt(p.x, p.z);
+        const from = list.length, y = p.y ?? this.island.standAt(p.x, p.z);
         propStatics(p, list);
         for (let s = from; s < list.length; s++) (list[s] as StaticDesc).position.y += y;
       }
@@ -206,16 +215,27 @@ export class IslandView {
    * the nearest missing chunk a frame (M8.10 slice 18: the island's start builds only what is near); the near ones at
    * once when `snap`.
    */
-  sync(x: number, z: number, quality: QualityTier, snap = false): void {
+  sync(x: number, z: number, quality: QualityTier, snap = false, fx = 0, fz = 0): void {
     this.tier = quality;
     const fog = QUALITY[quality].far, reach = fog + CHUNK * 0.75;
-    if (snap) this.ground.sync(x, z, Math.min(reach, SNAP_REACH), true);
+    // what the start builds at once: what is near, or ahead along (fx, fz) (all of it with no heading)
+    if (snap) {
+      const heading = Math.hypot(fx, fz), ux = heading > 0 ? fx / heading : 0, uz = heading > 0 ? fz / heading : 0;
+      const ahead = (px: number, pz: number): boolean => (px - x) * ux + (pz - z) * uz > SNAP_SIGHT * Math.hypot(px - x, pz - z);
+      this.seen = (x0, z0, x1, z1) => heading === 0 || Math.hypot(Math.max(x0 - x, 0, x - x1), Math.max(z0 - z, 0, z - z1)) < SNAP_NEAR
+        || ahead(x0, z0) || ahead(x1, z0) || ahead(x0, z1) || ahead(x1, z1) || ahead((x0 + x1) / 2, (z0 + z1) / 2);
+      this.ground.sync(x, z, Math.min(reach, SNAP_REACH), true, this.seen);
+    }
     this.ground.sync(x, z, reach);
-    // the chunks in sight begun (their roads' surfaces, their quarters): the near ones at once when `snap`, else the
-    // nearest missing one a frame; one far past its reach unmade
+    // the chunks in sight begun (their roads' surfaces, their quarters): the near ones in sight at once when `snap`,
+    // else the nearest missing one a frame; one far past its reach unmade
     if (snap) {
       const [ci, cj] = Island.chunkOf(x, z), here = Island.chunkIndex(ci, cj);
-      for (let k = 0; k < this.made.length; k++) if (this.made[k] === 0 && (k === here || far(k, x, z) < Math.min(reach, SNAP_BUILT))) this.start(k);
+      for (let k = 0; k < this.made.length; k++) {
+        if (this.made[k] === 1 || (k !== here && far(k, x, z) >= Math.min(reach, SNAP_BUILT))) continue;
+        const x0 = CHUNK_X0 + (k % CHUNKS_X) * CHUNK, z0 = CHUNK_Z0 + Math.floor(k / CHUNKS_X) * CHUNK;
+        if (k === here || this.seen(x0, z0, x0 + CHUNK, z0 + CHUNK)) this.start(k);
+      }
     } else {
       let next = -1, best = reach;
       for (let k = 0; k < this.made.length; k++) {
@@ -264,7 +284,7 @@ export class IslandView {
       if (!this.building) {
         let best = snap ? SNAP_BUILT : Infinity, pick: Part | null = null;
         for (const p of this.parts) {
-          if (!p.seen || p.levels[p.level]) continue;
+          if (!p.seen || p.levels[p.level] || (snap && !this.seen(p.x0, p.z0, p.x1, p.z1))) continue;
           const d = Math.hypot(Math.max(p.x0 - x, 0, x - p.x1), Math.max(p.z0 - z, 0, z - p.z1));
           if (d < best) { best = d; pick = p; }
         }
@@ -360,7 +380,7 @@ export class IslandView {
    * their kerbs, the paint; null where none.
    */
   private surface(k: number): THREE.Mesh | null {
-    const chunk = this.island.surfaceMeshes().get(k), c = this.color;
+    const chunk = this.island.surfaceMesh(k), c = this.color;
     if (!chunk) return null;
     const col = new Float32Array(chunk.positions.length);
     chunk.colors.forEach((hex, t) => {

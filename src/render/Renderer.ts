@@ -183,8 +183,9 @@ export class Renderer {
       this.cityView.sync(p.x, p.z, this.quality, true);
     }
     if (this.islandView) {
-      const p = sim.vehicle.body.translation();
-      this.islandView.sync(p.x, p.z, this.quality, true);
+      // at the start what the camera will see first, ahead of the car (M8.10 slice 18); the rest streams in
+      const p = sim.vehicle.body.translation(), q = sim.vehicle.body.rotation();
+      this.islandView.sync(p.x, p.z, this.quality, true, 2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y));
     }
     for (const d of sim.dynamics) this.shapes.addDynamic(d);
     this.player = new PlayerCar(this.scene, sim);
@@ -286,7 +287,10 @@ export class Renderer {
     const snap = sim.respawned || this.lastCarPos.distanceToSquared(carPos) > 80 * 80;
     this.lastCarPos.copy(carPos);
     this.cityView?.sync(carPos.x, carPos.z, this.quality, snap);
-    this.islandView?.sync(carPos.x, carPos.z, this.quality, snap);
+    if (this.islandView) {
+      const q = car.quaternion;
+      this.islandView.sync(carPos.x, carPos.z, this.quality, snap, 2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y));
+    }
     this.islandView?.update(alpha, dt, sim.props, carPos.x, carPos.z);
     if (this.cityView && dt > 0 && dt <= 0.25) this.adaptQuality(dt);
     this.carVel.set(tm.vx, tm.vy, tm.vz);

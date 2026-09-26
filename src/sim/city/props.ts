@@ -106,7 +106,11 @@ export function propHeight(kind: PropKind): number {
 }
 
 /** One placed prop. `yaw` turns its local +Z (its face: the lamp's arm, the bench's seat) toward the road. */
-export interface PropDesc { id: number; kind: PropKind; x: number; z: number; yaw: number }
+export interface PropDesc {
+  id: number; kind: PropKind; x: number; z: number; yaw: number;
+  /** The island's: the height it stands at (a pavement's top or the ground), worked out with its chunk's props (M8.10 slice 18). */
+  y?: number;
+}
 /** A thing placed where given (the cold open's route, M8 slice 8). */
 export interface PropSpot { kind: PropKind; x: number; z: number; yaw: number }
 

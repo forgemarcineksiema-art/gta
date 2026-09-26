@@ -43,6 +43,12 @@ function newReach(): Reach {
   return { lanes: new Int32Array(REACH_LANES), s: new Float64Array(REACH_LANES), leg: new Float64Array(REACH_LANES), count: 0 };
 }
 
+/**
+ * What a way works out once from its world (M8.10 slice 18: kept with the island's bake): the junctions' metres of its
+ * links (by lane, in `next`'s order), each placed ring's reach by its def's id, each door's.
+ */
+export interface WayBake { links: Float32Array; rings: Map<number, Reach>; doors: Reach[] }
+
 export class Way implements GoalChooser {
   /** What the line names and the route leads to. Read-only outside. */
   readonly goal: Goal = newGoal();
@@ -117,7 +123,7 @@ export class Way implements GoalChooser {
    * only from the lanes at its ground's height, never a deck over it (the viaduct, a bridge) or the tunnel under it;
    * none (the grid's) reads them in plan alone, as it always has.
    */
-  constructor(private readonly sim: SimWorld, graph: RoadGraph, private readonly lanes: LaneTables, private readonly groundAt?: (x: number, z: number) => number) {
+  constructor(private readonly sim: SimWorld, graph: RoadGraph, private readonly lanes: LaneTables, private readonly groundAt?: (x: number, z: number) => number, baked: WayBake | null = null) {
     const n = (this.n = lanes.laneCount);
     this.len = lanes.length;
     this.lanePoints = graph.lanes.map((lane) => lane.points);
@@ -132,7 +138,7 @@ export class Way implements GoalChooser {
       this.outStart[u] = e;
       for (const v of graph.lanes[u]?.next ?? []) {
         this.outTo[e] = v;
-        this.outConn[e] = lanes.connectionLength(u, v);
+        this.outConn[e] = baked ? (baked.links[e] as number) : lanes.connectionLength(u, v);
         ins[v] = (ins[v] as number) + 1;
         e++;
       }
@@ -168,12 +174,18 @@ export class Way implements GoalChooser {
     this.seedS = new Float64Array(n);
     this.seedLeg = new Float64Array(n);
     this.seedTotal = new Float64Array(n);
+    // (a def the bake knows, or a door, as it was worked out; one it does not, the cold open's, now)
     for (const d of sim.jobs.defs) {
-      const r = newReach();
-      this.reachOf(d.x, d.z, r);
+      let r = baked?.rings.get(d.id);
+      if (!r) {
+        r = newReach();
+        this.reachOf(d.x, d.z, r);
+      }
       this.ringReach.set(d.id, r);
     }
-    this.doorReach = sim.run.dropOffs.map((site) => {
+    this.doorReach = sim.run.dropOffs.map((site, i) => {
+      const known = baked?.doors[i];
+      if (known) return known;
       const r = newReach();
       if (site.approachLane >= 0) {
         // the street the door opens on, the way the garage is driven into
@@ -187,6 +199,11 @@ export class Way implements GoalChooser {
       }
       return r;
     });
+  }
+
+  /** What this way worked out once, for a bake (its world's rings and doors as they are now). */
+  bake(): WayBake {
+    return { links: this.outConn.slice(), rings: new Map(this.ringReach), doors: [...this.doorReach] };
   }
 
   step(dt: number): void {

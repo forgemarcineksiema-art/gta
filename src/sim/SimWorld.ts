@@ -35,7 +35,7 @@ import { Life } from './life/Life';
 import { Heat } from './heat/Heat';
 import { Police } from './police/Police';
 import { Pursuit } from './police/Pursuit';
-import { ColdOpen, coldOpenRouteOf, coldOpenSpots } from './run/ColdOpen';
+import { ColdOpen, coldOpenRouteOf, coldOpenSpots, islandColdOpenBake } from './run/ColdOpen';
 import { Run } from './run/Run';
 import { Way } from './run/way';
 import { Skill } from './run/Skill';
@@ -363,7 +363,12 @@ export class SimWorld {
     this.jobs.revealAll = opts.reveal ?? false;
     // the way and the AI cars on the grid's streets or the island's (M8.10 slice 14: there a place is reached from the
     // lanes at its ground's height, never a deck's over it)
-    this.way = streets && this.traffic ? new Way(this, streets.graph, this.traffic.lanes, this.island ? (x, z) => streets.groundAt(x, z) : undefined) : null;
+    this.way = streets && this.traffic ? new Way(this, streets.graph, this.traffic.lanes, this.island ? (x, z) => streets.groundAt(x, z) : undefined, baked && baked.seed === seed ? (baked.way ?? null) : null) : null;
+    // (the island's way and first minute worked out here are kept with its bake: M8.10 slice 18)
+    if (this.island && !baked && this.way && this.island.worldBake) {
+      this.island.worldBake.way = this.way.bake();
+      this.island.worldBake.coldOpen = islandColdOpenBake(this);
+    }
     this.ai = streets && this.traffic ? new AiCars(this) : null;
     if (this.city) {
       // what the street furniture keeps out of (M8 D7): every job's ring and its end, the stash's cars, the

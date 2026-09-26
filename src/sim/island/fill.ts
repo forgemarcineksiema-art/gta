@@ -7,9 +7,9 @@
  * Quay's front. The lots, the hedges and the palms worked out once; a chunk's statics made from them when first asked
  * (`fillStatics`: the island's bake keeps the lots, not their 130 000 pieces, M8.10 slice 18); no Three.js.
  */
-import { Architecture } from '../city/architecture';
+import { Architecture, buildingHeight } from '../city/architecture';
 import { GRASS } from '../city/surface';
-import type { StaticDesc } from '../scene';
+import { IDENTITY_QUAT, type StaticDesc } from '../scene';
 import { ACCENTS, CITY_COLORS } from '../palette';
 import { inPolygon, type P2 } from './geom';
 import type { Ground } from './ground';
@@ -63,6 +63,32 @@ export function fillStatics(fill: IslandFill, index: number, chunkOf: (x: number
     if (chunkOf(t.x, t.z) !== index) continue;
     const start = list.length;
     kit.tree(0, 0, true);
+    kit.rotateFrom(start, t.x, t.z, 0);
+    for (let i = start; i < list.length; i++) (list[i] as StaticDesc).position.y += t.y;
+  }
+  return list;
+}
+
+/**
+ * What of `fillStatics`' a collider stands for, alone (M8.10 slice 18: the physics' when a chunk loads, the facades not
+ * made): each lot's envelope and its plinth, each palm's trunk, in `fillStatics`' order and to the bit.
+ */
+export function fillSolids(fill: IslandFill, index: number, chunkOf: (x: number, z: number) => number): StaticDesc[] {
+  const list: StaticDesc[] = [], kit = new Architecture(list);
+  for (const lot of fill.lots) {
+    if (chunkOf(lot.x, lot.z) !== index) continue;
+    const start = list.length, height = buildingHeight(lot.district, lot.floors);
+    // the kit's building's envelope (its first static), then the plinth
+    list.push({ shape: { kind: 'box', hx: lot.hx, hy: height / 2, hz: lot.hz }, position: { x: 0, y: height / 2 + 0.14, z: 0 }, rotation: IDENTITY_QUAT, color: CITY_COLORS.stone, tag: 'building', collisionOnly: true });
+    kit.box(0, (lot.foot - lot.base - 0.4) / 2, 0, lot.hx + 0.05, (lot.base - lot.foot + 0.4) / 2, lot.hz + 0.05, CITY_COLORS.stone, 'building');
+    kit.rotateFrom(start, lot.x, lot.z, lot.yaw);
+    for (let i = start; i < list.length; i++) (list[i] as StaticDesc).position.y += lot.base;
+  }
+  for (const t of fill.trees) {
+    if (chunkOf(t.x, t.z) !== index) continue;
+    const start = list.length;
+    // the kit's tree's trunk (its first static)
+    kit.cylinder(0, 2.5, 0, 0.24, 2.35, 0x8b7966, 6, 'trunk');
     kit.rotateFrom(start, t.x, t.z, 0);
     for (let i = start; i < list.length; i++) (list[i] as StaticDesc).position.y += t.y;
   }

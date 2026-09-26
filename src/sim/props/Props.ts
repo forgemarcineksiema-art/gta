@@ -240,7 +240,7 @@ export class Props {
         this.x[p.id] = p.x;
         this.z[p.id] = p.z;
         this.yaw[p.id] = p.yaw;
-        this.base[p.id] = island ? island.standAt(p.x, p.z) : 0;
+        this.base[p.id] = p.y ?? (island ? island.standAt(p.x, p.z) : 0);
         this.state[p.id] = PropState.Standing;
         this.standingFootprint(p.id);
         this.gridInsert(p.id);

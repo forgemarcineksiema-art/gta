@@ -2,9 +2,9 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { PALETTE, initPhysics } from '../../../src/sim';
-import { CHUNK, CHUNKS_X, CHUNK_X0, CHUNK_Z0, Island, PLUMB_TILT } from '../../../src/sim/island/Island';
+import { CHUNK, CHUNKS_X, CHUNKS_Z, CHUNK_X0, CHUNK_Z0, Island, PLUMB_TILT } from '../../../src/sim/island/Island';
 import { HALF_WIDTH } from '../../../src/sim/island/ground';
-import { KERB, PAINT_LIFT, PAVEMENT, ROAD_LIFT, heightOn, onStrip, type Strip } from '../../../src/sim/island/surfaces';
+import { KERB, PAINT_LIFT, PAVEMENT, ROAD_LIFT, heightOn, onStrip, surfaceChunk, surfaceIndex, type Strip } from '../../../src/sim/island/surfaces';
 import { GroundView } from '../../../src/render/island/GroundView';
 
 describe('M8.10 slice 6b: the roads\' surfaces', () => {
@@ -181,5 +181,18 @@ describe('M8.10 slice 6b: the roads\' surfaces', () => {
     console.log(`18.4 the far level ${far} of ${all} triangles`);
     expect(wrong).toBe(0);
     expect(far / all).toBeLessThan(0.6);
+  });
+
+  it("18.5 a chunk's surfaces made alone are the chunk's made with the island's: its triangles in their order, its far level", () => {
+    const chunkOf = (x: number, z: number): number => Island.chunkIndex(...Island.chunkOf(x, z));
+    const all = island.surfaceMeshes(), index = surfaceIndex(island.surfaces, chunkOf);
+    for (let k = 0; k < CHUNKS_X * CHUNKS_Z; k++) {
+      const alone = surfaceChunk(island.surfaces, index, k, chunkOf), whole = all.get(k) ?? null;
+      expect(alone === null, `chunk ${k}`).toBe(whole === null);
+      if (!alone || !whole) continue;
+      expect(alone.far, `chunk ${k}`).toBe(whole.far);
+      expect(alone.colors, `chunk ${k}`).toEqual(whole.colors);
+      expect(alone.positions, `chunk ${k}`).toEqual(whole.positions);
+    }
   });
 });

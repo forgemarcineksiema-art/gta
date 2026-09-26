@@ -473,80 +473,170 @@ function stripPoint(st: Strip, k: number, i: number): number[] {
  * the junctions' fans, the strips' bands, their pavements on their kerbs (or their edges' skirts), the paint.
  */
 export function surfaceMeshes(s: RoadSurfaces, chunkOf: (x: number, z: number) => number): Map<number, SurfaceChunk> {
+  const e = new Emitter(chunkOf, -1);
+  s.junctions.forEach((j) => e.junction(j));
+  for (const st of s.strips) for (let k = 0; k + 1 < st.s.length; k++) e.segment(st, k);
+  const v = new Float64Array(12);
+  s.paint.forEach((p) => e.paint(p, paintCorners(s, p, v)));
+  return e.done();
+}
+
+/**
+ * Which junctions, strips' segments (strip and segment, in pairs) and paint quads lay triangles in each chunk (M8.10
+ * slice 18: a chunk's triangles made alone, in the order the island's are): the chunks a junction's or a segment's box
+ * touches, the chunks a paint quad's two triangles' middles are in (its corners kept, twelve a quad).
+ */
+export interface SurfaceIndex { junctions: Map<number, number[]>; segments: Map<number, number[]>; paint: Map<number, number[]>; corners: Float64Array }
+
+export function surfaceIndex(s: RoadSurfaces, chunkOf: (x: number, z: number) => number): SurfaceIndex {
+  const index: SurfaceIndex = { junctions: new Map(), segments: new Map(), paint: new Map(), corners: new Float64Array(s.paint.length * 12) };
+  // an entry (one number, or two: `v2` NaN for none) into a chunk's list
+  const into = (map: Map<number, number[]>, key: number, v: number, v2 = NaN): void => {
+    let list = map.get(key);
+    if (!list) { list = []; map.set(key, list); }
+    list.push(v);
+    if (v2 === v2) list.push(v2);
+  };
+  // a box's chunks: its corners' (a box smaller than a chunk touches no other)
+  const box = (map: Map<number, number[]>, x0: number, x1: number, z0: number, z1: number, v: number, v2 = NaN): void => {
+    const a = chunkOf(x0, z0), b = chunkOf(x1, z0), c = chunkOf(x0, z1), d = chunkOf(x1, z1);
+    into(map, a, v, v2);
+    if (b !== a) into(map, b, v, v2);
+    if (c !== a && c !== b) into(map, c, v, v2);
+    if (d !== a && d !== b && d !== c) into(map, d, v, v2);
+  };
+  s.junctions.forEach((j, n) => {
+    let x0 = j.x, x1 = j.x, z0 = j.z, z1 = j.z;
+    for (const r of j.rim) { x0 = Math.min(x0, r.x); x1 = Math.max(x1, r.x); z0 = Math.min(z0, r.z); z1 = Math.max(z1, r.z); }
+    for (let i = 0; i < j.fan.length; i += 3) {
+      const x = j.fan[i] as number, z = j.fan[i + 2] as number;
+      x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z);
+    }
+    box(index.junctions, x0 - 1, x1 + 1, z0 - 1, z1 + 1, n);
+  });
+  s.strips.forEach((st, n) => {
+    const reach = st.hw + PAVEMENT + 1;
+    for (let k = 0; k + 1 < st.s.length; k++) {
+      if (!st.drawn[k]) continue;
+      const xa = st.x[k] as number, za = st.z[k] as number, xb = st.x[k + 1] as number, zb = st.z[k + 1] as number;
+      box(index.segments, Math.min(xa, xb) - reach, Math.max(xa, xb) + reach, Math.min(za, zb) - reach, Math.max(za, zb) + reach, n, k);
+    }
+  });
+  const v = new Float64Array(12);
+  s.paint.forEach((p, n) => {
+    paintCorners(s, p, v);
+    index.corners.set(v, n * 12);
+    // its two triangles' middles (a, b, c) and (a, c, d), as the emitter names them
+    const a = chunkOf(((v[0] as number) + (v[3] as number) + (v[6] as number)) / 3, ((v[2] as number) + (v[5] as number) + (v[8] as number)) / 3);
+    const b = chunkOf(((v[0] as number) + (v[6] as number) + (v[9] as number)) / 3, ((v[2] as number) + (v[8] as number) + (v[11] as number)) / 3);
+    into(index.paint, a, n);
+    if (b !== a) into(index.paint, b, n);
+  });
+  return index;
+}
+
+/** One chunk's triangles made alone, from its index (as `surfaceMeshes` makes them); null where none. */
+export function surfaceChunk(s: RoadSurfaces, index: SurfaceIndex, key: number, chunkOf: (x: number, z: number) => number): SurfaceChunk | null {
+  const e = new Emitter(chunkOf, key);
+  for (const n of index.junctions.get(key) ?? []) e.junction(s.junctions[n] as Junction);
+  const segs = index.segments.get(key) ?? [];
+  for (let i = 0; i < segs.length; i += 2) e.segment(s.strips[segs[i] as number] as Strip, segs[i + 1] as number);
+  for (const n of index.paint.get(key) ?? []) e.paint(s.paint[n] as Paint, index.corners.subarray(n * 12, n * 12 + 12));
+  return e.done().get(key) ?? null;
+}
+
+/** A paint quad's corners on its strip at its heights (x, y, z four times), into `out` (`onStrip`'s x and z; its own y). */
+function paintCorners(s: RoadSurfaces, p: Paint, out: Float64Array): Float64Array {
+  const st = s.strips[p.strip] as Strip;
+  for (let i = 0; i < 4; i++) {
+    const sv = p.s[i] as number, o = p.o[i] as number, k = segmentAt(st, sv), s0 = st.s[k] as number, s1 = st.s[k + 1] as number;
+    const t = Math.max(0, Math.min(1, (sv - s0) / (s1 - s0 || 1)));
+    const xa = (st.x[k] as number) + (st.rx[k] as number) * o, za = (st.z[k] as number) + (st.rz[k] as number) * o;
+    const xb = (st.x[k + 1] as number) + (st.rx[k + 1] as number) * o, zb = (st.z[k + 1] as number) + (st.rz[k + 1] as number) * o;
+    out[i * 3] = xa + (xb - xa) * t; out[i * 3 + 1] = p.y[i] as number; out[i * 3 + 2] = za + (zb - za) * t;
+  }
+  return out;
+}
+
+/** The surfaces' triangles as they are laid, a chunk's each (`only` the one kept, -1 all): its far level, then its detail. */
+class Emitter {
   // (the detail, drawn near only, kept apart and put after each chunk's far level)
-  const chunks = new Map<number, SurfaceChunk>(), details = new Map<number, SurfaceChunk>();
-  const tri = (ax: number, ay: number, az: number, bx: number, by: number, bz: number, cx: number, cy: number, cz: number, colour: number, detail = false): void => {
-    const key = chunkOf((ax + bx + cx) / 3, (az + bz + cz) / 3), into = detail ? details : chunks;
+  private readonly chunks = new Map<number, SurfaceChunk>();
+  private readonly details = new Map<number, SurfaceChunk>();
+  constructor(private readonly chunkOf: (x: number, z: number) => number, private readonly only: number) {}
+
+  private tri(ax: number, ay: number, az: number, bx: number, by: number, bz: number, cx: number, cy: number, cz: number, colour: number, detail = false): void {
+    const key = this.chunkOf((ax + bx + cx) / 3, (az + bz + cz) / 3), into = detail ? this.details : this.chunks;
+    if (this.only >= 0 && key !== this.only) return;
     let c = into.get(key);
     if (!c) { c = { positions: [], colors: [], far: 0 }; into.set(key, c); }
     c.positions.push(ax, ay, az, bx, by, bz, cx, cy, cz);
     c.colors.push(colour);
-  };
-  const quad = (a: readonly number[], b: readonly number[], c: readonly number[], d: readonly number[], colour: number, detail = false): void => {
-    tri(a[0] as number, a[1] as number, a[2] as number, b[0] as number, b[1] as number, b[2] as number, c[0] as number, c[1] as number, c[2] as number, colour, detail);
-    tri(a[0] as number, a[1] as number, a[2] as number, c[0] as number, c[1] as number, c[2] as number, d[0] as number, d[1] as number, d[2] as number, colour, detail);
-  };
-  // a fan from each junction's middle, each triangle in four: the spokes' middles and the corners' chords on the ground
-  for (const j of s.junctions) {
+  }
+
+  private quad(a: ArrayLike<number>, b: ArrayLike<number>, c: ArrayLike<number>, d: ArrayLike<number>, colour: number, detail = false): void {
+    this.tri(a[0] as number, a[1] as number, a[2] as number, b[0] as number, b[1] as number, b[2] as number, c[0] as number, c[1] as number, c[2] as number, colour, detail);
+    this.tri(a[0] as number, a[1] as number, a[2] as number, c[0] as number, c[1] as number, c[2] as number, d[0] as number, d[1] as number, d[2] as number, colour, detail);
+  }
+
+  /** A fan from a junction's middle, each triangle in four: the spokes' middles and the corners' chords on the ground. */
+  junction(j: Junction): void {
     const colour = PALETTE.asphalt, rim = j.rim, f = j.fan;
     for (let i = 0; i < rim.length; i++) {
       const a = rim[i] as RimPoint, b = rim[(i + 1) % rim.length] as RimPoint, n = 9 * i;
       const mx = f[n] as number, my = f[n + 1] as number, mz = f[n + 2] as number, nx = f[n + 3] as number, ny = f[n + 4] as number, nz = f[n + 5] as number;
       const ex = f[n + 6] as number, ey = f[n + 7] as number, ez = f[n + 8] as number;
-      tri(j.x, j.y, j.z, mx, my, mz, nx, ny, nz, colour);
-      tri(mx, my, mz, a.x, a.y, a.z, ex, ey, ez, colour);
-      tri(mx, my, mz, ex, ey, ez, nx, ny, nz, colour);
-      tri(nx, ny, nz, ex, ey, ez, b.x, b.y, b.z, colour);
+      this.tri(j.x, j.y, j.z, mx, my, mz, nx, ny, nz, colour);
+      this.tri(mx, my, mz, a.x, a.y, a.z, ex, ey, ez, colour);
+      this.tri(mx, my, mz, ex, ey, ez, nx, ny, nz, colour);
+      this.tri(nx, ny, nz, ex, ey, ez, b.x, b.y, b.z, colour);
     }
   }
-  for (const st of s.strips) {
+
+  /** A strip's segment `k` (none where it is not drawn): its bands, and each side's pavement on its kerb or its skirt. */
+  segment(st: Strip, k: number): void {
+    if (!st.drawn[k]) return;
     const colour = st.cls === 'dirt' ? ISLAND_COLORS.dirt : st.cls === 'taxiway' ? PALETTE.concrete : PALETTE.asphalt;
-    const count = st.s.length, last = ACROSS.length - 1, walked = [false, false];
-    for (let k = 0; k + 1 < count; k++) {
-      if (!st.drawn[k]) { walked[0] = walked[1] = false; continue; }
-      // the bands as `heightOn` reads them
-      for (let i = 0; i < last; i++) quad(stripPoint(st, k, i), stripPoint(st, k + 1, i), stripPoint(st, k + 1, i + 1), stripPoint(st, k, i + 1), colour);
-      for (const [side, e0, e1] of [[1, stripPoint(st, k, 0), stripPoint(st, k + 1, 0)], [-1, stripPoint(st, k, last), stripPoint(st, k + 1, last)]] as const) {
-        const w = side > 0 ? 0 : 1;
-        if (((st.walk[k] as number) & (w === 0 ? 1 : 2)) === 0) {
-          walked[w] = false;
-          // the edge's skirt
-          quad(e0, [e0[0] as number, (e0[1] as number) - SKIRT, e0[2] as number], [e1[0] as number, (e1[1] as number) - SKIRT, e1[2] as number], e1, colour);
-          continue;
-        }
-        const outX0 = (st.x[k] as number) + (st.rx[k] as number) * side * (st.hw + PAVEMENT), outZ0 = (st.z[k] as number) + (st.rz[k] as number) * side * (st.hw + PAVEMENT);
-        const outX1 = (st.x[k + 1] as number) + (st.rx[k + 1] as number) * side * (st.hw + PAVEMENT), outZ1 = (st.z[k + 1] as number) + (st.rz[k + 1] as number) * side * (st.hw + PAVEMENT);
-        const g0 = st.out[2 * k + w] as number, g1 = st.out[2 * (k + 1) + w] as number;
-        const top0 = [e0[0] as number, (e0[1] as number) + KERB, e0[2] as number], top1 = [e1[0] as number, (e1[1] as number) + KERB, e1[2] as number];
-        const out0 = [outX0, g0 + ROAD_LIFT + KERB, outZ0], out1 = [outX1, g1 + ROAD_LIFT + KERB, outZ1];
-        quad(top0, top1, out1, out0, ISLAND_COLORS.paving);
-        quad(e0, e1, top1, top0, PALETTE.kerb, true);
-        quad(out0, out1, [outX1, g1 - 0.3, outZ1], [outX0, g0 - 0.3, outZ0], PALETTE.kerb, true);
-        // its end where it starts after a gap, and where it stops before one (the next segment decides)
-        if (!walked[w]) quad(e0, top0, out0, [outX0, g0 - 0.3, outZ0], PALETTE.kerb, true);
-        walked[w] = true;
-        const ends = k + 2 >= count || !st.drawn[k + 1];
-        if (ends) quad(e1, top1, out1, [outX1, g1 - 0.3, outZ1], PALETTE.kerb, true);
+    const count = st.s.length, last = ACROSS.length - 1;
+    // the bands as `heightOn` reads them
+    for (let i = 0; i < last; i++) this.quad(stripPoint(st, k, i), stripPoint(st, k + 1, i), stripPoint(st, k + 1, i + 1), stripPoint(st, k, i + 1), colour);
+    for (const [side, e0, e1] of [[1, stripPoint(st, k, 0), stripPoint(st, k + 1, 0)], [-1, stripPoint(st, k, last), stripPoint(st, k + 1, last)]] as const) {
+      const w = side > 0 ? 0 : 1, bit = w === 0 ? 1 : 2;
+      if (((st.walk[k] as number) & bit) === 0) {
+        // the edge's skirt
+        this.quad(e0, [e0[0] as number, (e0[1] as number) - SKIRT, e0[2] as number], [e1[0] as number, (e1[1] as number) - SKIRT, e1[2] as number], e1, colour);
+        continue;
       }
+      const outX0 = (st.x[k] as number) + (st.rx[k] as number) * side * (st.hw + PAVEMENT), outZ0 = (st.z[k] as number) + (st.rz[k] as number) * side * (st.hw + PAVEMENT);
+      const outX1 = (st.x[k + 1] as number) + (st.rx[k + 1] as number) * side * (st.hw + PAVEMENT), outZ1 = (st.z[k + 1] as number) + (st.rz[k + 1] as number) * side * (st.hw + PAVEMENT);
+      const g0 = st.out[2 * k + w] as number, g1 = st.out[2 * (k + 1) + w] as number;
+      const top0 = [e0[0] as number, (e0[1] as number) + KERB, e0[2] as number], top1 = [e1[0] as number, (e1[1] as number) + KERB, e1[2] as number];
+      const out0 = [outX0, g0 + ROAD_LIFT + KERB, outZ0], out1 = [outX1, g1 + ROAD_LIFT + KERB, outZ1];
+      this.quad(top0, top1, out1, out0, ISLAND_COLORS.paving);
+      this.quad(e0, e1, top1, top0, PALETTE.kerb, true);
+      this.quad(out0, out1, [outX1, g1 - 0.3, outZ1], [outX0, g0 - 0.3, outZ0], PALETTE.kerb, true);
+      // its end where it starts after a gap (the segment before it not drawn or with no pavement on this side), and
+      // where it stops before one (the next not drawn)
+      const walked = k > 0 && st.drawn[k - 1] === true && ((st.walk[k - 1] as number) & bit) !== 0;
+      if (!walked) this.quad(e0, top0, out0, [outX0, g0 - 0.3, outZ0], PALETTE.kerb, true);
+      if (k + 2 >= count || !st.drawn[k + 1]) this.quad(e1, top1, out1, [outX1, g1 - 0.3, outZ1], PALETTE.kerb, true);
     }
   }
-  // the paint, on its strip at its heights
-  const corner = { x: 0, y: 0, z: 0 }, v = [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]];
-  for (const p of s.paint) {
-    const st = s.strips[p.strip] as Strip;
-    for (let i = 0; i < 4; i++) {
-      onStrip(st, p.s[i] as number, p.o[i] as number, corner);
-      const q = v[i] as number[];
-      q[0] = corner.x; q[1] = p.y[i] as number; q[2] = corner.z;
+
+  /** A paint quad on its strip at its heights, its corners given. */
+  paint(p: Paint, v: ArrayLike<number>): void {
+    this.quad([v[0] as number, v[1] as number, v[2] as number], [v[3] as number, v[4] as number, v[5] as number], [v[6] as number, v[7] as number, v[8] as number], [v[9] as number, v[10] as number, v[11] as number], p.colour, true);
+  }
+
+  /** The chunks' triangles, each its far level first. */
+  done(): Map<number, SurfaceChunk> {
+    for (const c of this.chunks.values()) c.far = c.colors.length;
+    for (const [key, d] of this.details) {
+      let c = this.chunks.get(key);
+      if (!c) { c = { positions: [], colors: [], far: 0 }; this.chunks.set(key, c); }
+      c.positions = c.positions.concat(d.positions);
+      c.colors = c.colors.concat(d.colors);
     }
-    quad(v[0] as number[], v[1] as number[], v[2] as number[], v[3] as number[], p.colour, true);
+    return this.chunks;
   }
-  for (const c of chunks.values()) c.far = c.colors.length;
-  for (const [key, d] of details) {
-    let c = chunks.get(key);
-    if (!c) { c = { positions: [], colors: [], far: 0 }; chunks.set(key, c); }
-    c.positions = c.positions.concat(d.positions);
-    c.colors = c.colors.concat(d.colors);
-  }
-  return chunks;
 }

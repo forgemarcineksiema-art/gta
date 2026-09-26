@@ -6,8 +6,10 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { clearControls, type SimWorld } from '../../../src/sim';
-import { CHUNKS_X, CHUNKS_Z, PLUMB_TILT, type Island, type IslandBake } from '../../../src/sim/island/Island';
-import { pack, unpack } from '../../../src/sim/pack';
+import { CHUNKS_X, CHUNKS_Z, Island, PLUMB_TILT, bakeSections, joinBake, type IslandBake } from '../../../src/sim/island/Island';
+import { SectionReader, pack, packSections, unpack } from '../../../src/sim/pack';
+import { fillSolids } from '../../../src/sim/island/fill';
+import type { StaticDesc } from '../../../src/sim';
 import { createWorld } from '../helpers';
 
 describe('M8.10 slice 18: the island\'s bake', () => {
@@ -38,6 +40,41 @@ describe('M8.10 slice 18: the island\'s bake', () => {
     expect(JSON.stringify(baked.cover)).toBe(JSON.stringify(built.cover));
   });
 
+  it('18.6 the bake in its sections, read piece by piece as it comes, is the bake; no two sections share an object', () => {
+    const sections = bakeSections((built.island as Island).toBake()), bytes = packSections(sections);
+    const seen = new Set<object>();
+    for (const section of sections) {
+      const mine = objects(section, new Set());
+      // (the section's own wrapper aside)
+      for (const o of mine) if (o !== section) expect(seen.has(o)).toBe(false);
+      for (const o of mine) seen.add(o);
+    }
+    // fed in pieces of odd sizes, as a stream brings them
+    const reader = new SectionReader(), read: unknown[] = [];
+    for (let at = 0, n = 1; at < bytes.length; at += n, n = ((n * 7 + 13) % 65521) + 1) read.push(...reader.feed(bytes.subarray(at, Math.min(bytes.length, at + n))));
+    expect(reader.done).toBe(true);
+    expect(read.length).toBe(sections.length);
+    const again = packSections(bakeSections(joinBake(read)));
+    expect(again.length).toBe(bytes.length);
+    let differ = -1;
+    for (let i = 0; i < bytes.length && differ < 0; i++) if (again[i] !== bytes[i]) differ = i;
+    expect(differ).toBe(-1);
+  });
+
+  it("18.7 a chunk's solids (the physics', no facades made) are what its statics make colliders of, in their order", () => {
+    const island = built.island as Island, chunkOf = (x: number, z: number): number => Island.chunkIndex(...Island.chunkOf(x, z));
+    const colliders = (list: readonly StaticDesc[]): string => JSON.stringify(list
+      .filter((st) => (st.tag === 'trunk' && st.shape.kind === 'cylinder') || st.tag === 'building' || st.tag === 'kerb')
+      .map((st) => [st.shape, st.position, st.rotation, st.tag]));
+    let solids = 0;
+    for (let k = 0; k < CHUNKS_X * CHUNKS_Z; k++) {
+      const alone = [...fillSolids(island.fill, k, chunkOf), ...(island.fill.chunks.get(k) ?? [])];
+      solids += alone.length;
+      expect(colliders(alone), `chunk ${k}`).toBe(colliders(island.statics(k)));
+    }
+    expect(solids).toBeGreaterThan(1000);
+  });
+
   it('18.0 the ground under the wheels the same, and a car drives on it', () => {
     const a = built.island as Island, b = baked.island as Island;
     // down onto the height fields round the start, in both worlds
@@ -55,6 +92,18 @@ describe('M8.10 slice 18: the island\'s bake', () => {
     expect(baked.hasNaN()).toBe(false);
   });
 });
+
+/** Every object (arrays, maps, sets, typed arrays and plain objects) reachable from `v`, into `out`. */
+function objects(v: unknown, out: Set<object>): Set<object> {
+  if (v === null || typeof v !== 'object' || out.has(v)) return out;
+  out.add(v);
+  if (ArrayBuffer.isView(v)) return out;
+  if (Array.isArray(v)) { for (const x of v) objects(x, out); return out; }
+  if (v instanceof Map) { for (const [k, x] of v) { objects(k, out); objects(x, out); } return out; }
+  if (v instanceof Set) { for (const x of v) objects(x, out); return out; }
+  for (const x of Object.values(v)) objects(x, out);
+  return out;
+}
 
 /** Where a ray straight down (the plumb's lean) meets the ground's height field at (x, z), the chunks round it loaded. */
 function cast(sim: SimWorld, island: Island, x: number, z: number): number | null {

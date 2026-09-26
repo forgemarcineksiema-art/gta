@@ -7,8 +7,8 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { it } from 'vitest';
 import { SimWorld, initPhysics } from '../../src/sim';
-import type { Island } from '../../src/sim/island/Island';
-import { pack } from '../../src/sim/pack';
+import { bakeSections, type Island } from '../../src/sim/island/Island';
+import { packSections } from '../../src/sim/pack';
 
 it('bakes the island', async () => {
   await initPhysics();
@@ -16,7 +16,7 @@ it('bakes the island', async () => {
   const bake = { ...(sim.island as Island).toBake(), key: process.env['BAKE_KEY'] ?? '' };
   mkdirSync('public', { recursive: true });
   mkdirSync('output', { recursive: true });
-  writeFileSync('public/island.bin', gzipSync(pack(bake), { level: 9 }));
+  writeFileSync('public/island.bin', gzipSync(packSections(bakeSections(bake)), { level: 9 }));
   writeFileSync('output/island.key', bake.key);
   sim.dispose();
 }, 300_000);

@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-26 — M8.10 slice 18: the island's triangles
+
+Measured (a still start, no traffic, as the city suite's tour): the island drew 111 calls / 572k triangles on low at
+its summit, 128 / 706k on high (the budget 150 / 250k, 300 / 600k). Now: its buildings in quarters by chunk, each
+building whole in one, at three levels (the grid's near and far; past 140 m on low, 280 on high, blocks: the envelope's
+faces, the core, the glass brought onto the faces, lit as near, `blocks.ts`), casting only in the shadows' box; the
+roads' far level without kerbs and paint (51% of their triangles); the coast's things and the structures a mesh a
+chunk; the props to 200 m on low. Five spawns: low 94–216k, 90–129 calls; high 116–291k, 111–164. The smoke's drive
+(traffic on) peaks at 156 calls, 291k (827k before). Pins 18.3–18.4.
+
 ## 2026-09-26 — M8.10 slice 18: the island by default
 
 Done: the island is the game's world (`src/app/world.ts`); the grid behind `?map=grid` or its spawns, the playground as

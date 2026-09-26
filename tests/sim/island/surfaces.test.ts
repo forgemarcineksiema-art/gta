@@ -1,7 +1,7 @@
 /** M8.10 slice 6b: the roads' surfaces, the junctions, the pavements and the paint (docs/M8.10_PLAN.md). */
 import RAPIER from '@dimforge/rapier3d-compat';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { initPhysics } from '../../../src/sim';
+import { PALETTE, initPhysics } from '../../../src/sim';
 import { CHUNK, CHUNKS_X, CHUNK_X0, CHUNK_Z0, Island, PLUMB_TILT } from '../../../src/sim/island/Island';
 import { HALF_WIDTH } from '../../../src/sim/island/ground';
 import { KERB, PAINT_LIFT, PAVEMENT, ROAD_LIFT, heightOn, onStrip, type Strip } from '../../../src/sim/island/surfaces';
@@ -166,5 +166,20 @@ describe('M8.10 slice 6b: the roads\' surfaces', () => {
       }
     }
     expect(checked).toBeGreaterThan(1500);
+  });
+
+  it("18.4 a chunk's far level is its first triangles: the strips, the junctions, the skirts, the pavements' tops; the kerbs' faces and the paint after it", () => {
+    const paint = new Set(island.surfaces.paint.map((p) => p.colour));
+    let far = 0, all = 0, wrong = 0;
+    for (const c of island.surfaceMeshes().values()) {
+      expect(c.far).toBeGreaterThanOrEqual(0);
+      expect(c.far).toBeLessThanOrEqual(c.colors.length);
+      c.colors.forEach((colour, t) => { if ((colour === PALETTE.kerb || paint.has(colour)) !== t >= c.far) wrong++; });
+      far += c.far;
+      all += c.colors.length;
+    }
+    console.log(`18.4 the far level ${far} of ${all} triangles`);
+    expect(wrong).toBe(0);
+    expect(far / all).toBeLessThan(0.6);
   });
 });

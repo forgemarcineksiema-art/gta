@@ -81,8 +81,11 @@ export interface Junction { x: number; y: number; z: number; rim: RimPoint[]; fa
 export type PaintKind = 'centre' | 'lane' | 'edge' | 'stop' | 'zebra' | 'arrow' | 'bay';
 /** A quad of paint on a strip: its corners' stations and offsets, and heights. */
 export interface Paint { kind: PaintKind; strip: number; s: number[]; o: number[]; y: number[]; colour: number }
-/** A chunk's surfaces: three corners a triangle, a colour a triangle. */
-export interface SurfaceChunk { positions: number[]; colors: number[] }
+/**
+ * A chunk's surfaces: three corners a triangle, a colour a triangle; its first `far` triangles its far level (M8.10
+ * slice 18: the strips, the junctions, the skirts and the pavements' tops, without the kerbs' faces and the paint).
+ */
+export interface SurfaceChunk { positions: number[]; colors: number[]; far: number }
 export interface RoadSurfaces {
   strips: Strip[];
   junctions: Junction[];
@@ -470,17 +473,18 @@ function stripPoint(st: Strip, k: number, i: number): number[] {
  * the junctions' fans, the strips' bands, their pavements on their kerbs (or their edges' skirts), the paint.
  */
 export function surfaceMeshes(s: RoadSurfaces, chunkOf: (x: number, z: number) => number): Map<number, SurfaceChunk> {
-  const chunks = new Map<number, SurfaceChunk>();
-  const tri = (ax: number, ay: number, az: number, bx: number, by: number, bz: number, cx: number, cy: number, cz: number, colour: number): void => {
-    const key = chunkOf((ax + bx + cx) / 3, (az + bz + cz) / 3);
-    let c = chunks.get(key);
-    if (!c) { c = { positions: [], colors: [] }; chunks.set(key, c); }
+  // (the detail, drawn near only, kept apart and put after each chunk's far level)
+  const chunks = new Map<number, SurfaceChunk>(), details = new Map<number, SurfaceChunk>();
+  const tri = (ax: number, ay: number, az: number, bx: number, by: number, bz: number, cx: number, cy: number, cz: number, colour: number, detail = false): void => {
+    const key = chunkOf((ax + bx + cx) / 3, (az + bz + cz) / 3), into = detail ? details : chunks;
+    let c = into.get(key);
+    if (!c) { c = { positions: [], colors: [], far: 0 }; into.set(key, c); }
     c.positions.push(ax, ay, az, bx, by, bz, cx, cy, cz);
     c.colors.push(colour);
   };
-  const quad = (a: readonly number[], b: readonly number[], c: readonly number[], d: readonly number[], colour: number): void => {
-    tri(a[0] as number, a[1] as number, a[2] as number, b[0] as number, b[1] as number, b[2] as number, c[0] as number, c[1] as number, c[2] as number, colour);
-    tri(a[0] as number, a[1] as number, a[2] as number, c[0] as number, c[1] as number, c[2] as number, d[0] as number, d[1] as number, d[2] as number, colour);
+  const quad = (a: readonly number[], b: readonly number[], c: readonly number[], d: readonly number[], colour: number, detail = false): void => {
+    tri(a[0] as number, a[1] as number, a[2] as number, b[0] as number, b[1] as number, b[2] as number, c[0] as number, c[1] as number, c[2] as number, colour, detail);
+    tri(a[0] as number, a[1] as number, a[2] as number, c[0] as number, c[1] as number, c[2] as number, d[0] as number, d[1] as number, d[2] as number, colour, detail);
   };
   // a fan from each junction's middle, each triangle in four: the spokes' middles and the corners' chords on the ground
   for (const j of s.junctions) {
@@ -516,13 +520,13 @@ export function surfaceMeshes(s: RoadSurfaces, chunkOf: (x: number, z: number) =
         const top0 = [e0[0] as number, (e0[1] as number) + KERB, e0[2] as number], top1 = [e1[0] as number, (e1[1] as number) + KERB, e1[2] as number];
         const out0 = [outX0, g0 + ROAD_LIFT + KERB, outZ0], out1 = [outX1, g1 + ROAD_LIFT + KERB, outZ1];
         quad(top0, top1, out1, out0, ISLAND_COLORS.paving);
-        quad(e0, e1, top1, top0, PALETTE.kerb);
-        quad(out0, out1, [outX1, g1 - 0.3, outZ1], [outX0, g0 - 0.3, outZ0], PALETTE.kerb);
+        quad(e0, e1, top1, top0, PALETTE.kerb, true);
+        quad(out0, out1, [outX1, g1 - 0.3, outZ1], [outX0, g0 - 0.3, outZ0], PALETTE.kerb, true);
         // its end where it starts after a gap, and where it stops before one (the next segment decides)
-        if (!walked[w]) quad(e0, top0, out0, [outX0, g0 - 0.3, outZ0], PALETTE.kerb);
+        if (!walked[w]) quad(e0, top0, out0, [outX0, g0 - 0.3, outZ0], PALETTE.kerb, true);
         walked[w] = true;
         const ends = k + 2 >= count || !st.drawn[k + 1];
-        if (ends) quad(e1, top1, out1, [outX1, g1 - 0.3, outZ1], PALETTE.kerb);
+        if (ends) quad(e1, top1, out1, [outX1, g1 - 0.3, outZ1], PALETTE.kerb, true);
       }
     }
   }
@@ -535,7 +539,14 @@ export function surfaceMeshes(s: RoadSurfaces, chunkOf: (x: number, z: number) =
       const q = v[i] as number[];
       q[0] = corner.x; q[1] = p.y[i] as number; q[2] = corner.z;
     }
-    quad(v[0] as number[], v[1] as number[], v[2] as number[], v[3] as number[], p.colour);
+    quad(v[0] as number[], v[1] as number[], v[2] as number[], v[3] as number[], p.colour, true);
+  }
+  for (const c of chunks.values()) c.far = c.colors.length;
+  for (const [key, d] of details) {
+    let c = chunks.get(key);
+    if (!c) { c = { positions: [], colors: [], far: 0 }; chunks.set(key, c); }
+    c.positions = c.positions.concat(d.positions);
+    c.colors = c.colors.concat(d.colors);
   }
   return chunks;
 }

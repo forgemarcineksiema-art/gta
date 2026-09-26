@@ -173,7 +173,7 @@ export class SimWorld {
   readonly stash: Stash;
   /** The busted rule's officer walking up with the ticket book (M5.5 slice 18). */
   readonly ticket: TicketOfficer;
-  /** The pursuit breakers (M5.5 slice 18): the city's scaffold towers; null off the city. */
+  /** The pursuit breakers (M5.5 slice 18): the grid's scaffold towers, the island's eight (M8.10 slice 15); null on the playground. */
   readonly breakers: Breakers | null;
   /** The donut shop's cruisers (M5.5 slice 18; the island's by its roundabout, M8.10 slice 15a); null on the playground. */
   readonly donuts: DonutShop | null;
@@ -304,7 +304,8 @@ export class SimWorld {
     const streets = this.city ? cityStreets(this.city) : this.island ? islandStreets(this.island) : null;
     this.traffic = streets ? new Traffic(this.world, this.transforms, streets, opts.seed ?? 42, TRAFFIC, this.trafficDensity) : null;
     this.peds = streets && this.traffic ? new Pedestrians(this.transforms, streets, this.traffic.lanes, opts.seed ?? 42, PEDS, this.pedsDensity) : null;
-    this.collectibles = this.city ? new Collectibles(this.city) : null;
+    // the grid's from its chunks, the island's fifty from the start (M8.10 slice 15)
+    this.collectibles = this.city ? new Collectibles(this.city) : this.island ? new Collectibles(null, this.island.billboards) : null;
     this.coins = this.city && this.traffic ? new Coins(this.city, this.traffic.lanes) : null;
     this.life = new Life(this, opts.damage ?? this.city !== null);
     this.heat = new Heat(this.events, this.traffic);
@@ -326,7 +327,7 @@ export class SimWorld {
     this.roadblocks = this.traffic && this.cover ? new Roadblocks(this, this.cover.chokepoints) : null;
     this.cameras = this.cover ? new Cameras(this.cover.cameraSites, this.cover.daily.cameras) : null;
     // the kickers, then the mega-ramp (M8.8 slice 21)
-    this.jumps = this.city ? new Jumps(this, [...this.city.jumps, this.city.megaRamp]) : null;
+    this.jumps = this.city ? new Jumps(this, [...this.city.jumps, this.city.megaRamp]) : this.island ? new Jumps(this, this.island.jumps) : null;
     // the generator's sixteen markers (docs/M5_PLAN.md D4); the cold open adds its own as id 0
     this.jobs = new Jobs(this, this.city && this.traffic ? jobsFor(this.city, opts.seed ?? 42, this.traffic.lanes) : []);
     // the sea trial (M8.8 slice 20), after the generator's, before the way learns the rings
@@ -335,7 +336,7 @@ export class SimWorld {
     this.skill = new Skill(this);
     this.stash = new Stash(this);
     this.ticket = new TicketOfficer(this);
-    this.breakers = this.city && this.traffic ? new Breakers(this) : null;
+    this.breakers = this.city && this.traffic ? new Breakers(this) : this.island && this.traffic ? new Breakers(this, this.island.breakers) : null;
     this.donuts = (this.city || this.island) && this.traffic ? new DonutShop(this, this.island?.donutShop) : null;
     this.run = new Run(this);
     this.coldOpen = new ColdOpen(this);

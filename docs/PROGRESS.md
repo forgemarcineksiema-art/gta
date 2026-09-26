@@ -2,6 +2,17 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-26 — M8.10 slice 15b: jumps, billboards, breakers on the island
+
+Done: 20 jumps (`island/jumps.ts`): the places' own and 12 kickers; Crown Avenue's three and the hill's street's in the
+kerbside strip of the way down (a crest in a 10 % avenue only hops, and one that flies a second also throws pin 2.3's
+climb), the summit's ring, the third hairpin, over and into the canal, the container stack, the siding's flatcar (the
+Works' third flat gave way), the roundabout's island, the level crossing's verge: 1.15–1.8 s at 90 km/h (the canal's
+1.5 at 110, the mega 4.25 at 200). The detector reads heights and carries a flight through a wheel's graze of the lip.
+50 billboards (16 verges, 26 street gates with the first minute's, 8 landings the car flies through), 8 breakers with
+their places' looks, barriers turned with their streets; lots, props and bays keep off. Pins 15.1–15.5. drive.long 6a.4
+(the bay bridge) fails at 156d1c8 already.
+
 ## 2026-09-26 — M8.10 slice 17: the island on the radar and the full map
 
 Done: `ui/map/islandShape.ts` works out the island's map once (the land less the basin, the districts' tints and their

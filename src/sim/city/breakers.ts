@@ -13,6 +13,9 @@ import { GROUPS_SOLID } from '../collision';
 import type { SimWorld } from '../SimWorld';
 import { AgentState, type PlayerProbe } from '../traffic/Traffic';
 
+/** What comes down (M8.10 slice 15): the grid's are scaffold towers; the island's what each place has to hand. */
+export type BreakerKind = 'scaffold' | 'containers' | 'rocks' | 'flatcar' | 'pallets' | 'huts';
+
 export interface BreakerDesc {
   id: number;
   /** The tower's foot on the pavement. */
@@ -21,6 +24,9 @@ export interface BreakerDesc {
   /** Unit vector toward the street's centre: the way it falls. */
   nx: number;
   nz: number;
+  /** The island's (M8.10 slice 15): the height its foot stands at, and what it is; the grid's are scaffolds at 0. */
+  y?: number;
+  kind?: BreakerKind;
 }
 
 /** Street spots (x or z street, the pavement point, the side's normal toward the carriageway). */
@@ -48,32 +54,51 @@ export const BREAKER = {
 
 export enum BreakerState { Standing = 0, Falling = 1, Down = 2, Cleared = 3 }
 
+/** A car's middle meets an island's breaker between this far under its foot and this far over its top (m). */
+const BREAKER_BELOW = 2;
+/** An island's barrier lies from its foot's height (a kerb's top) this far down into the road beside it (m). */
+const BARRIER_SINK = 0.3;
+
 export class Breakers {
-  readonly descs = BREAKERS;
-  readonly state = new Uint8Array(BREAKERS.length);
+  readonly state: Uint8Array;
   /** Sim time the fall started (the view topples it over `fallSeconds`). */
-  readonly fellAt = new Float32Array(BREAKERS.length);
-  private readonly left = new Float32Array(BREAKERS.length);
-  private readonly colliders: Array<RAPIER.Collider | null> = BREAKERS.map(() => null);
+  readonly fellAt: Float32Array;
+  private readonly left: Float32Array;
+  private readonly colliders: Array<RAPIER.Collider | null>;
   /** Police records already credited to a barrier. */
   private readonly credited: Uint8Array;
   private runs = -1;
 
-  constructor(private readonly sim: SimWorld) {
+  /** The grid's eight towers, or the island's eight (M8.10 slice 15) at their heights. */
+  constructor(private readonly sim: SimWorld, readonly descs: readonly BreakerDesc[] = BREAKERS) {
+    this.state = new Uint8Array(descs.length);
+    this.fellAt = new Float32Array(descs.length);
+    this.left = new Float32Array(descs.length);
+    this.colliders = descs.map(() => null);
     this.credited = new Uint8Array(sim.traffic?.capacity ?? 0);
   }
 
-  /** The barrier's box once down, from the tower's street-side edge its height out: centre and half extents, axis-aligned (the streets are). */
+  /**
+   * The barrier's box once down, from the tower's street-side edge its height out: its centre and the half extents of
+   * the box that holds it on the world's axes (the grid's streets run on them, so there it is the barrier itself; the
+   * island's run any way, and the barrier lies turned with its normal, as the tests below take it).
+   */
   static barrier(d: BreakerDesc, out: { x: number; z: number; hx: number; hz: number }): { x: number; z: number; hx: number; hz: number } {
     const half = BREAKER.height / 2, w = BREAKER.fallen.halfWidth, from = BREAKER.halfDepth + half;
     out.x = d.x + d.nx * from;
     out.z = d.z + d.nz * from;
-    out.hx = d.nx !== 0 ? half : w;
-    out.hz = d.nz !== 0 ? half : w;
+    out.hx = Math.abs(d.nx) * half + Math.abs(d.nz) * w;
+    out.hz = Math.abs(d.nz) * half + Math.abs(d.nx) * w;
     return out;
   }
 
   private readonly box = { x: 0, z: 0, hx: 0, hz: 0 };
+
+  /** A point within `margin` m of breaker `d`'s barrier, the barrier turned with its normal (its height along it). */
+  private static onBarrier(d: BreakerDesc, x: number, z: number, margin: number): boolean {
+    const from = BREAKER.halfDepth + BREAKER.height / 2, dx = x - d.x - d.nx * from, dz = z - d.z - d.nz * from;
+    return Math.abs(dx * d.nx + dz * d.nz) < BREAKER.height / 2 + margin && Math.abs(dz * d.nx - dx * d.nz) < BREAKER.fallen.halfWidth + margin;
+  }
 
   step(probe: PlayerProbe, dt: number): void {
     const sim = this.sim, traffic = sim.traffic;
@@ -87,14 +112,14 @@ export class Breakers {
       const st = this.state[k];
       if (st === BreakerState.Standing) {
         if (probe.speed < BREAKER.minSpeed || Math.abs(probe.x - d.x) > 12 || Math.abs(probe.z - d.z) > 12) continue;
+        if (d.y !== undefined && (probe.y < d.y - BREAKER_BELOW || probe.y > d.y + BREAKER.height)) continue;
         if (!this.touches(probe, d)) continue;
         this.state[k] = BreakerState.Falling;
         this.fellAt[k] = sim.time;
-        sim.events.push('breaker', k, d.x, BREAKER.height / 2, d.z, k);
+        sim.events.push('breaker', k, d.x, (d.y ?? 0) + BREAKER.height / 2, d.z, k);
       } else if (st === BreakerState.Falling) {
         // it lands once the car is clear of where it lands (and the fall has had its time)
-        Breakers.barrier(d, this.box);
-        if (sim.time - (this.fellAt[k] as number) < BREAKER.fallSeconds || this.near(probe, this.box, BREAKER.clear)) continue;
+        if (sim.time - (this.fellAt[k] as number) < BREAKER.fallSeconds || this.near(probe, d, BREAKER.clear)) continue;
         this.land(k);
       } else if (st === BreakerState.Down) {
         this.left[k] = (this.left[k] as number) - dt;
@@ -120,7 +145,7 @@ export class Breakers {
       if (this.state[k] !== BreakerState.Standing || Math.hypot(d.x - x, d.z - z) > reach) continue;
       this.state[k] = BreakerState.Falling;
       this.fellAt[k] = sim.time;
-      sim.events.push('breaker', k, d.x, BREAKER.height / 2, d.z, k);
+      sim.events.push('breaker', k, d.x, (d.y ?? 0) + BREAKER.height / 2, d.z, k);
       return true;
     }
     return false;
@@ -129,28 +154,32 @@ export class Breakers {
   /** The car's footprint over the tower's. */
   private touches(probe: PlayerProbe, d: BreakerDesc): boolean {
     const fx = Math.sin(probe.yaw), fz = Math.cos(probe.yaw);
-    // the tower as a box (its depth along the normal, its width along the street), tested at its corners and centre against the car
-    const ax = d.nz !== 0 ? BREAKER.halfWidth : BREAKER.halfDepth, az = d.nz !== 0 ? BREAKER.halfDepth : BREAKER.halfWidth;
-    for (const [ox, oz] of [[0, 0], [ax, az], [-ax, az], [ax, -az], [-ax, -az]] as const) {
-      const px = d.x + ox - probe.x, pz = d.z + oz - probe.z;
+    // the tower as a box (its depth along the normal, its width along the street), tested at its corners and centre
+    // against the car; the street's way is the normal turned a quarter
+    const dn = BREAKER.halfDepth, ds = BREAKER.halfWidth, sx = -d.nz, sz = d.nx;
+    for (const [a, b] of [[0, 0], [1, 1], [-1, 1], [1, -1], [-1, -1]] as const) {
+      const px = d.x + d.nx * dn * a + sx * ds * b - probe.x, pz = d.z + d.nz * dn * a + sz * ds * b - probe.z;
       const along = px * fx + pz * fz, side = px * -fz + pz * fx;
       if (Math.abs(along) <= probe.halfLength + 0.2 && Math.abs(side) <= probe.halfWidth + 0.2) return true;
     }
     return false;
   }
 
-  /** The car within `margin` m of an axis-aligned box. */
-  private near(probe: PlayerProbe, b: { x: number; z: number; hx: number; hz: number }, margin: number): boolean {
-    const reach = Math.hypot(probe.halfWidth, probe.halfLength) + margin;
-    return Math.abs(probe.x - b.x) < b.hx + reach && Math.abs(probe.z - b.z) < b.hz + reach;
+  /** The car within `margin` m of breaker `d`'s barrier. */
+  private near(probe: PlayerProbe, d: BreakerDesc, margin: number): boolean {
+    return Breakers.onBarrier(d, probe.x, probe.z, Math.hypot(probe.halfWidth, probe.halfLength) + margin);
   }
 
   /** Down across the lane: the barrier's collider, and anything standing where it lands is crushed. */
   private land(k: number): void {
     const sim = this.sim, traffic = sim.traffic, d = this.descs[k] as BreakerDesc;
-    const b = Breakers.barrier(d, this.box), h = BREAKER.fallen.height / 2;
-    this.colliders[k] = sim.world.createCollider(RAPIER.ColliderDesc.cuboid(b.hx, h, b.hz)
-      .setTranslation(b.x, h, b.z)
+    const b = Breakers.barrier(d, this.box), h = BREAKER.fallen.height / 2, yaw = Math.atan2(d.nx, d.nz);
+    // lying along its normal (the grid's on the axes); on the island from its foot's height (a kerb's top) down a hand
+    // into the road beside it
+    const sink = d.y === undefined ? 0 : BARRIER_SINK;
+    this.colliders[k] = sim.world.createCollider(RAPIER.ColliderDesc.cuboid(BREAKER.fallen.halfWidth, h + sink / 2, BREAKER.height / 2)
+      .setTranslation(b.x, (d.y ?? 0) + h - sink / 2, b.z)
+      .setRotation({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) })
       .setFriction(1)
       .setRestitution(1)
       .setCollisionGroups(GROUPS_SOLID));
@@ -160,7 +189,7 @@ export class Breakers {
     for (let i = 0; i < traffic.capacity; i++) {
       const st = traffic.state[i];
       if (st === AgentState.Free || st === AgentState.Wrecked) continue;
-      if (Math.abs((traffic.x[i] as number) - b.x) > b.hx + 0.5 || Math.abs((traffic.z[i] as number) - b.z) > b.hz + 0.5) continue;
+      if (!Breakers.onBarrier(d, traffic.x[i] as number, traffic.z[i] as number, 0.5)) continue;
       traffic.wreck(i);
       traffic.justWrecked[i] = 1;
     }
@@ -171,13 +200,13 @@ export class Breakers {
   private credit(k: number): void {
     const sim = this.sim, traffic = sim.traffic;
     if (!traffic) return;
-    const b = Breakers.barrier(this.descs[k] as BreakerDesc, this.box), r = BREAKER.credit;
+    const d = this.descs[k] as BreakerDesc, r = BREAKER.credit;
     for (let i = 0; i < traffic.capacity; i++) {
       if (traffic.state[i] === AgentState.Free) { this.credited[i] = 0; continue; }
       if (traffic.police[i] !== 1 || traffic.justWrecked[i] !== 1 || this.credited[i] === 1) continue;
-      if (Math.abs((traffic.x[i] as number) - b.x) > b.hx + r || Math.abs((traffic.z[i] as number) - b.z) > b.hz + r) continue;
+      if (!Breakers.onBarrier(d, traffic.x[i] as number, traffic.z[i] as number, r)) continue;
       this.credited[i] = 1;
-      sim.events.push('takedown', 0, traffic.x[i] as number, 0.5, traffic.z[i] as number, i);
+      sim.events.push('takedown', 0, traffic.x[i] as number, (d.y ?? 0) + 0.5, traffic.z[i] as number, i);
     }
   }
 }

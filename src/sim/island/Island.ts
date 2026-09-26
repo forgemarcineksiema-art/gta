@@ -13,7 +13,7 @@ import type { RoadPoint } from '../city/roads';
 import type { TrackDef, TrackSample } from '../track';
 import { inPolygon, type P2 } from './geom';
 import { ASPHALT, GRASS } from '../city/surface';
-import { PROP_LINES, chunkProps, type PropDesc, type PropPlace } from '../city/props';
+import { PROP_LINES, PROP_TYPES, chunkProps, type PropDesc, type PropKind, type PropPlace } from '../city/props';
 import { FOOT, Ground, HALF_WIDTH, type CoastKind, type GroundProbe } from './ground';
 import { LaneIndex } from '../city/laneIndex';
 import { buildNetwork } from './network';
@@ -30,6 +30,12 @@ import { GARAGE, hideoutSign, toDropOff, type DropOff } from '../city/cover';
 import type { StaticDesc } from '../scene';
 import { BOUNDS, CIRCUS, highwayLoop, islet } from './plan';
 import { shoreOpen } from './shapes';
+import type { JumpDesc } from '../city/jumps';
+import type { BillboardDesc } from '../city/collectibles';
+import type { BreakerDesc } from '../city/breakers';
+import { kerbsideKickers, type Kicker } from './jumps';
+import { kerbsideGates, type BillboardSite } from './billboards';
+import { buildStunts, inKeep, kerbsideBlocked, stuntSites, type StuntSites } from './stunts';
 
 /** A chunk of the ground: its side (m) and the height field's cell (m). The chunks cover the plan's bounds. */
 export const CHUNK = 250;
@@ -81,22 +87,33 @@ export class Island {
   private readonly laneIndex = new LaneIndex(this.network.graph);
   /** The highway's structures (M8.10 slice 6a): the viaduct, the bay bridge, the overpasses, the tunnel. */
   readonly structures: Structure[] = structures((this.network.lines[0] as { pts: RoadPoint[] }).pts, highwayLoop(6).span);
+  /** The kickers and the billboards in the roads' kerbside strips (M8.10 slice 15): Crown Avenue's, the hill's street's; no bay under them. */
+  private readonly kerbside: Kicker[] = kerbsideKickers(this.ground);
+  private readonly kerbsideGates: BillboardSite[] = kerbsideGates(this.ground, this.kerbside);
   /** The roads' surfaces (M8.10 slice 6b): the strips, the junctions, the pavements and their kerbs, the paint, the bays. */
-  readonly surfaces: RoadSurfaces = roadSurfaces(this.ground, this.network.graph, (x, z) => { const [i, j] = Island.chunkOf(x, z); return Island.chunkIndex(i, j); });
+  readonly surfaces: RoadSurfaces = roadSurfaces(this.ground, this.network.graph, (x, z) => { const [i, j] = Island.chunkOf(x, z); return Island.chunkIndex(i, j); }, (x, z) => kerbsideBlocked(this.kerbside, this.kerbsideGates, x, z));
   /** The drive-throughs (M8.10 slice 16): their sites, beside their roads; the sim's `Services` serves the car in their bays. */
   readonly services: ServiceSite[] = serviceSpots(this.ground);
   /** The Coral Hotel's garage (M8.10 slice 14): the third of the run's garages, on the Quay's road north of the hotel. */
   readonly hotelGarage: DropOff = hotelGarageSite(this.ground);
   /** The police's places that stand (M8.10 slice 15a): the cameras' poles, the pergola and the warehouse passage, the donut shop. */
   readonly policeSites: PoliceSites = policeSites(this.ground, this.network, (x, z) => this.standAt(x, z));
-  /** The lots, their buildings and the palms (M8.10 slice 7a), off the drive-throughs' sites, the hotel's garage and the police's places. */
-  readonly fill: IslandFill = fillIsland(this.ground, this.surfaces, (x, z) => { const [i, j] = Island.chunkOf(x, z); return Island.chunkIndex(i, j); }, [...this.services.map(siteRect), garageRect(this.hotelGarage), ...this.policeSites.keep]);
+  /** Where the jumps' kickers, the billboards and the breakers stand (M8.10 slice 15), before the lots keep off them. */
+  readonly stuntSites: StuntSites = stuntSites(this.ground, this.surfaces, this.kerbside, this.kerbsideGates);
+  /** The lots, their buildings and the palms (M8.10 slice 7a), off the drive-throughs' sites, the hotel's garage, the police's places and the slice 15 sites. */
+  readonly fill: IslandFill = fillIsland(this.ground, this.surfaces, (x, z) => { const [i, j] = Island.chunkOf(x, z); return Island.chunkIndex(i, j); }, [...this.services.map(siteRect), garageRect(this.hotelGarage), ...this.policeSites.keep, ...this.stuntSites.keep]);
   /** Each district's places (M8.10 slices 8–12): their statics in `fill.chunks`, the ones that move stepped here. */
   readonly places: Place[];
   /** The run's three garages (M8.10 slice 14), the hideout first: their kerbs and lanes; the props keep off their doors. */
   readonly garages: DropOff[];
   /** The plan's thirteen covers (M8.10 slice 15a): where the helicopter cannot see a car. */
   readonly covers: IslandCover[];
+  /** The twenty jumps (M8.10 slice 15), the plan's order: the places' own and the kickers built for the rest. */
+  readonly jumps: JumpDesc[];
+  /** The fifty billboards (M8.10 slice 15): the verges', the streets', the big jumps' landings'; each at its height. */
+  readonly billboards: BillboardDesc[];
+  /** The eight pursuit breakers (M8.10 slice 15), each at its height. */
+  readonly breakers: BreakerDesc[];
   /** The chunks with a height field in the physics, by index. */
   readonly active = new Map<number, RAPIER.Collider>();
   /** Each physics chunk's kerbs, buildings and trunks, with its height field. */
@@ -155,6 +172,11 @@ export class Island {
     // the covers, the places' own and those
     buildPoliceSites(this, statics);
     this.covers = islandCovers(this);
+    // the jumps' kickers, the billboards and the breakers (slice 15)
+    const stunts = buildStunts(this.ground, this.places, this.stuntSites, statics, (x, z) => this.standAt(x, z));
+    this.jumps = stunts.jumps;
+    this.billboards = stunts.billboards;
+    this.breakers = stunts.breakers;
   }
 
   /** The donut shop by the centre's roundabout (M8.10 slice 15a): its kiosk, its two bays, the lane the units head for. */
@@ -198,7 +220,7 @@ export class Island {
     const gardens = this.places.find((p) => p.id === 'gardens') as GardensPlace | undefined;
     const spots = (gardens?.fences ?? []).filter((s) => s.x >= x0 && s.x < x0 + CHUNK && s.z >= z0 && s.z < z0 + CHUNK);
     if (spots.length > 0) places.unshift({ kind: 'spots', x: x0, z: z0, dx: 1, dz: 0, half: 0, nx: 0, nz: 1, spots });
-    list = chunkProps(i, j, { seed: PROP_SEED, runs, places, blocked: (x, z, yaw, hx, hz) => this.propBlocked(x, z, yaw, hx, hz) }, index);
+    list = chunkProps(i, j, { seed: PROP_SEED, runs, places, blocked: (x, z, yaw, hx, hz, _route, kind) => this.propBlocked(x, z, yaw, hx, hz, kind) }, index);
     this.propLists.set(index, list);
     return list;
   }
@@ -259,7 +281,7 @@ export class Island {
    * Whether a prop's footprint (its middle, the way its +Z faces, half extents) stands where nothing may: a
    * carriageway, a junction, a lot, the water, or the walkers' band down the pavement.
    */
-  private propBlocked(x: number, z: number, yaw: number, hx: number, hz: number): boolean {
+  private propBlocked(x: number, z: number, yaw: number, hx: number, hz: number, kind?: PropKind): boolean {
     const c = Math.cos(yaw), s = Math.sin(yaw), p = this.probeScratch;
     for (const [a, b] of [[0, 0], [-1, -1], [1, -1], [1, 1], [-1, 1]] as const) {
       const px = x + c * hx * a + s * hz * b, pz = z - s * hx * a + c * hz * b;
@@ -268,6 +290,11 @@ export class Island {
       if (p.road > PROP_LINES.walkers.middle - PROP_LINES.walkers.half && p.road < PROP_LINES.walkers.middle + PROP_LINES.walkers.half) return true;
     }
     for (const jn of this.surfaces.junctions) if (Math.hypot(jn.x - x, jn.z - z) < this.junctionReach(jn)) return true;
+    // the jumps' run-ups and landings, the breakers and where they fall; a billboard's run-out keeps out the solid ones
+    // (slice 15: a car through the panel knocks a loose one aside)
+    const reach = Math.max(hx, hz);
+    if (this.stuntSites.props.some((k) => inKeep(k, x, z, reach))) return true;
+    if ((kind === undefined || PROP_TYPES[kind].breakImpulse > 0) && this.stuntSites.solid.some((k) => inKeep(k, x, z, reach))) return true;
     // a garage and its apron out to the kerb (the car rolls in over it), its sign's pole (slice 14)
     const r = Math.max(hx, hz), frame = this.garageFrame;
     for (const g of this.garages) {

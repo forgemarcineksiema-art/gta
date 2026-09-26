@@ -2,8 +2,11 @@
  * The atlas's dump (M8.10 slice 1): the island as the sim knows it, written to `output/atlas/island.js` for
  * `tools/atlas.html` to draw. Run by `npm run atlas` (ATLAS=1), never by the quick set. Each slice adds its layer.
  */
+import RAPIER from '@dimforge/rapier3d-compat';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
+import { initPhysics } from '../../src/sim';
+import { Island } from '../../src/sim/island/Island';
 import { GLYPHS, KIND_GLYPH } from '../../src/sim/glyphs';
 import { catmullRom, circle, ellipse } from '../../src/sim/island/geom';
 import { DECKS, REEF } from '../../src/sim/island/shapes/quay';
@@ -20,7 +23,15 @@ import {
 const r1 = (v: number): number => Math.round(v * 10) / 10;
 const pts = (p: ReadonlyArray<readonly [number, number]>): number[][] => p.map(([x, z]) => [r1(x), r1(z)]);
 
-it('dumps the island for the atlas', () => {
+it('dumps the island for the atlas', async () => {
+  // what the slices build where the plan put it (slice 15: the jumps, the billboards, the breakers as built)
+  await initPhysics();
+  const island = new Island(new RAPIER.World({ x: 0, y: -9.81, z: 0 }));
+  const built = {
+    jumps: island.jumps.map((j) => ({ x: r1(j.x), z: r1(j.z), yaw: Math.round(j.yaw * 100) / 100, mega: j.mega === true })),
+    billboards: island.billboards.map((b) => ({ x: r1(b.x), z: r1(b.z), yaw: Math.round(b.yaw * 100) / 100, width: b.width })),
+    breakers: island.breakers.map((b) => ({ x: r1(b.x), z: r1(b.z) })),
+  };
   // the ground's height every 8 m, the district every 25 m (-1 in the sea)
   const cell = 8, nx = Math.floor((BOUNDS.x1 - BOUNDS.x0) / cell) + 1, nz = Math.floor((BOUNDS.z1 - BOUNDS.z0) / cell) + 1;
   const heights: number[] = [];
@@ -63,6 +74,7 @@ it('dumps the island for the atlas', () => {
       roadblocks: ROADBLOCK_SITES, services: SERVICES, stash: STASH, slipways: SLIPWAYS, buoys: pts(catmullRom(BUOYS, false, 30)),
       firstMinute: FIRST_MINUTE, firstMinuteSteps: FIRST_MINUTE_STEPS,
     },
+    built,
     glyphs: GLYPHS, kindGlyph: KIND_GLYPH,
     // Palm Gardens (slice 10): the garden's paths, terrace and trees; the golf; the dunes; the jumps; the boardwalk
     gardens: {

@@ -344,11 +344,14 @@ export function worksPlaces(ctx: PlaceContext): Place[] {
       kit.box(0, 0.08, 0, half - 0.3, 0.08, w - 0.3, PALETTE.concrete, 'kerb');
     });
   }
-  // a few flats standing on the sidings, their containers on them
-  for (const [x, z] of [[SIDINGS.x0 + 20, SIDINGS.z[0]], [SIDINGS.x0 + 34, SIDINGS.z[0]], [SIDINGS.x1 - 30, SIDINGS.z[1]]] as const) {
+  // a few flats standing on the sidings, their containers on them (the third place is the flatcar jump's, its ramp up
+  // onto it from the east: slice 15 builds it; its colour is still drawn, so the yard's stream runs on as before)
+  for (const [x, z, jump] of [[SIDINGS.x0 + 20, SIDINGS.z[0], false], [SIDINGS.x0 + 34, SIDINGS.z[0], false], [SIDINGS.x1 - 30, SIDINGS.z[1], true]] as const) {
+    const colour = CONTAINER_COLOURS[Math.floor(rnd() * CONTAINER_COLOURS.length)] as number;
+    if (jump) continue;
     put(x, z, 0, ground.surfaceHeight(x, z), (kit) => {
       kit.box(0, 1.0, 0, 6, 0.3, 1.4, PALETTE.graphite, 'building');
-      kit.box(0, 2.6, 0, 5.9, 1.3, 1.2, CONTAINER_COLOURS[Math.floor(rnd() * CONTAINER_COLOURS.length)] as number, 'building');
+      kit.box(0, 2.6, 0, 5.9, 1.3, 1.2, colour, 'building');
     });
   }
   // the level crossings: where a road's centreline meets the line, the plan's four

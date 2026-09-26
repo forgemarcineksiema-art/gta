@@ -287,9 +287,12 @@ function drawPlaced() {
   for (const r of L.roadblocks) mark('roadblock', X(r[0]), Y(r[1]), 8);
   for (let i = 0; i < L.buoys.length; i += 2) { const [x, z] = L.buoys[i]; if (onLand(x, z)) continue; g.beginPath(); g.arc(X(x), Y(z), 4, 0, 7); g.fillStyle = '#ff8a1f'; g.fill(); }
   trace(L.firstMinute, false); g.save(); g.lineWidth = 7; g.strokeStyle = 'rgba(255,255,255,0.9)'; g.setLineDash([2, 10]); g.lineCap = 'round'; g.stroke(); g.restore();
-  for (const b of L.breakers) mark('breaker', X(b.at[0]), Y(b.at[1]), 11);
+  // the jumps and the breakers where they are built (slice 15), else where the plan puts them; the billboards as built
+  const BU = A.built;
+  if (BU) for (const b of BU.billboards) { g.save(); g.translate(X(b.x), Y(b.z)); g.rotate(-b.yaw); g.fillStyle = '#ff4fa3'; g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.fillRect(-b.width * 1.4, -3, b.width * 2.8, 6); g.strokeRect(-b.width * 1.4, -3, b.width * 2.8, 6); g.restore(); }
+  for (const b of BU ? BU.breakers.map((q) => ({ at: [q.x, q.z] })) : L.breakers) mark('breaker', X(b.at[0]), Y(b.at[1]), 11);
   for (const c of L.cameras) mark('camera', X(c[0]), Y(c[1]), 10);
-  for (const j of L.jumps) mark('jump', X(j.at[0]), Y(j.at[1]), j.kind === 'mega' ? 16 : 11);
+  for (const j of BU ? BU.jumps.map((q) => ({ at: [q.x, q.z], kind: q.mega ? 'mega' : 'jump' })) : L.jumps) mark('jump', X(j.at[0]), Y(j.at[1]), j.kind === 'mega' ? 16 : 11);
   for (const j of L.jobs) if (j.to) { g.save(); g.setLineDash([8, 7]); g.lineWidth = 2.5; g.strokeStyle = KIND[j.kind][1]; g.globalAlpha = 0.7; trace([j.at, j.to], false); g.stroke(); g.restore(); }
   for (const j of L.jobs) jobIcon(j.kind, X(j.at[0]), Y(j.at[1]), 13);
   for (const r of L.rivals) jobIcon('duel', X(r.at[0]), Y(r.at[1]), 13, r.rival >= 10 ? 0 : 10 - r.rival);
@@ -309,7 +312,7 @@ function drawPanel() {
   t(`ląd ${(A.area.island / 1e6).toFixed(2).replace('.', ',')} km² + grobla i wysepka ${(A.area.extra / 1e6).toFixed(2).replace('.', ',')} km²`, 18, { weight: 600, fill: '#8d83ad' }); y += 44;
   const L2 = A.placed;
   const rows = MODE === 'placed'
-    ? [['pierścienie zleceń', L2.jobs.length], ['rywale i Komendant', L2.rivals.length], ['garaże', L2.garages.length], ['skocznie', L2.jumps.length], ['fotoradary', L2.cameras.length], ['osłony', L2.covers.length], ['rusztowania i sterty', L2.breakers.length], ['miejsca blokad', L2.roadblocks.length], ['stacje, warsztaty, lakiernie', L2.services.length], ['ukryte auta i znaleziska', Object.keys(L2.stash).length]]
+    ? [['pierścienie zleceń', L2.jobs.length], ['rywale i Komendant', L2.rivals.length], ['garaże', L2.garages.length], ['skocznie', L2.jumps.length], ['fotoradary', L2.cameras.length], ['osłony', L2.covers.length], ['rusztowania i sterty', L2.breakers.length], ['miejsca blokad', L2.roadblocks.length], ['stacje, warsztaty, lakiernie', L2.services.length], ['ukryte auta i znaleziska', Object.keys(L2.stash).length], ...(A.built ? [['billboardy do rozbicia', A.built.billboards.length]] : [])]
     : [['drogi planu', A.roads.length], ['garaże', L2.garages.length]];
   for (const [label, n] of rows) { t(label, 19, { weight: 600 }); t(String(n), 19, { weight: 800, fill: '#ffd23f', align: 'right' }); y += 30; }
 }

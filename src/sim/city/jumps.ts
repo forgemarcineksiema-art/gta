@@ -41,6 +41,15 @@ export interface JumpDesc {
   profile?: ReadonlyArray<{ along: number; y: number }>;
   landing?: ReadonlyArray<{ along: number; y: number }>;
   halfWidth?: number;
+  /** The mega-ramp (M8.8 slice 21): its apex's slow motion alone, its own pay. */
+  mega?: boolean;
+  /**
+   * The island's (M8.10 slice 15): the ground's height at the foot, so a car over or under it (a deck, a street below)
+   * is not on it; and how far past the lip its footprint reaches (a hump or a gap taken either way: its whole length).
+   * The grid's stand on the flat ground, their footprint ending a metre past the lip.
+   */
+  y?: number;
+  back?: number;
 }
 
 /**
@@ -62,7 +71,7 @@ const MEGA_LANDING = [
 
 /** The mega-ramp's desc, `id` after the kickers'. */
 export function megaRamp(id: number): JumpDesc {
-  return { id, x: MEGA.x, z: MEGA.z, yaw: MEGA.yaw, length: 60, height: 12.94, profile: MEGA_LAUNCH, landing: MEGA_LANDING, halfWidth: MEGA.halfWidth };
+  return { id, x: MEGA.x, z: MEGA.z, yaw: MEGA.yaw, length: 60, height: 12.94, profile: MEGA_LAUNCH, landing: MEGA_LANDING, halfWidth: MEGA.halfWidth, mega: true };
 }
 
 /** Half the ramp's width (m); the ramps sit in the gap between the edge parks' two rows of lots. */
@@ -73,6 +82,9 @@ const PITCH = 170;
 const JITTER = 12;
 /** A launch this soon after the wheels were on a ramp counts as a launch from it (s). */
 const LAUNCH_GRACE = 0.25;
+/** A car's middle is on a ramp of the island's between this far under its foot and this far over its top (m). */
+const JUMP_BELOW = 2;
+const JUMP_ABOVE = 3;
 
 /** Twenty ramps on the park strip: west (heading +z), north (+x), east (−z) short of the quay. */
 export function placeJumps(seed: number, count: number): JumpDesc[] {
@@ -158,6 +170,8 @@ export class Jumps {
   foundCount = 0;
   private lastRamp = -1;
   private sinceRamp = Infinity;
+  /** A flight's time so far when a wheel grazed the ramp on the way off (M8.10 slice 15), carried on if it flies on. */
+  private carried = 0;
   /** The mega-ramp's flight has had its apex (its slow motion). */
   private apexed = false;
 
@@ -168,7 +182,7 @@ export class Jumps {
   step(probe: PlayerProbe, airborne: boolean, dt: number, events: EventLog): void {
     if (this.flying >= 0) {
       this.flightTime += dt;
-      if (this.descs[this.flying]?.profile === undefined) {
+      if (this.descs[this.flying]?.mega !== true) {
         // the slow motion rides the whole flight and runs out after the landing
         this.sim.life.state.slowMo = ECONOMY.slowMoSeconds;
         this.sim.life.state.slowMoTarget = -1;
@@ -190,21 +204,28 @@ export class Jumps {
           this.foundCount++;
           events.push('hunt', this.foundCount === this.descs.length ? BALANCE.hunts.jumps : 0, probe.x, 0, probe.z, 0);
         }
+      } else {
+        // too short for a jump: a wheel grazed the lip (a kicker with no back to roll down, the car pitching off it) on
+        // the way off; off the ground again within the grace, it is the same flight from the same ramp
+        this.lastRamp = ramp;
+        this.sinceRamp = 0;
+        this.carried = this.flightTime;
       }
       return;
     }
     if (!airborne) {
       const on = this.rampUnder(probe);
-      if (on >= 0) { this.lastRamp = on; this.sinceRamp = 0; }
+      if (on >= 0) { this.lastRamp = on; this.sinceRamp = 0; this.carried = 0; }
       else this.sinceRamp += dt;
       return;
     }
     this.sinceRamp += dt;
     if (this.lastRamp >= 0 && this.sinceRamp <= LAUNCH_GRACE) {
       this.flying = this.lastRamp;
-      this.flightTime = 0;
+      this.flightTime = this.carried;
+      this.carried = 0;
       this.apexed = false;
-      if (this.descs[this.flying]?.profile === undefined) {
+      if (this.descs[this.flying]?.mega !== true) {
         this.sim.life.state.slowMo = ECONOMY.slowMoSeconds;
         this.sim.life.state.slowMoTarget = -1;
       }
@@ -212,15 +233,16 @@ export class Jumps {
     this.lastRamp = -1;
   }
 
-  /** The ramp whose footprint holds the car's centre, -1 for none. */
+  /** The ramp whose footprint holds the car's centre (on the island at its height, not over or under it), -1 for none. */
   private rampUnder(probe: PlayerProbe): number {
     for (let i = 0; i < this.descs.length; i++) {
       const jd = this.descs[i] as JumpDesc;
-      const dx = probe.x - jd.x, dz = probe.z - jd.z, reach = jd.length + 21;
+      const dx = probe.x - jd.x, dz = probe.z - jd.z, reach = jd.length + (jd.back ?? 0) + 21;
       if (Math.abs(dx) > reach || Math.abs(dz) > reach) continue;
+      if (jd.y !== undefined && (probe.y < jd.y - JUMP_BELOW || probe.y > jd.y + jd.height + JUMP_ABOVE)) continue;
       const fx = Math.sin(jd.yaw), fz = Math.cos(jd.yaw);
       const along = dx * fx + dz * fz, across = -dx * fz + dz * fx;
-      if (along >= -jd.length && along <= 1 && Math.abs(across) <= (jd.halfWidth ?? RAMP_HALF_WIDTH) + 0.5) return jd.id;
+      if (along >= -jd.length && along <= (jd.back ?? 1) && Math.abs(across) <= (jd.halfWidth ?? RAMP_HALF_WIDTH) + 0.5) return jd.id;
     }
     return -1;
   }

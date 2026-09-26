@@ -44,7 +44,8 @@ export class Billboards {
       this.slotOf.set(b.id, slot);
       this.descs[slot] = b;
       this.q.setFromAxisAngle(UP, b.yaw);
-      this.p.set(b.x, 0, b.z);
+      // the island's stand on their ground or deck (M8.10 slice 15), the grid's on its flat 0
+      this.p.set(b.x, b.y ?? 0, b.z);
       this.s.set(b.width / BILLBOARD_WIDTH, 1, 1);
       this.mesh.setMatrixAt(slot, this.m.compose(this.p, this.q, this.s));
       this.color.setHex(b.paint);

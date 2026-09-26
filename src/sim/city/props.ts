@@ -160,9 +160,10 @@ export interface PropContext {
    * lane, the walkers' band, a ring, a door's approach, a billboard's line, a ramp, a junction's corner, an
    * overpass, a covered street, the cold open's route, or anything built that stands above the kerb. `onRoute`: a
    * thing the cold open drives through, which the route, the gate's line and the walkers' band do not keep out, nor
-   * a billboard's run-out a loose one (a car through the panel knocks it aside; a solid one would hold it).
+   * a billboard's run-out a loose one (a car through the panel knocks it aside; a solid one would hold it). `kind`: the
+   * thing itself (the island's billboards keep only the solid out of their run-outs, M8.10 slice 15).
    */
-  blocked(x: number, z: number, yaw: number, hx: number, hz: number, onRoute?: 'loose' | 'solid'): boolean;
+  blocked(x: number, z: number, yaw: number, hx: number, hz: number, onRoute?: 'loose' | 'solid', kind?: PropKind): boolean;
 }
 
 /** The lines and their rhythms (M8_PLAN D7). */
@@ -222,7 +223,7 @@ export function chunkProps(cx: number, cz: number, ctx: PropContext, index = (cz
     const r = propRadius(kind);
     // a thing laid at its own spot stands side by side with its row (a fence's panels); the rest keep apart
     if (!laid) for (const t of taken) if (Math.hypot(t.x - x, t.z - z) < t.r + r + PROP_LINES.apart) return false;
-    if (ctx.blocked(x, z, yaw, f.hx, f.hz, onRoute)) return false;
+    if (ctx.blocked(x, z, yaw, f.hx, f.hz, onRoute, kind)) return false;
     taken.push({ x, z, r });
     out.push({ id: index * PROPS_PER_CHUNK + out.length, kind, x, z, yaw });
     return true;

@@ -13,6 +13,9 @@
 import { BALANCE, CITY_HALF, DISTRICTS, PALETTE, districtAt, type JobDef, type SimWorld } from '../../sim';
 import { GLYPHS, GLYPH_ORDER, NO_GLYPH, digitSlot, glyphOf, goalGlyph, numberGlyphs, type GlyphId } from '../../sim/glyphs';
 import { SIGNALS } from '../../sim/palette';
+import type { Island } from '../../sim/island/Island';
+import { districtOf } from '../../sim/island/plan';
+import { islandMapShapeOf } from './islandShape';
 import { INK as INK_COLOR, MONEY, OFF, POLICE, TROUBLE, WAY, cssAlpha } from '../colors';
 import { FONT_STACK, fontReady } from '../fonts';
 import { labelAria, relabel, t } from '../lang';
@@ -94,18 +97,74 @@ export interface MapPaths {
   gridLines: Array<{ path: Path2D; axis: 'x' | 'z'; at: number }>;
   highwayPath: Path2D;
   highwayRing: number;
-  specialPaths: Array<{ path: Path2D; width: number; minX: number; maxX: number; minZ: number; maxZ: number }>;
+  specialPaths: MapLinePath[];
   islandPath: Path2D;
   districtFills: Array<{ path: Path2D; fill: string }>;
   gridWidth: number;
   highwayWidth: number;
+  /** The island's (M8.10 slice 17): its streets as lines (the grid's are `gridLines`), its highway's bounds (the grid's a ring), the port's basin. */
+  streetPaths: MapLinePath[];
+  highwayBox: { minX: number; maxX: number; minZ: number; maxZ: number } | null;
+  waterPath: Path2D | null;
+}
+
+/** A road's line on the maps, at its width, and its bounds for the radar's cull. */
+export interface MapLinePath { path: Path2D; width: number; minX: number; maxX: number; minZ: number; maxZ: number }
+
+/** A line's path and bounds. */
+function linePath(pts: ReadonlyArray<readonly [number, number]>, width: number, closed: boolean): MapLinePath {
+  const path = new Path2D();
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  pts.forEach(([x, z], i) => {
+    if (i === 0) path.moveTo(x, z); else path.lineTo(x, z);
+    minX = Math.min(minX, x); maxX = Math.max(maxX, x); minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
+  });
+  if (closed) path.closePath();
+  return { path, width, minX, maxX, minZ, maxZ };
+}
+
+/** The island's paths (M8.10 slice 17), from its map's shape: the land less the basin, the districts' tints, its roads. */
+function islandPaths(island: Island): MapPaths {
+  const shape = islandMapShapeOf(island);
+  const polys = (list: ReadonlyArray<ReadonlyArray<readonly [number, number]>>): Path2D => {
+    const path = new Path2D();
+    for (const poly of list) {
+      poly.forEach(([x, z], i) => (i === 0 ? path.moveTo(x, z) : path.lineTo(x, z)));
+      path.closePath();
+    }
+    return path;
+  };
+  const highway = linePath(shape.highway.pts, shape.highway.width, true);
+  return {
+    gridLines: [],
+    highwayPath: highway.path,
+    highwayRing: 0,
+    highwayBox: { minX: highway.minX, maxX: highway.maxX, minZ: highway.minZ, maxZ: highway.maxZ },
+    specialPaths: shape.roads.map((r) => linePath(r.pts, r.width, r.closed)),
+    streetPaths: shape.streets.map((r) => linePath(r.pts, r.width, r.closed)),
+    islandPath: polys(shape.land),
+    waterPath: polys(shape.water),
+    districtFills: shape.districts.map((d) => {
+      const path = new Path2D();
+      for (const [x0, z0, x1, z1] of d.runs) path.rect(x0, z0, x1 - x0, z1 - z0);
+      return { path, fill: rgba(districtOfId(d.id).color, TINT_ALPHA) };
+    }),
+    gridWidth: Math.min(...shape.streets.map((r) => r.width)),
+    highwayWidth: shape.highway.width,
+  };
+}
+
+/** The grid's district entry (its name, landmark and colour) the island's district of that id shares. */
+export function districtOfId(id: string): (typeof DISTRICTS)[number] {
+  return DISTRICTS.find((d) => d.id === id) ?? DISTRICTS[0];
 }
 
 export function buildMapPaths(sim: SimWorld): MapPaths {
+  if (sim.island) return islandPaths(sim.island);
   const layers = sim.city ? buildRoadLayers(sim.city.graph) : null;
   const out: MapPaths = {
     gridLines: [], highwayPath: new Path2D(), highwayRing: 0, specialPaths: [], islandPath: new Path2D(), districtFills: [],
-    gridWidth: layers?.gridWidth ?? 24, highwayWidth: layers?.highwayWidth ?? 38,
+    gridWidth: layers?.gridWidth ?? 24, highwayWidth: layers?.highwayWidth ?? 38, streetPaths: [], highwayBox: null, waterPath: null,
   };
   if (layers) {
     const lines = new Map<string, { axis: 'x' | 'z'; at: number; min: number; max: number }>();
@@ -146,11 +205,19 @@ export function buildMapPaths(sim: SimWorld): MapPaths {
   return out;
 }
 
-/** The island under the roads: water, the island panel, the district tints (in world space). */
+/** The island under the roads: water, the island panel, the district tints, the water inside its line (in world space). */
 export function fillIsland(c: CanvasRenderingContext2D, paths: MapPaths): void {
   c.fillStyle = ISLAND;
   c.fill(paths.islandPath);
   for (const d of paths.districtFills) { c.fillStyle = d.fill; c.fill(d.path); }
+  if (paths.waterPath) { c.fillStyle = WATER; c.fill(paths.waterPath); }
+}
+
+/** Whether the highway can show in a disc of `reach` round (x, z): the grid's ring, or the island's loop's bounds. */
+export function highwayNear(paths: MapPaths, x: number, z: number, reach: number): boolean {
+  if (paths.highwayRing > 0) return Math.max(Math.abs(x), Math.abs(z)) >= paths.highwayRing - reach;
+  const b = paths.highwayBox;
+  return !!b && x + reach >= b.minX && x - reach <= b.maxX && z + reach >= b.minZ && z - reach <= b.maxZ;
 }
 
 /** Four distinct shapes so the landmarks read without colour: the tower, the water tank, the glasshouse, the hotel slab; and the jobs, caches, garages and cameras. */
@@ -504,7 +571,7 @@ export class Minimap {
       }
     }
 
-    const d = districtAt(x, z);
+    const d = this.sim?.island ? districtOfId(districtOf(x, z)) : districtAt(x, z);
     if (d.id !== this.district) {
       this.district = d.id;
       this.label.textContent = t(d.name);
@@ -571,17 +638,19 @@ export class Minimap {
     const highW = Math.max(paths.highwayWidth, minW);
     // Only paths within reach of the visible disc are stroked (casing pass, then fills).
     const reach = this.state.radiusM + casing;
-    const highwayVisible = paths.highwayRing > 0 && Math.max(Math.abs(x), Math.abs(z)) >= paths.highwayRing - reach - highW / 2;
+    const highwayVisible = highwayNear(paths, x, z, reach + highW / 2);
     const k = radarScale(size);
     const st = this.radar;
     c.strokeStyle = DARK;
     this.strokeGrid(x, z, reach + gridW / 2, gridW + casing);
+    this.strokeLines(paths.streetPaths, x, z, reach, casing, minW);
     if (highwayVisible) { c.lineWidth = highW + casing; c.stroke(paths.highwayPath); }
-    this.strokeSpecials(x, z, reach, casing, minW);
+    this.strokeLines(paths.specialPaths, x, z, reach, casing, minW);
     c.strokeStyle = GRID;
     this.strokeGrid(x, z, reach + gridW / 2, gridW);
+    this.strokeLines(paths.streetPaths, x, z, reach, 0, minW);
     c.strokeStyle = LOOP;
-    this.strokeSpecials(x, z, reach, 0, minW);
+    this.strokeLines(paths.specialPaths, x, z, reach, 0, minW);
     if (highwayVisible) {
       c.lineCap = 'butt';
       c.lineJoin = 'miter';
@@ -771,12 +840,12 @@ export class Minimap {
     }
   }
 
-  /** Authored polylines whose bounds touch the visible disc; round joins for the curves. */
-  private strokeSpecials(x: number, z: number, reach: number, extra: number, minW: number): void {
+  /** Road lines whose bounds touch the visible disc (the authored roads, the island's streets); round joins for the curves. */
+  private strokeLines(lines: readonly MapLinePath[], x: number, z: number, reach: number, extra: number, minW: number): void {
     const c = this.ctx;
     c.lineCap = 'round';
     c.lineJoin = 'round';
-    for (const p of this.paths.specialPaths) {
+    for (const p of lines) {
       const w = Math.max(p.width, minW);
       const margin = reach + w;
       if (x + margin < p.minX || x - margin > p.maxX || z + margin < p.minZ || z - margin > p.maxZ) continue;

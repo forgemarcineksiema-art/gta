@@ -39,7 +39,7 @@ export type DriveElement = keyof typeof DRIVE;
 
 /** What the corners read. */
 export interface DriveState {
-  /** A city world: the test track has no run, no police and no radar. */
+  /** A town (the grid or the island, M8.10 slice 17): the test track has no run, no police and no radar. */
   city: boolean;
   run: RunState;
   bag: number;
@@ -160,7 +160,7 @@ export function newDriveState(): DriveState {
 
 /** The world into `out` (the district's and the hit's ages are the caller's: it keeps the clocks). */
 export function readDrive(sim: SimWorld, placeAge: number, out: DriveState, hitAge = Infinity): DriveState {
-  out.city = sim.city !== null;
+  out.city = sim.city !== null || sim.island !== null;
   out.run = sim.run.state;
   out.bag = sim.run.bag;
   out.multiplier = sim.run.multiplier;

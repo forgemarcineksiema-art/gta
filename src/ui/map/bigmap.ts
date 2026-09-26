@@ -21,7 +21,9 @@ import {
   drawArrow, drawBadge, drawGlyph, drawHeli, fillIsland, hex, type MapPaths, type MarkerKind,
 } from './minimap';
 import { SIGNALS } from '../../sim/palette';
+import { BOUNDS } from '../../sim/island/plan';
 import { cssAlpha } from '../colors';
+import { islandMapShapeOf, rectCorners } from './islandShape';
 import { fontReady } from '../fonts';
 import { label, labelAria, relabel, t } from '../lang';
 import { MINIMAP, bigMapProject, bigMapScale, clearSpot, mapHalf, yawFromQuat, type Box, type Vec2 } from './minimapModel';
@@ -98,14 +100,25 @@ export function legendState(sim: SimWorld): LegendState {
   const police = sim.police;
   if (police) for (let u = 0; u < police.units.length; u++) if ((police.units[u] as number) >= 0) { cops = true; break; }
   return {
-    jobs, caches: cache, cameras: (sim.cameras?.descs.length ?? 0) > 0, breakers: breaker, cover: (sim.city?.covers.length ?? 0) > 0, cops,
+    jobs, caches: cache, cameras: (sim.cameras?.descs.length ?? 0) > 0, breakers: breaker,
+    cover: (sim.city?.covers.length ?? 0) > 0 || (sim.island ? islandMapShapeOf(sim.island).decks.length > 0 : false), cops,
     heli: !!police?.heli.active,
   };
 }
 
-/** The map's half extent: the island's, out to the player at sea (M8.8 slice 19). */
+/** The map's half extent: the island's, out to the player at sea (M8.8 slice 19); the island's land and causeway (M8.10 slice 17). */
 function halfOf(sim: SimWorld): number {
+  if (sim.island) {
+    const half = islandMapShapeOf(sim.island).half;
+    return mapHalf(sim.probe.x, sim.probe.z, half, Math.max(0, Math.max(-BOUNDS.x0, BOUNDS.x1, -BOUNDS.z0, BOUNDS.z1) - half));
+  }
   return mapHalf(sim.probe.x, sim.probe.z, CITY_HALF, SEA.limit);
+}
+
+/** The four landmarks on the map (the tower, the Waterworks, the Glasshouse, the hotel): the grid's or the island's. */
+export function landmarksOf(sim: SimWorld): Array<{ kind: MarkerKind; x: number; z: number }> {
+  if (sim.island) return islandMapShapeOf(sim.island).landmarks;
+  return LANDMARKS.map((l, i) => ({ kind: GLYPH_KINDS[i] ?? 'tower', x: l.x, z: l.z }));
 }
 
 /**
@@ -120,7 +133,7 @@ export function mapIcons(sim: SimWorld, size: number): Box[] {
     bigMapProject(tmp, x, z, size, s);
     out.push({ x: tmp.x, y: tmp.y, hw: r, hh: r });
   };
-  for (const l of LANDMARKS) put(l.x, l.z, GLYPH * 1.3);
+  for (const l of landmarksOf(sim)) put(l.x, l.z, GLYPH * 1.3);
   for (const d of sim.run.dropOffs) put(d.door.x, d.door.z, GLYPH * 1.2);
   for (const cam of sim.cameras?.descs ?? []) put(cam.x, cam.z, GLYPH * 0.8);
   const breakers = sim.breakers;
@@ -152,8 +165,12 @@ export function namePlaces(sim: SimWorld, size: number, width: (name: string) =>
   const s = bigMapScale(size, halfOf(sim));
   const font = nameFontPx(size);
   const tmp: Vec2 = { x: 0, y: 0 };
+  const anchors = sim.island ? islandMapShapeOf(sim.island).districts : null;
   return DISTRICTS.map((d, i) => {
-    bigMapProject(tmp, i % 2 ? CITY_HALF / 2 : -CITY_HALF / 2, i >= 2 ? CITY_HALF / 2 : -CITY_HALF / 2, size, s);
+    // the grid's quarters' middles; the island's each district's own ground's
+    const own = anchors?.find((a) => a.id === d.id)?.anchor;
+    if (own) bigMapProject(tmp, own[0], own[1], size, s);
+    else bigMapProject(tmp, i % 2 ? CITY_HALF / 2 : -CITY_HALF / 2, i >= 2 ? CITY_HALF / 2 : -CITY_HALF / 2, size, s);
     return clearSpot(tmp.x, tmp.y, width(t(d.name)) / 2 + 3, font * 0.6, icons, size, font * 0.75, size / 5, { x: 0, y: 0, hw: 0, hh: 0 });
   });
 }
@@ -190,6 +207,8 @@ export class BigMap {
   private legendKey = '';
   /** The covered streets and the overpasses' decks as world rectangles (centre and half extents). */
   private readonly coverRects: Array<{ x: number; z: number; hx: number; hz: number }> = [];
+  /** The island's cover: its decks, turned (M8.10 slice 17). */
+  private readonly coverTurned = new Path2D();
   /** The island's blocks, parks and shallows (`cityFootprints`), built the first time the map is shown. */
   private ground: { blocks: Path2D; parks: Path2D; shallows: Path2D } | null = null;
   private shown = false;
@@ -226,6 +245,11 @@ export class BigMap {
     for (const c of sim.city?.covers ?? []) {
       const along = COVER.length / 2, across = COVER.half;
       this.coverRects.push(c.axis === 'x' ? { x: c.x, z: c.z, hx: along, hz: across } : { x: c.x, z: c.z, hx: across, hz: along });
+    }
+    // the island's: the decks the highway lifts over the crossings and the tunnel's roof, turned as they run (M8.10 slice 17)
+    if (sim.island) for (const d of islandMapShapeOf(sim.island).decks) {
+      rectCorners(d).forEach(([x, z], k) => (k === 0 ? this.coverTurned.moveTo(x, z) : this.coverTurned.lineTo(x, z)));
+      this.coverTurned.closePath();
     }
     if (sim.city) {
       for (const [gx, gz] of OVERPASS_NODES) {
@@ -360,7 +384,21 @@ export class BigMap {
 
   /** The footprints as paths, once (a few hundred rectangles; the city's lot plans, not its chunks). */
   private groundOf(sim: SimWorld): { blocks: Path2D; parks: Path2D; shallows: Path2D } | null {
-    if (this.ground || !sim.city) return this.ground;
+    if (this.ground) return this.ground;
+    if (sim.island) {
+      // the island's (M8.10 slice 17): its lots' blocks turned as they stand, the botanic garden and the golf, the pond
+      const shape = islandMapShapeOf(sim.island), g = { blocks: new Path2D(), parks: new Path2D(), shallows: new Path2D() };
+      const poly = (path: Path2D, pts: ReadonlyArray<readonly [number, number]>): void => {
+        pts.forEach(([x, z], k) => (k === 0 ? path.moveTo(x, z) : path.lineTo(x, z)));
+        path.closePath();
+      };
+      for (const r of shape.blocks) poly(g.blocks, rectCorners(r));
+      for (const p of shape.parks) poly(g.parks, p);
+      for (const p of shape.shallows) poly(g.shallows, p);
+      this.ground = g;
+      return g;
+    }
+    if (!sim.city) return this.ground;
     const fp = cityFootprints(sim.city);
     const g = { blocks: new Path2D(), parks: new Path2D(), shallows: new Path2D() };
     for (const r of fp.blocks) g.blocks.rect(r.x - r.hx, r.z - r.hz, r.hx * 2, r.hz * 2);
@@ -424,7 +462,16 @@ export class BigMap {
       c.strokeStyle = pass === 0 ? DARK : GRID;
       c.lineWidth = gridW + extra;
       for (const line of paths.gridLines) c.stroke(line.path);
-      if (paths.highwayRing > 0) {
+      // the island's streets (M8.10 slice 17): lines, the grid's grey
+      c.lineCap = 'round';
+      c.lineJoin = 'round';
+      for (const p of paths.streetPaths) {
+        c.lineWidth = Math.max(p.width, minW) + extra;
+        c.stroke(p.path);
+      }
+      c.lineCap = 'butt';
+      c.lineJoin = 'miter';
+      if (paths.highwayRing > 0 || paths.highwayBox) {
         c.strokeStyle = pass === 0 ? DARK : HIGHWAY;
         c.lineWidth = highW + extra;
         c.stroke(paths.highwayPath);
@@ -444,6 +491,10 @@ export class BigMap {
     for (const r of this.coverRects) {
       c.fillRect(r.x - r.hx, r.z - r.hz, r.hx * 2, r.hz * 2);
       c.strokeRect(r.x - r.hx, r.z - r.hz, r.hx * 2, r.hz * 2);
+    }
+    if (sim.island) {
+      c.fill(this.coverTurned);
+      c.stroke(this.coverTurned);
     }
     const jobs = sim.jobs, running = jobs.running;
     // a zone job's edge
@@ -499,7 +550,7 @@ export class BigMap {
       c.fillStyle = INK;
       c.fillText(name, p.x, p.y);
     }
-    LANDMARKS.forEach((l, i) => this.glyphAt(GLYPH_KINDS[i] ?? 'tower', l.x, l.z, s, GLYPH, INK));
+    for (const l of landmarksOf(sim)) this.glyphAt(l.kind, l.x, l.z, s, GLYPH, INK);
     for (const d of sim.run.dropOffs) this.glyphAt('garage', d.door.x, d.door.z, s, GLYPH * 1.2, INK);
     for (const cam of sim.cameras?.descs ?? []) this.glyphAt('camera', cam.x, cam.z, s, GLYPH * 0.8, CAMERA_COLOR);
     // the pursuit breakers still standing (M5.5 slice 18)

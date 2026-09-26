@@ -119,8 +119,9 @@ export class RunHud {
     this.wall.append(page);
     this.root.append(block, this.bar, this.card, this.wall);
     parent.appendChild(this.root);
-    this.bag.classList.toggle('is-visible', sim.city !== null);
-    this.bankRow.classList.toggle('is-visible', sim.city !== null);
+    // a town's run (the grid's or the island's, M8.10 slice 17)
+    this.bag.classList.toggle('is-visible', sim.city !== null || sim.island !== null);
+    this.bankRow.classList.toggle('is-visible', sim.city !== null || sim.island !== null);
     this.update(sim, 0);
   }
 

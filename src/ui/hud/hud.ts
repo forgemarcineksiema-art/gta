@@ -8,12 +8,13 @@
 import { AgentState, BALANCE, bodySpec, districtAt } from '../../sim';
 import type { EventKind, SimEvent, SimWorld } from '../../sim';
 import { BigMap } from '../map/bigmap';
+import { districtOf } from '../../sim/island/plan';
 import {
   DRIVE, comboMult, drive, hintRow, hintRows, newDriveState, newHitClock, newPlaceClock, promptPlace, readDrive, screenTaken, tickHit, tickPlace,
   type KeyHints,
 } from './corners';
 import { GaugeHud } from './gauge';
-import { Minimap } from '../map/minimap';
+import { Minimap, districtOfId } from '../map/minimap';
 import { HeatHud } from './heat';
 import { starText } from './stars';
 import { label, num, relabel, t } from '../lang';
@@ -140,7 +141,7 @@ export class Hud {
       jumps: 0, jumpsTotal: 0, boards: 0, boardsTotal: 0, cachesTotal: sim.caches?.total ?? 0,
       cameraLimits: sim.cameras ? sim.cameras.descs.map((c) => c.limitMs * 3.6) : [],
     };
-    this.minimap = sim.city ? new Minimap(this.root, sim) : null;
+    this.minimap = sim.city || sim.island ? new Minimap(this.root, sim) : null;
     this.heat = new HeatHud(this.root, sim);
 
     // the car's corner (DESIGN.md §17.2, M8.9 R4): the gauge. No gear (the box is automatic; the debug block keeps
@@ -380,7 +381,8 @@ export class Hud {
     this.frameIndex++;
     // the corners (DESIGN.md §17.2): one mask for the frame; the district's name has its own clock
     // the intro's caption holds the name's clock: it shows after the caption, in a quiet moment (M8.9 R5)
-    const placeAge = tickPlace(this.place, sim.city ? districtAt(sim.probe.x, sim.probe.z) : null, sim.run.state, dt, sim.coldOpen.caption !== null);
+    const place = sim.city ? districtAt(sim.probe.x, sim.probe.z) : sim.island ? districtOfId(districtOf(sim.probe.x, sim.probe.z)) : null;
+    const placeAge = tickPlace(this.place, place, sim.run.state, dt, sim.coldOpen.caption !== null);
     const hitAge = tickHit(this.hit, sim.life.state.damage, dt);
     const m = drive(readDrive(sim, placeAge, this.driveState, hitAge));
     if (m !== this.mask) {

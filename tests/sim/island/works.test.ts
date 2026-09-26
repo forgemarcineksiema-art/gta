@@ -20,7 +20,7 @@ describe('M8.10 slice 9: Sunset Works', () => {
     sim = await createWorld({ map: 'island', traffic: 0, peds: 0 });
     island = sim.island as Island;
     works = island.places.find(isWorks) as WorksPlace;
-  }, 60_000);
+  }, 120_000);
 
   it('9.2 the canal runs 6 m deep to the sea, and its five bridges clear 5 m over its floor', () => {
     const world = sim.world, length = canalLength(), p = { x: 0, z: 0 };

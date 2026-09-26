@@ -55,7 +55,10 @@ export class IslandView {
   private readonly surfaceMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1.5, polygonOffsetUnits: -3 });
   private readonly buildingMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
   /** The places that move (slices 8–12). */
-  private readonly views: PlaceView[];
+  private views: PlaceView[] = [];
+  /** What is built after the first frame, one a frame (M8.10 slice 18: the start builds what its first frame needs). */
+  private readonly later: Array<() => void> = [];
+  private frames = 0;
   /** The standing props' meshes by chunk (slice 7b), and the props' serial they show. */
   private readonly propChunks = new Map<number, THREE.Mesh>();
   private readonly propMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
@@ -72,10 +75,12 @@ export class IslandView {
     fadeRoadPaint(this.buildingMaterial);
     lightCity(this.buildingMaterial);
     this.group.add(this.surfaceGroup, this.buildingGroup);
-    this.group.add(this.paving());
-    this.group.add(this.structures());
-    this.group.add(...this.coast());
-    this.views = placeViews(this.group, island);
+    this.later.push(
+      () => { this.group.add(this.paving()); },
+      () => { this.group.add(this.structures()); },
+      () => { this.group.add(...this.coast()); },
+      () => { this.views = placeViews(this.group, island); },
+    );
   }
 
   /**
@@ -83,6 +88,7 @@ export class IslandView {
    * near (x, z), a chunk's built a frame, a knocked one's pieces collapsed and a healed one's rebuilt (slice 7b).
    */
   update(alpha: number, dt: number, props: Props | null = null, x = 0, z = 0): void {
+    if (++this.frames > 1) this.later.shift()?.();
     for (const v of this.views) v.update?.(alpha, dt);
     if (!props) return;
     let built = false;

@@ -12,6 +12,7 @@ import { CHUNK, CHUNKS_X, CHUNKS_Z, CHUNK_X0, CHUNK_Z0, Island } from '../../sim
 import { DECK, type Piece } from '../../sim/island/structures';
 import { PLACES } from '../../sim/island/plan';
 import { shoreOpen } from '../../sim/island/shapes';
+import { atSlipway } from '../../sim/island/slipways';
 import { cityGeometry, type PropRanges } from '../city/CityView';
 import { propStatics } from '../props/propMesh';
 import { lightCity } from '../city/glow';
@@ -322,8 +323,9 @@ export class IslandView {
         const a = pts[i] as readonly [number, number], b = pts[(i + 1) % n] as readonly [number, number];
         const kind: CoastKind = line.kinds[i] ?? 'rocks';
         const dx = b[0] - a[0], dz = b[1] - a[1], len = Math.hypot(dx, dz);
-        // (no wall where a place's deck leaves the shore, nor what stands for it)
-        if (len < 0.01 || shoreOpen((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)) continue;
+        // (no wall where a place's deck leaves the shore, nor what stands for it; a slipway's mouth is open to the eye, its
+        // gate the hovercraft's: M8.10 slice 15)
+        if (len < 0.01 || shoreOpen((a[0] + b[0]) / 2, (a[1] + b[1]) / 2) || atSlipway(this.island.slipways, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2)) continue;
         // toward the land
         const nx = (-dz / len) * line.land, nz = (dx / len) * line.land;
         // none where a road crosses the shore (the taxiways' bridges, M8.10 slice 12), as the wall has none there

@@ -1128,11 +1128,14 @@ export class Traffic {
     return i;
   }
 
-  /** A prop's stopped car at a point (M7 slice 0): on the records above the pool, -1 when all are taken. */
-  spawnProp(x: number, z: number, yaw: number, body: BodyId, state: AgentState.Abandoned | AgentState.Parked, paint: number): number {
+  /**
+   * A prop's stopped car at a point (M7 slice 0): on the records above the pool, -1 when all are taken; on the ground,
+   * or at `y` (a car on a roof: M8.10 slice 15, the island's hidden cars).
+   */
+  spawnProp(x: number, z: number, yaw: number, body: BodyId, state: AgentState.Abandoned | AgentState.Parked, paint: number, y?: number): number {
     for (let i = this.pool; i < this.capacity; i++) {
       if (this.state[i] !== AgentState.Free) continue;
-      this.placeAtPoint(i, x, z, yaw, BODY_INDEX[body], state, paint);
+      this.placeAtPoint(i, x, z, yaw, BODY_INDEX[body], state, paint, y);
       return i;
     }
     return -1;
@@ -1241,7 +1244,7 @@ export class Traffic {
     this.lastPlayerContactTick[i] = -100000;
     this.paintSerial++;
     // on the ground where it stands (the grid's 0; a bay on the island's hill, nose up or down its slope), or on the road
-    // given (a deck, the tunnel's floor: the ground there is the sea's floor or the hill over it)
+    // given (a deck, the tunnel's floor: the ground there is the sea's floor or the hill over it; a roof, level)
     const fx = Math.sin(yaw) * 2, fz = Math.cos(yaw) * 2;
     this.y[i] = Number.isNaN(y) ? this.streets.groundAt(x, z) : y;
     this.grade[i] = Number.isNaN(y) ? (this.streets.groundAt(x + fx, z + fz) - this.streets.groundAt(x - fx, z - fz)) / 4 : grade;
@@ -1256,6 +1259,7 @@ export class Traffic {
    * velocity and class); the agent's record becomes the player's old car,
    * standing where the player was: abandoned, or a wreck if the player's car
    * was one. It keeps no lane and is lent a body next step like any obstacle.
+   * `oldPose.y` is the road under the player's car (the grid's 0).
    */
   takeOver(agent: number, oldBody: BodyId, oldPaint: number, oldPose: { x: number; y: number; z: number; yaw: number }, oldWrecked: boolean, out: SwapHandover): void {
     const yaw = this.yaw[agent] as number;
@@ -1310,8 +1314,8 @@ export class Traffic {
     this.paintSerial++;
     this.posed[agent] = 0;
     this.tipFor[agent] = 0;
-    // the old car on the ground where the player left it
-    this.y[agent] = this.streets.groundAt(oldPose.x, oldPose.z);
+    // the old car on the road where the player left it (`oldPose.y`: the ground, or a roof or a deck on the island)
+    this.y[agent] = oldPose.y;
     this.grade[agent] = 0;
     const q = M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, oldPose.yaw);
     this.transforms.writeBoth(this.slot[agent] as number, oldPose.x, (this.y[agent]) + 0.03, oldPose.z, q.x, q.y, q.z, q.w);
@@ -2401,9 +2405,9 @@ export class Traffic {
       this.poseQ[k + 1] = q.y;
       this.poseQ[k + 2] = q.z;
       this.poseQ[k + 3] = q.w;
-      // on the road under it (the highway's deck or the street)
+      // on the road under it (the highway's deck or the street), off a lane on the ground (the grid's 0, the island's)
       const lane = this.lane[i] as number;
-      this.y[i] = lane >= 0 ? this.lanes.heightAt(lane, this.s[i] as number) : 0;
+      this.y[i] = lane >= 0 ? this.lanes.heightAt(lane, this.s[i] as number) : this.streets.groundAt(this.pos.x, this.pos.z);
       this.posed[i] = 1;
     }
     this.wreck(i);

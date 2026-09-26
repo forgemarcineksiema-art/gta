@@ -18,6 +18,11 @@
  * ahead of a wreck as a short-lived pool of bigger coins that pay back into
  * the bag. No allocation per step: the picked set and the spill pool are
  * typed arrays.
+ *
+ * Every coin is laid at its road's height (M8.10 slice 15, the island's hills): a line on a lane at the lane's, a coin
+ * off it (a gate's swerve, a panel, the pools laid without one) at the ground's (the grid's 0). The island's own static
+ * lines (a gate through its billboards, an arc over its ramps) are laid a chunk at a time (`layChunk`), their ids after
+ * the pools'.
  */
 import { BALANCE } from '../balance';
 import type { EventLog } from '../events';
@@ -30,7 +35,10 @@ import { alongLane, laneAt, laneLength, type Pt } from './route';
 import { BLOCK, type Lane, type RoadGraph } from './roads';
 
 export interface CoinDesc {
-  /** Stable: chunk index × COINS_PER_CHUNK_MAX + slot; run-time coins from EXTRA_COIN_BASE in their pool's range. */
+  /**
+   * Stable: chunk index × COINS_PER_CHUNK_MAX + slot; run-time coins from EXTRA_COIN_BASE in their pool's range; the
+   * island's chunks' from ISLAND_COIN_BASE.
+   */
   id: number;
   x: number;
   /** The centre's height: COIN_HEIGHT over the road, higher in a ramp's arc. */
@@ -54,9 +62,24 @@ export type ExtraTag = 'rings' | 'caches' | 'route';
 /** Each pool's slot range within the extras (the rings: 32 markers × 8, M5.5's 28 jobs; the caches: 30 × 9; a route: 300 at most). */
 export const EXTRA_RANGES: Readonly<Record<ExtraTag, readonly [number, number]>> = { rings: [0, 256], caches: [256, 576], route: [576, 1024] };
 export const EXTRA_COINS_MAX = 1024;
+/**
+ * The island's static lines (M8.10 slice 15) take ids after the pools': chunk index × COINS_PER_CHUNK_MAX + slot from
+ * here, for up to `ISLAND_COIN_CHUNKS` chunks (the island has 10 × 8).
+ */
+export const ISLAND_COIN_BASE = EXTRA_COIN_BASE + EXTRA_COINS_MAX;
+export const ISLAND_COIN_CHUNKS = 128;
+/** Whether a coin's id is a run-time pool's (the rings', the caches', a route's), not a chunk's. */
+export function isExtraCoin(id: number): boolean {
+  return id >= EXTRA_COIN_BASE && id < ISLAND_COIN_BASE;
+}
 const TAG_LANE: Readonly<Record<ExtraTag, number>> = { rings: -3, caches: -4, route: -5 };
 /** A coin's centre hovers this high over the road: bonnet height, half a metre of air under it. */
 export const COIN_HEIGHT = 1.0;
+/** The ground's height at a point: the grid's flat 0, the island's hills. */
+export type GroundAt = (x: number, z: number) => number;
+const FLAT: GroundAt = () => 0;
+/** A spill keeps to a lane at the wreck's own level: a lane more than this over or under the wreck is another road's (m). */
+const OTHER_LEVEL = 3;
 /** The verge hook turns off the outer lane on this radius (m): a drift at speed, a firm turn at 50 km/h. */
 const HOOK_RADIUS = 30;
 /** A route's runs keep this far from a lane's ends (m) and this far from each other. */
@@ -86,8 +109,11 @@ function push(out: CoinPoint[], p: Pt, y: number, lane: number, value: number, p
   out.push({ x: p.x, y, z: p.z, lane, value, phase });
 }
 
-/** Over a ramp: `arcCoins` coins in the flight of a car launched at `arc.speed`, the cap on the landing. */
-function arc(jd: JumpDesc, out: CoinPoint[]): void {
+/**
+ * Over a ramp: `arcCoins` coins in the flight of a car launched at `arc.speed`, the cap on the landing; `base` the
+ * height the ramp's foot stands on (the grid's 0), the flight measured from it.
+ */
+function arc(jd: JumpDesc, out: CoinPoint[], base: number): void {
   const c = BALANCE.coin;
   const fx = Math.sin(jd.yaw), fz = Math.cos(jd.yaw);
   const profile = rampProfile(jd);
@@ -104,15 +130,18 @@ function arc(jd: JumpDesc, out: CoinPoint[]): void {
   const at = (a: number): Pt => ({ x: jd.x + fx * a, z: jd.z + fz * a });
   let phase = 0;
   let a = c.pitch;
-  for (let laid = 0; flight(a) > 0.3 && laid < c.arcCoins; a += c.pitch, laid++) push(out, at(a), Math.max(surface(a), flight(a)) + COIN_HEIGHT, -1, c.value, phase++);
+  for (let laid = 0; flight(a) > 0.3 && laid < c.arcCoins; a += c.pitch, laid++) push(out, at(a), base + Math.max(surface(a), flight(a)) + COIN_HEIGHT, -1, c.value, phase++);
   while (flight(a) > 0.3) a += c.pitch;
-  push(out, at(a + c.pitch), COIN_HEIGHT, -1, c.cap, phase);
+  push(out, at(a + c.pitch), base + COIN_HEIGHT, -1, c.cap, phase);
 }
 
-/** The static layout from the seed: an arc over every ramp. The gate lines are placed per chunk with their billboards. */
-export function layoutCoins(jumps: readonly JumpDesc[]): CoinPoint[] {
+/**
+ * The static layout from the seed: an arc over every ramp, each over the ground its foot stands on (`base`, the grid's
+ * 0). The gate lines are placed per chunk with their billboards.
+ */
+export function layoutCoins(jumps: readonly JumpDesc[], base: (jd: JumpDesc) => number = () => 0): CoinPoint[] {
   const out: CoinPoint[] = [];
-  for (const jd of jumps) arc(jd, out);
+  for (const jd of jumps) arc(jd, out, base(jd));
   return out;
 }
 
@@ -120,9 +149,11 @@ export function layoutCoins(jumps: readonly JumpDesc[]): CoinPoint[] {
  * The line through a billboard: a footway gate's `gateCoins` coins swerving
  * from the lane it stands beside onto the footway and the cap on the panel;
  * a verge panel's the last `gateCoins` of a hook off the ring's outer lane
- * and the cap on the panel. Null when no lane runs past the panel.
+ * and the cap on the panel. Null when no lane runs past the panel. Each coin
+ * over the ground at its point (`ground`, the grid's 0); a verge's hook only
+ * off a lane on the ground (not a deck's, nor the tunnel's).
  */
-export function gateLine(graph: RoadGraph, b: BillboardDesc): CoinPoint[] | null {
+export function gateLine(graph: RoadGraph, b: BillboardDesc, ground: GroundAt = FLAT): CoinPoint[] | null {
   const c = BALANCE.coin;
   const n = c.gateCoins;
   const out: CoinPoint[] = [];
@@ -137,8 +168,9 @@ export function gateLine(graph: RoadGraph, b: BillboardDesc): CoinPoint[] | null
     const { s, lateral } = alongLane(lane, b.x, b.z);
     if (verge) {
       if (lateral < 14 || lateral > 20 || s > len - 10) continue;
-      // a panel beside an overpass's ramp: its hook would run through the wall
-      if (laneAt(lane, s).y > 0.05) continue;
+      // a panel beside an overpass's ramp: its hook would run through the wall (a lane off the ground's height)
+      const beside = laneAt(lane, s);
+      if (Math.abs(beside.y - ground(beside.x, beside.z)) > 0.05) continue;
       const theta = Math.acos(1 - lateral / HOOK_RADIUS);
       const sArc = s - HOOK_RADIUS * Math.sin(theta);
       // the corner chunks' slots sit 39 m along the lane: the arc must start on it
@@ -152,15 +184,20 @@ export function gateLine(graph: RoadGraph, b: BillboardDesc): CoinPoint[] | null
       for (let phi = step; phi < theta - 0.5 * step; phi += step) phis.push(phi);
       let phase = 0;
       for (const phi of phis.slice(Math.max(0, phis.length - n))) {
-        push(out, { x: cx - rx * HOOK_RADIUS * Math.cos(phi) + tx * HOOK_RADIUS * Math.sin(phi), z: cz - rz * HOOK_RADIUS * Math.cos(phi) + tz * HOOK_RADIUS * Math.sin(phi) }, COIN_HEIGHT, -1, c.value, phase++);
+        const p = { x: cx - rx * HOOK_RADIUS * Math.cos(phi) + tx * HOOK_RADIUS * Math.sin(phi), z: cz - rz * HOOK_RADIUS * Math.cos(phi) + tz * HOOK_RADIUS * Math.sin(phi) };
+        push(out, p, ground(p.x, p.z) + COIN_HEIGHT, -1, c.value, phase++);
       }
-      push(out, { x: b.x, z: b.z }, COIN_HEIGHT, -1, c.cap, phase);
+      push(out, { x: b.x, z: b.z }, ground(b.x, b.z) + COIN_HEIGHT, -1, c.cap, phase);
       return out;
     }
     if (lateral < 8 || lateral > 12 || s < n * c.pitch + 2 || s > len - 4) continue;
     let phase = 0;
-    for (let k = -n; k < 0; k++) push(out, laneAt(lane, s + k * c.pitch, lateral * smooth((k + n) / n)), COIN_HEIGHT, -1, c.value, phase++);
-    push(out, laneAt(lane, s, lateral), COIN_HEIGHT, -1, c.cap, phase);
+    for (let k = -n; k < 0; k++) {
+      const p = laneAt(lane, s + k * c.pitch, lateral * smooth((k + n) / n));
+      push(out, p, ground(p.x, p.z) + COIN_HEIGHT, -1, c.value, phase++);
+    }
+    const cap = laneAt(lane, s, lateral);
+    push(out, cap, ground(cap.x, cap.z) + COIN_HEIGHT, -1, c.cap, phase);
     return out;
   }
   return null;
@@ -188,8 +225,9 @@ export function placeCoins(cx: number, cz: number, layout: readonly CoinPoint[],
  * `TURN_INSET` past the lane's start) and into every turn (ending `TURN_INSET`
  * before its end), a run of `route.straight` every `straightEvery` m of the
  * straight between them, and on the last lane a run before the cap, which
- * sits on `end` (the target). `s0` is where the chain's first lane is joined,
- * `sEnd` where its last lane is left.
+ * sits on `end` (the target) at the height of its lane where it is left.
+ * `s0` is where the chain's first lane is joined, `sEnd` where its last lane
+ * is left. Each coin over its lane's road (the grid's 0, the island's hills).
  */
 export function routeLine(graph: RoadGraph, chain: readonly number[], s0: number, sEnd: number, end: Pt, out: CoinPoint[]): void {
   const c = BALANCE.coin;
@@ -218,7 +256,8 @@ export function routeLine(graph: RoadGraph, chain: readonly number[], s0: number
     for (let s = a + r.straightEvery / 2; s + (r.straight - 1) * pitch <= b; s += r.straightEvery) run(lane, s, r.straight);
     if (exit >= 0 && exit >= Math.max(from, entry >= 0 ? entry + turnSpan + RUN_GAP : from)) run(lane, exit, r.turn);
   }
-  if (chain.length > 0) push(out, end, COIN_HEIGHT, TAG_LANE.route, c.cap, phase);
+  const last = chain[chain.length - 1];
+  if (last !== undefined) push(out, end, COIN_HEIGHT + laneAt(graph.lanes[last] as Lane, sEnd).y, TAG_LANE.route, c.cap, phase);
 }
 
 /**
@@ -240,18 +279,22 @@ export function polyLine(points: readonly Pt[], y: number, out: CoinPoint[]): vo
 }
 
 export class Coins {
-  /** One byte per (chunk, slot), then one per extra coin. */
-  readonly picked = new Uint8Array(EXTRA_COIN_BASE + EXTRA_COINS_MAX);
+  /** One byte per (chunk, slot), then one per extra coin, then per island chunk's (slot). */
+  readonly picked = new Uint8Array(ISLAND_COIN_BASE + ISLAND_COIN_CHUNKS * COINS_PER_CHUNK_MAX);
   pickedCount = 0;
   /** Coins laid at run time, outside the chunks, in their pools' id ranges. */
   readonly extra: CoinDesc[] = [];
   /** Bumps when extra coins are laid or cleared, so the view registers them. */
   extraSerial = 0;
+  /** The island's static lines by chunk index (`layChunk`; the grid's chunks hold their own), and a serial the view reads. */
+  readonly chunks = new Map<number, readonly CoinDesc[]>();
+  chunkSerial = 0;
   /** The running job's route: coins laid and coins taken (the job line and the tip). */
   routeTotal = 0;
   routePicked = 0;
-  /** The spill pool: position, value, seconds left (0 = empty). */
+  /** The spill pool: position, its centre's height (its lane's road's and COIN_HEIGHT), value, seconds left (0 = empty). */
   readonly spillX: Float32Array;
+  readonly spillY: Float32Array;
   readonly spillZ: Float32Array;
   readonly spillValue: Float32Array;
   readonly spillTtl: Float32Array;
@@ -261,12 +304,32 @@ export class Coins {
   private readonly pose: LanePose = { x: 0, z: 0, yaw: 0 };
   private readonly proj: LaneProjection = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };
 
-  constructor(private readonly city: City, private readonly lanes: LaneTables) {
+  /**
+   * `city`: the grid's, whose loaded chunks hold their static coins (null on the island). `ground`: the ground's height
+   * a coin laid without one stands over (the grid's 0; the island's hills, `StreetMap.groundAt`).
+   */
+  constructor(private readonly city: City | null, private readonly lanes: LaneTables, private readonly ground: GroundAt = FLAT) {
     const n = BALANCE.spill.coins;
     this.spillX = new Float32Array(n);
+    this.spillY = new Float32Array(n).fill(COIN_HEIGHT);
     this.spillZ = new Float32Array(n);
     this.spillValue = new Float32Array(n);
     this.spillTtl = new Float32Array(n);
+  }
+
+  /**
+   * An island chunk's static line (M8.10 slice 15: a gate through a billboard, an arc over a ramp), by its index: ids from
+   * `ISLAND_COIN_BASE`, the chunk's `COINS_PER_CHUNK_MAX` at most; laid again, it replaces the chunk's.
+   */
+  layChunk(index: number, points: readonly CoinPoint[]): void {
+    if (index < 0 || index >= ISLAND_COIN_CHUNKS) throw new Error(`coins: island chunk ${index} past ${ISLAND_COIN_CHUNKS}`);
+    const out: CoinDesc[] = [];
+    for (const p of points) {
+      if (out.length >= COINS_PER_CHUNK_MAX) break;
+      out.push({ id: ISLAND_COIN_BASE + index * COINS_PER_CHUNK_MAX + out.length, x: p.x, y: p.y, z: p.z, lane: p.lane, value: p.value, phase: p.phase });
+    }
+    this.chunks.set(index, out);
+    this.chunkSerial++;
   }
 
   /**
@@ -282,24 +345,10 @@ export class Coins {
     const hl = player.halfLength + reach.ahead, hw = player.halfWidth + reach.side;
     const cy = player.y + 0.5;
     let value = 0;
-    for (const entry of this.city.active.values()) {
-      const coins = entry.chunk.coins;
-      if (coins.length === 0) continue;
-      // a chunk is 225 m across: its coins are only worth testing when it is near
-      const first = coins[0] as CoinDesc;
-      if (Math.abs(first.x - player.x) > 250 || Math.abs(first.z - player.z) > 250) continue;
-      for (let i = 0; i < coins.length; i++) {
-        const coin = coins[i] as CoinDesc;
-        if (this.picked[coin.id] === 1) continue;
-        const dx = coin.x - player.x, dz = coin.z - player.z;
-        if (Math.abs(dx) > 8 || Math.abs(dz) > 8 || Math.abs(coin.y - cy) > reach.up) continue;
-        if (Math.abs(dx * fx + dz * fz) > hl || Math.abs(dx * rx + dz * rz) > hw) continue;
-        this.picked[coin.id] = 1;
-        this.pickedCount++;
-        value += coin.value;
-        events.push('coin', coin.value, coin.x, coin.y, coin.z, coin.id);
-      }
-    }
+    // a grid chunk is 225 m across: its coins are only worth testing when its first is within 250 m; an island chunk's
+    // 250 m, its list within its diagonal and a car's reach
+    if (this.city) for (const entry of this.city.active.values()) value += this.pickChunk(entry.chunk.coins, 250, player, fx, fz, rx, rz, hl, hw, cy, events);
+    if (this.chunks.size > 0) for (const coins of this.chunks.values()) value += this.pickChunk(coins, 370, player, fx, fz, rx, rz, hl, hw, cy, events);
     const extra = this.extra;
     const routeLo = EXTRA_COIN_BASE + EXTRA_RANGES.route[0];
     for (let i = 0; i < extra.length; i++) {
@@ -323,7 +372,7 @@ export class Coins {
         this.spillTtl[k] = 0;
         this.spillSerial++;
         value += v;
-        events.push('coin', v, this.spillX[k] as number, COIN_HEIGHT, this.spillZ[k] as number, -2);
+        events.push('coin', v, this.spillX[k] as number, this.spillY[k] as number, this.spillZ[k] as number, -2);
         continue;
       }
       const left = ttl - dt;
@@ -333,22 +382,57 @@ export class Coins {
     return value;
   }
 
+  /** A chunk's static coins in the reach box (`step`'s), picked, when its first is within `near` m; the value picked. */
+  private pickChunk(coins: readonly CoinDesc[], near: number, player: PlayerProbe, fx: number, fz: number, rx: number, rz: number, hl: number, hw: number, cy: number, events: EventLog): number {
+    if (coins.length === 0) return 0;
+    const first = coins[0] as CoinDesc;
+    if (Math.abs(first.x - player.x) > near || Math.abs(first.z - player.z) > near) return 0;
+    const up = BALANCE.coin.reach.up;
+    let value = 0;
+    for (let i = 0; i < coins.length; i++) {
+      const coin = coins[i] as CoinDesc;
+      if (this.picked[coin.id] === 1) continue;
+      const dx = coin.x - player.x, dz = coin.z - player.z;
+      if (Math.abs(dx) > 8 || Math.abs(dz) > 8 || Math.abs(coin.y - cy) > up) continue;
+      if (Math.abs(dx * fx + dz * fz) > hl || Math.abs(dx * rx + dz * rz) > hw) continue;
+      this.picked[coin.id] = 1;
+      this.pickedCount++;
+      value += coin.value;
+      events.push('coin', coin.value, coin.x, coin.y, coin.z, coin.id);
+    }
+    return value;
+  }
+
   /**
    * Lay `total` over the spill pool on the lane that runs the way the wreck
    * faced: from `startAhead` m past the wreck at `pitch`, each coin an equal
    * share (the remainder on the first ones), for `seconds`. The rolling
-   * respawn comes out on that lane, so it drives through them.
+   * respawn comes out on that lane, so it drives through them. With the
+   * wreck's height given (`y`), a lane at another level (a deck over it, the
+   * street under it) is not its; each coin over its lane's road, or over the
+   * ground with no lane near.
    */
-  spill(x: number, z: number, yaw: number, total: number, events: EventLog): void {
+  spill(x: number, z: number, yaw: number, total: number, events: EventLog, y = Number.NaN): void {
     const sp = BALANCE.spill;
     const lanes = this.lanes;
+    const level = Number.isFinite(y);
     let lane = -1, best = Infinity, bestS = 0;
     for (let i = 0; i < lanes.laneCount; i++) {
       if (Math.hypot((lanes.midX[i] as number) - x, (lanes.midZ[i] as number) - z) > (lanes.length[i] as number) / 2 + 30) continue;
       lanes.project(i, x, z, this.proj);
       // near and facing the way the car did: the other carriageway's lane runs backwards
-      const cost = this.proj.dist + (1 - Math.cos(this.proj.yaw - yaw)) * 20;
+      let cost = this.proj.dist + (1 - Math.cos(this.proj.yaw - yaw)) * 20;
+      if (level) {
+        lanes.positionAt(i, this.proj.s, 0, this.pose);
+        if (Math.abs((this.pose.y ?? 0) - y) > OTHER_LEVEL) cost += 1000;
+      }
       if (cost < best) { best = cost; lane = i; bestS = this.proj.s; }
+    }
+    // the burst leaves the wreck from its road (its lane's there, or the ground's)
+    let road = this.ground(x, z);
+    if (lane >= 0) {
+      lanes.positionAt(lane, bestS, 0, this.pose);
+      road = this.pose.y ?? 0;
     }
     const n = this.spillTtl.length;
     const base = Math.floor(total / n);
@@ -356,6 +440,7 @@ export class Coins {
     for (let k = 0; k < n; k++) {
       let px = x + Math.sin(yaw) * (sp.startAhead + k * sp.pitch);
       let pz = z + Math.cos(yaw) * (sp.startAhead + k * sp.pitch);
+      let py = this.ground(px, pz);
       if (lane >= 0) {
         const s = bestS + sp.startAhead + k * sp.pitch;
         const outs = lanes.outs(lane);
@@ -364,18 +449,23 @@ export class Coins {
         lanes.positionAt(lane, s, 0, this.pose, next >= 0 ? next : (outs[0] ?? -1));
         px = this.pose.x;
         pz = this.pose.z;
+        py = this.pose.y ?? 0;
       }
       this.spillX[k] = px;
+      this.spillY[k] = py + COIN_HEIGHT;
       this.spillZ[k] = pz;
       this.spillValue[k] = base + (rest > 0 ? 1 : 0);
       if (rest > 0) rest--;
       this.spillTtl[k] = sp.seconds;
     }
     this.spillSerial++;
-    events.push('spill', total, x, 0.5, z, -1);
+    events.push('spill', total, x, road + 0.5, z, -1);
   }
 
-  /** Lays coins into a pool (beyond its room they are dropped); returns how many were laid. The id of the k-th coin laid is `extraId(tag, k)`. */
+  /**
+   * Lays coins into a pool (beyond its room they are dropped); returns how many were laid. The id of the k-th coin laid
+   * is `extraId(tag, k)`. A point without its height stands `COIN_HEIGHT` over the ground there.
+   */
   addExtra(points: ReadonlyArray<Pt & { y?: number; value?: number; phase?: number }>, tag: ExtraTag = 'rings'): number {
     const [lo, hi] = EXTRA_RANGES[tag];
     let n = 0;
@@ -385,7 +475,7 @@ export class Coins {
       this.extraNext[tag]++;
       const id = EXTRA_COIN_BASE + slot;
       this.picked[id] = 0;
-      this.extra.push({ id, x: p.x, y: p.y ?? COIN_HEIGHT, z: p.z, lane: TAG_LANE[tag], value: p.value ?? BALANCE.coin.value, phase: p.phase ?? n });
+      this.extra.push({ id, x: p.x, y: p.y ?? this.ground(p.x, p.z) + COIN_HEIGHT, z: p.z, lane: TAG_LANE[tag], value: p.value ?? BALANCE.coin.value, phase: p.phase ?? n });
       n++;
     }
     if (tag === 'route') this.routeTotal += n;

@@ -17,6 +17,7 @@ import { Island, PLUMB_TILT } from './island/Island';
 import { islandStreets } from './island/streetMap';
 import { islandCover } from './island/cover';
 import { Services } from './island/services';
+import { islandSeaTrial, slipwayHead } from './island/slipways';
 import { coverSites, type CoverSites } from './city/cover';
 import { Roadblocks } from './police/Roadblocks';
 import { Cameras } from './city/cameras';
@@ -306,7 +307,9 @@ export class SimWorld {
     this.peds = streets && this.traffic ? new Pedestrians(this.transforms, streets, this.traffic.lanes, opts.seed ?? 42, PEDS, this.pedsDensity) : null;
     // the grid's from its chunks, the island's fifty from the start (M8.10 slice 15)
     this.collectibles = this.city ? new Collectibles(this.city) : this.island ? new Collectibles(null, this.island.billboards) : null;
-    this.coins = this.city && this.traffic ? new Coins(this.city, this.traffic.lanes) : null;
+    // the coins on the grid's streets or the island's (M8.10 slice 15), each over its road
+    const map = this.traffic?.streets;
+    this.coins = this.traffic && map ? new Coins(this.city, this.traffic.lanes, (x, z) => map.groundAt(x, z)) : null;
     this.life = new Life(this, opts.damage ?? this.city !== null);
     this.heat = new Heat(this.events, this.traffic);
     this.heat.set(opts.heat ?? 0);
@@ -332,6 +335,9 @@ export class SimWorld {
     this.jobs = new Jobs(this, this.city && this.traffic ? jobsFor(this.city, opts.seed ?? 42, this.traffic.lanes) : []);
     // the sea trial (M8.8 slice 20), after the generator's, before the way learns the rings
     if (this.city && this.traffic) this.jobs.add(seaTrial());
+    // the island's, from the marina's slipway round the bay and the lighthouse to the beach's (M8.10 slice 15)
+    const islandTrial = this.island && this.traffic ? islandSeaTrial(this.island.slipways) : null;
+    if (islandTrial) this.jobs.add(islandTrial);
     this.fares = new Fares(this, this.events);
     this.skill = new Skill(this);
     this.stash = new Stash(this);
@@ -363,6 +369,24 @@ export class SimWorld {
       const city = this.city;
       city.setPropKeepOut(rings, () => {
         const loop = city.spawns.find((s) => s.name === 'loop'), hideout = this.run.dropOffs[0];
+        const route = loop && hideout ? coldOpenRoute(this, loop.position.x, loop.position.z, hideout) : null;
+        return route ? { samples: route.samples, spots: coldOpenSpots(route) } : { samples: [], spots: [] };
+      }, this.jobs.defs.filter((d) => d.kind === 'mayhem').map((d) => ({ x: d.x, z: d.z })));
+    }
+    if (this.island) {
+      // the island's (M8.10 slice 15), as the grid's: every job's ring and its end, the hidden cars, the breakers, the
+      // slipways' heads; the cold open's route with the things it drives through; the mayhem zones' markets
+      const r = BALANCE.jobs.markerRadius;
+      const rings: PropRing[] = [];
+      for (const d of this.jobs.defs) {
+        rings.push({ x: d.x, z: d.z, r: d.kind === 'duel' ? BALANCE.board.ringRadius : r });
+        rings.push({ x: d.targetX, z: d.targetZ, r });
+      }
+      for (const spot of Object.values(this.stash.spots)) rings.push({ x: spot.x, z: spot.z, r: PARKED_CAR_RING });
+      for (const b of this.breakers?.descs ?? []) rings.push({ x: b.x, z: b.z, r: Math.hypot(BREAKER.halfWidth, BREAKER.halfDepth) + BREAKER.clear });
+      for (const s of this.island.slipways) rings.push({ ...slipwayHead(s), r: SLIPWAY.clear });
+      this.island.setPropKeepOut(rings, () => {
+        const loop = this.spawns.find((s) => s.name === 'loop'), hideout = this.run.dropOffs[0];
         const route = loop && hideout ? coldOpenRoute(this, loop.position.x, loop.position.z, hideout) : null;
         return route ? { samples: route.samples, spots: coldOpenSpots(route) } : { samples: [], spots: [] };
       }, this.jobs.defs.filter((d) => d.kind === 'mayhem').map((d) => ({ x: d.x, z: d.z })));
@@ -491,8 +515,8 @@ export class SimWorld {
     // before the run: a delivery into a garage pays the bag before the door can drop the job
     this.breakers?.step(this.probe, FIXED_DT);
     this.skill.step(FIXED_DT);
-    // (the island's hidden cars and finds stand at their places from slice 15; till then none)
-    if (this.traffic && this.city) this.stash.step(this.probe);
+    // the hidden cars and the fleet's finds at their places, the grid's or the island's (M8.10 slice 15)
+    if (this.traffic) this.stash.step(this.probe);
     this.donuts?.step(this.probe);
     this.fares.step(this.probe, FIXED_DT);
     if (this.controls.horn) {

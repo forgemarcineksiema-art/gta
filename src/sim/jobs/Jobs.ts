@@ -47,7 +47,6 @@ import { AgentState, type PlayerProbe } from '../traffic/Traffic';
 import type { BodyId } from '../traffic/bodies';
 import { trialMedal, unpackDescriptor, type JobDef } from './catalog';
 import { Race } from './Race';
-import { pointTarget } from './place';
 
 export type { JobDef, JobKind } from './catalog';
 
@@ -506,7 +505,7 @@ export class Jobs {
     const hunted = rival.format === 'hunt' ? (this.race.rivals[0] as number) : -1;
     if (hunted >= 0 && traffic && traffic.state[hunted] === AgentState.Wrecked) {
       const x = traffic.x[hunted] as number, z = traffic.z[hunted] as number;
-      this.sim.coins?.spill(x, z, traffic.yaw[hunted] as number, BALANCE.board.hunt.burst, this.sim.events);
+      this.sim.coins?.spill(x, z, traffic.yaw[hunted] as number, BALANCE.board.hunt.burst, this.sim.events, traffic.y[hunted]);
       this.lastPlace = 1;
       this.winDuel(d, probe);
       return;
@@ -545,21 +544,26 @@ export class Jobs {
 
   /**
    * The route's coins: the lane chain from a point to the target, laid whole
-   * into the coins' route pool (D3), the cap on the target.
+   * into the coins' route pool (D3), the cap on the target; on the grid's
+   * streets or the island's (M8.10 slice 15), each coin over its road.
    */
   private layRoute(x: number, z: number, targetX: number, targetZ: number): void {
     const coins = this.sim.coins;
-    const city = this.sim.city;
-    if (!coins || !city) return;
+    const streets = this.sim.traffic?.streets;
+    if (!coins || !streets) return;
     coins.clearExtra('route');
-    const target = pointTarget(city, targetX, targetZ);
+    const graph = streets.graph;
+    // the target's lane: the nearest (on the island the street at its ground's height, never a deck over it)
+    const end = streets.nearestLane(targetX, targetZ, this.sim.island ? streets.groundAt(targetX, targetZ) : undefined);
     // the marker stands on the ground: its lane is the street's, never an overpass above it
-    const start = city.nearestLane(x, z, 0);
-    const s0 = alongLane(city.graph.lanes[start] as Lane, x, z).s;
-    const chain = start === target.lane && target.s >= s0 ? [start] : laneChain(city.graph, start, target.lane);
+    const start = streets.nearestLane(x, z, streets.groundAt(x, z));
+    if (start < 0 || end < 0) return;
+    const s0 = alongLane(graph.lanes[start] as Lane, x, z).s;
+    const sEnd = alongLane(graph.lanes[end] as Lane, targetX, targetZ).s;
+    const chain = start === end && sEnd >= s0 ? [start] : laneChain(graph, start, end);
     if (chain.length === 0) return;
     this.routePoints.length = 0;
-    routeLine(city.graph, chain, s0, target.s, { x: targetX, z: targetZ }, this.routePoints);
+    routeLine(graph, chain, s0, sEnd, { x: targetX, z: targetZ }, this.routePoints);
     coins.addExtra(this.routePoints, 'route');
     this.routePoints.length = 0;
   }

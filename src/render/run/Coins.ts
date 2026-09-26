@@ -1,7 +1,8 @@
 /**
  * Coins (docs/STYLE.md, the run HUD, coins and ramps): one instanced mesh of
  * upright gold octagonal prisms over the chunks the city view has claimed
- * (the cap a line ends on half as big again), a second of bigger carWhite
+ * and the island's lines (the cap a line ends on half as big again; each
+ * where the sim laid it, over its road), a second of bigger carWhite
  * ones for the spill pool. They spin in the vertex shader from one time
  * uniform and a per-instance phase, so a line ripples away from the player
  * and a spinning coin costs no matrix upload. Picked coins leave the packed
@@ -12,7 +13,7 @@
 import * as THREE from 'three';
 import { BALANCE } from '../../sim/balance';
 import { PALETTE, type SimEvent, type SimWorld } from '../../sim';
-import { COIN_HEIGHT, EXTRA_COIN_BASE, type CoinDesc, type Coins as SimCoins } from '../../sim/city/coins';
+import { COIN_HEIGHT, isExtraCoin, type CoinDesc, type Coins as SimCoins } from '../../sim/city/coins';
 
 const CAPACITY = 4096;
 const SPIN = 3.5;
@@ -32,13 +33,16 @@ export const BURST_STAGGER = 0.02;
 export const BURST_FLIGHT = 0.28;
 export const BURST_ARC = 2.2;
 
-/** Where the `k`-th spilled coin is `elapsed` s into the burst, from the wreck (ox, oz) to its place (sx, sz). */
-export function burstPoint(ox: number, oz: number, sx: number, sz: number, k: number, elapsed: number, out: { x: number; y: number; z: number }): { x: number; y: number; z: number } {
+/**
+ * Where the `k`-th spilled coin is `elapsed` s into the burst, from the wreck (ox, oz) to its place (sx, sz); from the
+ * wreck's road's height `oy` to its place's `sy` (the grid's 0, the island's hills: M8.10 slice 15).
+ */
+export function burstPoint(ox: number, oz: number, sx: number, sz: number, k: number, elapsed: number, out: { x: number; y: number; z: number }, oy = 0, sy = oy): { x: number; y: number; z: number } {
   const u = Math.max(0, Math.min(1, (elapsed - k * BURST_STAGGER) / BURST_FLIGHT));
   const e = 1 - (1 - u) * (1 - u);
   out.x = ox + (sx - ox) * e;
   out.z = oz + (sz - oz) * e;
-  out.y = COIN_HEIGHT + BURST_ARC * 4 * u * (1 - u);
+  out.y = COIN_HEIGHT + oy + (sy - oy) * e + BURST_ARC * 4 * u * (1 - u);
   return out;
 }
 
@@ -97,6 +101,8 @@ export class Coins {
   private pickedSeen = 0;
   private spillSerial = -1;
   private extraSerial = 0;
+  /** The island's static lines seen (M8.10 slice 15: `Coins.chunks`, laid a chunk at a time). */
+  private chunkSerial = 0;
   private eventSeq = 0;
   private readonly onEvent = (e: SimEvent): void => this.handleEvent(e);
   private readonly m = new THREE.Matrix4();
@@ -104,9 +110,10 @@ export class Coins {
   private readonly q = new THREE.Quaternion();
   private readonly s = new THREE.Vector3(1, 1, 1);
   private readonly target = new THREE.Vector3();
-  /** The spill's burst: seconds into it (-1 none) and the wreck it flies out of. */
+  /** The spill's burst: seconds into it (-1 none) and the wreck it flies out of (its road's height). */
   private burst = -1;
   private burstX = 0;
+  private burstY = 0;
   private burstZ = 0;
   private readonly bp = { x: 0, y: 0, z: 0 };
 
@@ -178,6 +185,11 @@ export class Coins {
       this.extraSerial = coins.extraSerial;
       this.replaceExtra(coins, sim);
     }
+    // the island's static lines as they are laid (the grid's come with the city view's chunks)
+    if (coins.chunkSerial !== this.chunkSerial) {
+      this.chunkSerial = coins.chunkSerial;
+      for (const list of coins.chunks.values()) this.add(list, sim);
+    }
     if (coins.pickedCount !== this.pickedSeen) {
       this.pickedSeen = coins.pickedCount;
       this.removePicked(coins);
@@ -195,10 +207,10 @@ export class Coins {
       for (let k = 0; k < coins.spillTtl.length; k++) {
         if ((coins.spillTtl[k] as number) <= 0) continue;
         if (flying) {
-          const b = burstPoint(this.burstX, this.burstZ, coins.spillX[k] as number, coins.spillZ[k] as number, k, this.burst, this.bp);
+          const b = burstPoint(this.burstX, this.burstZ, coins.spillX[k] as number, coins.spillZ[k] as number, k, this.burst, this.bp, this.burstY, (coins.spillY[k] as number) - COIN_HEIGHT);
           this.p.set(b.x, b.y, b.z);
         } else {
-          this.p.set(coins.spillX[k] as number, COIN_HEIGHT, coins.spillZ[k]);
+          this.p.set(coins.spillX[k] as number, coins.spillY[k] as number, coins.spillZ[k]);
         }
         this.spill.setMatrixAt(n++, this.m.compose(this.p, this.q, this.s));
       }
@@ -225,6 +237,8 @@ export class Coins {
     if (e.kind === 'spill') {
       this.burst = 0;
       this.burstX = e.x;
+      // the event's height is half a metre over the wreck's road
+      this.burstY = e.y - 0.5;
       this.burstZ = e.z;
       return;
     }
@@ -274,7 +288,7 @@ export class Coins {
   /** The run-time coins changed (laid or cleared): drop every extra slot and register the current ones. */
   private replaceExtra(coins: SimCoins, sim: SimWorld): void {
     this.removeWhere(coins, true);
-    for (const id of this.known) if (id >= EXTRA_COIN_BASE) this.known.delete(id);
+    for (const id of this.known) if (isExtraCoin(id)) this.known.delete(id);
     this.add(coins.extra, sim);
   }
 
@@ -288,7 +302,7 @@ export class Coins {
     let changed = false;
     for (let slot = 0; slot < this.count; slot++) {
       const c = this.slotCoin[slot] as CoinDesc;
-      if (extra ? c.id < EXTRA_COIN_BASE : coins.picked[c.id] !== 1) continue;
+      if (extra ? !isExtraCoin(c.id) : coins.picked[c.id] !== 1) continue;
       const last = this.count - 1;
       const moved = this.slotCoin[last] as CoinDesc;
       this.slotOf.delete(c.id);

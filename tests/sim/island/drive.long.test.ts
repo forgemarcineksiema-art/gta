@@ -62,18 +62,27 @@ describe('M8.10: the island\'s long drives', () => {
       const s = island.structures.find((q) => q.kind === kind);
       const first = s?.pieces[0], last = s?.pieces[(s?.pieces.length ?? 1) - 1];
       if (!first || !last) throw new Error(kind);
-      // from 60 m before the deck, heading along it
-      const x0 = first.x - Math.sin(first.yaw) * 60, z0 = first.z - Math.cos(first.yaw) * 60;
-      island.sync(x0, z0, true);
-      sim.vehicle.teleport({ x: x0, y: island.heightAt(x0, z0) + 0.8, z: z0 }, first.yaw);
+      // on the highway's own line 60 m before the deck, heading along it (a point straight back off a bend is in the sea)
+      const line = (island.network.lines[0] as { pts: Array<{ x: number; y?: number; z: number }> }).pts, n = line.length;
+      const at = (k: number): { x: number; y?: number; z: number } => line[((k % n) + n) % n] as { x: number; y?: number; z: number };
+      let k0 = 0, best = Infinity;
+      line.forEach((q, k) => { const d = Math.hypot(q.x - first.x, q.z - first.z); if (d < best) { best = d; k0 = k; } });
+      for (let back = 0; back < 60; k0--) back += Math.hypot(at(k0).x - at(k0 - 1).x, at(k0).z - at(k0 - 1).z);
+      const start = at(k0), next = at(k0 + 1);
+      island.sync(start.x, start.z, true);
+      sim.vehicle.teleport({ x: start.x, y: (start.y ?? island.heightAt(start.x, start.z)) + 1, z: start.z }, Math.atan2(next.x - start.x, next.z - start.z));
       for (let i = 0; i < 30; i++) { clearControls(sim.controls); sim.controls.brake = 1; sim.step(); }
       let lowest = Infinity, grounded = 0, steps = 0;
       for (let i = 0; i < 60 * 25; i++) {
         const p = sim.vehicle.body.translation();
-        // steer for the deck's far end
+        // steer along the highway's line: for its point 25 m on from the nearest
         const q = sim.vehicle.body.rotation();
         const yaw = Math.atan2(2 * (q.w * q.y + q.x * q.z), 1 - 2 * (q.y * q.y + q.x * q.x));
-        let err = Math.atan2(last.x - p.x, last.z - p.z) - yaw;
+        let near = 0, nd = Infinity;
+        for (let k = 0; k < n; k++) { const d = Math.hypot(at(k).x - p.x, at(k).z - p.z); if (d < nd) { nd = d; near = k; } }
+        let ahead = near;
+        for (let run = 0; run < 25; ahead++) run += Math.hypot(at(ahead + 1).x - at(ahead).x, at(ahead + 1).z - at(ahead).z);
+        let err = Math.atan2(at(ahead).x - p.x, at(ahead).z - p.z) - yaw;
         err = Math.atan2(Math.sin(err), Math.cos(err));
         clearControls(sim.controls);
         sim.controls.steer = Math.max(-1, Math.min(1, -err * 2.5));

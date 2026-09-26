@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { initPhysics } from '../../../src/sim';
 import { CHUNK, CHUNKS_X, CHUNK_X0, CHUNK_Z0, Island, PLUMB_TILT } from '../../../src/sim/island/Island';
 import { HALF_WIDTH } from '../../../src/sim/island/ground';
-import { KERB, PAINT_LIFT, ROAD_LIFT, heightOn, onStrip, type Strip } from '../../../src/sim/island/surfaces';
+import { KERB, PAINT_LIFT, PAVEMENT, ROAD_LIFT, heightOn, onStrip, type Strip } from '../../../src/sim/island/surfaces';
 import { GroundView } from '../../../src/render/island/GroundView';
 
 describe('M8.10 slice 6b: the roads\' surfaces', () => {
@@ -143,5 +143,28 @@ describe('M8.10 slice 6b: the roads\' surfaces', () => {
       expect(Math.abs((down(p.x, p.y + 5, p.z) ?? -99) - p.y), `a kerb at ${p.x.toFixed(0)}, ${p.z.toFixed(0)}`).toBeLessThan(0.03);
     }
     expect(KERB).toBe(0.14);
+  });
+
+  it('6.6 a foot\'s height read from the kerbs\' cells is every kerb piece\'s: on the pavements, across their edges, off them', () => {
+    const all = [...island.surfaces.kerbs.values()].flat();
+    // every piece's highest top at a point, the slow way
+    const slow = (x: number, z: number): number => {
+      let top = -Infinity;
+      for (const p of all) {
+        const dx = x - p.x, dz = z - p.z, s = Math.sin(p.yaw), c = Math.cos(p.yaw), along = dx * s + dz * c, across = dx * c - dz * s;
+        if (Math.abs(across) <= PAVEMENT / 2 && Math.abs(along) <= p.length / 2 + 0.2) top = Math.max(top, p.y + Math.tan(p.pitch) * along);
+      }
+      return Number.isFinite(top) ? top : island.ground.surfaceHeight(x, z);
+    };
+    let checked = 0;
+    for (let k = 0; k < all.length; k += Math.max(1, Math.floor(all.length / 400))) {
+      const p = all[k] as (typeof all)[number], s = Math.sin(p.yaw), c = Math.cos(p.yaw);
+      for (const [along, across] of [[0, 0], [p.length / 2, PAVEMENT / 2 - 0.05], [-p.length / 2 - 0.1, -PAVEMENT / 2 + 0.05], [0, PAVEMENT / 2 + 0.3], [p.length / 3, -PAVEMENT]] as const) {
+        const x = p.x + s * along + c * across, z = p.z + c * along - s * across;
+        expect(island.standAt(x, z), `at ${x.toFixed(1)}, ${z.toFixed(1)}`).toBeCloseTo(slow(x, z), 4);
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(1500);
   });
 });

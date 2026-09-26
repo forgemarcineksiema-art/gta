@@ -49,6 +49,8 @@ const WALL = { height: 4, half: 0.5, piece: 24, shallows: 6 } as const;
  * down (measured: most such rays pass through), and a lean this small moves nothing.
  */
 export const PLUMB_TILT = 1e-4;
+/** The side of a cell the pavements' kerb slabs are listed by (m): a pavement's width and a little. */
+const KERB_CELL = 8;
 /** The heights of the chunks round the physics ring are worked out ahead, this many columns a step (126 heights each). */
 export const PREFETCH_COLUMNS = 4;
 /** The props' random stream's seed (the grid's world seed's role). */
@@ -100,6 +102,11 @@ export class Island {
   private readonly junctionReaches = new Map<object, number>();
   private readonly probeScratch: GroundProbe = { h: 0, steep: 0, steepKind: -1, road: Infinity, surface: GRASS };
   private readonly garageFrame = { along: 0, across: 0 };
+  /** The pavements' kerb slabs by cell (`indexKerbs`), made the first time a height is read on them. */
+  private kerbCells: {
+    cols: number; rows: number; start: Int32Array; items: Int32Array;
+    x: Float32Array; y: Float32Array; z: Float32Array; sin: Float32Array; cos: Float32Array; tan: Float32Array; half: Float32Array;
+  } | null = null;
   loaded = 0;
   unloaded = 0;
   /** Chunks whose heights were worked out when the ring needed them, not ahead (the start's ring, or a prefetch late). */
@@ -178,17 +185,54 @@ export class Island {
 
   /** Where a prop stands: on its pavement (the top of the kerb's slab the wheels ride there) or on the ground past it. */
   standAt(x: number, z: number): number {
-    const [i, j] = Island.chunkOf(x, z);
+    const k = this.kerbCells ??= this.indexKerbs();
+    const ci = Math.floor((x - BOUNDS.x0) / KERB_CELL), cj = Math.floor((z - BOUNDS.z0) / KERB_CELL);
     // where two pieces overlap (a bend's outer side), the higher: what a wheel or a ray meets first
     let top = -Infinity;
-    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
-      for (const p of this.surfaces.kerbs.get(Island.chunkIndex(i + di, j + dj)) ?? []) {
-        const dx = x - p.x, dz = z - p.z, s = Math.sin(p.yaw), c = Math.cos(p.yaw);
-        const along = dx * s + dz * c, across = dx * c - dz * s;
-        if (Math.abs(across) <= PAVEMENT / 2 && Math.abs(along) <= p.length / 2 + 0.2) top = Math.max(top, p.y + Math.tan(p.pitch) * along);
+    if (ci >= 0 && ci < k.cols && cj >= 0 && cj < k.rows) {
+      const cell = cj * k.cols + ci;
+      for (let n = k.start[cell] as number, end = k.start[cell + 1] as number; n < end; n++) {
+        const q = k.items[n] as number, dx = x - (k.x[q] as number), dz = z - (k.z[q] as number);
+        const s = k.sin[q] as number, c = k.cos[q] as number, along = dx * s + dz * c, across = dx * c - dz * s;
+        if (Math.abs(across) <= PAVEMENT / 2 && Math.abs(along) <= (k.half[q] as number)) top = Math.max(top, (k.y[q] as number) + (k.tan[q] as number) * along);
       }
     }
     return Number.isFinite(top) ? top : this.ground.surfaceHeight(x, z);
+  }
+
+  /**
+   * The pavements' kerb slabs by `KERB_CELL` m cell, each listed in every cell its footprint reaches: a foot's or a
+   * prop's height reads the few pieces round it, not every piece of nine chunks (a walker's every step, slice 13).
+   */
+  private indexKerbs(): NonNullable<Island['kerbCells']> {
+    const pieces: Piece[] = [];
+    for (const list of this.surfaces.kerbs.values()) pieces.push(...list);
+    const n = pieces.length, cols = Math.ceil((BOUNDS.x1 - BOUNDS.x0) / KERB_CELL), rows = Math.ceil((BOUNDS.z1 - BOUNDS.z0) / KERB_CELL);
+    const k = {
+      cols, rows, start: new Int32Array(cols * rows + 1), items: new Int32Array(0),
+      x: new Float32Array(n), y: new Float32Array(n), z: new Float32Array(n), sin: new Float32Array(n), cos: new Float32Array(n), tan: new Float32Array(n), half: new Float32Array(n),
+    };
+    // each piece's cells: its footprint's bounds, the pavement's half width across, its half length (and a hand) along
+    const cells: Array<[number, number, number, number]> = pieces.map((p, q) => {
+      const s = Math.sin(p.yaw), c = Math.cos(p.yaw), half = p.length / 2 + 0.2, w = PAVEMENT / 2;
+      k.x[q] = p.x; k.y[q] = p.y; k.z[q] = p.z; k.sin[q] = s; k.cos[q] = c; k.tan[q] = Math.tan(p.pitch); k.half[q] = half;
+      const ex = Math.abs(s) * half + Math.abs(c) * w, ez = Math.abs(c) * half + Math.abs(s) * w;
+      const i0 = Math.max(0, Math.floor((p.x - ex - BOUNDS.x0) / KERB_CELL)), i1 = Math.min(cols - 1, Math.floor((p.x + ex - BOUNDS.x0) / KERB_CELL));
+      const j0 = Math.max(0, Math.floor((p.z - ez - BOUNDS.z0) / KERB_CELL)), j1 = Math.min(rows - 1, Math.floor((p.z + ez - BOUNDS.z0) / KERB_CELL));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) k.start[j * cols + i + 1] = (k.start[j * cols + i + 1] as number) + 1;
+      return [i0, i1, j0, j1];
+    });
+    for (let c = 0; c < cols * rows; c++) k.start[c + 1] = (k.start[c + 1] as number) + (k.start[c] as number);
+    k.items = new Int32Array(k.start[cols * rows] as number);
+    const fill = k.start.slice(0, cols * rows);
+    cells.forEach(([i0, i1, j0, j1], q) => {
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const cell = j * cols + i;
+        k.items[fill[cell] as number] = q;
+        fill[cell] = (fill[cell] as number) + 1;
+      }
+    });
+    return k;
   }
 
   /**

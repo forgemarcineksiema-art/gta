@@ -1,5 +1,5 @@
 /**
- * The street set (M8 slice 3, docs/M8_PLAN.md §4): a broken hydrant's water pushes a car with its real thrust, never
+ * The street set (M8 slice 3, docs/history/M8_PLAN.md §4): a broken hydrant's water pushes a car with its real thrust, never
  * flings it; a bus shelter and a newsstand hold at 20 km/h and go at 40 with the rule's loss. (The terraces' places,
  * pin 3.1, are with the island's placement pins in street.long.test.ts.)
  */

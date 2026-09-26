@@ -1,5 +1,5 @@
 /**
- * The garage on the wall of every drop-off (docs/M5_PLAN.md slice 4, D8,
+ * The garage on the wall of every drop-off (docs/history/M5_PLAN.md slice 4, D8,
  * D13; M6 slice 0, DESIGN.md §14.6): the cars the player owns as bodies (the
  * catalogue's five, any civilian body brought home and kept, the hidden cars
  * found), the paint per car, three upgrade stats in three tiers per class (a

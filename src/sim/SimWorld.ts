@@ -110,7 +110,7 @@ export interface SimWorldOptions {
   /** Initial heat points for pursuit probes. Normal play starts quiet. */
   heat?: number;
   /**
-   * The player's save (docs/M5_PLAN.md slice 0), applied once every subsystem exists: the garage car, its
+   * The player's save (docs/history/M5_PLAN.md slice 0), applied once every subsystem exists: the garage car, its
    * paint and tiers, the seen flag, the bank, the coins, the billboards, the dailies and the streak. `car`
    * still wins for dev runs.
    */
@@ -340,7 +340,7 @@ export class SimWorld {
     this.cameras = this.cover ? new Cameras(this.cover.cameraSites, this.cover.daily.cameras) : null;
     // the kickers, then the mega-ramp (M8.8 slice 21)
     this.jumps = this.city ? new Jumps(this, [...this.city.jumps, this.city.megaRamp]) : this.island ? new Jumps(this, this.island.jumps) : null;
-    // the generator's sixteen markers (docs/M5_PLAN.md D4); the cold open adds its own as id 0; the island's plan's
+    // the generator's sixteen markers (docs/history/M5_PLAN.md D4); the cold open adds its own as id 0; the island's plan's
     // 28 rings and 11 rivals (M8.10 slice 14)
     const islandDefs = this.island && this.traffic ? (baked && baked.seed === seed ? baked.jobs : islandJobs(this.island, this.traffic.streets, this.traffic.lanes, seed)) : [];
     this.jobs = new Jobs(this, this.city && this.traffic ? jobsFor(this.city, seed, this.traffic.lanes) : islandDefs.slice());

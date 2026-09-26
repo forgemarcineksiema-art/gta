@@ -204,7 +204,7 @@ export class Run {
     return true;
   }
 
-  /** Dailies and the streak pay into the bank, never the bag (docs/M5_PLAN.md D14). */
+  /** Dailies and the streak pay into the bank, never the bag (docs/history/M5_PLAN.md D14). */
   earn(amount: number): void {
     if (amount > 0 && Number.isFinite(amount)) this.bank += amount;
   }
@@ -292,7 +292,7 @@ export class Run {
 
   /**
    * The door's rewarded offer, after the video finished: the bag doubled before the multiplier, so the bank
-   * gains the banked amount again (docs/M5_PLAN.md D10). Once a door; false otherwise.
+   * gains the banked amount again (docs/history/M5_PLAN.md D10). Once a door; false otherwise.
    */
   doubleLastBag(): boolean {
     if (this.state !== 'door' || this.lastDoubled || this.lastBag <= 0) return false;

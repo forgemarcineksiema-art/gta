@@ -164,5 +164,5 @@ walk the player through the city's activities, beaten in a race or a hunt with a
 verbs, each win taking their car and their item; the garage keeps bodies (28 cars to collect); the driver's kit
 (toppers, neon, horns, flame, smoke) travels into every swapped car, the car's kit (wheels, spoilers, stance) stays
 home; three more hidden cars. Why: after the chain there is no goal longer than a run and nothing has a face; the
-brief's customization is paint and one cone. Contract `docs/M6_PLAN.md` (slices 0–11); `docs/M6_PLAN.md` renamed
-`docs/M7_PLAN.md`. Verify green before the edits (338 tests). Next: Marcin's 0.5.5 notes, then M6 on his word.
+brief's customization is paint and one cone. Contract `docs/history/M6_PLAN.md` (slices 0–11); `docs/history/M6_PLAN.md` renamed
+`docs/history/M7_PLAN.md`. Verify green before the edits (338 tests). Next: Marcin's 0.5.5 notes, then M6 on his word.

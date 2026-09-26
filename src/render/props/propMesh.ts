@@ -1,5 +1,5 @@
 /**
- * Each street-furniture kind's low-poly model (M8, docs/M8_PLAN.md §3.1): its parts in the prop's own frame (+Z
+ * Each street-furniture kind's low-poly model (M8, docs/history/M8_PLAN.md §3.1): its parts in the prop's own frame (+Z
  * the face it turns to the road, y up from the ground), boxes and six-sided cylinders in the palette's colours.
  * A standing prop is drawn inside its chunk's mesh from these parts (`propStatics`); a knocked one by its kind's
  * instanced mesh built from the same parts, so both are one model.

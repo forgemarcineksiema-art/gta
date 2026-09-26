@@ -1,5 +1,5 @@
 /**
- * The run (docs/M4_PLAN.md slice 3a): the bag from the event ring, `maxHeat`
+ * The run (docs/history/M4_PLAN.md slice 3a): the bag from the event ring, `maxHeat`
  * by the pursuit, the three garages, the door race, busted and the fine.
  * Police dispatch is off in every world here: the boxes are parked cars, so
  * the timings are exact.

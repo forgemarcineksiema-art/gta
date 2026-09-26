@@ -1,5 +1,5 @@
 /**
- * The three garages checked against their neighbours (docs/M4_PLAN.md 3.0).
+ * The three garages checked against their neighbours (docs/history/M4_PLAN.md 3.0).
  * Long: run by `npm run verify:gate` and `npm run test:long` (CLAUDE.md), moved
  * unchanged from `run.test.ts` in M5.1.
  */

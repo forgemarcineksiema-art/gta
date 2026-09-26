@@ -188,7 +188,7 @@ export class App {
     const date = params.get('date');
     this.fixedDate = date !== null && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null;
     this.datesOn = this.fixedDate !== null || !COLD_OPEN_OFF_PARAMS.some((k) => params.has(k));
-    // the day's three, the streak and today's police before the first step (docs/M5_PLAN.md D3)
+    // the day's three, the streak and today's police before the first step (docs/history/M5_PLAN.md D3)
     if (this.datesOn) sim.dailies.setDate(this.today());
     this.manual = params.get('manual') === '1';
     const quality = params.get('quality');
@@ -213,7 +213,7 @@ export class App {
     const stamp = pause.querySelector('.hud__pause-build');
     if (stamp) pause.insertBefore(this.settingsUi.root, stamp);
     this.applySettings();
-    // the garage on the wall: App is the one caller of Garage and of the rewarded ads (docs/M5_PLAN.md §3.3)
+    // the garage on the wall: App is the one caller of Garage and of the rewarded ads (docs/history/M5_PLAN.md §3.3)
     const actions: GarageActions = {
       buy: (car) => {
         if (this.adShowing) return;
@@ -315,7 +315,7 @@ export class App {
       clearGhost: () => (sim.bestLapPoses = null),
       extra: {
         camera: this.renderer.chase.tuning as unknown as Record<string, number>,
-        // the life numbers (docs/M3_PLAN.md §3.4): live-editable, same objects the sim reads
+        // the life numbers (docs/history/M3_PLAN.md §3.4): live-editable, same objects the sim reads
         traffic: TRAFFIC as unknown as Record<string, number>,
         peds: PEDS as unknown as Record<string, number>,
         economy: ECONOMY as unknown as Record<string, number>,
@@ -593,7 +593,7 @@ export class App {
   }
 
   /**
-   * The ad point of a break (docs/M4_PLAN.md slice 8, CRAZYGAMES.md A1/A3): at the door and at the busted
+   * The ad point of a break (docs/history/M4_PLAN.md slice 8, CRAZYGAMES.md A1/A3): at the door and at the busted
    * card a midgame ad, input blocked from the request until it finishes or fails (the ad events unblock and
    * unmute), the break held open meanwhile. Never at the first door of a session (it ends the cold open),
    * never a request when the platform has no ad to give.
@@ -620,7 +620,7 @@ export class App {
   }
 
   /**
-   * The door shut (docs/M5_PLAN.md D10): at most one ad per door and none at the session's first. With a bag
+   * The door shut (docs/history/M5_PLAN.md D10): at most one ad per door and none at the session's first. With a bag
    * above the threshold and a rewarded ad to give, the wall offers DOUBLE THE BAG beside BANK IT; otherwise
    * the midgame request fires once as the totals appear. The garage car stands behind the door.
    */

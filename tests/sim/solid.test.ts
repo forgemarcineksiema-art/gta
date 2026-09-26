@@ -1,5 +1,5 @@
 /**
- * Solid cars (docs/M8.6_PLAN.md, DESIGN.md §18): a driving car stays on its four wheels under a push, and a shaken car
+ * Solid cars (docs/history/M8.6_PLAN.md, DESIGN.md §18): a driving car stays on its four wheels under a push, and a shaken car
  * drives again only once it is back on them, with nothing left to see of the turn.
  */
 import { describe, expect, it } from 'vitest';

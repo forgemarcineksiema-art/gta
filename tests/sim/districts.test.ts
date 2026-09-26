@@ -1,5 +1,5 @@
 /**
- * Each district's things (M8 slice 4, docs/M8_PLAN.md §3.3): the Works' yards and kerbs, the Gardens' front gardens
+ * Each district's things (M8 slice 4, docs/history/M8_PLAN.md §3.3): the Works' yards and kerbs, the Gardens' front gardens
  * and stalls, the Quay's promenade and stalls, only in their districts; 40–70 things a block (a park's and a yard's
  * may add more); a barrel knocked from the side rolls.
  */

@@ -1,5 +1,5 @@
 /**
- * The signs' pictograms (docs/M8.7_PLAN.md D5; DESIGN.md §20.3 rule 5): one outline per kind, drawn at four sizes
+ * The signs' pictograms (docs/history/M8.7_PLAN.md D5; DESIGN.md §20.3 rule 5): one outline per kind, drawn at four sizes
  * by one source: the sign's face in the world (extruded), the radar's and the full map's glyph, and the goal line's
  * badge. Pure data in a unit square, x right and y down; a shape is an outer polygon and its holes, each a flat
  * list of x, y pairs, filled even-odd. No Three.js, no DOM: the render and the ui both read it.

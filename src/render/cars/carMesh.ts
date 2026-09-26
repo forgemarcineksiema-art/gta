@@ -709,7 +709,7 @@ export function buildCarMesh(t: VehicleTuning, profile: CarProfile, color: numbe
 }
 
 /**
- * The streak's day-7 topper (docs/M5_PLAN.md slice 6): a `carOrange` cone on
+ * The streak's day-7 topper (docs/history/M5_PLAN.md slice 6): a `carOrange` cone on
  * the roof, 20 sides (40 triangles), flat-shaded. The renderer puts it on
  * whichever car the player drives, so it survives a swap.
  */

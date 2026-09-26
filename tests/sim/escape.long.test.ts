@@ -1,5 +1,5 @@
 /**
- * Pursuit escape by the bot policies (docs/M5_PLAN.md slice 3's measurement):
+ * Pursuit escape by the bot policies (docs/history/M5_PLAN.md slice 3's measurement):
  * from each escape marker, the skilled bot (swaps out of sight, turns away
  * while searched, boosts) drives until the job pays, it is busted, or three
  * minutes pass; seeds 42, 7 and 123, traffic on. The police have the player

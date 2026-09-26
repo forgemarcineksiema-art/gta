@@ -1,5 +1,5 @@
 /**
- * Which signs and rings the city shows this frame (docs/M8.7_PLAN.md D5–D6; DESIGN.md §20.3 rules 5–6): the pure
+ * Which signs and rings the city shows this frame (docs/history/M8.7_PLAN.md D5–D6; DESIGN.md §20.3 rules 5–6): the pure
  * choice `MarkerView` draws, pinned in Node.
  *
  * - Between jobs every shown marker has its ring on the road and its sign on a pole over it (a rival's floats over

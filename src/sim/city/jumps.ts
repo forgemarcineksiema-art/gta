@@ -1,5 +1,5 @@
 /**
- * Stunt jumps (docs/M4_PLAN.md slice 6, DESIGN.md §4 and §7): twenty `ramp`
+ * Stunt jumps (docs/history/M4_PLAN.md slice 6, DESIGN.md §4 and §7): twenty `ramp`
  * red kickers on the park strip outside the highway ring, where the edge parks
  * leave a clear lane between their two rows of lots (trees and benches stand
  * 13 m or more off it) and nothing but grass lies for a kilometre: eight on

@@ -1,5 +1,5 @@
 /**
- * The label over the nearest open sign (docs/M8.7_PLAN.md D5; docs/M8.9_PLAN.md R7): anchored in the world, the
+ * The label over the nearest open sign (docs/history/M8.7_PLAN.md D5; docs/M8.9_PLAN.md R7): anchored in the world, the
  * sign's kind in words with its pay in the line's yellow (UCIECZKA +3000), so a pictogram that does not say itself
  * (the police light, the crash star, the hammer) is named where the choice is made. Shown only near a sign (its
  * moment, never a standing place). The app places it from the renderer's projection; DOM writes only on change.

@@ -1,5 +1,5 @@
 /**
- * The street furniture that is down (M8, docs/M8_PLAN.md D5): a flying, lying or arcing prop is drawn by its kind's
+ * The street furniture that is down (M8, docs/history/M8_PLAN.md D5): a flying, lying or arcing prop is drawn by its kind's
  * instanced mesh from the sim's poses (the flying ones between the last step's pose and this one's), while its
  * standing self is collapsed out of its chunk's mesh (CityView). A kind with nothing down is hidden: an instanced
  * mesh with no instances still costs a draw call (the M7 gate, pin G.3). No allocation per frame; a kind's mesh

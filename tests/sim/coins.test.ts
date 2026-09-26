@@ -1,5 +1,5 @@
 /**
- * Coins and the spill (docs/M4_PLAN.md slice 3b, the coin layer redesigned
+ * Coins and the spill (docs/history/M4_PLAN.md slice 3b, the coin layer redesigned
  * 2026-09-23, DESIGN.md §3.5): the layout from the seed as lines (no coin in a
  * static, none doubled, a gate line through every billboard, an arc over
  * every ramp, a cap on every line), a run picked once at 60 km/h, the reach

@@ -1,5 +1,5 @@
 /**
- * The way (docs/M8.7_PLAN.md D1–D2; DESIGN.md §20.3 rules 2–3): the goal the line names, and the route to it.
+ * The way (docs/history/M8.7_PLAN.md D1–D2; DESIGN.md §20.3 rules 2–3): the goal the line names, and the route to it.
  *
  * - The goal is `goalFor`'s, with this as its chooser: where it picks a ring or a door, the pick holds. It is read
  *   again every `repick` s against the road distances of a forward pass from the car's lane, and let go only when

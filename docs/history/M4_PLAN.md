@@ -1,20 +1,20 @@
 # M4 "Heat" — implementation plan
 
-Executor: the agent that worked M4 (slices 0–8 are done; the gate report is `docs/M4_REPORT.md`).
+Executor: the agent that worked M4 (slices 0–8 are done; the gate report is `docs/history/M4_REPORT.md`).
 Reviewer: Claude, at the gate. Director and playtester: Marcin. This
 document is the milestone contract: what to build, in which order, with
 which numbers, and what "done" means; each fixed decision carries its
 reason. First written 2026-09-22 as a slice list; revised the same day after
 the design talk (coins into slice 3, the cold open as slice 4, the disguise
 and the spill added, cover / overpasses / the helicopter moved to update 1,
-§5) and then rewritten at `docs/M3_PLAN.md`'s level against commit
+§5) and then rewritten at `docs/history/M3_PLAN.md`'s level against commit
 `6b52d03`, with slices 0–2 kept as the record of what was measured.
 
 Read, in this order, before touching anything: `CLAUDE.md`, `docs/BRIEF.md`
 (§3 fixed decisions, §4 heat, §6 budgets, §7 ads, §8 verification, §10),
 `docs/DESIGN.md` (§2 the run in full, §3.2 coins, §5, §6.3–6.6, §8, §9,
 §11, §12), `docs/PROGRESS.md` (the three M4 entries and the design-talk
-entries), `docs/M3_REPORT.md`, `docs/ARCHITECTURE.md` (decision records 12–30),
+entries), `docs/history/M3_REPORT.md`, `docs/ARCHITECTURE.md` (decision records 12–30),
 `docs/STYLE.md` (police, the interceptor, the hideout), `docs/CRAZYGAMES.md`
 (sections 3, 10, 11), then this file. Run `npm run verify`; green before the
 first edit (189 tests at `6b52d03`).
@@ -22,7 +22,7 @@ first edit (189 tests at `6b52d03`).
 ## 0. How to work on this milestone
 
 - **Language, cadence, autonomy, scope, honesty, research, perf** as in
-  `docs/M5_PLAN.md` §0: one slice at a time, commit per slice with verify
+  `docs/history/M5_PLAN.md` §0: one slice at a time, commit per slice with verify
   green and the measurement in PROGRESS, decide and note rather than ask,
   never loosen a pin, check installed types, alternate builds before
   calling a perf regression, nothing else rendering during a measured run.
@@ -63,7 +63,7 @@ update 1 (§5).
 | 5 identity | the descriptor; a swap nobody saw loses the police and they box the car left behind, then pull out and withdraw; the disguise with BORROW, the lit bar, COVER BLOWN and the dispatcher's 30 s timer; `novice` and `skilled` bot policies; the road bot no longer resets out of an arrest | skilled at level 2, 120 s: 1 / 1 / 1 escapes by swap, 0 by cooldown, 0 disguises; novice busted 1 / 1 / 0; the in-sight cruiser exploit disguised 114 of 120 s → 30 s with the timer |
 | 6 level 3 | roadblocks at chokepoints ahead and out of view with the sawhorse, the braced car half and the heavy's breach; spike strips (grip, pull, mend); four parked patrols near the player; ten speed cameras with the flash; twenty stunt ramps on the park strip with the slow motion | busted per 5 min at L1 / L2 / L3: novice 0–5 / 2–6 / 1–16, skilled 0–2 / 1–2 / 0–2 (the rule does not fire); jumps 1.1–1.3 s; e2e heat 3: 84 draws, 147k tris |
 | 7 levels 4–5 | heavies (half the roster from level 4, a corner shove) and the Chief (level 5, a leading PIT, kept through the chase, replaced 16 s after a wreck); the heavy and Chief liveries; the siren bed | busted per 5 min at L4 / L5: novice 2–7 / 3–10, skilled 1–7 / 0–3; heat 5 in the browser 57.1 fps, step p95 6.8 ms, 110 draws |
-| 8 ad points, polish, gate | midgame ads at the door (not the first) and the busted card, input blocked, the break held, mute on `adStarted`; the wanted poster on the wall; the heat e2e at levels 1, 3 and 5; the screens at ten sizes | e2e 8.1–8.5; gate numbers in `docs/M4_REPORT.md` |
+| 8 ad points, polish, gate | midgame ads at the door (not the first) and the busted card, input blocked, the break held, mute on `adStarted`; the wanted poster on the wall; the heat e2e at levels 1, 3 and 5; the screens at ten sizes | e2e 8.1–8.5; gate numbers in `docs/history/M4_REPORT.md` |
 
 ### 1.2 In scope (gate-critical, §4 slices 3–8)
 
@@ -95,7 +95,7 @@ dependency; any change to `docs/BRIEF.md`.
 
 ### 1.4 Fixed by the brief and still binding
 
-As `docs/M5_PLAN.md` §1.4, plus: pedestrians can never be hit; police are
+As `docs/history/M5_PLAN.md` §1.4, plus: pedestrians can never be hit; police are
 comic; the takedown slow motion ≤ 1.5 s and skippable; the respawn rolls;
 `R` resets to the nearest road (under pursuit: within line of sight).
 
@@ -997,7 +997,7 @@ the siren bed did not exist and was built here.
 
 Files: `App.ts`, `ui/run.ts`, `audio/EngineAudio.ts` (the mute hook is
 wired: verify), `docs/CRAZYGAMES.md`, `e2e/heat.spec.ts`,
-`e2e/screens.spec.ts`, `docs/M4_REPORT.md`, `docs/ARCHITECTURE.md`,
+`e2e/screens.spec.ts`, `docs/history/M4_REPORT.md`, `docs/ARCHITECTURE.md`,
 `docs/STYLE.md`, `docs/BACKLOG.md`, `docs/PROGRESS.md`.
 
 Behaviour:
@@ -1025,7 +1025,7 @@ Behaviour:
   screens` with `door`, `busted` and the cold open's first caption at 1280
   ×720 and the seven M3/M4 states at the ten sizes, inspected; perf A/B
   against the M3 gate (`perf/m3-gate-*.json` are the bases; two runs on the
-  final commit); `docs/M4_REPORT.md` per `CLAUDE.md`; ARCHITECTURE
+  final commit); `docs/history/M4_REPORT.md` per `CLAUDE.md`; ARCHITECTURE
   decisions for D2–D17 that surprise; STYLE.md sections (the bag and coin
   counters, the busted bar and card, the door screen, coins, the sawhorse,
   the strip, the cameras, the heavy and Chief liveries); BACKLOG;
@@ -1125,7 +1125,7 @@ inspected at the gate and after slices 3 and 8.
 ### 6.4 Performance protocol
 
 Bases: the M3 gate's two runs (`perf/m3-gate-1.json`, `-2.json`; summary
-lines in `docs/M3_REPORT.md`: 57.4 / 52.5 fps, step p50 2.9 / 3.4 ms) and
+lines in `docs/history/M3_REPORT.md`: 57.4 / 52.5 fps, step p50 2.9 / 3.4 ms) and
 the slice-0 phase profile (traffic 1.55 ms mean / 3.0 p95). After slices 3,
 6 and 7 run `npm run perf` once and `PERF_HEAT=3` (slice 6) / `5` (slice 7)
 once; at the gate twice each. A regression claim needs both new runs worse
@@ -1172,8 +1172,8 @@ and is taken at the start of slice 3 on an idle machine. Marcin's
    A4, T15 updated.
 8. Docs: ARCHITECTURE records, STYLE sections, README (`?heat`, `?coldopen`,
    `npm run heat`), BACKLOG (polish skipped, update 1), PROGRESS entries,
-   `docs/M4_REPORT.md` with the playtest script and the known issues, and
-   `docs/M5_PLAN.md` §1.2 checked against what shipped (`BALANCE.measured`
+   `docs/history/M4_REPORT.md` with the playtest script and the known issues, and
+   `docs/history/M5_PLAN.md` §1.2 checked against what shipped (`BALANCE.measured`
    filled with the slice 3 and 6 numbers, the date and the commit).
 9. On `/` with no parameters: the cold open runs once, the stars, the bag
    and the coins are on the HUD, a takedown or two brings the patrols, the

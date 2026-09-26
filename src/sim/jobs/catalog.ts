@@ -1,5 +1,5 @@
 /**
- * Job kinds and their definitions (docs/M5_PLAN.md §3.3): what the generator
+ * Job kinds and their definitions (docs/history/M5_PLAN.md §3.3): what the generator
  * places, what a marker starts, and the steal-to-order descriptor packed in
  * one number (class index in the top byte, paint below), so a def stays
  * plain data the card can name.

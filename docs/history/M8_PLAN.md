@@ -13,13 +13,13 @@ Read, in this order, before touching anything: `CLAUDE.md`, `docs/BRIEF.md`
 (§3, §4 vehicle, takedowns and damage, activities, §6 budgets, §10),
 `docs/DESIGN.md` §16 in full, then §7 (free-roam scoring), §4 (mayhem),
 §6.6 (the cold open), §13.3 (heat and sight), `docs/PROGRESS.md` (newest
-first), `docs/M7_REPORT.md` (its perf method and known issues),
+first), `docs/history/M7_REPORT.md` (its perf method and known issues),
 `docs/BACKLOG.md`, `docs/ARCHITECTURE.md`, `docs/STYLE.md`, then this file.
 Run `npm run verify`; green before the first edit.
 
 ## 0. How to work on this milestone
 
-- **Language, autonomy, scope, honesty**: as in `docs/M5_PLAN.md` §0.
+- **Language, autonomy, scope, honesty**: as in `docs/history/M5_PLAN.md` §0.
 - **Pace** (`CLAUDE.md`): a slice is the code, its pins, the quick verify,
   one commit, eight lines in PROGRESS. Every measurement below that is not
   a Vitest pin is taken at the gate. One exception, named in the design

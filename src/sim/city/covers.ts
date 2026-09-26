@@ -1,5 +1,5 @@
 /**
- * Covered streets (M5.5 slice 7; docs/M4_PLAN.md §5 A, DESIGN.md §5): one per
+ * Covered streets (M5.5 slice 7; docs/history/M4_PLAN.md §5 A, DESIGN.md §5): one per
  * district over the middle of a grid street near the district's drop-off (the
  * landmark in the Gardens, which has none): an arcade under a frontage row in
  * Crown Heights, a factory gantry in Sunset Works, a tree-canopy tunnel in

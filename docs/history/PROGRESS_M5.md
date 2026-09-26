@@ -2,8 +2,8 @@
 
 The M5 session entries (slices 0–8 and the gate, 2026-09-23), the M5.1 pass
 and Marcin's M5 playtest that opened M5.5, newest first, moved here from
-`docs/PROGRESS.md` at the M5.5 gate. The gate reports are `docs/M5_REPORT.md`
-and `docs/M5.5_REPORT.md`.
+`docs/PROGRESS.md` at the M5.5 gate. The gate reports are `docs/history/M5_REPORT.md`
+and `docs/history/M5.5_REPORT.md`.
 
 ## 2026-09-23 — Marcin's M5 playtest: polish before the platform
 
@@ -31,7 +31,7 @@ Launch with a game that is not good.
   Nintendo's course dojo, Forza's boards, Burnout's smashes, a 2018 study
   and the GDC 2019 exploration talk; loop legibility in GTA, Forza,
   Burnout, Crazy Taxi, Hit & Run, the accessibility guideline and the
-  CrazyGames quality page. Sources in `docs/M5.5_PLAN.md` §8.
+  CrazyGames quality page. Sources in `docs/history/M5.5_PLAN.md` §8.
 - `docs/DESIGN.md` §13: his findings, the decision (M5.5 before M6), and
   the design for each: heat that moves (patrols at heat 0, seen crimes
   double and start the chase, reckless driving counts, the numbers, the
@@ -43,7 +43,7 @@ Launch with a game that is not good.
   a different animal (the driving mode, pressure instead of a flat speed,
   the refill cadence, arrivals in view, the search disc and the escape
   ring, dispatch lines, sirens by heat). §11 and §12 revised.
-- `docs/M5.5_PLAN.md`: the contract (slices 0–7, numbers, pins,
+- `docs/history/M5.5_PLAN.md`: the contract (slices 0–7, numbers, pins,
   measurements, the gate). `CLAUDE.md` and `docs/BACKLOG.md` point at it.
 - Docs closed after M5.1 (aea0137): the stale known issues and the backlog's
   resolved lines.
@@ -133,7 +133,7 @@ max 100 / 133 / 83 ms (the M5 gate's 200 / 1,017, M4's 917 / 517), step p95
 ## 2026-09-23 — M5, the launch minimum
 
 Marcin: carry out the whole M5 plan. Working autonomously per
-`docs/M5_PLAN.md`, slice by slice.
+`docs/history/M5_PLAN.md`, slice by slice.
 
 ### Before slice 0
 
@@ -472,7 +472,7 @@ Decided (set here):
   the daily fanfare, the streak's chime) is oscillator notes on the master
   gain.
 - Docs: CRAZYGAMES rows, ARCHITECTURE 41–49, STYLE, README, DEV, ASSETS,
-  BACKLOG, M6_PLAN's as-built notes, `docs/M5_REPORT.md`. Package 0.5.0.
+  BACKLOG, M6_PLAN's as-built notes, `docs/history/M5_REPORT.md`. Package 0.5.0.
   The entries before M5 moved to `docs/history/PROGRESS_M4-gate.md`.
 
 Gate (d21cedd and the report's commit): `verify:gate` green (282 tests),
@@ -485,7 +485,7 @@ the protocol. Frame max 200 ms and 1.0 s (the M4 long-frame issue).
 
 ### Next
 
-- Marcin plays the gate (`docs/M5_REPORT.md`, the five-minute script); his
+- Marcin plays the gate (`docs/history/M5_REPORT.md`, the five-minute script); his
   notes drive the M5.1 pass before M6. Asked of him: the first minute on
   `?fresh=1` with a stopwatch, `npm run perf:headed`, a yes or no on a music
   track.

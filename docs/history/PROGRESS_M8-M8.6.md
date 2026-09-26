@@ -109,7 +109,7 @@ car, the officer inside his car; frames dropping. The chase read (the bot, level
 18 % of the driving samples tilted over 15°, ten cars sunk (one by 2.5 m), two driving on their roofs (a lent body's
 height is held but its roll and pitch were free); 4 of 12 wrecks at rest on a side; the officer in the player's car on
 6.5 % of his steps; the sim 0.8 ms a step, the only steps over 8 ms the city loading a part (15–27 ms). DESIGN §18 and
-`docs/M8.6_PLAN.md` set the fix, slices 0–5 and the gate; it starts now, his notes being the word. The platform after.
+`docs/history/M8.6_PLAN.md` set the fix, slices 0–5 and the gate; it starts now, his notes being the word. The platform after.
 
 ## 2026-09-24 — M8.5 gate (with M8's): the numbers
 
@@ -123,7 +123,7 @@ check's own wait), `balance` green (the first car at minute 6.7). **The A/B** ag
 paint's older cost both now read only what is near (ARCHITECTURE 89, every answer equal to the digit): 3.91 against
 3.97. The kid's pass found an E keycap on every job's card (since M5.5) and the trials' dashes on GOALS: fixed. Not
 met: the heap 58–65 MB against M8's 50 (the brief's 250 holds), the quick tests at 60–63 s (BACKLOG). Report
-`docs/M8.5_REPORT.md`; M7's entries to `docs/history/PROGRESS_M7.md`; 0.8.5. Marcin asked to clear stray processes:
+`docs/history/M8.5_REPORT.md`; M7's entries to `docs/history/PROGRESS_M7.md`; 0.8.5. Marcin asked to clear stray processes:
 mine stopped (a run he declined had started, two preview servers, log watchers), three old watchers too; three other
 Claude Code sessions idle, left to him. Next: his 0.8.5 notes, then M9 on his word.
 
@@ -183,7 +183,7 @@ bad sense, and a CrazyGames game cannot ship careless. Counted on the M7 gate's 
 news over the busted card, and the key hints naming the tuning panel, which opens without `?dev=1`. Set here, DESIGN
 §17: each corner answers one question (seven things on a calm drive), one voice at a time, one name for each thing, a
 road coin in the bank (save v6), the wall as TOTALS · CARS · STYLE · GOALS, the screen's budget in `CLAUDE.md`. The
-contract `docs/M8.5_PLAN.md` (slices 0–5); the platform keeps M9. M8's gate closes inside M8.5's (one A/B, one
+contract `docs/history/M8.5_PLAN.md` (slices 0–5); the platform keeps M9. M8's gate closes inside M8.5's (one A/B, one
 report, 0.8.5): the new work touches only the screen and the coin pool, and M8's long pins hold. Open for it: the
 heat suite's last run crashed its browser at 14:29 (`Target crashed`). Next: M8.5 on his word.
 
@@ -302,5 +302,5 @@ street trees, benches and railings are decoration without colliders (cars and wa
 nothing in the city breaks but the billboards and the scaffold towers. The design: props with mass and a base's
 strength, the contact decided before the physics step (closed-form, pinned), a pool of 16 bodies, fallen props
 that lie and heal, each district's things, the smash as a skill-chain trick, the bill at the door, save v5. The
-contract `docs/M8_PLAN.md` (slices 0–10); the platform's plan renamed `docs/M9_PLAN.md`. Next: his 0.7.0 notes,
+contract `docs/history/M8_PLAN.md` (slices 0–10); the platform's plan renamed `docs/M9_PLAN.md`. Next: his 0.7.0 notes,
 then M8 on his word.

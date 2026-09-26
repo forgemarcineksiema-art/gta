@@ -1,5 +1,5 @@
 /**
- * Damage pins (docs/M3_PLAN.md slice 5, bands from the calibration table under
+ * Damage pins (docs/history/M3_PLAN.md slice 5, bands from the calibration table under
  * its section 3.4): a 100 km/h head-on wrecks, 60 km/h dents, a glance and a
  * prop cost nothing; a wreck cannot drive and respawns rolling on the road
  * with a clean car and its boost; hits on traffic count less.

@@ -1,5 +1,5 @@
 /**
- * The knock (M8 slice 1, docs/M8_PLAN.md D1–D4): the contact decided before the physics step by the two-body rule,
+ * The knock (M8 slice 1, docs/history/M8_PLAN.md D1–D4): the contact decided before the physics step by the two-body rule,
  * anchored props that hold as walls below their base's strength, the pool of sixteen bodies and the arcs past it,
  * lying props, the heal, no allocation, the same poses twice.
  */

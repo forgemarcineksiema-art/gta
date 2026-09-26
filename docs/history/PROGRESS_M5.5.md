@@ -288,12 +288,12 @@ a carpet), the save's v1 shape. verify:gate 294 green, heat 10/10, game 9/9.
 
 Marcin, on the way: two slices in an hour and a half is too slow, and the
 plan must hold everything discussed before the platform: no M6 until the
-whole game is in. §4 of `docs/M5.5_PLAN.md` now lists the rest; from here
+whole game is in. §4 of `docs/history/M5.5_PLAN.md` now lists the rest; from here
 a slice is code and pins, the measurements and the suites run at the gate.
 
 ## 2026-09-23 — M5.5 slice 0: heat that moves
 
-Marcin: "Lecisz". Working autonomously per `docs/M5.5_PLAN.md`, slice 0
+Marcin: "Lecisz". Working autonomously per `docs/history/M5.5_PLAN.md`, slice 0
 (DESIGN.md §13.3). Verify green before the first edit (264 quick tests
 after the doc commits).
 

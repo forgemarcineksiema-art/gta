@@ -1,5 +1,5 @@
 /**
- * The bot policies (docs/M4_PLAN.md slice 5, 5.8): 120 s at heat 40 with
+ * The bot policies (docs/history/M4_PLAN.md slice 5, 5.8): 120 s at heat 40 with
  * traffic on. The skilled bot swaps and escapes by a swap; the novice never
  * swaps; neither needs a reset. They go round what blocks them, as a player
  * does (the bot's unblock, M8.6 gate): since M8.6 a wreck no longer slides off

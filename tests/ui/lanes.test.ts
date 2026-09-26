@@ -1,5 +1,5 @@
 /**
- * The top of the screen (M7 slice 1, docs/M7_PLAN.md D3; docs/M8.9_PLAN.md R5): the job line, a card, the intro's
+ * The top of the screen (M7 slice 1, docs/history/M7_PLAN.md D3; docs/M8.9_PLAN.md R5): the job line, a card, the intro's
  * caption, the key hints and the news stack in one column in a fixed order, so none is drawn over another; the top's
  * voice gives the line at most one more (`voice.test.ts`, M8.9 9.1).
  */

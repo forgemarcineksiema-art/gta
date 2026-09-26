@@ -1,5 +1,5 @@
 /**
- * The chase read (docs/M8.6_PLAN.md §0, DESIGN.md §18.1): the bot under a level-5 chase for 120 s, every lent body read
+ * The chase read (docs/history/M8.6_PLAN.md §0, DESIGN.md §18.1): the bot under a level-5 chase for 120 s, every lent body read
  * at every step. Run by `npm run verify:gate` and `npm run test:long`, not by the quick `npm run verify`.
  */
 import { describe, expect, it } from 'vitest';

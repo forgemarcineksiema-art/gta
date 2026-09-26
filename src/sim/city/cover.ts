@@ -111,7 +111,7 @@ export interface ParkedJunction { node: number; lane: number; s: number; offset:
 export interface CameraSite { x: number; z: number; yaw: number; halfWidth: number; poleX: number; poleZ: number; limitMs: number; y: number; poleY: number }
 
 /**
- * Today's police (docs/M5_PLAN.md slice 6, DESIGN.md §8): the date seeds an
+ * Today's police (docs/history/M5_PLAN.md slice 6, DESIGN.md §8): the date seeds an
  * order over each fixed site list and the first share of it is manned today.
  * Nothing new is placed; before a date is set every site is manned.
  */
@@ -232,7 +232,7 @@ const TOWER_APPROACH = 60;
 /** A parked patrol stands this far before the stop line, this far to the lane's right (kerb side). */
 const PARKED_BACK = 14;
 const PARKED_KERB = 3;
-/** Parked patrols keep this far from the hideout (docs/M4_PLAN.md slice 3a). */
+/** Parked patrols keep this far from the hideout (docs/history/M4_PLAN.md slice 3a). */
 const PARKED_CLEAR_OF_HIDEOUT = 300;
 /** The laps' limits the cameras enforce: the traffic tuning's highway and avenue speeds (m/s). */
 const LIMIT_HIGHWAY = 22;

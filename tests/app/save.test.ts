@@ -1,5 +1,5 @@
 /**
- * The save store (docs/M5_PLAN.md slice 0) with a fake platform and a fake
+ * The save store (docs/history/M5_PLAN.md slice 0) with a fake platform and a fake
  * clock, in Node: the debounce, the flush and its no-op, the newer-save guard
  * and a failing load.
  */

@@ -1,5 +1,5 @@
 /**
- * The trees by their trunks (M8 slice 2, docs/M8_PLAN.md D8): a thick tree (a park's, a front garden's, the quay's
+ * The trees by their trunks (M8 slice 2, docs/history/M8_PLAN.md D8): a thick tree (a park's, a front garden's, the quay's
  * palms) has a solid trunk in the physics ring, a wall, and stands clear of every D7 clearance; a street tree is a
  * staked sapling that snaps at speed and costs the rule's share of it.
  */

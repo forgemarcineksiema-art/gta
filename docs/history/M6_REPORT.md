@@ -1,6 +1,6 @@
 # M6 gate report: the wanted board
 
-Date: 2026-09-24. Contract: `docs/M6_PLAN.md` (slices 0–11, §7 gate
+Date: 2026-09-24. Contract: `docs/history/M6_PLAN.md` (slices 0–11, §7 gate
 criteria); design: `docs/DESIGN.md` §14. Session log: `docs/PROGRESS.md` (an
 entry per slice, and the gate's two entries with the numbers below). Package
 `0.6.0`.
@@ -178,12 +178,12 @@ built at load).
 
 Marcin plays 0.6.0. His notes drive a short pass (one or two play items,
 each committed; the rest to BACKLOG). Then M7, the platform
-(`docs/M7_PLAN.md`: the SDK adapter, touch, the mobile tier, the
+(`docs/history/M7_PLAN.md`: the SDK adapter, touch, the mobile tier, the
 submission; the day's pick becomes the rewarded offer there), only on his
 word.
 
 Revised 2026-09-24 (Marcin): a milestone that improves and fixes what the
-game has goes in first. M7 is now the polish (`docs/M7_PLAN.md`, DESIGN
+game has goes in first. M7 is now the polish (`docs/history/M7_PLAN.md`, DESIGN
 §15: every recorded issue a player can meet, worked off, with our own music,
 a settings row, skid marks and a screen where nothing overlaps); the
-platform is M8 (`docs/M8_PLAN.md`). Both on his word.
+platform is M8 (`docs/history/M8_PLAN.md`). Both on his word.

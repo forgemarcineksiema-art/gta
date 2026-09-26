@@ -1,5 +1,5 @@
 /**
- * The twenty ramps checked island-wide (docs/M4_PLAN.md 6.13): placement, clearance and spacing.
+ * The twenty ramps checked island-wide (docs/history/M4_PLAN.md 6.13): placement, clearance and spacing.
  * Long: run by `npm run verify:gate` and `npm run test:long` (CLAUDE.md), moved
  * unchanged from `jumps.test.ts` in M5.1.
  */

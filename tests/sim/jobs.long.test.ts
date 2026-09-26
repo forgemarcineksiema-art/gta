@@ -1,5 +1,5 @@
 /**
- * The bot drives the generator's deliveries (docs/M5_PLAN.md slice 1, 1.7):
+ * The bot drives the generator's deliveries (docs/history/M5_PLAN.md slice 1, 1.7):
  * from each delivery ring, the road bot on the shortest lane path into the
  * drop-off arrives inside the limit and is paid. City, seed 42, traffic on.
  * Long: run by `npm run verify:gate`. The times are slice 1's measurement.

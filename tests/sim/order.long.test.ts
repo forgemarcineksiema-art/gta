@@ -1,5 +1,5 @@
 /**
- * The hunt by a naive bot (docs/M5_PLAN.md slice 2's measurement): from each
+ * The hunt by a naive bot (docs/history/M5_PLAN.md slice 2's measurement): from each
  * order ring the road bot re-plans the shortest lane path to the wanted car
  * every two seconds and drives it until it is within swap reach. Records the
  * hunt time and whether the traffic repainted a car or spawned one. City,

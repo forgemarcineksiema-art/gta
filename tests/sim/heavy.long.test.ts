@@ -1,5 +1,5 @@
 /**
- * Levels 4 and 5 (docs/M4_PLAN.md slice 7): the roster's heavies and the
+ * Levels 4 and 5 (docs/history/M4_PLAN.md slice 7): the roster's heavies and the
  * Chief, the van's shove across the road, the Chief's PIT on a straight, and
  * the Chief kept through the chase and replaced after a wreck. The body pool
  * at level 5 (7.5) is police.long.test.ts's pin, which now runs with them.

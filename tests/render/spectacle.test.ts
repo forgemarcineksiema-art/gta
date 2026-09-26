@@ -1,5 +1,5 @@
 /**
- * The spectacle (M8 slice 5, docs/M8_PLAN.md §4): every material throws its own debris from one pool that never
+ * The spectacle (M8 slice 5, docs/history/M8_PLAN.md §4): every material throws its own debris from one pool that never
  * overflows and allocates nothing a frame; a broken hydrant's water column stands on its jet, and is hidden with none.
  */
 import { getHeapSpaceStatistics, setFlagsFromString } from 'node:v8';

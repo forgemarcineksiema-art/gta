@@ -2,7 +2,7 @@
 
 The M4 gate entry and the post-gate sessions before M5 (the bonnet smoke,
 one build, the coin lines; 2026-09-23), newest first, moved here from
-`docs/PROGRESS.md` at the M5 gate. The M4 gate report is `docs/M4_REPORT.md`.
+`docs/PROGRESS.md` at the M5 gate. The M4 gate report is `docs/history/M4_REPORT.md`.
 
 ## 2026-09-23 — The coin layer as lines
 
@@ -141,7 +141,7 @@ also a fixed pixel factor, so the puffs grew on smaller screens.
 ## 2026-09-23 — M4 gate
 
 Marcin: work autonomously to the end of M4. Slices 3a–8 are done; the gate
-report is `docs/M4_REPORT.md`; every M4 session entry is archived in
+report is `docs/history/M4_REPORT.md`; every M4 session entry is archived in
 `docs/history/PROGRESS_M4.md`.
 
 ### Done (slice 8)
@@ -197,7 +197,7 @@ report is `docs/M4_REPORT.md`; every M4 session entry is archived in
 ### Next
 
 - Marcin's review of the gate report and his first minute by hand. Then
-  M5 per `docs/M5_PLAN.md` (§1.2 is checked against what shipped: every row
+  M5 per `docs/history/M5_PLAN.md` (§1.2 is checked against what shipped: every row
   exists; `BALANCE.measured`'s values are in the plan's comment).
 
 ### Open problems

@@ -1,5 +1,5 @@
 /**
- * The roadblock placement pin (docs/M4_PLAN.md slice 6, 6.1 and 6.2): the
+ * The roadblock placement pin (docs/history/M4_PLAN.md slice 6, 6.1 and 6.2): the
  * bot round the highway in a chase for 90 s. Long: run by `npm run
  * verify:gate`.
  */

@@ -1,5 +1,5 @@
 /**
- * The police brain and the damage model (docs/M4_PLAN.md slice 3c): a nudge
+ * The police brain and the damage model (docs/history/M4_PLAN.md slice 3c): a nudge
  * is not a kill, a police car takes a real slam to write off, hitting a
  * police car nobody was chasing you in costs heat and gets you seen, and a
  * lost pursuit searches where it last saw the player. The arrest across the

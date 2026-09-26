@@ -1,5 +1,5 @@
 /**
- * Mayhem and the cold open (M8 slice 8, docs/M8_PLAN.md): each mayhem zone's corner is a market of thirty things
+ * Mayhem and the cold open (M8 slice 8, docs/history/M8_PLAN.md): each mayhem zone's corner is a market of thirty things
  * and more, a smash in the zone is priced at its bill toward a quota of 15,000; the cold open drives through a café
  * terrace, a newspaper box and a bin on its footway run, a newsstand beside it, and nothing on its route would hold it.
  */

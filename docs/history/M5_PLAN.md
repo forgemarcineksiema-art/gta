@@ -13,7 +13,7 @@ Read, in this order, before touching anything: `CLAUDE.md`, `docs/BRIEF.md`
 verification, §10 how to work), `docs/DESIGN.md` (§2 the run, §3 audience
 and progression, §4 activities, §6 the city as a level, §9 KPIs, §11 the
 launch scope, §12 the watch list), `docs/PROGRESS.md` (newest first, the M4
-gate entry and every M4 measurement), `docs/M4_REPORT.md`,
+gate entry and every M4 measurement), `docs/history/M4_REPORT.md`,
 `docs/ARCHITECTURE.md`, `docs/STYLE.md`, `docs/CRAZYGAMES.md` (sections 3,
 5, 7, 9, 10, 11), then this file. Run `npm run verify`; it must be green
 before the first edit.
@@ -78,7 +78,7 @@ minimum; the rest ships as update 2 after the first Basic Launch numbers.
 
 ### 1.2 Delivered by M4 and assumed here
 
-From `docs/M4_PLAN.md`, all must exist before slice 0; the executor checks
+From `docs/history/M4_PLAN.md`, all must exist before slice 0; the executor checks
 each and lists any gap in PROGRESS before starting:
 
 | Item | M4 slice | Used by |
@@ -237,7 +237,7 @@ e2e/screens.spec.ts            + job card, door with totals, garage, busted at t
 
 ### 3.2 Step order in `SimWorld.step()`
 
-`docs/M4_PLAN.md` §3.2's order, which already holds `jobs.step` (the M4
+`docs/history/M4_PLAN.md` §3.2's order, which already holds `jobs.step` (the M4
 skeleton, before `run.step`), with M5's one line added (marked +) and the
 jobs line extended:
 
@@ -426,7 +426,7 @@ export const BALANCE = {
   save: { key: 'save', debounceSeconds: 1, maxBytes: 32768 },
   // placeholders replaced from M4's measurements before slice 0 (PROGRESS, M4 slices 3 and 6):
   measured: { bagPerMinute: 0, coinsPerMinute: 0, runSeconds: 0, bustedPerMinute: [0, 0, 0, 0, 0, 0], bustedPerMinuteSkilled: [0, 0, 0, 0, 0, 0] },
-  // M4 gate values (docs/M4_REPORT.md, seeds 42 / 7 / 123, busted counts including a 10 s re-arm after each card):
+  // M4 gate values (docs/history/M4_REPORT.md, seeds 42 / 7 / 123, busted counts including a 10 s re-arm after each card):
   //   bagPerMinute 336–476 from heat 0 (novice bot, 10 min), 600–800 at heat 2 (slice 3a); coinsPerMinute 42–53 with the
   //   slice-3b carpet, 32–40 worth 426–564 a minute with the coin lines of 2026-09-23 (DESIGN.md §3.5: the caps are a third of the take);
   //   runSeconds: no run ended in 10 min from heat 0 (the bot takes no door and nothing arrests it at heat 0–1);
@@ -824,7 +824,7 @@ unaffected in time (check the test count and duration).
 
 Files: `ui/styles.css`, `ui/hud.ts`, `ui/jobs.ts`, `ui/garage.ts`,
 `audio/Sfx.ts`, `audio/EngineAudio.ts` (the music bed hook), `docs/ASSETS.md`,
-`e2e/screens.spec.ts`, `e2e/game.spec.ts`, `docs/M5_REPORT.md`.
+`e2e/screens.spec.ts`, `e2e/game.spec.ts`, `docs/history/M5_REPORT.md`.
 
 Behaviour:
 
@@ -910,12 +910,12 @@ to +5 (arrow, markers, the wanted ring and their shadow draws), triangles
 
 ## 6. Records
 
-PROGRESS entry per session as in `docs/M3_PLAN.md` §6.1 (Done /
+PROGRESS entry per session as in `docs/history/M3_PLAN.md` §6.1 (Done /
 Verification / Decided and why / Next / Open problems, newest first, absolute
-dates). The gate report `docs/M5_REPORT.md` per `CLAUDE.md`: built, verify
+dates). The gate report `docs/history/M5_REPORT.md` per `CLAUDE.md`: built, verify
 and perf numbers with the A/B, how to run, the five-minute playtest, the
 knobs and where they live, known issues, the proposed M6 scope (which is
-`docs/M6_PLAN.md`; say what M5 changed in it).
+`docs/history/M6_PLAN.md`; say what M5 changed in it).
 
 ## 7. Gate criteria (definition of done for M5)
 
@@ -939,14 +939,14 @@ knobs and where they live, known issues, the proposed M6 scope (which is
 7. `docs/CRAZYGAMES.md` rows D1, D2, D5, A5–A10, A12, Q1, G10, P2, M1, M2
    updated with their status and the reason; ARCHITECTURE decision records
    for D1–D14 that surprised anyone; STYLE.md sections for the wall, the
-   card, the arrow and the markers; README; BACKLOG; `docs/M5_REPORT.md`.
+   card, the arrow and the markers; README; BACKLOG; `docs/history/M5_REPORT.md`.
 8. A fresh profile on `/` gets the cold open, banks, buys the compact on the
    second or third run, and every job type is reachable by driving.
 
 ## 8. API facts and traps
 
 Verified against the code at `ba9a12f` on 2026-09-22 (re-verify after the
-M4 gate; the M4 items are per `docs/M4_PLAN.md`):
+M4 gate; the M4 items are per `docs/history/M4_PLAN.md`):
 
 - `Platform` (`src/platform/Platform.ts`): `saveData(key, value:
   string): Promise<void>`, `loadData(key): Promise<string | null>`,

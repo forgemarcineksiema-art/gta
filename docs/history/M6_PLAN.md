@@ -5,19 +5,19 @@ Reviewer: Claude, at the gate. Director and the only tester: Marcin. This
 document is the milestone contract for the wanted board (`docs/DESIGN.md`
 §14): what to build, in which order, with which numbers, and what "done"
 means. Written 2026-09-23 against commit `11b4441`. Until that day `M6`
-named the platform milestone; its contract is now `docs/M8_PLAN.md` (M7
+named the platform milestone; its contract is now `docs/history/M8_PLAN.md` (M7
 from 2026-09-23, M8 since 2026-09-24, when M7 became the polish), and older
 docs that say M6 or M7 for the platform mean M8.
 
 Read, in this order, before touching anything: `CLAUDE.md`, `docs/BRIEF.md`
 (§2, §3, §4, §10), `docs/DESIGN.md` §14 in full and §1, §2.2, §2.5, §13.4,
-§13.7, `docs/PROGRESS.md` (newest first), `docs/M5.5_REPORT.md`,
+§13.7, `docs/PROGRESS.md` (newest first), `docs/history/M5.5_REPORT.md`,
 `docs/ARCHITECTURE.md`, `docs/STYLE.md` (Vehicles), then this file. Run
 `npm run verify`; green before the first edit.
 
 ## 0. How to work on this milestone
 
-- **Language, autonomy, scope, honesty**: as in `docs/M5_PLAN.md` §0.
+- **Language, autonomy, scope, honesty**: as in `docs/history/M5_PLAN.md` §0.
 - **Pace** (`CLAUDE.md`): a slice is the code, its pins, the quick verify,
   one commit, eight lines in PROGRESS. The measurements named below are
   taken at the gate; no perf, e2e, screens, balance, browser or research
@@ -62,7 +62,7 @@ presets or the handling pins.
 
 ### 1.3 Fixed by the brief and still binding
 
-Everything in `docs/M5_PLAN.md` §1.4: always in a vehicle, pedestrians
+Everything in `docs/history/M5_PLAN.md` §1.4: always in a vehicle, pedestrians
 always dodge, PEGI 12 (no gambling: nothing random is sold), no menu before
 gameplay, control never taken for more than 2 s, keyboard first, the
 layering, the budgets, no per-frame allocation in the step paths, every
@@ -447,7 +447,7 @@ every 8 minutes of the first hour. The run and its numbers at the gate.
 horn), `heat`, `city`, `life`, `screens` (with `board`, `style`, `duel`)
 green and the images inspected; `npm run perf` A/B against
 `perf/m5.5-gate-fix-1..2.json`; `npm run balance` with its tables in
-PROGRESS; package `0.6.0`; `docs/M6_REPORT.md` per `CLAUDE.md`; ARCHITECTURE
+PROGRESS; package `0.6.0`; `docs/history/M6_REPORT.md` per `CLAUDE.md`; ARCHITECTURE
 records (D4, D5, D8, D9, D11); STYLE (the rivals' cars, the kit, the
 posters); DEV (`?board=`, `?kit=all`); BACKLOG; PROGRESS entries older than
 M5.5 archived. Then Marcin plays, and M8 starts only on his word.
@@ -494,7 +494,7 @@ gate.
 
 ## 6. Records
 
-PROGRESS entries per slice; `docs/M6_REPORT.md` at the gate; ARCHITECTURE
+PROGRESS entries per slice; `docs/history/M6_REPORT.md` at the gate; ARCHITECTURE
 records for D4, D5, D8, D9, D11; STYLE sections for the rivals' cars, the
 kit and the posters; BACKLOG (the rivals cruising their turf before their
 duel, if the playtest asks for a teaser); `docs/CRAZYGAMES.md` Q3 ("clear

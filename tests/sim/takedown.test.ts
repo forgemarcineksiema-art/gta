@@ -1,5 +1,5 @@
 /**
- * Takedowns (docs/M3_PLAN.md slice 7): shoving a car the player has just hit
+ * Takedowns (docs/history/M3_PLAN.md slice 7): shoving a car the player has just hit
  * into a wall or into another car wrecks it, pays boost and starts the slow
  * motion; an open-road rear-end is not a takedown; a wreck cannot be taken
  * down twice.

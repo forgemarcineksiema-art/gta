@@ -1,9 +1,9 @@
 # M9 "Platform" — implementation plan
 
 Renumbered three times (Marcin): the brief's M6, it was M6 until 2026-09-23
-(M6 became the wanted board, `docs/M6_PLAN.md`, DESIGN §14), M7 until
-2026-09-24 (M7 became the polish, `docs/M7_PLAN.md`, DESIGN §15) and M8
-until later that day (M8 became the chaos, `docs/M8_PLAN.md`, DESIGN §16);
+(M6 became the wanted board, `docs/history/M6_PLAN.md`, DESIGN §14), M7 until
+2026-09-24 (M7 became the polish, `docs/history/M7_PLAN.md`, DESIGN §15) and M8
+until later that day (M8 became the chaos, `docs/history/M8_PLAN.md`, DESIGN §16);
 older docs that say M6, M7 or M8 for the platform mean this milestone. What
 M8 hands over: the props and their pool (touch drives into them like the
 keys do; the mobile tier's budgets are measured with them standing and
@@ -16,7 +16,7 @@ settings in the save (version 4 then, 5 since M8; slice 0 checks the current
 version through the Data module), the settings row on the pause screen (the
 SDK's mute and the quality ride on it), the synthesized music (no file to
 load: the loading brackets only wrap the city). What M8.8 hands over
-(`docs/M8.8_PLAN.md`): new vehicles on the same controls (the motorbike and
+(`docs/history/M8.8_PLAN.md`): new vehicles on the same controls (the motorbike and
 the hovercraft included, so the touch layer maps nothing new), the scooters
 in the traffic the mobile tier thins, `physicalUnits` for the mobile tier to
 set (0 until its phones hold the budget), and the cover's picture (the
@@ -40,14 +40,14 @@ exists.
 Read, in this order, before touching anything: `CLAUDE.md`, `docs/BRIEF.md`
 (§3, §5 the platform seam, §6 budgets, §7 compliance, §8, §10),
 `docs/CRAZYGAMES.md` in full, `docs/DESIGN.md` §9, `docs/PROGRESS.md`
-(newest first), `docs/M5_REPORT.md`, `docs/ARCHITECTURE.md`,
+(newest first), `docs/history/M5_REPORT.md`, `docs/ARCHITECTURE.md`,
 `docs/STYLE.md`, then this file. Run `npm run verify`; green before the
 first edit.
 
 ## 0. How to work on this milestone
 
 - **Language, cadence, autonomy, scope, honesty, research, perf**: as in
-  `docs/M5_PLAN.md` §0. One slice at a time, commit per slice with verify
+  `docs/history/M5_PLAN.md` §0. One slice at a time, commit per slice with verify
   green and the measurement in PROGRESS, stop only at the gate or where the
   brief says to.
 - **The docs are the truth and they drift.** Every SDK call in this plan is
@@ -96,7 +96,7 @@ garage's ad calls through `Platform.requestAd` with the input block and the
 mute, `adsAvailable` hiding the video buttons, the seen flag, the ten-size
 screens spec with ten states, `npm run game`. Slice 0 checks each.
 
-As built in M5 (docs/M5_REPORT.md; read before slice 0):
+As built in M5 (docs/history/M5_REPORT.md; read before slice 0):
 
 - The save's key is `save` (`BALANCE.save.key`), one document of 0.4–1.1 kB,
   written at the door, the busted card, the drive-out, `pagehide`, a hidden
@@ -127,7 +127,7 @@ update 1 and update 2 content.
 
 ### 1.4 Fixed by the brief and still binding
 
-Everything in `docs/M5_PLAN.md` §1.4, plus: relative paths only; works in
+Everything in `docs/history/M5_PLAN.md` §1.4, plus: relative paths only; works in
 an iframe; Chrome and Edge clean; Safari must not misbehave; no custom
 fullscreen button; no external links; nothing bound to Escape; pause on
 `P`; auto-pause on blur and `visibilitychange` without `gameplayStop`;

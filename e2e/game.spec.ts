@@ -1,10 +1,10 @@
 /**
- * M5 in the browser (docs/M5_PLAN.md §5.2), against the preview build: the
+ * M5 in the browser (docs/history/M5_PLAN.md §5.2), against the preview build: the
  * garage on the wall by keys and by clicks, the door's offer on every ad
  * path (off, an error, a finished video), the save across a reload, a
  * delivery and an order by the bot, the cold open once and not twice; M6
- * (docs/M6_PLAN.md §5.2): a rival's race driven by the bot, the STYLE page's
- * kit on the car, the horn; M8 (docs/M8_PLAN.md §5.2): a lamp post smashed on its kerb line.
+ * (docs/history/M6_PLAN.md §5.2): a rival's race driven by the bot, the STYLE page's
+ * kit on the car, the horn; M8 (docs/history/M8_PLAN.md §5.2): a lamp post smashed on its kerb line.
  * Every case ends with no page errors.
  */
 import { expect, test, type Page } from '@playwright/test';

@@ -1,5 +1,5 @@
 /**
- * Takedowns (docs/M3_PLAN.md slice 7): an open-road rear-end is not a
+ * Takedowns (docs/history/M3_PLAN.md slice 7): an open-road rear-end is not a
  * takedown; a wreck cannot be taken down twice.
  * Long (M7 slice 0): moved out of the quick verify's minute; `npm run verify:gate` runs it.
  */

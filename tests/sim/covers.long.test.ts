@@ -1,5 +1,5 @@
 /**
- * Covered streets (M5.5 slice 7, docs/M4_PLAN.md §5 A): one per district on a
+ * Covered streets (M5.5 slice 7, docs/history/M4_PLAN.md §5 A): one per district on a
  * grid street's middle, clear of the doors, ramps, cameras and plazas, with no
  * street tree or lamp under it; solid, so the police cannot see in through its
  * walls or down through its roof, only along the street through its open ends.

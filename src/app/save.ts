@@ -1,5 +1,5 @@
 /**
- * The save's IO (docs/M5_PLAN.md D1): one key through the platform adapter,
+ * The save's IO (docs/history/M5_PLAN.md D1): one key through the platform adapter,
  * loaded before the sim boots, written at most once per
  * `BALANCE.save.debounceSeconds` while something changed, and at once at the
  * breaks (the door, the busted card, the drive-out) and when the page is

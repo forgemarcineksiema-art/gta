@@ -1,5 +1,5 @@
 /**
- * Dailies and the streak (docs/M5_PLAN.md slice 6): the date seeds the day's
+ * Dailies and the streak (docs/history/M5_PLAN.md slice 6): the date seeds the day's
  * police order and nothing else; the day's three are the same for a date and
  * differ across dates; a car-bound challenge counts only in that car; a
  * banked-run challenge pays into the bank; the streak moves by the calendar

@@ -1,5 +1,5 @@
 /**
- * Roadblocks and spike strips (docs/M4_PLAN.md slice 6); the placement pin
+ * Roadblocks and spike strips (docs/history/M4_PLAN.md slice 6); the placement pin
  * (6.1, 6.2) is in roadblocks.long.test.ts. The sawhorse as the weak
  * point; the car half, which only the heavy breaches; the spike's puncture
  * and its cure; the block clearing behind the player. City, seed 42, traffic

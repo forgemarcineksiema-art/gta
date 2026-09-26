@@ -17,7 +17,7 @@ states. The perf A/B's draw attribution found three draws a frame for nothing in
 versions (instanced meshes with no instances: the police's liveries, the coins' pools, the debris): hidden while
 empty (pins M7 4.3, G.3). The prices refitted on the careful novice (below).
 
-**Perf A/B** (MX330, 4× CPU, `?quality=low`, alternating; the rows in docs/M7_REPORT.md): the protocol's first pairs
+**Perf A/B** (MX330, 4× CPU, `?quality=low`, alternating; the rows in docs/history/M7_REPORT.md): the protocol's first pairs
 read −6.0 / −4.6 / −5.8 fps because 0.6.0's bot queues 25 s on the northern avenue in all three (cheap frames) while
 0.7.0's traffic flows; on the same drive (the car teleported to 40 tour points: the chunks draw the same 20.5 a frame)
 and in the fair runs (no traffic: +2.7 / −0.9 / +1.1; the first 20 s: +4.0 / −5.6 / +6.3) and the final build's
@@ -200,5 +200,5 @@ covers anything, it never stutters, it sounds alive, every promise the rules mak
 player can meet (the M5.5 and M6 reports, the backlog's play items) worked off; mine added: our own synthesized
 music that climbs with the heat, a settings row on the pause screen, skid marks, one rule for the top of the screen
 (the intro's first second prints the level news across the key hints today), the first rival beatable at the first
-try, far parked cars kept out of the traffic. Contract `docs/M7_PLAN.md` (slices 0–14); `docs/M7_PLAN.md` renamed
-`docs/M8_PLAN.md`. Verify green before the edits (374 tests). Next: his 0.6.0 notes, then M7 on his word.
+try, far parked cars kept out of the traffic. Contract `docs/history/M7_PLAN.md` (slices 0–14); `docs/history/M7_PLAN.md` renamed
+`docs/history/M8_PLAN.md`. Verify green before the edits (374 tests). Next: his 0.6.0 notes, then M7 on his word.

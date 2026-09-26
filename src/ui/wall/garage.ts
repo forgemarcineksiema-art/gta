@@ -1,5 +1,5 @@
 /**
- * The garage on the wall behind every drop-off's door (docs/M5_PLAN.md
+ * The garage on the wall behind every drop-off's door (docs/history/M5_PLAN.md
  * slice 4, D9; DESIGN.md §6.3): four pages since M8.5 (DESIGN.md §17.5,
  * `wallPages.ts`): TOTALS, CARS (the cars, the chosen car's upgrades under
  * them, the next run's boosters under those), STYLE, and GOALS (the next
@@ -384,7 +384,7 @@ export class GarageUi {
     this.show();
   }
 
-  /** Video buttons hide, never disable, when the platform has no rewarded ad (docs/M5_PLAN.md D11). */
+  /** Video buttons hide, never disable, when the platform has no rewarded ad (docs/history/M5_PLAN.md D11). */
   setAdsAvailable(rewarded: boolean): void {
     this.rewarded = rewarded;
     for (const list of this.items.values()) {

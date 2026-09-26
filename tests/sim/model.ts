@@ -1,5 +1,5 @@
 /**
- * The balance model's quick half (M7 slice 10, docs/M7_PLAN.md D8): the EV table of DESIGN.md §2.7 and the first
+ * The balance model's quick half (M7 slice 10, docs/history/M7_PLAN.md D8): the EV table of DESIGN.md §2.7 and the first
  * hour's purchases, pure, from measured inputs. `balance.test.ts` measures the inputs with the bots at the gate and
  * calls this; `model.test.ts` runs it on the last gate's recorded inputs in the quick set, so fitting a price or a
  * multiplier takes a second, not the bots' minutes.
@@ -171,7 +171,7 @@ export function firstHour(input: ModelInput, knobs: Knobs = BALANCE_KNOBS): Firs
   return { run: nov, bought, gaps, seenGaps, cars, thirdCar: third ? third[1] : -1 };
 }
 
-/** What the four assertions read (DESIGN.md §2.7, docs/M7_PLAN.md slice 10). */
+/** What the four assertions read (DESIGN.md §2.7, docs/history/M7_PLAN.md slice 10). */
 export interface Verdict {
   noviceBest: number;
   skilledBest: number;

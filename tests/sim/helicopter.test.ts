@@ -1,5 +1,5 @@
 /**
- * The helicopter (M5.5 slice 9, docs/M4_PLAN.md §5 C): from heat level 4 an
+ * The helicopter (M5.5 slice 9, docs/history/M4_PLAN.md §5 C): from heat level 4 an
  * air unit joins a pursuit and takes one of the level's places; its light is
  * its sight, so in the open it holds the chase with no car in sight of the
  * player, and only a covered street's roof or an overpass's deck hides the

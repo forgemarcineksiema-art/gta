@@ -196,7 +196,7 @@ export const AVENUE_LANDMARKS: Readonly<Record<string, LandmarkStyle>> = {
   'Garden Parkway': { district: 'marina', body: CITY_COLORS.stone, sign: PALETTE.carLime, floors: 5 },
 };
 
-/** The big map's island (M7 slice 12, docs/M7_PLAN.md §3.2): blocks, parks and the shallows. */
+/** The big map's island (M7 slice 12, docs/history/M7_PLAN.md §3.2): blocks, parks and the shallows. */
 export function cityFootprints(city: City): { parks: Rect[]; blocks: Rect[]; water: Polygon[] } {
   return city.footprints();
 }

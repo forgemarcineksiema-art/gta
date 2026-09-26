@@ -1,5 +1,5 @@
 /**
- * The street furniture's lives (M8, docs/DESIGN.md §16.2, docs/M8_PLAN.md D1–D4). Every prop of every chunk the
+ * The street furniture's lives (M8, docs/DESIGN.md §16.2, docs/history/M8_PLAN.md D1–D4). Every prop of every chunk the
  * physics ring has loaded has a state by its id: standing, flying (a body from the pool), lying, or flying a
  * ballistic arc (the pool was empty).
  *

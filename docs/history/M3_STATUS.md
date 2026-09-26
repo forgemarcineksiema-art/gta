@@ -1,8 +1,8 @@
 # M3 status — slices 0–3
 
 Mid-milestone report for branch `grok/m3-life`, 2026-09-21. This is not the gate
-report. `docs/M3_REPORT.md` is written when slices 0–8 and the gate in
-`docs/M3_PLAN.md` §7 are done.
+report. `docs/history/M3_REPORT.md` is written when slices 0–8 and the gate in
+`docs/history/M3_PLAN.md` §7 are done.
 
 Five commits ahead of `main`. The branch is five commits ahead of
 `origin/grok/m3-life` and has not been pushed since slice 0.
@@ -38,6 +38,6 @@ A near miss measures the gap between chassis half-widths, not the distance betwe
 
 ## Not built yet
 
-Slices 4–8: pedestrians, damage and wrecked, car-swap on `E`, takedown slow motion, billboards. After those, the documentation pass and `docs/M3_REPORT.md`. Stretch content (parked cars, stunt ramps, speed cameras) stays behind the gate.
+Slices 4–8: pedestrians, damage and wrecked, car-swap on `E`, takedown slow motion, billboards. After those, the documentation pass and `docs/history/M3_REPORT.md`. Stretch content (parked cars, stunt ramps, speed cameras) stays behind the gate.
 
 The build at `http://localhost:5173/` is this state: traffic on the streets, nearby cars physical, near misses and the oncoming label. No pedestrians, smoke, car-swap, or billboards yet.

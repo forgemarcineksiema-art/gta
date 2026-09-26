@@ -1,5 +1,5 @@
 /**
- * The top of the screen (M7 slice 1, DESIGN.md §15.3, docs/M7_PLAN.md D3). Five things want the top centre: the
+ * The top of the screen (M7 slice 1, DESIGN.md §15.3, docs/history/M7_PLAN.md D3). Five things want the top centre: the
  * job line, a job's card, the intro's caption, the key hints and the news. They stack in one column in that order,
  * so none is ever drawn over another. Which of them show is the top's voice's (`voice.ts`, docs/M8.9_PLAN.md R5):
  * the goal line and at most one more.

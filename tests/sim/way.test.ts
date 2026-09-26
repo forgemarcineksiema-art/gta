@@ -1,5 +1,5 @@
 /**
- * The way (docs/M8.7_PLAN.md slice 0, D1–D2; DESIGN.md §20.3 rules 2–3): the goal holds and is the ring nearest by
+ * The way (docs/history/M8.7_PLAN.md slice 0, D1–D2; DESIGN.md §20.3 rules 2–3): the goal holds and is the ring nearest by
  * road; the field leads every lane to the goal by the shortest road; a car put off the route has its route from
  * there at once; a goal that moves is followed; a delivery's route is the lane path its limit came from. The way
  * reads the probe, so most pins move the probe (not the car) and step the way alone.

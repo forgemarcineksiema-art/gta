@@ -1,5 +1,5 @@
 /**
- * The jobs skeleton (docs/M4_PLAN.md slice 4): a delivery ring starts the
+ * The jobs skeleton (docs/history/M4_PLAN.md slice 4): a delivery ring starts the
  * job and adds its heat once, arrival pays the payout with the time bonus
  * into the bag, the clock fails it, a second ring does nothing while one
  * runs, and abandon is silent.

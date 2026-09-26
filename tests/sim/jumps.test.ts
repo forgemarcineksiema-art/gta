@@ -1,5 +1,5 @@
 /**
- * Stunt jumps (docs/M4_PLAN.md slice 6): twenty ramps on the park strip
+ * Stunt jumps (docs/history/M4_PLAN.md slice 6): twenty ramps on the park strip
  * outside the highway, clear ahead and apart; a launch at 90 km/h flies,
  * pays the bag by the airtime with the slow motion through the flight, and
  * lands upright; a hop off a kerb pays nothing. The mega-ramp (M8.8 slice

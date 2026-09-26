@@ -1,5 +1,5 @@
 /**
- * Standing props cost no draw call (M8 slice 0, docs/M8_PLAN.md D5): they are built into their chunk's part
+ * Standing props cost no draw call (M8 slice 0, docs/history/M8_PLAN.md D5): they are built into their chunk's part
  * meshes like the buildings, every prop's pieces one vertex range in one part; the far level holds only the tall
  * kinds, and the tall ones are in the shadow casters' prefix, the small ones after it.
  */

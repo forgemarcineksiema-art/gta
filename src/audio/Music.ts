@@ -1,5 +1,5 @@
 /**
- * The game's own music (M7 slice 2, DESIGN.md §15.3, docs/M7_PLAN.md D2): the score (`score.ts`) rendered once,
+ * The game's own music (M7 slice 2, DESIGN.md §15.3, docs/history/M7_PLAN.md D2): the score (`score.ts`) rendered once,
  * a second after gameplay starts, through an `OfflineAudioContext` into one mono loop a layer and a buffer a sting;
  * then the layers loop together from one start time and the heat only moves their gains, over a bar. A sting plays
  * over the loops and ducks them 6 dB for its length. Synthesized like the engine: no file, nothing to load before

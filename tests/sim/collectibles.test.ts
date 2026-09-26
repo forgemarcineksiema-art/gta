@@ -1,5 +1,5 @@
 /**
- * Billboards (docs/M3_PLAN.md slice 8): exactly fifty, stable from the seed,
+ * Billboards (docs/history/M3_PLAN.md slice 8): exactly fifty, stable from the seed,
  * clear of everything taller than a metre with ten metres of run-out either
  * side, off the carriageways and near a road; a pass at speed smashes one
  * once, pays boost and costs a little speed.

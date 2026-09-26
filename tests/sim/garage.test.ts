@@ -1,5 +1,5 @@
 /**
- * The garage (docs/M5_PLAN.md slice 4): buying from the bank, the police
+ * The garage (docs/history/M5_PLAN.md slice 4): buying from the bank, the police
  * car's lock, tier 0 equal to the preset and tier 3's multipliers, the
  * drive-out's retune in place, the respray on the descriptor, and the prep
  * items at the run's end.

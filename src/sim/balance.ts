@@ -101,7 +101,7 @@ export const BALANCE = {
   /** Hidden cars (M5.5 slice 16): the stashed car is placed when the player comes within `range` m of its spot. */
   stash: { range: 260 },
   /**
-   * Jobs (docs/M5_PLAN.md slices 1–3): a `markerRadius` m ring starts one, arriving within the same radius of
+   * Jobs (docs/history/M5_PLAN.md slices 1–3): a `markerRadius` m ring starts one, arriving within the same radius of
    * its target pays payout × (1 + timeBonus × remaining / limit) for a timed delivery; done and failed show for
    * `holdSeconds`, the card for `cardSeconds`. The generator places `counts` of each kind at least
    * `markerMinGap` m apart. A delivery's limit is `limitFactor` × its lane-path time at the lanes' limits,
@@ -168,7 +168,7 @@ export const BALANCE = {
     hot: { share: 0.25, pay: 2, heatPerSecond: 0.8 },
   },
   /**
-   * The garage's catalogue (docs/M5_PLAN.md D13): cash only; the muscle car is owned from the start. Refitted at the
+   * The garage's catalogue (docs/history/M5_PLAN.md D13): cash only; the muscle car is owned from the start. Refitted at the
    * M7 gate on its measured novice (the careful bot, 13.2k a run of 2.6 minutes at level 3; the M6 gate's 7k of 2.4):
    * the compact at 24,000 is the second run's door after the cold open, minute 6.7 (18,000 was the first's, at 4.1,
    * before the brief's 5–7); the van at 30,000 the fourth's, two runs a rung; the sports car stays the second hour's.
@@ -250,7 +250,7 @@ export const BALANCE = {
   /** The door's rewarded offer: above `doorThreshold` in the bag the video doubles it (`doorMultiplier`); the idle arrow turns to the doors above it too. */
   offer: { doorThreshold: 8000, doorMultiplier: 2 },
   /**
-   * The way (docs/M8.7_PLAN.md D1–D2, DESIGN.md §20.3 rules 2–3): the goal's ring or door is read again every
+   * The way (docs/history/M8.7_PLAN.md D1–D2, DESIGN.md §20.3 rules 2–3): the goal's ring or door is read again every
    * `repick` s and held unless another is under `switchShare` of its road distance and `switchGain` m nearer; a ring
    * or a point is reached from the lanes within `reach` m of it; a goal that moves is laid again once it has moved
    * `moveReplan` m and `movingReplan` s have passed; the route's points are rebuilt every `routeEvery` s, at least
@@ -258,7 +258,7 @@ export const BALANCE = {
    */
   way: { repick: 0.5, switchShare: 0.6, switchGain: 150, reach: 25, moveReplan: 10, movingReplan: 1, routeEvery: 0.25, pointGap: 15, roadblockCost: 800 },
   /**
-   * One kind at a time (docs/M8.7_PLAN.md D10, DESIGN.md §20.3 rule 10): a placed kind shows from the first quarter
+   * One kind at a time (docs/history/M8.7_PLAN.md D10, DESIGN.md §20.3 rule 10): a placed kind shows from the first quarter
    * hour's chain step at this bit (`STEP`: take 0, bank 1, car 2, escape 3); a kind not listed shows from the start
    * (the deliveries; the rivals and the fares keep their own gates).
    */
@@ -274,7 +274,7 @@ export const BALANCE = {
   /** The save: one key, written at most once per `debounceSeconds`; everything filled must stay under `maxBytes`. */
   save: { key: 'save', debounceSeconds: 1, maxBytes: 32768 },
   /**
-   * The M4 gate's measurements (docs/M4_REPORT.md, PROGRESS 2026-09-23, commit 74c827e and the coin lines of
+   * The M4 gate's measurements (docs/history/M4_REPORT.md, PROGRESS 2026-09-23, commit 74c827e and the coin lines of
    * 3ae1f72; seeds 42 / 7 / 123): bag a minute from heat 0 with the novice bot (336–476, midpoint), coins a
    * minute with the coin lines (32–40, worth 426–564), run length (no run ended in 10 min from heat 0: the
    * bot takes no door and nothing arrests it at heat 0–1, so 600 is a floor), busted a minute by level 0..5
@@ -301,7 +301,7 @@ export const BALANCE = {
 };
 
 /**
- * The street furniture (M8, docs/M8_PLAN.md §3.3; the catalogue's rows are `PROP_TYPES` in city/props.ts). The pool
+ * The street furniture (M8, docs/history/M8_PLAN.md §3.3; the catalogue's rows are `PROP_TYPES` in city/props.ts). The pool
  * of flying bodies; a loose prop goes from `looseMin` m/s of closing speed, a lying one from `lyingMin`; a knocked
  * prop leaves up the bonnet's `slopeDeg`, with `tangential` of the car's speed across the contact, spun by the
  * lever from the bumper (`contactHeight` m) to its centre of mass; it settles under `settleSpeed` m/s and

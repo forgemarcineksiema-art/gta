@@ -1,5 +1,5 @@
 /**
- * Identity (docs/M4_PLAN.md slice 5, DESIGN.md §2.5): a swap in sight only
+ * Identity (docs/history/M4_PLAN.md slice 5, DESIGN.md §2.5): a swap in sight only
  * changes the descriptor; a swap nobody saw ends the chase and the units box
  * the abandoned car, then withdraw; a police car is a disguise until a crime
  * is seen from it; the door and a swap out clear a blown cover. City, seed

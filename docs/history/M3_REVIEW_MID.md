@@ -3,7 +3,7 @@
 Reviewer: Claude, 2026-09-21. Reviewed: branch `grok/m3-life` at `64b8724`
 (five commits over the plan at `d3f4455`), `docs/M3_STATUS.md` and the
 session-15 entries of `docs/PROGRESS.md`. Method: every diff read against
-`docs/M3_PLAN.md` §3.3, §4 and §10; `npm run verify` re-run (green, 126
+`docs/history/M3_PLAN.md` §3.3, §4 and §10; `npm run verify` re-run (green, 126
 tests, smoke 59.2 fps / p95 16.7 ms / 90 draws / 191k triangles, 3.44 MB);
 `npm run perf` twice on this build; and a 90 s headless measurement of the
 things the slice tests do not pin (yaw of lent bodies, lane transitions of

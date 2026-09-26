@@ -1,5 +1,5 @@
 /**
- * The cold open driven through (docs/M4_PLAN.md slice 4, 4.5): the scripted
+ * The cold open driven through (docs/history/M4_PLAN.md slice 4, 4.5): the scripted
  * bot takes every verb in order to the door inside 120 s. Long: run by `npm
  * run verify:gate`.
  */

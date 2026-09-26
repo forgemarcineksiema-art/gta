@@ -136,7 +136,7 @@ export const STINGS: Readonly<Record<StingKind, readonly Note[]>> = {
   door: [n(0, 0, 0.12, 72, 0.8), n(0, 0.125, 0.12, 76, 0.8), n(0, 0.25, 0.12, 79, 0.85), n(0, 0.375, 1.1, 84, 0.9), n(0, 0.375, 1.4, 96, 0.5)],
 };
 
-/** The score in one object (docs/M7_PLAN.md §3.2): the tempo, the loop's bars, the layers and the stings. */
+/** The score in one object (docs/history/M7_PLAN.md §3.2): the tempo, the loop's bars, the layers and the stings. */
 export const SCORE = { bpm: BPM, bars: BARS, layers: LAYERS, stings: STINGS } as const;
 
 /** Seconds from a note's place in the loop. */

@@ -1,5 +1,5 @@
 /**
- * The cold open (docs/M4_PLAN.md slice 4): the van at heat 1 with the pair
+ * The cold open (docs/history/M4_PLAN.md slice 4): the van at heat 1 with the pair
  * sent out of sight, the candidate drawn alongside, the coin line and the
  * route's reach, and skip (the bot through every verb, 4.5, is in
  * coldOpen.long.test.ts). City, seed 42, traffic on.

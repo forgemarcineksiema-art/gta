@@ -36,7 +36,7 @@ export const MINIMAP = {
   /** The player's arrow: its half-length, px (the arrow is 1.66 of it: 14 px). */
   arrowPx: 8.5,
   /**
-   * The way's route (docs/M8.7_PLAN.md D3; M8.9 R6): its line, px, on a dark edge `routeEdgePx` wider on each side,
+   * The way's route (docs/history/M8.7_PLAN.md D3; M8.9 R6): its line, px, on a dark edge `routeEdgePx` wider on each side,
    * the brightest line of the disc; drawn in from the car over `drawInMs` when the goal or the route changes. The
    * goal's badge, px (radius: 20 across); an open or closed ring is a dot of `ringPx` radius (6 across).
    */

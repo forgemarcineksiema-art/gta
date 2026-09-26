@@ -1,5 +1,5 @@
 /**
- * The police helicopter (M5.5 slice 9; docs/M4_PLAN.md §5 C, DESIGN.md §5):
+ * The police helicopter (M5.5 slice 9; docs/history/M4_PLAN.md §5 C, DESIGN.md §5):
  * from heat level 4, while there is a pursuit, one air unit flies in from the
  * island's edge and holds its spotlight on the player. The light is its sight:
  * the player is seen when the lit spot is on the car and nothing solid stands

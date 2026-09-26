@@ -1,5 +1,5 @@
 /**
- * Everyone else (M8 slice 7, docs/M8_PLAN.md D6): a lent body knocks by the same rule with its own mass and pays the
+ * Everyone else (M8 slice 7, docs/history/M8_PLAN.md D6): a lent body knocks by the same rule with its own mass and pays the
  * speed, nothing else; the cars on their lanes plough lying props aside and never stop for them; walkers dodge a
  * flying prop and the guarantee keeps it off them; props never damage a car.
  */

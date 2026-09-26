@@ -1,5 +1,5 @@
 /**
- * Car-swap (docs/M3_PLAN.md slice 6): E next to a traffic car retunes the
+ * Car-swap (docs/history/M3_PLAN.md slice 6): E next to a traffic car retunes the
  * player's vehicle in place, carries speed over, leaves the old car behind
  * with its driver shaking a fist, needs a candidate and the ground, works on
  * a wreck, and the new class drives like its preset.

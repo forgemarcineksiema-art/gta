@@ -1156,7 +1156,7 @@ boundary at CPU ×4 sits at a p95 of 33.4 ms. Rules:
 - the next slice, and anything left open
 ```
 
-### 6.2 Gate report (`docs/M3_REPORT.md`, written last)
+### 6.2 Gate report (`docs/history/M3_REPORT.md`, written last)
 
 Sections, in this order: what was built (per slice, two or three lines each);
 verify and perf numbers (base vs final, all four perf runs, city and life

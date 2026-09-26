@@ -1,5 +1,5 @@
 /**
- * The balance script (docs/M5_PLAN.md slice 7, D12; DESIGN.md §2.7, §3.3):
+ * The balance script (docs/history/M5_PLAN.md slice 7, D12; DESIGN.md §2.7, §3.3):
  * `npm run balance`, outside `verify` (it steps the sim for minutes).
  *
  * 1. The capture probe: the road bot under the police, headless, traffic on,
@@ -12,7 +12,7 @@
  *    a bot wedged in a queue at the lights was busted there every 13 s, eight
  *    cards for one trap). The same novice at heat 0, same seeds, gives the
  *    bag and the coins a minute. The novice drives as a cautious player does
- *    (M7 slice 10, docs/M7_PLAN.md D8): the careful bot, which waits at the
+ *    (M7 slice 10, docs/history/M7_PLAN.md D8): the careful bot, which waits at the
  *    lights and in a queue and backs off and goes round a car that will not
  *    move on; the skilled keeps the plain bot's speed.
  * 2. The model (`model.ts`, the quick half the fitting runs on): the EV of

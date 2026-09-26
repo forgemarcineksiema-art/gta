@@ -1,5 +1,5 @@
 /**
- * The street furniture (M8, docs/DESIGN.md §16, docs/M8_PLAN.md D7): every lamp post, street tree, bin and bench
+ * The street furniture (M8, docs/DESIGN.md §16, docs/history/M8_PLAN.md D7): every lamp post, street tree, bin and bench
  * is a prop with a mass, a restitution and, when it is anchored, a base that holds up to a break impulse. This
  * module is the catalogue (`PROP_TYPES`, the numbers the pins read) and where the props stand (`chunkProps`).
  *
@@ -52,7 +52,7 @@ const box = (hx: number, hy: number, hz: number): PropShape => ({ kind: 'box', h
 const cyl = (radius: number, halfHeight: number): PropShape => ({ kind: 'cylinder', radius, halfHeight });
 
 /**
- * The catalogue, one row a kind (docs/M8_PLAN.md §3.3). Shapes are the things' real sizes: a lamp post's steel
+ * The catalogue, one row a kind (docs/history/M8_PLAN.md §3.3). Shapes are the things' real sizes: a lamp post's steel
  * pole 8 m, its weight low on the base; a sapling a staked trunk; a bus shelter 3.2 × 1.4 m of glass and steel.
  */
 export const PROP_TYPES: Readonly<Record<PropKind, PropType>> = {

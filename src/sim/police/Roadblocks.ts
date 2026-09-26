@@ -1,5 +1,5 @@
 /**
- * Roadblocks (docs/M4_PLAN.md slice 6, DESIGN.md §2.6 level 3): while the
+ * Roadblocks (docs/history/M4_PLAN.md slice 6, DESIGN.md §2.6 level 3): while the
  * pursuit is active at level 3 and up, one roadblock at a time at a
  * chokepoint on the player's road 150–300 m ahead, placed where the player
  * cannot see it go up. Two parked police cars across the lane with their

@@ -1,5 +1,5 @@
 /**
- * The wanted board's first race by a bot (M6 gate criterion 4, docs/M6_PLAN.md
+ * The wanted board's first race by a bot (M6 gate criterion 4, docs/history/M6_PLAN.md
  * §7; M7 slice 13): a test bot pulled up at Granny Gears' bay drives the lane
  * path to the Glasshouse against her, three starts each (the traffic a
  * different moment each time): the careful bot wins all three, the plain M5

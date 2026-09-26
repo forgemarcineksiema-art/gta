@@ -1,5 +1,5 @@
 /**
- * The line at the top centre (docs/M5_PLAN.md slice 1; DESIGN.md §13.4): the
+ * The line at the top centre (docs/history/M5_PLAN.md slice 1; DESIGN.md §13.4): the
  * running job (`DELIVERY 0:48 · 620 m · 12/48`, a card for its first 2.5 s,
  * the result while it holds), else the goal (`TAKE A JOB · 320 m`, `BANK IT ·
  * 540 m`, `LOSE THEM`, the chain's step) with its badge. A card is a title,

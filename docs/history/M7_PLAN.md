@@ -6,18 +6,18 @@ document is the milestone contract for the polish (`docs/DESIGN.md` §15):
 what to fix and improve, in which order, with which numbers, and what
 "done" means. Written 2026-09-24 against commit `67a5ad7` (0.6.0). Until
 that day `M7` named the platform milestone; its contract is now
-`docs/M8_PLAN.md`, and older docs that say M7 for the platform mean M8.
+`docs/history/M8_PLAN.md`, and older docs that say M7 for the platform mean M8.
 
 Read, in this order, before touching anything: `CLAUDE.md`, `docs/BRIEF.md`
 (§3, §4 audio, §6 budgets, §10), `docs/DESIGN.md` §15 in full and §12,
-`docs/PROGRESS.md` (newest first), `docs/M6_REPORT.md` and
-`docs/M5.5_REPORT.md` (their known issues are this milestone's list),
+`docs/PROGRESS.md` (newest first), `docs/history/M6_REPORT.md` and
+`docs/history/M5.5_REPORT.md` (their known issues are this milestone's list),
 `docs/BACKLOG.md`, `docs/ARCHITECTURE.md`, `docs/STYLE.md`, then this file.
 Run `npm run verify`; green before the first edit.
 
 ## 0. How to work on this milestone
 
-- **Language, autonomy, scope, honesty**: as in `docs/M5_PLAN.md` §0.
+- **Language, autonomy, scope, honesty**: as in `docs/history/M5_PLAN.md` §0.
 - **Pace** (`CLAUDE.md`): a slice is the code, its pins, the quick verify,
   one commit, eight lines in PROGRESS. Every measurement below that is not
   a Vitest pin (the browser, the bots, perf, the balance's bot runs, the
@@ -407,7 +407,7 @@ the renderer's tuning.
 
 `verify:gate`; `game`, `heat`, `city`, `life`, `screens` (with the overlap
 check), the boot loop, `balance`; perf A/B against 0.6.0 (§5.3); the
-screens looked at; `docs/M7_REPORT.md`; PROGRESS entries older than M7
+screens looked at; `docs/history/M7_REPORT.md`; PROGRESS entries older than M7
 archived to `docs/history/PROGRESS_M6.md`; version 0.7.0.
 
 ## 5. Verification

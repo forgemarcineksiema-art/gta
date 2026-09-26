@@ -1,5 +1,5 @@
 /**
- * Jobs (docs/M5_PLAN.md §3.3, slices 1–3; the M4 skeleton extended, nothing
+ * Jobs (docs/history/M5_PLAN.md §3.3, slices 1–3; the M4 skeleton extended, nothing
  * renamed). A marker is a ring on the ground; rolling into it under
  * `startSpeed` starts its job (M8.7 D8: driven through faster, nothing but a
  * `ringPass` while it teaches). One job at a time: markers do nothing while

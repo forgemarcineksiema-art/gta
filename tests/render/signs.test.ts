@@ -1,5 +1,5 @@
 /**
- * The signs and the colours (docs/M8.7_PLAN.md slice 3, D5–D7; DESIGN.md §20.3 rules 5–7): one outline per kind in
+ * The signs and the colours (docs/history/M8.7_PLAN.md slice 3, D5–D7; DESIGN.md §20.3 rules 5–7): one outline per kind in
  * a unit square; colour says the state (open white, the goal cyan, closed grey); each goal wears its sign; the line
  * names the goal with its badge and its pay in both languages; no kind has a colour of its own left.
  */

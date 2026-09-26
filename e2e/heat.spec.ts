@@ -1,5 +1,5 @@
 /**
- * M4 in the browser (docs/M4_PLAN.md §6.2), against the preview build. Slice
+ * M4 in the browser (docs/history/M4_PLAN.md §6.2), against the preview build. Slice
  * 3a: the road bot drives to the hideout (`?bot=door`), the door shuts and the
  * wall is a game-made break (`gameplayStop`), and opening it hands the game
  * back (`gameplayStart`). Slice 4: the cold open's first caption and the

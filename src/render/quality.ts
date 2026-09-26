@@ -1,5 +1,5 @@
 /**
- * The quality tiers and the automatic quality (M7 slice 5; M8.6 slice 5, docs/M8.6_PLAN.md D10): from a window of
+ * The quality tiers and the automatic quality (M7 slice 5; M8.6 slice 5, docs/history/M8.6_PLAN.md D10): from a window of
  * frames, their mean and the share that missed a vsync, what to change. The mean alone read a stutter as fine: on
  * Marcin's MX330 at a 1.5 pixel ratio a pile of cruisers ran 47 fps with one frame in five past two vsyncs and one in
  * fifteen past 50 ms, a mean of 21 ms under the 24 that steps down; the misses count now. `qualityStep` is pure;

@@ -1,5 +1,5 @@
 /**
- * Speed cameras (docs/M4_PLAN.md slice 6, DESIGN.md §7): ten, on the highway
+ * Speed cameras (docs/history/M4_PLAN.md slice 6, DESIGN.md §7): ten, on the highway
  * straights and the Crown avenue, from `cover.ts`'s sites. Each watches a
  * line across its road in both directions; the chassis crossing it more than
  * `cameras.overKmh` over the road's limit flashes: one `camera` event with the

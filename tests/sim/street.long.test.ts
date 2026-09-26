@@ -1,5 +1,5 @@
 /**
- * The street furniture's places (M8 slice 0, docs/M8_PLAN.md D7): two lines on every footway and each district's
+ * The street furniture's places (M8 slice 0, docs/history/M8_PLAN.md D7): two lines on every footway and each district's
  * places, clear of the lanes, the walkers, the rings, the doors, the billboards' lines, the ramps, the junctions'
  * corners, the overpasses and the cold open's route, from each chunk's own random stream, so the buildings, the
  * billboards and the coins are those of 0.7.0 and the decoration that stood on the footways left the statics.

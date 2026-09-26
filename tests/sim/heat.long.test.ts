@@ -1,5 +1,5 @@
 /**
- * M5.5 slice 0 (docs/M5.5_PLAN.md 0.5): the novice bot from heat 0 with the
+ * M5.5 slice 0 (docs/history/M5.5_PLAN.md 0.5): the novice bot from heat 0 with the
  * traffic and the beat on reaches level 2 inside five minutes and level 3
  * inside nine at two seeds of three: the ratchet moves for a player who only
  * drives. Long: minutes of sim per seed.

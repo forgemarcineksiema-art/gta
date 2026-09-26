@@ -194,7 +194,7 @@ All of the first five are live in the dev panel (`?dev=1` or the backtick).
 
 ## Proposed next scope (M4)
 
-Superseded on 2026-09-22 by `docs/DESIGN.md` §11 and `docs/M4_PLAN.md`
+Superseded on 2026-09-22 by `docs/DESIGN.md` §11 and `docs/history/M4_PLAN.md`
 (the run, cover and the hideout door added). Kept for the record.
 
 Police and pursuits on the same traffic machinery: a wanted level from the

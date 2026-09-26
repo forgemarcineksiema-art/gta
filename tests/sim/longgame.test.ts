@@ -1,5 +1,5 @@
 /**
- * The long game (M8 slice 9, docs/M8_PLAN.md D10): the save's version 5 carries the career's lifetime count of
+ * The long game (M8 slice 9, docs/history/M8_PLAN.md D10): the save's version 5 carries the career's lifetime count of
  * things smashed; two dailies count the player's smashes (sixty in one run, ten lamp posts); Big Bernie's second
  * requirement reads the lifetime count.
  */

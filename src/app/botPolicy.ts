@@ -1,5 +1,5 @@
 /**
- * Bot policies (docs/M4_PLAN.md slice 5): the measurements of slices 5 and 6
+ * Bot policies (docs/history/M4_PLAN.md slice 5): the measurements of slices 5 and 6
  * and M5's balance script assume a novice and a skilled player, and the road
  * bot only follows lanes. `novice` is the road bot as it is. `skilled` wraps
  * it: it swaps when a car is alongside and no unit can see (during a chase,

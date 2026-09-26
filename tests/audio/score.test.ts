@@ -1,5 +1,5 @@
 /**
- * The game's own music (M7 slice 2, docs/M7_PLAN.md D2): the score is whole
+ * The game's own music (M7 slice 2, docs/history/M7_PLAN.md D2): the score is whole
  * bars, every note inside the loop; the heat adds the layers two, three,
  * three, four, four and five strong from none to five stars; the stings are
  * busted, the escape and the door; a rendered tail folds back onto the loop's

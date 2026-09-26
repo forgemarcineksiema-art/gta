@@ -1,5 +1,5 @@
 /**
- * Daily challenges and the login streak (docs/M5_PLAN.md slice 6, DESIGN.md
+ * Daily challenges and the login streak (docs/history/M5_PLAN.md slice 6, DESIGN.md
  * §3.4). Three challenges in the language of runs, drawn from the local date
  * (`YYYY-MM-DD`, passed in by the app: the sim never reads a clock, D3), the
  * same three for everyone on a date; progress from the event ring and from

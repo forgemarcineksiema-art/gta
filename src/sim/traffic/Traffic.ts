@@ -257,7 +257,7 @@ export class Traffic {
   /** Wrecks towed away since the run began. */
   towedAway = 0;
   guardHops = 0;
-  /** An order's wanted car (docs/M5_PLAN.md D7): never despawned or claimed while it is wanted; -1 none. */
+  /** An order's wanted car (docs/history/M5_PLAN.md D7): never despawned or claimed while it is wanted; -1 none. */
   wanted = -1;
   /**
    * The drivers (docs/DESIGN.md §13.8): `pace` the share of the limit drawn at spawn, `gapT` the time gap kept
@@ -789,7 +789,7 @@ export class Traffic {
 
   /**
    * Guarantees a car of this class and paint `ensureMin`–`ensureMax` m from the
-   * player and out of view (docs/M5_PLAN.md D7): an unseen driving civilian of
+   * player and out of view (docs/history/M5_PLAN.md D7): an unseen driving civilian of
    * the class in that band is repainted (the nearest, for the shorter hunt),
    * else one is spawned on a lane there through the police spawner's
    * out-of-view search. Returns the agent or -1 (the caller retries).

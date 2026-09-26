@@ -1,6 +1,6 @@
 # M7 gate report: the polish
 
-Date: 2026-09-24. Contract: `docs/M7_PLAN.md` (slices 0–14, §7 gate
+Date: 2026-09-24. Contract: `docs/history/M7_PLAN.md` (slices 0–14, §7 gate
 criteria); design: `docs/DESIGN.md` §15. Session log: `docs/PROGRESS.md` (an
 entry per slice, and the gate's entry with the numbers below). Package
 `0.7.0`.
@@ -286,11 +286,11 @@ final 0.7.0 run against 33.3–33.4.
 Marcin plays 0.7.0 (the script above; the first car's minute is the
 question the model cannot answer). His notes drive a short pass, one or two
 play items each committed, the rest to BACKLOG. Then M8, the platform
-(`docs/M8_PLAN.md`: the SDK adapter, touch, the mobile tier, the ads, the
+(`docs/history/M8_PLAN.md`: the SDK adapter, touch, the mobile tier, the ads, the
 submission), on his word.
 
 Revised 2026-09-24 (Marcin): the milestone after M7 is designed "seriously"
-before the platform. M8 is now the chaos (DESIGN §16, `docs/M8_PLAN.md`):
+before the platform. M8 is now the chaos (DESIGN §16, `docs/history/M8_PLAN.md`):
 the street furniture made of things with mass, knocked by a rule decided
 before the physics step, each district's things, the smash paid through the
 skill chain. The platform is M9 (`docs/M9_PLAN.md`). Both on his word, his

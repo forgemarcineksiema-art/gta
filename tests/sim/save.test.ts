@@ -1,5 +1,5 @@
 /**
- * The save format (docs/M5_PLAN.md slice 0): the round trip and its stable
+ * The save format (docs/history/M5_PLAN.md slice 0): the round trip and its stable
  * string, parsing that never throws, the v0 migration, the size guard with
  * everything filled, and collect / apply against a world. Version 3 (M6 slice
  * 0): the garage keeps bodies, the M6 fields are reserved. Version 6 (M8.5

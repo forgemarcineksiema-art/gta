@@ -1,6 +1,6 @@
 # M4 gate report: Heat
 
-Date: 2026-09-23. Contract: `docs/M4_PLAN.md` (slices 0–8, §7 gate
+Date: 2026-09-23. Contract: `docs/history/M4_PLAN.md` (slices 0–8, §7 gate
 criteria). Session logs: `docs/history/PROGRESS_M4.md`.
 
 ## What was built
@@ -164,7 +164,7 @@ All live-editable in the dev panel (backtick).
 
 ## Proposed next scope
 
-M5, the launch minimum, as `docs/M5_PLAN.md` has it: the cold open on the
+M5, the launch minimum, as `docs/history/M5_PLAN.md` has it: the cold open on the
 save's seen flag, the save through the platform, the garage with the
 catalogue and paint, three jobs on the skeleton (getaway delivery,
 steal-to-order, pursuit escape) with the arrow, the daily police seed and

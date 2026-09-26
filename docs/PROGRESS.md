@@ -2,6 +2,14 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-26 — the worktrees removed, the finished plans to history
+
+At Marcin's word ("finished work") every worktree and its branch went, `m8.10-island` on origin too, each checked clean
+and inside origin/main first; CLAUDE.md lost its "Milestones in worktrees" section (its gate and save-version rules
+moved to Working method). The finished plans and gate reports, M2 to M8.8 (twenty files), moved to `docs/history/`,
+every path to them rewritten (comments in src/tests/e2e included); `docs/` keeps the brief, the design, the log, the
+standing guides and the three open contracts (M8.9, M8.10, M9). README and AGENTS.md now name those three.
+
 ## 2026-09-26 — M8.10 slice 18: the island's start
 
 Measured as the city suite does (4× CPU, 20 Mbit): 6.2–6.4 s to control on the island, 4.6–4.8 on the grid. Now 4.2–4.7
@@ -694,7 +702,7 @@ not run (no code touched).
 
 ## 2026-09-25 — M8.7 gate: 0.8.7 (M8.6's gate closed inside it)
 
-Report `docs/M8.7_REPORT.md`. `verify:gate` 525 of 526 on the final tree: the city tour's 120 s timeout at 134 s under
+Report `docs/history/M8.7_REPORT.md`. `verify:gate` 525 of 526 on the final tree: the city tour's 120 s timeout at 134 s under
 the suite's load (64 s alone); the gate now runs a worker a core. §20.5 read: six things at the ten sizes, greyscale, the
 still test; the radar's signs were 13.4 px across, under the 14 px floor at 800×450, now 14.5; a bot's first five
 minutes: the first job 11.6 s after the drive-out. Not run, stopped at Marcin's word: the perf A/B against 0.8.5, the e2e
@@ -710,7 +718,7 @@ Chief is two cars; the compact, the first purchase, is worse than the free start
 a job per class, the trophies each best at one thing, the 4×4 on grass and dirt, three crazy cars, the motorbike, the
 hovercraft and the sea, a mega-ramp instead of a helicopter, a steamroller instead of a tank, the police on the car
 model. One document at his request, first as M10 after the launch; on 2026-09-25 he put the whole of it before the
-platform: `docs/M8.8_PLAN.md`, on his word after M8.7's gate, then M9.
+platform: `docs/history/M8.8_PLAN.md`, on his word after M8.7's gate, then M9.
 
 ## 2026-09-24 — M8.7 gate, the long pins (M8.6's two with them)
 
@@ -779,7 +787,7 @@ the arrow aims straight through the blocks, at 40 % in orange on the peach sky, 
 the goal is the straight-line nearest ring every frame, so it flips; nothing shows the way between jobs; a ring is a flat
 circle and a 3 m pole told apart by eight colours; any ring starts at any speed, in a chase too; all seven kinds are open
 from minute one. Decided by Marcin in the talk: one answer per question (he cut seven signals to four) and no arrow. Set
-here (§20, `docs/M8.7_PLAN.md`, six slices): a goal that holds; the route on the radar, laid from the goal over the
+here (§20, `docs/history/M8.7_PLAN.md`, six slices): a goal that holds; the route on the radar, laid from the goal over the
 lanes; road-sign pictograms shared by the world, the radar, the map and the line; colour by state (cyan the goal, white
 open, grey closed); a job taken by rolling in under 20 km/h; nothing opened in a chase; the kinds one at a time with the
 chain; the pick on the full map; the detour round a roadblock. CLAUDE.md's budget is six things. M8.6's gate closes

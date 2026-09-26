@@ -1,5 +1,5 @@
 /**
- * The camera's occlusion rule (M5.5 slice 7, docs/M4_PLAN.md §5 A): a static
+ * The camera's occlusion rule (M5.5 slice 7, docs/history/M4_PLAN.md §5 A): a static
  * between the car and the camera pulls the camera in along the boom at once
  * and lets it out again gradually; driven through each covered street, the
  * camera never sits behind a wall or above a roof.

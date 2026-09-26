@@ -2,7 +2,7 @@
 
 The M4 session entries (slices 0–8, the design talks and the docs passes,
 2026-09-22 to 2026-09-23), newest first, moved here from `docs/PROGRESS.md`
-at the gate. The gate report is `docs/M4_REPORT.md`.
+at the gate. The gate report is `docs/history/M4_REPORT.md`.
 
 ## 2026-09-22 — M4 slice 7: levels 4 and 5, heavies and the Chief
 
@@ -724,11 +724,11 @@ or DESIGN decision.
 Marcin asked whether every remaining milestone should have a plan at
 M4_PLAN's level. Recommended and done: M5 and M6 now, the update plans
 after the first Basic Launch numbers (update 1 already has its contract in
-`docs/M4_PLAN.md` §5). Docs only.
+`docs/history/M4_PLAN.md` §5). Docs only.
 
 ### Done
 
-- `docs/M5_PLAN.md`: the launch minimum. Ground rules (headless save format
+- `docs/history/M5_PLAN.md`: the launch minimum. Ground rules (headless save format
   with app-side IO, one key, migrations, 32 kB guard; one ad per door; the
   offers' rules), the inputs M4 still has to measure (bag and coins per
   minute, busted rates per level, the cold open route), the layout, nine
@@ -738,7 +738,7 @@ after the first Basic Launch numbers (update 1 already has its contract in
   streak (ships if it fits); the balance script as `npm run balance` with
   the bot as the capture probe and three assertions; the UI and audio pass
   and the gate. Numbers table, playtest.
-- `docs/M6_PLAN.md`: the platform. Ground rules (script-tag SDK, `init`
+- `docs/history/M6_PLAN.md`: the platform. Ground rules (script-tag SDK, `init`
   first, a 3 s timeout to a no-op adapter, the docs re-read before the
   adapter), the layout, seven slices: the SDK re-read and
   `CrazyGamesPlatform`; the compliance sweep and the hand-obfuscated
@@ -749,7 +749,7 @@ after the first Basic Launch numbers (update 1 already has its contract in
   `docs/SUBMISSION.md` with the cover brief; the gate. Numbers, playtest.
 - Pointers: `CLAUDE.md` (session start, the table), `AGENTS.md`, README,
   DESIGN §11, ARCHITECTURE layout.
-- Rewritten the same day at `docs/M3_PLAN.md`'s level on Marcin's request
+- Rewritten the same day at `docs/history/M3_PLAN.md`'s level on Marcin's request
   ("more detailed and more precise"): both plans now carry the working
   rules, scope in / out / delivered-by-the-previous-milestone, numbered
   decisions with reasons (M5: D1–D14, M6: D1–D11), the module map, the
@@ -763,7 +763,7 @@ after the first Basic Launch numbers (update 1 already has its contract in
   API facts checked against the code at `ba9a12f` (M6's SDK facts from
   the 2026-09-20 read, to be re-verified in its slice 0), the playtest
   script and the reviewer checklist. 46 numbered tests in M5, 34 in M6.
-- `docs/M4_PLAN.md` rewritten the same way on Marcin's "and M4?": slices
+- `docs/history/M4_PLAN.md` rewritten the same way on Marcin's "and M4?": slices
   0–2 kept as the record with their measurements, decisions D1–D17 with
   reasons, the module map, the step order, contracts for `Run`, `Coins`,
   `cover.ts`, `ColdOpen`, the `Pursuit` and `Police` additions,
@@ -800,7 +800,7 @@ after the first Basic Launch numbers (update 1 already has its contract in
 
 ### Next
 
-- Unchanged: M4 slice 3 (`docs/M4_PLAN.md`).
+- Unchanged: M4 slice 3 (`docs/history/M4_PLAN.md`).
 
 ## 2026-09-22 — Design talk, part 2: the swap as the job, the spill, the disguise
 
@@ -839,13 +839,13 @@ reorder, all on systems that exist; he said to write them in. Docs only.
 - `docs/DESIGN.md`: §2.2 the spill, §2.4 note, §2.5 the disguise, §3.3 two
   rows, §4 steal-to-order as item 0 and the launch line, §6.6 rewritten,
   §8 five rows, §11 the job list, §12 two watch items, references.
-- `docs/M4_PLAN.md`: slice 3 spill rule and pins, slice 4 order and pins,
+- `docs/history/M4_PLAN.md`: slice 3 spill rule and pins, slice 4 order and pins,
   slice 5 disguise and breach with pins and measurement, slice 6 breach pin,
   three number rows, playtest additions. `docs/BACKLOG.md` launch line.
 
 ### Next
 
-- Unchanged: slice 3 of `docs/M4_PLAN.md`.
+- Unchanged: slice 3 of `docs/history/M4_PLAN.md`.
 
 ## 2026-09-22 — Design talk: the pitch, the launch scope, the cold open moved up
 
@@ -893,7 +893,7 @@ green at the start: 189 tests, smoke 60.0 fps / p95 16.7 ms / 97 draws /
 - `docs/DESIGN.md`: §1 the pitch, §2.6 and §2.8 notes, §3.2 coins in M4,
   §4 three jobs at launch, §5 rewritten, §11 rewritten with the launch scope
   and the two updates, §12 the busted-rate watch item with its rule.
-- `docs/M4_PLAN.md`: coins in slice 3 (placement, pickup, pins, the
+- `docs/history/M4_PLAN.md`: coins in slice 3 (placement, pickup, pins, the
   coins-per-minute measurement), the cold open prototype as slice 4 (script,
   captions, pins, measurement), slices 5–8 renumbered, levels 4–5 on the
   ground, the slice 6 decision rule, the coin row in the numbers table, the
@@ -904,7 +904,7 @@ green at the start: 189 tests, smoke 60.0 fps / p95 16.7 ms / 97 draws /
 
 ### Next
 
-- Slice 3 of `docs/M4_PLAN.md`, now with the coins, then slice 4.
+- Slice 3 of `docs/history/M4_PLAN.md`, now with the coins, then slice 4.
 
 ### Open problems
 
@@ -1156,7 +1156,7 @@ Verify green before and after.
 
 ### Next
 
-- Back to `docs/M4_PLAN.md` slice 1 (heat and pursuit as two systems).
+- Back to `docs/history/M4_PLAN.md` slice 1 (heat and pursuit as two systems).
 - Marcin drives it: the things to feel are the 1–2 shift in town (muscle now
   at ~53 km/h, was 63) and whether the overdrive appearing only on boost reads
   as a top gear or as a missing gear.
@@ -1260,12 +1260,12 @@ green at the start and at the end.
   constraints, the M4 slice order, the playtest watch list.
 - `docs/BACKLOG.md`: three new sections (run structure and heat, activities
   and progression, city v2) with the ideas that are not in a slice.
-- `docs/M4_PLAN.md`: the M4 contract for the next agent: layout to add, ten
+- `docs/history/M4_PLAN.md`: the M4 contract for the next agent: layout to add, ten
   slices with done criteria, pins and the behaviour measurement each must
   record, starting numbers, the per-slice playtest. `AGENTS.md`, `README.md`
   and `CLAUDE.md` point at it. `docs/history/` takes the M1 report, the M3
   mid-milestone status and review; the stale root `progress.md` (an M2 scratch
-  log) is removed. `docs/M3_REPORT.md` marks its M4 scope as superseded.
+  log) is removed. `docs/history/M3_REPORT.md` marks its M4 scope as superseded.
 - `docs/CRAZYGAMES.md`: A1 and A5 notes carry the planned ad points (the
   hideout door and busted; rewarded offers only in the garage and at the door
   with a cash alternative). `CLAUDE.md`: the DESIGN.md row and session-start
@@ -1295,7 +1295,7 @@ green at the start and at the end.
 
 ### Next
 
-- A new agent in a new session starts M4 at slice 0 of `docs/M4_PLAN.md`, on
+- A new agent in a new session starts M4 at slice 0 of `docs/history/M4_PLAN.md`, on
   Marcin's signal. Nothing is in progress; this session changed docs only
   and did not run `npm run verify` (two background runs were cut off by
   session restarts); the next session runs it first, as always.

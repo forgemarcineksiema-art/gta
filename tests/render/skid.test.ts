@@ -1,5 +1,5 @@
 /**
- * Skid marks and the spill's burst (M7 slice 4, docs/M7_PLAN.md D4): a wheel
+ * Skid marks and the spill's burst (M7 slice 4, docs/history/M7_PLAN.md D4): a wheel
  * marks the ground only past the slip thresholds and above walking pace; a
  * drift on the skidpad lays marks on the ground under the rear tyres, a
  * straight run at speed none; the ring wraps and never grows; a spilled coin

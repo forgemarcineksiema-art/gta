@@ -1,6 +1,6 @@
 # M5 gate report: the launch minimum
 
-Date: 2026-09-23. Contract: `docs/M5_PLAN.md` (slices 0–8, §7 gate
+Date: 2026-09-23. Contract: `docs/history/M5_PLAN.md` (slices 0–8, §7 gate
 criteria). Session log: `docs/PROGRESS.md` (the M5 entry, a section per
 slice with its measurement and what was decided).
 
@@ -190,7 +190,7 @@ All live-editable in the dev panel (backtick) unless noted.
 
 ## Proposed next scope
 
-M6, the platform, as `docs/M6_PLAN.md` has it (the SDK adapter, touch, the
+M6, the platform, as `docs/history/M6_PLAN.md` has it (the SDK adapter, touch, the
 mobile tier, the submission); its §1.2 now carries M5's as-built notes: the
 save's key and flush points, where the ads are and that the SDK adapter
 must report no rewarded ad under an adblocker, that the wall is already

@@ -1,5 +1,5 @@
 /**
- * Speed cameras (docs/M4_PLAN.md slice 6): ten, fixed, on the highway
+ * Speed cameras (docs/history/M4_PLAN.md slice 6): ten, fixed, on the highway
  * straights and the Crown avenue, 200 m apart at least; a flash for the
  * km/h over the limit when the car crosses the line more than 20 over, once
  * per cooldown.

@@ -3,8 +3,8 @@
 The session entries from the first commit to the M3 gate, moved out of
 `docs/PROGRESS.md` so a new session reads only the current milestone and the
 design talks. Same format: newest first, absolute dates. Nothing here is
-edited; the M3 gate report is `docs/M3_REPORT.md`, the M2 report
-`docs/M2_REPORT.md`, the M1 report `docs/history/M1_REPORT.md`.
+edited; the M3 gate report is `docs/history/M3_REPORT.md`, the M2 report
+`docs/history/M2_REPORT.md`, the M1 report `docs/history/M1_REPORT.md`.
 
 ## 2026-09-22 — M3 session 16: gate
 
@@ -16,7 +16,7 @@ edited; the M3 gate report is `docs/M3_REPORT.md`, the M2 report
   5/5 with the new `E`-without-a-candidate check. Screens spec gains the life
   state (popup, damage bar at stage 2, swap prompt, 12/50) and a wrecked
   capture at 1280×720; the full ten-size run stalled in the background and was
-  not inspected, the 1280×720 case passes alone. `docs/M3_REPORT.md` with the
+  not inspected, the 1280×720 case passes alone. `docs/history/M3_REPORT.md` with the
   perf protocol (bases 56.1 / 58.5 fps, gate 57.4 / 52.5; step p50 up
   1.4–2.1 ms, the rest within noise), the playtest script and the knobs.
 - Marcin closed the gate without the screens inspection; merged to `main`,
@@ -92,7 +92,7 @@ edited; the M3 gate report is `docs/M3_REPORT.md`, the M2 report
 
 - Polish pass: ARCHITECTURE decisions, STYLE, README, BACKLOG, CRAZYGAMES
   note, dev panel Life section, N4; then the gate (e2e `life`, screens,
-  perf A/B, `docs/M3_REPORT.md`).
+  perf A/B, `docs/history/M3_REPORT.md`).
 
 ## 2026-09-21 — M3 session 16: slice 7, takedowns
 
@@ -374,7 +374,7 @@ and the small ones, with behaviour pins.
 
 ## 2026-09-21 — M3 session 15: status report
 
-Marcin asked for the work-so-far report in a document. `docs/M3_STATUS.md` records slices 0–3. It is not the gate report; `docs/M3_REPORT.md` is still written at the gate.
+Marcin asked for the work-so-far report in a document. `docs/M3_STATUS.md` records slices 0–3. It is not the gate report; `docs/history/M3_REPORT.md` is still written at the gate.
 
 ## 2026-09-21 — M3 session 15: slice 3
 
@@ -478,7 +478,7 @@ Claude reviews the branch after the gate and runs the fix-up pass.
 
 ### Done
 
-- `docs/M3_PLAN.md`: the milestone contract. Working rules for the executor,
+- `docs/history/M3_PLAN.md`: the milestone contract. Working rules for the executor,
   scope (in, out, stretch), twelve fixed decisions with reasons (pooled
   typed-array traffic with a lent body pool; velocity-driven dynamic bodies
   near the player; highway sub-lane offsets instead of a graph change; a
@@ -753,7 +753,7 @@ after.
   compile at start, resumable geometry builds (1200 statics per frame), claims
   and slices alternating during the start burst.
 - Leak guard re-derived: fixed scene is about 50 geometries, not 40.
-- Report: `docs/M2_REPORT.md` § performance pass.
+- Report: `docs/history/M2_REPORT.md` § performance pass.
 
 ### Evidence and boundaries
 
@@ -843,7 +843,7 @@ new streets, and the perf hygiene items left by M2.1.
 - **Gate measurement**: the startup test reads navigation-relative time to the
   first controllable frame and logs the wall clock alongside.
 - Docs: `docs/STYLE.md` § Street plan and skyline, `docs/ARCHITECTURE.md`
-  decisions 16–17, `docs/M2_REPORT.md` § M2.2, backlog items.
+  decisions 16–17, `docs/history/M2_REPORT.md` § M2.2, backlog items.
 
 ### Evidence and boundaries
 
@@ -909,7 +909,7 @@ usage mid-way; this session verified its state and finished the pass.
   X bands showed the underside of the adjacent band as a dark wedge, located by a
   pixel raycast against the merged buffer); render parts no longer retain chunk
   descriptors; two docs written in cp1252 by the previous session restored to UTF-8.
-- Gate report extended: `docs/M2_REPORT.md` § M2.1.
+- Gate report extended: `docs/history/M2_REPORT.md` § M2.1.
 
 ### Evidence and boundaries
 
@@ -1018,7 +1018,7 @@ Marcin's instruction: begin M2. Baseline `verify` passed: 81 tests, 3.34 MB,
 - The renderer detects a large position jump itself, because a fixed step can clear
   the sim's one-tick respawn flag before rendering. City teleport views and the chase
   camera snap on their first frame; this has a browser regression assertion.
-- Gate report and five-minute playtest: `docs/M2_REPORT.md`. Start at `/`, or jump
+- Gate report and five-minute playtest: `docs/history/M2_REPORT.md`. Start at `/`, or jump
   with `?spawn=crown|foundry|gardens|marina|highway`; compare `?quality=low|high`.
 - Stop at the M2 playtest gate. M3 scope remains traffic LOD, dodging pedestrians,
   damage, car-swap, takedowns, near misses, boost economy and collectibles.

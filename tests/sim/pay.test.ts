@@ -1,5 +1,5 @@
 /**
- * The pay (M8 slice 6, docs/M8_PLAN.md D9): a smash is a skill-chain trick with the thing's points and name, the
+ * The pay (M8 slice 6, docs/history/M8_PLAN.md D9): a smash is a skill-chain trick with the thing's points and name, the
  * smashes within half a second of their group's first count as one trick toward the multiplier, an anchored thing
  * that holds loses the chain, every smash is a crime by the thing's heat (doubled in a unit's sight), and the bill
  * sums into the run's CITY DAMAGE, never into the bag or the bank.

@@ -1,5 +1,5 @@
 /**
- * The siren bed (docs/M4_PLAN.md §3.1 audio, slice 7): while the police are
+ * The siren bed (docs/history/M4_PLAN.md §3.1 audio, slice 7): while the police are
  * after the player, a wailing siren whose loudness follows the nearest unit;
  * a lower third voice joins while heavies are in the roster, and the Chief
  * leans on a two-tone horn when it is close. Nodes are built once when the

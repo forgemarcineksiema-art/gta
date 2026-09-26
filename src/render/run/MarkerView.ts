@@ -1,5 +1,5 @@
 /**
- * Job markers and their signs (docs/STYLE.md, markers; docs/M5_PLAN.md slices 1–2; M8.7 slice 3, DESIGN.md §20.3
+ * Job markers and their signs (docs/STYLE.md, markers; docs/history/M5_PLAN.md slices 1–2; M8.7 slice 3, DESIGN.md §20.3
  * rules 5–6): draws what `signs.ts` chooses. A flat ring on the road where a job is taken; a round sign 1.4 m
  * across, always turned to the camera, its face, its rim and its kind's pictogram (`sim/glyphs.ts`, extruded 3 cm),
  * on a steel pole or floating over a car, a walker or a door; a zone job's edge in the way's cyan; a taken ring lit

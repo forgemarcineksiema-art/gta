@@ -308,7 +308,7 @@ locked district. Revised around the audience.
   Discovery is the progression: heat 3 shows
   roadblocks for the first time, heat 4 the heavy units (the helicopter
   joins in update 1, §5), a first escape from heat 5 unlocks the police car
-  (the Interceptor of §3.3; at launch the police saloon, `docs/M5_PLAN.md`
+  (the Interceptor of §3.3; at launch the police saloon, `docs/history/M5_PLAN.md`
   D13).
 
 ### 3.3 Earnings (placeholders for `balance.ts`)
@@ -477,7 +477,7 @@ slices (the overpasses reopen M2, cover needs the camera occlusion rule, the
 helicopter needs both), they gate only heat 4–5, and the three KPIs are
 measured live from Basic Launch, where an update gets the game re-featured.
 Heat 4 and 5 ship on the ground: heavy SUVs and the Chief, the cooldown as the
-only escape. The contracts below and in `docs/M4_PLAN.md` (post-launch
+only escape. The contracts below and in `docs/history/M4_PLAN.md` (post-launch
 section) stand for that update.
 
 The city is flat: `RoadPoint` has x and z only, lanes carry no height, the
@@ -658,11 +658,11 @@ onto the front page.
 ## 11. Milestones as they stand now
 
 The contracts with done criteria, pins and measurements per slice are
-`docs/M4_PLAN.md` (its §5 holds update 1), `docs/M5_PLAN.md` and
-`docs/M6_PLAN.md` (the board), `docs/M7_PLAN.md` (the polish),
-`docs/M8_PLAN.md` (the chaos), `docs/M8.5_PLAN.md` (the clean screen),
-`docs/M8.6_PLAN.md` (solid cars), `docs/M8.7_PLAN.md` (the way),
-`docs/M8.8_PLAN.md` (the fleet, its design in the same file),
+`docs/history/M4_PLAN.md` (its §5 holds update 1), `docs/history/M5_PLAN.md` and
+`docs/history/M6_PLAN.md` (the board), `docs/history/M7_PLAN.md` (the polish),
+`docs/history/M8_PLAN.md` (the chaos), `docs/history/M8.5_PLAN.md` (the clean screen),
+`docs/history/M8.6_PLAN.md` (solid cars), `docs/history/M8.7_PLAN.md` (the way),
+`docs/history/M8.8_PLAN.md` (the fleet, its design in the same file),
 `docs/M8.9_PLAN.md` (the look, its design in the same file) and
 `docs/M9_PLAN.md` (the platform); this section is the summary. Update 2 gets its contract after the first Basic
 Launch numbers.
@@ -699,7 +699,7 @@ both.
   v1 and they are the one D1 lever; if anything slips it is the day-7
   topper).
 - **M5.5 The city lives** (decided 2026-09-23, §13; the contract is
-  `docs/M5.5_PLAN.md`): heat that moves with patrols at heat 0, coins as
+  `docs/history/M5.5_PLAN.md`): heat that moves with patrols at heat 0, coins as
   breadcrumbs, the goal line and the first quarter hour's chain, traffic
   with character, the police as a different animal, the garage dressed
   and the wall sized; optionally "bring it home, pay to keep it". As many
@@ -709,48 +709,47 @@ both.
   helicopter, §5), the jobs (the time trial, street races, takedown rage,
   mayhem, fares, the hunts, the skill chain, the full map, §4, §7), the
   hidden cars and the toys (§8), the life and police extras of the backlog.
-  `docs/M5.5_PLAN.md` §4 slices 7–18.
+  `docs/history/M5.5_PLAN.md` §4 slices 7–18.
 - **M6 The board** (decided by Marcin 2026-09-23 that a milestone sits
-  here; what it is, §14, set here; the contract is `docs/M6_PLAN.md`): the
+  here; what it is, §14, set here; the contract is `docs/history/M6_PLAN.md`): the
   wanted board of ten rivals and the Chief, their duels and their cars, the
   garage keeping bodies, the driver's kit and the car's kit, three more
   hidden cars. On his word after the M5.5 playtest.
 - **M7 Polish** (decided by Marcin 2026-09-24 that the next milestone
   improves and fixes what the game has; what goes in, §15, set here; the
-  contract is `docs/M7_PLAN.md`): the recorded issues a player can meet,
+  contract is `docs/history/M7_PLAN.md`): the recorded issues a player can meet,
   worked off, plus our own music, a settings row, skid marks and the
   screen's lanes. On his word after the M6 playtest.
 - **M8 Chaos** (decided by Marcin 2026-09-24 that a milestone designed
   "seriously" sits here; what it is, §16, set here; the contract is
-  `docs/M8_PLAN.md`): the street made of things with mass, the knock
+  `docs/history/M8_PLAN.md`): the street made of things with mass, the knock
   decided before the physics step, each district's things, the smash as a
   trick, the bill at the door. On his word after the 0.7.0 playtest.
 - **M8.5 The clean screen** (set here 2026-09-24 after Marcin's review of
-  the screen, §17; the contract is `docs/M8.5_PLAN.md`): each corner
+  the screen, §17; the contract is `docs/history/M8.5_PLAN.md`): each corner
   answers one question, one voice at a time, one name for each thing, the
   wall in four pages, a road coin in the bank. On his word; M8's gate
   closes inside its gate.
 - **M8.6 Solid cars** (set here 2026-09-24 after Marcin's screenshots of a
-  five-star chase, §18; the contract is `docs/M8.6_PLAN.md`): a driving car
+  five-star chase, §18; the contract is `docs/history/M8.6_PLAN.md`): a driving car
   stays on its wheels, a wreck lies on its wheels or its roof and keeps its
   pose, the police box without shoving, the officer walks round cars, the
   player's car is always seen, the frames measured in his scenes and fixed.
   Its gate closes inside M8.7's.
 - **M8.7 The way** (set here 2026-09-24 after Marcin's notes on how the game
   tells a player where to go, §20; the arrow's removal decided by him; the
-  contract is `docs/M8.7_PLAN.md`): one answer to each question (the goal
+  contract is `docs/history/M8.7_PLAN.md`): one answer to each question (the goal
   line, the route on the radar, the sign over the ring), a goal that holds,
   a job taken by rolling in, nothing opened in a chase, the kinds one at a
   time over the first quarter hour.
 - **M8.8 The fleet** (set here 2026-09-24 in a talk with Marcin; its design
-  and its contract are one document at his request, `docs/M8.8_PLAN.md`;
+  and its contract are one document at his request, `docs/history/M8.8_PLAN.md`;
   placed before the platform by him on 2026-09-25): a job for every class,
   the trophies each best at one thing, every body its own mass, grass and
   dirt with a 4×4 class, the steamroller, the monster truck and the rocket
   trolley, the motorbike, the hovercraft and the sea, the mega-ramp, then the
   police and the rivals on the player's car model if the budget holds.
-  Beside M8.9, each in its own worktree (Marcin, 2026-09-25; `CLAUDE.md`,
-  Milestones in worktrees). Built, and closed without a gate (Marcin,
+  Beside M8.9, each in its own worktree (Marcin, 2026-09-25). Built, and closed without a gate (Marcin,
   2026-09-25).
 - **M8.9 The look** (set here 2026-09-25 after a review of every screen,
   which Marcin accepted whole with his bar: six out of ten, "it must be ten,
@@ -760,7 +759,7 @@ both.
   the screen, one message at a time, a radar that answers three questions,
   signs that read from afar and never block, the garage as a showroom with
   a picture on every card. Beside M8.8, before the platform (Marcin,
-  2026-09-25; `CLAUDE.md`, Milestones in worktrees); its slice 0 (two faults
+  2026-09-25); its slice 0 (two faults
   of M8.7) first.
 - **M8.10 The island** (decided by Marcin 2026-09-25 from the grid island's
   atlas, "a simple generator with a few authored roads"; its design and its
@@ -830,7 +829,7 @@ Marcin played the M5 gate build (0.5.0 with M5.1) and the verdict reorders
 the roadmap. This section records what he found, the decision it forced,
 and the design that answers each finding. Status: **decided** where he said
 so, **set here** for the answers (he overrides by saying so). The contract
-is `docs/M5.5_PLAN.md`.
+is `docs/history/M5.5_PLAN.md`.
 
 ### 13.1 The decision — decided
 
@@ -971,7 +970,7 @@ figures still covered the island (2,300 coins, one figure per road, ten
 random trails), so from the driver's seat it was the same carpet in a
 better font. The verdict is the rule now: **a coin is attached to a goal or
 it does not exist.** The genre agrees (research 2026-09-23, sources in
-`docs/M5.5_PLAN.md` §8): Subway Surfers' coins exist only where the run
+`docs/history/M5.5_PLAN.md` §8): Subway Surfers' coins exist only where the run
 goes, in streaks of 4–6 that trace one jump; Sonic's rings run along the
 intended route and "guide the player"; Mario Kart caps coins at ten and lays
 them to "highlight the curve of the track"; Nintendo's own course dojo warns
@@ -1071,7 +1070,7 @@ seconds at a junction; nothing reacts to a siren; nothing differs between
 one driver and the next. Traffic like that is a conveyor, and police built
 on it (§13.9) are a faster conveyor.
 
-What the big games do (research 2026-09-23, sources in `docs/M5.5_PLAN.md`
+What the big games do (research 2026-09-23, sources in `docs/history/M5.5_PLAN.md`
 §8): GTA V gives every driver a bitmask of driving-style flags (stop for
 vehicles, steer around obstructions, change lanes around obstructions, go
 the wrong way only when the own lane is full) and two scalars, ability and
@@ -1229,7 +1228,7 @@ planner, the swap and the chase treat a bus as a bus; four pedestrian
 silhouettes with a walk cycle in the instanced shader, tints by district,
 the dive and the fist on all of them. Spawn weights make the districts
 read: buses on the avenues, trucks in the Works, taxis round the tower.
-Slices 19 and 20 of `docs/M5.5_PLAN.md`; the taxi's and the bus's
+Slices 19 and 20 of `docs/history/M5.5_PLAN.md`; the taxi's and the bus's
 behaviour (§13.8) rides on these bodies.
 
 ### 13.10 What this section changes elsewhere
@@ -1250,7 +1249,7 @@ behaviour (§13.8) rides on these bodies.
 Marcin, after the M5.5 gate: a new M6 before the platform, the platform
 becoming M7 (decided; M8 since 2026-09-24, §15, M9 since later that day,
 §16). What M6 is, is my idea (set here; he overrides). The contract is
-`docs/M6_PLAN.md`; the platform's is `docs/M9_PLAN.md`.
+`docs/history/M6_PLAN.md`; the platform's is `docs/M9_PLAN.md`.
 
 ### 14.1 What is missing after M5.5
 
@@ -1429,7 +1428,7 @@ Marcin, after the M6 gate: the next milestone improves and fixes what the
 game already has, and the platform becomes M8 (decided; M9 since later that
 day, §16). What goes in and
 in which order is set here (he overrides). The contract is
-`docs/M7_PLAN.md`; the platform's is `docs/M9_PLAN.md`.
+`docs/history/M7_PLAN.md`; the platform's is `docs/M9_PLAN.md`.
 
 ### 15.1 The bar
 
@@ -1540,7 +1539,7 @@ the gate. Version 0.7.0, save version 4.
 Marcin, after the M7 gate: M8 is designed "seriously" and the platform
 becomes M9 (decided). What M8 is, is my proposal from the design talk the
 same day, which he took ("Dobra, napisz M8"); the design below is set here
-(he overrides). The contract is `docs/M8_PLAN.md`; the platform's is
+(he overrides). The contract is `docs/history/M8_PLAN.md`; the platform's is
 `docs/M9_PLAN.md`.
 
 ### 16.1 What is missing
@@ -1716,7 +1715,7 @@ the ticker and CITY DAMAGE to the wall's counts):
 - **The door**: seven tabs; BAG, MULTIPLIER, BANKED, BEST RUN, BANK; the
   sentence, the first car's line, the counts, the WANTED poster; CASH in the
   footer. BANK and CASH differ by the coin pool (`funds` is the bank plus
-  the coins, D14 of `docs/M5_PLAN.md`). The radar, the speed and the
+  the coins, D14 of `docs/history/M5_PLAN.md`). The radar, the speed and the
   counters still show beside the wall.
 - **Names**: money is COINS, BAG, BANK, CASH and BANKED; heat is the stars,
   LEVEL 3 (the news) and HEAT 3 (the dailies, the police car's card); the

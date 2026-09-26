@@ -1,5 +1,5 @@
 /**
- * Pursuit escape (docs/M5_PLAN.md slice 3): the marker sets the heat to its
+ * Pursuit escape (docs/history/M5_PLAN.md slice 3): the marker sets the heat to its
  * level's threshold and the police have the player on the same step; the
  * escape pays `bounty × level`; a higher heat is kept; busted ends it with no
  * bounty; the level-4 marker brings the level-4 roster. City, seed 42.

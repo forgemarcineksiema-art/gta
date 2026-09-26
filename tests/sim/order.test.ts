@@ -1,5 +1,5 @@
 /**
- * Steal-to-order (docs/M5_PLAN.md slice 2): the traffic's guarantee of the
+ * Steal-to-order (docs/history/M5_PLAN.md slice 2): the traffic's guarantee of the
  * wanted car, a repaint before a spawn, the hunt, the swap that starts the
  * clock, the payout by damage stage, the retarget after a wreck, and the
  * car left behind. City, seed 42.

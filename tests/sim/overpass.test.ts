@@ -1,5 +1,5 @@
 /**
- * The overpasses (M5.5 slice 8, docs/M4_PLAN.md §5 B): the highway climbs
+ * The overpasses (M5.5 slice 8, docs/history/M4_PLAN.md §5 B): the highway climbs
  * over its four crossings with the central streets. The graph carries the
  * height, the traffic drives it, the player's car climbs the ramp, crosses the
  * deck and comes down inside the landing rules, the street passes under it,

@@ -1,5 +1,5 @@
 /**
- * The settings (M7 slice 3, docs/M7_PLAN.md D5): a volume step is a gain on a
+ * The settings (M7 slice 3, docs/history/M7_PLAN.md D5): a volume step is a gain on a
  * dB curve (10 full, 3 dB a step, 0 silent); the radar north up holds its
  * heading at north whatever the car does. The save's version 4 is pinned in
  * tests/sim/save.test.ts (M7 3.1).

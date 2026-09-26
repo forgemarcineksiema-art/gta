@@ -1,5 +1,5 @@
 /**
- * The save (docs/M5_PLAN.md D1, D2): one versioned JSON document under one
+ * The save (docs/history/M5_PLAN.md D1, D2): one versioned JSON document under one
  * key. This module is the format only: the type, the defaults, a stable
  * serializer, a parser that never throws, the migrations table, and
  * `collect` / `apply` between a document and a world. No storage, no clock,

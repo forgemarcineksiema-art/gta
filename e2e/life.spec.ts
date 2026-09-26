@@ -1,5 +1,5 @@
 /**
- * M3 gates (docs/M3_PLAN.md §5.2), against the preview build: a bot run with
+ * M3 gates (docs/history/M3_PLAN.md §5.2), against the preview build: a bot run with
  * traffic and pedestrians on inside the perf budgets, a keyboard swap, the
  * takedown slow motion on the loop, and wrecked to respawn.
  */

@@ -1,5 +1,5 @@
 /**
- * The arrest across the city (docs/M4_PLAN.md slice 3c), with traffic and
+ * The arrest across the city (docs/history/M4_PLAN.md slice 3c), with traffic and
  * pedestrians on: a player who stops at heat 2 is boxed and busted within
  * 20 s wherever it happens, the units arrive braking (never at chase speed)
  * and none of them writes itself off on the player. Long: four worlds with

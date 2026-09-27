@@ -83,6 +83,8 @@ export class ColdOpen {
   route: ColdOpenRoute | null = null;
   /** The job def the marker starts, -1 outside the script. */
   job = -1;
+  /** Its delivery paid: its ring is gone (out of the hotel's garage and back into it paid 7,500 a lap, for ever). */
+  delivered = false;
   /** The tick the script ended (its door, a skip); -1 before. Events up to it are the intro's, not the chain's. */
   endTick = -1;
   /** The muscle car held alongside, -1 once taken or let go. */
@@ -152,6 +154,7 @@ export class ColdOpen {
     this.markerX = route.markerX;
     this.markerZ = route.markerZ;
     const fx = Math.sin(hideout.yaw), fz = Math.cos(hideout.yaw);
+    this.delivered = false;
     this.job = sim.jobs.add({
       kind: 'delivery', x: route.markerX, z: route.markerZ, yaw: route.markerYaw,
       // four metres inside the door: any car through the opening passes within the ring
@@ -302,6 +305,9 @@ export class ColdOpen {
       case 'door':
         this.complete('escape');
         this.finish();
+        break;
+      case 'jobDone':
+        if (e.target === this.job) this.delivered = true;
         break;
       default:
         break;

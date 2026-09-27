@@ -17,6 +17,8 @@ import { canalLength, inCanal, pointAt } from '../../../src/sim/island/shapes/wo
 import { DECK } from '../../../src/sim/island/structures';
 import type { P2 } from '../../../src/sim/island/geom';
 import type { Traffic } from '../../../src/sim/traffic/Traffic';
+import type { LanePose, LaneProjection } from '../../../src/sim/traffic/lanes';
+import { POLICE } from '../../../src/sim/police/tuning';
 import * as THREE from 'three';
 import { collectSigns, newRingList, newSignList } from '../../../src/render/run/signs';
 import { MarkerView } from '../../../src/render/run/MarkerView';
@@ -413,6 +415,183 @@ describe('M8.10 slice 14: the jobs, the rivals and the way on the island', () =>
       expect(n, id).toBeGreaterThan(8);
     }
   });
+
+  it("14b.13 a street race's rivals down the road from a short lane: spaced, never stacked at its end or past a long curve", () => {
+    leave();
+    const lanes = traffic.lanes, graph = traffic.streets.graph;
+    // the first eight short lanes on the ground with a way on (most of the island's junction curves are over 16 m)
+    const shorts: number[] = [];
+    for (let i = 0; i < lanes.laneCount && shorts.length < 8; i++) {
+      const lane = graph.lanes[i] as Lane, len = lanes.length[i] as number;
+      if (lane.highway || lane.ring || len < 14 || len > 26 || lanes.outs(i).length === 0) continue;
+      if (Math.abs(lanes.heightAt(i, 0) - traffic.streets.groundAt(lane.x0, lane.z0)) > 0.5) continue;
+      shorts.push(i);
+    }
+    expect(shorts.length).toBe(8);
+    for (const short of shorts) {
+      const lane = graph.lanes[short] as Lane;
+      const finish = rings().find((d) => Math.hypot(d.x - lane.x0, d.z - lane.z0) > 600) as JobDef;
+      put(lane.x0, lane.z0, lane.yaw0);
+      run(sim, 0.05);
+      sim.jobs.race.start(finish.x, finish.z, sim.probe);
+      const cars = [0, 1, 2].map((k) => sim.jobs.race.rivals[k] as number);
+      for (const a of cars) expect(a, `lane ${short}`).toBeGreaterThanOrEqual(0);
+      for (let k = 0; k < 3; k++) {
+        for (let j = k + 1; j < 3; j++) {
+          const a = cars[k] as number, b = cars[j] as number;
+          expect(Math.hypot((traffic.x[a] as number) - (traffic.x[b] as number), (traffic.z[a] as number) - (traffic.z[b] as number)), `lane ${short}`).toBeGreaterThan(6);
+        }
+      }
+      sim.jobs.race.stop();
+      for (const a of cars) traffic.remove(a);
+    }
+    leave();
+  });
+
+  it("14b.14 a race's rival from a full pool: the farthest civilian out of sight gives up its record (a duel had no rival)", () => {
+    leave();
+    const lanes = traffic.lanes;
+    // the pool filled with civilians on a street behind the player (facing +z at z 50)
+    let behind = -1;
+    for (let i = 0; i < lanes.laneCount && behind < 0; i++) if ((lanes.midZ[i] as number) < -300) behind = i;
+    const filled: number[] = [];
+    for (let a = traffic.spawnRacer(behind, (lanes.length[behind] as number) / 2, 'muscle', 0); a >= 0; a = traffic.spawnRacer(behind, (lanes.length[behind] as number) / 2, 'muscle', 0)) {
+      traffic.endRace(a);
+      filled.push(a);
+    }
+    expect(filled.length).toBeGreaterThan(0);
+    const cosHalf = Math.cos(POLICE.viewHalfAngleDeg * Math.PI / 180);
+    const rival = traffic.spawnRacer(behind, 5, 'muscle', 0, true, sim.probe, POLICE.viewNear, cosHalf);
+    expect(rival).toBeGreaterThanOrEqual(0);
+    for (const a of [...filled, rival]) traffic.remove(a);
+  });
+
+  it("14b.15 a hailer under the deck: the taxi stopped over them on the deck takes nobody; a few metres from them on their street it does", () => {
+    const peds = sim.peds;
+    if (!peds) throw new Error('no walkers');
+    leave();
+    sim.setBody('taxi');
+    const spot = deckOverStreet();
+    expect(spot).not.toBeNull();
+    if (!spot) return;
+    const h = peds.spawnAt(spot.streetX, spot.streetZ, 0, PedPose.Walk);
+    expect(h).toBeGreaterThanOrEqual(0);
+    peds.hail(h, 0);
+    sim.fares.hailer = h;
+    island.sync(spot.x, spot.z, true);
+    sim.vehicle.teleport({ x: spot.x, y: spot.deckY + 0.9, z: spot.z }, spot.yaw);
+    sim.vehicle.setVelocity(0, 0, 0);
+    for (let i = 0; i < 10; i++) { clearControls(sim.controls); sim.controls.brake = 1; sim.step(); }
+    expect(sim.fares.fare).toBe(-1);
+    // down on their street, 4 m back from them
+    traffic.lanes.positionAt(spot.street, spot.streetS - 4, 0, pose);
+    put(pose.x, pose.z, pose.yaw);
+    for (let i = 0; i < 10 && sim.fares.fare < 0; i++) { clearControls(sim.controls); sim.controls.brake = 1; sim.step(); }
+    expect(sim.fares.fare).toBeGreaterThanOrEqual(0);
+    leave();
+    sim.setBody('muscle');
+  });
+
+  it("14b.16 the horn on a deck: a car on the street under it, ahead the same way, heeds nothing; honked on its street, it does", () => {
+    leave();
+    const spot = deckOverStreet(1);
+    expect(spot).not.toBeNull();
+    if (!spot) return;
+    const civ = traffic.spawnRacer(spot.street, spot.streetS + 10, 'muscle', 0);
+    expect(civ).toBeGreaterThanOrEqual(0);
+    traffic.endRace(civ);
+    // on the deck over its street, facing its way
+    island.sync(spot.x, spot.z, true);
+    sim.vehicle.teleport({ x: spot.x, y: spot.deckY + 0.9, z: spot.z }, spot.streetYaw);
+    sim.vehicle.setVelocity(0, 0, 0);
+    run(sim, 0.05);
+    expect(traffic.honked(sim.probe)).toBe(0);
+    traffic.lanes.positionAt(spot.street, spot.streetS, 0, pose);
+    put(pose.x, pose.z, pose.yaw);
+    run(sim, 0.05);
+    expect(traffic.honked(sim.probe)).toBe(1);
+    traffic.remove(civ);
+    leave();
+  });
+
+  it("14b.17 a car knocked off its lane on a deck and flattened lies on the deck, not on the street under it", () => {
+    leave();
+    const spot = deckOverStreet();
+    expect(spot).not.toBeNull();
+    if (!spot) return;
+    const car = traffic.spawnRacer(spot.deck, spot.deckS, 'muscle', 0);
+    expect(car).toBeGreaterThanOrEqual(0);
+    traffic.endRace(car);
+    // the player on the deck behind it: its body lent
+    traffic.lanes.positionAt(spot.deck, spot.deckS - 12, 0, pose);
+    island.sync(pose.x, pose.z, true);
+    sim.vehicle.teleport({ x: pose.x, y: (pose.y ?? 0) + 0.9, z: pose.z }, pose.yaw);
+    sim.vehicle.setVelocity(0, 0, 0);
+    run(sim, 0.1);
+    expect(traffic.hasBody(car)).toBe(true);
+    traffic.lane[car] = -1;
+    traffic.flatten(car);
+    expect(Math.abs((traffic.y[car] as number) - spot.deckY)).toBeLessThan(0.6);
+    traffic.remove(car);
+    leave();
+  });
+
+  it("14b.18 a car on the street under a deck does not wait for a car over it on the deck", () => {
+    leave();
+    const spot = deckOverStreet(1);
+    expect(spot).not.toBeNull();
+    if (!spot) return;
+    const over = traffic.spawnRacer(spot.deck, spot.deckS, 'muscle', 0);
+    const under = traffic.spawnRacer(spot.street, spot.streetS - 8, 'muscle', 0);
+    expect(Math.min(over, under)).toBeGreaterThanOrEqual(0);
+    traffic.endRace(over);
+    traffic.endRace(under);
+    // the player on the street behind them, out of their way
+    traffic.lanes.positionAt(spot.street, Math.max(2, spot.streetS - 40), 0, pose);
+    put(pose.x, pose.z, pose.yaw);
+    run(sim, 1.5);
+    expect(traffic.speed[under] as number).toBeGreaterThan(2);
+    traffic.remove(over);
+    traffic.remove(under);
+    leave();
+  });
+
+  it("14b.19 a duel's place by the way left, the way the car faces: Granny driving off in front is first; turned round, the shorter way back is", () => {
+    leave();
+    duel(0);
+    run(sim, 3, (_t, c) => { c.brake = 1; });
+    expect(sim.jobs.race.place(sim.probe)).toBe(2);
+    // facing back: the way round behind it is shorter than the one she is driving
+    const p = sim.vehicle.body.translation();
+    sim.vehicle.teleport({ x: p.x, y: p.y + 0.1, z: p.z }, sim.probe.yaw + Math.PI);
+    sim.vehicle.setVelocity(0, 0, 0);
+    run(sim, 0.1, (_t, c) => { c.brake = 1; });
+    expect(sim.jobs.race.place(sim.probe)).toBe(1);
+    leave();
+  });
+
+  const pose: LanePose = { x: 0, z: 0, yaw: 0 };
+  const proj: LaneProjection = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };
+  /** A point of a highway deck over a street (within `near` m of its lane): the deck's lane and height, the street's under it. */
+  function deckOverStreet(near = 3): { deck: number; x: number; z: number; yaw: number; deckY: number; deckS: number; street: number; streetS: number; streetX: number; streetZ: number; streetYaw: number } | null {
+    const lanes = traffic.lanes, streets = traffic.streets;
+    for (let i = 0; i < lanes.laneCount; i++) {
+      if (!(streets.graph.lanes[i] as Lane).highway) continue;
+      const len = lanes.length[i] as number;
+      for (let s = 10; s < len - 10; s += near < 2 ? 1 : 5) {
+        lanes.positionAt(i, s, 0, pose);
+        const ground = streets.groundAt(pose.x, pose.z), deckY = pose.y ?? 0;
+        if (deckY - ground < 5) continue;
+        const street = streets.nearestLane(pose.x, pose.z, ground);
+        if (street < 0 || (streets.graph.lanes[street] as Lane).highway) continue;
+        lanes.project(street, pose.x, pose.z, proj);
+        if (proj.dist > near || Math.abs(lanes.heightAt(street, proj.s) - ground) > 1) continue;
+        if (proj.s < 20 || proj.s > (lanes.length[street] as number) - 20) continue;
+        return { deck: i, x: pose.x, z: pose.z, yaw: pose.yaw, deckY, deckS: s, street, streetS: proj.s, streetX: proj.x, streetZ: proj.z, streetYaw: proj.yaw };
+      }
+    }
+    return null;
+  }
 
   /** The car stopped at (x, z) facing `yaw`. */
   function put(x: number, z: number, yaw: number): void {

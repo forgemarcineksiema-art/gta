@@ -160,9 +160,14 @@ describe('M8.10 slice 15: the finds', () => {
     const w = under!;
     island.sync(w.x, w.z, true);
     coins.spill(w.x, w.z, w.yaw, 1200, sim.events, w.y + 0.6);
+    // every coin laid (the pool holds two spills: the other's slots stand empty)
+    let laid = 0;
     for (let k = 0; k < coins.spillTtl.length; k++) {
+      if ((coins.spillTtl[k] as number) <= 0) continue;
+      laid++;
       expect(Math.abs((coins.spillY[k] as number) - COIN_HEIGHT - ground(coins.spillX[k] as number, coins.spillZ[k] as number)), `spill ${k}`).toBeLessThan(0.2);
     }
+    expect(laid).toBe(BALANCE.spill.coins);
     coins.spillTtl.fill(0);
     // a gate line through a panel beside a street on the hill, laid as an island chunk's: over the ground, picked by a
     // car at its height, not by one on the level under it

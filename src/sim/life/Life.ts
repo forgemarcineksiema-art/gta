@@ -114,10 +114,13 @@ export class Life {
       controls.swap = false;
       return;
     }
+    // under the busted card and behind the shut door the wreck waits: its respawn moved the car from under the officer
+    // at its window, or out of the garage
+    const held = this.sim.run.state === 'busted' || this.sim.run.state === 'door';
     if (st.wrecked) {
       st.wreckedFor += dt;
-      st.respawnIn = Math.max(0, st.respawnIn - dt);
-      if (controls.reset || st.respawnIn <= 0) {
+      if (!held) st.respawnIn = Math.max(0, st.respawnIn - dt);
+      if (!held && (controls.reset || st.respawnIn <= 0)) {
         this.respawn();
         controls.reset = false;
       }

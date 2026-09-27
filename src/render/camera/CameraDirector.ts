@@ -85,12 +85,17 @@ export class CameraDirector {
    * The takedown camera while the slow motion runs: a cut to a low side view across the wreck (M5.5 slice 17)
    * when a side has a clear line to it, else a look at it from the chase; released as soon as it ends or is skipped.
    */
-  syncFocus(car: THREE.Vector3, vel: THREE.Vector3): void {
+  syncFocus(car: THREE.Vector3, vel: THREE.Vector3, alpha = 1): void {
     const life = this.sim.life.state;
     const traffic = this.sim.traffic;
     if (life.slowMo > 0 && life.slowMoTarget >= 0 && traffic) {
       const i = life.slowMoTarget;
-      const wx = traffic.x[i] as number, wz = traffic.z[i] as number, wy = (traffic.y[i] as number) + 0.8;
+      // where the wreck is drawn (its transform between the last two steps): its record moves a step at a time, four
+      // frames apart in the slow motion, and the eye on it jerked with it
+      const tb = this.sim.transforms, p = (traffic.slot[i] as number) * 3;
+      const wx = lerp(tb.prevPos[p] as number, tb.currPos[p] as number, alpha);
+      const wy = lerp(tb.prevPos[p + 1] as number, tb.currPos[p + 1] as number, alpha) + 0.8;
+      const wz = lerp(tb.prevPos[p + 2] as number, tb.currPos[p + 2] as number, alpha);
       if (this.sideCut !== i && !this.chase.cutting && this.sim.run.state === 'running' && this.cutToSide(wx, wy, wz, car, vel)) this.sideCut = i;
       if (this.sideCut !== i) this.chase.focus(wx, wy, wz, 0.2);
     } else {
@@ -117,4 +122,8 @@ export class CameraDirector {
     }
     return false;
   }
+}
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
 }

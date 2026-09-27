@@ -113,11 +113,12 @@ export class LocalPlatform implements Platform {
     return Promise.resolve();
   }
 
+  /** A storage that cannot be read rejects (the save then writes nothing), never answers "no save". */
   loadData(key: string): Promise<string | null> {
     try {
       return Promise.resolve(localStorage.getItem(key));
-    } catch {
-      return Promise.resolve(null);
+    } catch (e) {
+      return Promise.reject(e instanceof Error ? e : new Error(String(e)));
     }
   }
 

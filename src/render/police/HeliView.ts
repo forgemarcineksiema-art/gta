@@ -119,13 +119,15 @@ export class HeliView {
     scene.add(this.root, this.spot);
   }
 
-  update(dt: number): void {
+  /** `alpha`: how far the frame is between the last two steps (the aircraft drawn between them, as the cars are). */
+  update(dt: number, alpha = 1): void {
     const heli = this.sim.police?.heli;
     const on = heli?.active ?? false;
     if (this.root.visible !== on) { this.root.visible = on; this.spot.visible = on; }
     if (!heli || !on) return;
-    this.root.position.set(heli.x, heli.y, heli.z);
-    this.root.rotation.set(0, heli.yaw, 0);
+    const turn = heli.yaw - heli.prevYaw;
+    this.root.position.set(lerp(heli.prevX, heli.x, alpha), lerp(heli.prevY, heli.y, alpha), lerp(heli.prevZ, heli.z, alpha));
+    this.root.rotation.set(0, heli.prevYaw + Math.atan2(Math.sin(turn), Math.cos(turn)) * alpha, 0);
     // a nose-down lean with its speed
     this.root.rotateX(Math.min(0.25, Math.hypot(heli.vx, heli.vz) * 0.006));
     this.rotor.rotation.y += dt * 38;
@@ -138,7 +140,7 @@ export class HeliView {
     const near = Math.hypot(this.sim.probe.x - heli.lightX, this.sim.probe.z - heli.lightZ) < spot * 2;
     // on the island's slopes laid along the ground (a flat disc sank on the uphill side, floated on the downhill), over
     // the most the ground strays from it; on the car's road where that is over the ground (a deck), flat on it
-    const island = this.sim.island, x = heli.lightX, z = heli.lightZ;
+    const island = this.sim.island, x = lerp(heli.prevLightX, heli.lightX, alpha), z = lerp(heli.prevLightZ, heli.lightZ, alpha);
     let under = 0.06, sx = 0, sz = 0;
     if (island) {
       const g = island.ground, d = spot * 0.7;
@@ -154,4 +156,8 @@ export class HeliView {
     this.spot.scale.setScalar(spot);
     (this.spot.material as THREE.MeshBasicMaterial).opacity = heli.sees ? 0.3 : 0.18;
   }
+}
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
 }

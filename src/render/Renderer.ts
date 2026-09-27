@@ -4,7 +4,7 @@
  * drawn lives in the folders by what it is (docs/ARCHITECTURE.md, decision 97); this file keeps the order.
  */
 import * as THREE from 'three';
-import { KIT, bodySpec, type CarId, type SimEvent, type SimWorld } from '../sim';
+import { KIT, bodySpec, type CarId, type SimEvent, type SimWorld, type VehicleTelemetry } from '../sim';
 import type { CarLook, Preview } from '../sim/garage/look';
 import { CameraDirector } from './camera/CameraDirector';
 import { ChaseCamera } from './camera/ChaseCamera';
@@ -122,9 +122,12 @@ export class Renderer {
   private readonly onEvent = (e: SimEvent): void => this.handleEvent(e);
   private readonly lastCarPos = new THREE.Vector3(Infinity, Infinity, Infinity);
   private readonly carVel = new THREE.Vector3();
+  /** The telemetry as a frame reads it (the frame's hardest hit and landing over its steps), one object reused. */
+  private readonly frameTm: VehicleTelemetry;
 
   constructor(canvas: HTMLCanvasElement, sim: SimWorld, quality?: QualityTier) {
     this.sim = sim;
+    this.frameTm = { ...sim.vehicle.telemetry };
     this.auto = new AutoQuality(quality !== undefined);
     this.quality = quality ?? 'low';
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', stencil: false });
@@ -267,7 +270,11 @@ export class Renderer {
     return this.player.visibleCar;
   }
 
-  render(alpha: number, dt: number): void {
+  /**
+   * `dt` the frame's time (the camera, the quality's reading), `worldDt` the sim's (the effects and the car's wheels: the
+   * takedown's slow motion), `impact` and `landing` the hardest over the frame's steps (the shake, the sparks).
+   */
+  render(alpha: number, dt: number, worldDt = dt, impact = this.sim.vehicle.telemetry.impact, landing = this.sim.vehicle.telemetry.landingImpact): void {
     const sim = this.sim;
     if (this.player.sync()) this.director.onSwap(sim.carBody, this.player.roof);
     this.shapes.update(sim.transforms, alpha);
@@ -287,12 +294,15 @@ export class Renderer {
     const car = this.player.mesh.root;
     const carPos = car.position;
     // the camera where the last frame left it and the car where this one puts it: a car between them is thinned
-    this.trafficView?.update(sim.transforms, alpha, dt, this.camera.position, carPos);
+    this.trafficView?.update(sim.transforms, alpha, dt, this.camera.position, carPos, worldDt);
     this.pedView?.update(sim.transforms, alpha);
     this.propsView?.update(sim, alpha, this.elapsed);
     this.policeView.update(alpha, this.trafficView?.fade ?? null);
-    this.heliView?.update(dt);
-    const tm = sim.vehicle.telemetry;
+    this.heliView?.update(dt, alpha);
+    // the telemetry as the frame reads it: the last step's, with the frame's hardest hit and landing
+    const tm = Object.assign(this.frameTm, sim.vehicle.telemetry);
+    tm.impact = impact;
+    tm.landingImpact = landing;
     // A fixed step can clear the sim's respawn flag before the next render frame.
     const snap = sim.respawned || this.lastCarPos.distanceToSquared(carPos) > 80 * 80;
     this.lastCarPos.copy(carPos);
@@ -307,26 +317,26 @@ export class Renderer {
 
     this.chase.update(car, this.carVel, tm, dt, snap);
     this.hideoutView?.update(sim);
-    this.coinsView?.update(sim, dt, carPos);
+    this.coinsView?.update(sim, worldDt, carPos);
     this.markerView.update(sim, alpha);
     this.roadblockView?.update(sim);
     this.signalView?.update(sim);
     this.breakerView?.update(sim);
-    this.player.update(tm, dt);
+    this.player.update(tm, worldDt);
     this.ghost.update();
     this.sky.update(carPos, this.camera.position);
     // the paint's fade by the camera's height over the ground under it (the island's hills; the grid's 0)
     if (sim.island) PAINT_GROUND.value = sim.island.ground.surfaceHeight(this.camera.position.x, this.camera.position.z);
-    this.fx.drive(tm, this.carVel, this.camera.aspect, dt);
+    this.fx.drive(tm, this.carVel, this.camera.aspect, worldDt);
     this.eventSeq = sim.events.readFrom(this.eventSeq, this.onEvent);
-    this.director.syncFocus(carPos, this.carVel);
+    this.director.syncFocus(carPos, this.carVel, alpha);
     this.player.mesh.setDamage(sim.life.state.stage);
-    this.fx.emitSmoke(dt, car, this.carVel);
-    this.player.emitTyreSmoke(dt, this.smoke, this.carVel);
-    this.fx.kick(dt, this.player.mesh.wheels, car, this.carVel);
+    this.fx.emitSmoke(worldDt, car, this.carVel);
+    this.player.emitTyreSmoke(worldDt, this.smoke, this.carVel);
+    this.fx.kick(worldDt, this.player.mesh.wheels, car, this.carVel);
     this.elapsed += dt;
     if (this.billboards && sim.collectibles) this.billboards.update(sim.collectibles);
-    this.fx.update(dt, this.elapsed);
+    this.fx.update(worldDt, this.elapsed);
 
     // the wall's pictures while it is up, never while the run drives (before the frame: they borrow the renderer)
     this.thumbs?.step(sim.run.state === 'door');
@@ -363,6 +373,7 @@ export class Renderer {
   setQualityMode(mode: 'auto' | QualityTier): void {
     if (!this.auto.setMode(mode)) return;
     if (mode !== 'auto' && mode !== this.quality) this.setQuality(mode);
+    else this.resize();
   }
 
   private setQuality(tier: QualityTier): void {

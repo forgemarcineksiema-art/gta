@@ -310,6 +310,8 @@ export class Coins {
   readonly spillZ: Float32Array;
   readonly spillValue: Float32Array;
   readonly spillTtl: Float32Array;
+  /** The slots a spill being laid takes (a scratch). */
+  private readonly spillSlots: Int32Array;
   /** Bumps whenever the spill pool changes shape (laid, a coin picked, expired) so the view repacks. */
   spillSerial = 0;
   private readonly extraNext: Record<ExtraTag, number> = { rings: 0, caches: 0, route: 0 };
@@ -321,12 +323,14 @@ export class Coins {
    * a coin laid without one stands over (the grid's 0; the island's hills, `StreetMap.groundAt`).
    */
   constructor(private readonly city: City | null, private readonly lanes: LaneTables, private readonly ground: GroundAt = FLAT) {
-    const n = BALANCE.spill.coins;
+    // room for two spills on the road at once (a wreck's and a hunt's burst): the second wiped the first, its value with it
+    const n = BALANCE.spill.coins * 2;
     this.spillX = new Float32Array(n);
     this.spillY = new Float32Array(n).fill(COIN_HEIGHT);
     this.spillZ = new Float32Array(n);
     this.spillValue = new Float32Array(n);
     this.spillTtl = new Float32Array(n);
+    this.spillSlots = new Int32Array(BALANCE.spill.coins);
   }
 
   /**
@@ -447,15 +451,19 @@ export class Coins {
       lanes.positionAt(lane, bestS, 0, this.pose);
       road = this.pose.y ?? 0;
     }
-    const n = this.spillTtl.length;
+    // a spill's coins into the slots no spill on the road holds (a third at once takes the pool from its first slot)
+    let n = 0;
+    for (let k = 0; k < this.spillTtl.length && n < sp.coins; k++) if ((this.spillTtl[k] as number) <= 0) this.spillSlots[n++] = k;
+    if (n === 0) for (; n < sp.coins; n++) this.spillSlots[n] = n;
     const base = Math.floor(total / n);
     let rest = total - base * n;
-    for (let k = 0; k < n; k++) {
-      let px = x + Math.sin(yaw) * (sp.startAhead + k * sp.pitch);
-      let pz = z + Math.cos(yaw) * (sp.startAhead + k * sp.pitch);
+    for (let j = 0; j < n; j++) {
+      const k = this.spillSlots[j] as number;
+      let px = x + Math.sin(yaw) * (sp.startAhead + j * sp.pitch);
+      let pz = z + Math.cos(yaw) * (sp.startAhead + j * sp.pitch);
       let py = this.ground(px, pz);
       if (lane >= 0) {
-        const s = bestS + sp.startAhead + k * sp.pitch;
+        const s = bestS + sp.startAhead + j * sp.pitch;
         const outs = lanes.outs(lane);
         let next = -1;
         for (const o of outs) if (lanes.straightThrough(lane, o)) { next = o; break; }

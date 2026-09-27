@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-28 — the third bug hunt (Marcin: "/bughunt")
+
+Five read-only agents by area, the chase probe, stills; fixed: on stacked roads a car given back to its lane was drawn up
+to 1.7 m in the road (13.6), a car under a deck waited for one on it (14b.18), the horn and the disco reached the other road
+(14b.16), a taxi on a deck took a hailer under it (14b.15), a flattened car fell to the street (14b.17); a race's rivals
+stacked past a short lane (14b.13), none from a full pool (14b.14), a duel's place in a straight line (14b.19); under the card
+a wreck respawned and a bump made the player wanted (3.5b), a rival's ring restarted inside itself (1.2b); two spills
+(3.10b), the intro's delivery a lap (4.7), dailies by door, reload and clock (6.3c, 0.12, 6.6), a save unread (0.10); the
+pause drew and ran the messages, the card's key reset the car, the radar, the helicopter, the eye. The rest in BACKLOG.
+
 ## 2026-09-27 — the bug hunt's prompt (Marcin: "Opracuj prompt do szukania błędów w tej grze")
 
 `docs/BUGHUNT.md`, run by `/bughunt [focus]` (`.claude/commands/bughunt.md`): the two hunts' method (five read-only agents

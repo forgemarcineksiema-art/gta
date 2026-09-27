@@ -107,6 +107,31 @@ describe('the wanted board', () => {
     } finally { sim.dispose(); }
   }, 60_000);
 
+  it("M6 1.2b busted in a rival's ring, it waits till the car has left all of it: 5.5 m off (past a job ring's 4) the duel started again", async () => {
+    const sim = await world();
+    try {
+      sim.police!.dispatching = false;
+      sim.run.chain = CHAIN_ALL;
+      const d = ring(sim, 0);
+      pullUp(sim, d);
+      sim.run.state = 'busted';
+      run(sim, 0.2);
+      expect(sim.jobs.state).toBe('idle');
+      sim.run.closeCard();
+      const lx = Math.cos(d.yaw), lz = -Math.sin(d.yaw);
+      sim.vehicle.teleport({ x: d.x - lx * 5.5, y: 0.8, z: d.z - lz * 5.5 }, d.yaw);
+      sim.vehicle.setVelocity(0, 0, 0);
+      run(sim, 0.3);
+      expect(sim.jobs.state).toBe('idle');
+      // out of the ring and back: the rival pulls out
+      sim.vehicle.teleport({ x: d.x - lx * 30, y: 0.8, z: d.z - lz * 30 }, d.yaw);
+      run(sim, 0.2);
+      pullUp(sim, d);
+      run(sim, 0.3);
+      expect(sim.jobs.state).toBe('active');
+    } finally { sim.dispose(); }
+  });
+
   it('M6 1.3 a race: a slow pull-up starts it, the rival pulls out in their car and paint; the player first wins the place, the purse and the car; the save keeps them', async () => {
     const sim = await world();
     try {

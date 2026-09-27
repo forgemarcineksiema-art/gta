@@ -74,6 +74,9 @@ export class AutoQuality {
   setMode(mode: 'auto' | QualityTier): boolean {
     if (this.fixed) return false;
     this.locked = mode !== 'auto';
+    // a tier the player holds draws at its full resolution: the scale the automatic one had shrunk stayed, and HIGH
+    // picked to mend a soft picture kept it soft for the session
+    if (this.locked) this.scale = 1;
     this.cooldown = 3;
     this.reset();
     return true;

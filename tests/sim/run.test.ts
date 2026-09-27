@@ -216,6 +216,33 @@ describe('the run', () => {
     } finally { sim.dispose(); }
   }, 60_000);
 
+  it("3.5b under the busted card a wreck waits for the card, and the car rolled into a unit at its window makes nobody wanted", async () => {
+    const sim = await cityWorld(20);
+    try {
+      const site = sim.run.dropOffs[1]!;
+      placeCar(sim, site, -GARAGE.depth / 2 - 16);
+      const unit = parkPolice(sim, site, -GARAGE.depth / 2 - 16, 3.5);
+      parkPolice(sim, site, -GARAGE.depth / 2 - 16, -3.5);
+      run(sim, POLICE.busted.seconds + 0.2);
+      expect(sim.run.state).toBe('busted');
+      // wrecked as the card comes up: its respawn moved the car from under the officer at its window
+      (sim.life as unknown as { wreck(): void }).wreck();
+      const seq = sim.events.sequence;
+      run(sim, 4);
+      expect([count(sim, 'respawn', seq), sim.life.state.wrecked]).toEqual([0, true]);
+      // shoved into the unit beside it: the card is up, nobody is wanted for it
+      const traffic = sim.traffic as Traffic, p = sim.vehicle.body.translation();
+      const dx = (traffic.x[unit] as number) - p.x, dz = (traffic.z[unit] as number) - p.z, d = Math.hypot(dx, dz);
+      run(sim, 0.1, (_t, _c, w) => w.vehicle.setVelocity(dx / d * 9, 0, dz / d * 9));
+      run(sim, 0.4);
+      expect(sim.heat.points).toBe(0);
+      // the card closed, the wreck's own clock runs on
+      sim.run.closeCard();
+      run(sim, 3.2);
+      expect(count(sim, 'respawn', seq)).toBe(1);
+    } finally { sim.dispose(); }
+  }, 60_000);
+
   it('3.6 the busted bar: two units and a stopped car fill it in 3 s, driving on drains it, one unit or heat 0 never fills it', async () => {
     const setup = async (heat: number, units: number) => {
       const sim = await cityWorld(heat);

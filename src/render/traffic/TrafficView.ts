@@ -107,9 +107,11 @@ export class TrafficView {
    * `eye` is the camera and `target` the player's car: a car whose box meets the line between them, or within
    * `FADE.near` of the camera, is thinned (M8.6 D9).
    */
-  update(transforms: TransformBuffer, alpha: number, dt = 1 / 60, eye: THREE.Vector3 | null = null, target: THREE.Vector3 | null = null): void {
+  /** `worldDt` the world's time this frame (none while paused, slowed in a takedown's slow motion): the lowriders' hops. */
+  update(transforms: TransformBuffer, alpha: number, dt = 1 / 60, eye: THREE.Vector3 | null = null, target: THREE.Vector3 | null = null, worldDt = dt): void {
     const traffic = this.traffic;
-    this.clock += 1 / 60;
+    // a sixtieth a frame hopped the lowriders twice as fast at 120 Hz, on through a pause
+    this.clock += worldDt;
     const repaint = traffic.paintSerial !== this.paintSerial;
     const counts = this.counts;
     counts.fill(0);

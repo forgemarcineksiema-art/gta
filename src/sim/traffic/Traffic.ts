@@ -294,6 +294,11 @@ export class Traffic {
   private readonly blendX: Float32Array;
   private readonly blendZ: Float32Array;
   private readonly blendYaw: Float32Array;
+  /**
+   * And its height (the third bug hunt): drawn where its body or its AI car was at its lane point's height, a car
+   * given back 10 m off its lane on a hill ran up to 1.7 m under the road for a second.
+   */
+  private readonly blendY: Float32Array;
   private readonly blendLeft: Float32Array;
   /** Per lane: the other lane of the same carriageway (the highway), the lane the other way (a street); -1 none. */
   readonly parallel: Int16Array;
@@ -578,6 +583,7 @@ export class Traffic {
     this.blendX = new Float32Array(n);
     this.blendZ = new Float32Array(n);
     this.blendYaw = new Float32Array(n);
+    this.blendY = new Float32Array(n);
     this.blendLeft = new Float32Array(n);
     this.passLeft = new Float32Array(n);
     this.stuck = new Float32Array(n);
@@ -958,8 +964,10 @@ export class Traffic {
   }
 
   /** A street race's rival on a lane (M5.5 slice 11): a civilian record in the race's paint, the race's plan to follow; a wanted board's rival's (M6) is never a swap candidate. */
-  spawnRacer(lane: number, s: number, body: BodyId, paint: number, rival = false): number {
-    const i = this.findFree();
+  spawnRacer(lane: number, s: number, body: BodyId, paint: number, rival = false, player: PlayerProbe | null = null, near = 0, cosHalf = 1): number {
+    // a full pool gives up its farthest unseen civilian, as a unit's spawn does: into free records only, the island's full
+    // pool (at the hideout on 99 % of steps) left a duel with no rival, a hunt with nothing to wreck, a race to win alone
+    const i = player ? this.claim(player, near, cosHalf) : this.findFree();
     if (i < 0) return -1;
     this.place(i, lane, s, BODY_INDEX[body], 0, AgentState.Kinematic, paint);
     this.racer[i] = 1;
@@ -1015,6 +1023,8 @@ export class Traffic {
       const dx = (this.x[i] as number) - player.x, dz = (this.z[i] as number) - player.z;
       const along = dx * fx + dz * fz, across = dx * -fz + dz * fx;
       if (along <= 0 || along > h.reach || Math.abs(across) > h.cone) continue;
+      // a car on the deck over the player or the street under it is not in the player's lane
+      if (Math.abs(player.y - 0.5 - (this.y[i] as number) + (this.grade[i] as number) * along) > OTHER_ROAD) continue;
       const yaw = this.yaw[i] as number;
       if (Math.sin(yaw) * fx + Math.cos(yaw) * fz < 0.5) continue;
       this.hornLeft[i] = h.seconds;
@@ -1065,7 +1075,8 @@ export class Traffic {
     if (this.puppet[agent] !== 1) return;
     this.unpuppet(agent);
     this.state[agent] = AgentState.Kinematic;
-    this.y[agent] = this.streets.groundAt(this.x[agent] as number, this.z[agent] as number);
+    // its AI car's road (puppetPose's: a deck's over the ground)
+    const y0 = this.y[agent] as number;
     const lane = this.lane[agent] as number;
     if (lane < 0) return;
     const x0 = this.x[agent] as number, z0 = this.z[agent] as number, yaw0 = this.yaw[agent] as number;
@@ -1077,6 +1088,7 @@ export class Traffic {
     this.blendX[agent] = x0 - (this.x[agent] as number);
     this.blendZ[agent] = z0 - (this.z[agent] as number);
     this.blendYaw[agent] = Math.atan2(Math.sin(yaw0 - (this.yaw[agent] as number)), Math.cos(yaw0 - (this.yaw[agent] as number)));
+    this.blendY[agent] = Number.isFinite(y0) ? y0 - (this.y[agent] as number) : 0;
     this.blendLeft[agent] = BLEND_BACK;
     this.reposition(agent);
   }
@@ -1800,6 +1812,8 @@ export class Traffic {
     this.aheadAgent[i] = -1;
     for (let j = 0; j < this.capacity; j++) {
       if (j === i || this.state[j] === AgentState.Free) continue;
+      // a car on the road over or under this one's (a deck, the tunnel) is not in its corridor
+      if (Math.abs((this.y[j] as number) - (this.y[i] as number)) > OTHER_ROAD) continue;
       const dx = (this.x[j] as number) - x;
       const dz = (this.z[j] as number) - z;
       const along = dx * fx + dz * fz;
@@ -2277,6 +2291,8 @@ export class Traffic {
     const body = this.bodies[slot] as RAPIER.RigidBody;
     const col = this.bodyCollider[slot] as RAPIER.Collider;
     this.colliderAgent.delete(col.handle);
+    // where it stood: its road's height under it, for the blend back onto its lane
+    const y0 = body.translation(this.pos).y - 0.03;
     body.setLinvel(ZERO, true);
     body.setAngvel(ZERO, true);
     this.pos.x = 0;
@@ -2306,6 +2322,7 @@ export class Traffic {
         this.blendX[i] = dx;
         this.blendZ[i] = dz;
         this.blendYaw[i] = Math.atan2(Math.sin(yaw0 - (this.yaw[i] as number)), Math.cos(yaw0 - (this.yaw[i] as number)));
+        this.blendY[i] = y0 - (this.y[i] as number);
         this.blendLeft[i] = BLEND_BACK;
         this.reposition(i);
       }
@@ -2453,9 +2470,22 @@ export class Traffic {
       this.poseQ[k + 1] = q.y;
       this.poseQ[k + 2] = q.z;
       this.poseQ[k + 3] = q.w;
-      // on the road under it (the highway's deck or the street), off a lane on the ground (the grid's 0, the island's)
+      // on the road under it (the highway's deck or the street); off a lane, the ground, but for a road at its own level
+      // over or under the ground (a car pushed off its lane on a deck lay flat on the street under it)
       const lane = this.lane[i] as number;
-      this.y[i] = lane >= 0 ? this.lanes.heightOn(lane, this.s[i] as number, this.next[i] as number, this.laneOffset[i]) : this.streets.groundAt(this.pos.x, this.pos.z);
+      if (lane >= 0) {
+        this.y[i] = this.lanes.heightOn(lane, this.s[i] as number, this.next[i] as number, this.laneOffset[i]);
+      } else {
+        const ground = this.streets.groundAt(this.pos.x, this.pos.z);
+        const at = this.streets.nearestLane(this.pos.x, this.pos.z, this.pos.y - 0.03);
+        let y = ground;
+        if (at >= 0) {
+          this.lanes.project(at, this.pos.x, this.pos.z, this.proj);
+          const road = this.lanes.heightAt(at, this.proj.s);
+          if (this.proj.dist < 12 && Math.abs(road - ground) > OTHER_ROAD) y = road;
+        }
+        this.y[i] = y;
+      }
       this.posed[i] = 1;
     }
     this.wreck(i);
@@ -2986,6 +3016,7 @@ export class Traffic {
       this.x[i] = this.x[i] + (this.blendX[i] as number) * f;
       this.z[i] = this.z[i] + (this.blendZ[i] as number) * f;
       this.yaw[i] = this.yaw[i] + (this.blendYaw[i] as number) * f;
+      this.y[i] = this.y[i] + (this.blendY[i] as number) * f;
     }
   }
 
@@ -3154,7 +3185,8 @@ export class Traffic {
     }
 
     // the pull-over: a lit police car close behind on its lane, or the player in the Fake Cruiser (M8.8 slice 6)
-    const discoBehind = this.playerLit && along < 0 && -along < t.pullOver.behind && Math.abs(side) < 2.8 && Math.cos(player.yaw - yaw) > 0.5;
+    const discoBehind = this.playerLit && along < 0 && -along < t.pullOver.behind && Math.abs(side) < 2.8 && Math.cos(player.yaw - yaw) > 0.5
+      && Math.abs(player.y - 0.5 - (this.y[i] as number) - (this.grade[i] as number) * along) < OTHER_ROAD;
     if (discoBehind || this.litBehind(i, lane, s)) {
       if ((this.pullLeft[i]) <= 0) this.pullOvers++;
       this.pullLeft[i] = t.pullOver.hold;

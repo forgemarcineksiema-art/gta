@@ -16,6 +16,7 @@ import type { SimWorld } from '../SimWorld';
 import { BODY_IDS, type BodyId } from '../traffic/bodies';
 import { CAR_IDS, type CarId } from '../vehicle/presets';
 import { DEFAULT_SETTINGS, LANGS, QUALITY_SETTINGS, type Settings } from '../settings';
+import { DAILY_TEMPLATES } from '../dailies/Dailies';
 
 export const SAVE_VERSION = 7;
 
@@ -543,7 +544,8 @@ export function apply(sim: SimWorld, save: SaveDoc): void {
   dailies.date = d.date;
   for (let i = 0; i < 3; i++) {
     dailies.ids[i] = d.ids[i] as number;
-    dailies.progress[i] = d.progress[i] as number;
+    // a one-run count starts with the run, and a load is a new run (SMASH 60 IN ONE RUN kept its 40 across a reload)
+    dailies.progress[i] = DAILY_TEMPLATES[d.ids[i] as number]?.oneRun && !d.done[i] ? 0 : d.progress[i] as number;
     dailies.done[i] = d.done[i] as boolean;
   }
   dailies.streak.count = save.streak.count;

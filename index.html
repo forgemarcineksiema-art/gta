@@ -37,7 +37,9 @@
           if ((g && g.started) || !l || l.classList.contains('is-hidden') || l.classList.contains('is-retry')) return;
           (text || l).textContent = english ? 'STILL LOADING · CLICK TO RETRY' : 'WCIĄŻ WCZYTUJĘ · KLIKNIJ, BY SPRÓBOWAĆ ZNOWU';
           l.classList.add('is-retry');
-          l.addEventListener('click', function () { location.reload(); });
+          // kept where the game can take it back: its script may still be arriving on a slow line
+          window.__retryClick = function () { location.reload(); };
+          l.addEventListener('click', window.__retryClick);
         }, 25000);
       })();
     </script>

@@ -143,6 +143,16 @@ describe('save format', () => {
     } finally { sim.dispose(); }
   });
 
+  it("0.12 a one-run daily's count is not carried over a load: a load is a new run (SMASH 60 IN ONE RUN kept its 40)", async () => {
+    const sim = await createWorld({ map: 'playground' });
+    try {
+      const save = defaultSave();
+      save.dailies = { date: '2026-09-23', ids: [13, 3, 7], progress: [40, 12000, 1], done: [false, false, true] };
+      apply(sim, save);
+      expect(Array.from(sim.dailies.progress)).toEqual([0, 12000, 1]);
+    } finally { sim.dispose(); }
+  });
+
   it('M8.8 10.3 a save from before the 4×4 loads with the class at tier 0, not owned, and a kept SUV drives as a 4×4', async () => {
     const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
     try {

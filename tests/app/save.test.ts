@@ -90,7 +90,7 @@ describe('save store', () => {
     } finally { sim.dispose(); }
   });
 
-  it('0.10 a load that rejects resolves the defaults', async () => {
+  it('0.10 a load that rejects resolves the defaults, and nothing is written over the save it could not read', async () => {
     const platform = new FakePlatform('');
     platform.failLoad = true;
     const store = new SaveStore(platform, BALANCE.save.key, clock().now);
@@ -98,6 +98,12 @@ describe('save store', () => {
     expect(save.bank).toBe(0);
     expect(save.owned).toEqual(['muscle']);
     expect(store.unknownRaw).toBeNull();
+    const sim = await createWorld({ map: 'playground' });
+    try {
+      sim.run.bank = 500;
+      await store.flush(sim);
+      expect(platform.writes).toEqual([]);
+    } finally { sim.dispose(); }
   });
 
   it("0.11 another tab's write of the save stops this tab's writes: its progress is not written over", async () => {

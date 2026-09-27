@@ -512,8 +512,9 @@ export class Minimap {
   update(sim: SimWorld, dt: number, now: number): void {
     this.sim = sim;
     if (!this.shown) return;
-    // units move on their own: while any is on the map the radar repaints at its own cadence
-    if (sim.police && sim.police.count > 0) this.dirty = true;
+    // units move on their own: while any is on the map the radar repaints at its own cadence (as moved, not dirty: dirty
+    // skips the cadence, and every chase painted the canvas every frame)
+    const units = sim.police !== null && sim.police.count > 0;
     // the nearest garage comes and goes with the bag
     if ((sim.run.bag > 0) !== (this.radar.bag > 0)) this.dirty = true;
     if (this.measure) {
@@ -581,7 +582,7 @@ export class Minimap {
     }
 
     if (this.size <= 0) return;
-    const moved = snap
+    const moved = snap || units
       || Math.abs(x - this.paintedX) > 0.05 || Math.abs(z - this.paintedZ) > 0.05
       || Math.abs(yaw - this.paintedYaw) > 0.002
       || Math.abs(this.state.heading - this.paintedHeading) > 0.0005

@@ -47,6 +47,8 @@ export class Hud {
   private readonly debug: HTMLElement;
   private readonly pause: HTMLElement;
   private readonly pauseKeys: HTMLElement;
+  /** The pause's build line: said again on a change of language (its version is a hole no label keeps). */
+  private readonly pauseBuild: HTMLElement;
   /** The pause screen names the mute key and the sound's state. */
   private readonly sound: HTMLElement;
   private readonly soundKey: HTMLElement;
@@ -191,7 +193,8 @@ export class Hud {
     this.sound.append(this.soundKey, this.soundState);
     // the full list of keys (M8.9 R5): the top's hints are four, in the first two sessions only
     this.pauseKeys = el('div', 'hud__pause-keys');
-    this.pause.append(label(el('div', 'hud__pause-title'), 'PAUSED'), el('div', 'hud__pause-sub', ''), this.sound, this.pauseKeys, el('div', 'hud__pause-build', t('build {version}', { version: __APP_VERSION__ })));
+    this.pauseBuild = el('div', 'hud__pause-build', t('build {version}', { version: __APP_VERSION__ }));
+    this.pause.append(label(el('div', 'hud__pause-title'), 'PAUSED'), el('div', 'hud__pause-sub', ''), this.sound, this.pauseKeys, this.pauseBuild);
     // a sibling of the HUD, the run's layer and the full map, on top of them all: its veil covers the whole screen
     parent.appendChild(this.pause);
 
@@ -247,6 +250,7 @@ export class Hud {
     relabel(this.root);
     // the pause is the HUD's sibling (its veil over every layer): its title said PAUZA on in English
     relabel(this.pause);
+    this.pauseBuild.textContent = t('build {version}', { version: __APP_VERSION__ });
     if (this.hintKeys) this.setHints(this.hintKeys);
     this.setSound(this.muteKey, this.muted);
     this.swapLabel.textContent = t(this.swapBorrow ? 'BORROW' : 'SWAP');
@@ -379,7 +383,8 @@ export class Hud {
     popup.classList.add('is-on');
   }
 
-  update(sim: SimWorld, dt: number, info: HudDebugInfo | null, now: number): void {
+  /** `dt` the game's clocks (0 while paused), `wall` the frame's own: a toast (the sound key's) goes in a pause too. */
+  update(sim: SimWorld, dt: number, info: HudDebugInfo | null, now: number, wall = dt): void {
     // Every DOM write here costs style, layout and paint on the main thread. The
     // radar paints its own canvas at its own cadence, off the layout path.
     this.frameIndex++;
@@ -402,10 +407,12 @@ export class Hud {
     this.gauge.update(sim, dt);
     const tm = sim.vehicle.telemetry;
     const life = sim.life.state;
-    if (life.stage !== this.lastStage || life.wrecked !== this.lastWrecked) {
+    // the wreck's word goes under the wall and the card, as the pops do: WRECKED over the busted card's own words
+    const wreckShown = life.wrecked && !screenTaken(sim.run.state);
+    if (life.stage !== this.lastStage || wreckShown !== this.lastWrecked) {
       this.lastStage = life.stage;
-      this.lastWrecked = life.wrecked;
-      this.wrecked.classList.toggle('is-visible', life.wrecked);
+      this.lastWrecked = wreckShown;
+      this.wrecked.classList.toggle('is-visible', wreckShown);
     }
     // no swap behind a shut door or on the busted card: the controls are the break's
     // the cold open's own caption teaches the swap at the top: one prompt at a time
@@ -489,7 +496,7 @@ export class Hud {
       if (this.flashLeft <= 0) this.flash.classList.remove('is-on');
     }
     if (this.toastTimer > 0) {
-      this.toastTimer -= dt;
+      this.toastTimer -= wall;
       if (this.toastTimer <= 0) this.toast.classList.remove('is-visible');
     }
     this.dispatchQuiet += dt;

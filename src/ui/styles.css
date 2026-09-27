@@ -515,7 +515,8 @@ body {
   cursor: pointer;
 }
 .settings__step:hover { background: color-mix(in srgb, var(--ink) 35%, transparent); }
-.settings__value { min-width: 6.5rem; text-align: center; }
+/* the longest value (AUTOMATYCZNA) inside it: every row's arrows in one column */
+.settings__value { min-width: 9.5rem; text-align: center; }
 .settings__value.is-volume {
   border-radius: 3px;
   background: linear-gradient(90deg, color-mix(in srgb, var(--ink) 55%, transparent) var(--fill), color-mix(in srgb, var(--ink) 12%, transparent) var(--fill));
@@ -1072,6 +1073,8 @@ kbd.key {
   line-height: 1.05;
   color: var(--money);
 }
+/* a chain step's DONE is no money: ink (one colour, one meaning, M8.9 R1) */
+.jobs__card[data-kind='chain'] .jobs__card-pay { color: var(--ink); }
 
 /* the garage on the wall (docs/STYLE.md, the wall): tabs, one page at a time, a footer with the bank and DRIVE OUT. The
    showroom (M8.9 R10): the wall slides in on the right, 45 % of the width at most; the car turns on the left */

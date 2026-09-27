@@ -35,6 +35,13 @@ export class Helicopter {
   lightX = 0;
   lightZ = 0;
   sees = false;
+  /** The last step's pose and light, which the view draws between (a step at a time, it juddered on a 144 Hz screen). */
+  prevX = 0;
+  prevY = 0;
+  prevZ = 0;
+  prevYaw = 0;
+  prevLightX = 0;
+  prevLightZ = 0;
   /** Arrivals, for the pins and the radio. */
   arrivals = 0;
   /** Seconds it has not seen the player (0 while it does). */
@@ -65,6 +72,12 @@ export class Helicopter {
       return false;
     }
     if (!this.active) this.arrive(player);
+    this.prevX = this.x;
+    this.prevY = this.y;
+    this.prevZ = this.z;
+    this.prevYaw = this.yaw;
+    this.prevLightX = this.lightX;
+    this.prevLightZ = this.lightZ;
     // where the light should be: on the car while the radio has it, else a spiral round the last fix (out to
     // the circle and back through the middle)
     let lx = player.x, lz = player.z;

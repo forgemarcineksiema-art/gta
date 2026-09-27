@@ -204,7 +204,8 @@ export class EngineAudio {
   }
 
   /** The engine, the wind, the tyres and the body for this frame, in the voice of `body` (the player's car). */
-  update(tm: VehicleTelemetry, dt: number, body: BodyId = this.body, stepped = true): void {
+  /** `impact`: the hardest hit over the frame's steps (none on a frame with no step); the telemetry's last by default. */
+  update(tm: VehicleTelemetry, dt: number, body: BodyId = this.body, impact = tm.impact): void {
     if (!this.ctx || !this.oscA || !this.oscB || !this.oscSub || !this.engineFilter || !this.engineGain || !this.windGain || !this.skidGain || !this.skidFilter || !this.crashGain || !this.scrapeGain || !this.scrapeFilter || !this.rattleGain) return;
     if (body !== this.body) this.setVoice(body);
     const k = 1 - Math.exp(-dt * 10);
@@ -238,10 +239,10 @@ export class EngineAudio {
     this.skidGain.gain.setTargetAtTime(skid, t, 0.05);
     this.skidFilter.frequency.setTargetAtTime(900 + Math.min(1, slip) * 500, t, 0.05);
 
-    // a hit is a one-shot thump scaled by the speed lost, struck on the step that took it (a paused frame, or a 144 Hz
-    // frame between steps, read the same impact again and struck it every frame); scraping is a sustained grind
-    if (stepped && tm.impact > 0.6) {
-      const hit = Math.min(1, tm.impact / 14);
+    // a hit is a one-shot thump scaled by the speed lost, struck on the frame whose steps took it (a paused frame, or a
+    // 144 Hz frame between steps, read the same impact again and struck it every frame); scraping is a sustained grind
+    if (impact > 0.6) {
+      const hit = Math.min(1, impact / 14);
       this.crashGain.gain.cancelScheduledValues(t);
       this.crashGain.gain.setValueAtTime(0.25 + hit * 0.9, t);
       this.crashGain.gain.setTargetAtTime(0, t + 0.02, 0.09 + hit * 0.1);

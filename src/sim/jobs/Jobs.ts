@@ -120,6 +120,8 @@ export class Jobs {
   /** The running street race's rivals (M5.5 slice 11), and the player's place in the last one. */
   readonly race: Race;
   lastPlace = 0;
+  /** The last job failed was a fare the player got out of the taxi on (its line says so, not TOO LATE). */
+  lastLeft = false;
   /** The last duel won was a rematch (M6): the line says so, no car. */
   lastRematch = false;
   /** A zone job's count toward its quota (takedowns, or dollars of damage), and whether the car is inside the zone. */
@@ -191,7 +193,7 @@ export class Jobs {
   /** A marker that is there: during the cold open only its own; its kind revealed; a rival's ring while the board says so (M6). */
   shown(d: JobDef): boolean {
     const co = this.sim.coldOpen;
-    if (co.active) return d.id === co.job;
+    if (co.active) return d.id === co.job && !co.delivered;
     // a sea trial's ring is a hovercraft's (M8.8 slice 20)
     return d.id !== co.job && this.revealed(d.kind) && (d.kind !== 'duel' || this.sim.board.live(d.level))
       && (!d.hover || this.sim.vehicle.tuning.hover > 0);
@@ -207,8 +209,9 @@ export class Jobs {
     this.cursor = this.sim.events.readFrom(this.cursor, this.onEvent);
     const r = BALANCE.jobs.markerRadius;
     if (this.rearm >= 0) {
-      const d = this.defOf(this.rearm);
-      if (!d || (d.x - probe.x) ** 2 + (d.z - probe.z) ** 2 > r * r) this.rearm = -1;
+      // by the ring's own reach: a duel's wider ring, left by the marker's, started its duel again inside it
+      const d = this.defOf(this.rearm), rr = d ? ringOf(d) : 0;
+      if (!d || (d.x - probe.x) ** 2 + (d.z - probe.z) ** 2 > rr * rr) this.rearm = -1;
     }
     if (this.passing >= 0) {
       const d = this.defOf(this.passing);
@@ -232,7 +235,7 @@ export class Jobs {
         const d = this.defs[i] as JobDef;
         // a rival waits at the kerb (M6): pull up beside them, slowly, inside the wider ring; driving past does nothing
         const duel = d.kind === 'duel';
-        const rr = duel ? BALANCE.board.ringRadius : r;
+        const rr = ringOf(d);
         if (d.id === this.rearm || (d.x - probe.x) ** 2 + (d.z - probe.z) ** 2 > rr * rr) continue;
         if (onBreak) {
           this.rearm = d.id;
@@ -276,6 +279,7 @@ export class Jobs {
     if (d.kind === 'fare' && this.sim.carBody !== 'taxi') {
       this.sim.fares.broken();
       this.finish('failed', probe);
+      this.lastLeft = true;
       this.sim.events.push('jobFailed', 0, probe.x, 0, probe.z, d.id);
       return;
     }
@@ -771,11 +775,12 @@ export class Jobs {
   }
 
   private finish(state: 'done' | 'failed', probe: PlayerProbe): void {
+    this.lastLeft = false;
     this.release();
     this.race.stop();
     this.sim.coins?.clearExtra('route');
     const d = this.defOf(this.active);
-    if (d && (d.x - probe.x) ** 2 + (d.z - probe.z) ** 2 <= BALANCE.jobs.markerRadius ** 2) this.rearm = d.id;
+    if (d && (d.x - probe.x) ** 2 + (d.z - probe.z) ** 2 <= ringOf(d) ** 2) this.rearm = d.id;
     this.state = state;
     this.hold = BALANCE.jobs.holdSeconds;
     this.wantedAgent = -1;
@@ -812,4 +817,9 @@ function damagePrice(e: SimEvent): number {
     case 'roadblock': return m.roadblock;
     default: return 0;
   }
+}
+
+/** A start ring's reach: a duel's rival waits in the wider one (M6). */
+function ringOf(d: JobDef): number {
+  return d.kind === 'duel' ? BALANCE.board.ringRadius : BALANCE.jobs.markerRadius;
 }

@@ -339,11 +339,14 @@ export class JobsHud {
       kind = `${what} +${money(jobs.lastPaid)}${jobs.lastTip ? ` · ${t('CLEAN LINE')}` : ''}`;
       state = 'is-done';
     } else if (jobs.state === 'failed') {
-      kind = t(d.kind === 'trial' ? 'TOO SLOW · NO MEDAL' : d.kind === 'race' && jobs.lastPlace > 3 ? 'LAST · NO PRIZE' : 'TOO LATE');
+      kind = t(d.kind === 'trial' ? 'TOO SLOW · NO MEDAL' : d.kind === 'race' && jobs.lastPlace > 3 ? 'LAST · NO PRIZE'
+        : d.kind === 'fare' && jobs.lastLeft ? 'FARE LOST · OUT OF THE TAXI' : 'TOO LATE');
       state = 'is-failed';
     } else if (d.kind === 'order') {
       const w = unpackDescriptor(d.descriptor);
-      kind = jobs.state === 'hunting' ? t('FIND A {car}', { car: paintedCar(paintName(w.paint), CAR_WORDS[w.kind]) }) : t('DELIVER THE {car}', { car: t(CAR_WORDS[w.kind]) });
+      // an orange one is AN orange one (the English; the Polish says both alike)
+      const car = paintedCar(paintName(w.paint), CAR_WORDS[w.kind]);
+      kind = jobs.state === 'hunting' ? t(/^[AEIOU]/.test(car) ? 'FIND AN {car}' : 'FIND A {car}', { car }) : t('DELIVER THE {car}', { car: t(CAR_WORDS[w.kind]) });
     } else if (d.kind === 'escape') {
       kind = t('ESCAPE {stars}', { stars: '★'.repeat(d.level) });
     } else if (d.kind === 'trial') {

@@ -121,6 +121,20 @@ describe('coins', () => {
     } finally { sim.dispose(); }
   }, 60_000);
 
+  it("3.10b two spills on the road at once keep both: a hunt's burst over a wreck's spill wiped the first, its value with it", async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
+    try {
+      const { x, z, yaw } = street(sim, 30);
+      const coins = sim.coins!;
+      coins.spill(x, z, yaw, 3000, sim.events);
+      coins.spill(x, z, yaw + Math.PI, 1200, sim.events);
+      let sum = 0;
+      for (let k = 0; k < coins.spillTtl.length; k++) if ((coins.spillTtl[k] as number) > 0) sum += coins.spillValue[k] as number;
+      expect(sum).toBe(4200);
+      expect(coins.spillLeft()).toBe(2 * BALANCE.spill.coins);
+    } finally { sim.dispose(); }
+  });
+
   it('3.11 an untouched spill is gone after ten seconds and the bag keeps what it lost', async () => {
     const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
     try {

@@ -102,6 +102,8 @@ const COLD_OPEN_OFF_PARAMS = ['bot', 'spawn', 'heat', 'car', 'body', 'map', 'man
 
 /** Every action ends a break except the ones that are not about driving on. */
 const DISMISS: readonly Action[] = ACTIONS.filter((a) => a !== 'pause' && a !== 'mute' && a !== 'debug' && a !== 'camera');
+/** The keys that skip a takedown's slow motion: the pause, the sound, the camera and the map keep it. */
+const SKIPS_SLOWMO: readonly Action[] = DISMISS.filter((a) => a !== 'map');
 
 export class App {
   private readonly platform: Platform;
@@ -169,6 +171,11 @@ export class App {
   private langPick: Lang | '';
   /** The LANGUAGE row's uses applied (`SettingsUi.langPicks`). */
   private langPicksSeen = 0;
+  /** The hardest hit and landing over this frame's steps (`frame`). */
+  private frameImpact = 0;
+  private frameLanding = 0;
+  /** The paused frame is drawn (a resize or a setting draws it again). */
+  private drawnFrozen = false;
   /** `?dev=1`: the developer's panel and its key hint. */
   private readonly dev: boolean;
   /** Bound once: the save's dirty marks come from the event ring. */
@@ -425,7 +432,7 @@ export class App {
     // (the wall's pages scroll under the wheel: GOALS, CARS and STYLE run past a short screen's foot)
     window.addEventListener('wheel', (e) => { if (!(e.target instanceof Element && e.target.closest('.run__wall'))) e.preventDefault(); }, { passive: false });
     document.addEventListener('contextmenu', (e) => e.preventDefault());
-    window.addEventListener('resize', () => this.renderer.resize());
+    window.addEventListener('resize', () => { this.renderer.resize(); this.drawnFrozen = false; });
     window.addEventListener('blur', () => this.setFocusPaused(true));
     window.addEventListener('focus', () => this.setFocusPaused(false));
     // back on the tab without the keys (the page round the frame has them): paused till a click, as a blur is
@@ -447,6 +454,13 @@ export class App {
     document.documentElement.lang = lang();
     // the boot's watch (M7 slice 7): a slow phase names itself on the loading screen, a stuck boot offers a retry
     const loading = document.getElementById('loading');
+    // the page's own retry offer, made while this script was still coming on a slow line: the boot's watch offers its own
+    // (a click there reloaded and threw the download away)
+    if (loading && window.__retryClick) {
+      loading.removeEventListener('click', window.__retryClick);
+      loading.classList.remove('is-retry');
+      delete window.__retryClick;
+    }
     // the thin bar over the boot's phases (M8.9 R12)
     const watch = new BootWatch(performance.now() / 1000, (w) => loading?.style.setProperty('--boot', w.progress.toFixed(2)));
     const loadingText = loading?.querySelector<HTMLElement>('.loading__text') ?? loading;
@@ -699,6 +713,7 @@ export class App {
   /** The settings into the mix, the renderer, the radar (M7 slice 3) and the screen's words (DESIGN.md §19). */
   private applySettings(): void {
     const s = this.sim.settings;
+    this.drawnFrozen = false;
     this.music.setVolume(volumeGain(s.music));
     this.audio.setEffectsVolume(volumeGain(s.effects));
     this.renderer.setQualityMode(s.quality);
@@ -796,12 +811,14 @@ export class App {
     }
 
     // takedown slow motion: the fixed-step loop gets scaled time (the sim never sees wall time); any key skips it
-    if (this.sim.life.state.slowMo > 0 && !this.bot) {
-      for (const action of ACTIONS) if (st.pressed[action] && action !== 'map') { this.sim.life.skipSlowMo(); break; }
+    if (this.sim.life.state.slowMo > 0 && !this.bot && !this.paused && !this.adShowing) {
+      for (const action of SKIPS_SLOWMO) if (st.pressed[action]) { this.sim.life.skipSlowMo(); break; }
     }
     // behind the shut door the wall has the keys; on the busted card any driving key drives on
     const run = this.sim.run;
-    if ((run.state === 'door' || run.state === 'busted') && !this.paused && !this.adShowing) {
+    // the key that closes the card (or drives out of the door) is not also a reset, a swap into the car alongside or a horn
+    const onBreak = run.state === 'door' || run.state === 'busted';
+    if (onBreak && !this.paused && !this.adShowing) {
       const shown = now - this.breakAt;
       if (this.autoDismiss && shown > BREAK_AUTO_MS) {
         if (run.state === 'door') this.driveOut();
@@ -824,11 +841,17 @@ export class App {
     }
     const timeScale = this.sim.life.state.slowMo > 0 ? ECONOMY.slowMoScale : 1;
     let alpha = 0;
-    if (!this.paused) {
+    // the frame's hardest hit and landing over its steps (none with no step): read once a frame by the shake, the sparks
+    // and the thump, the last step's alone was struck again on a 144 Hz frame with no step, lost on a 30 fps one's first
+    this.frameImpact = 0;
+    this.frameLanding = 0;
+    // an ad is a pause (CRAZYGAMES.md A3): the world stood on and drew at full rate under the video
+    const frozen = this.paused || this.adShowing;
+    if (!frozen) {
       const stepStart = performance.now();
       // a press is one action, latched for the next step, which clears it: set in every step of a frame, a 30 fps
       // frame's two steps swapped into the car alongside and straight back, and a 144 Hz frame with no step lost it
-      if (!this.bot) {
+      if (!this.bot && !onBreak) {
         const c = this.sim.controls;
         if (st.pressed.reset) c.reset = true;
         if (st.pressed.swap) c.swap = true;
@@ -849,7 +872,10 @@ export class App {
         if (this.sim.run.state === 'door' || this.sim.run.state === 'busted') clearControls(c);
         this.simProfile?.begin();
         this.sim.step();
-        this.panel?.graphPush(this.sim.vehicle.telemetry);
+        const tm = this.sim.vehicle.telemetry;
+        if (tm.impact > this.frameImpact) this.frameImpact = tm.impact;
+        if (tm.landingImpact > this.frameLanding) this.frameLanding = tm.landingImpact;
+        this.panel?.graphPush(tm);
       });
       this.stepMsLast = performance.now() - stepStart;
     }
@@ -878,9 +904,16 @@ export class App {
     this.saveCursor = this.sim.events.readFrom(this.saveCursor, this.onSaveEvent);
     this.store.tick(this.sim, frameDt);
 
-    this.renderer.render(alpha, this.paused ? 0 : frameDt);
+    // the world's effects on the sim's time (the takedown's slow motion: its debris and smoke flew at full speed round
+    // the crawling cars), the camera on the frame's
+    // paused, drawn once: the still frame under the veil drew at the screen's rate (the shadows' pass, the veil's blur
+    // with it) and kept a weak laptop's fans going; again after a resize or a setting
+    if (!frozen || !this.drawnFrozen) {
+      this.renderer.render(alpha, frozen ? 0 : frameDt, frozen ? 0 : frameDt * timeScale, this.frameImpact, this.frameLanding);
+      this.drawnFrozen = frozen;
+    }
     this.queuePrefetch();
-    this.audio.update(this.sim.vehicle.telemetry, frameDt, this.sim.carBody, !this.paused && this.loop.lastSteps > 0);
+    this.audio.update(this.sim.vehicle.telemetry, frameDt, this.sim.carBody, this.frameImpact);
     this.sfx.update(this.sim);
     this.siren.update(this.sim, this.paused ? 0 : frameDt);
     this.rotor.update(this.sim);
@@ -901,7 +934,9 @@ export class App {
     const stats = this.renderer.stats;
     // the full-screen map while its key is held, over the drive (never over the wall or the card)
     this.hud.setMapVisible(st.value.map > 0.5 && playing && !this.bot);
-    this.runHud.update(this.sim, frameDt);
+    // the screen's clocks stand with the world: paused, the voice's line, the pops and the key hints ran out unread
+    const hudDt = frozen ? 0 : frameDt;
+    this.runHud.update(this.sim, hudDt);
     this.coldOpenHud.update(this.sim);
     this.jobsHud.update(this.sim);
     // the nearest open sign ahead: its kind and its pay, a metre over its face (M8.7 D5, M8.9 R7)
@@ -917,7 +952,7 @@ export class App {
     const ticket = run.bustedProgress > 0 && (run.state === 'running' || run.state === 'closing');
     const silent = ticket || screenTaken(run.state);
     this.hud.setSilent(silent);
-    const slot = this.hud.top.step(frameDt, {
+    const slot = this.hud.top.step(hudDt, {
       caption: this.coldOpenHud.captionShowing, job: this.jobsHud.jobHolds, busy: this.jobsHud.cardsWait, silent,
     });
     // a teaching line on the screen is learnt by the profile
@@ -929,7 +964,7 @@ export class App {
     // the four key hints on an otherwise empty top, for their seconds, in the first two sessions (the wall has the
     // keys behind a door, the intro's captions teach the same ones, the pause screen lists them all)
     const hints = !silent && slot === 'none' && this.hintsLeft > 0 && hintsWanted(run.sessions) && !this.bot && !this.sim.coldOpen.active && playing;
-    if (hints) this.hintsLeft -= frameDt;
+    if (hints) this.hintsLeft -= hudDt;
     this.hud.setHintsVisible(hints);
     this.garageUi.update(this.sim);
     // the showroom's preview (M8.9 R10): the focused card on the car in the room; a horn looked at sounds once
@@ -942,7 +977,7 @@ export class App {
     }
     this.hud.update(
       this.sim,
-      frameDt,
+      hudDt,
       {
         fps: frameDt > 0 ? 1 / frameDt : 0,
         frameMs: this.frameMsSmooth,
@@ -956,6 +991,7 @@ export class App {
         saveBytes: this.store.bytes,
       },
       now,
+      frameDt,
     );
 
     // an ad's frames are a break's, not the game's: the probe measures play

@@ -18,6 +18,9 @@ import { PedPose } from '../traffic/Pedestrians';
 import { lanePathTo } from './place';
 import type { Lane } from '../city/roads';
 
+/** A player this far over or under a hailer's pavement is on another road (a deck, a bridge; m, as the walkers'). */
+const OTHER_LEVEL = 3;
+
 export class Fares {
   /** The pedestrian waving the taxi down, -1 when none. */
   hailer = -1;
@@ -64,7 +67,10 @@ export class Fares {
       if (!peds.active[h] || peds.pose[h] !== PedPose.Hail) { this.hailer = -1; return; }
       const d = Math.hypot((peds.x[h] as number) - probe.x, (peds.z[h] as number) - probe.z);
       if (d > f.giveUp) { this.dropHailer(); this.chain = 0; this.carry = 0; return; }
-      if (d <= f.pickupRadius && probe.speed <= f.pickupSpeed) this.pickUp(h, probe);
+      // stopped on the deck over their street (or on the street under a bridge they wait on) is not at their kerb
+      const streets = sim.traffic?.streets;
+      const level = !streets || Math.abs(streets.footAt(peds.x[h] as number, peds.z[h] as number) - (probe.y - 0.5)) < OTHER_LEVEL;
+      if (d <= f.pickupRadius && probe.speed <= f.pickupSpeed && level) this.pickUp(h, probe);
       return;
     }
     this.hailLeft -= dt;

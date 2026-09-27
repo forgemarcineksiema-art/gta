@@ -123,6 +123,17 @@ describe('dailies', () => {
     } finally { sim.dispose(); }
   });
 
+  it("6.3c a door's banked event is no step of 'bank 25,000 in one run': the run's total judges it (it read 3/25,000)", async () => {
+    const sim = await createWorld({ map: 'playground' });
+    try {
+      slot(sim, DAILY_TEMPLATES.findIndex((t) => t.kind === 'banked' && t.target === 25000));
+      for (let i = 0; i < 3; i++) sim.events.push('banked', 5000, 0, 0, 0, -1);
+      sim.dailies.step();
+      expect(sim.dailies.progress[0]).toBe(0);
+      expect(sim.dailies.done[0]).toBe(false);
+    } finally { sim.dispose(); }
+  });
+
   it('6.4 / 6.5 the streak: yesterday then today counts up, a gap resets, the same day is nothing, day seven is the topper; its cash once a day', async () => {
     const sim = await createWorld({ map: 'playground' });
     try {
@@ -149,6 +160,27 @@ describe('dailies', () => {
       d.setDate('2026-09-09');
       expect(d.streak.count).toBe(1);
       expect(d.streak.topper).toBe(true);
+    } finally { sim.dispose(); }
+  });
+
+  it("6.6 a clock gone back a day: today's three, the streak and the bank stay; the next day counts on; a week back is a clock put right", async () => {
+    const sim = await createWorld({ map: 'playground' });
+    try {
+      const d = sim.dailies;
+      d.setDate('2026-09-10');
+      d.setDate('2026-09-11');
+      const ids = Array.from(d.ids), count = d.streak.count, bank = sim.run.bank;
+      d.progress[0] = 2;
+      d.setDate('2026-09-10');
+      expect([Array.from(d.ids), d.streak.count, sim.run.bank, d.progress[0], d.date]).toEqual([ids, count, bank, 2, '2026-09-11']);
+      d.setDate('2026-09-12');
+      expect(d.streak.count).toBe(count + 1);
+      // from a clock set in the future: the real date draws its three, the streak starts again, unpaid
+      const bank2 = sim.run.bank;
+      d.setDate('2026-09-05');
+      expect([d.date, d.streak.count, sim.run.bank]).toEqual(['2026-09-05', 1, bank2]);
+      d.setDate('2026-09-06');
+      expect(d.streak.count).toBe(2);
     } finally { sim.dispose(); }
   });
 });

@@ -57,7 +57,8 @@ export class HideoutView {
     this.geometry = doorGeometry();
     this.material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
     this.glowMaterial = new THREE.MeshBasicMaterial({ vertexColors: true });
-    for (const [frame, glow] of signGeometries(sim.run.dropOffs)) {
+    const island = sim.island;
+    for (const [frame, glow] of signGeometries(sim.run.dropOffs, island ? (x, z) => island.standAt(x, z) : undefined)) {
       for (const [geometry, material] of [[frame, this.material], [glow, this.glowMaterial]] as const) {
         const mesh = new THREE.Mesh(geometry, material);
         mesh.castShadow = false;
@@ -145,7 +146,7 @@ export class HideoutView {
  * The drop-offs' signs in world space (DESIGN.md §6.5): for each, a graphite pole and a frame round the panel,
  * and, apart, the panel's lit faces: the door band's orange with a white bar across it, both faces. A pair a sign.
  */
-export function signGeometries(sites: readonly DropOff[]): Array<[THREE.BufferGeometry, THREE.BufferGeometry]> {
+export function signGeometries(sites: readonly DropOff[], stand?: (x: number, z: number) => number): Array<[THREE.BufferGeometry, THREE.BufferGeometry]> {
   const s = HIDEOUT_SIGN;
   const merge = (parts: THREE.BufferGeometry[]): THREE.BufferGeometry => {
     const out = mergeGeometries(parts, false);
@@ -155,10 +156,12 @@ export function signGeometries(sites: readonly DropOff[]): Array<[THREE.BufferGe
   return sites.map((site) => {
     const sign = hideoutSign(site);
     const place = (g: THREE.BufferGeometry, y: number): THREE.BufferGeometry => g.rotateY(sign.yaw).translate(sign.x, y, sign.z);
-    // the pole from its street's height (the grid's 0, the island's hill) up to the panel
-    const bottom = sign.y - s.panel / 2, tall = bottom - site.y;
+    // the pole from its street's height (the grid's 0) up to the panel; the island's from the pavement at its foot, the
+    // door's street height left it hanging over a kerb on a slope or sunk into it
+    const foot = stand ? stand(sign.poleX, sign.poleZ) : site.y;
+    const bottom = sign.y - s.panel / 2, tall = Math.max(0.1, bottom - foot);
     const frame = merge([
-      paint(place(new THREE.BoxGeometry(s.pole * 2, tall, s.pole * 2), site.y + tall / 2), PALETTE.graphite),
+      paint(place(new THREE.BoxGeometry(s.pole * 2, tall, s.pole * 2), bottom - tall / 2), PALETTE.graphite),
       paint(place(new THREE.BoxGeometry(s.width + 0.4, s.panel + 0.4, s.depth), sign.y), PALETTE.graphite),
     ]);
     const glow = merge([

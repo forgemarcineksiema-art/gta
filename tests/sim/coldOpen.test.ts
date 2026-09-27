@@ -126,6 +126,19 @@ describe('cold open', () => {
     } finally { sim.dispose(); }
   }, 60_000);
 
+  it("4.7 its delivery pays once: delivered, its ring is gone while the script runs on (out of the garage and back in paid 7,500 a lap)", async () => {
+    const sim = await coldWorld();
+    try {
+      const def = sim.jobs.defOf(sim.coldOpen.job);
+      if (!def) throw new Error('no delivery');
+      expect(sim.jobs.shown(def)).toBe(true);
+      sim.events.push('jobDone', def.payout, def.x, 0, def.z, def.id);
+      sim.step();
+      expect(sim.coldOpen.active).toBe(true);
+      expect(sim.jobs.shown(def)).toBe(false);
+    } finally { sim.dispose(); }
+  }, 60_000);
+
   it('5.1 the save decides at boot: not seen, the script runs; seen, it does not', async () => {
     const fresh = defaultSave();
     const a = await createWorld({ map: 'city', seed: 42, traffic: 1, peds: 0, record: false, spawn: 'loop', save: fresh, coldOpen: true });

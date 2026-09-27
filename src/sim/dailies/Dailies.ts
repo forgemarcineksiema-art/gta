@@ -93,6 +93,9 @@ export function dayNumber(date: string): number {
   return era * 146097 + doe - 719468;
 }
 
+/** A date this many days back or fewer is the clock's (a flight west), not a new day; more is a clock put right. */
+const BACK_DAYS = 2;
+
 export class Dailies {
   /** The local date the three were drawn for, `YYYY-MM-DD`; '' before the first. */
   date = '';
@@ -151,7 +154,13 @@ export class Dailies {
    * the day's streak cash once. The same date again does nothing.
    */
   setDate(local: string): void {
-    if (!Number.isFinite(dayNumber(local))) return;
+    const day = dayNumber(local);
+    if (!Number.isFinite(day)) return;
+    // a clock gone back a day or two (a flight west, a zone's change): today's three, the caches and the streak stay the
+    // day's they are; a date back drew them again, paid again and dropped the streak to 1. Further back is a clock put
+    // right from the future: a new day, the streak started again unpaid (a future date kept would hold them for months)
+    const back = this.date === '' ? 0 : dayNumber(this.date) - day;
+    if (back > 0 && back <= BACK_DAYS) return;
     this.sim.caches?.setDate(local);
     if (local === this.date) {
       // a save from today: the police layout is today's too
@@ -170,9 +179,13 @@ export class Dailies {
       this.done[i] = false;
     }
     if (this.sim.cover) setDailyOrder(this.sim.cover, seed);
-    const s = this.streak;
-    if (s.last !== local) {
-      const gap = dayNumber(local) - dayNumber(s.last);
+    const s = this.streak, gap = day - dayNumber(s.last);
+    if (gap < 0) {
+      s.count = 1;
+      s.last = local;
+    }
+    // a day on from the streak's last (one: on; more, or none yet: from 1); never a day back, paid again
+    if (s.last !== local && !(gap <= 0)) {
       s.count = gap === 1 ? s.count + 1 : 1;
       s.last = local;
       if (s.count >= 7) s.topper = true;
@@ -253,6 +266,10 @@ export class Dailies {
     const sim = this.sim;
     if (t.car && sim.carId !== t.car) return false;
     switch (t.kind) {
+      // judged at the run's end (onRunEnd): the door's 'banked' event is its name too, and each door added 1 (3/25,000)
+      case 'banked':
+      case 'run':
+        return false;
       case 'takedown':
         if (e.kind !== 'takedown' && e.kind !== 'takedownTraffic') return false;
         return !t.police || sim.traffic?.police[e.target] === 1;

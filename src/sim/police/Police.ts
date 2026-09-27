@@ -821,7 +821,8 @@ export class Police {
     const traffic = this.traffic;
     const t = this.tuning;
     let assaulted = false;
-    const idle = this.sim.pursuit.state === 'idle';
+    // under the busted card the car rolling on into the unit at its window made the player wanted again as it closed
+    const idle = this.sim.pursuit.state === 'idle' && this.sim.run.state !== 'busted';
     this.playerSpeedMax = Math.max(this.sim.probe.speed, this.playerSpeedMax * 0.8);
     for (let i = 0; i < traffic.capacity; i++) {
       const cool = this.assaultCooldown[i] as number;

@@ -79,4 +79,29 @@ describe('M8.10 slice 13: the island\'s streets', () => {
     // most), not the 3.5 m it sank into the junction
     expect(worst).toBeLessThan(0.5);
   });
+
+  it("13.6 a car given back to its lane off it on a hill is drawn on the ground it left, not at its lane point's height", () => {
+    const island = sim.island as Island, traffic = sim.traffic as Traffic, lanes = traffic.lanes, graph = traffic.streets.graph;
+    // the lane that starts steepest (off the highway's decks), and a point 8 m back down its line, on the hill
+    let lane = -1, grade = 0;
+    graph.lanes.forEach((l, i) => {
+      if (l.highway || (lanes.length[i] as number) < 20) return;
+      const g = Math.abs(lanes.heightAt(i, 6) - lanes.heightAt(i, 0)) / 6;
+      if (g > grade) { grade = g; lane = i; }
+    });
+    expect(grade).toBeGreaterThan(0.12);
+    const l = graph.lanes[lane] as { x0: number; z0: number; yaw0: number };
+    const bx = l.x0 - Math.sin(l.yaw0) * 8, bz = l.z0 - Math.cos(l.yaw0) * 8, by = island.ground.surfaceHeight(bx, bz);
+    const a = traffic.spawnAt(lane, 10, 'sedan');
+    expect(a).toBeGreaterThanOrEqual(0);
+    // an AI car's record on this lane at its start while the car is still 8 m short of it (on the junction's curve):
+    // given back, it blends over a second from where the car was (the second bug hunt's third: 1.7 m under the road)
+    traffic.puppetOn(a, 1e6);
+    traffic.puppetPose(a, bx, by, bz, { x: 0, y: Math.sin(l.yaw0 / 2), z: 0, w: Math.cos(l.yaw0 / 2) }, 10, lane, 0);
+    traffic.puppetOff(a);
+    expect(traffic.blending(a)).toBe(true);
+    expect(Math.hypot((traffic.x[a] as number) - bx, (traffic.z[a] as number) - bz)).toBeLessThan(0.5);
+    expect(Math.abs((traffic.y[a] as number) - by)).toBeLessThan(0.3);
+    traffic.remove(a);
+  });
 });

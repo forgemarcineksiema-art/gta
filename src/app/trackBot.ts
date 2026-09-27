@@ -250,7 +250,10 @@ export class TrackBot {
       controls.brake = speed > 0.5 ? 1 : 0;
       controls.boost = 0;
     }
-    const boxed = sim.police !== null && sim.traffic !== null && this.policeOnTheMove(sim.traffic, px, pz);
+    // (a chase or an arrest on: a unit parked behind it after one, waiting on a wreck ahead, held the bot as boxed for
+    // good, no reset, no going round: the third bug hunt's probe sat 60 s at one Crown street)
+    const boxed = sim.police !== null && sim.traffic !== null && (sim.pursuit.state !== 'idle' || sim.police.arresting)
+      && this.policeOnTheMove(sim.traffic, px, pz);
     if (sim.traffic && (t.careful || t.unblock) && this.unblock(sim.traffic, controls, px, pz, yaw, speed, queued || boxed, dt)) return;
 
     // stuck: no progress while trying to drive; boxed in by the police is an arrest, not a stuck car

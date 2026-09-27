@@ -17,6 +17,7 @@ import { alongLane } from '../city/route';
 import { atFinish } from './finish';
 import type { SimWorld } from '../SimWorld';
 import { AgentState, type PlayerProbe } from '../traffic/Traffic';
+import type { LaneProjection } from '../traffic/lanes';
 import type { BodyId } from '../traffic/bodies';
 import { PALETTE } from '../palette';
 
@@ -40,6 +41,9 @@ export interface RaceField {
   /** Its rivals drive physical cars within `AI.physicalRadius` of the player (M8.8 slice 22: a duel's, a race or a hunt). */
   physical?: boolean;
 }
+
+/** The least room between two rivals on the grid (m): a van's length and a gap. */
+const GRID_ROOM = 10;
 
 export class Race {
   /** The rivals' traffic records, -1 when gone. */
@@ -93,7 +97,6 @@ export class Race {
     const lane = streets.nearestLane(probe.x, probe.z, probe.y - 0.5);
     if (lane < 0) return;
     const s0 = alongLane(streets.graph.lanes[lane] as Lane, probe.x, probe.z).s;
-    const len = traffic.lanes.length[lane] as number;
     const r = BALANCE.jobs.race;
     const cars = duel ? duel.cars : FIELD;
     this.count = Math.min(cars.length, this.rivals.length);
@@ -107,10 +110,29 @@ export class Race {
     this.swapLeft.fill(0);
     this.swaps = 0;
     const lead = duel?.lead ?? r.gridAhead;
+    const lengths = traffic.lanes.length;
+    let prevAt = -1, prevS = 0;
     for (let k = 0; k < this.count; k++) {
       const [body, paint] = cars[k] as readonly [BodyId, number];
-      const s = Math.min(len - 2, s0 + lead + r.gridAhead * k);
-      const agent = traffic.spawnRacer(lane, s, body, paint, duel !== undefined);
+      // down the road by the best exits: on a short lane the field stood stacked at its end, three cars in one spot
+      let at = lane, s = s0 + lead + r.gridAhead * k;
+      for (let hop = 0; hop < 6 && s > (lengths[at] as number) - 2; hop++) {
+        const next = this.bestExit(at);
+        if (next < 0) break;
+        s = Math.max(2, s - (lengths[at] as number) - traffic.lanes.connectionLength(at, next));
+        at = next;
+      }
+      s = Math.min((lengths[at] as number) - 2, s);
+      // two past one junction's long curve (most of the island's are over 16 m) both went to its next lane's start: each
+      // a car's room past the one before, on to the lane after when that one is full
+      if (at === prevAt && s < prevS + GRID_ROOM) {
+        s = prevS + GRID_ROOM;
+        const next = s > (lengths[at] as number) - 2 ? this.bestExit(at) : -1;
+        if (next >= 0) { at = next; s = 2; } else s = Math.min((lengths[at] as number) - 2, s);
+      }
+      prevAt = at;
+      prevS = s;
+      const agent = traffic.spawnRacer(at, s, body, paint, duel !== undefined, probe, POLICE.viewNear, Math.cos(POLICE.viewHalfAngleDeg * Math.PI / 180));
       if (agent >= 0 && duel?.armour !== undefined) traffic.armour[agent] = duel.armour;
       this.rivals[k] = agent;
       this.placeOf[k] = 0;
@@ -219,13 +241,35 @@ export class Race {
     const traffic = this.sim.traffic;
     let ahead = this.finished;
     if (!traffic) return ahead + 1;
-    const mine = Math.hypot(this.finishX - probe.x, this.finishZ - probe.z);
+    // by the way on to the finish, not in a line: the island's roads wind, and a rival 200 m ahead on the road read
+    // as behind (the line said 1. MIEJSCE at a duel's start with the rival driving off in front); in a line off the field
+    const streets = traffic.streets, lanes = traffic.lanes, lane = streets.nearestLane(probe.x, probe.z, probe.y - 0.5);
+    let mine = Infinity;
+    if (lane >= 0) {
+      lanes.project(lane, probe.x, probe.z, this.proj);
+      const s = this.proj.s, rev = traffic.reverse[lane] as number;
+      // the way the car faces: on a two-way street against its lane, the other way's (a U-turn's shorter way counted
+      // before the turn put the player first at a duel's start, the rival driving off in front)
+      const against = rev >= 0 && Math.cos(probe.yaw - this.proj.yaw) < 0;
+      mine = against ? this.left(rev, (lanes.length[rev] as number) - s) : this.left(lane, s);
+    }
+    const line = !Number.isFinite(mine), mineLine = Math.hypot(this.finishX - probe.x, this.finishZ - probe.z);
     for (let k = 0; k < this.count; k++) {
       const agent = this.rivals[k] as number;
       if (agent < 0 || this.placeOf[k] !== 0) continue;
-      if (Math.hypot(this.finishX - (traffic.x[agent] as number), this.finishZ - (traffic.z[agent] as number)) < mine) ahead++;
+      const theirs = line ? Infinity : this.left(traffic.lane[agent] as number, traffic.s[agent] as number);
+      if (Number.isFinite(theirs) ? theirs < mine : Math.hypot(this.finishX - (traffic.x[agent] as number), this.finishZ - (traffic.z[agent] as number)) < mineLine) ahead++;
     }
     return ahead + 1;
+  }
+
+  /** The player's place on its lane, read each frame by the line (no object a frame). */
+  private readonly proj: LaneProjection = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };
+
+  /** Metres left to the finish by the way on from `s` m along a lane (past its end on its junction's curve); Infinity off it. */
+  private left(lane: number, s: number): number {
+    const d = lane >= 0 ? this.dist[lane] as number : Infinity;
+    return Number.isFinite(d) ? Math.max(0, d - s) : Infinity;
   }
 
   /** The race is over: the rivals still on it drive on as traffic. */

@@ -24,6 +24,8 @@ export class SaveStore {
   private busy = false;
   /** Another tab of the game wrote the save: this one writes no more (it wrote over the other's progress). */
   private foreign = false;
+  /** The save could not be read: this session writes none (its first write, the cold open's, replaced the real one). */
+  private unread = false;
 
   constructor(private readonly platform: Platform, readonly key: string = BALANCE.save.key, private readonly now: () => number = () => performance.now() / 1000) {}
 
@@ -38,7 +40,8 @@ export class SaveStore {
     try {
       text = await this.platform.loadData(this.key);
     } catch (e) {
-      console.warn('save: load failed', e);
+      console.warn('save: load failed; playing on defaults, not writing', e);
+      this.unread = true;
       return defaultSave();
     }
     const v = versionOf(text);
@@ -67,7 +70,7 @@ export class SaveStore {
   /** Collect, serialize and write now; nothing when the text is unchanged or a newer save is protected. */
   async flush(sim: SimWorld): Promise<void> {
     this.dirty = false;
-    if (this.unknownRaw !== null || this.foreign) return;
+    if (this.unknownRaw !== null || this.foreign || this.unread) return;
     collect(sim, this.doc);
     const text = serialize(this.doc);
     if (text === this.lastText) return;

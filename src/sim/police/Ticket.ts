@@ -28,6 +28,8 @@ const BODY = 0.35;
 const CORNER = 0.25;
 /** Cars further than this from the officer are not looked at (m). */
 const NEAR = 9;
+/** A unit this far over or under the player is on another road (a deck, the tunnel): its officer does not walk from it. */
+const OTHER_ROAD = 3;
 
 /** True when the segment (a0, c0)–(a1, c1) meets the box |a| ≤ ha, |c| ≤ hc (a slab test, in the box's frame). */
 export function segmentMeetsBox(a0: number, c0: number, a1: number, c1: number, ha: number, hc: number): boolean {
@@ -261,6 +263,7 @@ export class TicketOfficer {
       if (traffic.police[a] !== 1) continue;
       const st = traffic.state[a];
       if (st === AgentState.Free || st === AgentState.Wrecked || st === AgentState.Abandoned) continue;
+      if (Math.abs(probe.y - 0.5 - (traffic.y[a] as number)) > OTHER_ROAD) continue;
       const d = Math.hypot((traffic.x[a] as number) - probe.x, (traffic.z[a] as number) - probe.z);
       if (d < bestD) { bestD = d; best = a; }
     }

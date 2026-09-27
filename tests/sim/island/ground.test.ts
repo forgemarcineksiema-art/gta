@@ -125,6 +125,27 @@ describe('M8.10 slice 2: the ground', () => {
     expect(tight).toBeLessThanOrEqual(30);
   });
 
+  it('2.7 round the serpentine\'s hairpins its lanes run on the ground without a step (inside a bend the height stepped 0.1-0.15 m where the nearest segment swapped)', () => {
+    const island = new Island(new RAPIER.World({ x: 0, y: -9.81, z: 0 })), g = island.ground;
+    let worst = 0, at = '', steps = 0;
+    island.network.graph.lanes.forEach((lane, li) => {
+      if (island.network.laneRoad[li] !== 'serpentine') return;
+      const hs: number[] = [], xs: number[] = [], zs: number[] = [];
+      for (let k = 0; k + 1 < lane.points.length; k++) {
+        const a = lane.points[k] as { x: number; z: number }, b = lane.points[k + 1] as { x: number; z: number }, n = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 0.25);
+        for (let i = 0; i < n; i++) { const x = a.x + ((b.x - a.x) * i) / n, z = a.z + ((b.z - a.z) * i) / n; xs.push(x); zs.push(z); hs.push(g.surfaceHeight(x, z)); }
+      }
+      // a quarter metre a step: the height's turn from one step to the next (a step shows as its whole height)
+      for (let k = 1; k + 1 < hs.length; k++) {
+        const turn = Math.abs((hs[k + 1] as number) - 2 * (hs[k] as number) + (hs[k - 1] as number));
+        steps++;
+        if (turn > worst) { worst = turn; at = `${(xs[k] as number).toFixed(0)}, ${(zs[k] as number).toFixed(0)}`; }
+      }
+    });
+    expect(steps).toBeGreaterThan(3000);
+    expect(worst, at).toBeLessThan(0.05);
+  });
+
   // 2.4 (a drive along the highway across four chunk borders) is a long pin: drive.long.test.ts
 
   it('2.5 at 60 m/s across the island the ground is worked out ahead, a bounded share a step; a height field builds in under 5 ms', () => {

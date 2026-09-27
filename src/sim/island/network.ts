@@ -9,8 +9,8 @@
  */
 import { HIGHWAY_LANE_OFFSETS, type Lane, type RoadGraph, type RoadNode, type RoadPoint } from '../city/roads';
 import { catmullRom, resample, type P2 } from './geom';
-import { HALF_WIDTH, deckFoot, type Ground } from './ground';
-import { PLACE_RINGS, PLACE_ROADS, RINGS, ROADS, highwayLoop, type RoadClass, type SpanKind } from './plan';
+import { HALF_WIDTH, deckTop, type Ground } from './ground';
+import { DECK_HEIGHT, PLACE_RINGS, PLACE_ROADS, RINGS, ROADS, highwayLoop, type RoadClass, type SpanKind } from './plan';
 import { districtStreets } from './streets';
 
 /** A road's ends join another road within this (m); joins this close along a road are one node. */
@@ -22,21 +22,11 @@ const MIN_STEP = 3;
 /** How far a lane stops short of a node: the widest road there plus this (m); a roundabout's own lanes stop `RING_INSET` short. */
 const INSET_PAD = 8;
 const RING_INSET = 6;
-/** Where the highway leaves the ground, its deck's least height over the sea (m), by span. */
-const DECK: Readonly<Record<SpanKind, number>> = { ground: 0, tunnel: 0, viaduct: 8, bridge: 10, overpass: 0 };
 
 /** A sampled line of the network: its points (with the tunnel's or a deck's height where it leaves the ground), its class. */
 interface Line { id: string; cls: RoadClass; pts: RoadPoint[]; onGround: boolean[]; firm: boolean[]; closed: boolean; ring: boolean; s: number[] }
 /** A lane eases between the ground and the tunnel's or a deck's profile over this many samples each side of the change. */
 const EASE = 3;
-/** A deck's top's corners are rounded over this much height (m): a curve a car keeps its wheels on at the highway's speed. */
-const ROUND = 1.5;
-
-/** A minimum with its corner rounded over `k` (m): never over either. */
-function softMin(a: number, b: number, k: number): number {
-  const h = Math.max(k - Math.abs(a - b), 0) / k;
-  return Math.min(a, b) - (h * h * k) / 4;
-}
 
 /** The graph, its sampled lines, and each lane's road (by id). */
 export interface IslandNetwork { graph: RoadGraph; lines: Line[]; laneRoad: string[] }
@@ -129,11 +119,10 @@ function lines(ground: Ground): Line[] {
       // the tunnel on the floor the ground has dug for it; a deck up at the highway's grade to its height over the sea, and
       // down, each ramp off its foot (`deckFoot`) and its top's corners rounded
       const line = h0 + ((h1 - h0) * d) / total;
-      const up = deckFoot(foot0, d), down = deckFoot(foot1, total - d);
       // an overpass carries the highway's own graded profile over the road beneath
       q.y = span === 'overpass' ? (ground.highwayAt(q.x, q.z) ?? line)
         : span === 'tunnel' ? (ground.tunnelFloorAt(q.x, q.z) ?? line)
-          : Math.max(line, softMin(softMin(DECK[span], up, ROUND), down, ROUND));
+          : deckTop(foot0, foot1, h0, h1, total, DECK_HEIGHT[span], d);
     });
   }
   out.push({ id: 'highway', cls: 'highway', pts, onGround, firm: [], closed: true, ring: false, s: [] });

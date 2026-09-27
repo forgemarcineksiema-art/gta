@@ -74,13 +74,45 @@ export interface Strip {
   /** Per point: the ground at the pavement's outer edge, the right then the left (NaN where no pavement reaches). */
   out: number[];
 }
+/** The height at (x, z) of a junction's fan in halves over one rim pair (its middle, the rim's two, the spokes' and the chord's middles). */
+function fanHeight(cx: number, cy: number, cz: number, a: RimPoint, b: RimPoint, max: number, may: number, maz: number, mbx: number, mby: number, mbz: number, ex: number, ey: number, ez: number, x: number, z: number): number {
+  const tris: ReadonlyArray<readonly [number, number, number, number, number, number, number, number, number]> = [
+    [cx, cy, cz, max, may, maz, mbx, mby, mbz], [max, may, maz, a.x, a.y, a.z, ex, ey, ez], [max, may, maz, ex, ey, ez, mbx, mby, mbz], [mbx, mby, mbz, ex, ey, ez, b.x, b.y, b.z],
+  ];
+  let best = NaN, miss = Infinity;
+  for (const [x0, y0, z0, x1, y1, z1, x2, y2, z2] of tris) {
+    const d = (z1 - z2) * (x0 - x2) + (x2 - x1) * (z0 - z2);
+    if (Math.abs(d) < 1e-9) continue;
+    const l0 = ((z1 - z2) * (x - x2) + (x2 - x1) * (z - z2)) / d, l1 = ((z2 - z0) * (x - x2) + (x0 - x2) * (z - z2)) / d, l2 = 1 - l0 - l1;
+    const out = Math.max(0, -l0, -l1, -l2);
+    if (out < miss) { miss = out; best = l0 * y0 + l1 * y1 + l2 * y2; }
+  }
+  return best;
+}
+
 /** A junction's rim point: where it is and, on an arm, its road's strip, station and offset. */
 export interface RimPoint { x: number; y: number; z: number; strip: number; s: number; o: number }
 /**
  * A junction: its middle, its rim, and per rim point its fan's points on the ground: the spoke's middle to it, to the
- * next, the chord's middle between them (x, y, z each).
+ * next, the chord's middle between them (x, y, z each); where the ground bends under it (`FAN_BEND`), `grid`: per rim
+ * point its fan's triangle cut `cut` times each way, the points of that grid past its corners (`fanOrder`).
  */
-export interface Junction { x: number; y: number; z: number; rim: RimPoint[]; fan: number[] }
+export interface Junction { x: number; y: number; z: number; rim: RimPoint[]; fan: number[]; grid?: number[]; cut?: number }
+
+/**
+ * A junction's fan is laid finer where the ground under it bends more than this from the fan in halves (m), in as many
+ * cuts each way as bring it within this (at most `FAN_CUTS`): a steep street leaving Crown Avenue at 45° dropped 0.4 m
+ * under the fan's faces, the ground drawn over them.
+ */
+const FAN_BEND = 0.08;
+const FAN_CUTS = 4;
+
+/** A fan's triangle cut `n` times each way: its grid's points past the middle and the rim's two, (u toward the first rim point, v the next). */
+function fanOrder(n: number): Array<readonly [number, number]> {
+  const out: Array<readonly [number, number]> = [];
+  for (let u = 0; u <= n; u++) for (let v = 0; u + v <= n; v++) if (!(u === 0 && v === 0) && u !== n && v !== n) out.push([u, v]);
+  return out;
+}
 export type PaintKind = 'centre' | 'lane' | 'edge' | 'stop' | 'zebra' | 'arrow' | 'bay';
 /** A quad of paint on a strip: its corners' stations and offsets, and heights. */
 export interface Paint { kind: PaintKind; strip: number; s: number[]; o: number[]; y: number[]; colour: number }
@@ -266,6 +298,31 @@ export function roadSurfaces(ground: Ground, graph: RoadGraph, chunkOf: (x: numb
       // along an arm's own section the chord is the strip's edge: straight, so the seam is exact
       const edge = a.strip === b.strip && a.s === b.s ? [(a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2] : lifted((a.x + b.x) / 2, (a.z + b.z) / 2);
       j.fan.push(...ma, ...mb, ...edge);
+    }
+    // the ground under the fan in thirds against the fan in halves: where it misses, the fan cut finer (a miss falls with
+    // the cut's square: halves' miss m, n cuts' m (2 / n)²)
+    let bent = 0;
+    for (let i = 0; i < rim.length; i++) {
+      const a = rim[i] as RimPoint, b = rim[(i + 1) % rim.length] as RimPoint, f = j.fan, n = 9 * i;
+      for (const [u, v] of fanOrder(3)) {
+        const x = j.x + ((a.x - j.x) * u + (b.x - j.x) * v) / 3, z = j.z + ((a.z - j.z) * u + (b.z - j.z) * v) / 3;
+        if (u + v === 3) continue;
+        const halves = fanHeight(j.x, j.y, j.z, a, b, f[n] as number, f[n + 1] as number, f[n + 2] as number, f[n + 3] as number, f[n + 4] as number, f[n + 5] as number, f[n + 6] as number, f[n + 7] as number, f[n + 8] as number, x, z);
+        bent = Math.max(bent, Math.abs(ground.surfaceHeight(x, z) + ROAD_LIFT - halves));
+      }
+    }
+    if (bent > FAN_BEND) {
+      const cut = Math.min(FAN_CUTS, Math.ceil(2 * Math.sqrt(bent / FAN_BEND))), order = fanOrder(cut), grid: number[] = [];
+      for (let i = 0; i < rim.length; i++) {
+        const a = rim[i] as RimPoint, b = rim[(i + 1) % rim.length] as RimPoint, own = a.strip === b.strip && a.s === b.s;
+        for (const [u, v] of order) {
+          const x = j.x + ((a.x - j.x) * u + (b.x - j.x) * v) / cut, z = j.z + ((a.z - j.z) * u + (b.z - j.z) * v) / cut;
+          // on the rim's chord along an arm's own section: the strip's edge, straight
+          grid.push(x, own && u + v === cut ? a.y + ((b.y - a.y) * v) / cut : ground.surfaceHeight(x, z) + ROAD_LIFT, z);
+        }
+      }
+      j.grid = grid;
+      j.cut = cut;
     }
   }
 
@@ -584,7 +641,27 @@ class Emitter {
 
   /** A fan from a junction's middle, each triangle in four: the spokes' middles and the corners' chords on the ground. */
   junction(j: Junction): void {
-    const colour = PALETTE.asphalt, rim = j.rim, f = j.fan;
+    const colour = PALETTE.asphalt, rim = j.rim, f = j.fan, grid = j.grid, cut = j.cut ?? 3;
+    if (grid) {
+      // cut finer: the grid's points by (u, v), the middle and the rim's two its corners
+      const order = fanOrder(cut), index = new Map(order.map(([u, v], k) => [u * 64 + v, k]));
+      for (let i = 0; i < rim.length; i++) {
+        const a = rim[i] as RimPoint, b = rim[(i + 1) % rim.length] as RimPoint, n = 3 * order.length * i;
+        const at = (u: number, v: number): readonly [number, number, number] => {
+          if (u === 0 && v === 0) return [j.x, j.y, j.z];
+          if (u === cut) return [a.x, a.y, a.z];
+          if (v === cut) return [b.x, b.y, b.z];
+          const k = n + 3 * (index.get(u * 64 + v) as number);
+          return [grid[k] as number, grid[k + 1] as number, grid[k + 2] as number];
+        };
+        for (let u = 0; u < cut; u++) for (let v = 0; u + v < cut; v++) {
+          const p = at(u, v), q = at(u + 1, v), r = at(u, v + 1);
+          this.tri(p[0], p[1], p[2], q[0], q[1], q[2], r[0], r[1], r[2], colour);
+          if (u + v < cut - 1) { const s = at(u + 1, v + 1); this.tri(q[0], q[1], q[2], s[0], s[1], s[2], r[0], r[1], r[2], colour); }
+        }
+      }
+      return;
+    }
     for (let i = 0; i < rim.length; i++) {
       const a = rim[i] as RimPoint, b = rim[(i + 1) % rim.length] as RimPoint, n = 9 * i;
       const mx = f[n] as number, my = f[n + 1] as number, mz = f[n + 2] as number, nx = f[n + 3] as number, ny = f[n + 4] as number, nz = f[n + 5] as number;

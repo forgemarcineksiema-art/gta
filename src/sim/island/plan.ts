@@ -125,6 +125,8 @@ export type RoadClass = 'highway' | 'avenue' | 'street' | 'serpentine' | 'dirt' 
 export const HALF_WIDTH: Readonly<Record<RoadClass, number>> = { highway: 19, avenue: 12, street: 9, serpentine: 7, dirt: 5, taxiway: 12, ramp: 7, side: 8 };
 /** How a stretch of road meets the ground: on it, under it, or over it. */
 export type SpanKind = 'ground' | 'tunnel' | 'viaduct' | 'bridge' | 'overpass';
+/** Where the highway leaves the ground, its deck's least height over the sea (m), by span. */
+export const DECK_HEIGHT: Readonly<Record<SpanKind, number>> = { ground: 0, tunnel: 0, viaduct: 8, bridge: 10, overpass: 0 };
 
 /**
  * A road of the plan: its class, its control points (a Catmull-Rom curve if `smooth`, else straight segments), and how

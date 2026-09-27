@@ -106,7 +106,7 @@ describe('M8.10 slice 6a: the highway all the way round', () => {
     expect(worst).toBeLessThan(0.015);
   });
 
-  it('6a.7 the lighthouse road keeps its headroom under the bay bridge\'s ramp: past its foot\'s curve the ramp runs on its straight line (eased from the abutment it stood a metre lower and cars hit it)', () => {
+  it('6a.7 the lighthouse road has a van\'s headroom under the bay bridge\'s ramp: it dips under it, and past its foot\'s curve the ramp runs on its straight line', () => {
     const island = new Island(new RAPIER.World({ x: 0, y: -9.81, z: 0 }));
     const bridge = island.structures.find((s) => s.kind === 'bridge')?.pieces ?? [];
     let under = 0, least = Infinity;
@@ -120,8 +120,9 @@ describe('M8.10 slice 6a: the highway all the way round', () => {
       }
     });
     expect(under).toBeGreaterThan(4);
-    // 1.66 m at its lowest, over the lane nearest the abutment at the deck's edge, as before the foot was curved
-    expect(least).toBeGreaterThan(1.6);
+    // (1.66 m at its lowest before it dipped: over the lane nearest the abutment at the deck's edge; now down to 1 m over
+    // the sea there)
+    expect(least).toBeGreaterThan(2.6);
   });
 
   it('6a.8 the tunnel\'s lid lies where the hill is drawn, past its trench\'s edge: along the serpentine over it, the wheels\' ground within 5 cm of the road', () => {
@@ -168,6 +169,25 @@ describe('M8.10 slice 6a: the highway all the way round', () => {
     expect(checked).toBeGreaterThan(20);
     // (the quay's sweep rose 2.2 m across under the south overpass: the highway's bank over its outer lane)
     expect(worst).toBeLessThan(0.1);
+  });
+
+  it('6a.10 at each of the tunnel\'s mouths the wheels\' ground is the road the player sees across the whole carriageway (the west one\'s sides stood 0.24 m off it)', () => {
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+    const island = new Island(world), g = island.ground;
+    const pieces = island.structures.find((s) => s.kind === 'tunnel')?.pieces ?? [];
+    let worst = 0, at = '';
+    for (const [p, sign] of [[pieces[0], -1], [pieces[pieces.length - 1], 1]] as const) {
+      if (!p) throw new Error('no tunnel');
+      island.sync(p.x, p.z, true);
+      world.step();
+      // across the carriageway on each side of the mouth's line (the floor's end), 0.3 m in and 0.3 m out
+      const fx = Math.sin(p.yaw) * sign, fz = Math.cos(p.yaw) * sign, rx = -Math.cos(p.yaw), rz = Math.sin(p.yaw);
+      for (const along of [p.length / 2 - 0.3, p.length / 2 + 0.3]) for (let o = -18; o <= 18; o += 2) {
+        const x = p.x + fx * along + rx * o, z = p.z + fz * along + rz * o, s = g.surfaceHeight(x, z), miss = Math.abs((down(world, x, s + 3, z) ?? -99) - s);
+        if (miss > worst) { worst = miss; at = `${x.toFixed(0)}, ${z.toFixed(0)}`; }
+      }
+    }
+    expect(worst, at).toBeLessThan(0.05);
   });
 
   // 6a.4 (a car across the viaduct and the bay bridge) is a long pin: drive.long.test.ts

@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-27 — the roads' backlog (Marcin: "Popraw też te z backlogu")
+
+The lighthouse road dips under the bay bridge's ramp to a van's headroom (1.66 → 2.7 m, 6a.7; the deck's top one function,
+`deckTop`, for the network and the ground); inside a bend the height blends the two segments that reach a point by how
+far each reaches past their corner, and a bank is measured from the nearest point (steps of 0.1–0.15 m across the
+serpentine's hairpins, 2.7); into a tunnel's mouth the road reaches 4 m on under the floor (the west mouth's sides stood
+0.24 m off it, 6a.10); a junction's fan is cut finer where the ground bends under it (ground over road now 25 cm at most,
+3.2). Crown's crests stay: the plan's "a car flies at each crossing". Left: the fans' faces over the ground (BACKLOG).
+
 ## 2026-09-27 — the island's roads and ground (Marcin: "drogi/teren ... zbugowane, niedopracowane")
 
 Surveyed headless (a car round every lane; the drawn ground against the drawn roads) and fixed: the tunnel's floor bends

@@ -10,11 +10,12 @@
 import { SEA } from '../city/sea';
 import { ASPHALT, DIRT, GRASS, SAND, type SurfaceKind } from '../city/surface';
 import { catmullRom, circle, ellipse, inPolygon, polylineLength, resample, signedArea, type P2 } from './geom';
-import { BASIN, BOUNDS, COAST, COAST_PARTS, HALF_WIDTH, OVERPASS_HALF, PLACES, PLACE_RINGS, PLACE_ROADS, RINGS, ROADS, causeway, highwayLoop, islet, naturalHeight, type PlanRoad, type RoadClass, type SpanKind } from './plan';
+import { BASIN, BOUNDS, COAST, COAST_PARTS, DECK_HEIGHT, HALF_WIDTH, OVERPASS_HALF, PLACES, PLACE_RINGS, PLACE_ROADS, RINGS, ROADS, causeway, highwayLoop, islet, naturalHeight, type PlanRoad, type RoadClass, type SpanKind } from './plan';
 import { placePaved, seabed, shaped } from './shapes';
 import { canalBed, inCanal, inScrapyard, onWaterworksPlaza } from './shapes/works';
 import { gardensCover } from './shapes/gardens';
 import { districtStreets } from './streets';
+import { DECK } from './structures';
 
 export { HALF_WIDTH };
 /** The steepest a road's profile may run, by class (rise over run). */
@@ -47,6 +48,8 @@ const UNDER = 7;
  * again at the foot, so no crest throws a car. A ramp joining it alongside is held level with it (`ALONGSIDE`).
  */
 const DRY = 1;
+/** A road passing under a deck's ramp keeps this much room under it (m: a van's and a margin), dipped as far as `DRY` allows. */
+const HEADROOM = 3;
 const RISE = { top: OVERPASS_HALF + 2 * STEP, curve: 40, grade: 0.05 } as const;
 /**
  * A road joining the highway is held level with it as far as its line runs this near the highway's (m, past its own half
@@ -108,6 +111,24 @@ export function deckFoot(line: { h: number; g: number }, s: number): number {
   return line.h + line.g * s + (MAX_GRADE.highway - line.g) * ease(s + CURVE / 2);
 }
 
+/** A deck's top's corners are rounded over this much height (m): a curve a car keeps its wheels on at the highway's speed. */
+const ROUND = 1.5;
+
+/** A minimum with its corner rounded over `k` (m): never over either. */
+function softMin(a: number, b: number, k: number): number {
+  const h = Math.max(k - Math.abs(a - b), 0) / k;
+  return Math.min(a, b) - (h * h * k) / 4;
+}
+
+/**
+ * A deck's top `d` m along it from its first abutment, `total` m to its last: up its first ramp from its foot (`foot0`,
+ * `deckFoot`) to `top` m over the sea, and down its last to `foot1`, the corners rounded; never under the straight line
+ * between its ends' heights `h0` and `h1`. The network lays the deck on it; the ground reads it for the roads beneath.
+ */
+export function deckTop(foot0: { h: number; g: number }, foot1: { h: number; g: number }, h0: number, h1: number, total: number, top: number, d: number): number {
+  return Math.max(h0 + ((h1 - h0) * d) / total, softMin(softMin(top, deckFoot(foot0, d), ROUND), deckFoot(foot1, total - d), ROUND));
+}
+
 /**
  * A highway's stretch's grade line at its end `e` (0 or its last point): its height carried on to the end and its grade
  * climbing toward it, both read where the stretch is half a `CURVE` from the end (a deck's foot bends the rest).
@@ -126,6 +147,8 @@ const CELL = 32;
 const MASK = 2;
 /** At most this many roads count at one point. */
 const NEAR = 8;
+/** A road's nearest segments to a point kept while the ground is worked out there (the inside of a bend's pair among them). */
+const SEAMS = 4;
 /**
  * Where two roads meet, the narrower gives way: the wider's surface holds across its whole carriageway and the
  * narrower's is blended in over `YIELD` m past its edge. They meet where their heights are within `AT_GRADE` m, and
@@ -222,6 +245,21 @@ function past(g: SegmentGrid, s: number, x: number, z: number): boolean {
  */
 function even(hw: number): number {
   return hw >= HALF_WIDTH.highway ? 0 : hw;
+}
+
+/**
+ * Whether (x, z) lies past segment `s`'s capped end (a highway's stretch's, at its structure), where it reaches no
+ * further; into a tunnel's mouth it reaches `capIn` m on, under the floor, within the road's width (stopped on the
+ * mouth's line, the carriageway's sides flipped between the road and the hill where that line turns off the road's:
+ * 0.24 m between the physics and the drawn road at the west mouth).
+ */
+function capped(g: SegmentGrid, s: number, x: number, z: number, u: number, cap: number): boolean {
+  const before = u < -CAP_SLACK && (cap & 1) !== 0, after = u > 1 + CAP_SLACK && (cap & 2) !== 0;
+  if (!before && !after) return false;
+  const inside = g.capIn[s] as number;
+  if (inside === 0) return true;
+  const ax = g.ax[s] as number, az = g.az[s] as number, dx = (g.bx[s] as number) - ax, dz = (g.bz[s] as number) - az, len = Math.hypot(dx, dz) || 1;
+  return (before ? -u : u - 1) * len > inside || Math.abs((z - az) * dx - (x - ax) * dz) / len > STOP_HALF;
 }
 
 /** A road's height `t` of the way along its step from point `i` (`bend`). */
@@ -493,7 +531,7 @@ function fillPolygon(mask: Uint8Array, nx: number, nz: number, poly: readonly P2
   }
 }
 
-interface Seg { a: P2; b: P2; ha: number; hb: number; hp?: number; hn?: number; hw: number; kind: number; reach: number; nx?: number; nz?: number; cap?: number; ends?: number; ba?: number; bb?: number; stop?: readonly [number, number, number, number] }
+interface Seg { a: P2; b: P2; ha: number; hb: number; hp?: number; hn?: number; seq?: number; after?: number; capIn?: number; hw: number; kind: number; reach: number; nx?: number; nz?: number; cap?: number; ends?: number; ba?: number; bb?: number; stop?: readonly [number, number, number, number] }
 
 /**
  * A banked road's cross-fall at each point (`BANK`): its turn over two samples each way, toward the outside of the
@@ -529,6 +567,8 @@ class SegmentGrid {
   readonly nx: Float32Array; readonly nz: Float32Array;
   /** A road segment whose road stops at a structure there reaches no further than its end: 1 before a, 2 past b. */
   readonly cap: Uint8Array;
+  /** How far past its capped end a road segment still reaches, within the road's width (m): into a tunnel's mouth. */
+  readonly capIn: Float32Array;
   /** A line a road segment reaches no point past (a point on it and the way past it; none where both are 0): an overpass's end. */
   readonly sx: Float32Array; readonly sz: Float32Array; readonly sdx: Float32Array; readonly sdz: Float32Array;
   /** A road segment at an open road's end: 1 its first, 2 its last. */
@@ -537,6 +577,8 @@ class SegmentGrid {
   readonly ba: Float32Array; readonly bb: Float32Array;
   /** A road segment's profile's points before a and past b (its curve's, `bend`). */
   readonly hp: Float32Array; readonly hn: Float32Array;
+  /** The road's segment on from a road segment's b, by index (-1 at an open road's end or a deck's). */
+  readonly next: Int32Array;
   readonly start: Int32Array; readonly items: Int32Array;
   readonly cols = Math.ceil((BOUNDS.x1 - BOUNDS.x0) / CELL);
   readonly rows = Math.ceil((BOUNDS.z1 - BOUNDS.z0) / CELL);
@@ -547,6 +589,12 @@ class SegmentGrid {
     this.nx = new Float32Array(n); this.nz = new Float32Array(n); this.cap = new Uint8Array(n); this.ends = new Uint8Array(n);
     this.sx = new Float32Array(n); this.sz = new Float32Array(n); this.sdx = new Float32Array(n); this.sdz = new Float32Array(n);
     this.ba = new Float32Array(n); this.bb = new Float32Array(n); this.hp = new Float32Array(n); this.hn = new Float32Array(n);
+    this.next = new Int32Array(n).fill(-1);
+    this.capIn = new Float32Array(n);
+    segs.forEach((s, k) => { this.capIn[k] = s.capIn ?? 0; });
+    const bySeq = new Map<number, number>();
+    segs.forEach((s, k) => { if (s.seq !== undefined) bySeq.set(s.kind * 100000 + s.seq, k); });
+    segs.forEach((s, k) => { if (s.after !== undefined) this.next[k] = bySeq.get(s.kind * 100000 + s.after) ?? -1; });
     const lists: number[][] = Array.from({ length: this.cols * this.rows }, () => []);
     segs.forEach((s, k) => {
       this.ax[k] = s.a[0]; this.az[k] = s.a[1]; this.bx[k] = s.b[0]; this.bz[k] = s.b[1];
@@ -608,7 +656,7 @@ export class Ground {
   /** The shores near the point being read: the nearest's distance and kind, the nearest steep one's and its side, the nearest beach's and quay's distances. */
   private readonly shore = { d: Infinity, kind: 0, steep: Infinity, side: 1, steepKind: -1, beach: Infinity, quay: Infinity };
   /** The roads near the point being read (no allocation per read), and the nearest carriageway's edge. */
-  private readonly near = { road: new Int32Array(NEAR), d: new Float64Array(NEAR), h: new Float64Array(NEAR), w: new Float64Array(NEAR), hw: new Float64Array(NEAR), give: new Float64Array(NEAR) };
+  private readonly near = { road: new Int32Array(NEAR), d: new Float64Array(NEAR), h: new Float64Array(NEAR), w: new Float64Array(NEAR), hw: new Float64Array(NEAR), give: new Float64Array(NEAR), n: new Uint8Array(NEAR), ds: new Float64Array(NEAR * SEAMS), hs: new Float64Array(NEAR * SEAMS), ss: new Int32Array(NEAR * SEAMS), us: new Float64Array(NEAR * SEAMS) };
   private edge = Infinity;
 
   /** The ground built from the plan, or restored from its bake (`toData`: the island's bake, M8.10 slice 18). */
@@ -673,6 +721,7 @@ export class Ground {
     let crossings: { h: Float64Array; held: Uint8Array } | null = null;
     let overpasses: Array<{ x: number; z: number; deck: number }> | null = null;
     let passages: P2[] | null = null;
+    let decks: ((x: number, z: number) => number) | null = null;
     // a profile with its points across the roads it meets on those roads' heights, unless that leaves a block steeper
     // than its class allows (a short street between two main roads far apart in height climbs from their middles)
     const levelled = (r: { pts: P2[]; cls: RoadClass; closed: boolean }, pins: Map<number, number>, flat: Map<number, number>): number[] => {
@@ -701,6 +750,14 @@ export class Ground {
           }
         }
         if (r.cls !== 'highway') {
+          // under a deck's ramp (a viaduct's, the bay bridge's) a road keeps a van's headroom, dipped as far as the sea
+          // allows: the lighthouse road ran 1.66 m under the bay bridge's ramp by its abutment
+          decks ??= this.deckUnder();
+          const under = decks;
+          r.pts.forEach((p, k) => {
+            const cap = Math.max(SEA.level + DRY, under(p[0], p[1]) - HEADROOM), h = pins.get(k) ?? natural(p[0], p[1]);
+            if (h > cap) { pins.set(k, cap); flat.set(k, cap); }
+          });
           // a road passing under the highway dips beneath its overpass, level under the deck
           overpasses ??= stretches('overpass').map((s) => { const m = s.pts[Math.floor(s.pts.length / 2)] as P2; return { x: m[0], z: m[1], deck: this.highwayAt(m[0], m[1]) ?? natural(m[0], m[1]) }; });
           for (const o of overpasses) {
@@ -813,6 +870,7 @@ export class Ground {
       // a road segment's kind is its road's index: where two roads overlap, each road counts once, by its nearest segment
       // the highway's stretches on the ground stop at its structures: no reach past their ends
       const open = road.id.startsWith('highway-');
+      const t = this.tunnel, mouths: P2[] = t ? [t.pts[1] as P2, t.pts[t.pts.length - 1] as P2] : [];
       const deck = road.deck;
       // an overpass's ends: `STOP_IN` m in under its deck from the last point on the ground before it and from the first
       // after, each line across the road's own way there (as its strip's section across it) with the way on under the deck
@@ -830,6 +888,9 @@ export class Ground {
         // (an overpass's ends stop it by their lines, under the deck only: capped at its last segment, its bank stood cut off
         // beside the deck's end)
         const cap = open ? (i === 0 ? 1 : 0) | (i === last - 1 ? 2 : 0) : 0;
+        // into a tunnel's mouth the road reaches on under the floor (`capped`)
+        const into = (p: P2 | undefined): boolean => mouths.some((m) => p !== undefined && Math.hypot(m[0] - p[0], m[1] - p[1]) < 0.5);
+        const capIn = open && ((i === 0 && into(road.pts[0])) || (i === last - 1 && into(road.pts[n - 1]))) ? STOP_IN : 0;
         const ends = road.closed ? 0 : (i === 0 ? 1 : 0) | (i === last - 1 ? 2 : 0);
         // over an overpass the ground follows the road beneath from the deck's ends on: no segment of the highway's reaches
         // past the nearer end's line (the round ends of those before the last reached 20 m in under the deck, and lifted
@@ -837,7 +898,7 @@ export class Ground {
         const a = road.pts[i] as P2, reach = hw + SHOULDER + BLEND;
         let stop: readonly [number, number, number, number] | undefined, near = reach + STEP;
         for (const l of stops) { const d = Math.hypot(a[0] - l[0], a[1] - l[1]); if (d < near && (a[0] - l[0]) * l[2] + (a[1] - l[1]) * l[3] <= 0) { near = d; stop = l; } }
-        segs.push({ a, b: road.pts[(i + 1) % n] as P2, ha: road.h[i] as number, hb: road.h[(i + 1) % n] as number, hp: profilePoint(road.h, road.closed, i - 1), hn: profilePoint(road.h, road.closed, i + 2), hw, kind: r, reach, cap, ends, ba: road.bank?.[i] ?? 0, bb: road.bank?.[(i + 1) % n] ?? 0, ...(stop ? { stop } : {}) });
+        segs.push({ a, b: road.pts[(i + 1) % n] as P2, ha: road.h[i] as number, hb: road.h[(i + 1) % n] as number, hp: profilePoint(road.h, road.closed, i - 1), hn: profilePoint(road.h, road.closed, i + 2), seq: i, after: road.closed ? (i + 1) % n : i + 1, capIn, hw, kind: r, reach, cap, ends, ba: road.bank?.[i] ?? 0, bb: road.bank?.[(i + 1) % n] ?? 0, ...(stop ? { stop } : {}) });
       }
     });
     return segs;
@@ -900,6 +961,39 @@ export class Ground {
       if (hit.d < 4 && (!best || hit.d < best.d)) best = hit;
     }
     return best ? best.h : null;
+  }
+
+  /**
+   * The underside of the deck (the viaduct's, the bay bridge's) over (x, z), as the network lays it (`deckTop`), or
+   * Infinity where none is: read as the roads are graded, after the highway's stretches.
+   */
+  private deckUnder(): (x: number, z: number) => number {
+    const loop = highwayLoop(STEP), n = loop.pts.length, runs: Array<{ pts: P2[]; s: number[]; top: (d: number) => number }> = [];
+    for (let i = 0; i < n; i++) {
+      const span = loop.span[i] as SpanKind;
+      if ((span !== 'viaduct' && span !== 'bridge') || loop.span[(i - 1 + n) % n] === span) continue;
+      let end = i;
+      while (loop.span[(end + 1) % n] === span) end++;
+      // from its first point to the first on the ground after it, as the network's run
+      const pts = Array.from({ length: end - i + 2 }, (_, k) => loop.pts[(i + k) % n] as P2), s = [0];
+      for (let k = 1; k < pts.length; k++) s.push((s[k - 1] as number) + Math.hypot((pts[k] as P2)[0] - (pts[k - 1] as P2)[0], (pts[k] as P2)[1] - (pts[k - 1] as P2)[1]));
+      const first = pts[0] as P2, last = pts[pts.length - 1] as P2, total = s[s.length - 1] as number;
+      const h0 = this.highwayAt(first[0], first[1]) ?? natural(first[0], first[1]), h1 = this.highwayAt(last[0], last[1]) ?? natural(last[0], last[1]);
+      const foot0 = this.highwayEnd(first[0], first[1]) ?? { h: h0, g: 0 }, foot1 = this.highwayEnd(last[0], last[1]) ?? { h: h1, g: 0 };
+      runs.push({ pts, s, top: (d) => deckTop(foot0, foot1, h0, h1, total, DECK_HEIGHT[span], d) });
+    }
+    return (x, z) => {
+      let under = Infinity;
+      for (const r of runs) for (let k = 0; k + 1 < r.pts.length; k++) {
+        const a = r.pts[k] as P2, b = r.pts[k + 1] as P2, dx = b[0] - a[0], dz = b[1] - a[1], len = Math.hypot(dx, dz) || 1;
+        const u = ((x - a[0]) * dx + (z - a[1]) * dz) / (len * len);
+        if ((k === 0 && u < 0) || (k === r.pts.length - 2 && u > 1)) continue;
+        const t = Math.max(0, Math.min(1, u));
+        if (Math.hypot(x - a[0] - dx * t, z - a[1] - dz * t) > DECK.half + 1) continue;
+        under = Math.min(under, r.top((r.s[k] as number) + t * len) - DECK.depth);
+      }
+      return under;
+    };
   }
 
   /** The grade line the highway's stretch on the ground ends on at (x, z) (a mouth, an abutment; `endLine`), or null. */
@@ -1001,7 +1095,7 @@ export class Ground {
       const ax = g.ax[s] as number, az = g.az[s] as number, dx = (g.bx[s] as number) - ax, dz = (g.bz[s] as number) - az;
       const u = ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1), cap = g.cap[s] as number;
       // (a hair of slack: the grid's ends are Float32, and a capped segment still holds its own end points)
-      if ((u < -CAP_SLACK && (cap & 1) !== 0) || (u > 1 + CAP_SLACK && (cap & 2) !== 0) || past(g, s, x, z)) continue;
+      if (capped(g, s, x, z, u, cap) || past(g, s, x, z)) continue;
       const t = Math.max(0, Math.min(1, u));
       const d = Math.hypot(x - ax - dx * t, z - az - dz * t);
       const reach = (g.hw[s] as number) + SHOULDER;
@@ -1014,19 +1108,57 @@ export class Ground {
       while (slot < count && near.road[slot] !== road) slot++;
       if (slot === count) {
         if (count === NEAR) continue;
-        near.road[slot] = road; near.d[slot] = Infinity; count++;
+        near.road[slot] = road; near.d[slot] = Infinity; near.n[slot] = 0; count++;
+      }
+      // the road's nearest segments, nearest first (`SEAMS` of them)
+      const kept = near.n[slot] as number, base = slot * SEAMS;
+      if (kept < SEAMS || d < (near.ds[base + SEAMS - 1] as number)) {
+        let at = bend(g.hp[s] as number, g.ha[s] as number, g.hb[s] as number, g.hn[s] as number, t);
+        // a banked road's cross-fall, its right side up by it, on over its shoulders and held past them
+        const bank = (g.ba[s] as number) + ((g.bb[s] as number) - (g.ba[s] as number)) * t, edge = (g.hw[s] as number) + SHOULDER;
+        // (the side by the segment's line, the distance to its nearest point: past its end round the corner, so the bank runs on
+        // where the next segment takes over)
+        if (bank !== 0) at += bank * Math.max(-edge, Math.min(edge, Math.sign((z - az) * dx - (x - ax) * dz) * d));
+        let j = kept < SEAMS ? kept : SEAMS - 1;
+        for (; j > 0 && (near.ds[base + j - 1] as number) > d; j--) {
+          near.ds[base + j] = near.ds[base + j - 1] as number; near.hs[base + j] = near.hs[base + j - 1] as number;
+          near.ss[base + j] = near.ss[base + j - 1] as number; near.us[base + j] = near.us[base + j - 1] as number;
+        }
+        near.ds[base + j] = d;
+        near.hs[base + j] = at;
+        near.ss[base + j] = s;
+        near.us[base + j] = u;
+        if (kept < SEAMS) near.n[slot] = kept + 1;
       }
       if (d < (near.d[slot] as number)) {
         near.d[slot] = d;
-        near.h[slot] = bend(g.hp[s] as number, g.ha[s] as number, g.hb[s] as number, g.hn[s] as number, t);
-        // a banked road's cross-fall, its right side up by it, on over its shoulders and held past them
-        const bank = (g.ba[s] as number) + ((g.bb[s] as number) - (g.ba[s] as number)) * t, edge = (g.hw[s] as number) + SHOULDER;
-        if (bank !== 0) near.h[slot] = (near.h[slot] as number) + bank * Math.max(-edge, Math.min(edge, ((z - az) * dx - (x - ax) * dz) / (Math.hypot(dx, dz) || 1)));
         near.w[slot] = d <= reach ? 1 : 1 - smooth01((d - reach) / BLEND);
         near.hw[slot] = g.hw[s] as number;
       }
     }
     if (count === 0) return h;
+    // a road's height: its nearest segment's where it reaches the point; inside a bend, where the nearest and the next
+    // (or the one before) both reach it, at different points along the road, the two blended by how far each reaches
+    // past their corner, so the height runs on across the bend (it stepped where the nearest swapped: 0.1-0.15 m across
+    // the serpentine's hairpins at 12 %)
+    for (let i = 0; i < count; i++) {
+      const base = i * SEAMS, first = near.ss[base] as number, u0 = near.us[base] as number;
+      near.h[i] = near.hs[base] as number;
+      if (u0 < 0 || u0 > 1) continue;
+      for (let j = 1; j < (near.n[i] as number); j++) {
+        const other = near.ss[base + j] as number, u1 = near.us[base + j] as number;
+        if (u1 < 0 || u1 > 1) continue;
+        // `a` the earlier along the road, `b` the later: each one's reach from their corner
+        const ahead = g.next[first] === other, behind = g.next[other] === first;
+        if (!ahead && !behind) continue;
+        const sa = ahead ? first : other, sb = ahead ? other : first, ua = ahead ? u0 : u1, ub = ahead ? u1 : u0;
+        const a = (1 - ua) * Math.hypot((g.bx[sa] as number) - (g.ax[sa] as number), (g.bz[sa] as number) - (g.az[sa] as number));
+        const b = ub * Math.hypot((g.bx[sb] as number) - (g.ax[sb] as number), (g.bz[sb] as number) - (g.az[sb] as number));
+        const ha = (ahead ? near.hs[base] : near.hs[base + j]) as number, hb = (ahead ? near.hs[base + j] : near.hs[base]) as number;
+        if (a + b > 1e-6) near.h[i] = (a * ha + b * hb) / (a + b);
+        break;
+      }
+    }
     // at a junction the narrower road gives way to the wider (the first graded of two alike): none of it on the wider's
     // carriageway, all of it `YIELD` past its edge, so a sloping road's surface runs on whole through the crossing; a
     // road dipping under the highway's overpass gives way to it only on its carriageway (keeping its dip beside it)
@@ -1139,7 +1271,7 @@ export class Ground {
       const s = g.items[k] as number;
       const ax = g.ax[s] as number, az = g.az[s] as number, dx = (g.bx[s] as number) - ax, dz = (g.bz[s] as number) - az;
       const u = ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1), cap = g.cap[s] as number;
-      if ((u < -CAP_SLACK && (cap & 1) !== 0) || (u > 1 + CAP_SLACK && (cap & 2) !== 0) || past(g, s, x, z)) continue;
+      if (capped(g, s, x, z, u, cap) || past(g, s, x, z)) continue;
       const t = Math.max(0, Math.min(1, u)), cx = ax + dx * t, cz = az + dz * t, d = Math.hypot(x - cx, z - cz), hw = g.hw[s] as number;
       if (d - hw >= best) continue;
       best = d - hw;

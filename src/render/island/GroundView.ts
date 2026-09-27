@@ -16,6 +16,7 @@ import { LAID, LAWN } from '../../sim/island/shapes/gardens';
 import { VIEW_GRID } from '../../sim/island/views';
 import { DECK } from '../../sim/island/structures';
 import { Rtin } from './rtin';
+import { fadeShadowEdges } from '../shadows';
 
 /** The mesh's grid: points a side of a chunk (the sim's view grid: the island reads the ground on it), and the step between them (m). */
 export const GRID = VIEW_GRID;
@@ -64,10 +65,17 @@ export function chunkSphere(k: number): THREE.Sphere {
   return new THREE.Sphere(new THREE.Vector3(x, (LOWEST + HIGHEST) / 2, z), Math.hypot(CHUNK * 0.75, (HIGHEST - LOWEST) / 2));
 }
 
+/** A material with the shadow map fading out before its edge. */
+function fadedEdges<M extends THREE.Material>(m: M): M {
+  fadeShadowEdges(m);
+  return m;
+}
+
 export class GroundView {
   readonly group = new THREE.Group();
   private readonly chunks = new Map<number, THREE.Mesh>();
-  private readonly material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  /** The ground's one material, the shadow map faded out before its edge (the grid's). */
+  private readonly material = fadedEdges(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
   private readonly rtin = new Rtin(GRID);
   private readonly above = new Float32Array(GRID * GRID);
   private readonly below = new Float32Array(GRID * GRID);

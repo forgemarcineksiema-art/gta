@@ -1,6 +1,6 @@
 /** M8.10 slice 4: the island's main road network as the grid's `RoadGraph` (docs/M8.10_PLAN.md). */
 import { beforeAll, describe, expect, it } from 'vitest';
-import type { Lane } from '../../../src/sim/city/roads';
+import { roadTour, type Lane } from '../../../src/sim/city/roads';
 import { Ground, MAX_GRADE } from '../../../src/sim/island/ground';
 import { buildNetwork, onTheGround, type IslandNetwork } from '../../../src/sim/island/network';
 
@@ -89,5 +89,12 @@ describe('M8.10 slice 4: the main network', () => {
     }
     expect(checked).toBeGreaterThan(3000);
     expect(off).toBeGreaterThan(300);
+  });
+
+  it('4.7 a tour drives every lane once, each into the next, and closes: the road bot\'s on the island (the gate\'s suites)', () => {
+    const { lanes } = net.graph, tour = roadTour(net.graph, (lanes[0] as Lane).from);
+    expect(tour.length).toBe(lanes.length);
+    expect(new Set(tour).size).toBe(lanes.length);
+    for (let i = 0; i < tour.length; i++) expect((lanes[tour[(i + 1) % tour.length] as number] as Lane).from).toBe((lanes[tour[i] as number] as Lane).to);
   });
 });

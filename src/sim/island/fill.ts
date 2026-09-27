@@ -50,7 +50,8 @@ export function fillStatics(fill: IslandFill, index: number, chunkOf: (x: number
     // the plinth from under the lowest ground up to the floor
     kit.box(0, (lot.foot - lot.base - 0.4) / 2, 0, lot.hx + 0.05, (lot.base - lot.foot + 0.4) / 2, lot.hz + 0.05, CITY_COLORS.stone, 'building');
     kit.rotateFrom(start, lot.x, lot.z, lot.yaw);
-    for (let i = start; i < list.length; i++) (list[i] as StaticDesc).position.y += lot.base;
+    // on its floor, the ground its facades are read from
+    for (let i = start; i < list.length; i++) { const st = list[i] as StaticDesc; st.position.y += lot.base; st.base = lot.base; }
   }
   for (const h of fill.hedges) {
     if (chunkOf(h.x, h.z) !== index) continue;

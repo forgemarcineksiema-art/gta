@@ -14,7 +14,7 @@ import { KeyboardDevice } from '../input/KeyboardDevice';
 import { createPlatform, type Platform } from '../platform';
 import { Renderer } from '../render/Renderer';
 import { ACTIONS, type Action } from '../input/actions';
-import { BODY_IDS, CAR_IDS, ECONOMY, FIXED_DT, Recorder, SimWorld, clearControls, districtAt, initPhysics, type BodyId, type CarId, type EventLog, type RecordingJSON, TRAFFIC, PEDS, DAMAGE, SWAP } from '../sim';
+import { BODY_IDS, CAR_IDS, ECONOMY, FIXED_DT, Recorder, SimWorld, clearControls, DISTRICTS, districtAt, initPhysics, type BodyId, type CarId, type EventLog, type RecordingJSON, TRAFFIC, PEDS, DAMAGE, SWAP } from '../sim';
 import { HINT_SECONDS, devTools, hintsWanted, screenTaken } from '../ui/hud/corners';
 import { DebugPanel } from '../ui/dev/debugPanel';
 import { Hud } from '../ui/hud/hud';
@@ -30,6 +30,7 @@ import { GarageUi, type GarageActions } from '../ui/wall/garage';
 import { routeToDropOff } from './doorRoute';
 import { BotDriver } from './bot';
 import { loadIslandBake } from './islandBake';
+import { districtOf } from '../sim/island/plan';
 import { worldMap } from './world';
 import { BotPolicy } from './botPolicy';
 import { JobBot } from './jobBot';
@@ -329,16 +330,18 @@ export class App {
     this.panel?.setVisible(true);
 
     const botParam = params.get('bot');
-    const doorBot = botParam === 'door' && sim.city !== null;
+    // the road bots in the game's worlds, the grid's and the island's (its tour of every lane, M8.10: the gate's suites)
+    const world = sim.city !== null || sim.island !== null;
+    const doorBot = botParam === 'door' && world;
     // the policies of slice 5: the road bot as a novice, or swapping and turning away as a skilled player
-    const policy = (botParam === 'novice' || botParam === 'skilled') && sim.city !== null ? botParam : null;
-    const jobBot = botParam === 'job' && sim.city !== null;
+    const policy = (botParam === 'novice' || botParam === 'skilled') && world ? botParam : null;
+    const jobBot = botParam === 'job' && world;
     const botOn = botParam === '1' || botParam === 'track' || doorBot || policy !== null || jobBot;
     // `pavement=8.2`: the road bot on the kerb line along the straights (M8: the chaos run's measurement)
     const pavement = Number(params.get('pavement') ?? '0') || 0;
     this.bot = jobBot ? new JobBot(sim.carId)
       : policy ? new BotPolicy(policy, new TrackBot(sim.carId, CITY_BOT_TUNING))
-      : botOn && sim.city ? new TrackBot(sim.carId, { ...CITY_BOT_TUNING, pavement })
+      : botOn && world ? new TrackBot(sim.carId, { ...CITY_BOT_TUNING, pavement })
         : botParam === 'track' ? new TrackBot(this.sim.carId) : botOn ? new BotDriver(Number(params.get('seed') ?? '42')) : null;
     // the drive to the hideout: the road bot on a path of its own (slice 3a's e2e and measurement)
     const hideout = sim.run.dropOffs[0];
@@ -360,7 +363,7 @@ export class App {
       bot: botOn,
       version: __APP_VERSION__,
       renderer: this.renderer,
-      roadBot: sim.city && this.bot instanceof TrackBot ? this.bot : this.bot instanceof BotPolicy || this.bot instanceof JobBot ? this.bot.bot : null,
+      roadBot: (sim.city || sim.island) && this.bot instanceof TrackBot ? this.bot : this.bot instanceof BotPolicy || this.bot instanceof JobBot ? this.bot.bot : null,
       audio: this.audio,
       adShowing: false,
       save: store,
@@ -387,7 +390,7 @@ export class App {
         trafficDensity: sim.trafficDensity,
         pedsDensity: sim.pedsDensity,
         player: { x: p.x, y: p.y, z: p.z, speedKmh: sim.vehicle.telemetry.speedKmh, boost: sim.vehicle.boostMeter },
-        district: sim.city ? districtAt(p.x, p.z).name : null,
+        district: sim.city ? districtAt(p.x, p.z).name : sim.island ? DISTRICTS.find((d) => d.id === districtOf(p.x, p.z))?.name ?? null : null,
         quality: this.renderer.quality, collisionChunks: sim.city?.active.size,
         renderChunks: this.renderer.cityView?.meshes.size, lanesVisited: this.handle.roadBot?.visitedLanes.size,
         tourComplete: this.handle.roadBot?.tourComplete, resets: this.bot?.resets ?? 0, tick: sim.tick,
@@ -526,12 +529,15 @@ export class App {
     // `job=<id>` or `job=delivery|order|escape`: into that marker's ring at boot (tests and playtests); `job=duel`
     // is the next rival's
     const jobParam = params.get('job');
-    if (jobParam !== null && sim.city) {
+    if (jobParam !== null && (sim.city || sim.island)) {
       const d = jobParam === 'duel' ? sim.jobs.defs.find((k) => k.kind === 'duel' && k.level === sim.board.next())
         : sim.jobs.defs.find((k) => String(k.id) === jobParam || k.kind === jobParam);
-      if (d) {
+      if (d && sim.city) {
         sim.city.sync(d.x, d.z, true);
         sim.vehicle.teleport({ x: d.x, y: 0.9, z: d.z }, d.yaw);
+      } else if (d && sim.island) {
+        // the island's ring on its ground (a kerb's top at a corner, a hill's slope: M8.10)
+        sim.spawnAtPoint({ name: 'job', position: { x: d.x, y: sim.island.standAt(d.x, d.z) + 0.9, z: d.z }, yaw: d.yaw });
       }
     }
     bootTimings['sim'] = performance.now();

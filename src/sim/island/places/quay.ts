@@ -347,16 +347,17 @@ function hotel(kit: Kit): void {
   // the tower on the podium's roof (its ground floor inside the podium), its face and sign toward the bay (the world's −z)
   const lift = 3.8 + 3.1, from = statics.length;
   a.rotatedLandmark(0, 0, 0, h.hx - 10, h.hz - 5, { body: QUAY_COLORS.hotel, sign: ACCENTS.marina, floors: 12, district: 'marina' }, ACCENTS.marina);
-  for (let i = from; i < statics.length; i++) (statics[i] as StaticDesc).position.y += lift;
+  for (let i = from; i < statics.length; i++) { const st = statics[i] as StaticDesc; st.position.y += lift; st.base = lift; }
   a.rotateFrom(0, h.x, h.z, 0);
-  for (const st of statics) { st.position.y += base; kit.put(st); }
+  // the podium on its ground, the tower on the podium's roof: their facades read from it
+  for (const st of statics) { st.position.y += base; st.base = base + (st.base ?? 0); kit.put(st); }
   // the wing on the water, off the podium's south face from the shore out over the bay (sketch numbers)
   const [wx0, wz0] = W(630, 362), [wx1, wz1] = W(676, 392);
   const cx = (wx0 + wx1) / 2, cz = (wz0 + wz1) / 2, hx = Math.abs(wx1 - wx0) / 2, hz = Math.abs(wz1 - wz0) / 2;
   const deckY = kit.ground(cx, wz0 - 1) + 0.2, wing: StaticDesc[] = [], b = new Architecture(wing);
   b.building(0, 0, hx, hz, 'marina', 1, 1, 2, 1, ACCENTS.marina, true, true, { body: QUAY_COLORS.hotel });
   b.rotateFrom(0, cx, cz, 0);
-  for (const st of wing) { st.position.y += deckY; kit.put(st); }
+  for (const st of wing) { st.position.y += deckY; st.base = deckY; kit.put(st); }
   // what it stands on: a solid down into the water (nothing drives under it), piles along its sea side
   kit.box(cx, (deckY + FLOOR) / 2, cz, hx, (deckY - FLOOR) / 2, hz, CITY_COLORS.stone, 'building').collisionOnly = true;
   for (let x = wx0 - 3; x > wx1; x -= 7) for (const z of [wz1 + 0.6, cz]) {

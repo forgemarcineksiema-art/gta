@@ -195,7 +195,7 @@ function landing(ctx: PlaceContext): number {
   kit.building(0, 0, hx, hz, 'crown', 1, 1, L.floors, 0, ACCENTS.crown, false, true);
   kit.box(0, (foot - base - 0.4) / 2, 0, hx + 0.05, (base - foot + 0.4) / 2, hz + 0.05, CITY_COLORS.stone, 'building');
   kit.rotateFrom(start, cx, cz, Math.PI);
-  for (let i = start; i < list.length; i++) (list[i] as StaticDesc).position.y += base;
+  for (let i = start; i < list.length; i++) { const st = list[i] as StaticDesc; st.position.y += base; st.base = base; }
   // the roof a deck over the kit's cornice and plant room, the wheels' ground
   const height = base + buildingHeight('crown', L.floors), roof = height + 1.5;
   box(list, L.x0 - 0.3, L.x1 + 0.3, height + 0.1, roof, L.z0 - 0.3, L.z1 + 0.3, PALETTE.concrete, 'decor');
@@ -225,7 +225,7 @@ function headquarters(ctx: PlaceContext): void {
   kit.box(0, height - 2.6, -hz - 0.25, 7, 1.1, 0.12, PALETTE.policeBlue);
   for (let i = -3; i <= 3; i++) kit.box(i * 1.6, height - 2.6 + (i % 2 === 0 ? 0.35 : -0.35), -hz - 0.39, 0.4, 0.35, 0.03, PALETTE.policeWhite);
   kit.rotateFrom(start, cx, cz, Math.PI / 2);
-  for (let i = start; i < list.length; i++) (list[i] as StaticDesc).position.y += base;
+  for (let i = start; i < list.length; i++) { const st = list[i] as StaticDesc; st.position.y += base; st.base = base; }
   // the helipad on the roof's south end
   const pad = base + height + 0.7, hpz = B.z1 - 7;
   box(list, cx - 5.5, cx + 5.5, pad - 0.1, pad, hpz - 5.5, hpz + 5.5, PALETTE.charcoal, 'decor');

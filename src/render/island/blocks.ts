@@ -30,6 +30,20 @@ export function spread(st: StaticDesc): number {
   }
 }
 
+/** How far a static reaches below and above its middle (m): a prism's own heights, a turned box's by its turn's up row. */
+export function rise(st: StaticDesc): { lo: number; hi: number } {
+  const s: ShapeDesc = st.shape, y = st.position.y, q = st.rotation;
+  switch (s.kind) {
+    case 'box': case 'gable': {
+      const r = Math.abs(2 * (q.x * q.y + q.w * q.z)) * s.hx + Math.abs(1 - 2 * (q.x * q.x + q.z * q.z)) * s.hy + Math.abs(2 * (q.y * q.z - q.w * q.x)) * s.hz;
+      return { lo: y - r, hi: y + r };
+    }
+    case 'cylinder': return { lo: y - Math.max(s.halfHeight, s.radius), hi: y + Math.max(s.halfHeight, s.radius) };
+    case 'wheel': case 'ball': return { lo: y - s.radius, hi: y + s.radius };
+    case 'prism': return { lo: s.y0, hi: s.y1 };
+  }
+}
+
 /** Whether two statics are turned alike. */
 function alike(a: Quat, b: Quat): boolean {
   return Math.abs(a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w) > 0.9999;

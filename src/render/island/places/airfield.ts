@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import type { Island } from '../../../sim/island/Island';
 import type { AirfieldPlace } from '../../../sim/island/places/airfield';
 import type { PlaceView } from './index';
+import { fadeShadowEdges } from '../../shadows';
 
 export function airfieldViews(group: THREE.Group, island: Island): PlaceView[] {
   const place = island.places.find((p): p is AirfieldPlace => p.id === 'airfield');
@@ -27,6 +28,7 @@ export function airfieldViews(group: THREE.Group, island: Island): PlaceView[] {
   geometry.setAttribute('color', new THREE.BufferAttribute(col, 3));
   geometry.computeVertexNormals();
   const material = new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2.5, polygonOffsetUnits: -5 });
+  fadeShadowEdges(material);
   const mesh = new THREE.Mesh(geometry, material);
   mesh.receiveShadow = true;
   mesh.matrixAutoUpdate = false;

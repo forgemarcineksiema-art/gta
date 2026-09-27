@@ -82,8 +82,8 @@ export class BotPolicy {
 
 /** From the lane the car drives along, `TURNS` junctions taking a turn at each (left and right by turns), resampled for the bot. */
 function turningPath(sim: SimWorld, salt: number): TrackSample[] {
-  const traffic = sim.traffic, city = sim.city;
-  if (!traffic || !city) return [];
+  const traffic = sim.traffic;
+  if (!traffic) return [];
   const lanes = traffic.lanes;
   const p = sim.probe;
   const proj = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };
@@ -96,7 +96,8 @@ function turningPath(sim: SimWorld, salt: number): TrackSample[] {
     if (cost < best) { best = cost; lane = i; s0 = proj.s; }
   }
   if (lane < 0) return [];
-  const graph = city.graph;
+  // the street map's lanes (the grid's or the island's): the traffic's own
+  const graph = traffic.streets.graph;
   const raw: Pt[] = [];
   let current = graph.lanes[lane] as Lane;
   laneSpan(current, s0, laneLength(current), raw);

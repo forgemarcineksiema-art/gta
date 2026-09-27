@@ -11,7 +11,7 @@ import { GROUPS_GATE, GROUPS_PROP, GROUPS_SOLID, GROUPS_TERRAIN, GROUPS_WATER } 
 import type { SpawnPoint } from '../playground';
 import { SEA } from '../city/sea';
 import type { SurfaceReader } from '../city/surface';
-import type { RoadPoint } from '../city/roads';
+import { buildCityRoute, type CityRoute, type RoadPoint } from '../city/roads';
 import type { TrackDef, TrackSample } from '../track';
 import { inPolygon, type P2 } from './geom';
 import { ASPHALT, GRASS } from '../city/surface';
@@ -152,6 +152,9 @@ export function bakeSections(bake: IslandBake): unknown[] {
   return [{ key }, { ...island, surfaces: roads, world }, { fill }, { heights }, { paint }, { views }, { props }];
 }
 
+/** How many sections `bakeSections` writes: a bake read short of them (an empty or a cut file) is not used. */
+export const BAKE_SECTIONS = 7;
+
 /** The bake joined again from its sections (`bakeSections`', in order). */
 export function joinBake(sections: readonly unknown[]): IslandBake {
   const bake = Object.assign({}, ...sections) as IslandBake & { paint?: RoadSurfaces['paint'] };
@@ -189,6 +192,7 @@ export class Island {
   readonly spawns: SpawnPoint[];
   /** The highway's loop as the bot's and the lap timer's track. */
   readonly route: TrackDef;
+  private tourMade: CityRoute | null = null;
   /** The main roads' lanes (M8.10 slice 4): the grid's `RoadGraph`, for the traffic, the police, the bot and the way. */
   readonly network: IslandNetwork;
   /** The lanes by their bounds: the nearest lane or point on one, a height counting its gap (slice 14). */
@@ -365,6 +369,14 @@ export class Island {
     this.breakers = stunts.breakers;
     // the slipways' ramps and the sea trial's buoys (slice 15)
     for (const st of seaStatics(this.slipways)) statics(st.position.x, st.position.z).push(st);
+  }
+
+  /**
+   * The road bot's tour (the gate's suites on the island): every lane of the network once, joined at their junctions, as
+   * the grid's `route` is (its graph balanced and joined as the grid's); made the first time a bot asks.
+   */
+  get tour(): CityRoute {
+    return (this.tourMade ??= buildCityRoute(this.network.graph, this.network.graph.lanes[0]?.from ?? 0));
   }
 
   /** The donut shop by the centre's roundabout (M8.10 slice 15a): its kiosk, its two bays, the lane the units head for. */

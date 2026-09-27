@@ -1,7 +1,7 @@
 /**
  * The best lap's ghost on the test tracks: the player's car, translucent, no shadow, its wheels carried by the body
- * at their resting places. Hidden while the sim has no ghost pose; built the first time it has one (M8.10 slice 18: not
- * at the start).
+ * at their resting places. Hidden while the sim has no ghost pose; built as the first lap starts (M8.10 slice 18: not at
+ * the start) and its translucent programs compiled then (`prepare`), so the second lap's first frame does not.
  */
 import * as THREE from 'three';
 import { PALETTE, type GhostPose, type SimWorld } from '../../sim';
@@ -13,7 +13,7 @@ export class GhostCar {
   private built: CarMesh | null = null;
   private readonly pose: GhostPose = { x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1 };
 
-  constructor(private readonly scene: THREE.Scene, private readonly sim: SimWorld) {}
+  constructor(private readonly scene: THREE.Scene, private readonly sim: SimWorld, private readonly prepare?: (object: THREE.Object3D) => void) {}
 
   private get mesh(): CarMesh {
     if (this.built) return this.built;
@@ -24,12 +24,15 @@ export class GhostCar {
       w.traverse(translucent);
       mesh.root.add(w);
     }
-    mesh.root.visible = false;
     this.scene.add(mesh.root);
+    this.prepare?.(mesh.root);
+    mesh.root.visible = false;
     return (this.built = mesh);
   }
 
   update(): void {
+    // made while the first lap runs (a track's lap timer; never on the island), shown from the second
+    if (!this.built && this.sim.recorder && this.sim.lap.lapStartTick >= 0) void this.mesh;
     if (!this.sim.ghostPose(this.pose)) {
       if (this.built) this.built.root.visible = false;
       return;

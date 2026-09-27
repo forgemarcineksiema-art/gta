@@ -11,6 +11,7 @@ import { TRAIN, barrierPost, isWorks, type FreightTrain, type LevelCrossing, typ
 import { CANAL, canalLength, pointAt } from '../../../sim/island/shapes/works';
 import { PAVEMENT } from '../../../sim/island/surfaces';
 import type { PlaceView } from './index';
+import { fadeShadowEdges } from '../../shadows';
 
 /** The lining's sections along the canal (m), and how far it lies over the channel's ground. */
 const SECTION = 4;
@@ -30,7 +31,9 @@ function meshOf(pos: number[], col: number[]): THREE.Mesh {
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   geometry.computeVertexNormals();
-  const mesh = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+  const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  fadeShadowEdges(material);
+  const mesh = new THREE.Mesh(geometry, material);
   mesh.receiveShadow = true;
   return mesh;
 }
@@ -103,6 +106,7 @@ function boxes(parts: ReadonlyArray<readonly [number, number, number, number, nu
  */
 function trainView(group: THREE.Group, train: FreightTrain): PlaceView {
   const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  fadeShadowEdges(material);
   const meshes = train.units.map((u, k) => {
     const hl = u.length / 2, hh = u.height / 2, w = TRAIN.half;
     const outer = k === 0 ? 1 : -1;

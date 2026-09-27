@@ -149,7 +149,9 @@ export class TrackBot {
   /** Fill `controls` for one fixed step. */
   drive(sim: SimWorld, controls: VehicleControls, dt: number): void {
     const t = this.tuning;
-    const S = this.path ?? sim.track.samples;
+    // the map's tour of every lane (the grid's, the island's), else its track (the playground's)
+    const tour = sim.city?.route ?? sim.island?.tour ?? null;
+    const S = this.path ?? (tour ?? sim.track).samples;
     const m = S.length;
     const tp = sim.transforms.currPos;
     const px = tp[sim.vehicle.slot * 3] as number;
@@ -160,7 +162,7 @@ export class TrackBot {
     // nearest sample: local search from the last index, with a global fallback
     let best = this.idx;
     let bestD = Infinity;
-    for (let k = sim.city ? -4 : -8; k <= (sim.city ? 16 : 24); k++) {
+    for (let k = tour ? -4 : -8; k <= (tour ? 16 : 24); k++) {
       const i = this.at(this.idx + k, m);
       const s = S[i] as TrackSample;
       const d = (s.x - px) ** 2 + (s.z - pz) ** 2;
@@ -180,10 +182,10 @@ export class TrackBot {
       }
     }
     this.idx = best;
-    if (sim.city && !this.path) {
-      const lane = sim.city.route.laneAtSample[best];
+    if (tour && !this.path) {
+      const lane = tour.laneAtSample[best];
       if (lane !== undefined) this.visitedLanes.add(lane);
-      this.tourComplete = this.visitedLanes.size === sim.city.graph.lanes.length;
+      this.tourComplete = this.visitedLanes.size === (sim.city ? sim.city.graph.lanes.length : sim.island?.network.graph.lanes.length);
     }
 
     // pursuit target: the sample `look` metres ahead along the track, shifted across by an overtake's offset
@@ -255,8 +257,15 @@ export class TrackBot {
     if (speed < 0.8 && controls.throttle > 0 && !queued && !boxed) {
       this.stuckTime += dt;
       if (this.stuckTime > 2.5) {
-        sim.spawnAt(sim.city ? 'city' : 'track');
-        this.idx = 0;
+        if (sim.island) {
+          // on the island: a little further along its way, on the road there at its level (no one spawn is on the tour)
+          const i = this.at(best + 8, m), s = S[i] as TrackSample, road = sim.nearestSpawn(s.x, s.z, tp[sim.vehicle.slot * 3 + 1]);
+          sim.spawnAtPoint({ name: 'bot', position: { ...road.position }, yaw: s.yaw });
+          this.idx = i;
+        } else {
+          sim.spawnAt(sim.city ? 'city' : 'track');
+          this.idx = 0;
+        }
         this.resets++;
         this.stuckTime = 0;
       }

@@ -43,9 +43,12 @@ export function windowHash(x: number, y: number, z: number): number {
   return mix(Math.round(x * 10) ^ mix(Math.round(y * 10) ^ mix(Math.round(z * 10) + 0x9e3779b9))) / 4294967296;
 }
 
-/** A glazing panel's glow at its centre: lit by its draw, the shops on the ground floor more often and brighter. */
-export function windowGlow(x: number, y: number, z: number): number {
-  const shop = y < GLOW.shopTop;
+/**
+ * A glazing panel's glow at its centre: lit by its draw, the shops on the ground floor more often and brighter; `base`
+ * the ground its building stands on (the island's, M8.10).
+ */
+export function windowGlow(x: number, y: number, z: number, base = 0): number {
+  const shop = y - base < GLOW.shopTop;
   return windowHash(x, y, z) < (shop ? GLOW.shop : GLOW.upper) ? (shop ? GLOW.shopWindow : GLOW.window) : 0;
 }
 
@@ -65,12 +68,14 @@ export function lightCity(material: THREE.Material): void {
   const glow = new THREE.Color(GLOW.color);
   material.onBeforeCompile = function (shader, renderer) {
     previous.call(this, shader, renderer);
+    // the facade's height over the ground its building stands on (`cityBase`, cm: the island's; the grid's none, 0)
     shader.vertexShader = `attribute vec2 cityLook;
+      attribute float cityBase;
       varying vec2 vCityLook;
       varying float vCityY;
       ${shader.vertexShader}`.replace('#include <project_vertex>', `#include <project_vertex>
       vCityLook = cityLook;
-      vCityY = (modelMatrix * vec4(transformed, 1.0)).y;`);
+      vCityY = (modelMatrix * vec4(transformed, 1.0)).y - cityBase * 0.01;`);
     shader.fragmentShader = `varying vec2 vCityLook;
       varying float vCityY;
       ${shader.fragmentShader}`.replace('#include <opaque_fragment>', `#include <opaque_fragment>
@@ -78,5 +83,5 @@ export function lightCity(material: THREE.Material): void {
       float cityShade = (${f(DEPTH.foot)} + ${f(1 - DEPTH.foot)} * cityT) * mix(${f(DEPTH.band)}, 1.0, smoothstep(0.0, ${f(DEPTH.bandTop)}, vCityY));
       gl_FragColor.rgb = gl_FragColor.rgb * mix(1.0, cityShade, vCityLook.y) + vec3(${f(glow.r)}, ${f(glow.g)}, ${f(glow.b)}) * vCityLook.x;`);
   };
-  material.customProgramCacheKey = () => `${cacheKey}-city-look-v1`;
+  material.customProgramCacheKey = () => `${cacheKey}-city-look-v2`;
 }

@@ -34,6 +34,9 @@ function allNumbers(a: readonly unknown[]): boolean {
   return true;
 }
 
+/** A key an object lists before its others (an array index's form). */
+const INDEX_KEY = /^(0|[1-9]\d*)$/;
+
 /** Pack a value into bytes. */
 export function pack(root: unknown): Uint8Array {
   // the objects met more than once get an id where first written
@@ -122,6 +125,8 @@ export function pack(root: unknown): Uint8Array {
     }
     // a key of the markers' own (none in the island's data) would be read as one
     for (const k of Object.keys(o)) if (k.startsWith('$')) throw new Error(`pack: a key "${k}"`);
+    // a number-like key goes first in an object, before a marker: a shared one's marker nested round it
+    if (shared && Object.keys(o).some((k) => INDEX_KEY.test(k))) return { $id: mine, $o: o };
     return tag(o);
   };
   const json = new TextEncoder().encode(JSON.stringify(out(root)));
@@ -223,6 +228,15 @@ export function unpack(bytes: Uint8Array): unknown {
         const set = keep(new Set<unknown>());
         for (const x of o['$s'] as unknown[]) set.add(read(x));
         return set;
+      }
+      case '$o': {
+        // a shared plain object with number-like keys, its marker round it
+        const inner = keep(o['$o'] as Record<string, unknown>);
+        for (const k in inner) {
+          const x = inner[k];
+          if (x !== null && typeof x === 'object') inner[k] = read(x);
+        }
+        return inner;
       }
       default: {
         // a shared plain object: its id taken off, its fields read

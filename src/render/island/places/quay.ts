@@ -13,6 +13,7 @@ import { DUCK, WHEEL, quayPlace, type Kicker, type QuayPlace } from '../../../si
 import { REEF } from '../../../sim/island/shapes/quay';
 import { PALETTE, QUAY_COLORS } from '../../../sim/palette';
 import type { PlaceView } from './index';
+import { fadeShadowEdges } from '../../shadows';
 
 /** The gondolas' colours round the wheel. */
 const GONDOLAS = [QUAY_COLORS.coral, QUAY_COLORS.seatTeal, QUAY_COLORS.duck, PALETTE.carWhite, PALETTE.carBlue, QUAY_COLORS.coralDeep] as const;
@@ -42,7 +43,9 @@ function coloured(g: THREE.BufferGeometry, hex: number): THREE.BufferGeometry {
 function merged(parts: THREE.BufferGeometry[], shadow = true): THREE.Mesh {
   const geometry = mergeGeometries(parts, false);
   for (const p of parts) p.dispose();
-  const mesh = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+  const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  fadeShadowEdges(material);
+  const mesh = new THREE.Mesh(geometry, material);
   mesh.castShadow = shadow;
   mesh.receiveShadow = true;
   return mesh;
@@ -87,7 +90,9 @@ function kickers(list: readonly Kicker[]): THREE.Mesh {
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   g.computeVertexNormals();
-  const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }));
+  const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide });
+  fadeShadowEdges(material);
+  const mesh = new THREE.Mesh(g, material);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   return mesh;

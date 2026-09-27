@@ -19,6 +19,23 @@ export function stableShadowTarget(position: THREE.Vector3, resolution: number, 
     .addScaledVector(up, Math.round(y / texel) * texel - y);
 }
 
+/**
+ * Whether a box (its world bounds) reaches into the shadow map round `(tx, ty, tz)`, its light-space square grown by
+ * `margin` (m): what casts into the map. On the ground the map reaches ±140 m across the sun's bearing and ±265 m along
+ * it (the low sun, M8.9 R8), so a distance from the car is the wrong test both ways (M8.10: the island's quarters).
+ */
+export function inShadowBox(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, tx: number, ty: number, tz: number, margin = 0): boolean {
+  let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+  for (let c = 0; c < 8; c++) {
+    const dx = ((c & 1) !== 0 ? x1 : x0) - tx, dy = ((c & 2) !== 0 ? y1 : y0) - ty, dz = ((c & 4) !== 0 ? z1 : z0) - tz;
+    const u = dx * right.x + dy * right.y + dz * right.z, v = dx * up.x + dy * up.y + dz * up.z;
+    u0 = Math.min(u0, u); u1 = Math.max(u1, u);
+    v0 = Math.min(v0, v); v1 = Math.max(v1, v);
+  }
+  const h = SHADOW_HALF + margin;
+  return u1 >= -h && u0 <= h && v1 >= -h && v0 <= h;
+}
+
 /** A single shadow map must fade out before its finite edge crosses visible buildings. */
 export function fadeShadowEdges(material: THREE.Material): void {
   material.onBeforeCompile = (shader) => {

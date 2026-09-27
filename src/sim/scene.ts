@@ -54,6 +54,11 @@ export interface StaticDesc {
    * (M8.10 slice 18). A place's collision-only stand-in (a wreck pile's, the kiosk's, the grandstand's) is not one.
    */
   envelope?: boolean;
+  /**
+   * The ground its building stands on (m): a facade's height, its foot's shade and its shop windows, is read from it
+   * (the island's buildings stand on their lots' floors, M8.10; the grid's on 0, none given).
+   */
+  base?: number;
   /** A piece of a standing prop (M8): its id, so the chunk's mesh knows the prop's vertex range. */
   prop?: number;
 }

@@ -2,7 +2,7 @@
  * The island's bake (M8.10 slice 18): its builders' work done once at the build (`npm run bake`), fetched beside the
  * physics' start, unzipped and unpacked here; null without it (the island is then built from its plan, slower).
  */
-import { joinBake, type IslandBake } from '../sim/island/Island';
+import { BAKE_SECTIONS, joinBake, type IslandBake } from '../sim/island/Island';
 import { SectionReader } from '../sim/pack';
 
 /** The bake's file next to the page (relative: the game runs in an iframe). */
@@ -33,7 +33,8 @@ export async function loadIslandBake(key: string, url = ISLAND_BAKE_URL): Promis
         sections.push(section);
       }
     }
-    return reader.done ? joinBake(sections) : null;
+    // every section read (an empty or a cut file builds the island from its plan)
+    return reader.done && sections.length === BAKE_SECTIONS ? joinBake(sections) : null;
   } catch {
     return null;
   }

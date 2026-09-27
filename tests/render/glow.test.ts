@@ -77,4 +77,28 @@ describe('the city lit at dusk (M8.9 slice 3)', () => {
       expect(lit).toBe(36);
     } finally { geometry.dispose(); }
   });
+
+  it('M8.10 18.12 a building on the island\'s ground reads its facade and its shop windows from its floor, not from the sea', () => {
+    const statics: StaticDesc[] = [], a = new Architecture(statics);
+    a.building(0, 0, 12, 10, 'crown', 1, 1, 4, 0, 0x3a6ea5, false, true);
+    for (const st of statics) { st.position.y += 30; st.base = 30; }
+    const geometry = cityGeometry(statics);
+    try {
+      // the shader's base per vertex (cm): its facades' foot is 30 m up
+      const base = geometry.getAttribute('cityBase');
+      expect(base.count).toBe(geometry.getAttribute('position').count);
+      for (let i = 0; i < base.count; i++) expect(base.getX(i)).toBe(3000);
+    } finally { geometry.dispose(); }
+    // its ground floor's windows are shops by their height over the floor: lit, they are lit as shops
+    const shops = statics.filter((st) => st.tag === 'glazing' && st.position.y - 30 < GLOW.shopTop);
+    expect(shops.length).toBeGreaterThan(0);
+    const lit = shops.map((st) => windowGlow(st.position.x, st.position.y, st.position.z, 30)).filter((g) => g > 0);
+    expect(lit.length).toBeGreaterThan(0);
+    expect(lit.every((g) => g === GLOW.shopWindow)).toBe(true);
+    // the grid's (none given) keeps no base
+    const grid: StaticDesc[] = [];
+    new Architecture(grid).building(0, 0, 12, 10, 'crown', 1, 1, 4, 0, 0x3a6ea5, false, true);
+    const flat = cityGeometry(grid);
+    try { expect(flat.getAttribute('cityBase')).toBeUndefined(); } finally { flat.dispose(); }
+  });
 });

@@ -10,6 +10,7 @@ import { ISLAND_COLORS, PALETTE } from '../../../sim';
 import type { Island } from '../../../sim/island/Island';
 import { BUNKERS, FAIRWAYS, GLASSHOUSE, GREENS, PATH, TEE, TEES, gardenPaths, type Capsule, type Oval } from '../../../sim/island/shapes/gardens';
 import type { PlaceView } from './index';
+import { fadeShadowEdges } from '../../shadows';
 
 /** How far each surface lies over the ground (m): the fairways, then the bunkers and the greens over them. */
 const LIFT = { gravel: 0.05, fairway: 0.05, bunker: 0.06, green: 0.07 } as const;
@@ -103,6 +104,7 @@ export function gardensViews(group: THREE.Group, island: Island): PlaceView[] {
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   geometry.computeVertexNormals();
   const material = new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
+  fadeShadowEdges(material);
   const mesh = new THREE.Mesh(geometry, material);
   mesh.receiveShadow = true;
   mesh.matrixAutoUpdate = false;

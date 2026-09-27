@@ -14,12 +14,12 @@ import { PLACES } from '../../sim/island/plan';
 import { shoreOpen } from '../../sim/island/shapes';
 import { atSlipway } from '../../sim/island/slipways';
 import { BUILD_SLICE, DETAIL_FAR, DETAIL_NEAR, GeometryBuild, cityGeometry, type PropRanges } from '../city/CityView';
-import { SHADOW_HALF } from '../shadows';
+import { fadeShadowEdges, inShadowBox } from '../shadows';
 import { propStatics } from '../props/propMesh';
 import { lightCity } from '../city/glow';
 import { fadeRoadPaint } from '../city/roadPaint';
 import { QUALITY, type QualityTier } from '../quality';
-import { blockStatics, isEnvelope, ofBuilding, spread } from './blocks';
+import { blockStatics, isEnvelope, ofBuilding, rise, spread } from './blocks';
 import { GroundView, MOUTH, chunkSphere } from './GroundView';
 import { placeViews, type PlaceView } from './places';
 
@@ -37,8 +37,8 @@ const PROP_SIGHT: Readonly<Record<QualityTier, number>> = { low: 200, high: 420 
  * view's middle is still short of it in depth, the fog's measure.
  */
 const PAST_FOG = 50;
-/** A quarter casts while its nearest building is within the shadows' box's corner (m). */
-const CASTING = SHADOW_HALF * Math.SQRT2;
+/** What casts: a quarter, a chunk's props or its structures reaching into the shadow map's box grown by this (m). */
+const CASTING = 8;
 /** Its buildings are blocks (`blocks.ts`) from its nearest this far, by the quality's tier (m); back to the far level 30 m in. */
 const BLOCK: Readonly<Record<QualityTier, number>> = { low: 140, high: 280 };
 /** A statics' run that follows a building's envelope and stands on its footprint (within this, m) is the building's. */
@@ -60,7 +60,7 @@ EMPTY.userData['shadowVertices'] = 0;
  * they cover, its three levels as built (0 the near with the facades' frames and sills, 1 the far without, both
  * `GeometryBuild`'s; 2 the blocks), the level its distance wants, and whether it is in sight.
  */
-interface Part { k: number; mesh: THREE.Mesh; statics: StaticDesc[]; x0: number; x1: number; z0: number; z1: number; levels: Array<THREE.BufferGeometry | null>; level: number; seen: boolean }
+interface Part { k: number; mesh: THREE.Mesh; statics: StaticDesc[]; x0: number; x1: number; y0: number; y1: number; z0: number; z1: number; levels: Array<THREE.BufferGeometry | null>; level: number; seen: boolean }
 
 /** The level a quarter whose nearest building is `d` off wants, from the one it has (the grid's hysteresis: 30 m). */
 function levelAt(d: number, was: number, block: number, snap: boolean): number {
@@ -132,8 +132,12 @@ export class IslandView {
     this.group.add(sea);
     this.ground = new GroundView(island);
     this.group.add(this.ground.group);
+    // the shadow map fades out before its edge on everything it falls on (the grid's), the buildings' hooks chained after
+    for (const m of [this.buildingMaterial, this.surfaceMaterial, this.extraMaterial, this.propMaterial]) fadeShadowEdges(m);
     fadeRoadPaint(this.buildingMaterial);
     lightCity(this.buildingMaterial);
+    // the props lit as the grid's (M8.9 R9: the lamps' heads glow at dusk)
+    lightCity(this.propMaterial);
     this.group.add(this.surfaceGroup, this.buildingGroup);
     this.later.push(
       () => { this.group.add(this.paving()); },
@@ -147,7 +151,7 @@ export class IslandView {
    * Each frame: the places that move (`alpha` the fixed step's fraction, `dt` the frame's seconds); the standing props
    * near (x, z), a chunk's built a frame, a knocked one's pieces collapsed and a healed one's rebuilt (slice 7b).
    */
-  update(alpha: number, dt: number, props: Props | null = null, x = 0, z = 0): void {
+  update(alpha: number, dt: number, props: Props | null = null, x = 0, z = 0, y = 0): void {
     if (++this.frames > 1) this.later.shift()?.();
     for (const v of this.views) v.update?.(alpha, dt);
     if (!props) return;
@@ -156,7 +160,19 @@ export class IslandView {
     for (let j = 0; j < CHUNKS_Z; j++) for (let i = 0; i < CHUNKS_X; i++) {
       const k = Island.chunkIndex(i, j), d = Math.hypot(CHUNK_X0 + (i + 0.5) * CHUNK - x, CHUNK_Z0 + (j + 0.5) * CHUNK - z);
       const mesh = this.propChunks.get(k), sight = PROP_SIGHT[this.tier];
-      if (mesh) { mesh.visible = d < sight; mesh.castShadow = d < SHADOW_HALF + CHUNK * Math.SQRT1_2; continue; }
+      if (mesh) {
+        // freed a chunk past their sight (made again when it comes back)
+        if (d > sight + CHUNK) {
+          mesh.geometry.dispose();
+          mesh.removeFromParent();
+          this.propChunks.delete(k);
+          continue;
+        }
+        const b = mesh.geometry.boundingBox;
+        mesh.visible = d < sight;
+        mesh.castShadow = mesh.visible && b !== null && inShadowBox(b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z, x, y, z, CASTING);
+        continue;
+      }
       if (built || d >= sight) continue;
       const list: StaticDesc[] = [];
       for (const p of this.island.props(k)) {
@@ -165,6 +181,7 @@ export class IslandView {
         for (let s = from; s < list.length; s++) (list[s] as StaticDesc).position.y += y;
       }
       const m = new THREE.Mesh(cityGeometry(list), this.propMaterial);
+      m.geometry.computeBoundingBox();
       m.castShadow = true;
       m.receiveShadow = true;
       m.matrixAutoUpdate = false;
@@ -215,7 +232,7 @@ export class IslandView {
    * the nearest missing chunk a frame (M8.10 slice 18: the island's start builds only what is near); the near ones at
    * once when `snap`.
    */
-  sync(x: number, z: number, quality: QualityTier, snap = false, fx = 0, fz = 0): void {
+  sync(x: number, z: number, quality: QualityTier, snap = false, fx = 0, fz = 0, y = 0): void {
     this.tier = quality;
     const fog = QUALITY[quality].far, reach = fog + CHUNK * 0.75;
     // what the start builds at once: what is near, or ahead along (fx, fz) (all of it with no heading)
@@ -232,7 +249,8 @@ export class IslandView {
     if (snap) {
       const [ci, cj] = Island.chunkOf(x, z), here = Island.chunkIndex(ci, cj);
       for (let k = 0; k < this.made.length; k++) {
-        if (this.made[k] === 1 || (k !== here && far(k, x, z) >= Math.min(reach, SNAP_BUILT))) continue;
+        // by its nearest edge: a neighbour a few metres ahead is built now, not a frame later with its buildings popping in
+        if (this.made[k] === 1 || (k !== here && edge(k, x, z) >= Math.min(reach, SNAP_BUILT))) continue;
         const x0 = CHUNK_X0 + (k % CHUNKS_X) * CHUNK, z0 = CHUNK_Z0 + Math.floor(k / CHUNKS_X) * CHUNK;
         if (k === here || this.seen(x0, z0, x0 + CHUNK, z0 + CHUNK)) this.start(k);
       }
@@ -254,11 +272,10 @@ export class IslandView {
       this.detail[k] = near ? 1 : 0;
       mesh.geometry.setDrawRange(0, near ? Infinity : (mesh.geometry.userData['far'] as number));
     }
-    const cast = SHADOW_HALF + CHUNK * Math.SQRT1_2;
     for (const [k, mesh] of this.extraChunks) {
-      const d = far(k, x, z);
-      mesh.visible = d < reach;
-      mesh.castShadow = d < cast;
+      const b = mesh.geometry.boundingBox;
+      mesh.visible = far(k, x, z) < reach;
+      mesh.castShadow = mesh.visible && b !== null && inShadowBox(b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z, x, y, z, CASTING);
     }
     // each quarter by its nearest building: shown inside the fog, casting inside the shadows' box, its level by the
     // distance (the grid's hysteresis), its wanted level shown once built
@@ -267,7 +284,7 @@ export class IslandView {
       const d = Math.hypot(Math.max(p.x0 - x, 0, x - p.x1), Math.max(p.z0 - z, 0, z - p.z1));
       p.seen = d < fog + PAST_FOG;
       p.mesh.visible = p.seen && p.mesh.geometry !== EMPTY;
-      p.mesh.castShadow = d < CASTING;
+      p.mesh.castShadow = p.seen && inShadowBox(p.x0, p.y0, p.z0, p.x1, p.y1, p.z1, x, y, z, CASTING);
       p.level = levelAt(d, p.level, block, snap);
       const want = p.levels[p.level];
       if (want && p.mesh.geometry !== want) p.mesh.geometry = want;
@@ -325,10 +342,11 @@ export class IslandView {
     }
     for (const statics of quarters) {
       if (statics.length === 0) continue;
-      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+      let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, z0 = Infinity, z1 = -Infinity;
       for (const st of statics) {
-        const r = spread(st);
+        const r = spread(st), h = rise(st);
         x0 = Math.min(x0, st.position.x - r); x1 = Math.max(x1, st.position.x + r);
+        y0 = Math.min(y0, h.lo); y1 = Math.max(y1, h.hi);
         z0 = Math.min(z0, st.position.z - r); z1 = Math.max(z1, st.position.z + r);
       }
       const mesh = new THREE.Mesh(EMPTY, this.buildingMaterial);
@@ -338,7 +356,7 @@ export class IslandView {
       mesh.visible = false;
       shadowPrefix(mesh);
       this.buildingGroup.add(mesh);
-      this.parts.push({ k, mesh, statics, x0, x1, z0, z1, levels: [null, null, null], level: 2, seen: false });
+      this.parts.push({ k, mesh, statics, x0, x1, y0, y1, z0, z1, levels: [null, null, null], level: 2, seen: false });
     }
   }
 
@@ -416,6 +434,7 @@ export class IslandView {
       geometry.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
       geometry.setAttribute('color', new THREE.Float32BufferAttribute(b.col, 3));
       geometry.computeVertexNormals();
+      geometry.computeBoundingBox();
       const mesh = new THREE.Mesh(geometry, this.extraMaterial);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
@@ -526,7 +545,9 @@ export class IslandView {
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     geometry.computeVertexNormals();
-    const mesh = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -0.5, polygonOffsetUnits: -1 }));
+    const material = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -0.5, polygonOffsetUnits: -1 });
+    fadeShadowEdges(material);
+    const mesh = new THREE.Mesh(geometry, material);
     mesh.receiveShadow = true;
     return mesh;
   }

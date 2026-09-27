@@ -126,6 +126,8 @@ export class GeometryBuild {
   private readonly paint: Uint8Array;
   /** Per vertex: its glow (a lit window, a lamp head) and whether it is a facade's (darker at the foot), M8.9 R9. */
   private readonly look: Uint8Array;
+  /** Per vertex: the ground its building stands on (cm), where any static has one (the island's, M8.10); null else. */
+  private readonly base: Uint16Array | null;
   private cursor = 0;
   private index = 0;
   private shadowVertices = 0;
@@ -157,6 +159,7 @@ export class GeometryBuild {
     this.positions = new Float32Array(count * 3); this.normals = new Float32Array(count * 3); this.colors = new Float32Array(count * 3);
     this.paint = new Uint8Array(count * 4);
     this.look = new Uint8Array(count * 2);
+    this.base = this.order.some((st) => st.base !== undefined) ? new Uint16Array(count) : null;
   }
 
   /** Fill up to `budget` statics; returns true once every static is written. */
@@ -188,7 +191,8 @@ export class GeometryBuild {
       const [r, g, b] = rgb(st.color);
       const underlay = st.paint ? rgb(st.paint.underlay) : null;
       // a lit window by its place, a lamp's head; a facade darker at its foot (M8.9 R9)
-      const glow = st.tag === 'glazing' ? windowGlow(st.position.x, st.position.y, st.position.z) : st.tag === 'glow' ? GLOW.lamp : 0;
+      const glow = st.tag === 'glazing' ? windowGlow(st.position.x, st.position.y, st.position.z, st.base ?? 0) : st.tag === 'glow' ? GLOW.lamp : 0;
+      const baseCm = Math.max(0, Math.min(65535, Math.round((st.base ?? 0) * 100)));
       const glowByte = Math.round(glow * 255), facadeByte = st.tag !== undefined && FACADE_TAGS.has(st.tag) ? 255 : 0;
       sourcesOf(st);
       for (const src of sourceList) {
@@ -219,6 +223,7 @@ export class GeometryBuild {
           const li = index / 3 * 2;
           this.look[li] = glowByte;
           this.look[li + 1] = facadeByte;
+          if (this.base) this.base[index / 3] = baseCm;
           if (underlay && st.paint) {
             const pi = index / 3 * 4;
             this.paint[pi] = Math.round(underlay[0] * 255);
@@ -242,6 +247,7 @@ export class GeometryBuild {
     out.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
     out.setAttribute('roadPaint', new THREE.BufferAttribute(this.paint, 4, true));
     out.setAttribute('cityLook', new THREE.BufferAttribute(this.look, 2, true));
+    if (this.base) out.setAttribute('cityBase', new THREE.BufferAttribute(this.base, 1, false));
     out.computeBoundingSphere();
     out.userData['shadowVertices'] = this.shadowVertices;
     out.userData['props'] = { ids: Int32Array.from(this.propIds), start: Uint32Array.from(this.propStart), count: Uint32Array.from(this.propCount) } satisfies PropRanges;

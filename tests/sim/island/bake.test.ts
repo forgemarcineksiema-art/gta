@@ -6,7 +6,7 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { clearControls, type SimWorld } from '../../../src/sim';
-import { CHUNKS_X, CHUNKS_Z, Island, PLUMB_TILT, bakeSections, joinBake, type IslandBake } from '../../../src/sim/island/Island';
+import { BAKE_SECTIONS, CHUNKS_X, CHUNKS_Z, Island, PLUMB_TILT, bakeSections, joinBake, type IslandBake } from '../../../src/sim/island/Island';
 import { SectionReader, pack, packSections, unpack } from '../../../src/sim/pack';
 import { fillSolids } from '../../../src/sim/island/fill';
 import type { StaticDesc } from '../../../src/sim';
@@ -42,6 +42,8 @@ describe('M8.10 slice 18: the island\'s bake', () => {
 
   it('18.6 the bake in its sections, read piece by piece as it comes, is the bake; no two sections share an object', () => {
     const sections = bakeSections((built.island as Island).toBake()), bytes = packSections(sections);
+    // as many as the game waits for (a bake short of them is built from the plan)
+    expect(sections.length).toBe(BAKE_SECTIONS);
     const seen = new Set<object>();
     for (const section of sections) {
       const mine = objects(section, new Set());
@@ -112,3 +114,13 @@ function cast(sim: SimWorld, island: Island, x: number, z: number): number | nul
   const hit = sim.world.castRay(new RAPIER.Ray({ x, y: 400, z }, { x: PLUMB_TILT, y: -1, z: PLUMB_TILT }), 800, true, undefined, undefined, undefined, sim.vehicle.body);
   return hit ? 400 - hit.timeOfImpact : null;
 }
+
+describe('M8.10 the bake\'s pack', () => {
+  it('18.13 a shared object with number-like keys comes back shared (its marker nested round it: such keys go first)', () => {
+    const s = { 0: 'x', 10: 'y', name: 'z' };
+    const back = unpack(pack({ a: s, b: s, c: [s] })) as { a: typeof s; b: typeof s; c: Array<typeof s> };
+    expect(back.a).toEqual(s);
+    expect(back.b).toBe(back.a);
+    expect(back.c[0]).toBe(back.a);
+  });
+});

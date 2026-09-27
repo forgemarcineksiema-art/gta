@@ -2,6 +2,17 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-27 — the island's backlog from the bug hunt (Marcin: "Popraw też te z backlogu")
+
+Fixed: shadows cast by the shadow map's box in light space (±265 m along the low sun, ±140 across; the 198 m circle
+popped them in) and its edge faded on every island material (18.11); the start builds a chunk by its nearest edge; a
+chunk's props freed past sight; the facades' foot shade and shop windows read from their building's floor (`base`,
+`cityBase`, 18.12), and the props' lamps glow (their material lacked the hook); pack's shared objects with number-like
+keys (18.13); a bake short of its sections builds from the plan; the key hashes the bake's driver, the same from vite's
+root (18.14: my first cut made them differ); the ghost made and compiled as the first lap starts; the bots on the island:
+`bot=1`/`track` tour every lane (an Euler tour, 4.7), `door`, `job`, `novice`, `skilled` and `?job=` there. Left for the
+gate: the job bot crawls round the centre's roundabout behind its traffic and misses delivery #1's clock (BACKLOG).
+
 ## 2026-09-27 — the bug hunt on the island (Marcin: "Szukaj błędów w grze")
 
 Played headless (the first minute, a highway lap, the tunnel) and read by four agents; fixed, pinned where the sim shows

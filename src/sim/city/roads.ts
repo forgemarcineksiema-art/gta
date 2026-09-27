@@ -241,10 +241,13 @@ export function buildRoadGraph(): RoadGraph {
   return { nodes, lanes, special: SPECIAL_ROADS };
 }
 
-/** A deterministic Euler tour visits every directed lane, including the perimeter. */
-export function roadTour(graph: RoadGraph): number[] {
+/**
+ * A deterministic Euler tour visits every directed lane, including the perimeter, from node `start` (the grid's 24; the
+ * island's graph is as balanced and joined, M8.10).
+ */
+export function roadTour(graph: RoadGraph, start = 24): number[] {
   const remaining = graph.nodes.map((n) => [...n.outgoing]);
-  const stack: Array<{ node: number; via: number }> = [{ node: 24, via: -1 }];
+  const stack: Array<{ node: number; via: number }> = [{ node: start, via: -1 }];
   const reversed: number[] = [];
   while (stack.length) {
     const top = stack[stack.length - 1] as { node: number; via: number };
@@ -308,8 +311,8 @@ export function distanceToPolyline(points: RoadPoint[], x: number, z: number): n
 }
 
 export interface CityRoute extends TrackDef { laneAtSample: number[] }
-export function buildCityRoute(graph: RoadGraph): CityRoute {
-  const tour = roadTour(graph);
+export function buildCityRoute(graph: RoadGraph, start = 24): CityRoute {
+  const tour = roadTour(graph, start);
   const raw: Array<{ x: number; z: number; lane: number }> = [];
   for (let i = 0; i < tour.length; i++) {
     const lane = graph.lanes[tour[i] as number] as Lane;

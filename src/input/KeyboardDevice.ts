@@ -68,6 +68,9 @@ const FALLBACK_LABEL: Record<string, string> = {
  */
 const PREVENT_DEFAULT = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter']);
 
+/** Keys that are not "any key": the modifiers (Alt of an Alt+Tab), Escape (the host's), the function keys. */
+const NOT_ANY = /^(Control|Alt|Meta|OS|Shift|Escape|F[0-9]+|CapsLock|Tab|Context)/;
+
 interface KeyboardLayoutMapLike {
   get(code: string): string | undefined;
 }
@@ -77,6 +80,7 @@ export class KeyboardDevice implements InputDevice {
   /** Keys that went down since the last read, so a tap shorter than a frame is reported once instead of never. */
   private readonly tapped = new Set<string>();
   private layout: KeyboardLayoutMapLike | null = null;
+  private other = false;
   /** Settles when the layout's labels are known (Chromium's layout map comes after the first keycaps are drawn). */
   readonly layoutReady: Promise<void>;
   private readonly target: Window;
@@ -95,6 +99,8 @@ export class KeyboardDevice implements InputDevice {
         this.down.add(e.code);
         this.tapped.add(e.code);
         if (PREVENT_DEFAULT.has(e.code)) e.preventDefault();
+      } else if (!NOT_ANY.test(e.code)) {
+        this.other = true;
       }
     };
     this.onUp = (e) => {
@@ -115,6 +121,12 @@ export class KeyboardDevice implements InputDevice {
     } catch {
       this.layout = null;
     }
+  }
+
+  otherTapped(): boolean {
+    const was = this.other;
+    this.other = false;
+    return was;
   }
 
   read(raw: Record<Action, number>): void {

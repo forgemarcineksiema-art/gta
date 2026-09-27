@@ -23,6 +23,8 @@ export interface Goal {
   hasTarget: boolean;
   x: number;
   z: number;
+  /** A car's road's height when the point is a car (the wanted car, a hunted rival: on a deck or in the tunnel), else NaN. */
+  y: number;
   /** 'buy': the cash still missing (0: affordable, the point is a door); 'fill': the bag now. */
   amount: number;
   /** The kind of the ring the point is ('' for a door, a job's own target or none): the line's dot. */
@@ -52,7 +54,7 @@ export const STEP = { take: 0, bank: 1, car: 2, escape: 3, order: 4, big: 5 } as
 export const CHAIN_ALL = (1 << CHAIN_STEPS.length) - 1;
 
 export function newGoal(): Goal {
-  return { kind: 'none', hasTarget: false, x: 0, z: 0, amount: 0, ring: '', rival: -1, req: -1, id: -1, door: -1 };
+  return { kind: 'none', hasTarget: false, x: 0, z: 0, y: Number.NaN, amount: 0, ring: '', rival: -1, req: -1, id: -1, door: -1 };
 }
 
 /** Every field of `from` into `to`. */
@@ -61,6 +63,7 @@ export function copyGoal(from: Goal, to: Goal): void {
   to.hasTarget = from.hasTarget;
   to.x = from.x;
   to.z = from.z;
+  to.y = from.y;
   to.amount = from.amount;
   to.ring = from.ring;
   to.rival = from.rival;
@@ -163,6 +166,7 @@ export const NEAREST: GoalChooser = { ring: nearestRing, door: nearestDoor };
 export function goalFor(sim: SimWorld, out: Goal, choose: GoalChooser = NEAREST): void {
   out.kind = 'none';
   out.hasTarget = false;
+  out.y = Number.NaN;
   out.amount = 0;
   out.ring = '';
   out.rival = -1;

@@ -30,7 +30,7 @@
  * steps physics. No allocation per step.
  */
 import RAPIER from '@dimforge/rapier3d-compat';
-import { QUERY_NOT_PROP } from '../collision';
+import { QUERY_NOT_PROP, QUERY_WALLS } from '../collision';
 import { BALANCE } from '../balance';
 import { bodySpec } from '../traffic/bodies';
 import type { SimEvent } from '../events';
@@ -887,7 +887,7 @@ export class Police {
     this.ray.dir.x = dx / reach;
     this.ray.dir.y = 0;
     this.ray.dir.z = dz / reach;
-    if (this.sim.world.castRay(this.ray, reach + 1.5, true, RAPIER.QueryFilterFlags.ONLY_FIXED | RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, QUERY_NOT_PROP) !== null) return false;
+    if (this.sim.world.castRay(this.ray, reach + 1.5, true, RAPIER.QueryFilterFlags.ONLY_FIXED | RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, QUERY_WALLS) !== null) return false;
     const fx = Math.sin(player.yaw), fz = Math.cos(player.yaw);
     for (let o = 0; o < traffic.capacity; o++) {
       const st = traffic.state[o];

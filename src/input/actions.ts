@@ -24,6 +24,8 @@ export class ActionState {
   readonly value: Record<Action, number>;
   readonly pressed: Record<Action, boolean>;
   readonly released: Record<Action, boolean>;
+  /** A key bound to no action went down this frame (a letter, a digit; not a modifier, Escape or a function key). */
+  other = false;
 
   constructor() {
     this.value = Object.fromEntries(ACTIONS.map((a) => [a, 0])) as Record<Action, number>;
@@ -40,6 +42,8 @@ export class ActionState {
 export interface InputDevice {
   /** Merge this device's current state into `raw` (max of analog values). */
   read(raw: Record<Action, number>): void;
+  /** Whether a key bound to no action went down since the last call (the busted card's "any key"). */
+  otherTapped?(): boolean;
   /** Human-readable label for the primary binding of an action (for keycap overlays). */
   label(action: Action): string;
   dispose(): void;

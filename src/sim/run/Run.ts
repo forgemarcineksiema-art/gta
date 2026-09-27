@@ -146,8 +146,13 @@ export class Run {
   step(probe: PlayerProbe, dt: number): void {
     // this step's crimes first: the bag must hold them before a door or a fine can end the run
     this.cursor = this.sim.events.readFrom(this.cursor, this.onEvent);
-    // a save from before the chain may own a car already: that step is done, silently
-    if ((this.chain & (1 << STEP.car)) === 0 && this.sim.garage.owned.size > 1) this.chain |= 1 << STEP.car;
+    // a save from before the chain may own a car already: that step is done, silently; a car found or won in play is the
+    // step, said (a hidden car found before the first buy ticked it with no card, and the rings it opened came unnamed)
+    if ((this.chain & (1 << STEP.car)) === 0 && this.sim.garage.owned.size > 1) {
+      if (this.chainRead) this.tickStep(STEP.car);
+      else this.chain |= 1 << STEP.car;
+    }
+    this.chainRead = true;
     if (this.state === 'door' || this.state === 'busted') return;
     // a police car alongside: the BORROW prompt comes up (counted once per appearance)
     const cand = this.sim.life.state.swapCandidate;
@@ -303,6 +308,10 @@ export class Run {
     this.bank += extra;
     this.bestRun = Math.max(this.bestRun, this.lastBanked);
     this.lastBest = this.lastBanked > this.bestBefore;
+    // the run's total as the chain's big step and the day's "bank n in one run" read it: the wall said 24,000 and the
+    // step for 20,000 stayed open
+    if (this.lastBanked >= BALANCE.chain.bankGoal) this.tickStep(STEP.big);
+    this.sim.dailies.onBanked(this.lastBanked);
     this.lastSerial++;
     return true;
   }
@@ -429,6 +438,9 @@ export class Run {
         break;
     }
   }
+
+/** The chain read against the garage once (its first step): an owned car after it is the step's news. */
+  private chainRead = false;
 
   private tickStep(step: number): void {
     const bit = 1 << step;

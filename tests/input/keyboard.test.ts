@@ -126,4 +126,29 @@ describe('keyboard input', () => {
     input.update();
     expect(input.state.pressed.horn).toBe(false);
   });
+
+  it("the busted card's 'any key': a key with no action counts once, a modifier, Escape and a function key never", () => {
+    const { input, win } = setup();
+    win.fire('keydown', 'KeyQ');
+    input.update();
+    expect(input.state.other).toBe(true);
+    input.update();
+    expect(input.state.other).toBe(false);
+    for (const code of ['AltLeft', 'ControlRight', 'MetaLeft', 'Escape', 'F5', 'CapsLock']) {
+      win.fire('keydown', code);
+      input.update();
+      expect(input.state.other, code).toBe(false);
+    }
+    // a bound key is its action, not "other"
+    win.fire('keydown', 'KeyW');
+    input.update();
+    expect(input.state.other).toBe(false);
+    expect(input.state.pressed.throttle).toBe(true);
+  });
+
+  it('Enter is kept from the page (a focused wall card clicked by it a second time)', () => {
+    const { win } = setup();
+    win.fire('keydown', 'Enter');
+    expect(win.defaults).toContain('Enter');
+  });
 });

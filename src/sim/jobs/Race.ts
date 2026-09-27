@@ -198,7 +198,7 @@ export class Race {
     this.swapLeft[k] = BALANCE.board.twins.every;
     this.swaps++;
     const x = traffic.x[into] as number, z = traffic.z[into] as number, yaw = traffic.yaw[into] as number;
-    sim.peds?.spawnAt(x + Math.cos(yaw) * 2.4, z - Math.sin(yaw) * 2.4, yaw + Math.PI / 2, PedPose.Fist);
+    sim.peds?.spawnAt(x + Math.cos(yaw) * 2.4, z - Math.sin(yaw) * 2.4, yaw + Math.PI / 2, PedPose.Fist, traffic.y[into]);
     sim.events.push('twinSwap', 0, x, 0, z, ((traffic.body[into] as number) << 24) | ((traffic.paint[into] as number) & 0xffffff));
   }
 

@@ -440,7 +440,7 @@ export class Way implements GoalChooser {
     if (g.door >= 0) r = this.doorReach[g.door];
     else if (g.id >= 0 && g.kind !== 'job') r = this.ringReach.get(g.id);
     if (!r) {
-      this.reachOf(g.x, g.z, this.pointReach);
+      this.reachOf(g.x, g.z, this.pointReach, g.y);
       r = this.pointReach;
     }
     this.field(r);
@@ -569,12 +569,16 @@ export class Way implements GoalChooser {
     this.count++;
   }
 
-  /** The lanes within `reach` m of a point (the eight nearest), else the nearest one; with the ground's height, those at it. */
-  private reachOf(x: number, z: number, out: Reach): void {
+  /**
+   * The lanes within `reach` m of a point (the eight nearest), else the nearest one; with the ground's height, those at
+   * it, or at `y`, a car's road (the wanted car on the viaduct, the bay bridge, in the tunnel: the ground's there led
+   * the route to the road under it or over it, or to none).
+   */
+  private reachOf(x: number, z: number, out: Reach, y = Number.NaN): void {
     const reach = BALANCE.way.reach;
     out.count = 0;
     let nearest = -1, nearestD = Infinity, nearestS = 0;
-    const ground = this.groundAt ? this.groundAt(x, z) : 0;
+    const ground = Number.isFinite(y) ? y : this.groundAt ? this.groundAt(x, z) : 0;
     for (let i = 0; i < this.n; i++) {
       const box = this.boxDistance(i, x, z);
       if (box > reach && box > nearestD) continue;

@@ -203,7 +203,8 @@ export class Breakers {
     const d = this.descs[k] as BreakerDesc, r = BREAKER.credit;
     for (let i = 0; i < traffic.capacity; i++) {
       if (traffic.state[i] === AgentState.Free) { this.credited[i] = 0; continue; }
-      if (traffic.police[i] !== 1 || traffic.justWrecked[i] !== 1 || this.credited[i] === 1) continue;
+      // (one the player's touch already took down this step is Life's: it paid two takedowns, the heat twice)
+      if (traffic.police[i] !== 1 || traffic.justWrecked[i] !== 1 || this.credited[i] === 1 || sim.life.tookDown(i)) continue;
       if (!Breakers.onBarrier(d, traffic.x[i] as number, traffic.z[i] as number, r)) continue;
       this.credited[i] = 1;
       sim.events.push('takedown', 0, traffic.x[i] as number, (d.y ?? 0) + 0.5, traffic.z[i] as number, i);

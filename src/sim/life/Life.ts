@@ -101,6 +101,11 @@ export class Life {
     this.underTick = new Int32Array(n).fill(-10);
   }
 
+  /** The record is a wreck the player's takedown made (Life counted it: a breaker's credit is then not a second one). */
+  tookDown(agent: number): boolean {
+    return this.takenDown[agent] === 1;
+  }
+
   preStep(controls: VehicleControls, dt: number): void {
     const st = this.state;
     st.swapCandidate = this.findSwapCandidate();
@@ -269,7 +274,7 @@ export class Life {
       const side = (x - fromX) * lx + (z - fromZ) * lz >= 0 ? 1 : -1;
       const out = traffic.halfWidthOf(i) + 1.2;
       const dx = x + lx * side * out, dz = z + lz * side * out;
-      this.sim.peds?.spawnAt(dx, dz, Math.atan2(px - dx, pz - dz), PedPose.Fist);
+      this.sim.peds?.spawnAt(dx, dz, Math.atan2(px - dx, pz - dz), PedPose.Fist, traffic.y[i]);
     }
     // a unit flattened is a takedown (read below, this step)
     if (unit) {
@@ -484,7 +489,7 @@ export class Life {
     const lz = -Math.sin(oldYaw);
     const px = this.oldPose.x + lx * 2.2;
     const pz = this.oldPose.z + lz * 2.2;
-    this.sim.peds?.spawnAt(px, pz, Math.atan2(h.x - px, h.z - pz), PedPose.Fist);
+    this.sim.peds?.spawnAt(px, pz, Math.atan2(h.x - px, h.z - pz), PedPose.Fist, this.oldPose.y);
     this.sim.events.push('swap', 0, h.x, h.y, h.z, agent);
     this.state.swapCandidate = -1;
     // identity (docs/DESIGN.md §2.5): a swap no unit saw loses them, and they box the car you left

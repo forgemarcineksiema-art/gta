@@ -39,5 +39,10 @@ export const GROUPS_PROP = interactionGroups(GROUP_PROP, ALL);
  * and nobody's cover (M8.8 slice 19).
  */
 export const QUERY_NOT_PROP = interactionGroups(ALL, ALL & ~GROUP_PROP & ~GROUP_WATER);
+/**
+ * A query for walls only: no prop, no sea, no ground (the police's box's slots: on a street past 17 % a level ray from
+ * the car met the rising ground on the uphill side and the box left that side open).
+ */
+export const QUERY_WALLS = interactionGroups(ALL, ALL & ~GROUP_PROP & ~GROUP_WATER & ~GROUP_TERRAIN);
 /** The hovercraft's rays (M8.8 slice 19): the ground and the sea, never a prop, nor the gate it passes through. */
 export const QUERY_HOVER = interactionGroups(ALL, ALL & ~GROUP_PROP & ~GROUP_GATE);

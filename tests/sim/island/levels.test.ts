@@ -8,6 +8,7 @@ import { BALANCE, POLICE, clearControls, type SimWorld } from '../../../src/sim'
 import type { Island } from '../../../src/sim/island/Island';
 import { canalBed } from '../../../src/sim/island/shapes/works';
 import { atFinish } from '../../../src/sim/jobs/finish';
+import { PedPose } from '../../../src/sim/traffic/Pedestrians';
 import { AgentState, type Traffic } from '../../../src/sim/traffic/Traffic';
 import { createWorld } from '../helpers';
 
@@ -113,5 +114,25 @@ describe('the island\'s stacked roads', () => {
     // under both lamps of the bridge at x -640 (the probe smashed both at 18 m/s, heat 0 to 6)
     expect(sim.probe.x).toBeLessThan(-660);
     expect(smashes).toBe(0);
+  });
+
+  it('18.21 a driver put down on a deck stands on it, and goes with no footway of its own there, not down through the air', () => {
+    const traffic = sim.traffic as Traffic, peds = sim.peds, lanes = traffic.lanes;
+    expect(peds).not.toBeNull();
+    if (!peds) return;
+    const o = overpass('quay-sweep'), pose = { x: 0, z: 0, yaw: 0, y: 0 };
+    // the player stopped on the deck (the walkers go past their reach of the car)
+    stopAt(o.high, o.s + 8);
+    lanes.positionAt(o.high, o.s, 0, pose);
+    const deck = lanes.heightAt(o.high, o.s);
+    const i = peds.spawnAt(pose.x + 3, pose.z, 0, PedPose.Fist, deck);
+    expect(i).toBeGreaterThanOrEqual(0);
+    sim.step();
+    const slot = peds.slot[i] as number, y = sim.transforms.currPos[slot * 3 + 1] as number;
+    // on the deck, not on the street 7 m under it
+    expect(Math.abs(y - deck)).toBeLessThan(0.5);
+    // its fist shaken (4 s), no footway of its own on the deck: gone
+    for (let k = 0; k < 60 * 5; k++) sim.step();
+    expect(peds.active[i]).toBe(0);
   });
 });

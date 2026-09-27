@@ -1112,6 +1112,11 @@ export class Traffic {
     this.plannerLane[agent] = -1;
     this.plannerNext[agent] = -1;
     this.plannerSpeed[agent] = 0;
+    // driving on as traffic: its duel's own (Fake Frank's badge, a hunt's armour, the bad driver's temper) end with it;
+    // Frank's car rammed after a lost duel was a unit assaulted. The rival's flag stays: its car is never taken
+    this.badge[agent] = 0;
+    this.bad[agent] = 0;
+    this.armour[agent] = 1;
   }
 
   /** The driving mode (DESIGN.md §13.9): a unit on a chase or a rival in a race runs the junction box, pulls away ×1.5 and goes round slower cars. */

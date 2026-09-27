@@ -20,6 +20,8 @@ export interface SettingsNav {
 }
 
 export class SettingsUi {
+  /** Bumps on every use of the LANGUAGE row: a pick there is the player's, over a `lang` parameter (even the same value). */
+  langPicks = 0;
   readonly root: HTMLElement;
   private focus = 0;
   private readonly values = new Map<Row, HTMLElement>();
@@ -86,7 +88,10 @@ export class SettingsUi {
     if (row === 'music' || row === 'effects') s[row] = Math.max(0, Math.min(10, s[row] + by));
     else if (row === 'quality') s.quality = QUALITY_SETTINGS[(QUALITY_SETTINGS.indexOf(s.quality) + by + QUALITY_SETTINGS.length) % QUALITY_SETTINGS.length] ?? 'auto';
     else if (row === 'radar') s.radarNorth = !s.radarNorth;
-    else s.lang = LANGS[(LANGS.indexOf(lang()) + by + LANGS.length) % LANGS.length] ?? 'pl';
+    else {
+      s.lang = LANGS[(LANGS.indexOf(lang()) + by + LANGS.length) % LANGS.length] ?? 'pl';
+      this.langPicks++;
+    }
     this.refresh();
     this.changed();
   }

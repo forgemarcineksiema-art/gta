@@ -22,8 +22,10 @@ export class SaveStore {
   private dirty = false;
   private lastWrite = -Infinity;
   private busy = false;
+  /** Another tab of the game wrote the save: this one writes no more (it wrote over the other's progress). */
+  private foreign = false;
 
-  constructor(private readonly platform: Platform, private readonly key: string = BALANCE.save.key, private readonly now: () => number = () => performance.now() / 1000) {}
+  constructor(private readonly platform: Platform, readonly key: string = BALANCE.save.key, private readonly now: () => number = () => performance.now() / 1000) {}
 
   /** Last serialized length in bytes (UTF-16 code units: the document is ASCII). */
   get bytes(): number {
@@ -65,7 +67,7 @@ export class SaveStore {
   /** Collect, serialize and write now; nothing when the text is unchanged or a newer save is protected. */
   async flush(sim: SimWorld): Promise<void> {
     this.dirty = false;
-    if (this.unknownRaw !== null) return;
+    if (this.unknownRaw !== null || this.foreign) return;
     collect(sim, this.doc);
     const text = serialize(this.doc);
     if (text === this.lastText) return;
@@ -90,11 +92,17 @@ export class SaveStore {
     const onVisibility = (): void => {
       if (target.document.visibilityState === 'hidden') void this.flush(sim);
     };
+    // another tab's write (the storage event comes from other documents only): its progress is the newer, this one stops
+    const onStorage = (e: StorageEvent): void => {
+      if (e.key === this.key && e.newValue !== null && e.newValue !== this.lastText) this.foreign = true;
+    };
     target.addEventListener('pagehide', onHide);
     target.document.addEventListener('visibilitychange', onVisibility);
+    target.addEventListener('storage', onStorage);
     return () => {
       target.removeEventListener('pagehide', onHide);
       target.document.removeEventListener('visibilitychange', onVisibility);
+      target.removeEventListener('storage', onStorage);
     };
   }
 }

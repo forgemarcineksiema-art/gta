@@ -18,6 +18,9 @@ import { DECK } from '../../sim/island/structures';
 import { Rtin } from './rtin';
 import { fadeShadowEdges } from '../shadows';
 
+/** Every box in sight: `sync`'s default, one function (a default `() => true` was a new one every frame). */
+const SEEN_ALL = (): boolean => true;
+
 /** The mesh's grid: points a side of a chunk (the sim's view grid: the island reads the ground on it), and the step between them (m). */
 export const GRID = VIEW_GRID;
 const STEP = CHUNK / (GRID - 1);
@@ -114,7 +117,7 @@ export class GroundView {
    * Show the chunks within `reach` of (x, z), free the far ones, and keep building the nearest missing one a few columns
    * a frame (all of them now when `snap`).
    */
-  sync(x: number, z: number, reach: number, snap = false, seen: (x0: number, z0: number, x1: number, z1: number) => boolean = () => true): void {
+  sync(x: number, z: number, reach: number, snap = false, seen: (x0: number, z0: number, x1: number, z1: number) => boolean = SEEN_ALL): void {
     let best = -1, bestD = Infinity;
     for (let j = 0; j < CHUNKS_Z; j++) for (let i = 0; i < CHUNKS_X; i++) {
       const d = Math.hypot(CHUNK_X0 + (i + 0.5) * CHUNK - x, CHUNK_Z0 + (j + 0.5) * CHUNK - z), k = j * CHUNKS_X + i;

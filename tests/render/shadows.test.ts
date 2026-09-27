@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, test } from 'vitest';
-import { SHADOW_HALF, SUN_OFFSET, inShadowBox, stableShadowTarget } from '../../src/render/shadows';
+import { SHADOW_HALF, SUN_OFFSET, fadeShadowEdges, inShadowBox, shadeTunnel, stableShadowTarget } from '../../src/render/shadows';
 
 describe('stable city shadows', () => {
   test('light-space grid does not drift under sub-texel car motion on either quality tier', () => {
@@ -35,5 +35,19 @@ describe('the island\'s casters by the shadow map\'s box (M8.10)', () => {
     expect(box(sun.clone().multiplyScalar(-240), 8, 20)).toBe(true);
     expect(box(across.clone().multiplyScalar(180), 8, 20)).toBe(false);
     expect(box(sun.clone().multiplyScalar(320), 8, 20)).toBe(false);
+  });
+});
+
+describe('the tunnel out of the sun (M8.10, the second bug hunt)', () => {
+  test("18.19 the tunnel's shade patches the shadow's return and the vertex, on the edges' fade: none of it a silent miss", () => {
+    const material = new THREE.MeshLambertMaterial();
+    fadeShadowEdges(material);
+    shadeTunnel(material, { pts: [[0, 0], [100, 20], [200, 0]], floor: [5, 4, 3] }, 21, 7);
+    const shader = { uniforms: {} as Record<string, unknown>, vertexShader: THREE.ShaderLib.lambert.vertexShader, fragmentShader: THREE.ShaderLib.lambert.fragmentShader };
+    material.onBeforeCompile(shader as never, null as never);
+    expect(shader.fragmentShader).toContain('shadowIntensity * coverage ) * ( 1.0 - vTunnel )');
+    expect(shader.vertexShader).toContain('vTunnel = (1.0 - smoothstep(');
+    expect(shader.uniforms['tunnelCount']).toEqual({ value: 3 });
+    expect(material.customProgramCacheKey()).toContain('tunnel-shade');
   });
 });

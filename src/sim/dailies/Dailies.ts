@@ -194,6 +194,14 @@ export class Dailies {
     }
   }
 
+  /** A run's total raised at its door (the rewarded double): the banked-run challenges read it again. */
+  onBanked(banked: number): void {
+    for (let i = 0; i < 3; i++) {
+      const t = this.template(i);
+      if (t && !this.done[i] && t.kind === 'banked' && banked >= t.target) this.complete(i);
+    }
+  }
+
   /** The run's end (Run calls it at the door and on busted): the banked-run challenges. */
   onRunEnd(banked: number, _maxHeat: number, busted: boolean): void {
     for (let i = 0; i < 3; i++) {
@@ -261,8 +269,8 @@ export class Dailies {
         if (e.kind !== 'jobDone') return false;
         const d = sim.jobs.defOf(e.target);
         if (!d || (t.job && d.kind !== t.job)) return false;
-        // an order without a scratch: paid in full
-        return d.kind !== 'order' || e.value >= d.payout;
+        // an order without a scratch on its way (by the pay, a dented car with every route coin was paid in full)
+        return d.kind !== 'order' || sim.jobs.lastClean;
       }
       default:
         return e.kind === t.kind;

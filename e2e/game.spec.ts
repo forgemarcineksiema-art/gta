@@ -368,7 +368,7 @@ test('M7 3.4e the settings on the pause screen: W/S a row, A/D its value, saved 
   const settings = await page.evaluate(async () => {
     const g = window.__game!;
     await g.save.flush(g.sim);
-    return { ...g.sim.settings, saved: (JSON.parse(localStorage.getItem('save') ?? '{}') as { settings?: unknown }).settings };
+    return { ...g.sim.settings, saved: (JSON.parse(localStorage.getItem(g.save.key) ?? '{}') as { settings?: unknown }).settings };
   });
   expect(settings.music).toBe(8);
   expect(settings.radarNorth).toBe(true);

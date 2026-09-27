@@ -167,6 +167,8 @@ export class App {
   /** `?lang=` for this session (DESIGN.md §19), until the player picks a language in the settings; the pick last seen. */
   private langParam: string | null;
   private langPick: Lang | '';
+  /** The LANGUAGE row's uses applied (`SettingsUi.langPicks`). */
+  private langPicksSeen = 0;
   /** `?dev=1`: the developer's panel and its key hint. */
   private readonly dev: boolean;
   /** Bound once: the save's dirty marks come from the event ring. */
@@ -469,10 +471,13 @@ export class App {
     bootTimings['physics'] = performance.now();
     watch.enter('save', performance.now() / 1000);
     // the save before the world: the garage car, the bank and the seen flag are in place for the first step
-    const store = new SaveStore(platform);
+    // a test page (a bot, a spawn, a board, a kit, a date...) keeps a save of its own: a visit to one wrote its rivals, its
+    // kit and its bot's bank into the player's profile
+    const testing = [...COLD_OPEN_OFF_PARAMS, 'kit', 'reveal', 'date'].some((p) => params.has(p));
+    const store = new SaveStore(platform, testing ? `${BALANCE.save.key}-test` : BALANCE.save.key);
     let save: SaveV1;
     if (params.get('fresh') === '1') {
-      await platform.clearData(BALANCE.save.key);
+      await platform.clearData(store.key);
       save = defaultSave();
     } else {
       save = await store.load();
@@ -698,9 +703,11 @@ export class App {
     this.audio.setEffectsVolume(volumeGain(s.effects));
     this.renderer.setQualityMode(s.quality);
     this.hud.setRadarNorth(s.radarNorth);
-    // a pick in the row replaces the `lang` parameter for the rest of the session
-    if (s.lang !== this.langPick) {
+    // a pick in the row replaces the `lang` parameter for the rest of the session: any use of the row (?lang=en over a
+    // saved POLSKI: the row's step back to POLSKI was the same value as the pick, and the parameter stayed)
+    if (s.lang !== this.langPick || this.settingsUi.langPicks !== this.langPicksSeen) {
       this.langPick = s.lang;
+      this.langPicksSeen = this.settingsUi.langPicks;
       this.langParam = null;
     }
     const l = resolveLang(this.langParam, s.lang);
@@ -809,7 +816,9 @@ export class App {
           this.nav.select = st.pressed.handbrake || st.pressed.skip;
           this.garageUi.navigate(this.nav);
         } else {
-          for (const action of DISMISS) if (st.pressed[action]) { run.closeCard(); break; }
+          // any key, as the card says: an unbound one too
+          if (st.other) run.closeCard();
+          else for (const action of DISMISS) if (st.pressed[action]) { run.closeCard(); break; }
         }
       }
     }

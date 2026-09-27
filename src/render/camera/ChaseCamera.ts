@@ -115,6 +115,12 @@ const DEG = Math.PI / 180;
 /** The occlusion rule's gap kept to the static that blocks, and the shortest boom it pulls to, m. */
 const BOOM_MARGIN = 0.4;
 const BOOM_MIN = 1.6;
+/**
+ * The room the camera keeps under a ceiling, m: the near plane's half height at the widest view (0.6 m × tan 40°) and a
+ * hair. Pulled in along a shallow line the boom's margin left it 7 cm under a deck's slab, and at its own height under
+ * a low one it sat 0.3 m under it: the view's top cut into the slab (the lighthouse road under the bay bridge's ramp).
+ */
+const CEILING_ROOM = 0.6;
 
 function wrapAngle(a: number): number {
   while (a > Math.PI) a -= Math.PI * 2;
@@ -154,6 +160,8 @@ export class ChaseCamera {
    * solid statics (the sim's `clearFraction`); null shows the camera where it is, as the tests' cameras do.
    */
   occluder: ((ax: number, ay: number, az: number, bx: number, by: number, bz: number) => number) | null = null;
+  /** The room over a point up to a ceiling, at most `reach` (the world's query; null: none). */
+  ceiling: ((x: number, y: number, z: number, reach: number) => number) | null = null;
   /** How much of the boom is out: pulled in at once by a static between, let out again at the ground height's pace. */
   private boom = 1;
   private readonly shown = new THREE.Vector3();
@@ -356,6 +364,12 @@ export class ChaseCamera {
       const want = clear >= 1 || len < 1e-3 ? 1 : Math.max(Math.min(1, BOOM_MIN / len), (clear * len - BOOM_MARGIN) / len);
       this.boom = snap || want < this.boom ? want : this.boom + (want - this.boom) * (1 - Math.exp(-dt * t.heightRateGround));
       if (this.boom < 0.999) this.shown.set(ox + (this.pos.x - ox) * this.boom, oy + (this.pos.y - oy) * this.boom, oz + (this.pos.z - oz) * this.boom);
+    }
+    // under a ceiling (pulled in to it, or at its own height under a low deck): down out of it, never under the car's
+    // roof line
+    if (this.ceiling) {
+      const room = this.ceiling(this.shown.x, this.shown.y, this.shown.z, CEILING_ROOM);
+      if (room < CEILING_ROOM) this.shown.y = Math.max(car.position.y + 0.3, this.shown.y - (CEILING_ROOM - room));
     }
     this.camera.position.set(this.shown.x + sx, this.shown.y + sy, this.shown.z);
     const ahead = (t.lookAhead + speed * t.lookAheadPerSpeed) * (tm.airborne ? 0.5 : 1);

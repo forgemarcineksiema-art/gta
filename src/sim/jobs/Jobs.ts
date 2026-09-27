@@ -105,6 +105,13 @@ export class Jobs {
   /** The last job's pay into the bag (the HUD's result line), and whether every coin of its route was taken (the tip). */
   lastPaid = 0;
   lastTip = false;
+  /** The last order delivered without a scratch on the way (its worst damage none): the day's "without a scratch". */
+  lastClean = false;
+  /**
+   * The worst damage stage the taken car had on an order's way, a wreck 4: what the pay reads at the fence, not the stage
+   * then (a reset, a wreck's respawn repair the car; a wrecked order's fresh car was paid in full).
+   */
+  private orderStage = 0;
   /** A sea trial's next buoy (M8.8 slice 20): its route's index; the finish counts only past the last. */
   buoy = 0;
   /** The last trial's medal (3 gold .. 1 bronze), and the best per trial def id (saved). */
@@ -263,6 +270,15 @@ export class Jobs {
       this.duelStep(d, probe, dt);
       return;
     }
+    if (d.kind === 'order') this.orderStage = Math.max(this.orderStage, this.sim.life.state.wrecked ? 4 : this.sim.life.state.stage);
+    // a fare rides in the taxi: out of it by a swap, the ride is over (it paid on, counted for the board, a hot one's heat
+    // went on)
+    if (d.kind === 'fare' && this.sim.carBody !== 'taxi') {
+      this.sim.fares.broken();
+      this.finish('failed', probe);
+      this.sim.events.push('jobFailed', 0, probe.x, 0, probe.z, d.id);
+      return;
+    }
     if (d.kind === 'race') this.race.step(probe);
     if (d.kind === 'rage' || d.kind === 'mayhem') {
       // the zone round its middle (the grid's ring; the island's place, its ring at the nearest corner: M8.10 slice 14)
@@ -324,8 +340,9 @@ export class Jobs {
         this.medals.set(d.id, Math.max(this.medals.get(d.id) ?? 0, medal));
         paid = BALANCE.jobs.trial.pay[medal - 1] as number;
       } else {
+        this.lastClean = d.kind === 'order' && this.orderStage === 0;
         paid = d.kind === 'order'
-          ? Math.round(d.payout * Math.max(0, 1 - BALANCE.jobs.order.stagePenalty * this.sim.life.state.stage))
+          ? Math.round(d.payout * Math.max(0, 1 - BALANCE.jobs.order.stagePenalty * this.orderStage))
           : Math.round(d.payout * (1 + BALANCE.jobs.timeBonus * Math.max(0, this.remaining) / d.limitSeconds));
       }
       // arriving takes the cap on the target; every coin of the route taken is the clean line, and pays the tip
@@ -363,8 +380,11 @@ export class Jobs {
     this.sim.events.push('jobStart', d.payout, d.x, 0, d.z, d.id);
   }
 
-  /** The running job's target: the drop-off or fence, the wanted car while it exists; false for none (idle, an escape). */
-  target(out: { x: number; z: number }): boolean {
+  /**
+   * The running job's target: the drop-off or fence, the wanted car while it exists; false for none (idle, an escape).
+   * A car's has its road's height in `y` (NaN for a place on the ground): the way's route starts on its road.
+   */
+  target(out: { x: number; z: number; y?: number }): boolean {
     const d = this.running;
     if (!d) return false;
     if (this.state === 'hunting') {
@@ -372,6 +392,7 @@ export class Jobs {
       if (!traffic || this.wantedAgent < 0) return false;
       out.x = traffic.x[this.wantedAgent] as number;
       out.z = traffic.z[this.wantedAgent] as number;
+      out.y = traffic.y[this.wantedAgent] as number;
       return true;
     }
     if (d.kind === 'escape' || (d.kind === 'duel' && RIVALS[d.level]?.format === 'chief')) return false;
@@ -381,10 +402,12 @@ export class Jobs {
       if (!traffic || a < 0 || traffic.state[a] === AgentState.Free) return false;
       out.x = traffic.x[a] as number;
       out.z = traffic.z[a] as number;
+      out.y = traffic.y[a] as number;
       return true;
     }
     out.x = d.targetX;
     out.z = d.targetZ;
+    out.y = Number.NaN;
     return true;
   }
 
@@ -416,10 +439,13 @@ export class Jobs {
     this.state = 'active';
     this.remaining = d.limitSeconds;
     this.wantedAgent = -1;
+    this.orderStage = 0;
     if (this.sim.traffic) this.sim.traffic.wanted = -1;
     this.sim.heat.add(d.heat);
-    // the car is taken: the coins from here to the fence
-    this.layRoute(this.sim.probe.x, this.sim.probe.z, d.targetX, d.targetZ);
+    // the car is taken: the coins from it to the fence, from its own road (on a deck or in the tunnel, not the ground's)
+    const traffic = this.sim.traffic;
+    if (traffic) this.layRoute(traffic.x[agent] as number, traffic.z[agent] as number, d.targetX, d.targetZ, traffic.y[agent]);
+    else this.layRoute(this.sim.probe.x, this.sim.probe.z, d.targetX, d.targetZ);
     this.serial++;
   }
 
@@ -609,7 +635,7 @@ export class Jobs {
    * into the coins' route pool (D3), the cap on the target; on the grid's
    * streets or the island's (M8.10 slice 15), each coin over its road.
    */
-  private layRoute(x: number, z: number, targetX: number, targetZ: number): void {
+  private layRoute(x: number, z: number, targetX: number, targetZ: number, y = Number.NaN): void {
     const coins = this.sim.coins;
     const streets = this.sim.traffic?.streets;
     if (!coins || !streets) return;
@@ -617,8 +643,8 @@ export class Jobs {
     const graph = streets.graph;
     // the target's lane: the nearest (on the island the street at its ground's height, never a deck over it)
     const end = streets.nearestLane(targetX, targetZ, this.sim.island ? streets.groundAt(targetX, targetZ) : undefined);
-    // the marker stands on the ground: its lane is the street's, never an overpass above it
-    const start = streets.nearestLane(x, z, streets.groundAt(x, z));
+    // the marker stands on the ground: its lane is the street's, never an overpass above it; a car taken, its road's (`y`)
+    const start = streets.nearestLane(x, z, Number.isFinite(y) ? y : streets.groundAt(x, z));
     if (start < 0 || end < 0) return;
     const s0 = alongLane(graph.lanes[start] as Lane, x, z).s;
     const sEnd = alongLane(graph.lanes[end] as Lane, targetX, targetZ).s;
@@ -733,7 +759,7 @@ export class Jobs {
     if (d.route) return this.buoy >= d.route.length;
     if (d.kind !== 'order') return true;
     // the class's own shell, as the order names it
-    return this.sim.carBody === unpackDescriptor(d.descriptor).body && this.sim.life.state.stage < 4 && !this.sim.life.state.wrecked;
+    return this.sim.carBody === unpackDescriptor(d.descriptor).body && this.orderStage < 4 && !this.sim.life.state.wrecked;
   }
 
   /** The wanted car goes back to being traffic. */

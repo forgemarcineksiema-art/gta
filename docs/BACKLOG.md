@@ -2,25 +2,6 @@
 
 Ideas outside the current milestone, non-blocking bugs, refactors. One line of context each. A milestone's plan takes what it schedules from here; what shipped is removed (M5.5 shipped updates 1 and 2, the life models and the polish items, 2026-09-23).
 
-## The island (the second bug hunt, 2026-09-27)
-
-- An order's coin line after the wanted car is taken on a deck or in the tunnel starts on the road under or over it: `Jobs.layRoute` picks its first lane at the ground's height (`Jobs.ts` ~613), not the car's; the clean line's tip is then out of reach.
-- The radar's route to a moving target (the wanted car, a hunted rival) on the viaduct, the bay bridge or in the tunnel leads to the road under or over it (`way.ts` ~577 keeps the lanes near the ground's height): route from the car's own lane.
-- A walker made at a car on a deck (the ticket's officer, the driver left by a swap, a flattened car's) stands on the ground under it: `Pedestrians.spawnAt`/`spawnOfficer` take no height and the walk reads `footAt`.
-- The arrest's slot rays (`Police.ts` ~870) are cast level from the car's middle: on a street steeper than ~17 % the uphill slots read blocked by the ground and the box leaves the uphill side open.
-- The tunnel's inside is lit by the sun past the shadow map's reach (84–133 m across the sun): the road from ~90 m ahead reads as open air; its pieces want a material without the sun.
-- Under a low deck (the lighthouse road under the bay bridge's ramp, 2.7 m) the camera's pull-in stops 7 cm under the slab and the near plane cuts into it for about 2 s (`ChaseCamera` ~352: the margin along the line, not off the surface).
-- The helicopter's spot is a flat disc at the ground under its middle (`HeliView` ~137): on a slope half of it sinks and half floats.
-- `IslandView`/`GroundView` walk their chunk maps with `for…of` entries and a default `seen` closure every frame (~50 small objects a frame).
-- The rewarded DOUBLE at the door updates the best run but not the chain's "bank 20,000 in one run" step or a "bank n in one run" daily (`Run.doubleLastBag`).
-- An order's damage: the "without a scratch" daily is judged by the pay (a stage-1 car with every route coin is paid in full) and a reset or a wreck's respawn repairs the car before the fence.
-- A unit that hits a fallen breaker 2.5 s after touching the player pays two takedowns (`Breakers.credit` and `Life.takedowns`).
-- A hidden car found before a car is bought ticks the chain's first step with no card (`Run.ts` ~150).
-- A fare runs on after a swap out of the taxi (`Fares.ts` ~45): it pays, counts for the board and, hot, adds heat.
-- A duel's rival that drives on as traffic after the duel keeps `rival`, `badge`, `bad` and `armour` (`Traffic.endRace`): Fake Frank's car rammed later is a unit assaulted.
-- A test URL (`board`, `bot`, `job`) on 4173 writes the real profile's save; two tabs of the game overwrite each other's.
-- The busted card says "press any key" but only the bound keys drive on; `?lang=en` stays over the LANGUAGE row until the row's value changes.
-
 ## Performance / size
 
 - The JS heap with traffic is 58–65 MB against M8's own 50 MB target (0.7.0: 48; the brief's 250 holds): M8's props hold it (their arrays, the 96 debris, the prop meshes merged into the chunks' geometry). Measure where at the next perf pass. (M8.5 gate)

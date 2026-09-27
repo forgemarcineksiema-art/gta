@@ -44,6 +44,21 @@ describe('the camera occlusion rule', () => {
     expect(boom()).toBeGreaterThan(open * 0.97);
   });
 
+  it("18.20 pulled in under a low deck, the camera keeps its near plane's room under the slab (the second bug hunt)", () => {
+    const cam = new THREE.PerspectiveCamera(60, 16 / 9, 0.6, 1000);
+    const chase = new ChaseCamera(cam);
+    const car = new THREE.Object3D();
+    const vel = new THREE.Vector3();
+    // a slab's underside 2.7 m over the road: the line from the car's look point to the camera meets it
+    const slab = 2.7;
+    chase.occluder = (_ax, ay, _az, _bx, by) => (by <= slab ? 1 : Math.max(0, (slab - ay) / (by - ay)));
+    chase.ceiling = (_x, y, _z, reach) => Math.min(reach, Math.max(0, slab - y));
+    const tm = telemetry(0);
+    for (let i = 0; i < 120; i++) chase.update(car, vel, tm, 1 / 60, i === 0);
+    // the frustum's top at the near plane: 0.6 m × tan(fov / 2) over the camera, under the slab
+    expect(cam.position.y + 0.6 * Math.tan(cam.fov * Math.PI / 360)).toBeLessThan(slab);
+  });
+
   it('7.4 through each covered street the camera never sits behind a static', async () => {
     const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
     try {

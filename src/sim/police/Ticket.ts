@@ -115,7 +115,7 @@ export class TicketOfficer {
       this.side = this.freeSide();
       this.doorOf();
       this.route(sx, sz);
-      this.ped = peds.spawnOfficer(sx, sz, this.way.x, this.way.z, this.pace(p));
+      this.ped = peds.spawnOfficer(sx, sz, this.way.x, this.way.z, this.pace(p), traffic.y[unit]);
       this.leaving = false;
       return;
     }

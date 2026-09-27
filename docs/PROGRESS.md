@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-27 — the second bug hunt's backlog (Marcin: "Popraw też te z backlogu")
+
+All sixteen: a taken car's coins and the radar's route start on its own road (a deck, the tunnel); a driver or the officer
+put down on a deck stands on it (18.21); the box's slot rays see walls, not an uphill street; the tunnel out of the sun
+past the shadow map (18.19); the camera keeps its near plane's room under a slab (18.20); the helicopter's spot along the
+slope; the double reaches the chain and the dailies, a car found is the chain's step with its card, an order pays its worst
+damage (a reset no repair; the scratch daily by it), a breaker no second takedown, a fare ends out of the taxi, a duel's
+flags end with it (runRules, 2.4b, 13.3); test pages keep their own save and a second tab stops writing (0.11); any key.
+
 ## 2026-09-27 — the second bug hunt (Marcin: "szukaj błędów w grze")
 
 Played (the first minute, the pause, a five-minute chase headless) and read by five agents; fixed: E, R and H were set in

@@ -99,6 +99,13 @@ describe('fares', () => {
       const before = sim.heat.points;
       run(sim, 3, (_t, c) => { c.brake = 1; });
       expect(sim.heat.points - before).toBeGreaterThan(BALANCE.fares.hot.heatPerSecond * 3 * 0.8);
+      // out of the taxi (a swap): the ride is over, no pay, no more heat (the second bug hunt: it rode on)
+      sim.setCar('muscle');
+      run(sim, 2 / 60, (_t, c) => { c.brake = 1; });
+      expect(sim.jobs.state).toBe('failed');
+      const after = sim.heat.points;
+      run(sim, 2, (_t, c) => { c.brake = 1; });
+      expect(sim.heat.points).toBeLessThanOrEqual(after);
     } finally { sim.dispose(); }
   }, 60_000);
 });

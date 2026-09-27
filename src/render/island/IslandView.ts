@@ -14,7 +14,7 @@ import { PLACES } from '../../sim/island/plan';
 import { shoreOpen } from '../../sim/island/shapes';
 import { atSlipway } from '../../sim/island/slipways';
 import { BUILD_SLICE, DETAIL_FAR, DETAIL_NEAR, GeometryBuild, cityGeometry, type PropRanges } from '../city/CityView';
-import { fadeShadowEdges, inShadowBox } from '../shadows';
+import { fadeShadowEdges, inShadowBox, shadeTunnel } from '../shadows';
 import { propStatics } from '../props/propMesh';
 import { lightCity } from '../city/glow';
 import { fadeRoadPaint } from '../city/roadPaint';
@@ -138,6 +138,9 @@ export class IslandView {
     this.group.add(this.ground.group);
     // the shadow map fades out before its edge on everything it falls on (the grid's), the buildings' hooks chained after
     for (const m of [this.buildingMaterial, this.surfaceMaterial, this.extraMaterial, this.propMaterial]) fadeShadowEdges(m);
+    // the tunnel's floor, walls, roof and road out of the sun past the shadow map's reach
+    const tunnel = island.ground.toData().tunnel;
+    for (const m of [this.surfaceMaterial, this.extraMaterial]) shadeTunnel(m, tunnel, DECK.half + 1, DECK.clear);
     fadeRoadPaint(this.buildingMaterial);
     lightCity(this.buildingMaterial);
     // the props lit as the grid's (M8.9 R9: the lamps' heads glow at dusk)
@@ -269,14 +272,19 @@ export class IslandView {
     }
     // a chunk's roads' surfaces shown inside the reach, their detail near (its nearest edge, the grid's hysteresis); the
     // structures and the coast's things shown inside the reach, casting inside the shadows'
-    for (const [k, mesh] of this.surfaceChunks) {
+    // (by index over the chunks, not the maps' entries: an entry is an array a chunk a frame)
+    for (let k = 0; k < CHUNKS_X * CHUNKS_Z; k++) {
+      const mesh = this.surfaceChunks.get(k);
+      if (!mesh) continue;
       mesh.visible = far(k, x, z) < reach;
       const e = edge(k, x, z), was = this.detail[k] === 1, near = !snap && was ? e < DETAIL_FAR : e < DETAIL_NEAR;
       if (near === was) continue;
       this.detail[k] = near ? 1 : 0;
       mesh.geometry.setDrawRange(0, near ? Infinity : (mesh.geometry.userData['far'] as number));
     }
-    for (const [k, mesh] of this.extraChunks) {
+    for (let k = 0; k < CHUNKS_X * CHUNKS_Z; k++) {
+      const mesh = this.extraChunks.get(k);
+      if (!mesh) continue;
       const b = mesh.geometry.boundingBox;
       mesh.visible = far(k, x, z) < reach;
       mesh.castShadow = mesh.visible && b !== null && inShadowBox(b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z, x, y, z, CASTING);

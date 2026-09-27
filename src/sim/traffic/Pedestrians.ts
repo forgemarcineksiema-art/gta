@@ -43,6 +43,8 @@ const CAR_MIN_SPEED = 3;
 const HEAD_HEIGHT = 1.9;
 /** A mover this far under a walker's feet is on another road (the tunnel under the hill; m, as Life's near misses). */
 const OTHER_LEVEL = 3;
+/** A walker put down this far over or under the footway at its feet is on another level (m). */
+const FLOOR_GAP = 2;
 
 export class Pedestrians {
   readonly tuning: PedTuning;
@@ -67,6 +69,11 @@ export class Pedestrians {
   readonly look: Uint8Array;
   /** Metres walked, for the walk cycle's phase (the body's bob here, the limbs' swing in the view). */
   readonly gait: Float32Array;
+  /**
+   * Where a walker put down off the footways stands while it has no lane (the driver out of a swapped or flattened car,
+   * the ticket's officer): the car's road's height, a deck's over the ground; NaN to read the footway's.
+   */
+  readonly floorY: Float32Array;
   /** Bumps when a tint is assigned so the view reuploads instance colours. */
   tintSerial = 0;
   /** Last-resort hops (a car centre inside `guaranteeDistance`), and those from a flying prop's bound (M8). */
@@ -122,6 +129,7 @@ export class Pedestrians {
     this.tint = new Uint32Array(n);
     this.look = new Uint8Array(n);
     this.gait = new Float32Array(n);
+    this.floorY = new Float32Array(n).fill(Number.NaN);
     this.diveX = new Float32Array(n);
     this.diveZ = new Float32Array(n);
     this.scored = new Uint8Array(n);
@@ -167,11 +175,15 @@ export class Pedestrians {
     return n;
   }
 
-  /** Test and swap hook. Without a lane the pedestrian finds the nearest footway once it walks. */
-  spawnAt(x: number, z: number, yaw: number, pose: PedPose = PedPose.Walk): number {
+  /**
+   * Test and swap hook. Without a lane the pedestrian finds the nearest footway once it walks. `y`: the road it is put
+   * down on (a car's on a deck), NaN for the ground's footway there.
+   */
+  spawnAt(x: number, z: number, yaw: number, pose: PedPose = PedPose.Walk, y = Number.NaN): number {
     const i = this.findFree();
     if (i < 0) return -1;
     this.active[i] = 1;
+    this.floorY[i] = y;
     this.lane[i] = -1;
     this.dir[i] = 1;
     this.s[i] = 0;
@@ -223,10 +235,11 @@ export class Pedestrians {
    * The busted rule's officer (M5.5 slice 18): out of a unit at (x, z), walking toward (tx, tz) at `speed` m/s,
    * in the officer's look; the crowd's dice are left alone.
    */
-  spawnOfficer(x: number, z: number, tx: number, tz: number, speed: number): number {
+  spawnOfficer(x: number, z: number, tx: number, tz: number, speed: number, y = Number.NaN): number {
     const i = this.findFree();
     if (i < 0) return -1;
     this.active[i] = 1;
+    this.floorY[i] = y;
     this.lane[i] = -1;
     this.dir[i] = 1;
     this.s[i] = 0;
@@ -395,16 +408,35 @@ export class Pedestrians {
       M.quatMul(this.q3, this.q3, this.q2);
     }
     const q = this.q3;
-    // on the footway's top where the walker is (the grid's 0; the island's pavements on its hills)
-    y += this.streets.footAt(this.x[i] as number, this.z[i] as number);
+    // on the footway's top where the walker is (the grid's 0; the island's pavements on its hills), or where it was put
+    y += this.footOf(i);
     if (both) tb.writeBoth(slot, this.x[i] as number, y, this.z[i] as number, q.x, q.y, q.z, q.w);
     else tb.write(slot, this.x[i] as number, y, this.z[i] as number, q.x, q.y, q.z, q.w);
   }
 
   // ---- walking ----------------------------------------------------------------
 
+  /**
+   * The height a walker's feet are at: its footway's or the ground's top, but for one put down on another level (a deck
+   * over the street, a bridge over the canal) while it has no lane, the road it was put on.
+   */
+  private footOf(i: number): number {
+    const foot = this.streets.footAt(this.x[i] as number, this.z[i] as number), put = this.floorY[i] as number;
+    return (this.lane[i] as number) < 0 && Math.abs(foot - put) > FLOOR_GAP ? put : foot;
+  }
+
   private walk(i: number, dt: number): void {
-    if ((this.lane[i] as number) < 0) this.attach(i);
+    if ((this.lane[i] as number) < 0) {
+      this.attach(i);
+      // put down on a deck (a swap's driver on the highway over a street): no footway on its level, it is gone rather
+      // than walking off through the air to the street's under it
+      const put = this.floorY[i] as number;
+      this.floorY[i] = Number.NaN;
+      if (Number.isFinite(put) && Math.abs(this.streets.footAt(this.x[i] as number, this.z[i] as number) - put) > FLOOR_GAP) {
+        this.remove(i);
+        return;
+      }
+    }
     const lane = this.lane[i] as number;
     if (lane < 0) return;
     const len = this.lanes.length[lane] as number;
@@ -578,7 +610,7 @@ export class Pedestrians {
    * yelped and paid the boost for a car on another road), or under a flying prop past its head.
    */
   private otherLevel(i: number, cy: number): boolean {
-    const foot = this.streets.footAt(this.x[i] as number, this.z[i] as number);
+    const foot = this.footOf(i);
     return cy - foot > HEAD_HEIGHT || foot - cy > OTHER_LEVEL;
   }
 
@@ -653,6 +685,8 @@ export class Pedestrians {
       const i = this.findFree();
       if (i < 0) return;
       this.active[i] = 1;
+      // a crowd walker on its footway (the record may have been a driver put down on a deck)
+      this.floorY[i] = Number.NaN;
       this.lane[i] = lane;
       this.dir[i] = this.rng() < 0.5 ? 1 : -1;
       this.s[i] = s;

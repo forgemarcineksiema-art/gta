@@ -99,4 +99,30 @@ describe('save store', () => {
     expect(save.owned).toEqual(['muscle']);
     expect(store.unknownRaw).toBeNull();
   });
+
+  it("0.11 another tab's write of the save stops this tab's writes: its progress is not written over", async () => {
+    const platform = new FakePlatform('');
+    const store = new SaveStore(platform, BALANCE.save.key, clock().now);
+    await store.load();
+    // a window's events, enough for the lifecycle's bindings
+    const listeners = new Map<string, (e: unknown) => void>();
+    const target = {
+      addEventListener: (type: string, fn: (e: unknown) => void) => listeners.set(type, fn),
+      removeEventListener: () => undefined,
+      document: { addEventListener: () => undefined, removeEventListener: () => undefined, visibilityState: 'visible' },
+    };
+    const sim = await createWorld({ map: 'playground' });
+    try {
+      const unbind = store.bindLifecycle(target as unknown as Window, sim);
+      sim.run.bank = 5;
+      await store.flush(sim);
+      expect(platform.writes.length).toBe(1);
+      // the other tab banks 9,000 and writes
+      listeners.get('storage')?.({ key: BALANCE.save.key, newValue: '{"v":7,"bank":9000}' });
+      sim.run.bank = 6;
+      await store.flush(sim);
+      expect(platform.writes.length).toBe(1);
+      unbind();
+    } finally { sim.dispose(); }
+  });
 });

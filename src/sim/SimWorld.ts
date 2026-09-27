@@ -658,6 +658,16 @@ export class SimWorld {
     return hit ? hit.timeOfImpact / length : 1;
   }
 
+  /** The room over a point up to the first solid or deck over it (a slab's underside), at most `reach` m: the camera's. */
+  roomAbove(x: number, y: number, z: number, reach: number): number {
+    const ray = this.sightRay;
+    ray.origin.x = x; ray.origin.y = y; ray.origin.z = z;
+    // a hair off plumb: the island's height fields miss an exactly plumb ray
+    ray.dir.x = 1e-3; ray.dir.y = 1; ray.dir.z = 1e-3;
+    const hit = this.world.castRay(ray, reach, true, RAPIER.QueryFilterFlags.ONLY_FIXED | RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, this.island ? SOLID_AND_GROUND : SOLID_ONLY);
+    return hit ? hit.timeOfImpact : reach;
+  }
+
   /**
    * The first surface under a point that a wheel would meet (the ground, a deck, a kerb, a roof; not a prop or the sea)
    * within 60 m, else the ground there, the sea's level at least: where the effects' pieces land (the island's ground

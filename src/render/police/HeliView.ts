@@ -83,6 +83,8 @@ export class HeliView {
   private readonly barMaterial: THREE.MeshBasicMaterial;
   private readonly spot: THREE.Mesh;
   private blink = 0;
+  private readonly up = new THREE.Vector3(0, 1, 0);
+  private readonly normal = new THREE.Vector3();
 
   constructor(scene: THREE.Scene, private readonly sim: SimWorld) {
     const body = new THREE.Mesh(buildHeliBody(), new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
@@ -134,9 +136,21 @@ export class HeliView {
     // slice 15a)
     const spot = this.sim.police?.tuning.heli.spot ?? 14;
     const near = Math.hypot(this.sim.probe.x - heli.lightX, this.sim.probe.z - heli.lightZ) < spot * 2;
-    const island = this.sim.island, under = island ? Math.max(SEA.level, island.ground.surfaceHeight(heli.lightX, heli.lightZ)) + 0.06 : 0.06;
-    const groundY = near ? Math.max(under, this.sim.probe.y - 0.45) : under;
-    this.spot.position.set(heli.lightX, groundY, heli.lightZ);
+    // on the island's slopes laid along the ground (a flat disc sank on the uphill side, floated on the downhill), over
+    // the most the ground strays from it; on the car's road where that is over the ground (a deck), flat on it
+    const island = this.sim.island, x = heli.lightX, z = heli.lightZ;
+    let under = 0.06, sx = 0, sz = 0;
+    if (island) {
+      const g = island.ground, d = spot * 0.7;
+      const h0 = Math.max(SEA.level, g.surfaceHeight(x, z)), xp = Math.max(SEA.level, g.surfaceHeight(x + d, z)), xm = Math.max(SEA.level, g.surfaceHeight(x - d, z));
+      const zp = Math.max(SEA.level, g.surfaceHeight(x, z + d)), zm = Math.max(SEA.level, g.surfaceHeight(x, z - d));
+      sx = (xp - xm) / (2 * d);
+      sz = (zp - zm) / (2 * d);
+      under = h0 + Math.max(0, xp - h0 - sx * d, xm - h0 + sx * d, zp - h0 - sz * d, zm - h0 + sz * d) + 0.06;
+    }
+    const onRoad = near && this.sim.probe.y - 0.45 > under;
+    this.spot.position.set(x, onRoad ? this.sim.probe.y - 0.45 : under, z);
+    this.spot.quaternion.setFromUnitVectors(this.up, onRoad ? this.up : this.normal.set(-sx, 1, -sz).normalize());
     this.spot.scale.setScalar(spot);
     (this.spot.material as THREE.MeshBasicMaterial).opacity = heli.sees ? 0.3 : 0.18;
   }

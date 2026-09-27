@@ -180,6 +180,32 @@ describe('steal to order', () => {
     } finally { sim.dispose(); }
   });
 
+  it('2.4b the fence pays the worst the car took on the way: a repair before it (a reset) pays no more; "without a scratch" reads it', async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
+    try {
+      const d = firstOrder(sim);
+      const kind = unpackDescriptor(d.descriptor).kind;
+      const full = BALANCE.jobs.order.payout[kind as keyof typeof BALANCE.jobs.order.payout];
+      for (const [damage, paid, clean] of [[DAMAGE.stages[1] + 0.01, Math.round(full * 0.8), false], [0, full, true]] as const) {
+        sim.jobs.abandon();
+        drop(sim, 0, 0);
+        const wanted = hunt(sim, d);
+        sim.jobs.onSwap(wanted);
+        sim.setCar(kind);
+        sim.life.setDamage(damage);
+        run(sim, 0.1);
+        // the second bug hunt: a reset (any reset is a fresh car) before the fence paid in full
+        sim.life.setDamage(0);
+        const bag = sim.run.bag;
+        drop(sim, d.targetX, d.targetZ);
+        expect(sim.jobs.state).toBe('done');
+        expect(sim.run.bag - bag).toBe(paid);
+        expect(sim.jobs.lastClean).toBe(clean);
+        run(sim, BALANCE.jobs.holdSeconds + 0.1);
+      }
+    } finally { sim.dispose(); }
+  });
+
   it('2.5 wrecking the wanted car before the swap finds another of the same class and paint within 5 s', async () => {
     const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
     const traffic = sim.traffic as Traffic;

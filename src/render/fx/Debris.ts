@@ -3,7 +3,8 @@
  * taken-down car, and what a smashed prop throws by its material (M8 slice 5):
  * glass shards, paper, fruit, splinters, plastic and ceramic chunks, bolts. A
  * fixed pool with fake physics (gravity, one bounce on the ground, spin, a
- * fixed life), no Rapier: boxes in one instanced mesh, the round pieces (fruit)
+ * fixed life), no Rapier (the ground each piece lands on read once where its
+ * throw starts: the island's is not at 0, M8.10): boxes in one instanced mesh, the round pieces (fruit)
  * in another, each hidden while it has nothing in flight. Dead pieces are
  * scaled to zero. Typed arrays, no allocation after construction.
  */
@@ -37,6 +38,9 @@ export class Debris {
   /** 1 for a round piece (the round mesh), and each piece's share of gravity (paper flutters down). */
   private readonly round = new Uint8Array(POOL);
   private readonly fall = new Float32Array(POOL).fill(1);
+  /** The ground each piece lands on, and a throw's, read once for all its pieces (NaN: each spawn reads its own). */
+  private readonly floor = new Float32Array(POOL);
+  private throwFloor = NaN;
   /** The round pieces (fruit): their own instanced mesh. */
   readonly balls: THREE.InstancedMesh;
   private next = 0;
@@ -48,7 +52,8 @@ export class Debris {
   private readonly color = new THREE.Color();
   private seed = 1;
 
-  constructor(scene: THREE.Scene) {
+  /** `floorAt`: the ground under a point where a throw starts (the sim's `floorBelow`); the grid's flat 0 without it. */
+  constructor(scene: THREE.Scene, private readonly floorAt: (x: number, y: number, z: number) => number = () => 0) {
     const material = new THREE.MeshLambertMaterial({ flatShading: true });
     this.mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), material, POOL);
     this.mesh.frustumCulled = false;
@@ -85,6 +90,7 @@ export class Debris {
     if ((this.round[i] === 1) !== round) (round ? this.mesh : this.balls).setMatrixAt(i, this.m.makeScale(0, 0, 0));
     this.round[i] = round ? 1 : 0;
     this.fall[i] = fall;
+    this.floor[i] = Number.isNaN(this.throwFloor) ? this.floorAt(x, y, z) : this.throwFloor;
     this.px[i] = x; this.py[i] = y; this.pz[i] = z;
     this.vx[i] = vx; this.vy[i] = vy; this.vz[i] = vz;
     this.sx[i] = sx; this.sy[i] = sy; this.sz[i] = sz;
@@ -108,6 +114,7 @@ export class Debris {
    */
   smash(material: PropMaterial, x: number, y: number, z: number, vx: number, vz: number, color: number): void {
     const n = material === 'glass' ? 16 : material === 'paper' ? 14 : material === 'fruit' ? 12 : material === 'wood' ? 9 : material === 'metal' ? 4 : 7;
+    this.throwFloor = this.floorAt(x, y, z);
     for (let k = 0; k < n; k++) {
       const px = x + (this.rnd() - 0.5) * 0.6, py = y + this.rnd() * 0.6, pz = z + (this.rnd() - 0.5) * 0.6;
       const sx = (this.rnd() - 0.5), sz = (this.rnd() - 0.5), up = this.rnd();
@@ -134,6 +141,7 @@ export class Debris {
           this.spawn(px, py, pz, vx * 0.5 + sx * 4, 2 + up * 2.5, vz * 0.5 + sz * 4, 0.16, 0.1, 0.13, color);
       }
     }
+    this.throwFloor = NaN;
   }
 
   /** Pieces in flight now (tests). */
@@ -145,6 +153,7 @@ export class Debris {
 
   /** A burst of `count` pieces from a point, scattered around a base velocity. */
   burst(x: number, y: number, z: number, vx: number, vy: number, vz: number, count: number, size: number, color: number, spread = 3): void {
+    this.throwFloor = this.floorAt(x, y, z);
     for (let k = 0; k < count; k++) {
       this.spawn(
         x + (this.rnd() - 0.5) * 0.6, y + this.rnd() * 0.4, z + (this.rnd() - 0.5) * 0.6,
@@ -152,6 +161,7 @@ export class Debris {
         size * (0.6 + this.rnd() * 0.8), size * 0.12, size * (0.3 + this.rnd() * 0.5), color,
       );
     }
+    this.throwFloor = NaN;
   }
 
   update(dt: number): void {
@@ -166,9 +176,10 @@ export class Debris {
       this.px[i] = (this.px[i] as number) + (this.vx[i] as number) * dt;
       this.py[i] = (this.py[i] as number) + (this.vy[i] as number) * dt;
       this.pz[i] = (this.pz[i] as number) + (this.vz[i] as number) * dt;
-      const half = (this.sy[i] as number) * 0.5;
-      if ((this.py[i] as number) < half) {
-        this.py[i] = half;
+      // resting on its ground: its middle half its height over it
+      const rest = (this.floor[i] as number) + (this.sy[i] as number) * 0.5;
+      if ((this.py[i] as number) < rest) {
+        this.py[i] = rest;
         if (this.bounced[i] === 0 && (this.vy[i] as number) < -1) {
           this.vy[i] = -(this.vy[i] as number) * BOUNCE;
           this.bounced[i] = 1;

@@ -749,16 +749,20 @@ export class Ground {
   height(x: number, z: number): number {
     const h = Math.min(this.surfaceHeight(x, z), canalBed(x, z)), t = this.tunnel;
     if (!t || x < t.x0 || x > t.x1 || z < t.z0 || z > t.z1) return h;
-    // the nearest point of the tunnel's line, between its mouths only
-    let best = TRENCH, floor = 0;
+    // the nearest point of the tunnel's line, between its mouths only: a point whose nearest is past either end is outside
+    // (skipping the end segments instead let the next one's round end, a point inside, dig 17 m out of each mouth)
+    let best = TRENCH, floor = 0, outside = false;
     for (let i = 0; i + 1 < t.pts.length; i++) {
       const a = t.pts[i] as P2, b = t.pts[i + 1] as P2, dx = b[0] - a[0], dz = b[1] - a[1];
       const u = ((x - a[0]) * dx + (z - a[1]) * dz) / (dx * dx + dz * dz || 1);
-      if ((i === 0 && u < 0) || (i === t.pts.length - 2 && u > 1)) continue;
       const c = Math.max(0, Math.min(1, u)), d = Math.hypot(x - a[0] - dx * c, z - a[1] - dz * c);
-      if (d < best) { best = d; floor = (t.floor[i] as number) + ((t.floor[i + 1] as number) - (t.floor[i] as number)) * c; }
+      if (d < best) {
+        best = d;
+        floor = (t.floor[i] as number) + ((t.floor[i + 1] as number) - (t.floor[i] as number)) * c;
+        outside = (i === 0 && u < 0) || (i === t.pts.length - 2 && u > 1);
+      }
     }
-    return best < TRENCH ? Math.min(h, floor - TRENCH_DEPTH) : h;
+    return best < TRENCH && !outside ? Math.min(h, floor - TRENCH_DEPTH) : h;
   }
 
   /** The ground's surface at (x, z), m over the sea: the hill whole over the tunnel (what is drawn, and its lid). */

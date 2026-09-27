@@ -677,14 +677,15 @@ export class Police {
     }
   }
 
-  /** The swap nobody saw: box the abandoned car at this pose for `box.seconds`. */
-  box(x: number, z: number, yaw: number): void {
+  /** The swap nobody saw: box the abandoned car at this pose (`y` its chassis' middle) for `box.seconds`. */
+  box(x: number, z: number, yaw: number, y = 0.5): void {
     this.boxing = true;
     this.boxX = x;
     this.boxZ = z;
     this.boxLeft = this.tuning.box.seconds;
     this.boxAge = 0;
     this.boxProbe.x = x;
+    this.boxProbe.y = y;
     this.boxProbe.z = z;
     this.boxProbe.yaw = yaw;
     this.routeLeft = 0;
@@ -866,8 +867,9 @@ export class Police {
     const x = this.placeX[p] as number, z = this.placeZ[p] as number;
     const dx = x - player.x, dz = z - player.z;
     const reach = Math.hypot(dx, dz);
+    // from the boxed car's own height (the island's: the car left on a hill is not where the player drove on to)
     this.ray.origin.x = player.x;
-    this.ray.origin.y = this.pos.y + 0.6;
+    this.ray.origin.y = player.y + 0.6;
     this.ray.origin.z = player.z;
     this.ray.dir.x = dx / reach;
     this.ray.dir.y = 0;
@@ -894,7 +896,6 @@ export class Police {
   private dealSlots(player: PlayerProbe): void {
     const traffic = this.traffic;
     const a = this.tuning.arrest;
-    this.sim.vehicle.body.translation(this.pos);
     for (let p = 0; p < PLACES; p++) this.placeOpen[p] = this.placeFree(p, player) ? 1 : 0;
     // each slot on its own place, or on a free diagonal beside it not taken by another slot (M8.6 D5); a diagonal it
     // stands on stays its place while free, so a unit is not sent back and forth as the pile shifts

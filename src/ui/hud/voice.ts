@@ -45,6 +45,8 @@ export interface VoiceContext {
   cachesTotal: number;
   /** The speed cameras' limits in km/h, by camera. */
   cameraLimits: readonly number[];
+  /** Each rival's turf as the board places them (`Board.turfOf`); without it, each their own. */
+  turfs?: readonly string[];
 }
 
 /** What a top line's lead means (M8.9 R1): the stars' news is trouble, the police radio the police, the rest ink. */
@@ -109,7 +111,8 @@ export function speak(kind: EventKind, value: number, target: number, ctx: Voice
       if (!r) break;
       const p = posterNumber(target);
       out.lead = p > 0 ? `#${p}` : t('BOARD');
-      out.text = `${t(r.name)} ${t(r.call)} · ${t(r.turf === 'highway' ? 'THE HIGHWAY' : DISTRICTS.find((d) => d.id === r.turf)?.name ?? '')}`;
+      const turf = ctx.turfs?.[target] ?? r.turf;
+      out.text = `${t(r.name)} ${t(r.call)} · ${t(turf === 'highway' ? 'THE HIGHWAY' : DISTRICTS.find((d) => d.id === turf)?.name ?? '')}`;
       break;
     }
     case 'twinSwap': {

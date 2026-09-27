@@ -42,4 +42,35 @@ describe('M8.10 slice 18: a grid save on the island', () => {
       expect(BALANCE.save.maxBytes).toBeGreaterThan(serialize(save).length);
     } finally { sim.dispose(); }
   }, 120_000);
+
+  it('18.8 the island dents the car as the grid does: 50 km/h into a building\'s wall is damage', async () => {
+    const sim = await createWorld({ map: 'island', spawn: 'hideout', traffic: 0, peds: 0, record: false });
+    try {
+      const island = sim.island as Island;
+      // a Crown office's street face, 12 m out, facing it (its door is the face's middle, as the props read it)
+      const lot = island.fill.lots.find((l) => l.district === 'crown' && l.hx > 8);
+      if (!lot) throw new Error('no Crown office');
+      const fx = Math.sin(lot.yaw), fz = Math.cos(lot.yaw), out = lot.hz + 12;
+      const x = lot.x - fx * out, z = lot.z - fz * out;
+      sim.spawnAtPoint({ name: 'wall', position: { x, y: island.standAt(x, z) + 0.8, z }, yaw: lot.yaw });
+      for (let i = 0; i < 30; i++) sim.step();
+      sim.vehicle.body.setLinvel({ x: fx * 14, y: 0, z: fz * 14 }, true);
+      for (let i = 0; i < 90 && sim.life.state.damage === 0; i++) { sim.controls.throttle = 1; sim.step(); }
+      expect(sim.life.state.damage).toBeGreaterThan(0);
+    } finally { sim.dispose(); }
+  }, 120_000);
+
+  it('18.10 the camera\'s sight meets the island\'s ground (R4): a slope between the car and the eye pulls it in', async () => {
+    const sim = await createWorld({ map: 'island', spawn: 'hideout', traffic: 0, peds: 0, record: false });
+    try {
+      const island = sim.island as Island, s = sim.track.samples[0];
+      if (!s) throw new Error('no highway');
+      // on the highway by the south coast, open ground: a sight from 2 m over it to 2 m under it crosses it halfway
+      const g = island.heightAt(s.x, s.z);
+      sim.spawnAtPoint({ name: 'highway', position: { x: s.x, y: g + 1, z: s.z }, yaw: s.yaw });
+      sim.step();
+      expect(sim.clearFraction(s.x, g + 2, s.z, s.x + 0.5, g - 2, s.z + 0.5)).toBeLessThan(0.7);
+      expect(sim.clearFraction(s.x, g + 2, s.z, s.x + 0.5, g + 3, s.z + 0.5)).toBe(1);
+    } finally { sim.dispose(); }
+  }, 120_000);
 });

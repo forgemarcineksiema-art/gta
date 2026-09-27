@@ -13,6 +13,7 @@ import { PlayerCar } from './cars/PlayerCar';
 import { Billboards } from './city/Billboards';
 import { BreakerView } from './city/BreakerView';
 import { CityView } from './city/CityView';
+import { PAINT_GROUND } from './city/roadPaint';
 import { IslandView } from './island/IslandView';
 import { RampView } from './city/RampView';
 import { SignalView } from './city/SignalView';
@@ -223,7 +224,8 @@ export class Renderer {
   resize(): void {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    const dpr = Math.min(window.devicePixelRatio || 1, this.sim.city ? QUALITY[this.quality].dpr : MAX_DPR) * this.auto.scale;
+    // the game's worlds by their tier (the grid's and, since the switch, the island's); the playground at the cap
+    const dpr = Math.min(window.devicePixelRatio || 1, this.sim.city || this.sim.island ? QUALITY[this.quality].dpr : MAX_DPR) * this.auto.scale;
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
@@ -234,11 +236,14 @@ export class Renderer {
     this.markerView.viewHeight = h;
   }
 
-  /** The height (m) over a sign at (x, z) its pay label sits at: over its face as drawn, grown with the depth (M8.9 R7). */
-  signTop(x: number, z: number, goal: boolean): number {
+  /**
+   * The height (m) over a sign at (x, z) its pay label sits at: over its face as drawn, grown with the depth (M8.9 R7);
+   * `base` the ground its pole stands on (the island's ring's, M8.10).
+   */
+  signTop(x: number, z: number, goal: boolean, base = 0): number {
     this.camera.getWorldDirection(this.lookDir);
     const c = this.camera.position;
-    const depth = (x - c.x) * this.lookDir.x + (SIGN_Y - c.y) * this.lookDir.y + (z - c.z) * this.lookDir.z;
+    const depth = (x - c.x) * this.lookDir.x + (base + SIGN_Y - c.y) * this.lookDir.y + (z - c.z) * this.lookDir.z;
     return signTopY(signScale(depth, THREE.MathUtils.degToRad(this.camera.fov), this.stats.height), goal);
   }
 
@@ -292,7 +297,7 @@ export class Renderer {
       this.islandView.sync(carPos.x, carPos.z, this.quality, snap, 2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y));
     }
     this.islandView?.update(alpha, dt, sim.props, carPos.x, carPos.z);
-    if (this.cityView && dt > 0 && dt <= 0.25) this.adaptQuality(dt);
+    if ((this.cityView || this.islandView) && dt > 0 && dt <= 0.25) this.adaptQuality(dt);
     this.carVel.set(tm.vx, tm.vy, tm.vz);
 
     this.chase.update(car, this.carVel, tm, dt, snap);
@@ -305,6 +310,8 @@ export class Renderer {
     this.player.update(tm, dt);
     this.ghost.update();
     this.sky.update(carPos, this.camera.position);
+    // the paint's fade by the camera's height over the ground under it (the island's hills; the grid's 0)
+    if (sim.island) PAINT_GROUND.value = sim.island.ground.surfaceHeight(this.camera.position.x, this.camera.position.z);
     this.fx.drive(tm, this.carVel, this.camera.aspect, dt);
     this.eventSeq = sim.events.readFrom(this.eventSeq, this.onEvent);
     this.director.syncFocus(carPos, this.carVel);
@@ -355,7 +362,7 @@ export class Renderer {
 
   private setQuality(tier: QualityTier): void {
     this.quality = tier;
-    if (!this.sim.city) return;
+    if (!this.sim.city && !this.sim.island) return;
     this.sky.setTier(QUALITY[tier]);
     this.pedView?.setShadows(tier === 'high');
     this.resize();

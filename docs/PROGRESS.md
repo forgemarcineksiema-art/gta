@@ -2,6 +2,17 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-27 — the bug hunt on the island (Marcin: "Szukaj błędów w grze")
+
+Played headless (the first minute, a highway lap, the tunnel) and read by four agents; fixed, pinned where the sim shows
+it: the tunnel's trench reached 17 m out of each mouth, so a car fell under its floor and drove the tunnel with the camera
+in the slab (6a.5); no damage on the island (18.8); the quality tier never applied there (low at DPR 1.5 with high's
+shadows, fog to 700 m past the 390 m cut, no AUTO); the camera's sight reads the ground (R4, 18.10); the door's cut, the
+takedown's look, debris, sparks and smoke at the grid's 0; ONCOMING never paid; the pay label under a hill's sign; the
+canal trial's coins 6 m over its floor (15.2 on the floor); the kit pictures' wheels; places' stand-ins drawn far off
+(18.9); the Chief named in the Works; swaps and near misses through a bridge; the box's rays at the player's height; the
+paint's fade by the camera's height over the sea. The rest in BACKLOG.
+
 ## 2026-09-26 — the worktrees removed, the finished plans to history
 
 At Marcin's word ("finished work") every worktree and its branch went, `m8.10-island` on origin too, each checked clean

@@ -12,9 +12,12 @@ import type { Quat, ShapeDesc, StaticDesc, Vec3 } from '../../sim';
 const LIFT = 0.05;
 const SLACK = 0.01;
 
-/** A facaded building's envelope: a box the sim collides with and the view never draws. */
+/**
+ * A facaded building's envelope: a box the sim collides with and the view never draws, marked so by the kit (a place's
+ * collision-only stand-in, a wreck pile's or the kiosk's, is drawn as its own parts and never as a box).
+ */
 export function isEnvelope(st: StaticDesc): boolean {
-  return st.collisionOnly === true && st.tag === 'building' && st.shape.kind === 'box';
+  return st.envelope === true && st.collisionOnly === true && st.tag === 'building' && st.shape.kind === 'box';
 }
 
 /** How far a static reaches past its middle across the ground (m). */

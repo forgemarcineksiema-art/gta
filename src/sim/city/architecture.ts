@@ -191,7 +191,7 @@ export class Architecture {
     const loggia = marina && variant !== 1;
     const shellDepth = loggia ? 1.45 : 0.38;
     this.statics.push({ shape: { kind: 'box', hx, hy: height / 2, hz }, position: { x, y: height / 2 + 0.14, z },
-      rotation: IDENTITY_QUAT, color: body, tag: 'building', collisionOnly: true });
+      rotation: IDENTITY_QUAT, color: body, tag: 'building', collisionOnly: true, envelope: true });
     this.box(x, height / 2 + 0.14, z, hx - shellDepth, height / 2, hz - shellDepth, body);
     this.box(x, 0.3, z, hx + 0.04, 0.16, hz + 0.04, c.roof);
     // A 44 cm cornice stays three pixels tall at 100 m; the earlier 26 cm one shimmered.

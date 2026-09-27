@@ -200,7 +200,8 @@ describe('M8.10 slice 15: the finds', () => {
       for (const c of runs) {
         const at = `#${id}'s coin at ${c.x.toFixed(0)}, ${c.z.toFixed(0)}`;
         over = Math.max(over, c.y - COIN_HEIGHT - ground(c.x, c.z));
-        if (id === 20) { expect(Math.abs(c.y - COIN_HEIGHT - ground(c.x, c.z)), at).toBeLessThan(0.15); continue; }
+        // the canal's on its floor, where the wheels are (the drawn surface is its banks', 6 m over it)
+        if (id === 20) { expect(Math.abs(c.y - COIN_HEIGHT - island.heightAt(c.x, c.z)), at).toBeLessThan(0.15); continue; }
         // on a lane, at its height
         projectOnLane(graph.lanes[island.nearestLane(c.x, c.z, c.y - COIN_HEIGHT)]!, c.x, c.z, hit, c.y - COIN_HEIGHT);
         expect(Math.hypot(hit.x - c.x, hit.z - c.z), at).toBeLessThan(0.5);

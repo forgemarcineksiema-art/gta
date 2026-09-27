@@ -459,10 +459,11 @@ export class Jobs {
       return;
     }
     // the coins along the way (DESIGN.md §13.5); the cold open lays its own line; a sea trial's run buoy to buoy; an
-    // island trial's over the lanes through its points, the dry canal's (no lane in it) point to point over its floor
+    // island trial's over the lanes through its points, the dry canal's (no lane in it) point to point over its floor:
+    // the ground the wheels meet, its channel dug (the drawn surface is its banks', 6 m over it)
     const island = this.sim.island;
     if (d.route && !d.hover && island && this.layTrail(d)) return;
-    if (d.route) this.layPoints(d.route, d.targetX, d.targetZ, d.hover || !island ? SEA.level + COIN_HEIGHT : (x, z) => island.ground.surfaceHeight(x, z) + COIN_HEIGHT);
+    if (d.route) this.layPoints(d.route, d.targetX, d.targetZ, d.hover || !island ? SEA.level + COIN_HEIGHT : (x, z) => island.heightAt(x, z) + COIN_HEIGHT);
     else if (d.id !== this.sim.coldOpen.job) this.layRoute(d.x, d.z, d.targetX, d.targetZ);
   }
 

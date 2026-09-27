@@ -2,6 +2,16 @@
 
 Ideas outside the current milestone, non-blocking bugs, refactors. One line of context each. A milestone's plan takes what it schedules from here; what shipped is removed (M5.5 shipped updates 1 and 2, the life models and the polish items, 2026-09-23).
 
+## The island (the bug hunt after the switch, 2026-09-27)
+
+- At the start and after a respawn the view builds only the chunks whose middle is within 150 m (`IslandView`, `SNAP_BUILT`): a neighbour whose edge is a few metres ahead (the hideout's) is built a frame later and its buildings pop in over the first frames; building by the nearest edge costs start time (4.2–4.7 s at 4× CPU against 6).
+- The island's quarters cast within 198 m of the car (`CASTING`), but toward the 32° sun the shadows' box reaches ~290 m, and the island's materials have no `fadeShadowEdges`: driving into the sun, far shadows pop in at full strength and the box's edge is hard.
+- A chunk's prop mesh is never freed (`IslandView.propChunks`): bounded by the 80 chunks, and each `props.serial` change walks all of them.
+- The facades' foot shade and the lit shop windows read the world's height (`glow.ts`, the lit share in `CityView.ts`): on the island a building above 12 m loses its foot band and a ground-floor shop over 4 m gets the upper floors' share.
+- The bots are the grid's: `bot=door`, `novice`, `skilled` and `job` need `sim.city`, and `map=island&bot=track` from the summit drives into a wall and never resets (no `track` spawn): the gate's suites on the island (heat, game, life, perf) need island bots first.
+- `pack`: a shared plain object with number-like keys loses its `$id` (such keys go first); nothing in the bake is shaped so today. An empty but valid gzip bake crashes the boot instead of building from the plan. The bake's key hashes `src/sim` only, not `tools/bake.mjs` nor `tests/bake`.
+- The ghost, made when first wanted (slice 18), misses the start's `compileAsync`: a hitch when it first shows (the playground's second lap).
+
 ## Performance / size
 
 - The JS heap with traffic is 58–65 MB against M8's own 50 MB target (0.7.0: 48; the brief's 250 holds): M8's props hold it (their arrays, the 96 debris, the prop meshes merged into the chunks' geometry). Measure where at the next perf pass. (M8.5 gate)

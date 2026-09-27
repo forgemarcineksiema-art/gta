@@ -71,4 +71,14 @@ describe('the island\'s buildings far off', () => {
       expect(vertices(blocks)).toBeLessThan(vertices(list) * 0.5);
     });
   }
+
+  it('18.9 a place\'s collision-only stand-in (a wreck pile\'s, the kiosk\'s) is no envelope: far off it stays undrawn', () => {
+    const standIn: StaticDesc = {
+      shape: { kind: 'box', hx: 2.5, hy: 1.1, hz: 1.3 }, position: { x: X, y: BASE + 1.1, z: Z }, rotation: { x: 0, y: 0, z: 0, w: 1 },
+      color: 0x333333, tag: 'building', collisionOnly: true,
+    };
+    expect(isEnvelope(standIn)).toBe(false);
+    expect(blockStatics([standIn])).toEqual([standIn]);
+    expect(vertices(blockStatics([standIn]))).toBe(0);
+  });
 });

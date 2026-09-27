@@ -13,7 +13,7 @@ import type { JobDef } from '../jobs/catalog';
 import type { SimWorld } from '../SimWorld';
 import { AgentState, type PlayerProbe } from '../traffic/Traffic';
 import { BODY_INDEX } from '../traffic/bodies';
-import { CHIEF, RIVALS, type Req, type RivalDef } from './rivals';
+import { CHIEF, RIVALS, type Req, type RivalDef, type Turf } from './rivals';
 
 /** A turf's junction keeps its district this far round it (m): one on a street bounding the district is not the turf's. */
 const TURF_EDGE = 15;
@@ -249,6 +249,17 @@ export class Board {
       this.turfLanes.set(id, lanes);
     }
     return lanes;
+  }
+
+  /**
+   * Where a rival waits, as the news and the wall name it: their turf; the Chief's, the district his ring stands in (the
+   * island's HQ yard is Crown's, the grid's his by the donut shop: M8.10).
+   */
+  turfOf(i: number): Turf {
+    const r = RIVALS[i] as RivalDef, streets = this.sim.traffic?.streets;
+    if (r.target !== 'none' || !streets) return r.turf;
+    const d = this.sim.jobs.defs.find((q) => q.kind === 'duel' && q.level === i);
+    return d ? (streets.district(d.x, d.z) as Turf) : r.turf;
   }
 
   /** A rival's parked car leaves its bay: the duel starts and the rival pulls out as a racer. */

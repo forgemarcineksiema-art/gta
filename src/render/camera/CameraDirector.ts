@@ -56,11 +56,12 @@ export class CameraDirector {
       return;
     }
     const fx = Math.sin(site.yaw), fz = Math.cos(site.yaw);
-    // 1.2 m off the back wall, 4.5 m to the right, looking at the middle of the opening
+    // 1.2 m off the back wall, 4.5 m to the right, looking at the middle of the opening; over its floor (the island's
+    // garages stand on their streets, the hideout 42 m up the hill: M8.10)
     const along = GARAGE.depth / 2 - 1.2, across = 4.5, doorAlong = -GARAGE.depth / 2;
     const c = this.corner;
-    c.x = site.x + fx * along - fz * across; c.y = 3.2; c.z = site.z + fz * along + fx * across;
-    c.lx = site.x + fx * doorAlong; c.ly = 1.4; c.lz = site.z + fz * doorAlong;
+    c.x = site.x + fx * along - fz * across; c.y = site.y + 3.2; c.z = site.z + fz * along + fx * across;
+    c.lx = site.x + fx * doorAlong; c.ly = site.y + 1.4; c.lz = site.z + fz * doorAlong;
     if (run.state !== 'door') {
       this.shutFor = -1;
       this.chase.cut(c.x, c.y, c.z, c.lx, c.ly, c.lz);
@@ -91,7 +92,7 @@ export class CameraDirector {
       const i = life.slowMoTarget;
       const wx = traffic.x[i] as number, wz = traffic.z[i] as number, wy = (traffic.y[i] as number) + 0.8;
       if (this.sideCut !== i && !this.chase.cutting && this.sim.run.state === 'running' && this.cutToSide(wx, wy, wz, car, vel)) this.sideCut = i;
-      if (this.sideCut !== i) this.chase.focus(wx, 0.8, wz, 0.2);
+      if (this.sideCut !== i) this.chase.focus(wx, wy, wz, 0.2);
     } else {
       if (this.chase.focusing) this.chase.release();
       if (this.sideCut >= 0) {

@@ -18,7 +18,7 @@ import { SpeedLines } from './SpeedLines';
 
 export class Effects {
   private readonly speedLines = new SpeedLines();
-  private readonly sparks = new Sparks();
+  private readonly sparks: Sparks;
   private readonly debris: Debris;
   /** The tyres' marks on the ground (M7 slice 4). */
   private readonly skid: SkidMarks;
@@ -29,12 +29,16 @@ export class Effects {
   private readonly wreckSmokeAcc: Float32Array;
   private readonly tmpFwd = new THREE.Vector3();
   private readonly tmpPos = new THREE.Vector3();
+  /** The ground under a point: the island's from its physics (a deck, a kerb, the hill), the grid's flat 0 (M8.10). */
+  private readonly floorAt: (x: number, y: number, z: number) => number;
 
   constructor(scene: THREE.Scene, private readonly sim: SimWorld, private readonly smoke: Smoke, private readonly billboards: Billboards | null) {
+    this.floorAt = sim.island ? (x, y, z) => sim.floorBelow(x, y, z) : () => 0;
+    this.sparks = new Sparks(this.floorAt);
     scene.add(this.speedLines.object);
     scene.add(this.sparks.object);
     scene.add(this.sparks.heads);
-    this.debris = new Debris(scene);
+    this.debris = new Debris(scene, this.floorAt);
     scene.add(smoke.object);
     this.skid = new SkidMarks(scene);
     this.wreckSmokeAcc = new Float32Array(sim.traffic?.capacity ?? 1);
@@ -66,17 +70,18 @@ export class Effects {
       this.debris.burst(e.x, e.y + 0.6, e.z, 0, 3, 0, e.kind === 'takedownTraffic' ? 10 : 6, 0.4, tint, 4);
       for (let k = 0; k < 16; k++) this.smoke.emit(k % 2 ? 'fire' : 'dark', e.x, e.y + 0.8, e.z);
     } else if (e.kind === 'breaker') {
-      // the tower comes down: boards and poles over the street, dust, a jolt
+      // the tower comes down: boards and poles over the street, dust, a jolt (the poles' from lower down its height)
+      const foot = this.floorAt(e.x, e.y, e.z);
       this.debris.burst(e.x, e.y, e.z, vel.x * 0.3, 3, vel.z * 0.3, 16, 0.5, PALETTE.sand, 5);
-      this.debris.burst(e.x, e.y * 0.6, e.z, 0, 2, 0, 8, 0.3, PALETTE.steel, 4);
+      this.debris.burst(e.x, foot + (e.y - foot) * 0.6, e.z, 0, 2, 0, 8, 0.3, PALETTE.steel, 4);
       return 0.3;
     } else if (e.kind === 'smash') {
       // a prop knocked down (M8 slice 5): what its material throws from where it stood, with the knock's way; sparks off metal
       const props = this.sim.props, k = props ? props.kind[e.target] ?? 255 : 255;
       if (k !== 255) {
-        const kind = PROP_KINDS[k] as PropKind, material = PROP_TYPES[kind].material;
-        this.debris.smash(material, e.x, Math.min(e.y, 1.2), e.z, vel.x * 0.6, vel.z * 0.6, propParts(kind)[0]?.color ?? PALETTE.steel);
-        if (material === 'metal') this.sparks.burst(e.x, 0.5, e.z, 24);
+        const kind = PROP_KINDS[k] as PropKind, material = PROP_TYPES[kind].material, foot = this.floorAt(e.x, e.y, e.z);
+        this.debris.smash(material, e.x, Math.min(e.y, foot + 1.2), e.z, vel.x * 0.6, vel.z * 0.6, propParts(kind)[0]?.color ?? PALETTE.steel);
+        if (material === 'metal') this.sparks.burst(e.x, foot + 0.5, e.z, 24);
       }
     } else if (e.kind === 'billboard') {
       // planks in the panel's paint fly on with the car, and the camera takes a jolt
@@ -114,7 +119,7 @@ export class Effects {
       this.wreckSmokeAcc[i] = (this.wreckSmokeAcc[i] as number) + 10 * dt;
       while ((this.wreckSmokeAcc[i] as number) >= 1) {
         this.wreckSmokeAcc[i] = (this.wreckSmokeAcc[i] as number) - 1;
-        this.smoke.emit('dark', traffic.x[i] as number, 1.1, traffic.z[i] as number);
+        this.smoke.emit('dark', traffic.x[i] as number, (traffic.y[i] as number) + 1.1, traffic.z[i] as number);
       }
     }
   }

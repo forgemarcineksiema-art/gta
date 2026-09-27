@@ -56,5 +56,20 @@ describe('M8.10 slice 6a: the highway all the way round', () => {
     }
   });
 
+  it('6a.5 outside the tunnel\'s mouths the physics\' ground is the road the player sees: no trench before its floor', () => {
+    const island = new Island(new RAPIER.World({ x: 0, y: -9.81, z: 0 }));
+    const pieces = island.structures.find((s) => s.kind === 'tunnel')?.pieces ?? [];
+    const first = pieces[0], last = pieces[pieces.length - 1];
+    if (!first || !last) throw new Error('no tunnel');
+    // out of each mouth along the highway, where a car drives up to the floor's first piece (the trench once reached 17 m out)
+    for (const [p, sign] of [[first, -1], [last, 1]] as const) {
+      const fx = Math.sin(p.yaw) * sign, fz = Math.cos(p.yaw) * sign;
+      for (let k = 0.5; k <= 25; k += 1.5) {
+        const x = p.x + fx * (p.length / 2 + k), z = p.z + fz * (p.length / 2 + k);
+        expect(island.ground.surfaceHeight(x, z) - island.heightAt(x, z), `${k} m out of the mouth at ${p.x.toFixed(0)}, ${p.z.toFixed(0)}`).toBeLessThan(0.01);
+      }
+    }
+  });
+
   // 6a.4 (a car across the viaduct and the bay bridge) is a long pin: drive.long.test.ts
 });

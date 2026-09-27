@@ -200,6 +200,8 @@ describe('M8.10 slice 14: the jobs, the rivals and the way on the island', () =>
       if (d.level === 10) {
         expect(crown.bays.some((b) => Math.hypot(b.x - d.x, b.z - d.z) < 1e-6), at).toBe(true);
         expect(d.limitSeconds).toBe(0);
+        // the news and the wall name where he waits: the headquarters' yard is Crown's, not the grid's Works
+        expect(sim.board.turfOf(d.level), at).toBe('crown');
         continue;
       }
       // an exact bay (the traffic reserves it), on the turf, near the plan's point (the Gardens' side streets have none),

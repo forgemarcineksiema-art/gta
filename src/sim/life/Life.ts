@@ -18,6 +18,8 @@ const DRUM_REACH = 0.35;
 /** A car crushed under the monster truck takes up its climb: what is left of its rise (m/s) and of its pitch and roll. */
 const CRUSH_RISE = 1.0;
 const CRUSH_SPIN = 0.3;
+/** A car whose road is this far over or under the player's body is on another level (the island's bridges, overpasses: m). */
+const OTHER_LEVEL = 3;
 
 /** One axis of two ground rectangles' separation test: their spans on it overlap. */
 function spansMeet(ux: number, uz: number, dx: number, dz: number,
@@ -181,7 +183,7 @@ export class Life {
       traffic.wreck(i);
       const boost = other ? ECONOMY.takedownTrafficBoost : ECONOMY.takedownBoost;
       this.grant(boost);
-      this.sim.events.push(other ? 'takedownTraffic' : 'takedown', boost, traffic.x[i] as number, 0.5, traffic.z[i] as number, i);
+      this.sim.events.push(other ? 'takedownTraffic' : 'takedown', boost, traffic.x[i] as number, (traffic.y[i] as number) + 0.5, traffic.z[i] as number, i);
       this.state.slowMo = ECONOMY.slowMoSeconds;
       this.state.slowMoTarget = i;
     }
@@ -418,8 +420,10 @@ export class Life {
     let best = -1;
     let bestD = Infinity;
     for (let i = 0; i < traffic.capacity; i++) {
-      // a wanted board's rival's car is won in the duel, never taken (M6 D9)
+      // a wanted board's rival's car is won in the duel, never taken (M6 D9); one on another level (a bridge over the
+      // canal, an overpass: the island's, M8.10) is not alongside
       if (traffic.state[i] === AgentState.Free || traffic.rival[i] === 1) continue;
+      if (Math.abs((traffic.y[i] as number) - p.y) > OTHER_LEVEL) continue;
       const dx = (traffic.x[i] as number) - p.x;
       const dz = (traffic.z[i] as number) - p.z;
       const along = dx * fx + dz * fz;
@@ -481,7 +485,7 @@ export class Life {
     this.state.swapCandidate = -1;
     // identity (docs/DESIGN.md §2.5): a swap no unit saw loses them, and they box the car you left
     const police = this.sim.police;
-    if (this.sim.pursuit.onSwap(police?.crimeSeen() ?? false, h.kind, this.sim.carPaint, h.body, h.police)) police?.box(this.oldPose.x, this.oldPose.z, oldYaw);
+    if (this.sim.pursuit.onSwap(police?.crimeSeen() ?? false, h.kind, this.sim.carPaint, h.body, h.police)) police?.box(this.oldPose.x, this.oldPose.z, oldYaw, this.oldPose.y + 0.5);
   }
 
   /**
@@ -560,6 +564,8 @@ export class Life {
     for (let i = 0; i < traffic.capacity; i++) {
       if ((this.cool[i] as number) > 0) this.cool[i] = (this.cool[i] as number) - dt;
       if (traffic.state[i] === AgentState.Free) continue;
+      // a car on another level (over a bridge, under an overpass) passes nobody
+      if (Math.abs((traffic.y[i] as number) - px.y) > OTHER_LEVEL) { this.wasAhead[i] = 0; continue; }
       const ax = traffic.x[i] as number;
       const az = traffic.z[i] as number;
       const ox = ax - playerX;
@@ -597,9 +603,9 @@ export class Life {
       const pos = this.sim.vehicle.body.translation(this.proj);
       const x = pos.x;
       const z = pos.z;
-      // the nearest lane through the city's lane bounds, then one projection for its heading
-      // the road under the car: under an overpass the highway above is not the car's lane
-      const lane = this.sim.city ? this.sim.city.nearestLane(x, z, pos.y - 0.5) : -1;
+      // the nearest lane through the street map's lane bounds (the grid's or the island's), then one projection for its
+      // heading; the road under the car: under an overpass the highway above is not the car's lane
+      const lane = traffic.streets.nearestLane(x, z, pos.y - 0.5);
       let best = Infinity;
       let yaw = 0;
       if (lane >= 0) {

@@ -49,6 +49,11 @@ export interface StaticDesc {
   paint?: { underlay: number; fadeEnd: number };
   /** Full collision envelope for a facade whose visible walls contain recesses. */
   collisionOnly?: boolean;
+  /**
+   * The kit's building's envelope (its collision-only box round its facade): the island's far level draws its four faces
+   * (M8.10 slice 18). A place's collision-only stand-in (a wreck pile's, the kiosk's, the grandstand's) is not one.
+   */
+  envelope?: boolean;
   /** A piece of a standing prop (M8): its id, so the chunk's mesh knows the prop's vertex range. */
   prop?: number;
 }

@@ -5,7 +5,7 @@
  * a debug block, a pause overlay and the keycap hint strip. Reads sim state
  * only.
  */
-import { AgentState, BALANCE, bodySpec, districtAt } from '../../sim';
+import { AgentState, BALANCE, RIVALS, bodySpec, districtAt } from '../../sim';
 import type { EventKind, SimEvent, SimWorld } from '../../sim';
 import { BigMap } from '../map/bigmap';
 import { districtOf } from '../../sim/island/plan';
@@ -140,6 +140,7 @@ export class Hud {
     this.voice = {
       jumps: 0, jumpsTotal: 0, boards: 0, boardsTotal: 0, cachesTotal: sim.caches?.total ?? 0,
       cameraLimits: sim.cameras ? sim.cameras.descs.map((c) => c.limitMs * 3.6) : [],
+      turfs: RIVALS.map((_r, i) => sim.board.turfOf(i)),
     };
     this.minimap = sim.city || sim.island ? new Minimap(this.root, sim) : null;
     this.heat = new HeatHud(this.root, sim);

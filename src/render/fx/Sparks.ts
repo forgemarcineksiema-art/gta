@@ -58,6 +58,8 @@ export class Sparks {
   private readonly vz = new Float32Array(POOL);
   private readonly life = new Float32Array(POOL);
   private readonly maxLife = new Float32Array(POOL);
+  /** The ground each spark dies on, read once where its batch starts (the island's is not at 0, M8.10). */
+  private readonly floor = new Float32Array(POOL);
   private readonly positions: Float32Array;
   private readonly headPos: Float32Array;
   private readonly headCol: Float32Array;
@@ -71,7 +73,8 @@ export class Sparks {
   private seed = 0x9e3779b9;
   private alive = 0;
 
-  constructor() {
+  /** `floorAt`: the ground under a point (the sim's `floorBelow`); the grid's flat 0 without it. */
+  constructor(private readonly floorAt: (x: number, y: number, z: number) => number = () => 0) {
     this.positions = new Float32Array(POOL * 6);
     this.colors = new Float32Array(POOL * 6);
     this.positions.fill(HIDDEN_Y);
@@ -122,9 +125,12 @@ export class Sparks {
     const tx = carVel.x - nx * vn;
     const ty = carVel.y - ny * vn;
     const tz = carVel.z - nz * vn;
+    // the ground under the contact, read a little off the wall it scrapes
+    const floor = this.floorAt(tm.contactX + nx * 0.3, tm.contactY, tm.contactZ + nz * 0.3);
     for (let k = 0; k < count; k++) {
       const i = this.next;
       this.next = (this.next + 1) % POOL;
+      this.floor[i] = floor;
       this.px[i] = tm.contactX + (this.rand() - 0.5) * 0.3;
       this.py[i] = tm.contactY + (this.rand() - 0.5) * 0.2;
       this.pz[i] = tm.contactZ + (this.rand() - 0.5) * 0.3;
@@ -142,9 +148,11 @@ export class Sparks {
   /** A burst from a point, thrown every way and up (a lamp post's base giving, a meter sheared: M8 slice 5). */
   burst(x: number, y: number, z: number, count: number): void {
     const t = this.tuning;
+    const floor = this.floorAt(x, y, z);
     for (let k = 0; k < count; k++) {
       const i = this.next;
       this.next = (this.next + 1) % POOL;
+      this.floor[i] = floor;
       this.px[i] = x + (this.rand() - 0.5) * 0.3;
       this.py[i] = y + this.rand() * 0.3;
       this.pz[i] = z + (this.rand() - 0.5) * 0.3;
@@ -193,7 +201,7 @@ export class Sparks {
       const x = (this.px[i] as number) + vx * dt;
       const y = (this.py[i] as number) + vy * dt;
       const z = (this.pz[i] as number) + vz * dt;
-      if (y < 0.02) life = 0;
+      if (y < (this.floor[i] as number) + 0.02) life = 0;
       this.life[i] = life;
       this.vy[i] = vy;
       this.px[i] = x;

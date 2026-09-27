@@ -569,7 +569,7 @@ export class GarageUi {
     } else {
       const r = RIVALS[next] as RivalDef;
       const n = posterNumber(next);
-      const where = t(r.turf === 'highway' ? 'THE HIGHWAY' : DISTRICTS.find((d) => d.id === r.turf)?.name ?? '');
+      const turf = this.sim.board.turfOf(next), where = t(turf === 'highway' ? 'THE HIGHWAY' : DISTRICTS.find((d) => d.id === turf)?.name ?? '');
       const head = el('div', 'wall__daily');
       head.append(el('span', 'wall__daily-text', n > 0 ? t('NEXT: #{n} {name}', { n, name: t(r.name) }) : t('LAST: {name}', { name: t(r.name) })), el('span', 'wall__daily-progress', where),
         el('span', 'wall__daily-reward', t('{cash} + THE {car}', { cash: Math.round(r.purse), car: t(BODY_WORDS[r.body]) })));

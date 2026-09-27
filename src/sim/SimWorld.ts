@@ -8,10 +8,12 @@
  */
 import { BALANCE } from './balance';
 import RAPIER from '@dimforge/rapier3d-compat';
-import { GROUP_DEFAULT, interactionGroups } from './collision';
+import { GROUP_DEFAULT, GROUP_TERRAIN, QUERY_NOT_PROP, interactionGroups } from './collision';
 
 /** A query that meets the solid statics only (buildings, walls, roofs), not kerbs, ramps or the ground. */
 const SOLID_ONLY = interactionGroups(0xffff, GROUP_DEFAULT);
+/** The island's sight (M8.10 R4): the solids and the ground, a hill's slope or a crest between as much as a wall. */
+const SOLID_AND_GROUND = interactionGroups(0xffff, GROUP_DEFAULT | GROUP_TERRAIN);
 import { City, type PropRing } from './city/City';
 import { Island, PLUMB_TILT, type IslandBake } from './island/Island';
 import { islandCoinLines } from './island/coinLines';
@@ -105,7 +107,7 @@ export interface SimWorldOptions {
   traffic?: number;
   /** Pedestrian density scale. 0 disables. Default 1. */
   peds?: number;
-  /** Damage, wrecks and respawn. Default: on in the city, off on the playground (the handling lab keeps the M1 pins). */
+  /** Damage, wrecks and respawn. Default: on in the game's worlds (the grid and the island), off on the playground (the handling lab keeps the M1 pins). */
   damage?: boolean;
   /** Initial heat points for pursuit probes. Normal play starts quiet. */
   heat?: number;
@@ -234,6 +236,8 @@ export class SimWorld {
   readonly probe: PlayerProbe = { x: 0, y: 0.5, z: 0, yaw: 0, vx: 0, vz: 0, speed: 0, halfWidth: 0, halfLength: 0 };
   /** The camera's sight query's ray (clearFraction), reused. */
   private readonly sightRay = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: 1, z: 0 });
+  /** The effects' floor query's ray (floorBelow), down with the plumb lean the island's height field needs, reused. */
+  private readonly floorRay = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: PLUMB_TILT, y: -1, z: PLUMB_TILT });
   /** Pose stream of the best lap (x, y, z, qx, qy, qz, qw per tick), for the ghost. */
   bestLapPoses: Float32Array | null = null;
 
@@ -317,7 +321,7 @@ export class SimWorld {
     // the island's arcs over its jumps and lines through its billboards, laid a chunk's at a time (from its bake)
     const coinLines = this.island && map ? (this.island.worldBake?.coins ?? islandCoinLines(this.island, map.graph, (x, z) => Island.chunkIndex(...Island.chunkOf(x, z)))) : null;
     if (coinLines && this.coins) for (const [index, points] of coinLines) this.coins.layChunk(index, points);
-    this.life = new Life(this, opts.damage ?? this.city !== null);
+    this.life = new Life(this, opts.damage ?? (this.city !== null || this.island !== null));
     this.heat = new Heat(this.events, this.traffic);
     this.heat.set(opts.heat ?? 0);
     this.pursuit = new Pursuit(this.events);
@@ -639,8 +643,9 @@ export class SimWorld {
 
   /**
    * The share of the way from one point to another that is clear of solid statics (buildings, walls, a
-   * cover's roof): 1 when nothing is between, else the fraction to the first hit. The chase camera pulls in
-   * by it (M5.5 slice 7). A read of the world, no allocation.
+   * cover's roof), on the island of its ground too (M8.10 R4: a hill between, the slope the camera backs into): 1
+   * when nothing is between, else the fraction to the first hit. The chase camera pulls in by it (M5.5 slice 7). A
+   * read of the world, no allocation.
    */
   clearFraction(ax: number, ay: number, az: number, bx: number, by: number, bz: number): number {
     const dx = bx - ax, dy = by - ay, dz = bz - az;
@@ -649,8 +654,21 @@ export class SimWorld {
     const ray = this.sightRay;
     ray.origin.x = ax; ray.origin.y = ay; ray.origin.z = az;
     ray.dir.x = dx / length; ray.dir.y = dy / length; ray.dir.z = dz / length;
-    const hit = this.world.castRay(ray, length, true, RAPIER.QueryFilterFlags.ONLY_FIXED | RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, SOLID_ONLY);
+    const hit = this.world.castRay(ray, length, true, RAPIER.QueryFilterFlags.ONLY_FIXED | RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, this.island ? SOLID_AND_GROUND : SOLID_ONLY);
     return hit ? hit.timeOfImpact / length : 1;
+  }
+
+  /**
+   * The first surface under a point that a wheel would meet (the ground, a deck, a kerb, a roof; not a prop or the sea)
+   * within 60 m, else the ground there, the sea's level at least: where the effects' pieces land (the island's ground
+   * is not at 0, M8.10). A read of the world, once a throw.
+   */
+  floorBelow(x: number, y: number, z: number): number {
+    const ray = this.floorRay;
+    ray.origin.x = x; ray.origin.y = y; ray.origin.z = z;
+    const hit = this.world.castRay(ray, 60, true, RAPIER.QueryFilterFlags.ONLY_FIXED | RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, QUERY_NOT_PROP);
+    if (hit) return y - hit.timeOfImpact;
+    return this.island ? Math.max(this.island.ground.surfaceHeight(x, z), SEA.level) : 0;
   }
 
   /** Change the player's class in place (the cold open's van; the swap does its own). */

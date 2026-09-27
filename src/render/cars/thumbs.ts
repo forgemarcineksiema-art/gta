@@ -131,11 +131,17 @@ export class Thumbs {
   }
 
   private get grey(): CarMesh {
-    return (this.greyCar ??= buildCarMesh(bodyTuning('muscle'), BODY_PROFILES.muscle, THUMBS.grey));
+    if (!this.greyCar) {
+      this.greyCar = buildCarMesh(bodyTuning('muscle'), BODY_PROFILES.muscle, THUMBS.grey);
+      // its own wheels kept as it is built: a wheels item's picture swaps them before it asks for them
+      this.greyWheelGeometry = (this.greyCar.wheels[0]?.children[0] as THREE.Mesh | undefined)?.geometry ?? new THREE.BufferGeometry();
+    }
+    return this.greyCar;
   }
 
   private get greyWheels(): THREE.BufferGeometry {
-    return (this.greyWheelGeometry ??= (this.grey.wheels[0]?.children[0] as THREE.Mesh | undefined)?.geometry ?? new THREE.BufferGeometry());
+    if (!this.greyWheelGeometry) void this.grey;
+    return this.greyWheelGeometry as unknown as THREE.BufferGeometry;
   }
 
   /** A cell's size and the atlas' columns: where a cell stands. */

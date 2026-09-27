@@ -29,6 +29,7 @@ Distilled from `docs/BRIEF.md` (the source of truth; read it when in doubt, neve
 | `docs/ARCHITECTURE.md` | Structure, dependency justifications, decision records. |
 | `docs/DEV.md` | Servers and ports, the build stamp, test URLs, QA hooks, the suites, scratch folders. `npm start` (4173) is the one way to play; `npm run dev` (5173) is for editing. |
 | `docs/BACKLOG.md` | Out-of-milestone ideas and non-blocking bugs, one line of context each. |
+| `docs/BUGHUNT.md` | The bug hunt's prompt (`/bughunt [focus]`, or Marcin's "szukaj błędów w grze"): the five agents' briefs, the probes, the stills, where this game's bugs hide, triage, fix and report. Run only on his word. |
 | `docs/CRAZYGAMES.md` | Platform compliance checklist with status column. Keep updated. |
 | `docs/STYLE.md` | Art and UI style guide. |
 | `docs/TITLES.md` | Working title proposals (Marcin picks). |

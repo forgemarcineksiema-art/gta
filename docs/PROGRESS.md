@@ -2,6 +2,12 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-27 — the bug hunt's prompt (Marcin: "Opracuj prompt do szukania błędów w tej grze")
+
+`docs/BUGHUNT.md`, run by `/bughunt [focus]` (`.claude/commands/bughunt.md`): the two hunts' method (five read-only agents
+by area, the chase probe and its trace, stills by a key pilot in Playwright), the places this game's bugs hid, the known
+false alarms, triage, fix with pins, report. CLAUDE.md's table points to it.
+
 ## 2026-09-27 — the second bug hunt's backlog (Marcin: "Popraw też te z backlogu")
 
 All sixteen: a taken car's coins and the radar's route start on its own road (a deck, the tunnel); a driver or the officer

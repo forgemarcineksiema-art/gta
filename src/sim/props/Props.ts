@@ -371,8 +371,9 @@ export class Props {
     const c0z = Math.max(0, Math.min(last, Math.floor((pz - reach + off) / PROPS.cell))), c1z = Math.max(0, Math.min(last, Math.floor((pz + reach + off) / PROPS.cell)));
     for (let cz = c0z; cz <= c1z; cz++) for (let cx = c0x; cx <= c1x; cx++) {
       for (let id = this.cellHead[cz * this.cells + cx] as number; id >= 0; id = this.cellNext[id] as number) {
-        // an airborne car over a prop
-        if (bottom > (this.top[id] as number) + 0.5) continue;
+        // an airborne car over a prop, or a car under one (a canal's bridge, a deck: driving the canal knocked the lamps
+        // on its bridges 6 m over it, the heat and the bill with them)
+        if (bottom > (this.top[id] as number) + 0.5 || (this.base[id] as number) > bottom + 2.5) continue;
         const lying = this.state[id] === PropState.Lying;
         if (lyingOnly && !lying) continue;
         const half = this.capHalf[id] as number;

@@ -118,8 +118,12 @@ const FLAT: RingPlane = { y: 0, sx: 0, sz: 0 };
 /** Each job's ring's plane and its end's, worked out the first time they are drawn (a ring never moves). */
 const planes = new WeakMap<JobDef, { ring: RingPlane; end: RingPlane | null }>();
 
-/** A ring on the island stands this far over its ground's plane, past the ground's strays from it (m): clear of a pavement's top. */
-export const RING_LIFT = 0.1;
+/**
+ * A ring on the island stands this far over its ground's plane, past the ground's strays from it (m): clear of a pavement's
+ * top (0.18 m: the road's 0.04 and the kerb's 0.14; with the ring's own 0.08 at 0.1 it lay level with it, and the
+ * pavement, pulled toward the camera, hid the ring's two sides toward the streets).
+ */
+export const RING_LIFT = 0.17;
 
 /**
  * The plane a job's ring lies on (M8.10 slice 14): the island's ground under it, fitted through its middle and edge

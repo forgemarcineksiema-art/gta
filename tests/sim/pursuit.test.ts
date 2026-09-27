@@ -42,4 +42,21 @@ describe('pursuit', () => {
     expect(pursuit.state).toBe('idle');
     expect(pursuit.escapes).toBe(1);
   });
+
+  it("a swap inside the radio's window (an escape job, the Chief's duel) is seen: the chase goes on, the new car named", () => {
+    const events = new EventLog();
+    const pursuit = new Pursuit(events);
+    pursuit.force(8);
+    // the second bug hunt: a swap no unit saw here escaped at once, the escape's bounty and the Chief beaten in a second
+    expect(pursuit.onSwap(false, 'sports', 0)).toBe(false);
+    expect(pursuit.state).toBe('active');
+    let named = 0;
+    events.readFrom(0, (e) => { if (e.kind === 'dispatch') named++; });
+    expect(named).toBe(1);
+    // the window over, an unseen swap loses them as before
+    for (let t = 0; t < 8 * 60 + 1; t++) pursuit.step(DT, 2, false, 0, 0);
+    expect(pursuit.state).not.toBe('idle');
+    expect(pursuit.onSwap(false, 'muscle', 0)).toBe(true);
+    expect(pursuit.state).toBe('idle');
+  });
 });

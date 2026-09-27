@@ -202,6 +202,8 @@ export class Dailies {
       if (t.kind === 'banked') {
         if (!busted && banked >= t.target) this.complete(i);
       } else if (t.kind === 'run') {
+        // a run banks something: in and out of a garage three times with an empty bag paid the 5,000
+        if (!busted && banked <= 0) continue;
         this.progress[i] = busted ? 0 : (this.progress[i] ?? 0) + 1;
         this.serial++;
         if ((this.progress[i] ?? 0) >= t.target) this.complete(i);

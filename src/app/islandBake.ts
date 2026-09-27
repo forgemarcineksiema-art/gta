@@ -5,8 +5,9 @@
 import { BAKE_SECTIONS, joinBake, type IslandBake } from '../sim/island/Island';
 import { SectionReader } from '../sim/pack';
 
-/** The bake's file next to the page (relative: the game runs in an iframe). */
-export const ISLAND_BAKE_URL = './island.bin';
+/** The bake's file next to the page (relative: the game runs in an iframe), asked for by this build's key (a cached one of
+ * the last build's is not what it gets: vite.config.ts writes the same into the page's early fetch). */
+export const ISLAND_BAKE_URL = `./island.bin?k=${__ISLAND_KEY__}`;
 
 /** The page's own fetch of the bake (index.html starts it once the scripts are in), or this one's. */
 declare global {

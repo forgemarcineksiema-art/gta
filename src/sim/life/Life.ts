@@ -152,7 +152,10 @@ export class Life {
     const window = ECONOMY.takedownWindow * 60;
     for (let i = 0; i < traffic.capacity; i++) {
       const st = traffic.state[i];
-      if (st === AgentState.Free) { this.takenDown[i] = 0; continue; }
+      // the mark lasts while the record is the wreck it made: one freed and filled again in the traffic's own step was
+      // never Free here, and the new car could never be taken down
+      if (st !== AgentState.Wrecked) this.takenDown[i] = 0;
+      if (st === AgentState.Free) continue;
       if (this.takenDown[i]) continue;
       if (this.sim.tick - (traffic.lastPlayerContactTick[i] as number) > window) continue;
       // a police car is built for contact: the same slam has to be harder by its armour
@@ -215,7 +218,8 @@ export class Life {
       const st = traffic.state[i];
       if (st === AgentState.Free || traffic.flat[i] === 1) continue;
       const x = traffic.x[i] as number, z = traffic.z[i] as number;
-      if ((x - cx) ** 2 + (z - cz) ** 2 > 81) continue;
+      // a car on another road (over the roller on an overpass) is not in the drum's way
+      if ((x - cx) ** 2 + (z - cz) ** 2 > 81 || Math.abs((traffic.y[i] as number) - p.y) > OTHER_LEVEL) continue;
       if (!boxesMeet(cx, cz, yaw, drum.halfWidth + DRUM_REACH, drum.length / 2 + DRUM_REACH, x, z, traffic.yaw[i] as number, traffic.halfWidthOf(i), traffic.halfLengthOf(i))) continue;
       this.squash(traffic, i, cx, cz, p.x, p.z);
     }

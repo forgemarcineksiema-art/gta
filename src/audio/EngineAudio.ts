@@ -45,6 +45,10 @@ export class EngineAudio {
   private scrapeFilter: BiquadFilterNode | null = null;
   private muted = false;
   private userMuted = false;
+  /** Paused by P: the effects fade, the music plays on. */
+  private fxPaused = false;
+  /** The game left (another tab, a click outside the frame): the whole mix fades. */
+  private away = false;
   private volume = 0.5;
   private rpmSmooth = 900;
   private loadSmooth = 0;
@@ -86,7 +90,7 @@ export class EngineAudio {
   /** The effects' share of the mix, a gain (the settings' EFFECTS row). */
   setEffectsVolume(gain: number): void {
     this.effectsLevel = Math.max(0, gain);
-    if (this.effects && this.ctx) this.effects.gain.setTargetAtTime(this.effectsLevel, this.ctx.currentTime, 0.05);
+    this.applyEffects();
   }
 
   /** Create or resume the context. Must run inside a user gesture the first time. */
@@ -111,7 +115,7 @@ export class EngineAudio {
     this.muffler.frequency.value = 20000;
     this.master.connect(this.muffler).connect(ctx.destination);
     this.effects = ctx.createGain();
-    this.effects.gain.value = this.effectsLevel;
+    this.effects.gain.value = this.fxPaused ? 0 : this.effectsLevel;
     this.effects.connect(this.master);
 
     // engine: saw + square an octave down + sub sine, through a lowpass driven by load
@@ -200,7 +204,7 @@ export class EngineAudio {
   }
 
   /** The engine, the wind, the tyres and the body for this frame, in the voice of `body` (the player's car). */
-  update(tm: VehicleTelemetry, dt: number, body: BodyId = this.body): void {
+  update(tm: VehicleTelemetry, dt: number, body: BodyId = this.body, stepped = true): void {
     if (!this.ctx || !this.oscA || !this.oscB || !this.oscSub || !this.engineFilter || !this.engineGain || !this.windGain || !this.skidGain || !this.skidFilter || !this.crashGain || !this.scrapeGain || !this.scrapeFilter || !this.rattleGain) return;
     if (body !== this.body) this.setVoice(body);
     const k = 1 - Math.exp(-dt * 10);
@@ -234,8 +238,9 @@ export class EngineAudio {
     this.skidGain.gain.setTargetAtTime(skid, t, 0.05);
     this.skidFilter.frequency.setTargetAtTime(900 + Math.min(1, slip) * 500, t, 0.05);
 
-    // a hit is a one-shot thump scaled by the speed lost; scraping is a sustained grind
-    if (tm.impact > 0.6) {
+    // a hit is a one-shot thump scaled by the speed lost, struck on the step that took it (a paused frame, or a 144 Hz
+    // frame between steps, read the same impact again and struck it every frame); scraping is a sustained grind
+    if (stepped && tm.impact > 0.6) {
       const hit = Math.min(1, tm.impact / 14);
       this.crashGain.gain.cancelScheduledValues(t);
       this.crashGain.gain.setValueAtTime(0.25 + hit * 0.9, t);
@@ -260,6 +265,18 @@ export class EngineAudio {
     this.shaper.curve = distortionCurve(v.grit);
   }
 
+  /**
+   * The pause (the M8.10 bug hunt): the drone, the tyres and the siren went on at their last pitch on the pause screen,
+   * and in a hidden tab for as long as it stayed hidden. P fades the effects and keeps the music; the game left fades all.
+   */
+  setPaused(effects: boolean, all: boolean): void {
+    if (effects === this.fxPaused && all === this.away) return;
+    this.fxPaused = effects;
+    this.away = all;
+    this.applyVolume();
+    this.applyEffects();
+  }
+
   /** Ad-mute hook (adStarted / adFinished). Independent from the player's own mute. */
   setMuted(muted: boolean): void {
     this.muted = muted;
@@ -277,7 +294,11 @@ export class EngineAudio {
   }
 
   private effectiveVolume(): number {
-    return this.muted || this.userMuted ? 0 : this.volume;
+    return this.muted || this.userMuted || this.away ? 0 : this.volume;
+  }
+
+  private applyEffects(): void {
+    if (this.effects && this.ctx) this.effects.gain.setTargetAtTime(this.fxPaused ? 0 : this.effectsLevel, this.ctx.currentTime, 0.05);
   }
 
   private applyVolume(): void {

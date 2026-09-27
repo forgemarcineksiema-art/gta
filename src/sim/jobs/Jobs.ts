@@ -47,6 +47,7 @@ import { AgentState, type PlayerProbe } from '../traffic/Traffic';
 import type { BodyId } from '../traffic/bodies';
 import { trialMedal, unpackDescriptor, type JobDef } from './catalog';
 import { Race } from './Race';
+import { atFinish } from './finish';
 
 export type { JobDef, JobKind } from './catalog';
 
@@ -217,12 +218,19 @@ export class Jobs {
       this.serial++;
     }
     if (this.state === 'idle') {
+      // behind the busted card or the shut door nothing starts: busted in a ring, its job ran under the card (the clock,
+      // the rivals gone, an escape's chase that boxed the car again); the ring waits till the car has left it
+      const onBreak = this.sim.run.state === 'busted' || this.sim.run.state === 'door';
       for (let i = 0; i < this.defs.length; i++) {
         const d = this.defs[i] as JobDef;
         // a rival waits at the kerb (M6): pull up beside them, slowly, inside the wider ring; driving past does nothing
         const duel = d.kind === 'duel';
         const rr = duel ? BALANCE.board.ringRadius : r;
         if (d.id === this.rearm || (d.x - probe.x) ** 2 + (d.z - probe.z) ** 2 > rr * rr) continue;
+        if (onBreak) {
+          this.rearm = d.id;
+          continue;
+        }
         if (!this.open(d)) continue;
         if (probe.speed > (duel ? BALANCE.board.pullUp : BALANCE.jobs.startSpeed)) {
           // driven through (M8.7 D8): nothing starts; the first ring while the chain's first step is open, and the
@@ -287,7 +295,7 @@ export class Jobs {
     const buoy = d.route?.[this.buoy];
     if (buoy && (buoy.x - probe.x) ** 2 + (buoy.z - probe.z) ** 2 <= SEA_TRIAL.reach ** 2) this.buoy++;
     const reach = d.kind === 'trial' ? BALANCE.jobs.trial.finishRadius : d.kind === 'race' ? BALANCE.jobs.race.finishRadius : r;
-    if ((d.targetX - probe.x) ** 2 + (d.targetZ - probe.z) ** 2 <= reach * reach && this.canArrive(d)) {
+    if ((d.targetX - probe.x) ** 2 + (d.targetZ - probe.z) ** 2 <= reach * reach && this.canArrive(d) && atFinish(this.sim, d.targetX, d.targetZ, probe.y - 0.5)) {
       let paid: number;
       if (d.kind === 'fare') {
         // the ride and its tips; the leftover time carries into the next fare
@@ -572,7 +580,7 @@ export class Jobs {
       return;
     }
     const reach = BALANCE.jobs.race.finishRadius;
-    if (rival.format === 'race' && (d.targetX - probe.x) ** 2 + (d.targetZ - probe.z) ** 2 <= reach * reach) {
+    if (rival.format === 'race' && (d.targetX - probe.x) ** 2 + (d.targetZ - probe.z) ** 2 <= reach * reach && atFinish(this.sim, d.targetX, d.targetZ, probe.y - 0.5)) {
       this.lastPlace = 1;
       this.winDuel(d, probe);
       return;

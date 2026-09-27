@@ -143,7 +143,8 @@ function islandPaths(island: Island): MapPaths {
     specialPaths: shape.roads.map((r) => linePath(r.pts, r.width, r.closed)),
     streetPaths: shape.streets.map((r) => linePath(r.pts, r.width, r.closed)),
     islandPath: polys(shape.land),
-    waterPath: polys(shape.water),
+    // the basin and the golf's pond
+    waterPath: polys([...shape.water, ...shape.shallows]),
     districtFills: shape.districts.map((d) => {
       const path = new Path2D();
       for (const [x0, z0, x1, z1] of d.runs) path.rect(x0, z0, x1 - x0, z1 - z0);

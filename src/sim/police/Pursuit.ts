@@ -118,9 +118,12 @@ export class Pursuit {
     this.descriptor.police = police;
     this.blown = false;
     this.coverLeft = this.tuning.disguise.seconds;
+    // inside the radio's window (an escape job's start, the Chief's duel) the police know where the car is: a swap there
+    // is seen, or the escape paid and the Chief lost in a second
+    const seen = seenNow || this.radioLeft > 0;
     // seen: the radio names the new car (the identity rule, taught by the police themselves)
-    if (seenNow && this.state !== 'idle') this.events.push('dispatch', DISPATCH.suspect, 0, 0, 0, packSuspect(body, paint));
-    if (seenNow || this.state === 'idle') return false;
+    if (seen && this.state !== 'idle') this.events.push('dispatch', DISPATCH.suspect, 0, 0, 0, packSuspect(body, paint));
+    if (seen || this.state === 'idle') return false;
     this.lose();
     return true;
   }

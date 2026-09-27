@@ -25,6 +25,7 @@ export const PL: Readonly<Record<string, string>> = {
   'PAUSED': 'PAUZA',
   'press {key} to continue': 'NACIŚNIJ {key}, ABY GRAĆ DALEJ',
   'click the game to continue': 'KLIKNIJ GRĘ, ABY GRAĆ DALEJ',
+  'build {version}': 'WERSJA {version}',
   'LAST': 'OSTATNIE',
   'BEST': 'REKORD',
   'BEST LAP {time}': 'REKORD OKRĄŻENIA {time}',
@@ -172,7 +173,7 @@ export const PL: Readonly<Record<string, string>> = {
   "IT'S IN TRAFFIC · SWAP INTO IT": 'JEŹDZI W RUCHU · PRZESIĄDŹ SIĘ',
   'THE COPS HAVE YOU · LOSE THEM': 'GLINY CIĘ MAJĄ · ZGUB ICH',
   'DOUBLE PAY · MORE STARS': 'PODWÓJNA STAWKA · WIĘCEJ GWIAZDEK',
-  'WRECK IT BEFORE IT GETS HOME': 'ROZBIJ GO, ZANIM DOJEDZIE',
+  'WRECK IT BEFORE IT GETS HOME': 'ROZBIJ TO AUTO, ZANIM DOJEDZIE',
   // teaching at the moment, once per profile (M8.9 R5)
   'BAG': 'ŁUP',
   'BANK IT AT A GARAGE': 'WPŁAĆ GO W GARAŻU',

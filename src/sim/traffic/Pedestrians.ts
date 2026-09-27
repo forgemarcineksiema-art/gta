@@ -41,6 +41,8 @@ const RETURN_SPEED = 1.5;
 const CAR_MIN_SPEED = 3;
 /** A flying prop whose bound's bottom is higher than this passes over the walkers (m). */
 const HEAD_HEIGHT = 1.9;
+/** A mover this far under a walker's feet is on another road (the tunnel under the hill; m, as Life's near misses). */
+const OTHER_LEVEL = 3;
 
 export class Pedestrians {
   readonly tuning: PedTuning;
@@ -322,24 +324,24 @@ export class Pedestrians {
       if (this.active[i] && (pose === PedPose.Dive || pose === PedPose.GetUp)) this.tryScore(i, player, events);
     }
     if (this.dodgeEnabled) {
-      this.dodgeFrom(player.x, player.z, player.vx, player.vz, true, player, events);
+      this.dodgeFrom(player.x, player.z, player.y - 0.5, player.vx, player.vz, true, player, events);
       if (traffic) {
         for (let a = 0; a < traffic.capacity; a++) {
           const st = traffic.state[a];
           if ((st !== AgentState.Physical && st !== AgentState.Disturbed) || !traffic.hasBody(a)) continue;
           const yaw = traffic.yaw[a] as number;
           const speed = traffic.speed[a] as number;
-          this.dodgeFrom(traffic.x[a] as number, traffic.z[a] as number, Math.sin(yaw) * speed, Math.cos(yaw) * speed, false, player, events);
+          this.dodgeFrom(traffic.x[a] as number, traffic.z[a] as number, traffic.y[a] as number, Math.sin(yaw) * speed, Math.cos(yaw) * speed, false, player, events);
         }
       }
     }
-    this.guaranteeHops += this.guarantee(player.x, player.z, player.vx, player.vz, player.yaw, player.halfWidth, player.halfLength);
+    this.guaranteeHops += this.guarantee(player.x, player.z, player.y - 0.5, player.vx, player.vz, player.yaw, player.halfWidth, player.halfLength);
     if (traffic) {
       for (let a = 0; a < traffic.capacity; a++) {
         if (traffic.state[a] === AgentState.Free || !traffic.hasBody(a)) continue;
         const yaw = traffic.yaw[a] as number;
         const speed = traffic.speed[a] as number;
-        this.guaranteeHops += this.guarantee(traffic.x[a] as number, traffic.z[a] as number, Math.sin(yaw) * speed, Math.cos(yaw) * speed, yaw, traffic.halfWidthOf(a), traffic.halfLengthOf(a));
+        this.guaranteeHops += this.guarantee(traffic.x[a] as number, traffic.z[a] as number, traffic.y[a] as number, Math.sin(yaw) * speed, Math.cos(yaw) * speed, yaw, traffic.halfWidthOf(a), traffic.halfLengthOf(a));
       }
     }
     if (props) this.fromProps(props, player, dt, events);
@@ -354,13 +356,13 @@ export class Pedestrians {
       const id = props.down[k] as number, st = props.state[id];
       if (st !== PropState.Flying && st !== PropState.Ballistic) continue;
       const o = id * 7, r = props.boundOf(id);
-      if ((props.pose[o + 1] as number) - r > HEAD_HEIGHT) continue;
-      const x = props.pose[o] as number, z = props.pose[o + 2] as number;
+      // (over a walker's head is each walker's own measure: by the grid's 0, on the island's hills none ever dodged one)
+      const x = props.pose[o] as number, z = props.pose[o + 2] as number, bottom = (props.pose[o + 1] as number) - r;
       const vx = props.flight[id * 2] as number, vz = props.flight[id * 2 + 1] as number;
-      if (this.dodgeEnabled) this.dodgeFrom(x, z, vx, vz, false, player, events);
+      if (this.dodgeEnabled) this.dodgeFrom(x, z, bottom, vx, vz, false, player, events);
       const speed = Math.sqrt(vx * vx + vz * vz), travel = speed * dt;
       const yaw = speed > 1e-6 ? Math.atan2(vx, vz) : 0;
-      this.propHops += this.guarantee(x + vx * dt / 2, z + vz * dt / 2, vx, vz, yaw, r, r + travel / 2);
+      this.propHops += this.guarantee(x + vx * dt / 2, z + vz * dt / 2, bottom, vx, vz, yaw, r, r + travel / 2);
     }
   }
 
@@ -493,7 +495,8 @@ export class Pedestrians {
 
   // ---- dodging ------------------------------------------------------------------
 
-  private dodgeFrom(cx: number, cz: number, vx: number, vz: number, isPlayer: boolean, player: PlayerProbe, events: EventLog): void {
+  /** `cy` the mover's foot: its road's height, a flying prop's bottom. */
+  private dodgeFrom(cx: number, cz: number, cy: number, vx: number, vz: number, isPlayer: boolean, player: PlayerProbe, events: EventLog): void {
     const t = this.tuning;
     const speed = Math.hypot(vx, vz);
     if (speed < CAR_MIN_SPEED) return;
@@ -513,7 +516,7 @@ export class Pedestrians {
       const px = cx + sx * along;
       const pz = cz + sz * along;
       const off = Math.hypot((this.x[i] as number) - px, (this.z[i] as number) - pz);
-      if (off > t.corridorHalfWidth) continue;
+      if (off > t.corridorHalfWidth || this.otherLevel(i, cy)) continue;
       // dive to the side the pedestrian is already on, away from the car's line
       const side = dx * nx + dz * nz >= 0 ? 1 : -1;
       this.diveX[i] = nx * side;
@@ -570,7 +573,16 @@ export class Pedestrians {
   }
 
   /** Last resort: a pedestrian inside a car's footprint grown by `guaranteeDistance` hops `hopDistance` clear of its side; the hops. */
-  private guarantee(cx: number, cz: number, vx: number, vz: number, yaw: number, halfWidth: number, halfLength: number): number {
+  /**
+   * A walker off a mover's level: under a deck or a bridge it passes over, over the tunnel it passes under (they dove,
+   * yelped and paid the boost for a car on another road), or under a flying prop past its head.
+   */
+  private otherLevel(i: number, cy: number): boolean {
+    const foot = this.streets.footAt(this.x[i] as number, this.z[i] as number);
+    return cy - foot > HEAD_HEIGHT || foot - cy > OTHER_LEVEL;
+  }
+
+  private guarantee(cx: number, cz: number, cy: number, vx: number, vz: number, yaw: number, halfWidth: number, halfLength: number): number {
     const t = this.tuning;
     const fx = Math.sin(yaw);
     const fz = Math.cos(yaw);
@@ -588,7 +600,7 @@ export class Pedestrians {
       const dz = (this.z[i] as number) - cz;
       const along = dx * fx + dz * fz;
       const side = dx * rx + dz * rz;
-      if (Math.abs(along) > reachAlong || Math.abs(side) > reachSide) continue;
+      if (Math.abs(along) > reachAlong || Math.abs(side) > reachSide || this.otherLevel(i, cy)) continue;
       const dir = side >= 0 ? 1 : -1;
       // clear of the car's flank, plus the hop
       const target = dir * (reachSide + t.hopDistance);

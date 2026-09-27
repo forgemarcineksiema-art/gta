@@ -374,6 +374,16 @@ export class LaneTables {
     return this.scratch.y ?? 0;
   }
 
+  /**
+   * The road's height `s` m along a lane and, past its end, along the junction curve to `next` (`positionAt`'s): a lent
+   * body held at its lane end's height sank into an island junction's rising road, up to 3.6 m, and rose out of it at
+   * the next lane.
+   */
+  heightOn(lane: number, s: number, next: number, offset = 0): number {
+    this.positionAt(lane, s, offset, this.scratch, next);
+    return this.scratch.y ?? 0;
+  }
+
   private sampleConnection(conn: Connection, s: number, out: LanePose): void {
     let seg = 0;
     for (let i = 0; i < SAMPLES; i++) {

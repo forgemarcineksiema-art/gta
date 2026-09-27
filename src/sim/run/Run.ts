@@ -236,7 +236,7 @@ export class Run {
     // the pursuit's sampled sight would only add a lag.
     // never inside the cold open: the first minute teaches the verbs, not the fine
     const boxed = police !== null && this.sim.heat.level > 0 && probe.speed < b.speed && !this.sim.coldOpen.active
-      && police.unitsWithin(probe.x, probe.z, b.range) >= b.units;
+      && police.unitsWithin(probe.x, probe.z, b.range, probe.y - 0.5) >= b.units;
     this.bustedProgress = boxed
       ? Math.min(1, this.bustedProgress + dt / b.seconds)
       : Math.max(0, this.bustedProgress - dt * b.drainPerSecond);

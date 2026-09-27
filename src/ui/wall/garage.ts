@@ -409,6 +409,13 @@ export class GarageUi {
       return;
     }
     const i = this.order.indexOf(this.page);
+    // GOALS has nothing to take, and on a short screen its foot was out of reach: W reads on down, S back up, then out
+    const read = this.level === 'pages' && this.page === 'goals' ? this.pages.get('goals') : undefined;
+    if (read && read.scrollHeight > read.clientHeight + 1 && (nav.confirm || (nav.back && read.scrollTop > 0))) {
+      read.scrollTop += (nav.confirm ? 1 : -1) * read.clientHeight * 0.6;
+      this.show();
+      return;
+    }
     if (this.level === 'pages') {
       if (nav.left && i > 0) this.goPage(this.order[i - 1] as WallPage, false);
       else if (nav.right && i < this.order.length - 1) this.goPage(this.order[i + 1] as WallPage, false);

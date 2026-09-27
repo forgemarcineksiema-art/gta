@@ -45,6 +45,11 @@ import { DISPATCH, packSuspect } from './Pursuit';
 import { Helicopter } from './Helicopter';
 import { DONUT_SHOP } from './Donuts';
 
+/** A car this far over or under the player's road is on another road (a deck, the tunnel; m, as Life's near misses). */
+const OTHER_ROAD = 3;
+/** A roadside ambush's lane this far over or under the player's road is out of sight on another road (m). */
+const AMBUSH_LEVEL = 4;
+
 /**
  * A chasing unit's speed (docs/DESIGN.md §13.9): within `pressure.attack` its class's (the ram, the PIT); within
  * `pressure.within` the player's speed and a little more, up to the class's; beyond it the catch-up only where the
@@ -393,7 +398,7 @@ export class Police {
     if (this.boxing) {
       this.boxAge += dt;
       // the clock runs while the box is made: two cars round it, or all there are
-      if (this.unitsWithin(this.boxX, this.boxZ, t.box.range) >= Math.min(t.busted.units, this.count)) this.boxLeft -= dt;
+      if (this.unitsWithin(this.boxX, this.boxZ, t.box.range, this.boxProbe.y - 0.5) >= Math.min(t.busted.units, this.count)) this.boxLeft -= dt;
       if (this.boxLeft > 0 && this.boxAge < t.box.maxSeconds) {
         pursuit.step(dt, level, false, player.x, player.z);
         // fooled too: the chase is over, the air unit goes home
@@ -499,7 +504,7 @@ export class Police {
       const dz = player.z - (traffic.z[agent] as number);
       const gap = Math.hypot(dx, dz);
       const slot = this.slotOf[u] as number;
-      if (arresting && traffic.solid(agent) && gap < a.range) {
+      if (arresting && traffic.solid(agent) && gap < a.range && this.onRoadOf(agent, player)) {
         // one not dealt yet (it came on duty since the last deal) waits on the first standby place and is dealt next
         // step (M8.6 D6): it used to ram the stopped car at its class's speed meanwhile
         if (slot < 0) this.slotLeft = 0;
@@ -564,6 +569,11 @@ export class Police {
   }
 
   /** True when any unit or parked patrol had a clear line to the player at its last sight tick, disguise or not: a crime now is seen. */
+  /** A unit on the player's road, not on a deck over it or in the tunnel under it. */
+  private onRoadOf(agent: number, player: PlayerProbe): boolean {
+    return Math.abs((this.traffic.y[agent] as number) - (player.y - 0.5)) <= OTHER_ROAD;
+  }
+
   crimeSeen(): boolean {
     for (let u = 0; u < this.units.length; u++) if ((this.units[u] as number) >= 0 && this.los[u] === 1) return true;
     for (let k = 0; k < this.parked.length; k++) if ((this.parked[k] as number) >= 0 && this.parkedLos[k] === 1) return true;
@@ -783,9 +793,11 @@ export class Police {
   /**
    * Live police cars (pursuit units, parked patrols, roadblock cars) within
    * `range` of a point: what boxes the player in. A wreck or a car the player
-   * took no longer counts; a civilian never does.
+   * took no longer counts; a civilian never does. With `y` (the road's height
+   * there) a unit on another road over or under it does not either: two units on
+   * the street under a deck busted the player waiting on it.
    */
-  unitsWithin(x: number, z: number, range: number): number {
+  unitsWithin(x: number, z: number, range: number, y = NaN): number {
     const traffic = this.traffic;
     const r2 = range * range;
     let n = 0;
@@ -793,6 +805,7 @@ export class Police {
       if (traffic.police[i] !== 1) continue;
       const state = traffic.state[i];
       if (state === AgentState.Free || state === AgentState.Wrecked || state === AgentState.Abandoned) continue;
+      if (Math.abs((traffic.y[i] as number) - y) > OTHER_ROAD) continue;
       const dx = (traffic.x[i] as number) - x, dz = (traffic.z[i] as number) - z;
       if (dx * dx + dz * dz <= r2) n++;
     }
@@ -926,7 +939,7 @@ export class Police {
         const current = held[u] as number;
         if (current >= 0 && current < k) continue;
         const d = Math.hypot((traffic.x[agent] as number) - (this.slotX[k] as number), (traffic.z[agent] as number) - (this.slotZ[k] as number));
-        if (Math.hypot((traffic.x[agent] as number) - player.x, (traffic.z[agent] as number) - player.z) > a.range) continue;
+        if (Math.hypot((traffic.x[agent] as number) - player.x, (traffic.z[agent] as number) - player.z) > a.range || !this.onRoadOf(agent, player)) continue;
         const cost = slotCost(d, current === k, traffic.kindOf(agent) === 'heavy', a);
         if (cost < bestCost) { bestCost = cost; best = u; }
       }
@@ -1231,7 +1244,7 @@ export class Police {
     for (let u = 0; u < this.units.length; u++) if ((this.units[u] as number) >= 0 && this.seen[u] === 1) { watching = true; break; }
     if (!watching) return;
     if (this.limitLeft <= 0 || this.playerLimit === Infinity) {
-      this.playerLimit = this.limitUnder(player.x, player.z);
+      this.playerLimit = this.limitUnder(player.x, player.z, player.y - 0.5);
       this.limitLeft = this.tuning.routeSeconds;
     }
     if ((player.speed - this.playerLimit) * 3.6 <= h.speedingOverKmh) return;
@@ -1241,8 +1254,15 @@ export class Police {
   }
 
   /** The limit of the nearest lane to a point (the lanes' own bound, as the route search uses it). */
-  private limitUnder(x: number, z: number): number {
+  private limitUnder(x: number, z: number, y: number): number {
     const lanes = this.traffic.lanes;
+    // the island's roads cross one over another: the lane of the road the car is on (in the tunnel under the quarry's
+    // tracks their 40 km/h made 70 speeding, not the highway's 109)
+    const island = this.sim.island;
+    if (island) {
+      const lane = island.nearestLane(x, z, y);
+      return lane >= 0 ? lanes.limit[lane] as number : Infinity;
+    }
     let best = Infinity, limit = Infinity;
     for (let i = 0; i < lanes.laneCount; i++) {
       if (Math.hypot((lanes.midX[i] as number) - x, (lanes.midZ[i] as number) - z) > (lanes.length[i] as number) / 2 + 40) continue;
@@ -1360,6 +1380,8 @@ export class Police {
         if (ahead < near || ahead > far) continue;
         const across = dx * rx + dz * rz;
         if (Math.abs(across) > 45) continue;
+        // on the player's level: in the tunnel the unit "pulling out ahead, in view" came out on the hill's roads over it
+        if (Math.abs((this.pose.y ?? 0) - (player.y - 0.5)) > AMBUSH_LEVEL) continue;
         // a side street crossing the player's heading, driving toward the player's road
         const lx = Math.sin(this.pose.yaw), lz = Math.cos(this.pose.yaw);
         if (Math.abs(lx * fx + lz * fz) > 0.5) continue;

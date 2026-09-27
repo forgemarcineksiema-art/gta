@@ -108,6 +108,7 @@ export class App {
   private readonly sim: SimWorld;
   private readonly renderer: Renderer;
   private readonly input: InputManager;
+  private readonly keyboard: KeyboardDevice;
   private readonly hud: Hud;
   private readonly runHud: RunHud;
   private readonly coldOpenHud: ColdOpenHud;
@@ -195,7 +196,8 @@ export class App {
     const quality = params.get('quality');
     this.renderer = new Renderer(canvas, sim, quality === 'low' || quality === 'high' ? quality : undefined);
     this.input = new InputManager();
-    this.input.addDevice(new KeyboardDevice());
+    this.keyboard = new KeyboardDevice();
+    this.input.addDevice(this.keyboard);
     this.audio = new EngineAudio();
     this.sfx = new Sfx(this.audio);
     this.siren = new Siren(this.audio);
@@ -217,7 +219,7 @@ export class App {
     // the garage on the wall: App is the one caller of Garage and of the rewarded ads (docs/history/M5_PLAN.md §3.3)
     const actions: GarageActions = {
       buy: (car) => {
-        if (this.adShowing) return;
+        if (this.wallBlocked) return;
         const first = sim.garage.owned.size === 1;
         if (sim.garage.buy(car) !== 'ok') return;
         sim.garage.select(car);
@@ -225,7 +227,7 @@ export class App {
         if (first) this.platform.happyTime();
       },
       keep: (car) => {
-        if (this.adShowing) return;
+        if (this.wallBlocked) return;
         const first = sim.garage.owned.size === 1;
         if (sim.garage.keep(car, sim.run.hotPaint) !== 'ok') return;
         sim.run.hot = null;
@@ -234,27 +236,27 @@ export class App {
         if (first) this.platform.happyTime();
       },
       select: (car) => {
-        if (this.adShowing || !sim.garage.select(car)) return;
+        if (this.wallBlocked || !sim.garage.select(car)) return;
         sim.garage.applyToVehicle();
       },
       kit: (item) => {
-        if (this.adShowing) return;
+        if (this.wallBlocked) return;
         if (sim.kit.has(item)) sim.kit.wear(item);
         else if (sim.kit.buy(item) !== 'ok') return;
         this.store.markDirty();
       },
       respray: (car, paint) => {
-        if (this.adShowing) return;
+        if (this.wallBlocked) return;
         sim.garage.respray(car, paint);
         sim.garage.applyToVehicle();
         this.store.markDirty();
       },
       upgrade: (car, stat) => {
-        if (this.adShowing || sim.garage.upgrade(car, stat) !== 'ok') return;
+        if (this.wallBlocked || sim.garage.upgrade(car, stat) !== 'ok') return;
         sim.garage.applyToVehicle();
       },
       buyPrep: (item) => {
-        if (this.adShowing) return;
+        if (this.wallBlocked) return;
         sim.garage.buyPrep(item);
       },
       offer: (kind) => this.rewarded(kind),
@@ -277,6 +279,8 @@ export class App {
     const dev = devTools(params);
     this.dev = dev;
     this.sendKeys();
+    // the keycaps again with the printed letters (an AZERTY's Z Q S D) once the browser's layout map has come
+    void this.keyboard.layoutReady.then(() => this.sendKeys());
 
     this.panel = !dev ? null : new DebugPanel(uiRoot, sim, {
       spawnAt: (name) => sim.spawnAt(name),
@@ -416,12 +420,14 @@ export class App {
     });
 
     // CrazyGames common fixes: no page scroll from the wheel, no context menu on the canvas
-    window.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
+    // (the wall's pages scroll under the wheel: GOALS, CARS and STYLE run past a short screen's foot)
+    window.addEventListener('wheel', (e) => { if (!(e.target instanceof Element && e.target.closest('.run__wall'))) e.preventDefault(); }, { passive: false });
     document.addEventListener('contextmenu', (e) => e.preventDefault());
     window.addEventListener('resize', () => this.renderer.resize());
     window.addEventListener('blur', () => this.setFocusPaused(true));
     window.addEventListener('focus', () => this.setFocusPaused(false));
-    document.addEventListener('visibilitychange', () => this.setFocusPaused(document.hidden));
+    // back on the tab without the keys (the page round the frame has them): paused till a click, as a blur is
+    document.addEventListener('visibilitychange', () => this.setFocusPaused(document.hidden || !document.hasFocus()));
     canvas.addEventListener('pointerdown', () => {
       canvas.focus();
       this.setFocusPaused(false);
@@ -565,6 +571,14 @@ export class App {
     return this.heapMbCached;
   }
 
+  /**
+   * The wall takes no click behind an ad or under the pause's veil (the veil lets the pointer through to the settings):
+   * DRIVE OUT clicked there opened the door and started the gameplay with the pause still up.
+   */
+  private get wallBlocked(): boolean {
+    return this.adShowing || this.paused;
+  }
+
   private get paused(): boolean {
     return this.userPaused || this.focusPaused;
   }
@@ -595,6 +609,7 @@ export class App {
     this.focusPaused = v;
     this.hud.setPaused(this.paused, this.userPaused ? 'user' : 'focus');
     this.handle.paused = this.paused;
+    this.audio.setPaused(this.paused, this.focusPaused);
     if (!v) this.lastTime = performance.now();
   }
 
@@ -643,7 +658,7 @@ export class App {
   /** The wall's DRIVE OUT: the garage car, the door up, a new run; the save written. */
   private driveOut(): void {
     const run = this.sim.run;
-    if (run.state !== 'door' || this.adShowing) return;
+    if (run.state !== 'door' || this.wallBlocked) return;
     this.sim.garage.applyToVehicle();
     run.openDoor();
     this.garageUi.close();
@@ -656,7 +671,7 @@ export class App {
    * cash path stays. The double is answered either way: one video per reward, never a second ask.
    */
   private rewarded(kind: 'lawyer' | 'fence' | 'double'): void {
-    if (this.adShowing || !this.platform.adsAvailable('rewarded')) return;
+    if (this.wallBlocked || !this.platform.adsAvailable('rewarded')) return;
     // nothing to win: an item already bought for the next run
     if (kind !== 'double' && this.sim.garage.prep[kind]) return;
     this.adShowing = true;
@@ -733,6 +748,7 @@ export class App {
     this.userPaused = !this.userPaused;
     this.hud.setPaused(this.paused, 'user');
     this.handle.paused = this.paused;
+    this.audio.setPaused(this.paused, this.focusPaused);
     // behind a shut door or a busted card the game is already on a break: no second bracket
     const driving = this.sim.run.state === 'running' || this.sim.run.state === 'closing';
     if (this.userPaused) {
@@ -766,7 +782,8 @@ export class App {
       this.hud.showToast(t(muted ? 'MUTED' : 'SOUND ON'), 1);
       this.hud.setSound(this.key('mute'), muted);
     }
-    if (st.pressed.skip && this.sim.coldOpen.active) {
+    // not from the pause: Enter or N pressed to resume ended the first minute for good
+    if (st.pressed.skip && this.sim.coldOpen.active && !this.paused) {
       this.sim.coldOpen.skip();
       this.store.markDirty();
     }
@@ -800,6 +817,14 @@ export class App {
     let alpha = 0;
     if (!this.paused) {
       const stepStart = performance.now();
+      // a press is one action, latched for the next step, which clears it: set in every step of a frame, a 30 fps
+      // frame's two steps swapped into the car alongside and straight back, and a 144 Hz frame with no step lost it
+      if (!this.bot) {
+        const c = this.sim.controls;
+        if (st.pressed.reset) c.reset = true;
+        if (st.pressed.swap) c.swap = true;
+        if (st.pressed.horn) c.horn = true;
+      }
       alpha = this.loop.advance(frameDt * timeScale, () => {
         const c = this.sim.controls;
         if (this.bot) {
@@ -810,9 +835,6 @@ export class App {
           c.steer = st.steer;
           c.handbrake = st.value.handbrake;
           c.boost = st.value.boost;
-          if (st.pressed.reset) c.reset = true;
-          if (st.pressed.swap) c.swap = true;
-          if (st.pressed.horn) c.horn = true;
         }
         // the car idles behind a shut door and waits out the card
         if (this.sim.run.state === 'door' || this.sim.run.state === 'busted') clearControls(c);
@@ -849,7 +871,7 @@ export class App {
 
     this.renderer.render(alpha, this.paused ? 0 : frameDt);
     this.queuePrefetch();
-    this.audio.update(this.sim.vehicle.telemetry, frameDt, this.sim.carBody);
+    this.audio.update(this.sim.vehicle.telemetry, frameDt, this.sim.carBody, !this.paused && this.loop.lastSteps > 0);
     this.sfx.update(this.sim);
     this.siren.update(this.sim, this.paused ? 0 : frameDt);
     this.rotor.update(this.sim);

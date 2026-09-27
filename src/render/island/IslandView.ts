@@ -30,8 +30,12 @@ const PAVE_CELL = 8;
 const SNAP_REACH = 300;
 /** The buildings and the roads' surfaces of the chunks within this of the car are built at the start (m); the rest, the nearest first, `BUILD_SLICE` statics a frame. */
 const SNAP_BUILT = 150;
-/** The standing props are drawn in the chunks whose middles are within this of the car (m), by the quality's tier. */
-const PROP_SIGHT: Readonly<Record<QualityTier, number>> = { low: 200, high: 420 };
+/**
+ * The standing props are drawn in the chunks whose nearest edges are within this of the car (m), by the quality's tier:
+ * every lamp and bench this near. By the chunks' middles (200 m on low) a row of lamps came up 25–75 m ahead of the car
+ * at a chunk's border; by the edges at these the props' triangles are what they were (the worst 38k low, 87k high).
+ */
+const PROP_SIGHT: Readonly<Record<QualityTier, number>> = { low: 120, high: 280 };
 /**
  * A quarter is drawn while its nearest building is within the fog's end and this (m): past the fog's end a thing off the
  * view's middle is still short of it in depth, the fog's measure.
@@ -158,7 +162,7 @@ export class IslandView {
     // (none on the first frame: the start's frame is the player's first, M8.10 slice 18)
     let built = this.frames === 1;
     for (let j = 0; j < CHUNKS_Z; j++) for (let i = 0; i < CHUNKS_X; i++) {
-      const k = Island.chunkIndex(i, j), d = Math.hypot(CHUNK_X0 + (i + 0.5) * CHUNK - x, CHUNK_Z0 + (j + 0.5) * CHUNK - z);
+      const k = Island.chunkIndex(i, j), d = edge(k, x, z);
       const mesh = this.propChunks.get(k), sight = PROP_SIGHT[this.tier];
       if (mesh) {
         // freed a chunk past their sight (made again when it comes back)

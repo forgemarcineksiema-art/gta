@@ -442,7 +442,9 @@ export class BigMap {
     c.translate(size / 2, size / 2);
     c.scale(-s, -s);
     const ground = this.groundOf(sim);
-    if (ground) { c.fillStyle = SHALLOWS_FILL; c.fill(ground.shallows); }
+    // the grid's shallows are the sea's, under the land; the island's are the golf's pond, inland, over its park
+    const pond = sim.island !== null;
+    if (ground && !pond) { c.fillStyle = SHALLOWS_FILL; c.fill(ground.shallows); }
     fillIsland(c, paths);
     // under the roads: the built blocks, then the parks
     if (ground) {
@@ -450,6 +452,7 @@ export class BigMap {
       c.fill(ground.blocks);
       c.fillStyle = PARK_FILL;
       c.fill(ground.parks);
+      if (pond) { c.fillStyle = SHALLOWS_FILL; c.fill(ground.shallows); }
     }
     const minW = MINIMAP.minRoadPx / s;
     const casing = (MINIMAP.casingPx * 2) / s;

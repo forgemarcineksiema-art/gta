@@ -2,6 +2,17 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-27 — the second bug hunt (Marcin: "szukaj błędów w grze")
+
+Played (the first minute, the pause, a five-minute chase headless) and read by five agents; fixed: E, R and H were set in
+every step of a frame (at 30 fps E swapped in and straight back, at 144 Hz half the presses went); the sound played on under
+the pause and in a hidden tab; a lent car held its lane end's height across a junction, 3.9 m into a hill (13.5); on stacked
+roads units under a deck busted the player on it, a highway car stopped over a player, Niko's finish was won in the tunnel,
+the canal knocked its bridges' lamps (18.15–18.18), walkers and the roller took the other level; the ramps yielded to no one;
+a bust in a ring started its job under the card (2.3b); a respawn freed the duel's rival; a radio-window swap escaped the
+Chief; empty doors paid a daily (6.3b); the pause's line and title, Enter twice, the wall under the pause, GOALS out of reach,
+long words over the cards, props by chunk edges, rings under pavements, the bake by its key. The rest in BACKLOG.
+
 ## 2026-09-27 — the island's last backlog: the job bot, the fans, the survey bot (Marcin: "Popraw te z backlogu")
 
 The first delivery is done in 86 of 104 s with the traffic and the police on (long pin 14b.12): the bot's way curled round

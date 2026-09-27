@@ -191,7 +191,7 @@ export class Hud {
     this.sound.append(this.soundKey, this.soundState);
     // the full list of keys (M8.9 R5): the top's hints are four, in the first two sessions only
     this.pauseKeys = el('div', 'hud__pause-keys');
-    this.pause.append(label(el('div', 'hud__pause-title'), 'PAUSED'), el('div', 'hud__pause-sub', ''), this.sound, this.pauseKeys, el('div', 'hud__pause-build', `build ${__APP_VERSION__}`));
+    this.pause.append(label(el('div', 'hud__pause-title'), 'PAUSED'), el('div', 'hud__pause-sub', ''), this.sound, this.pauseKeys, el('div', 'hud__pause-build', t('build {version}', { version: __APP_VERSION__ })));
     // a sibling of the HUD, the run's layer and the full map, on top of them all: its veil covers the whole screen
     parent.appendChild(this.pause);
 
@@ -245,6 +245,8 @@ export class Hud {
   /** The language changed (DESIGN.md §19): every word the HUD shows, said again; the app sends the keys anew first. */
   relabel(): void {
     relabel(this.root);
+    // the pause is the HUD's sibling (its veil over every layer): its title said PAUZA on in English
+    relabel(this.pause);
     if (this.hintKeys) this.setHints(this.hintKeys);
     this.setSound(this.muteKey, this.muted);
     this.swapLabel.textContent = t(this.swapBorrow ? 'BORROW' : 'SWAP');
@@ -308,7 +310,8 @@ export class Hud {
   setPaused(paused: boolean, reason: 'user' | 'focus'): void {
     this.pause.classList.toggle('is-visible', paused);
     const sub = this.pause.querySelector('.hud__pause-sub');
-    if (sub && paused) sub.textContent = reason === 'focus' ? t('click the game to continue') : (sub.textContent ?? '');
+    // P's own line each time: after a focus pause said "click", every P pause said it too, and a click never resumes P
+    if (sub && paused) sub.textContent = reason === 'focus' ? t('click the game to continue') : t('press {key} to continue', { key: this.hintKeys?.pause ?? 'P' });
   }
 
   setDebugVisible(v: boolean): void {

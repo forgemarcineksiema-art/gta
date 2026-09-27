@@ -62,8 +62,11 @@ const FALLBACK_LABEL: Record<string, string> = {
   ArrowRight: '→',
 };
 
-/** Keys whose default browser behaviour (scrolling, and Tab's focus hop) must be suppressed while playing. */
-const PREVENT_DEFAULT = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab']);
+/**
+ * Keys whose default browser behaviour (scrolling, Tab's focus hop, Enter's click on a focused button) must be suppressed
+ * while playing: a wall card clicked kept the focus, and Enter, the wall's own select, clicked it a second time.
+ */
+const PREVENT_DEFAULT = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter']);
 
 interface KeyboardLayoutMapLike {
   get(code: string): string | undefined;
@@ -74,6 +77,8 @@ export class KeyboardDevice implements InputDevice {
   /** Keys that went down since the last read, so a tap shorter than a frame is reported once instead of never. */
   private readonly tapped = new Set<string>();
   private layout: KeyboardLayoutMapLike | null = null;
+  /** Settles when the layout's labels are known (Chromium's layout map comes after the first keycaps are drawn). */
+  readonly layoutReady: Promise<void>;
   private readonly target: Window;
   private readonly onDown: (e: KeyboardEvent) => void;
   private readonly onUp: (e: KeyboardEvent) => void;
@@ -100,7 +105,7 @@ export class KeyboardDevice implements InputDevice {
     target.addEventListener('keydown', this.onDown);
     target.addEventListener('keyup', this.onUp);
     target.addEventListener('blur', this.onBlur);
-    void this.resolveLayout();
+    this.layoutReady = this.resolveLayout();
   }
 
   private async resolveLayout(): Promise<void> {

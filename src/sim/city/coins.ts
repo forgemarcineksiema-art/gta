@@ -379,7 +379,8 @@ export class Coins {
       const ttl = this.spillTtl[k] as number;
       if (ttl <= 0) continue;
       const dx = (this.spillX[k] as number) - player.x, dz = (this.spillZ[k] as number) - player.z;
-      if (Math.abs(dx * fx + dz * fz) <= hl + 0.3 && Math.abs(dx * rx + dz * rz) <= hw + 0.3) {
+      // (as a coin's, within reach over or under: a spill on a deck was picked driving under it)
+      if (Math.abs(dx * fx + dz * fz) <= hl + 0.3 && Math.abs(dx * rx + dz * rz) <= hw + 0.3 && Math.abs((this.spillY[k] as number) - cy) <= reach.up) {
         const v = this.spillValue[k] as number;
         this.spillTtl[k] = 0;
         this.spillSerial++;

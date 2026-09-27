@@ -334,6 +334,24 @@ describe('a job taken by choice (M8.7 slice 2)', () => {
     } finally { sim.dispose(); }
   });
 
+  it('M8.7 2.3b busted in a ring, nothing starts behind the card; after it the ring waits till the car has left it', async () => {
+    const sim = await placedWorld();
+    try {
+      run(sim, 0.1);
+      const jobs = sim.jobs, d = firstDelivery(sim);
+      // the chase over at the bust, the card up (the second bug hunt: the job ran under it, its clock with it)
+      sim.run.state = 'busted';
+      for (let i = 0; i < 10; i++) jobs.step(inRing(sim, d, 0), 1 / 60);
+      expect(jobs.state).toBe('idle');
+      sim.run.state = 'running';
+      for (let i = 0; i < 10; i++) jobs.step(inRing(sim, d, 0), 1 / 60);
+      expect(jobs.state).toBe('idle');
+      jobs.step({ ...inRing(sim, d, 0), x: d.x + 40 }, 1 / 60);
+      jobs.step(inRing(sim, d, 0), 1 / 60);
+      expect(jobs.state).toBe('active');
+    } finally { sim.dispose(); }
+  });
+
   it('M8.7 2.3 with the police on the player and no job running nothing opens: a ring, a rival; the cold open ring does', async () => {
     const sim = await placedWorld();
     try {

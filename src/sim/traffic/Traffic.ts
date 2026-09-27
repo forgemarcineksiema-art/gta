@@ -105,6 +105,8 @@ const CARROT = 8;
 const CARROT_ROUND = 3.5;
 /** Seconds a returned body takes to blend back onto its lane (M7 slice 8). */
 const BLEND_BACK = 1;
+/** A player this far over or under a car's road is on another one (a deck, the tunnel; m, as Life's near misses). */
+const OTHER_ROAD = 3;
 /** A stopped car's body slower than this (m/s and rad/s) is at rest for the tip rule (M8.6 D3). */
 const TIP_REST = 0.3;
 /** A yielding car's tyres wear a push off at this rate (1/s): pushed at 2 m/s it stops in half a second (M8.6 gate). */
@@ -327,6 +329,8 @@ export class Traffic {
   private playerZ = 0;
   private readonly rng: () => number;
   private readonly nodes: RoadNode[];
+  /** The nodes a ramp's car gives way at (the highway's traffic coming): the grid's ring's; the island's, where a highway lane arrives. */
+  private readonly highwayNodes: Uint8Array;
   private readonly nodeHolders: Int32Array;
   private readonly nodeHoldFor: Float32Array;
   private readonly wait: Float32Array;
@@ -431,6 +435,11 @@ export class Traffic {
     this.target = Math.max(0, Math.min(this.moving, Math.round(this.moving * density)));
     this.lanes = new LaneTables(graph, tuning, (lane) => streets.kind(lane), streets.roadAt);
     this.nodes = graph.nodes;
+    // the island's merges by their lanes: by the grid's ring (|x| or |z| 675) none was, and a ramp's car pulled straight
+    // into the highway's lane in front of its traffic
+    this.highwayNodes = new Uint8Array(graph.nodes.length);
+    graph.nodes.forEach((node, k) => { if (Math.abs(node.x) === 675 || Math.abs(node.z) === 675) this.highwayNodes[k] = 1; });
+    if (streets.roadAt) for (const l of graph.lanes) if (l.highway) this.highwayNodes[l.to] = 1;
     this.rng = mulberry32(seed ^ 0x7a11);
     const n = this.capacity;
     this.state = new Uint8Array(n);
@@ -1328,7 +1337,9 @@ export class Traffic {
   clearAround(x: number, z: number, radius: number): void {
     const r2 = radius * radius;
     for (let i = 0; i < this.capacity; i++) {
-      if (this.state[i] === AgentState.Free) continue;
+      // the civilians only: a duel's rival freed here vanished and its duel failed (a race's was a free win), a unit
+      // freed stayed on the police's roll
+      if (this.state[i] === AgentState.Free || this.police[i] === 1 || this.racer[i] === 1 || this.rival[i] === 1 || this.puppet[i] === 1 || i === this.wanted) continue;
       const dx = (this.x[i] as number) - x;
       const dz = (this.z[i] as number) - z;
       if (dx * dx + dz * dz <= r2) this.free(i);
@@ -1687,9 +1698,9 @@ export class Traffic {
     body.setAngvel(this.ang, true);
   }
 
-  /** On an overpass's ramp the body rides at the road's height: its height is held, not simulated. */
+  /** On an overpass's ramp the body rides at the road's height: its height is held, not simulated (across a junction too). */
   private holdHeight(i: number, body: RAPIER.RigidBody, lane: number): void {
-    const h = this.lanes.heightAt(lane, this.s[i] as number);
+    const h = this.lanes.heightOn(lane, this.s[i] as number, this.next[i] as number, this.laneOffset[i]);
     this.y[i] = h;
     body.translation(this.pos);
     if (Math.abs(this.pos.y - (h + 0.03)) > 0.001) {
@@ -1760,6 +1771,9 @@ export class Traffic {
     // beside the path, not past its end: a player beyond a lane's end (no next lane chosen yet) projects onto the end
     // with no lateral, and cars braked for them from anywhere down the line (found in M7 slice 6)
     if (this.proj.dist > Math.abs(this.proj.lateral) + 0.5) return Infinity;
+    // on another road over or under this one's (a deck, the tunnel): a highway car braked to a stop for a player waiting
+    // on the street under its overpass, and its lane queued behind it
+    if (Math.abs(player.y - 0.5 - this.lanes.heightOn(lane, this.proj.s, this.next[i] as number)) > OTHER_ROAD) return Infinity;
     const along = this.proj.s - (this.s[i] as number);
     const lateral = this.proj.lateral - (this.laneOffset[i] as number) - (this.shift[i] as number);
     if (along > 0 && along < this.tuning.playerGap && Math.abs(lateral) < this.tuning.playerLateral) return along;
@@ -1860,7 +1874,7 @@ export class Traffic {
     // A holder is already committed: it keeps going (gaps still stop it behind anyone in the box).
     if (this.isHolder(node, i)) return true;
     // stopped, it lets the player cross first, not one queued behind it (each waited for the other to go, the full wait)
-    if ((this.plannerSpeed[i] as number) <= 0 && this.playerNear(node, player) && !this.playerBehind(i, player)) return false;
+    if ((this.plannerSpeed[i] as number) <= 0 && this.playerNear(node, player, i) && !this.playerBehind(i, player)) return false;
     const fromHighway = (this.lanes.limit[lane] as number) === t.speedHighway;
     if (!fromHighway && this.highwayNode(node) && this.highwayApproaching(node)) return false;
     if (this.turn[i] === 0 && fromHighway) return true;
@@ -1957,8 +1971,7 @@ export class Traffic {
   }
 
   private highwayNode(node: number): boolean {
-    const n = this.nodes[node] as RoadNode;
-    return Math.abs(n.x) === 675 || Math.abs(n.z) === 675;
+    return this.highwayNodes[node] === 1;
   }
 
   /** A car on a roundabout's ring coming up to `node`, within `RING_GAP` m of it: the arms give way to it. */
@@ -1980,11 +1993,12 @@ export class Traffic {
     return dx * fx + dz * fz < 0 && Math.abs(dx * fz - dz * fx) < BEHIND_ACROSS && Math.cos(player.yaw - (this.yaw[i] as number)) > 0.5;
   }
 
-  private playerNear(node: number, player: PlayerProbe): boolean {
+  private playerNear(node: number, player: PlayerProbe, i: number): boolean {
     const n = this.nodes[node] as RoadNode;
     const dx = n.x - player.x;
     const dz = n.z - player.z;
-    return dx * dx + dz * dz < 12 * 12;
+    // on this junction's road, not on a deck over it or in the tunnel under it
+    return dx * dx + dz * dz < 12 * 12 && Math.abs(player.y - 0.5 - (this.y[i] as number)) < OTHER_ROAD;
   }
 
   private highwayApproaching(node: number): boolean {
@@ -2436,7 +2450,7 @@ export class Traffic {
       this.poseQ[k + 3] = q.w;
       // on the road under it (the highway's deck or the street), off a lane on the ground (the grid's 0, the island's)
       const lane = this.lane[i] as number;
-      this.y[i] = lane >= 0 ? this.lanes.heightAt(lane, this.s[i] as number) : this.streets.groundAt(this.pos.x, this.pos.z);
+      this.y[i] = lane >= 0 ? this.lanes.heightOn(lane, this.s[i] as number, this.next[i] as number, this.laneOffset[i]) : this.streets.groundAt(this.pos.x, this.pos.z);
       this.posed[i] = 1;
     }
     this.wreck(i);
@@ -2497,7 +2511,7 @@ export class Traffic {
     const overdue = -this.disturbedFor[i] > t.disturbedMax - t.disturbedTime;
     const level = up >= Math.cos(t.reattachLevel * Math.PI / 180);
     body.translation(this.pos);
-    const road = lane >= 0 ? this.lanes.heightAt(this.proj.switched ? this.next[i] as number : lane, this.proj.s) + 0.03 : 0;
+    const road = lane >= 0 ? this.lanes.heightOn(this.proj.switched ? this.next[i] as number : lane, this.proj.s, this.proj.switched ? -1 : this.next[i] as number, this.laneOffset[i]) + 0.03 : 0;
     if (lane >= 0 && level && rock < t.reattachSpin && Math.abs(this.pos.y - road) < t.reattachHeight && (spin <= t.settleSpin || overdue)) {
       this.state[i] = AgentState.Physical;
       this.reattachLeft[i] = this.tuning.reattachBlend;
@@ -3122,7 +3136,8 @@ export class Traffic {
     const along = dx * fx + dz * fz;
     const side = -dx * Math.cos(yaw) + dz * Math.sin(yaw) - (this.shift[i] as number);
     const toward = -(player.vx * fx + player.vz * fz);
-    if (along > 3 && along < 60 && Math.abs(side) < 2.8 && toward > 4 && along / (speed + toward) < t.flinch.seconds) {
+    if (along > 3 && along < 60 && Math.abs(side) < 2.8 && toward > 4 && along / (speed + toward) < t.flinch.seconds
+      && Math.abs(player.y - 0.5 - (this.y[i] as number) - (this.grade[i] as number) * along) < OTHER_ROAD) {
       if ((this.flinchLeft[i]) <= 0) {
         this.flinches++;
         if ((this.honkCooldown[i] as number) <= 0) {
@@ -3333,7 +3348,7 @@ export class Traffic {
     const body = this.body[i] as number;
     const ex = Math.max(0, Math.abs(side) - (this.halfW[body] as number) - player.halfWidth);
     const ez = Math.max(0, Math.abs(along) - (this.halfL[body] as number) - player.halfLength);
-    if (ex * ex + ez * ez > 4) return;
+    if (ex * ex + ez * ez > 4 || Math.abs(player.y - 0.5 - (this.y[i] as number)) > OTHER_ROAD) return;
     const rel = Math.hypot(player.vx - (this.speed[i] as number) * fx, player.vz - (this.speed[i] as number) * fz);
     if (rel <= 8) return;
     events.push('honk', 0, this.x[i] as number, 0.03, this.z[i] as number, i);

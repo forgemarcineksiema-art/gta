@@ -25,6 +25,10 @@ import { PLUMB_TILT } from '../island/Island';
 import type { VehicleTuning } from '../vehicle/tuning';
 import { Driver } from './Driver';
 
+/** Under this height an AI car has fallen off the world, and this far under the island's ground through it (m). */
+const FELL_Y = -25;
+const FELL_UNDER = 4;
+
 export interface AiTuning {
   pool: number;
   physicalRadius: number;
@@ -142,6 +146,13 @@ export class AiCars {
       if (car.role === 'rival') {
         if (!race.physical || !traffic.isRacer(a) || d > AI.releaseRadius) { this.release(car, traffic); continue; }
       } else if (!chase || traffic.police[a] !== 1 || (d > AI.unitRelease && !this.isNear(a))) {
+        this.release(car, traffic);
+        continue;
+      }
+      // fallen through the ground (two units driven under a deck's end fell on for good, still on the roll) or off the
+      // world: back on its lane, as a fall puts the player's car back on its road
+      const y = car.vehicle.body.translation(this.pos).y, island = this.sim.island;
+      if (y < FELL_Y || (island && y < island.ground.height(x, z) - FELL_UNDER)) {
         this.release(car, traffic);
         continue;
       }

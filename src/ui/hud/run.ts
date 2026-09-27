@@ -138,6 +138,10 @@ export class RunHud {
     relabel(this.root);
     this.setKeys({ any: this.anyKey, swap: this.swapKey });
     this.ticketMode = '';
+    // the numbers written again in the new language's form (84 500, ×2,6), not when they next change
+    this.lastBank = -1;
+    this.lastBagShown = -1;
+    this.lastMult = -1;
     if (sim.run.state === 'busted') this.fillCard(sim);
     else if (sim.run.state === 'door') this.fillWall(sim);
   }

@@ -14,6 +14,7 @@ import { POLICE } from '../police/tuning';
 import { PedPose } from '../traffic/Pedestrians';
 import type { Lane } from '../city/roads';
 import { alongLane } from '../city/route';
+import { atFinish } from './finish';
 import type { SimWorld } from '../SimWorld';
 import { AgentState, type PlayerProbe } from '../traffic/Traffic';
 import type { BodyId } from '../traffic/bodies';
@@ -132,7 +133,7 @@ export class Race {
       if (!traffic.isRacer(agent)) { this.rivals[k] = -1; continue; }
       const x = traffic.x[agent] as number, z = traffic.z[agent] as number;
       const theirs = Math.hypot(this.finishX - x, this.finishZ - z);
-      if (theirs <= r.finishRadius) {
+      if (theirs <= r.finishRadius && atFinish(this.sim, this.finishX, this.finishZ, traffic.y[agent] as number)) {
         this.placeOf[k] = ++this.finished;
         traffic.endRace(agent);
         continue;

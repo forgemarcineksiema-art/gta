@@ -111,6 +111,18 @@ describe('dailies', () => {
     } finally { sim.dispose(); }
   });
 
+  it('6.3b "bank 3 runs without getting busted" counts a run that banked something: an empty bag through a garage is none', async () => {
+    const sim = await createWorld({ map: 'playground' });
+    try {
+      slot(sim, DAILY_TEMPLATES.findIndex((t) => t.kind === 'run'));
+      // in and out of a garage three times with nothing (the second bug hunt: it paid the 5,000)
+      for (let i = 0; i < 3; i++) sim.dailies.onRunEnd(0, 0, false);
+      expect(sim.dailies.done[0]).toBe(false);
+      for (let i = 0; i < 3; i++) sim.dailies.onRunEnd(500, 1, false);
+      expect(sim.dailies.done[0]).toBe(true);
+    } finally { sim.dispose(); }
+  });
+
   it('6.4 / 6.5 the streak: yesterday then today counts up, a gap resets, the same day is nothing, day seven is the topper; its cash once a day', async () => {
     const sim = await createWorld({ map: 'playground' });
     try {

@@ -21,11 +21,16 @@ function buildStamp(): string {
   }
 }
 
+const ISLAND_KEY = islandKey(fileURLToPath(new URL('.', import.meta.url)));
+
 export default defineConfig({
   // CrazyGames serves the build from an arbitrary path inside an iframe: relative URLs only.
   base: './',
   // the island's bake's key (M8.10 slice 18): the game loads `island.bin` only when it is of these sources
-  define: { __APP_VERSION__: JSON.stringify(buildStamp()), __ISLAND_KEY__: JSON.stringify(islandKey(fileURLToPath(new URL('.', import.meta.url)))) },
+  define: { __APP_VERSION__: JSON.stringify(buildStamp()), __ISLAND_KEY__: JSON.stringify(ISLAND_KEY) },
+  // the page's early fetch of the bake asks for this build's (a host's cached bake of the last build failed the key,
+  // and the island was built from its plan: some 20 s at 4× CPU); the game's own fetch adds the same (islandBake.ts)
+  plugins: [{ name: 'island-key', transformIndexHtml: (html: string) => html.replace("fetch('./island.bin')", `fetch('./island.bin?k=${ISLAND_KEY}')`) }],
   build: {
     target: 'es2022',
     sourcemap: false,

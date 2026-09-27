@@ -2,6 +2,17 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-27 — the island's roads and ground (Marcin: "drogi/teren ... zbugowane, niedopracowane")
+
+Surveyed headless (a car round every lane; the drawn ground against the drawn roads) and fixed: the tunnel's floor bends
+into the road's grade at its mouths (they stood 0.4 m proud, jolts of 200 m/s²; 6a.6); the decks' ramps leave the ground
+on a curve centred on the abutment (the lighthouse road keeps its headroom, 6a.7); the lid 4 m past the trench and 1.5 m
+fine (a 1.3 m ditch by the serpentine, 6a.8); the roads' profiles a cubic B-spline (streets' creases under 15 m: 76 → 20,
+2.6); the highway's ground stops under an overpass, the quay's slanting one 36 m each way (6a.9); a road joining the
+highway runs level beside it (the serpentine's 1.3 m step); no prop under a deck (7.7). Ground over road 7,895 → 672
+samples (over 30 cm 148 → 9); the ride's jolts 240 → 140, flights 32 → 10. Pin 6a.3 now leaves the tunnel's end pieces
+undug: the trench under them was the dip that threw the cars. The rest in BACKLOG.
+
 ## 2026-09-27 — the island's backlog from the bug hunt (Marcin: "Popraw też te z backlogu")
 
 Fixed: shadows cast by the shadow map's box in light space (±265 m along the low sun, ±140 across; the 198 m circle

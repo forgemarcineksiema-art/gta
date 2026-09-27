@@ -6,6 +6,7 @@ import { districtAt } from '../../../src/sim/city/City';
 import { QUERY_NOT_PROP } from '../../../src/sim/collision';
 import { CHUNKS_X, CHUNKS_Z, Island, PLUMB_TILT } from '../../../src/sim/island/Island';
 import { districtOf } from '../../../src/sim/island/plan';
+import { DECK } from '../../../src/sim/island/structures';
 import { createWorld } from '../helpers';
 
 describe('M8.10 slice 7b: the props on the island', () => {
@@ -63,5 +64,20 @@ describe('M8.10 slice 7b: the props on the island', () => {
     sim.vehicle.setVelocity(fx * 11, 0, fz * 11);
     for (let i = 0; i < 90 && props.state[target.id] === PropState.Standing; i++) { clearControls(sim.controls); sim.controls.throttle = 0.4; sim.step(); }
     expect(props.state[target.id], `a ${target.kind}`).not.toBe(PropState.Standing);
+  });
+
+  it('7.7 no prop stands under a deck (a lamp by the lighthouse road stood up through the bay bridge\'s ramp, a post the cars on it ran into)', () => {
+    const decks = island.structures.filter((s) => s.kind !== 'tunnel').flatMap((s) => s.pieces);
+    const under: string[] = [];
+    let count = 0;
+    for (let k = 0; k < CHUNKS_X * CHUNKS_Z; k++) for (const p of island.props(k)) {
+      count++;
+      for (const d of decks) {
+        const dx = p.x - d.x, dz = p.z - d.z, fx = Math.sin(d.yaw), fz = Math.cos(d.yaw);
+        if (Math.abs(dx * fx + dz * fz) <= d.length / 2 && Math.abs(dx * fz - dz * fx) <= DECK.half) { under.push(`a ${p.kind} at ${p.x.toFixed(0)}, ${p.z.toFixed(0)}`); break; }
+      }
+    }
+    expect(count).toBeGreaterThan(1000);
+    expect(under).toEqual([]);
   });
 });

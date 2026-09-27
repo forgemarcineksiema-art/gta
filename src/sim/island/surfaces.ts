@@ -21,8 +21,11 @@ export const PAINT_LIFT = 0.012;
 /** A pavement's kerb over the road and its width (m). */
 export const KERB = 0.14;
 export const PAVEMENT = 3;
-/** A strip's edge hangs this far under it where no pavement stands (m). */
-const SKIRT = 0.5;
+/**
+ * A strip's edge hangs this far under it where no pavement stands, and a pavement's outer edge under the ground there (m):
+ * past what the view's ground is drawn under the road (its grid's reach, M8.10).
+ */
+const SKIRT = 1.2;
 /** A strip's span is halved where the ground at its middle is further than this from the span's straight line (m). */
 const BEND = 0.01;
 /** A pavement stops this far past the carriageway of a road crossing it: the corner (m). */
@@ -614,12 +617,12 @@ class Emitter {
       const out0 = [outX0, g0 + ROAD_LIFT + KERB, outZ0], out1 = [outX1, g1 + ROAD_LIFT + KERB, outZ1];
       this.quad(top0, top1, out1, out0, ISLAND_COLORS.paving);
       this.quad(e0, e1, top1, top0, PALETTE.kerb, true);
-      this.quad(out0, out1, [outX1, g1 - 0.3, outZ1], [outX0, g0 - 0.3, outZ0], PALETTE.kerb, true);
+      this.quad(out0, out1, [outX1, g1 - SKIRT, outZ1], [outX0, g0 - SKIRT, outZ0], PALETTE.kerb, true);
       // its end where it starts after a gap (the segment before it not drawn or with no pavement on this side), and
       // where it stops before one (the next not drawn)
       const walked = k > 0 && st.drawn[k - 1] === true && ((st.walk[k - 1] as number) & bit) !== 0;
-      if (!walked) this.quad(e0, top0, out0, [outX0, g0 - 0.3, outZ0], PALETTE.kerb, true);
-      if (k + 2 >= count || !st.drawn[k + 1]) this.quad(e1, top1, out1, [outX1, g1 - 0.3, outZ1], PALETTE.kerb, true);
+      if (!walked) this.quad(e0, top0, out0, [outX0, g0 - SKIRT, outZ0], PALETTE.kerb, true);
+      if (k + 2 >= count || !st.drawn[k + 1]) this.quad(e1, top1, out1, [outX1, g1 - SKIRT, outZ1], PALETTE.kerb, true);
     }
   }
 

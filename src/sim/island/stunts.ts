@@ -65,7 +65,7 @@ export function stuntSites(ground: Ground, surfaces: RoadSurfaces, kerbside: rea
   const fallKeep = breakers.map(breakerKeep);
   const lips = placeLips();
   for (const k of kickers) lips.set(k.jump, k);
-  const billboards = billboardSites(ground, surfaces, gates, lips, [...jumpKeep, ...fallKeep]);
+  const billboards = billboardSites(ground, surfaces, gates, lips, [...jumpKeep, ...fallKeep], poles);
   const runOuts = billboards.map(billboardKeep);
   return { kickers, breakers, billboards, keep: [...jumpKeep, ...fallKeep, ...runOuts], props: [...jumpKeep, ...fallKeep], solid: runOuts };
 }

@@ -16,7 +16,7 @@ import type { TrackDef, TrackSample } from '../track';
 import { inPolygon, type P2 } from './geom';
 import { ASPHALT, GRASS } from '../city/surface';
 import { PROP_LINES, PROP_TYPES, chunkProps, type PropDesc, type PropKind, type PropPlace } from '../city/props';
-import { FOOT, Ground, HALF_WIDTH, type CoastKind, type GroundData, type GroundProbe } from './ground';
+import { FOOT, Ground, HALF_WIDTH, TRENCH, type CoastKind, type GroundData, type GroundProbe } from './ground';
 import { LaneIndex } from '../city/laneIndex';
 import { buildNetwork, type IslandNetwork } from './network';
 import { DECK, structures, type Piece, type Structure } from './structures';
@@ -80,8 +80,13 @@ const PROP_SEED = 42;
 /** A Works lot's setback (fill.ts's rule) and the grid's pavement's width, which the grid's yards are laid from (m). */
 const FOUNDRY_SETBACK = 7;
 const GRID_PAVEMENT = 4.5;
-/** The tunnel's lid over its trench (slice 8): its half width across the tunnel and its mesh's step across (m). */
-const LID = { half: 24, step: 3 } as const;
+/**
+ * The tunnel's lid over its trench (slice 8): its half width across the tunnel, past the trench's edge by a height field
+ * cell's diagonal and more (the cell across the edge slopes down into the trench: a ditch 1.3 m deep the serpentine's
+ * wheels dropped into beside the lid), the roof's top under it this far each side, and its mesh's step across and along
+ * (m: at 3 m it cut the serpentine's crest over the tunnel by 0.18 m, a kink the wheels met).
+ */
+const LID = { half: TRENCH + 4, roof: 24, step: 1.5 } as const;
 /**
  * The street furniture's keep-outs from the world (slice 15, the grid's M8 D7): a car's half width and room either side
  * of the cold open's route (m), as the grid's.
@@ -620,8 +625,10 @@ export class Island {
     const reach = Math.max(hx, hz);
     if (this.stuntSites.props.some((k) => inKeep(k, x, z, reach))) return true;
     if ((kind === undefined || PROP_TYPES[kind].breakImpulse > 0) && this.stuntSites.solid.some((k) => inKeep(k, x, z, reach))) return true;
-    // a garage and its apron out to the kerb (the car rolls in over it), its sign's pole (slice 14)
+    // under a deck: a lamp by the lighthouse road stood up through the bay bridge's ramp, a post the cars on it ran into
     const r = Math.max(hx, hz), frame = this.garageFrame;
+    if (this.underDeck(x, z, r)) return true;
+    // a garage and its apron out to the kerb (the car rolls in over it), its sign's pole (slice 14)
     for (const g of this.garages) {
       if (Math.hypot(g.x - x, g.z - z) > GARAGE.depth + g.toKerb + 10) continue;
       toDropOff(g, x, z, frame);
@@ -900,6 +907,20 @@ export class Island {
     return { shape: { kind: 'cuboid', hx, hy, hz }, x: p.x + x2, y: p.y + y1, z: p.z + z2, q: { x: cy * sp, y: sy * cp, z: -sy * sp, w: cy * cp }, groups };
   }
 
+  /** Whether (x, z) is under a deck (a viaduct's, a bridge's, an overpass's), with `r` m of room round it. */
+  private underDeck(x: number, z: number, r: number): boolean {
+    for (const s of this.structures) {
+      if (s.kind === 'tunnel') continue;
+      for (const p of s.pieces) {
+        const dx = x - p.x, dz = z - p.z, reach = DECK.half + p.length + r;
+        if (Math.abs(dx) > reach || Math.abs(dz) > reach) continue;
+        const fx = Math.sin(p.yaw), fz = Math.cos(p.yaw);
+        if (Math.abs(dx * fx + dz * fz) <= p.length / 2 + 0.5 + r && Math.abs(dx * fz - dz * fx) <= DECK.half + 0.5 + r) return true;
+      }
+    }
+    return false;
+  }
+
   /** A kerb's slab under a piece of a chunk's pavement, made as the chunk loads. */
   private slab(p: Piece, hx: number, hy: number, hz: number, ox: number, oy: number, oz: number, groups: number): RAPIER.Collider {
     const d = this.slabPose(p, hx, hy, hz, ox, oy, oz, groups), s = d.shape as { hx: number; hy: number; hz: number };
@@ -908,15 +929,18 @@ export class Island {
 
   /**
    * A piece of the tunnel's lid over its trench (slice 8: the serpentine crosses it): the hill's surface, the roof's top
-   * at least, as a mesh `LID.step` m across, at the piece's ends and middle, so a road over it is where it is drawn.
+   * at least, as a mesh about `LID.step` m square, so a road over it is where it is drawn.
    */
   private lidPiece(p: Piece, half: number, verts: number[], tris: number[]): void {
     const fx = Math.sin(p.yaw), fz = Math.cos(p.yaw), across = Math.round((2 * LID.half) / LID.step), first = verts.length / 3;
-    for (const a of [-half, 0, half]) for (let j = 0; j <= across; j++) {
+    const rows = Math.max(2, Math.ceil((2 * half) / LID.step));
+    for (let i = 0; i <= rows; i++) for (let j = 0; j <= across; j++) {
+      const a = -half + (2 * half * i) / rows;
       const c = -LID.half + (2 * LID.half * j) / across, x = p.x + fx * a + fz * c, z = p.z + fz * a - fx * c;
-      verts.push(x, Math.max(this.ground.surfaceHeight(x, z), p.y + Math.tan(p.pitch) * a + DECK.clear + 1), z);
+      const hill = this.ground.surfaceHeight(x, z);
+      verts.push(x, Math.abs(c) <= LID.roof ? Math.max(hill, p.y + Math.tan(p.pitch) * a + DECK.clear + 1) : hill, z);
     }
-    for (let i = 0; i < 2; i++) for (let j = 0; j < across; j++) {
+    for (let i = 0; i < rows; i++) for (let j = 0; j < across; j++) {
       const k = first + i * (across + 1) + j, n = k + across + 1;
       tris.push(k, n, k + 1, k + 1, n, n + 1);
     }

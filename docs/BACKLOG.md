@@ -5,6 +5,10 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 ## The island (the bug hunt after the switch, 2026-09-27)
 
 - The job bot (`bot=job`) on the island follows the centre's roundabout's traffic at walking pace (it neither overtakes nor weaves), so delivery #1 (104 s for about 1.2 km) runs out of its clock: the gate's balance measures the bot's pace and #1's limit, as planned (M8.10 slice 14).
+- The lighthouse road passes under the bay bridge's ramp with 1.66 m of headroom at its lowest (a car fits, a van would not): a dip under the deck, as the roads under the overpasses have, gives it 2.7 m.
+- The serpentine's hairpins ripple ±0.1 m at their apexes (its two legs within each other's reach: the nearest segment swaps legs), and crown-street-2 leaves Crown Avenue at 22 %: the drawn ground 0.4 m over the street's edge there.
+- Crown's crossings keep their crests: a 16 % block now bends into its crossing's flat over about 12 m, and the cars still lift off at 80 km/h; a longer bend needs steeper blocks between the flats.
+- In the tunnel's portals its floor is flat across while the road outside is cambered: 0.14–0.25 m apart at the carriageway's edges on the portal's line.
 
 ## Performance / size
 

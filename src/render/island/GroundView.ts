@@ -32,6 +32,14 @@ const COARSER = 1.6;
 const BANK = SHOULDER + 3;
 /** A wall face hangs from the cut's edge to under the sea's floor at a steep shore's foot (m). */
 const FACE_BOTTOM = FOOT - 0.5;
+/**
+ * Under a carriageway the ground is drawn this much lower than it lies (m), and past one no higher than the road's edge
+ * (the readings' `drop`): its triangles never reach over the road's strip between the grid's points (M8.10), the strips'
+ * skirts hanging past the gap.
+ */
+const UNDER_ROAD = 0.1;
+/** A point lowered to a road's edge by more than this (m) is held there (its allowance the road's); less, the open ground's. */
+const HELD_DROP = 0.05;
 /** How far a chunk's border skirt hangs (m): past the most two neighbours' meshes can part there. */
 const SKIRT = 1.5;
 /** The hill's ground is cut back this far into each of the tunnel's mouths, so the mouth shows (m). */
@@ -50,7 +58,7 @@ const FACE: Readonly<Record<string, number>> = {
 };
 
 /** A chunk's points being read: its column and row, the next column to read, what each point holds (`laid`: the Gardens' marks, `gardensGround`). */
-interface Reading { i: number; j: number; col: number; h: Float32Array; cut: Float32Array; kind: Int8Array; road: Float32Array; surface: Uint8Array; laid: Uint8Array; steep: Float32Array }
+interface Reading { i: number; j: number; col: number; h: Float32Array; cut: Float32Array; kind: Int8Array; road: Float32Array; surface: Uint8Array; laid: Uint8Array; steep: Float32Array; drop: Uint8Array }
 
 /** A chunk's ground as arrays: three corners a triangle, a colour a corner, and its count. */
 export interface ChunkMesh { positions: Float32Array; colors: Uint8Array; triangles: number }
@@ -170,11 +178,15 @@ export class GroundView {
   /** A chunk's points from the island's readings of its ground on the view's grid (M8.10 slice 18: baked). */
   private startReading(i: number, j: number): Reading {
     const n = GRID * GRID, v = this.island.viewReadings(Island.chunkIndex(i, j));
-    const r: Reading = { i, j, col: 0, h: new Float32Array(n), cut: new Float32Array(n), kind: new Int8Array(n), road: new Float32Array(n), surface: new Uint8Array(n), laid: new Uint8Array(n), steep: new Float32Array(n) };
+    const r: Reading = { i, j, col: 0, h: new Float32Array(n), cut: new Float32Array(n), kind: new Int8Array(n), road: new Float32Array(n), surface: new Uint8Array(n), laid: new Uint8Array(n), steep: new Float32Array(n), drop: new Uint8Array(n) };
     let h = 0, s = 0, d = 0;
     for (let k = 0; k < n; k++) {
       h += v.h[k] as number; s += v.steep[k] as number; d += v.road[k] as number;
       r.h[k] = h / 100; r.steep[k] = s / 100; r.road[k] = d / 100;
+      // drawn under the roads' strips: lower on a carriageway, no higher than its edge past one
+      const drop = (v.drop[k] as number) / 100;
+      if (d < 0) r.h[k] = (r.h[k] as number) - UNDER_ROAD;
+      else if (drop > 0) { r.h[k] = (r.h[k] as number) - drop; if (drop > HELD_DROP) r.drop[k] = 1; }
       r.kind[k] = v.kind[k] as number; r.surface[k] = v.surface[k] as number; r.laid[k] = v.laid[k] as number;
     }
     return r;
@@ -221,9 +233,13 @@ export class GroundView {
         const h = r.h[k] as number, road = r.road[k] as number;
         let a: number, b: number;
         if ((r.cut[k] as number) < -3) a = b = 1e6;
-        // under a road's strip or a paved place's slab (4 cm over the ground, 3.5 the slabs) or a place's own surface
-        // (the Gardens' paths and golf, 5 cm over): never over it
-        else if (road < 0 || r.surface[k] === ASPHALT || ((r.laid[k] as number) & LAID) !== 0) { a = 0.036; b = 0.6; }
+        // under a road's strip (drawn `UNDER_ROAD` lower: up to the ground it lies on, still under the strip's 4 cm) or a
+        // paved place's slab (3.5 cm over the ground) or a place's own surface (the Gardens' paths and golf, 5 cm over):
+        // never over it
+        else if (road < 0) { a = UNDER_ROAD; b = 0.6; }
+        else if (r.surface[k] === ASPHALT || ((r.laid[k] as number) & LAID) !== 0) { a = 0.036; b = 0.6; }
+        // lowered to a road's edge: held there, or the triangle over the edge rises again
+        else if (r.drop[k] === 1) { a = 0.036; b = 0.3; }
         else if (road < SHOULDER + 1) { a = 0.1; b = 0.3; }
         else if (h < SEA.level - 0.6) a = b = 3 * loose;
         else if (Math.abs(h - SEA.level) < 0.6) a = b = 0.08 * loose;

@@ -98,6 +98,33 @@ describe('M8.10 slice 2: the ground', () => {
     expect(grounded / steps).toBeGreaterThan(0.95);
   });
 
+  it('2.6 a road bends from one grade to the next on a curve: the highway on the ground never tighter than 100 m; a street\'s crest or sag tighter than 15 m in 30 m of the 5 km at most (a crossing\'s flat met its block in one point: the cars flew off the crests and bottomed in the sags)', () => {
+    const g = new Island(new RAPIER.World({ x: 0, y: -9.81, z: 0 })).ground;
+    let highway = Infinity, tight = 0, street = 0;
+    for (const r of g.roads) {
+      if (r.cls !== 'highway' && r.cls !== 'street') continue;
+      // the road's surface a metre a step (none over an overpass: its deck carries it)
+      const n = r.pts.length, last = r.closed ? n : n - 1, xs: number[] = [], zs: number[] = [];
+      for (let i = 0; i < last; i++) {
+        const a = r.pts[i] as [number, number], b = r.pts[(i + 1) % n] as [number, number], steps = Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1])));
+        const deck = r.deck?.[i] === true || r.deck?.[(i + 1) % n] === true;
+        for (let k = 0; k < steps; k++) { xs.push(deck ? NaN : a[0] + ((b[0] - a[0]) * k) / steps); zs.push(a[1] + ((b[1] - a[1]) * k) / steps); }
+      }
+      const h = xs.map((x, k) => (Number.isNaN(x) ? NaN : g.surfaceHeight(x, zs[k] as number)));
+      for (let k = 2; k + 2 < h.length; k++) {
+        const s0 = Math.hypot((xs[k] as number) - (xs[k - 2] as number), (zs[k] as number) - (zs[k - 2] as number)), s1 = Math.hypot((xs[k + 2] as number) - (xs[k] as number), (zs[k + 2] as number) - (zs[k] as number));
+        const turn = ((h[k + 2] as number) - (h[k] as number)) / s1 - ((h[k] as number) - (h[k - 2] as number)) / s0;
+        if (Number.isNaN(turn)) continue;
+        const radius = (s0 + s1) / 2 / Math.max(1e-6, Math.abs(turn));
+        if (r.cls === 'highway') highway = Math.min(highway, radius);
+        else { street++; if (radius < 15) tight++; }
+      }
+    }
+    expect(highway).toBeGreaterThan(100);
+    expect(street).toBeGreaterThan(4000);
+    expect(tight).toBeLessThanOrEqual(30);
+  });
+
   // 2.4 (a drive along the highway across four chunk borders) is a long pin: drive.long.test.ts
 
   it('2.5 at 60 m/s across the island the ground is worked out ahead, a bounded share a step; a height field builds in under 5 ms', () => {

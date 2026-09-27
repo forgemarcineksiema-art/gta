@@ -83,7 +83,7 @@ export function gateBlocked(gates: readonly BillboardSite[], x: number, z: numbe
  * Every billboard's site, before the lots: the verges' round the highway, the landings' of the big jumps (their lips from
  * `lips`, the places' and the kickers'), the streets' across their pavements; `keep` the jumps' ways they keep off.
  */
-export function billboardSites(ground: Ground, surfaces: RoadSurfaces, kerbside: readonly BillboardSite[], lips: ReadonlyMap<number, { x: number; z: number; yaw: number }>, keep: readonly Keep[]): BillboardSite[] {
+export function billboardSites(ground: Ground, surfaces: RoadSurfaces, kerbside: readonly BillboardSite[], lips: ReadonlyMap<number, { x: number; z: number; yaw: number }>, keep: readonly Keep[], poles: ReadonlyArray<{ x: number; z: number }> = []): BillboardSite[] {
   const landings: BillboardSite[] = [];
   JUMPS.forEach((j, id) => {
     if (!j.billboard) return;
@@ -92,7 +92,7 @@ export function billboardSites(ground: Ground, surfaces: RoadSurfaces, kerbside:
     const lip = lips.get(id);
     if (lip) landings.push(landingSite(id, lip));
   });
-  const verges = vergeSites(ground, keep);
+  const verges = vergeSites(ground, keep, poles);
   const taken = [...landings, ...verges];
   const streets = streetSites(ground, surfaces, kerbside.filter((b) => b.kind === 'street'), taken, keep);
   return [...verges, ...streets, ...landings];
@@ -109,9 +109,9 @@ function clearOfPlaces(x: number, z: number): boolean {
  * The verges' sixteen: round the highway's loop where it runs on the ground (the tunnel, the viaduct and the bridge left
  * out), one a sixteenth of that length apart, each the nearest spot to its place where the verge is ground (no deck or
  * overpass near), land to past its run-out, level with the road, clear of every other road, the places and the jumps'
- * ways; the panel on whichever side is clear, facing the carriageway.
+ * ways, no camera's pole in its run-out; the panel on whichever side is clear, facing the carriageway.
  */
-function vergeSites(ground: Ground, keep: readonly Keep[]): BillboardSite[] {
+function vergeSites(ground: Ground, keep: readonly Keep[], poles: ReadonlyArray<{ x: number; z: number }>): BillboardSite[] {
   const loop = highwayLoop(6), pts = loop.pts, n = pts.length, hw = HALF_WIDTH.highway, off = hw + VERGE;
   // each sample's station along the loop's ground alone (-1 off it)
   const onGround = (i: number): boolean => { for (let k = -3; k <= 3; k++) if (loop.span[(i + k + n) % n] !== 'ground') return false; return true; };
@@ -139,8 +139,9 @@ function vergeSites(ground: Ground, keep: readonly Keep[]): BillboardSite[] {
     if (!each((qx, qz, d) => d <= hw + 1 || !ground.nearOtherRoad(qx, qz, -1, 1.5))) return null;
     const road = ground.surfaceHeight(p[0] + ox * hw, p[1] + oz * hw);
     if (!each((qx, qz) => Math.abs(ground.surfaceHeight(qx, qz) - road) <= 1.8)) return null;
-    // facing the carriageway: the face's way is back toward the road
-    return { x, z, yaw: Math.atan2(-ox, -oz), width: ROADSIDE_WIDTH, kind: 'verge', jump: -1 };
+    // facing the carriageway: the face's way is back toward the road; nothing standing where a car runs out through it
+    const site: BillboardSite = { x, z, yaw: Math.atan2(-ox, -oz), width: ROADSIDE_WIDTH, kind: 'verge', jump: -1 }, out = billboardKeep(site);
+    return poles.some((q) => inKeep(out, q.x, q.z, 1)) ? null : site;
   };
   const gap = (a: number, b: number): number => Math.min(Math.abs(a - b), total - Math.abs(a - b));
   // the samples on the ground, nearest a station first, within `reach` of it

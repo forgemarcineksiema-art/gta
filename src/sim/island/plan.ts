@@ -121,6 +121,8 @@ export function naturalHeight(x: number, z: number): number {
 // ---------------------------------------------------------------- the main roads
 
 export type RoadClass = 'highway' | 'avenue' | 'street' | 'serpentine' | 'dirt' | 'taxiway' | 'ramp' | 'side';
+/** A road's half width by class (m), its carriageway without the pavement. */
+export const HALF_WIDTH: Readonly<Record<RoadClass, number>> = { highway: 19, avenue: 12, street: 9, serpentine: 7, dirt: 5, taxiway: 12, ramp: 7, side: 8 };
 /** How a stretch of road meets the ground: on it, under it, or over it. */
 export type SpanKind = 'ground' | 'tunnel' | 'viaduct' | 'bridge' | 'overpass';
 
@@ -149,8 +151,13 @@ export const HIGHWAY: readonly PlanRoad[] = [
   road('highway-bay-bridge', 'highway', 'bridge', false, [[852, 610], [515, 752]]),
 ];
 
-/** How far each way of a road passing under it the highway rides an overpass (m). */
+/**
+ * How far each way of a road passing under it the highway rides an overpass (m), at least; a slanting road's out past
+ * where its carriageway leaves the highway's, and `OVERPASS_CLEAR` more (the ground's stop under the deck's end, the
+ * road's shoulder, a drawn cell: the quay's sweep crosses at 58°, and at 30 m the highway's bank covered its outer lane).
+ */
 export const OVERPASS_HALF = 30;
+const OVERPASS_CLEAR = 10;
 
 const loops = new Map<number, { pts: P2[]; piece: number[]; span: SpanKind[] }>();
 /**
@@ -175,7 +182,11 @@ export function highwayLoop(spacing: number): { pts: P2[]; piece: number[]; span
       if (span[i] !== 'ground') continue;
       const x = segmentCross(rp[a] as P2, rp[a + 1] as P2, pts[i] as P2, pts[(i + 1) % n] as P2);
       if (!x || ends.some((e) => Math.hypot(e[0] - x[0], e[1] - x[1]) < 5)) continue;
-      for (let k = 0; k < n; k++) if (Math.hypot((pts[k] as P2)[0] - x[0], (pts[k] as P2)[1] - x[1]) < OVERPASS_HALF) span[k] = 'overpass';
+      const ra = rp[a] as P2, rb = rp[a + 1] as P2, ha = pts[i] as P2, hb = pts[(i + 1) % n] as P2;
+      const rx = rb[0] - ra[0], rz = rb[1] - ra[1], hx = hb[0] - ha[0], hz = hb[1] - ha[1];
+      const sin = Math.abs(rx * hz - rz * hx) / (Math.hypot(rx, rz) * Math.hypot(hx, hz) || 1), cos = Math.sqrt(Math.max(0, 1 - sin * sin));
+      const half = Math.max(OVERPASS_HALF, (HALF_WIDTH.highway * cos + HALF_WIDTH[r.cls]) / Math.max(sin, 0.3) + OVERPASS_CLEAR);
+      for (let k = 0; k < n; k++) if (Math.hypot((pts[k] as P2)[0] - x[0], (pts[k] as P2)[1] - x[1]) < half) span[k] = 'overpass';
     }
   }
   const out = { pts, piece, span };

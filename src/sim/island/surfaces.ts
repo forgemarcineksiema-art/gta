@@ -90,6 +90,44 @@ function fanHeight(cx: number, cy: number, cz: number, a: RimPoint, b: RimPoint,
   return best;
 }
 
+/**
+ * A junction's fan's faces, each as its three corners: from its middle to each pair of rim points, in halves (the spokes'
+ * and the chord's middles on the ground) or in the grid it was cut to where the ground bends under it. What is drawn, and
+ * what the wheels read there (the island's physics).
+ */
+export function fanFaces(j: Junction, face: (ax: number, ay: number, az: number, bx: number, by: number, bz: number, cx: number, cy: number, cz: number) => void): void {
+  const rim = j.rim, f = j.fan, grid = j.grid, cut = j.cut ?? 3;
+  if (grid) {
+    // cut finer: the grid's points by (u, v), the middle and the rim's two its corners
+    const order = fanOrder(cut), index = new Map(order.map(([u, v], k) => [u * 64 + v, k]));
+    for (let i = 0; i < rim.length; i++) {
+      const a = rim[i] as RimPoint, b = rim[(i + 1) % rim.length] as RimPoint, n = 3 * order.length * i;
+      const at = (u: number, v: number): readonly [number, number, number] => {
+        if (u === 0 && v === 0) return [j.x, j.y, j.z];
+        if (u === cut) return [a.x, a.y, a.z];
+        if (v === cut) return [b.x, b.y, b.z];
+        const k = n + 3 * (index.get(u * 64 + v) as number);
+        return [grid[k] as number, grid[k + 1] as number, grid[k + 2] as number];
+      };
+      for (let u = 0; u < cut; u++) for (let v = 0; u + v < cut; v++) {
+        const p = at(u, v), q = at(u + 1, v), r = at(u, v + 1);
+        face(p[0], p[1], p[2], q[0], q[1], q[2], r[0], r[1], r[2]);
+        if (u + v < cut - 1) { const s = at(u + 1, v + 1); face(q[0], q[1], q[2], s[0], s[1], s[2], r[0], r[1], r[2]); }
+      }
+    }
+    return;
+  }
+  for (let i = 0; i < rim.length; i++) {
+    const a = rim[i] as RimPoint, b = rim[(i + 1) % rim.length] as RimPoint, n = 9 * i;
+    const mx = f[n] as number, my = f[n + 1] as number, mz = f[n + 2] as number, nx = f[n + 3] as number, ny = f[n + 4] as number, nz = f[n + 5] as number;
+    const ex = f[n + 6] as number, ey = f[n + 7] as number, ez = f[n + 8] as number;
+    face(j.x, j.y, j.z, mx, my, mz, nx, ny, nz);
+    face(mx, my, mz, a.x, a.y, a.z, ex, ey, ez);
+    face(mx, my, mz, ex, ey, ez, nx, ny, nz);
+    face(nx, ny, nz, ex, ey, ez, b.x, b.y, b.z);
+  }
+}
+
 /** A junction's rim point: where it is and, on an arm, its road's strip, station and offset. */
 export interface RimPoint { x: number; y: number; z: number; strip: number; s: number; o: number }
 /**
@@ -641,36 +679,7 @@ class Emitter {
 
   /** A fan from a junction's middle, each triangle in four: the spokes' middles and the corners' chords on the ground. */
   junction(j: Junction): void {
-    const colour = PALETTE.asphalt, rim = j.rim, f = j.fan, grid = j.grid, cut = j.cut ?? 3;
-    if (grid) {
-      // cut finer: the grid's points by (u, v), the middle and the rim's two its corners
-      const order = fanOrder(cut), index = new Map(order.map(([u, v], k) => [u * 64 + v, k]));
-      for (let i = 0; i < rim.length; i++) {
-        const a = rim[i] as RimPoint, b = rim[(i + 1) % rim.length] as RimPoint, n = 3 * order.length * i;
-        const at = (u: number, v: number): readonly [number, number, number] => {
-          if (u === 0 && v === 0) return [j.x, j.y, j.z];
-          if (u === cut) return [a.x, a.y, a.z];
-          if (v === cut) return [b.x, b.y, b.z];
-          const k = n + 3 * (index.get(u * 64 + v) as number);
-          return [grid[k] as number, grid[k + 1] as number, grid[k + 2] as number];
-        };
-        for (let u = 0; u < cut; u++) for (let v = 0; u + v < cut; v++) {
-          const p = at(u, v), q = at(u + 1, v), r = at(u, v + 1);
-          this.tri(p[0], p[1], p[2], q[0], q[1], q[2], r[0], r[1], r[2], colour);
-          if (u + v < cut - 1) { const s = at(u + 1, v + 1); this.tri(q[0], q[1], q[2], s[0], s[1], s[2], r[0], r[1], r[2], colour); }
-        }
-      }
-      return;
-    }
-    for (let i = 0; i < rim.length; i++) {
-      const a = rim[i] as RimPoint, b = rim[(i + 1) % rim.length] as RimPoint, n = 9 * i;
-      const mx = f[n] as number, my = f[n + 1] as number, mz = f[n + 2] as number, nx = f[n + 3] as number, ny = f[n + 4] as number, nz = f[n + 5] as number;
-      const ex = f[n + 6] as number, ey = f[n + 7] as number, ez = f[n + 8] as number;
-      this.tri(j.x, j.y, j.z, mx, my, mz, nx, ny, nz, colour);
-      this.tri(mx, my, mz, a.x, a.y, a.z, ex, ey, ez, colour);
-      this.tri(mx, my, mz, ex, ey, ez, nx, ny, nz, colour);
-      this.tri(nx, ny, nz, ex, ey, ez, b.x, b.y, b.z, colour);
-    }
+    fanFaces(j, (ax, ay, az, bx, by, bz, cx, cy, cz) => this.tri(ax, ay, az, bx, by, bz, cx, cy, cz, PALETTE.asphalt));
   }
 
   /** A strip's segment `k` (none where it is not drawn): its bands, and each side's pavement on its kerb or its skirt. */

@@ -250,7 +250,7 @@ export class TrackBot {
       controls.brake = speed > 0.5 ? 1 : 0;
       controls.boost = 0;
     }
-    const boxed = (sim.police?.unitsWithin(px, pz, BOXED_RANGE) ?? 0) > 0;
+    const boxed = sim.police !== null && sim.traffic !== null && this.policeOnTheMove(sim.traffic, px, pz);
     if (sim.traffic && (t.careful || t.unblock) && this.unblock(sim.traffic, controls, px, pz, yaw, speed, queued || boxed, dt)) return;
 
     // stuck: no progress while trying to drive; boxed in by the police is an arrest, not a stuck car
@@ -333,6 +333,21 @@ export class TrackBot {
     this.dodgeLeft = 10;
     // round on the far side: a car on the left is passed on the right, one dead ahead or on the right on the left
     this.pass = side < -0.3 ? -3 : 3;
+    return false;
+  }
+
+  /**
+   * A police unit within `BOXED_RANGE` on the move: a stop the police box in is an arrest, not a stuck car. A patrol parked
+   * at its kerb is not one (on the island the bot pushed one at a Foundry junction for good, neither reset nor steered
+   * round it): it is a car in the way (`unblock`).
+   */
+  private policeOnTheMove(traffic: Traffic, px: number, pz: number): boolean {
+    for (let i = 0; i < traffic.capacity; i++) {
+      if (traffic.police[i] !== 1) continue;
+      const st = traffic.state[i];
+      if (st !== AgentState.Kinematic && st !== AgentState.Physical) continue;
+      if (Math.hypot((traffic.x[i] as number) - px, (traffic.z[i] as number) - pz) <= BOXED_RANGE) return true;
+    }
     return false;
   }
 

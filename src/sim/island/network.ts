@@ -220,7 +220,7 @@ export function buildNetwork(ground: Ground): IslandNetwork {
     if (pts.length < 2) return;
     const first = pts[0] as RoadPoint, second = pts[1] as RoadPoint, last = pts[pts.length - 1] as RoadPoint, before = pts[pts.length - 2] as RoadPoint;
     const lane: Lane = {
-      id: lanes.length, from, to, highway: line.cls === 'highway', offset, points: pts,
+      id: lanes.length, from, to, highway: line.cls === 'highway', offset, points: pts, ...(line.ring ? { ring: true } : {}),
       x0: first.x, z0: first.z, x1: last.x, z1: last.z,
       yaw0: Math.atan2(second.x - first.x, second.z - first.z), yaw: Math.atan2(last.x - before.x, last.z - before.z), next: [],
     };

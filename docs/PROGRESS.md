@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-27 — the island's last backlog: the job bot, the fans, the survey bot (Marcin: "Popraw te z backlogu")
+
+The first delivery is done in 86 of 104 s with the traffic and the police on (long pin 14b.12): the bot's way curled round
+each node of the circus (fixed 24 m handles on its 12 m gaps; `junctionHandle`, the traffic's rule, for both, 14b.12
+quick), the cars on a roundabout gave way to its arms (now the ring goes first), a stopped car waited on the player queued
+behind it, and the plain bot pushed into cars till a reset ended the job (the job bot drives careful). The junctions'
+fans are the wheels' ground (a trimesh under their lift: a car sank up to 0.3 m into the steep crossings, 6.7). A patrol
+parked at its kerb is not a box: the bots go round it (the survey bot pushed one for good).
+
 ## 2026-09-27 — the roads' backlog (Marcin: "Popraw też te z backlogu")
 
 The lighthouse road dips under the bay bridge's ramp to a van's headroom (1.66 → 2.7 m, 6a.7; the deck's top one function,

@@ -20,7 +20,7 @@ import { FOOT, Ground, HALF_WIDTH, TRENCH, type CoastKind, type GroundData, type
 import { LaneIndex } from '../city/laneIndex';
 import { buildNetwork, type IslandNetwork } from './network';
 import { DECK, structures, type Piece, type Structure } from './structures';
-import { PAVEMENT, roadSurfaces, surfaceChunk, surfaceIndex, surfaceMeshes, type RoadSurfaces, type SurfaceChunk, type SurfaceIndex } from './surfaces';
+import { PAVEMENT, ROAD_LIFT, fanFaces, roadSurfaces, surfaceChunk, surfaceIndex, surfaceMeshes, type RoadSurfaces, type SurfaceChunk, type SurfaceIndex } from './surfaces';
 import { fillIsland, fillStatics, inLot, type IslandFill, fillSolids } from './fill';
 import { buildPlaces, placeData, placeFrom, type Place } from './places';
 import type { GardensPlace } from './places/gardens';
@@ -972,6 +972,20 @@ export class Island {
         if (hill > roof + 0.5) put({ ...p, x: mx, y: roof, z: mz }, DECK.half + 4, (hill - roof) / 2, 0.5, 0, (hill - roof) / 2, 0, GROUPS_SOLID, true);
       }
     }
+    // the junctions' fans: the wheels on what is drawn there (between its 2 m points the height field ran under a fan's
+    // faces, and a car sank up to 0.3 m into the steep crossings' asphalt); at the ground, as the height field is, under the
+    // fan's 4 cm lift
+    const fans: number[] = [], fanTris: number[] = [], shared = new Map<string, number>();
+    const vertex = (x: number, y: number, z: number): number => {
+      const key = `${Math.round(x * 100)},${Math.round(z * 100)},${Math.round(y * 100)}`;
+      let k = shared.get(key);
+      if (k === undefined) { k = fans.length / 3; fans.push(x, y - ROAD_LIFT, z); shared.set(key, k); }
+      return k;
+    };
+    for (const j of this.surfaces.junctions) {
+      fanFaces(j, (ax, ay, az, bx, by, bz, cx, cy, cz) => { fanTris.push(vertex(ax, ay, az), vertex(bx, by, bz), vertex(cx, cy, cz)); });
+    }
+    if (fanTris.length > 0) this.fix({ shape: { kind: 'trimesh', verts: new Float32Array(fans), tris: new Uint32Array(fanTris) }, x: 0, y: 0, z: 0, q: { x: 0, y: 0, z: 0, w: 1 }, groups: GROUPS_TERRAIN, friction: 1, ground: true });
     if (lidTris.length > 0) {
       this.fix({ shape: { kind: 'trimesh', verts: new Float32Array(lid), tris: new Uint32Array(lidTris) }, x: 0, y: 0, z: 0, q: { x: 0, y: 0, z: 0, w: 1 }, groups: GROUPS_TERRAIN, friction: 1, ground: true });
     }

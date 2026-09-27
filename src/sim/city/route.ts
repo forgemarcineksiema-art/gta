@@ -9,7 +9,7 @@
 import type { TrackSample } from '../track';
 import type { DropOff } from './cover';
 import { GARAGE } from './cover';
-import { lanePath, type Lane, type RoadGraph, type RoadPoint } from './roads';
+import { junctionHandle, lanePath, type Lane, type RoadGraph, type RoadPoint } from './roads';
 
 export interface Pt { x: number; z: number }
 
@@ -53,8 +53,9 @@ export function chainPoints(graph: RoadGraph, chain: readonly number[], out: Pt[
 
 /** The junction curve from a lane's end to the next lane's start (the tail of `lanePath`), start included, end excluded. */
 export function junctionCurve(lane: Lane, next: Lane, out: Pt[]): void {
-  const cx0 = lane.x1 + Math.sin(lane.yaw) * 24, cz0 = lane.z1 + Math.cos(lane.yaw) * 24;
-  const cx1 = next.x0 - Math.sin(next.yaw0) * 24, cz1 = next.z0 - Math.cos(next.yaw0) * 24;
+  const handle = junctionHandle(Math.hypot(next.x0 - lane.x1, next.z0 - lane.z1));
+  const cx0 = lane.x1 + Math.sin(lane.yaw) * handle, cz0 = lane.z1 + Math.cos(lane.yaw) * handle;
+  const cx1 = next.x0 - Math.sin(next.yaw0) * handle, cz1 = next.z0 - Math.cos(next.yaw0) * handle;
   for (let i = 0; i < 24; i++) {
     const t = i / 24, u = 1 - t;
     out.push({

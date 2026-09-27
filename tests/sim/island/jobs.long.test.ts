@@ -9,6 +9,7 @@
 import { describe, expect, it } from 'vitest';
 import { clearControls, type SimWorld } from '../../../src/sim';
 import { routeToPoint } from '../../../src/app/doorRoute';
+import { JobBot } from '../../../src/app/jobBot';
 import { CITY_BOT_TUNING, TrackBot } from '../../../src/app/trackBot';
 import { alongLane, laneAt } from '../../../src/sim/city/route';
 import type { Lane } from '../../../src/sim/city/roads';
@@ -52,6 +53,25 @@ describe('M8.10 slice 14 (long): a delivery and a chase on the island', () => {
       expect(bot.resets).toBe(0);
       expect(sim.jobs.lastPaid).toBeGreaterThanOrEqual(d.payout);
       expect(sim.run.bag - bank).toBeGreaterThanOrEqual(sim.jobs.lastPaid);
+    } finally { sim.dispose(); }
+  }, 300_000);
+
+  it('14b.12 the job bot takes the first delivery round the centre\'s roundabout, with the traffic and the police on, and is paid inside the limit', async () => {
+    // (it was lost there: the bot's way curled round each of the circus's nodes and it crept through at 12 km/h, the cars
+    // on the circus gave way to every arm, a car waited on the player queued behind it, and a reset ended the job)
+    const sim = await createWorld({ map: 'island', seed: 42, record: false });
+    try {
+      const island = sim.island as Island;
+      sim.jobs.revealAll = true;
+      const d = sim.jobs.defs.find((q) => q.kind === 'delivery');
+      expect(d?.id).toBe(1);
+      if (!d) return;
+      sim.spawnAtPoint({ name: 'job', position: { x: d.x, y: island.standAt(d.x, d.z) + 0.9, z: d.z }, yaw: d.yaw });
+      const bot = new JobBot(sim.carId);
+      const time = runUntil(sim, d.limitSeconds + 10, (s) => s.jobs.state === 'done' || s.jobs.state === 'failed' || (s.jobs.state === 'idle' && s.jobs.active < 0 && s.tick > 60), (_t, c, s) => bot.drive(s, c, 1 / 60));
+      console.info(`14b.12 the first delivery: ${sim.jobs.state} in ${time.toFixed(1)} of ${d.limitSeconds} s, paid ${sim.jobs.lastPaid}, the bot's resets ${bot.resets}`);
+      expect(sim.jobs.state).toBe('done');
+      expect(time).toBeLessThan(d.limitSeconds);
     } finally { sim.dispose(); }
   }, 300_000);
 

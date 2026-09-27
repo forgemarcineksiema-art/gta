@@ -18,7 +18,10 @@ export class JobBot {
   private planned = '';
 
   constructor(car: SimWorld['carId']) {
-    this.bot = new TrackBot(car, CITY_BOT_TUNING);
+    // a careful driver: it waits in a queue, passes a slow car and goes round one that will not move on, where the plain
+    // city bot pushed into the car ahead till it was reset, and a reset ends the job (the island's first delivery, lost
+    // at the centre's roundabout behind a car that had stopped)
+    this.bot = new TrackBot(car, { ...CITY_BOT_TUNING, careful: true, unblock: true });
   }
 
   get resets(): number {

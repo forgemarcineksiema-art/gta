@@ -69,6 +69,8 @@ export interface Lane {
   offset: number;
   /** Authored off-grid road this lane belongs to, if any. */
   special?: string;
+  /** On a roundabout's ring (the island's): its traffic goes first at the arms' nodes. */
+  ring?: boolean;
   /** Lane centre path from the start point to the end point, inset from both junctions. */
   points: RoadPoint[];
   x0: number; z0: number; x1: number; z1: number;
@@ -258,6 +260,16 @@ export function roadTour(graph: RoadGraph, start = 24): number[] {
   return reversed.reverse();
 }
 
+/**
+ * A junction curve's Bezier handles (m) for its ends `gap` m apart: a share of the gap (0.55 of the radius approximates a
+ * circular arc), capped. Fixed 24 m handles fold into a cusp on a corner whose ends are 25 m apart and loop outright where
+ * they are nearer (the island's roundabouts' lanes stop 6 m short of their nodes: the bot's way curled round each node
+ * and it crept through at 12 km/h). The traffic's connections and the bot's ways alike.
+ */
+export function junctionHandle(gap: number): number {
+  return Math.min(24, 0.42 * gap);
+}
+
 /** Sample a lane and its connection at <= 3 m. Shared by bot and future traffic. */
 export function lanePath(lane: Lane, next: Lane): TrackSample[] {
   const out: TrackSample[] = [];
@@ -270,8 +282,9 @@ export function lanePath(lane: Lane, next: Lane): TrackSample[] {
       out.push({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, yaw, curvature: 0, s: 0 });
     }
   }
-  const cx0 = lane.x1 + Math.sin(lane.yaw) * 24, cz0 = lane.z1 + Math.cos(lane.yaw) * 24;
-  const cx1 = next.x0 - Math.sin(next.yaw0) * 24, cz1 = next.z0 - Math.cos(next.yaw0) * 24;
+  const handle = junctionHandle(Math.hypot(next.x0 - lane.x1, next.z0 - lane.z1));
+  const cx0 = lane.x1 + Math.sin(lane.yaw) * handle, cz0 = lane.z1 + Math.cos(lane.yaw) * handle;
+  const cx1 = next.x0 - Math.sin(next.yaw0) * handle, cz1 = next.z0 - Math.cos(next.yaw0) * handle;
   for (let i = 0; i < 24; i++) {
     const t = i / 24, u = 1 - t;
     out.push({

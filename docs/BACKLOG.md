@@ -2,12 +2,6 @@
 
 Ideas outside the current milestone, non-blocking bugs, refactors. One line of context each. A milestone's plan takes what it schedules from here; what shipped is removed (M5.5 shipped updates 1 and 2, the life models and the polish items, 2026-09-23).
 
-## The island (the bug hunt after the switch, 2026-09-27)
-
-- The job bot (`bot=job`) on the island follows the centre's roundabout's traffic at walking pace (it neither overtakes nor weaves), so delivery #1 (104 s for about 1.2 km) runs out of its clock: the gate's balance measures the bot's pace and #1's limit, as planned (M8.10 slice 14).
-- The junctions' fans on steep ground float up to 0.4 m over the physics' ground at their faces' middles (the ground's creases where a street gives way to an avenue): the wheels sink into the drawn junction there; a fan laid on the ground's own creases (its rim's spokes to the carriageways' edges) would lie on it.
-- The survey bot sticks once a tour at a Foundry junction (−65, 115) and is set on by the survey (before this pass too).
-
 ## Performance / size
 
 - The JS heap with traffic is 58–65 MB against M8's own 50 MB target (0.7.0: 48; the brief's 250 holds): M8's props hold it (their arrays, the 96 debris, the prop meshes merged into the chunks' geometry). Measure where at the next perf pass. (M8.5 gate)

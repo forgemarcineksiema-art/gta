@@ -89,6 +89,10 @@ const PAINTS = CIVILIAN_PAINTS;
 const CAR_GAP = 4.5;
 /** Metres past the stop line a car may creep and still count as waiting at it. */
 const STOP_TOLERANCE = 1.5;
+/** A car coming onto a roundabout waits while one on its ring is this near the node (m: two and a half seconds at its pace). */
+const RING_GAP = 30;
+/** The player this far across a car's line behind it (m) is queued behind it: in its lane, not crossing its junction. */
+const BEHIND_ACROSS = 2.5;
 /** A car stops this far short of a shut level crossing's barrier (m, from its place along the lane). */
 const CROSSING_SHORT = 3.5;
 const MAX_ON_LANE = 48;
@@ -1855,13 +1859,19 @@ export class Traffic {
     const node = this.lanes.toNode[lane] as number;
     // A holder is already committed: it keeps going (gaps still stop it behind anyone in the box).
     if (this.isHolder(node, i)) return true;
-    if ((this.plannerSpeed[i] as number) <= 0 && this.playerNear(node, player)) return false;
+    // stopped, it lets the player cross first, not one queued behind it (each waited for the other to go, the full wait)
+    if ((this.plannerSpeed[i] as number) <= 0 && this.playerNear(node, player) && !this.playerBehind(i, player)) return false;
     const fromHighway = (this.lanes.limit[lane] as number) === t.speedHighway;
     if (!fromHighway && this.highwayNode(node) && this.highwayApproaching(node)) return false;
     if (this.turn[i] === 0 && fromHighway) return true;
+    // A roundabout's traffic goes first: a car coming onto the ring waits while one on it comes up to the node, and one
+    // going round waits on no one coming on (first come, first served, the cars on the circus stopped at every arm and
+    // everyone behind them crept round it)
+    const onRing = this.lanes.ring[lane] === 1, round = onRing && this.lanes.ring[nxt] === 1;
+    if (!onRing && this.lanes.ring[nxt] === 1 && this.ringApproaching(node)) return false;
     // First come, first served across the arms: a platoon from one lane must
     // not starve a car that has been waiting longer on a conflicting movement.
-    if (this.waitingLonger(i, node, lane, nxt)) return false;
+    if (!round && this.waitingLonger(i, node, lane, nxt)) return false;
     const base = node * HOLDERS;
     let freeSlot = false;
     for (let k = 0; k < HOLDERS; k++) {
@@ -1949,6 +1959,25 @@ export class Traffic {
   private highwayNode(node: number): boolean {
     const n = this.nodes[node] as RoadNode;
     return Math.abs(n.x) === 675 || Math.abs(n.z) === 675;
+  }
+
+  /** A car on a roundabout's ring coming up to `node`, within `RING_GAP` m of it: the arms give way to it. */
+  private ringApproaching(node: number): boolean {
+    for (let k = 0; k < this.capacity; k++) {
+      const st = this.state[k];
+      if (st !== AgentState.Kinematic && st !== AgentState.Physical) continue;
+      const lane = this.lane[k] as number;
+      if (lane < 0 || this.lanes.ring[lane] !== 1 || (this.lanes.toNode[lane] as number) !== node) continue;
+      if ((this.lanes.length[lane] as number) - (this.s[k] as number) < RING_GAP) return true;
+    }
+    return false;
+  }
+
+  /** The player in `i`'s lane behind it: following it into the junction, not crossing it. */
+  private playerBehind(i: number, player: PlayerProbe): boolean {
+    const fx = Math.sin(this.yaw[i] as number), fz = Math.cos(this.yaw[i] as number);
+    const dx = player.x - (this.x[i] as number), dz = player.z - (this.z[i] as number);
+    return dx * fx + dz * fz < 0 && Math.abs(dx * fz - dz * fx) < BEHIND_ACROSS && Math.cos(player.yaw - (this.yaw[i] as number)) > 0.5;
   }
 
   private playerNear(node: number, player: PlayerProbe): boolean {

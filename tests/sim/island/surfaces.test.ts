@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { PALETTE, initPhysics } from '../../../src/sim';
 import { CHUNK, CHUNKS_X, CHUNKS_Z, CHUNK_X0, CHUNK_Z0, Island, PLUMB_TILT } from '../../../src/sim/island/Island';
 import { HALF_WIDTH } from '../../../src/sim/island/ground';
-import { KERB, PAINT_LIFT, PAVEMENT, ROAD_LIFT, heightOn, onStrip, surfaceChunk, surfaceIndex, type Strip } from '../../../src/sim/island/surfaces';
+import { KERB, PAINT_LIFT, PAVEMENT, ROAD_LIFT, fanFaces, heightOn, onStrip, surfaceChunk, surfaceIndex, type Strip } from '../../../src/sim/island/surfaces';
 import { GroundView } from '../../../src/render/island/GroundView';
 
 describe('M8.10 slice 6b: the roads\' surfaces', () => {
@@ -194,5 +194,21 @@ describe('M8.10 slice 6b: the roads\' surfaces', () => {
       expect(alone.colors, `chunk ${k}`).toEqual(whole.colors);
       expect(alone.positions, `chunk ${k}`).toEqual(whole.positions);
     }
+  });
+
+  it("6.7 the wheels ride on a junction as it is drawn: at its fan's faces' middles the physics' top is never 5 cm under it (between the height field's points a car sank up to 0.3 m into the steep crossings' asphalt)", () => {
+    let faces = 0, worst = 0, at = '', sx = Infinity, sz = Infinity;
+    for (const j of island.surfaces.junctions) {
+      fanFaces(j, (ax, ay, az, bx, by, bz, cx, cy, cz) => {
+        const x = (ax + bx + cx) / 3, y = (ay + by + cy) / 3 - ROAD_LIFT, z = (az + bz + cz) / 3;
+        if (Math.hypot(x - sx, z - sz) > 60) { island.sync(x, z, true); world.step(); sx = x; sz = z; }
+        const hit = world.castRay(new RAPIER.Ray({ x, y: y + 1, z }, { x: PLUMB_TILT, y: -1, z: PLUMB_TILT }), 3, true);
+        const under = y - (hit ? y + 1 - hit.timeOfImpact : -Infinity);
+        faces++;
+        if (under > worst) { worst = under; at = `${x.toFixed(0)}, ${z.toFixed(0)}`; }
+      });
+    }
+    expect(faces).toBeGreaterThan(5000);
+    expect(worst, at).toBeLessThan(0.05);
   });
 });

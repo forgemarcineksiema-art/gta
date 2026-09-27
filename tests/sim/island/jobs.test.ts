@@ -6,7 +6,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BALANCE, CHAIN_ALL, PedPose, RIVALS, clearControls, type JobDef, type SimWorld } from '../../../src/sim';
-import { alongLane } from '../../../src/sim/city/route';
+import { alongLane, junctionCurve, laneLength, laneSpan, resample } from '../../../src/sim/city/route';
 import { projectOnLane, type Lane } from '../../../src/sim/city/roads';
 import { Island, PLUMB_TILT } from '../../../src/sim/island/Island';
 import { HALF_WIDTH } from '../../../src/sim/island/ground';
@@ -373,6 +373,28 @@ describe('M8.10 slice 14: the jobs, the rivals and the way on the island', () =>
     }
     leave();
     sim.setBody('muscle');
+  });
+
+  it('14b.12 the bot\'s way round a roundabout bends with its ring: every curve between two of its lanes no tighter than 10 m (on 24 m handles they curled round each node, 1.5 m tight)', () => {
+    const graph = traffic.streets.graph, laneRoad = island.network.laneRoad;
+    let curves = 0, tightest = Infinity;
+    for (const lane of graph.lanes) {
+      if (laneRoad[lane.id] !== 'circus') continue;
+      for (const n of lane.next) {
+        const next = graph.lanes[n] as Lane;
+        if (laneRoad[next.id] !== 'circus') continue;
+        // the lane's last stretch, the curve through the node, the next one's first: as the bot's way samples them
+        const raw: Array<{ x: number; z: number }> = [];
+        laneSpan(lane, Math.max(0, laneLength(lane) - 6), laneLength(lane), raw);
+        junctionCurve(lane, next, raw);
+        laneSpan(next, 0, Math.min(6, laneLength(next)), raw);
+        const samples = resample(raw);
+        for (let k = 2; k + 2 < samples.length; k++) tightest = Math.min(tightest, 1 / Math.max(1e-6, Math.abs((samples[k] as { curvature: number }).curvature)));
+        curves++;
+      }
+    }
+    expect(curves).toBeGreaterThanOrEqual(6);
+    expect(tightest).toBeGreaterThan(10);
   });
 
   it('14b.9 the board\'s teaser keeps to its district\'s own streets on the island', () => {

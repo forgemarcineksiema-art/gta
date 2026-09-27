@@ -2,14 +2,11 @@
  * Lane length tables and cached junction curves for traffic.
  * Built once from the road graph. Connection samples are cached on first use.
  */
-import type { Lane, RoadGraph, RoadPoint } from '../city/roads';
+import { junctionHandle, type Lane, type RoadGraph, type RoadPoint } from '../city/roads';
 import type { RoadKind } from './bodies';
 import type { TrafficTuning } from './tuning';
 
 const SAMPLES = 24;
-/** Bezier handle length as a fraction of the endpoint gap (0.55 of the radius approximates a circular arc), capped. */
-const HANDLE_RATIO = 0.42;
-const HANDLE_MAX = 24;
 const TURN_RAD = 15 * Math.PI / 180;
 
 export interface LanePose {
@@ -58,6 +55,8 @@ export class LaneTables {
   private readonly pointCount: Int16Array;
   readonly length: Float32Array;
   readonly limit: Float32Array;
+  /** 1 for a roundabout's ring's lane (`Lane.ring`). */
+  readonly ring: Uint8Array;
   /** Metres right of the road centreline the lane was built at (`Lane.offset`). */
   readonly offset: Float32Array;
   readonly toNode: Int16Array;
@@ -86,6 +85,7 @@ export class LaneTables {
     this.pointCount = new Int16Array(this.laneCount);
     this.length = new Float32Array(this.laneCount);
     this.limit = new Float32Array(this.laneCount);
+    this.ring = new Uint8Array(this.laneCount);
     this.offset = new Float32Array(this.laneCount);
     this.toNode = new Int16Array(this.laneCount);
     this.midX = new Float32Array(this.laneCount);
@@ -112,6 +112,7 @@ export class LaneTables {
       const kind = kindOf(lane);
       this.limit[i] = kind ? KIND_LIMIT[kind](tuning) : limitFor(lane, graph, tuning);
       this.offset[i] = lane.offset;
+      this.ring[i] = lane.ring === true ? 1 : 0;
       this.toNode[i] = lane.to;
       // (its middle's place only: its heights on the island are worked out when the lane is first driven, not here)
       this.sample(i, (this.length[i] as number) * 0.5, 0, this.scratch, false);
@@ -418,9 +419,8 @@ export class LaneTables {
     const az = a.z1 + Math.sin(a.yaw) * offset;
     const bx = b.x0 - Math.cos(b.yaw0) * offset;
     const bz = b.z0 + Math.sin(b.yaw0) * offset;
-    // Handles scale with the gap between the endpoints: fixed 24 m handles fold into a cusp on a corner whose
-    // offset endpoints are 25 m apart (and loop outright on the inside of a tight turn).
-    const handle = Math.min(HANDLE_MAX, HANDLE_RATIO * Math.hypot(bx - ax, bz - az));
+    // Handles scale with the gap between the endpoints (`junctionHandle`)
+    const handle = junctionHandle(Math.hypot(bx - ax, bz - az));
     const cx0 = ax + Math.sin(a.yaw) * handle;
     const cz0 = az + Math.cos(a.yaw) * handle;
     const cx1 = bx - Math.sin(b.yaw0) * handle;

@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-28 — M8.9 gains the atmosphere (Marcin: "Tak, zapisz i zaczynaj")
+
+Marcin asked for the sun, the clouds and the atmosphere "at a really high level". Seen on the stills: the sun a sticker
+(a flat disc, a ring with an edge, its halo lit behind blocks, nothing burning without tone mapping), twelve alike flat
+clouds in half the sky, the sky banded and the same on every side, nothing reflecting it. Written into M8.9 as R13 and
+Phase G, slices 16–20 (the sky one function per pixel, Neutral tone mapping, low-poly lit clouds, the sea, glass and road
+reflecting the sky, the sun's glare by an occlusion query); the gate is slice 21; §1.4 lets tone mapping in (no pass),
+the draws' budget +3 on 0.8.7 (the disc folded into the dome, the probe and the glare added).
+
 ## 2026-09-28 — the third bug hunt's backlog (Marcin: "Lecisz z backlogiem")
 
 All fourteen, but a wreck in sight: a queue behind a wreck with no way round gets it towed out of sight in 10 s (drivers);

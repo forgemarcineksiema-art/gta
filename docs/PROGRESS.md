@@ -2,6 +2,14 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-28 — M8.9 slice 28: the first second
+
+A real session (no test's or bot's parameter, or `opening=1`) opens on a shot from 30 m over and 45 m behind the car,
+looking 100 m down its way: at the summit the golden sky and the sun over Crown Avenue and the city, the van at the
+frame's foot (from 45 m up and 60 m ahead it looked down into the haze). The chase follows the car under it from the
+first frame and takes over by an eased weight (`mixIn`) in 2 s, 0.5 s after the first input; no cut, control untouched.
+The look suite gains `opening` (M9's cover frame). Pins 28.1–28.3. Stills calm, intro unchanged; opening seen.
+
 ## 2026-09-28 — M8.9 slice 27: BUSTED and the wreck
 
 `shots.ts`: while the busted card is up the camera rises to 5 m and draws back to 18 m over 3 s from where the chase

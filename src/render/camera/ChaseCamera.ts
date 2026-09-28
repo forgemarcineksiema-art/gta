@@ -217,6 +217,10 @@ export class ChaseCamera {
   floor: ((x: number, y: number, z: number) => number) | null = null;
   /** The car's fall in the air, m/s² (the world's gravity and the car's own extra). */
   gravity = 9.81 + 3.5;
+  /** A shot the chase takes over from (the first second, M8.9 R14): its eye and look, and its weight over the chase's. */
+  private readonly mixEye = new THREE.Vector3();
+  private readonly mixLook = new THREE.Vector3();
+  private mixWeight = 0;
   /** The road's slope along the view (rad, + uphill), eased. */
   private slope = 0;
   /** How far the look leans toward the landing, and the landing it leans to. */
@@ -359,6 +363,16 @@ export class ChaseCamera {
 
   get cutting(): boolean {
     return this.cutActive;
+  }
+
+  /**
+   * A shot laid over the chase at `weight` (1 the shot, 0 the chase), set each frame by the director while the chase takes
+   * over from it: the chase follows the car underneath all the while, so there is nothing to catch up when it is gone.
+   */
+  mixIn(x: number, y: number, z: number, lookX: number, lookY: number, lookZ: number, weight: number): void {
+    this.mixEye.set(x, y, z);
+    this.mixLook.set(lookX, lookY, lookZ);
+    this.mixWeight = Math.max(0, Math.min(1, weight));
   }
 
   /** Where the chase looked in its last update (a shot that starts from the chase starts from here). */
@@ -564,6 +578,10 @@ export class ChaseCamera {
     const focusTarget = this.focusLeft > 0 ? 1 : 0;
     this.focusAmount += (focusTarget - this.focusAmount) * (snap ? 1 : 1 - Math.exp(-dt * 8));
     if (this.focusAmount > 0.001) this.look.lerp(this.focusPoint, this.focusAmount);
+    if (this.mixWeight > 0) {
+      this.camera.position.lerp(this.mixEye, this.mixWeight);
+      this.look.lerp(this.mixLook, this.mixWeight);
+    }
     this.camera.up.copy(this.up);
     this.camera.lookAt(this.look);
     // the jolt on top, in the camera's own axes: yaw (a turn to the left moves the car right on the screen), pitch, roll

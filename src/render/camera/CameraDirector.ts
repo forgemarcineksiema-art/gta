@@ -9,7 +9,7 @@ import type * as THREE from 'three';
 import { GARAGE, SWAP, bodySpec, type BodyId, type SimWorld } from '../../sim';
 import { sideCutEye, type ChaseCamera } from './ChaseCamera';
 import { newShot, showroomMix, showroomShot, type ShowroomShot, type ShowroomSite } from './showroom';
-import { circleShot, craneShot, newStillShot } from './shots';
+import { circleShot, craneShot, newStillShot, openingShot, openingWeight } from './shots';
 
 /** Who holds the chase's cut: the door and the showroom, the moments without control, the takedown, the apex. */
 type CutOwner = 'door' | 'still' | 'side' | 'apex';
@@ -54,6 +54,10 @@ export class CameraDirector {
   private readonly stillEye = { x: 0, y: 0, z: 0 };
   private readonly stillLook = { x: 0, y: 0, z: 0 };
   private readonly stillShot = newStillShot();
+  /** The first second (M8.9 R14): seconds into it (-1: over or never), the first input's time in it, its shot. */
+  private openFor = -1;
+  private openInputAt = -1;
+  private readonly openShot = newStillShot();
 
   constructor(private readonly chase: ChaseCamera, private readonly sim: SimWorld) {}
 
@@ -132,6 +136,31 @@ export class CameraDirector {
       c.x + (s.eye.x - c.x) * m, c.y + (s.eye.y - c.y) * m, c.z + (s.eye.z - c.z) * m,
       c.lx + (s.look.x - c.lx) * m, c.ly + (s.look.y - c.ly) * m, c.lz + (s.look.z - c.lz) * m,
     );
+  }
+
+  /** The game opens on the first second's shot (a real session's first frame; the tests' and the bots' do not). */
+  open(): void {
+    this.openFor = 0;
+    this.openInputAt = -1;
+  }
+
+  /**
+   * The first second (M8.9 R14): the island from high over and behind the car, handed down to the chase over
+   * `OPENING.seconds`, the rest over `OPENING.hurry` once the player first drives; the chase follows the car under it
+   * all the while and control is the player's from the first frame. Before the chase's update.
+   */
+  syncOpening(dt: number, car: THREE.Vector3, dx: number, dz: number, input: boolean): void {
+    if (this.openFor < 0) return;
+    this.openFor += dt;
+    if (input && this.openInputAt < 0) this.openInputAt = this.openFor;
+    const w = openingWeight(this.openFor, this.openInputAt);
+    if (w <= 1e-3) {
+      this.openFor = -1;
+      this.chase.mixIn(0, 0, 0, 0, 0, 0, 0);
+      return;
+    }
+    const s = openingShot(car, dx, dz, this.openShot);
+    this.chase.mixIn(s.eye.x, s.eye.y, s.eye.z, s.look.x, s.look.y, s.look.z, w);
   }
 
   /**

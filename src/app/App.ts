@@ -151,6 +151,11 @@ export class App {
   private prefetchQueued = false;
   private raf = 0;
   private readonly manual: boolean;
+  /**
+   * No test's or bot's parameter in the address (the cold open's rule), or `opening=1` (the look suite, M9's cover): the
+   * game opens on its first second's shot.
+   */
+  private readonly realSession: boolean;
   /** Last frame's run was being driven (running or closing): the brackets follow its edges. */
   private wasPlaying = true;
   private breakAt = 0;
@@ -202,6 +207,7 @@ export class App {
     // the day's three, the streak and today's police before the first step (docs/history/M5_PLAN.md D3)
     if (this.datesOn) sim.dailies.setDate(this.today());
     this.manual = params.get('manual') === '1';
+    this.realSession = params.get('opening') === '1' || !COLD_OPEN_OFF_PARAMS.some((k) => params.has(k));
     const quality = params.get('quality');
     this.renderer = new Renderer(canvas, sim, quality === 'low' || quality === 'high' ? quality : undefined);
     this.input = new InputManager();
@@ -586,6 +592,8 @@ export class App {
     } catch { /* a host that forbids it: the click below */ }
     if (!document.hasFocus() && !this.manual && !this.bot) this.setFocusPaused(true);
     this.lastTime = performance.now();
+    // the first second (M8.9 R14): a real session opens on the island from above; a test's or a bot's on the chase
+    if (this.realSession) this.renderer.open();
     if (this.manual) this.frame(this.lastTime + FIXED_DT * 1000);
     else this.raf = requestAnimationFrame(this.frame);
   }

@@ -38,6 +38,41 @@ export const CIRCLE = {
   turn: (72 * Math.PI) / 180,
 } as const;
 
+export const OPENING = {
+  /** The way down to the chase (s), and what is left of it after the first input (s). */
+  seconds: 2,
+  hurry: 0.5,
+  /**
+   * The eye this high over the car and this far behind it (m), looking this far ahead of it (m): the car at the frame's
+   * foot, the street and the city down it, the sky and the sun over them (from 45 m up and 60 m ahead the view looked
+   * down into the haze, no sky).
+   */
+  up: 30,
+  back: 45,
+  ahead: 100,
+} as const;
+
+/**
+ * The first second's shot (M8.9 R14): high over and behind a car at `car` facing (dx, dz), unit, looking over it down
+ * its way; the chase takes over from it as the game begins.
+ */
+export function openingShot(car: Vec3, dx: number, dz: number, out: StillShot): StillShot {
+  out.eye.x = car.x - dx * OPENING.back;
+  out.eye.y = car.y + OPENING.up;
+  out.eye.z = car.z - dz * OPENING.back;
+  out.look.x = car.x + dx * OPENING.ahead;
+  out.look.y = car.y;
+  out.look.z = car.z + dz * OPENING.ahead;
+  return out;
+}
+
+/** The first second's weight over the chase `t` s in, with the first input at `inputAt` s (-1: none yet): 1 to 0. */
+export function openingWeight(t: number, inputAt: number): number {
+  const w = (u: number): number => 1 - smoother(u);
+  if (inputAt < 0 || inputAt >= t) return w(t / OPENING.seconds);
+  return w(inputAt / OPENING.seconds) * w((t - inputAt) / OPENING.hurry);
+}
+
 /**
  * The crane `t` s after the card came up, from the chase's eye `fromEye` and look `fromLook`, back from a car at `car`
  * for a vertical field of view `fovY` (rad): the eye rises and draws back along the line from the car to where the chase

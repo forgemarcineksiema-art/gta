@@ -286,6 +286,11 @@ export class Renderer {
     this.showTurnTo = k && (k.slot === 'spoiler' || k.slot === 'flame' || k.slot === 'smoke') ? Math.PI : 0;
   }
 
+  /** The game opens on the first second's shot (M8.9 R14): a real session's first frame. */
+  open(): void {
+    this.director.open();
+  }
+
   /** The class whose mesh is shown (for the e2e swap check). */
   get visibleCar(): CarId {
     return this.player.visibleCar;
@@ -337,8 +342,11 @@ export class Renderer {
     this.carVel.set(tm.vx, tm.vy, tm.vz);
 
     this.chase.gravity = 9.81 + sim.vehicle.tuning.extraGravity;
-    // BUSTED's crane and the circle round a wreck (M8.9 R14), from where the chase stood
+    // BUSTED's crane and the circle round a wreck (M8.9 R14), from where the chase stood; the first second over the chase
     this.director.syncStill(dt, this.camera.position, carPos);
+    const c = sim.controls, q = car.quaternion;
+    const nx = 2 * (q.x * q.z + q.w * q.y), nz = 1 - 2 * (q.x * q.x + q.y * q.y), nn = Math.hypot(nx, nz) || 1;
+    this.director.syncOpening(dt, carPos, nx / nn, nz / nn, c.throttle > 0 || c.brake > 0 || c.steer !== 0 || c.handbrake > 0 || c.boost > 0);
     this.chase.update(car, this.carVel, tm, dt, snap);
     this.hideoutView?.update(sim);
     this.coinsView?.update(sim, worldDt, carPos);

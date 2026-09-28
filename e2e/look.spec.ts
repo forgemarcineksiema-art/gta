@@ -218,6 +218,13 @@ for (const [w, h] of SIZES) {
     await snap(page, 'intro');
   });
 
+  test(`stills: the first second at ${w}x${h}`, async ({ page }) => {
+    test.skip(!wanted('opening'));
+    // the game's first frame (M8.9 slice 28): the island from over the summit, the chase taking over in 2 s; M9's cover
+    await boot(page, 'coldopen=1&manual=1&opening=1', w, h);
+    await snap(page, 'opening');
+  });
+
   test(`stills: a drive, the map, a sign, a card, a step at ${w}x${h}`, async ({ page }) => {
     test.skip(!wanted('calm', 'sunward', 'pause', 'loading', 'map', 'sign', 'card', 'step'));
     await boot(page, `manual=1&spawn=crown&ad=off&fresh=1&${DATE}`, w, h);

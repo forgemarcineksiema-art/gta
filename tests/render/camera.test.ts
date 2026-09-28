@@ -672,6 +672,59 @@ describe('BUSTED and the wreck (M8.9 slice 27)', () => {
   });
 });
 
+/**
+ * The first second (M8.9 slice 28, R14): the game opens on the island from high over and behind the car, handed down to
+ * the chase in 2 s (0.5 s after the first input); the chase follows the car under it all the while.
+ */
+describe('the first second (M8.9 slice 28)', () => {
+  const dt = 1 / 60;
+
+  /** A car driving off along +Z at 10 m/s from the second `inputAt` (never: -1), under a director that `opens` or not. */
+  function run(opens: boolean, seconds: number, inputAt = -1) {
+    const cam = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 1000);
+    const chase = new ChaseCamera(cam);
+    const sim = { run: { state: 'running', dropOff: -1, dropOffs: [] }, life: { state: { slowMo: 0, slowMoTarget: -1, wrecked: false } }, traffic: null, transforms: null, jumps: null, clearFraction: () => 1, viewFraction: () => 1 } as unknown as SimWorld;
+    const director = new CameraDirector(chase, sim);
+    if (opens) director.open();
+    const car = new THREE.Object3D();
+    const vel = new THREE.Vector3();
+    const frames: Array<{ eye: THREE.Vector3; car: THREE.Vector3; ndc: THREE.Vector3; cutting: boolean }> = [];
+    for (let i = 0; i < Math.round(seconds * 60); i++) {
+      const input = inputAt >= 0 && i * dt >= inputAt;
+      vel.set(0, 0, input ? 10 : 0);
+      car.position.addScaledVector(vel, dt);
+      director.syncOpening(dt, car.position, 0, 1, input);
+      chase.update(car, vel, telemetry({ vx: 0, vz: vel.z, speed: vel.z }), dt, i === 0);
+      cam.updateMatrixWorld();
+      frames.push({ eye: cam.position.clone(), car: car.position.clone(), ndc: car.position.clone().project(cam), cutting: chase.cutting });
+    }
+    return frames;
+  }
+
+  test('28.1 the first frame looks from over 25 m over the car, the car in the frame', () => {
+    const first = run(true, 1 / 60)[0] as { eye: THREE.Vector3; car: THREE.Vector3; ndc: THREE.Vector3 };
+    expect(first.eye.y - first.car.y).toBeGreaterThan(25);
+    expect(Math.abs(first.ndc.x)).toBeLessThan(1);
+    expect(Math.abs(first.ndc.y)).toBeLessThan(1);
+  });
+
+  test('28.2 the chase whole by 2 s, and by 0.5 s after the first input', () => {
+    const at = (frames: Array<{ eye: THREE.Vector3 }>, s: number): THREE.Vector3 => (frames[Math.round(s * 60) - 1] as { eye: THREE.Vector3 }).eye;
+    const calm = run(true, 2.2), chase = run(false, 2.2);
+    expect(at(calm, 2).distanceTo(at(chase, 2))).toBeLessThan(0.01);
+    expect(at(calm, 1).distanceTo(at(chase, 1))).toBeGreaterThan(1);
+    const hurried = run(true, 1.2, 0.5), driven = run(false, 1.2, 0.5);
+    expect(at(hurried, 1.0).distanceTo(at(driven, 1.0))).toBeLessThan(0.01);
+  });
+
+  test('28.3 the opening holds no cut: the chase follows the car under it from the first frame', () => {
+    for (const f of run(true, 2, 0)) expect(f.cutting).toBe(false);
+    // driving from the first frame, the car has gone as far as without the opening
+    const a = run(true, 1, 0), b = run(false, 1, 0);
+    expect((a[59] as { car: THREE.Vector3 }).car.z).toBeCloseTo((b[59] as { car: THREE.Vector3 }).car.z, 6);
+  });
+});
+
 describe('the takedown side cut (M5.5 slice 17)', () => {
   test('17.3 the eye stands to the side of the travel, a little behind the wreck and above it', () => {
     const out = { x: 0, y: 0, z: 0 };

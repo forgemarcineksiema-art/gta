@@ -16,6 +16,11 @@
  * city dissolves into the sky's colour where it stands. The sun is seen on the light's bearing but low in the warm band
  * (the light itself stands higher, so the streets are not all in shade). A dozen flat clouds lit orange from below in
  * the sun's half of the sky (slice 4). All ride with the camera; two draws.
+ *
+ * Light with headroom (slice 17, R13): the renderer tone maps with Khronos PBR Neutral's shoulder and without its toe
+ * (`toneCurve`): under the knee a colour passes unchanged, so the palette and the dark asphalt stay as they are (the toe
+ * took up to 0.04 off every channel and crushed the road to black violet); over it the light rolls off into warm white
+ * instead of cutting to it. The sun shines stronger, and its disc brighter than the screen can show.
  */
 import * as THREE from 'three';
 import { PALETTE, mulberry32 } from '../sim';
@@ -23,7 +28,7 @@ import { SHADOW_HALF, SUN_OFFSET, stableShadowTarget } from './shadows';
 
 /** The light and the sky (colours sRGB hex; elevations and angles in degrees over the horizon). */
 export const SKY = {
-  sun: { color: PALETTE.sun, intensity: 2.4 },
+  sun: { color: PALETTE.sun, intensity: 3.4 },
   fill: { sky: 0xa8a4ec, ground: 0xb08a6c, intensity: 1.5 },
   shadow: 0.85,
   stops: [
@@ -42,9 +47,43 @@ export const SKY = {
    * rose band's colour, peak, width (a Gaussian's, °) and strength; the slate band's colour, top and strength.
    */
   arch: { from: 0.3, rose: 0xf5a9b8, peak: 6, width: 3, roseStrength: 0.7, slate: 0x7f86b8, slateTop: 4, slateStrength: 0.75 },
-  /** The sun's disc: its angular radius, the core's and the rim's colour, how much darker its limb. */
-  disc: { radius: 1.72, core: 0xfffaea, rim: 0xffe2a8, limb: 0.15 },
+  /** The sun's disc: its angular radius, the core's and the rim's colour, how much darker its limb, its brightness. */
+  disc: { radius: 1.72, core: 0xfffaea, rim: 0xffe2a8, limb: 0.15, gain: 1.8 },
+  /** The tone curve: the peak channel it starts to roll off at, how much a rolled-off colour goes to white, exposure. */
+  tone: { knee: 0.8, desaturate: 0.15, exposure: 1 },
 } as const;
+
+/** The renderer's tone mapping: three's custom slot, filled by `toneCurve`. */
+export const TONE_MAPPING = THREE.CustomToneMapping;
+
+/** The tone curve on a linear colour, the mirror of the GLSL (`toneCurve`). */
+export function toneMap(c: THREE.Color, out = new THREE.Color()): THREE.Color {
+  const t = SKY.tone;
+  out.copy(c).multiplyScalar(t.exposure);
+  const peak = Math.max(out.r, out.g, out.b);
+  if (peak < t.knee) return out;
+  const d = 1 - t.knee, top = 1 - d * d / (peak + d - t.knee);
+  out.multiplyScalar(top / peak);
+  const w = 1 - 1 / (t.desaturate * (peak - top) + 1);
+  return out.setRGB(out.r + (top - out.r) * w, out.g + (top - out.g) * w, out.b + (top - out.b) * w);
+}
+
+/** Three's custom tone mapping replaced by the curve, once, before any program compiles. */
+function toneCurve(): void {
+  const chunk = THREE.ShaderChunk as Record<string, string>, t = SKY.tone, d = 1 - t.knee;
+  const stub = 'vec3 CustomToneMapping( vec3 color ) { return color; }';
+  const pars = chunk['tonemapping_pars_fragment'] ?? '';
+  if (!pars.includes(stub)) return;
+  chunk['tonemapping_pars_fragment'] = pars.replace(stub, `vec3 CustomToneMapping( vec3 color ) {
+    color *= toneMappingExposure;
+    float peak = max( color.r, max( color.g, color.b ) );
+    if ( peak < ${t.knee.toFixed(4)} ) return color;
+    float top = 1.0 - ${(d * d).toFixed(4)} / ( peak + ${(d - t.knee).toFixed(4)} );
+    color *= top / peak;
+    float w = 1.0 - 1.0 / ( ${t.desaturate.toFixed(4)} * ( peak - top ) + 1.0 );
+    return mix( color, vec3( top ), w );
+  }`);
+}
 
 /** The sun as seen: on the light's bearing, `elevation`° up. */
 export const SUN_DISC = { elevation: 9 } as const;
@@ -138,6 +177,7 @@ export class Sky {
 
   constructor(private readonly scene: THREE.Scene) {
     skyFog();
+    toneCurve();
     scene.background = new THREE.Color(PALETTE.skyHorizon);
     scene.fog = new THREE.Fog(PALETTE.fog, 120, 700);
     const hemi = new THREE.HemisphereLight(SKY.fill.sky, SKY.fill.ground, SKY.fill.intensity);
@@ -233,7 +273,7 @@ export function domeFragment(): string {
     float r = degrees( asin( min( 1.0, length( cross( d, sunDir ) ) ) ) ) / ${f1(disc.radius)};
     float edge = ( 1.0 - smoothstep( 0.94, 1.0, r ) ) * step( 0.0, dot( d, sunDir ) );
     float limb = 1.0 - ${f1(disc.limb)} * ( 1.0 - sqrt( max( 0.0, 1.0 - r * r ) ) );
-    c = mix( c, mix( ${v3(linear(disc.core))}, ${v3(linear(disc.rim))}, min( 1.0, r * r ) ) * limb, edge );
+    c = mix( c, mix( ${v3(linear(disc.core))}, ${v3(linear(disc.rim))}, min( 1.0, r * r ) ) * ( limb * ${f1(disc.gain)} ), edge );
     gl_FragColor = vec4( c, 1.0 );
     #include <tonemapping_fragment>
     #include <colorspace_fragment>

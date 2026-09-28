@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-28 — M8.9 slice 17: light with headroom
+
+Tone mapping in three's custom slot: Khronos PBR Neutral's shoulder (a knee at 0.8, a roll-off into warm white) without
+its toe, which took up to 0.04 off every channel and turned the asphalt (lum 0.024 lit) to 0.006, black violet; under the
+knee the palette passes unchanged. The sun 2.4 → 3.4, the disc 1.8× past the screen's white. Tried and dropped: a
+stronger, bluer fill (1.9) to lift the shade, which greyed the warm facades (strong 22 → 11 % in the Gardens); the dark
+road is slice 19's sheen. Stills: clip 0.4–4 % → 0–0.1 %; S 0.30–0.40, strong 8–23 %, band 0.26–0.35, the top 0.08–0.17.
+Pins 17.1–17.3. Verify green.
+
 ## 2026-09-28 — M8.9 slice 16: the sky per pixel
 
 The sky is one function of a direction, `skyAt`, one GLSL source spliced into the dome and the fog, mirrored in

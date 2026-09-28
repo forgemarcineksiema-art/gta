@@ -35,7 +35,7 @@ import { Thumbs } from './cars/thumbs';
 import { showroomMix, turntableYaw } from './camera/showroom';
 import { SIGN_Y, signScale, signTopY } from './run/signs';
 import { ShapesView } from './shapes';
-import { Sky } from './sky';
+import { SKY, Sky, TONE_MAPPING } from './sky';
 import { PedView } from './traffic/PedView';
 import { TrafficView } from './traffic/TrafficView';
 
@@ -134,7 +134,9 @@ export class Renderer {
     this.quality = quality ?? 'low';
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', stencil: false });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.NoToneMapping;
+    // M8.9 slice 17: Neutral's shoulder without its toe (sky.ts `toneCurve`), in each material's shader, no pass
+    this.renderer.toneMapping = TONE_MAPPING;
+    this.renderer.toneMappingExposure = SKY.tone.exposure;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.info.autoReset = false;

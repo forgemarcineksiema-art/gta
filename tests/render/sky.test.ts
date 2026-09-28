@@ -5,9 +5,9 @@
  */
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { PALETTE } from '../../src/sim/palette';
+import { CITY_COLORS, PALETTE } from '../../src/sim/palette';
 import { SUN_OFFSET } from '../../src/render/shadows';
-import { CLOUDS, SKY, SUN_DISC, Sky, cloudLayout, domeFragment, skyAt, skyDirection, skyGlsl, sunBearing, sunDiscDirection } from '../../src/render/sky';
+import { CLOUDS, SKY, SUN_DISC, Sky, TONE_MAPPING, cloudLayout, domeFragment, skyAt, skyDirection, skyGlsl, sunBearing, sunDiscDirection, toneMap } from '../../src/render/sky';
 
 /** Relative luminance of a linear colour (three's working space is linear sRGB). */
 const luminance = (c: THREE.Color): number => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
@@ -128,5 +128,56 @@ describe('the sky per pixel (M8.9 slice 16, R13)', () => {
     let meshes = 0;
     scene.traverse((o) => { if (o instanceof THREE.Mesh) meshes++; });
     expect(meshes).toBe(2);
+  });
+});
+
+/**
+ * A Lambert face's colour (linear) as three lights it: the sun through `dotNL` (its share in shade `1 - SKY.shadow`), and
+ * the hemisphere's fill by the face's normal, each over π.
+ */
+function lambert(albedo: number, n: THREE.Vector3, lit: boolean): THREE.Color {
+  const l = SUN_OFFSET.clone().normalize();
+  const fill = new THREE.Color(SKY.fill.ground).lerp(new THREE.Color(SKY.fill.sky), 0.5 * n.y + 0.5).multiplyScalar(SKY.fill.intensity);
+  const sun = new THREE.Color(SKY.sun.color).multiplyScalar(SKY.sun.intensity * Math.max(0, n.dot(l)) * (lit ? 1 : 1 - SKY.shadow));
+  return new THREE.Color(albedo).multiply(sun.add(fill)).multiplyScalar(1 / Math.PI);
+}
+
+describe('light with headroom (M8.9 slice 17, R13)', () => {
+  it("M8.9 17.1 the renderer tone maps in three's custom slot, filled once with Neutral's shoulder", () => {
+    expect(TONE_MAPPING).toBe(THREE.CustomToneMapping);
+    new Sky(new THREE.Scene());
+    new Sky(new THREE.Scene());
+    const pars = (THREE.ShaderChunk as Record<string, string>)['tonemapping_pars_fragment'] ?? '';
+    expect(pars).not.toContain('vec3 CustomToneMapping( vec3 color ) { return color; }');
+    expect(pars.match(/vec3 CustomToneMapping\(/g)?.length).toBe(1);
+    expect(pars).toContain(`if ( peak < ${SKY.tone.knee.toFixed(4)} ) return color;`);
+  });
+
+  it('M8.9 17.2 under the knee a colour passes unchanged (no toe: the asphalt keeps its dark); over it the light rolls off, never past white', () => {
+    for (const hex of [PALETTE.asphalt, CITY_COLORS.brick, CITY_COLORS.window, PALETTE.skyTop]) {
+      const c = new THREE.Color(hex).multiplyScalar(0.3), t = toneMap(c);
+      expect(t.r).toBeCloseTo(c.r, 6); expect(t.g).toBeCloseTo(c.g, 6); expect(t.b).toBeCloseTo(c.b, 6);
+    }
+    let last = 0;
+    for (let x = 0.5; x <= 16; x *= 1.25) {
+      const t = toneMap(new THREE.Color(x, x * 0.6, x * 0.3));
+      expect(t.r).toBeLessThanOrEqual(1);
+      expect(t.r).toBeGreaterThanOrEqual(last);
+      last = t.r;
+    }
+    // a chalk facade square to the sun stays under 250 on every channel (§1.2), its sun at slice 17's strength
+    const wall = new THREE.Vector3(SUN_OFFSET.x, 0, SUN_OFFSET.z).normalize();
+    const lit = toneMap(lambert(CITY_COLORS.chalk, wall, true));
+    const srgb = lit.clone().convertLinearToSRGB();
+    for (const ch of [srgb.r, srgb.g, srgb.b]) expect(ch * 255).toBeLessThan(250);
+  });
+
+  it('M8.9 17.3 a wall in the sun comes out warmer than in shade and at least three times as bright', () => {
+    const wall = new THREE.Vector3(SUN_OFFSET.x, 0, SUN_OFFSET.z).normalize();
+    for (const hex of [CITY_COLORS.chalk, CITY_COLORS.stone, CITY_COLORS.peach]) {
+      const sun = toneMap(lambert(hex, wall, true)), shade = toneMap(lambert(hex, wall, false));
+      expect(sun.r / sun.b).toBeGreaterThan(shade.r / shade.b);
+      expect(luminance(sun)).toBeGreaterThanOrEqual(3 * luminance(shade));
+    }
   });
 });

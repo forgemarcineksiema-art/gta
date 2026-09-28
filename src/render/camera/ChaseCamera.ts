@@ -361,6 +361,11 @@ export class ChaseCamera {
     return this.cutActive;
   }
 
+  /** Where the chase looked in its last update (a shot that starts from the chase starts from here). */
+  get looking(): THREE.Vector3 {
+    return this.look;
+  }
+
   update(car: THREE.Object3D, carVel: THREE.Vector3, tm: VehicleTelemetry, dt: number, snap: boolean): void {
     if (this.cutActive) {
       this.camera.position.copy(this.cutPos);

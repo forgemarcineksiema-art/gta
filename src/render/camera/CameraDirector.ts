@@ -1,11 +1,20 @@
 /**
  * The camera's moments on top of the chase: the whip onto a swapped car, the door race seen from inside the garage,
- * the showroom behind the shut door (docs/M8.9_PLAN.md R10, `showroom.ts`), and the takedown's slow motion (a cut to
- * a low side view across the wreck, or a look at it from the chase).
+ * the showroom behind the shut door (docs/M8.9_PLAN.md R10, `showroom.ts`), the takedown's slow motion (a cut to
+ * a low side view across the wreck, or a look at it from the chase), the mega-ramp's apex, and the moments without
+ * control: BUSTED's crane and the circle round a wreck (R14, `shots.ts`). The chase holds one cut at a time; each shot
+ * releases only the cut it made (the door's sync released any, every frame: the takedown's side cut never showed).
  */
 import type * as THREE from 'three';
 import { GARAGE, SWAP, bodySpec, type BodyId, type SimWorld } from '../../sim';
 import { sideCutEye, type ChaseCamera } from './ChaseCamera';
+import { newShot, showroomMix, showroomShot, type ShowroomShot, type ShowroomSite } from './showroom';
+import { circleShot, craneShot, newStillShot } from './shots';
+
+/** Who holds the chase's cut: the door and the showroom, the moments without control, the takedown, the apex. */
+type CutOwner = 'door' | 'still' | 'side' | 'apex';
+/** A shot may take the cut from one ranked under it, never from one over it. */
+const RANK: Record<CutOwner, number> = { door: 3, still: 2, side: 1, apex: 1 };
 
 /** The two sides of the travel a side shot looks from, the left first. */
 const SIDES = [1, -1] as const;
@@ -24,7 +33,6 @@ export function sideShot(
   }
   return null;
 }
-import { newShot, showroomMix, showroomShot, type ShowroomShot, type ShowroomSite } from './showroom';
 
 export class CameraDirector {
   /** The takedown whose side cut is on screen, -1 when none; the cut's eye, reused. */
@@ -38,8 +46,31 @@ export class CameraDirector {
   readonly shot: ShowroomShot = newShot();
   readonly site: ShowroomSite = { x: 0, y: 0, z: 0, yaw: 0 };
   private readonly corner = { x: 0, y: 0, z: 0, lx: 0, ly: 0, lz: 0 };
+  /** The shot holding the chase's cut, null when the chase is free. */
+  private owner: CutOwner | null = null;
+  /** The moment without control on the screen, its clock, and the chase's eye and look it began from (M8.9 R14). */
+  private still: 'crane' | 'circle' | null = null;
+  private stillFor = 0;
+  private readonly stillEye = { x: 0, y: 0, z: 0 };
+  private readonly stillLook = { x: 0, y: 0, z: 0 };
+  private readonly stillShot = newStillShot();
 
   constructor(private readonly chase: ChaseCamera, private readonly sim: SimWorld) {}
+
+  /** The chase's cut for `owner`, unless a shot ranked over it holds the cut. */
+  private hold(owner: CutOwner, x: number, y: number, z: number, lx: number, ly: number, lz: number): boolean {
+    if (this.owner !== null && this.owner !== owner && RANK[this.owner] > RANK[owner]) return false;
+    this.owner = owner;
+    this.chase.cut(x, y, z, lx, ly, lz);
+    return true;
+  }
+
+  /** `owner`'s cut given back to the chase; another's is left alone. */
+  private drop(owner: CutOwner): void {
+    if (this.owner !== owner) return;
+    this.owner = null;
+    this.chase.releaseCut();
+  }
 
   /** Car-swap: whip the camera onto the new car, fitted to it. */
   onSwap(body: BodyId, roof: number): void {
@@ -73,7 +104,7 @@ export class CameraDirector {
     const site = run.dropOff >= 0 && (run.state === 'closing' || run.state === 'door') ? run.dropOffs[run.dropOff] : undefined;
     if (!site) {
       this.shutFor = -1;
-      this.chase.releaseCut();
+      this.drop('door');
       return;
     }
     const fx = Math.sin(site.yaw), fz = Math.cos(site.yaw);
@@ -85,7 +116,7 @@ export class CameraDirector {
     c.lx = site.x + fx * doorAlong; c.ly = site.y + 1.4; c.lz = site.z + fz * doorAlong;
     if (run.state !== 'door') {
       this.shutFor = -1;
-      this.chase.cut(c.x, c.y, c.z, c.lx, c.ly, c.lz);
+      this.hold('door', c.x, c.y, c.z, c.lx, c.ly, c.lz);
       return;
     }
     // the door shut: from the corner to the showroom
@@ -96,10 +127,45 @@ export class CameraDirector {
     this.site.yaw = site.yaw;
     const s = showroomShot(this.site, radius, height, aspect, fovY, this.shot);
     const m = showroomMix(this.shutFor);
-    this.chase.cut(
+    this.hold(
+      'door',
       c.x + (s.eye.x - c.x) * m, c.y + (s.eye.y - c.y) * m, c.z + (s.eye.z - c.z) * m,
       c.lx + (s.look.x - c.lx) * m, c.ly + (s.look.y - c.ly) * m, c.lz + (s.look.z - c.lz) * m,
     );
+  }
+
+  /**
+   * The moments without control (M8.9 R14): while the busted card is up, the crane back from the car and the units round
+   * it (framed under the card); while
+   * the car is a wreck, the circle round it. Each begins where the chase stood (`eye`, its look) and keeps its eye on a
+   * clear line to the car (pulled in along it as the chase's boom is); the chase is back in the frame control is (the
+   * card's key, the respawn). Before the chase's update.
+   */
+  syncStill(dt: number, eye: THREE.Vector3, car: THREE.Vector3): void {
+    const run = this.sim.run, life = this.sim.life.state;
+    const want = run.state === 'busted' ? 'crane' : life.wrecked && run.state === 'running' ? 'circle' : null;
+    if (want !== this.still) {
+      this.drop('still');
+      this.still = want;
+      this.stillFor = 0;
+      const look = this.chase.looking;
+      this.stillEye.x = eye.x; this.stillEye.y = eye.y; this.stillEye.z = eye.z;
+      this.stillLook.x = look.x; this.stillLook.y = look.y; this.stillLook.z = look.z;
+    }
+    if (!this.still) return;
+    this.stillFor += dt;
+    const s = this.still === 'crane'
+      ? craneShot(this.stillEye, this.stillLook, car, this.stillFor, (this.chase.tuning.fovBase * Math.PI) / 180, this.stillShot)
+      : circleShot(this.stillEye, this.stillLook, car, this.stillFor, this.stillShot);
+    const cy = car.y + 0.9;
+    const clear = this.sim.viewFraction(car.x, cy, car.z, s.eye.x, s.eye.y, s.eye.z);
+    if (clear < 1) {
+      const k = Math.max(0.2, clear - 0.05);
+      s.eye.x = car.x + (s.eye.x - car.x) * k;
+      s.eye.y = cy + (s.eye.y - cy) * k;
+      s.eye.z = car.z + (s.eye.z - car.z) * k;
+    }
+    this.hold('still', s.eye.x, s.eye.y, s.eye.z, s.look.x, s.look.y, s.look.z);
   }
 
   /**
@@ -117,7 +183,7 @@ export class CameraDirector {
       const wx = lerp(tb.prevPos[p] as number, tb.currPos[p] as number, alpha);
       const wy = lerp(tb.prevPos[p + 1] as number, tb.currPos[p + 1] as number, alpha) + 0.8;
       const wz = lerp(tb.prevPos[p + 2] as number, tb.currPos[p + 2] as number, alpha);
-      if (this.sideCut !== i && !this.chase.cutting && this.sim.run.state === 'running' && this.cutToSide(wx, wy, wz, car, vel)) this.sideCut = i;
+      if (this.sideCut !== i && this.owner === null && this.sim.run.state === 'running' && this.cutToSide(wx, wy, wz, car, vel)) this.sideCut = i;
       if (this.sideCut !== i) this.chase.focus(wx, wy, wz, 0.2);
     } else if (life.slowMo > 0 && this.megaFlight()) {
       this.apexShot(car, vel);
@@ -125,11 +191,11 @@ export class CameraDirector {
       if (this.chase.focusing) this.chase.release();
       if (this.sideCut >= 0) {
         this.sideCut = -1;
-        this.chase.releaseCut();
+        this.drop('side');
       }
       if (this.apexOn) {
         this.apexOn = false;
-        this.chase.releaseCut();
+        this.drop('apex');
       }
     }
   }
@@ -147,12 +213,12 @@ export class CameraDirector {
   private apexShot(car: THREE.Vector3, vel: THREE.Vector3): void {
     if (!this.apexOn) {
       const n = Math.hypot(vel.x, vel.z);
-      if (this.chase.cutting || this.sim.run.state !== 'running' || n < 1) return;
+      if (this.owner !== null || this.sim.run.state !== 'running' || n < 1) return;
       const sim = this.sim, cx = car.x, cy = car.y + 0.5, cz = car.z;
       if (!sideShot(this.apexEye, cx, car.y, cz, vel.x / n, vel.z / n, (x, y, z) => sim.clearFraction(x, y, z, cx, cy, cz) >= 0.99)) return;
       this.apexOn = true;
     }
-    this.chase.cut(this.apexEye.x, this.apexEye.y, this.apexEye.z, car.x, car.y + 0.5, car.z);
+    this.hold('apex', this.apexEye.x, this.apexEye.y, this.apexEye.z, car.x, car.y + 0.5, car.z);
   }
 
   /** The side cut: the eye on the travel's left or right with a clear line to the wreck, looking past it at the car. */
@@ -165,8 +231,7 @@ export class CameraDirector {
     for (const side of [1, -1]) {
       const eye = sideCutEye(this.cutEye, wx, wy, wz, dx, dz, side);
       if (this.sim.clearFraction(eye.x, eye.y, eye.z, wx, wy, wz) < 0.99) continue;
-      this.chase.cut(eye.x, eye.y, eye.z, wx + (car.x - wx) * 0.35, wy, wz + (car.z - wz) * 0.35);
-      return true;
+      return this.hold('side', eye.x, eye.y, eye.z, wx + (car.x - wx) * 0.35, wy, wz + (car.z - wz) * 0.35);
     }
     return false;
   }

@@ -9,6 +9,7 @@ import { ChaseCamera, DEFAULT_CAMERA, SIDE_CUT, sideCutEye } from '../../src/ren
 import { SHOWROOM, newShot, showroomMix, showroomShot, turntableYaw } from '../../src/render/camera/showroom';
 import { BODIES, type SimWorld, type VehicleTelemetry } from '../../src/sim';
 import { CameraDirector, sideShot } from '../../src/render/camera/CameraDirector';
+import { CIRCLE, CRANE, circleShot, craneShot, newStillShot } from '../../src/render/camera/shots';
 
 function telemetry(over: Partial<VehicleTelemetry> = {}): VehicleTelemetry {
   return {
@@ -543,6 +544,131 @@ describe('the ground (M8.9 slice 26)', () => {
     let least = Infinity;
     drive(road, 6, (cam) => { least = Math.min(least, cam.position.y - road(cam.position.z)); });
     expect(least).toBeGreaterThan(1.5 - 1e-6);
+  });
+});
+
+/**
+ * The moments without control (M8.9 slice 27, R14): BUSTED's crane and the circle round a wreck, each from where the
+ * chase stood; and one cut at a time, each released only by the shot that made it. The director in the Renderer's order
+ * a frame: the door, the still moments, the chase, the takedown and the apex.
+ */
+describe('BUSTED and the wreck (M8.9 slice 27)', () => {
+  const dt = 1 / 60;
+  const wrap = (a: number): number => Math.atan2(Math.sin(a), Math.cos(a));
+
+  function directorRig(over: Record<string, unknown> = {}) {
+    const cam = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 1000);
+    const chase = new ChaseCamera(cam);
+    const state = { slowMo: 0, slowMoTarget: -1, wrecked: false };
+    const run = { state: 'running', dropOff: -1, dropOffs: [] };
+    const sim = { run, life: { state }, traffic: null, transforms: null, jumps: null, clearFraction: () => 1, viewFraction: () => 1, ...over } as unknown as SimWorld;
+    const director = new CameraDirector(chase, sim);
+    const car = new THREE.Object3D();
+    const vel = new THREE.Vector3();
+    let first = true;
+    const frame = (): void => {
+      car.position.addScaledVector(vel, dt);
+      director.syncDoor(dt, 16 / 9, 1, 3, 1.6);
+      director.syncStill(dt, cam.position, car.position);
+      chase.update(car, vel, telemetry({ vx: vel.x, vz: vel.z, speed: vel.length() }), dt, first);
+      first = false;
+      director.syncFocus(car.position, vel, 1);
+    };
+    const frames = (seconds: number): void => { for (let i = 0; i < Math.round(seconds * 60); i++) frame(); };
+    return { cam, chase, car, vel, state, run, frame, frames };
+  }
+
+  test('27.1 the crane only rises and draws back, the car and the units round it framed under the card at the ten sizes', () => {
+    const car = { x: 0, y: 0, z: 0 };
+    const fromEye = { x: 0, y: 2.4, z: -8 }, fromLook = { x: 0, y: 0.9, z: 3 };
+    const shot = newStillShot();
+    let up = -Infinity, back = -Infinity;
+    for (let t = 0; t <= CRANE.seconds + 0.5; t += 0.1) {
+      craneShot(fromEye, fromLook, car, t, (DEFAULT_CAMERA.fovBase * Math.PI) / 180, shot);
+      expect(shot.eye.y).toBeGreaterThanOrEqual(up - 1e-9);
+      expect(Math.hypot(shot.eye.x, shot.eye.z)).toBeGreaterThanOrEqual(back - 1e-9);
+      up = shot.eye.y;
+      back = Math.hypot(shot.eye.x, shot.eye.z);
+    }
+    // the end: the car and four units boxing it 5 m round, in the frame's lower part, under the busted card that takes
+    // its middle (its bottom 0.25 under the middle at 1280x720)
+    craneShot(fromEye, fromLook, car, CRANE.seconds, (DEFAULT_CAMERA.fovBase * Math.PI) / 180, shot);
+    const round = [[0, 0], [5, 0], [-5, 0], [0, 5], [0, -5]] as const;
+    for (const [w, h] of SIZES) {
+      const cam = new THREE.PerspectiveCamera(DEFAULT_CAMERA.fovBase, w / h, 0.1, 1000);
+      cam.position.set(shot.eye.x, shot.eye.y, shot.eye.z);
+      cam.lookAt(shot.look.x, shot.look.y, shot.look.z);
+      cam.updateMatrixWorld();
+      for (const [x, z] of round) {
+        const p = new THREE.Vector3(x, 0, z).project(cam);
+        expect(Math.abs(p.x), `${w}x${h}`).toBeLessThan(0.95);
+        expect(p.y, `${w}x${h}`).toBeLessThan(-0.3);
+        expect(p.y, `${w}x${h}`).toBeGreaterThan(-0.9);
+      }
+    }
+  });
+
+  test('27.2 the circle turns under 40 deg/s round the wreck and keeps its eye on a clear line to it', () => {
+    const wreck = { x: 0, y: 0, z: 0 };
+    const shot = newStillShot();
+    circleShot({ x: 0, y: 2.4, z: -8 }, { x: 0, y: 0.9, z: 3 }, wreck, 0, shot);
+    let last = Math.atan2(shot.eye.x, shot.eye.z), peak = 0;
+    for (let i = 1; i <= CIRCLE.seconds * 60; i++) {
+      circleShot({ x: 0, y: 2.4, z: -8 }, { x: 0, y: 0.9, z: 3 }, wreck, i / 60, shot);
+      const a = Math.atan2(shot.eye.x, shot.eye.z);
+      peak = Math.max(peak, (Math.abs(wrap(a - last)) * 60 * 180) / Math.PI);
+      last = a;
+    }
+    expect(peak).toBeLessThan(40);
+    // a wall 5 m from the wreck all round: the eye pulled in along its line to inside it
+    const r = directorRig({ viewFraction: (ax: number, ay: number, az: number, bx: number, by: number, bz: number) => {
+      const len = Math.hypot(bx - ax, by - ay, bz - az);
+      return len > 5 ? 5 / len : 1;
+    } });
+    r.frames(1);
+    r.state.wrecked = true;
+    for (let i = 0; i < 150; i++) {
+      r.frame();
+      expect(r.chase.cutting).toBe(true);
+      expect(r.cam.position.distanceTo(r.car.position)).toBeLessThan(5.5);
+    }
+  });
+
+  test('27.3 the key at the card and the respawn give the chase back in that frame', () => {
+    const r = directorRig();
+    r.frames(1);
+    r.run.state = 'busted';
+    r.frames(1);
+    expect(r.chase.cutting).toBe(true);
+    r.run.state = 'running';
+    r.frame();
+    expect(r.chase.cutting).toBe(false);
+    r.state.wrecked = true;
+    r.frames(1);
+    expect(r.chase.cutting).toBe(true);
+    r.state.wrecked = false;
+    r.frame();
+    expect(r.chase.cutting).toBe(false);
+  });
+
+  test("27.4 a cut is released only by the shot that made it: the takedown's side cut holds through its slow motion", () => {
+    // the door's sync released any cut every frame since M5.5: the side cut, made after the chase's update, never showed
+    const tb = { prevPos: new Float32Array([10, 0, 20]), currPos: new Float32Array([10, 0, 20]) };
+    const r = directorRig({ traffic: { slot: [0] }, transforms: tb });
+    r.vel.set(0, 0, 10);
+    r.frames(1);
+    r.state.slowMo = 1;
+    r.state.slowMoTarget = 0;
+    const eye = sideCutEye({ x: 0, y: 0, z: 0 }, 10, 0.8, 20, 0, 1, 1);
+    let shown = 0;
+    for (let i = 0; i < 30; i++) {
+      r.frame();
+      if (r.cam.position.distanceTo(new THREE.Vector3(eye.x, eye.y, eye.z)) < 0.5) shown++;
+    }
+    expect(shown).toBeGreaterThan(27);
+    r.state.slowMo = 0;
+    r.frames(0.1);
+    expect(r.chase.cutting).toBe(false);
   });
 });
 

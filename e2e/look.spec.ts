@@ -361,7 +361,7 @@ for (const [w, h] of SIZES) {
   });
 
   test(`stills: busted, the door, CARS, STYLE at ${w}x${h}`, async ({ page }) => {
-    test.skip(!wanted('busted', 'totals', 'cars', 'style', 'preview', 'goals'));
+    test.skip(!wanted('busted', 'crane', 'totals', 'cars', 'style', 'preview', 'goals'));
     await boot(page, `manual=1&spawn=crown&ad=off&fresh=1&${DATE}`, w, h);
     await page.evaluate(`${RUN_STATES}
       sim.police.dispatching = false;
@@ -373,6 +373,11 @@ for (const [w, h] of SIZES) {
       window.advanceTime(1500);
     `);
     await snap(page, 'busted');
+    // the crane over the units at its end (M8.9 slice 27)
+    if (wanted('crane')) {
+      await adv(page, 3000);
+      await snap(page, 'crane');
+    }
     await adv(page, 1800);
     await page.evaluate(() => { window.__game!.sim.run.closeCard(); window.advanceTime!(50); });
     await page.evaluate(`${RUN_STATES}

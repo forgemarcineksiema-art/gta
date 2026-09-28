@@ -337,6 +337,8 @@ export class Renderer {
     this.carVel.set(tm.vx, tm.vy, tm.vz);
 
     this.chase.gravity = 9.81 + sim.vehicle.tuning.extraGravity;
+    // BUSTED's crane and the circle round a wreck (M8.9 R14), from where the chase stood
+    this.director.syncStill(dt, this.camera.position, carPos);
     this.chase.update(car, this.carVel, tm, dt, snap);
     this.hideoutView?.update(sim);
     this.coinsView?.update(sim, worldDt, carPos);

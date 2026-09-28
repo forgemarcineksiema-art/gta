@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-28 — M8.9 slice 27: BUSTED and the wreck
+
+`shots.ts`: while the busted card is up the camera rises to 5 m and draws back to 18 m over 3 s from where the chase
+stood, the car and the units round it in the frame's lower part (first framed over the middle, they stood behind the
+card: seen on the new `crane` still); while the car is a wreck, a fifth of a turn round it at 8 m; both keep a clear line
+(pulled in along it); the chase back in the frame the key or the respawn comes. Found on the way: the door's sync
+released any cut every frame, so the takedown's side cut (M5.5 slice 17, made after the chase's update) never reached
+the screen (0 of 29 frames); the director now holds one cut at a time by owner and rank. Pins 27.1–27.4. Stills calm,
+intro, wreck, busted unchanged; `crane` added to the look suite.
+
 ## 2026-09-28 — M8.9 slice 26: the ground
 
 The rig pitches with 60 % of the road's slope along the view (eased, held in the air; the camera over the road behind,

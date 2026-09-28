@@ -161,6 +161,7 @@ export class Renderer {
     // the occlusion rule reads the world's solid statics (a query; the sim is not written)
     this.chase.occluder = (ax, ay, az, bx, by, bz) => sim.clearFraction(ax, ay, az, bx, by, bz);
     this.chase.ceiling = (x, y, z, reach) => sim.roomAbove(x, y, z, reach);
+    this.chase.floor = (x, y, z) => sim.floorBelow(x, y, z);
     this.director = new CameraDirector(this.chase, sim);
     this.sky = new Sky(this.scene);
     this.clouds = new Clouds(this.scene);
@@ -335,6 +336,7 @@ export class Renderer {
     if ((this.cityView || this.islandView) && dt > 0 && dt <= 0.25) this.adaptQuality(dt);
     this.carVel.set(tm.vx, tm.vy, tm.vz);
 
+    this.chase.gravity = 9.81 + sim.vehicle.tuning.extraGravity;
     this.chase.update(car, this.carVel, tm, dt, snap);
     this.hideoutView?.update(sim);
     this.coinsView?.update(sim, worldDt, carPos);

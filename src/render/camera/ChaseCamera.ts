@@ -60,6 +60,15 @@ export interface CameraTuning {
   joltKick: number;
   joltScrape: number;
   joltRumble: number;
+  /** The most of a hit's or a landing's speed the jolt takes, m/s (a mega-ramp's 22 m/s landing would throw 50 px). */
+  joltCap: number;
+  /**
+   * Big air (M8.9 R14): the camera kept between these over the car in the air (m; a long fall's lag left it 12 m up at the
+   * landing), and the share of the way the look leans toward where the car will come down on a long flight.
+   */
+  airMinOver: number;
+  airMaxOver: number;
+  airLean: number;
   /**
    * Seconds of backing up in the reverse gear, faster than `reverseSpeed` m/s, before the view turns round: a back-up
    * off a wall and a three-point turn are over before it.
@@ -113,6 +122,10 @@ export const DEFAULT_CAMERA: CameraTuning = {
   joltKick: 300,
   joltScrape: 0.25,
   joltRumble: 0.4,
+  joltCap: 6,
+  airMinOver: 0.8,
+  airMaxOver: 4,
+  airLean: 0.35,
   reverseDelay: 1.2,
   reverseSpeed: 1,
   reverseHeight: 0.3,
@@ -134,6 +147,10 @@ const WHIP = { omega: 20, rateDeg: 720 } as const;
 const YAW_STEPS = 240;
 /** A slide tail first ends when the nose is back within this of the travel (it starts past a right angle). */
 const FACING = 70 * DEG;
+/** The landing's forecast: the fall sampled this often (s) this many times, the car's origin this high over its wheels (m). */
+const LANDING = { step: 0.15, samples: 27, ride: 0.5 } as const;
+/** The lean toward the landing fades in as the time to it grows from `from` to `to` seconds. */
+const AIR_LEAN = { from: 0.3, to: 1 } as const;
 /** The occlusion rule's gap kept to the static that blocks, and the shortest boom it pulls to, m. */
 const BOOM_MARGIN = 0.4;
 const BOOM_MIN = 1.6;
@@ -143,6 +160,11 @@ const BOOM_MIN = 1.6;
  * a low one it sat 0.3 m under it: the view's top cut into the slab (the lighthouse road under the bay bridge's ramp).
  */
 const CEILING_ROOM = 0.6;
+
+function smooth01(u: number): number {
+  const c = Math.max(0, Math.min(1, u));
+  return c * c * (3 - 2 * c);
+}
 
 function wrapAngle(a: number): number {
   while (a > Math.PI) a -= Math.PI * 2;
@@ -184,6 +206,15 @@ export class ChaseCamera {
   occluder: ((ax: number, ay: number, az: number, bx: number, by: number, bz: number) => number) | null = null;
   /** The room over a point up to a ceiling, at most `reach` (the world's query; null: none). */
   ceiling: ((x: number, y: number, z: number, reach: number) => number) | null = null;
+  /** The height of the first surface a wheel would meet under a point (the world's query; null: none). */
+  floor: ((x: number, y: number, z: number) => number) | null = null;
+  /** The car's fall in the air, m/s² (the world's gravity and the car's own extra). */
+  gravity = 9.81 + 3.5;
+  /** How far the look leans toward the landing, and the landing it leans to. */
+  private lean = 0;
+  /** The look-ahead's share, a half in the air. */
+  private airLook = 1;
+  private readonly landing = new THREE.Vector3();
   /** How much of the boom is out: pulled in at once by a static between, let out again at the ground height's pace. */
   private boom = 1;
   private readonly shown = new THREE.Vector3();
@@ -250,6 +281,32 @@ export class ChaseCamera {
     this.fovPunch = 10;
     // the new car is driven from here: whatever the last one was doing (backing up, a slide) is not its
     this.clearIntent();
+  }
+
+  /**
+   * Where the car in the air comes down (`landing`) and in how many seconds, -1 past the forecast's reach or with no
+   * floor query: its fall sampled every `LANDING.step` s against the floor under each sample, looked for from the last
+   * sample's height; the crossing found between the two.
+   */
+  private forecastLanding(p: THREE.Vector3, v: THREE.Vector3): number {
+    const floor = this.floor;
+    if (!floor) return -1;
+    const g = this.gravity;
+    let px = p.x, py = p.y, pz = p.z;
+    for (let i = 1; i <= LANDING.samples; i++) {
+      const s = i * LANDING.step;
+      const x = p.x + v.x * s, y = p.y + v.y * s - 0.5 * g * s * s, z = p.z + v.z * s;
+      const f = floor(x, py, z) + LANDING.ride;
+      if (y <= f) {
+        const u = Math.max(0, Math.min(1, (py - f) / Math.max(1e-6, py - y)));
+        this.landing.set(px + (x - px) * u, f - LANDING.ride, pz + (z - pz) * u);
+        return (i - 1 + u) * LANDING.step;
+      }
+      px = x;
+      py = y;
+      pz = z;
+    }
+    return -1;
   }
 
   private clearJolt(): void {
@@ -388,6 +445,10 @@ export class ChaseCamera {
 
     const dist = (t.distance + this.extraDistance + speed * t.distancePerSpeed + (tm.drifting ? t.driftDistanceBonus : 0)) * modeMul;
     const height = Math.max(1.4, t.height + this.extraHeight - speed * t.heightDropPerSpeed - (tm.drifting ? t.driftHeightDrop : 0) + t.reverseHeight * back) * modeMul;
+    // in the air the lag reads the jump, within bounds: never more than `airMaxOver` over the car, never under
+    // `airMinOver` (M8.9 R14)
+    const airLow = car.position.y + t.airMinOver * modeMul, airHigh = car.position.y + t.airMaxOver * modeMul;
+    if (tm.airborne) this.carY = Math.min(airHigh - height, Math.max(airLow - height, this.carY));
     this.target.set(car.position.x - this.dir.x * dist, this.carY + height, car.position.z - this.dir.z * dist);
 
     if (snap || !this.initialised) {
@@ -396,6 +457,7 @@ export class ChaseCamera {
       const k = 1 - Math.exp(-dt * t.followRate * (this.whipLeft > 0 ? 2 : 1));
       this.pos.lerp(this.target, k);
       this.pos.y = Math.max(this.pos.y, car.position.y + 0.6);
+      if (tm.airborne) this.pos.y = Math.min(airHigh, Math.max(airLow, this.pos.y));
     }
 
     // the jolt (M8.9 R14): the camera a loosely held body, so a hit throws the car across the screen the way it goes in
@@ -411,12 +473,12 @@ export class ChaseCamera {
         const nx = tm.contactNx, nz = tm.contactNz;
         const side = -nx * this.dir.z + nz * this.dir.x;
         const toward = -(nx * this.dir.x + nz * this.dir.z);
-        const kick = tm.impact * t.joltHit * DEG;
+        const kick = Math.min(tm.impact, t.joltCap) * t.joltHit * DEG;
         this.joltYawV += kick * side;
         this.joltRollV += kick * side * 0.3;
         this.joltPitchV -= kick * (Math.max(0, tm.contactNy) + 0.6 * Math.max(0, toward));
       }
-      if (tm.landingImpact > 0) this.joltPitchV -= tm.landingImpact * t.joltLanding * DEG;
+      if (tm.landingImpact > 0) this.joltPitchV -= Math.min(tm.landingImpact, t.joltCap) * t.joltLanding * DEG;
       // the scrape's tremble and the road's rumble move the spring's rest
       this.joltT += dt;
       this.loadMean += (tm.gVert - this.loadMean) * (1 - Math.exp(-dt * 2));
@@ -453,13 +515,21 @@ export class ChaseCamera {
       if (room < CEILING_ROOM) this.shown.y = Math.max(car.position.y + 0.3, this.shown.y - (CEILING_ROOM - room));
     }
     this.camera.position.copy(this.shown);
-    const ahead = (t.lookAhead + speed * t.lookAheadPerSpeed) * (tm.airborne ? 0.5 : 1);
+    // the look-ahead halves in the air, eased both ways: switched in one frame it threw the car 25 px on the screen at
+    // every take-off and landing
+    this.airLook += ((tm.airborne ? 0.5 : 1) - this.airLook) * (snap ? 1 : 1 - Math.exp(-dt * 6));
+    const ahead = (t.lookAhead + speed * t.lookAheadPerSpeed) * this.airLook;
     // left of the view direction is (cos yaw, 0, -sin yaw)
     this.look.set(
       car.position.x + this.dir.x * ahead + this.dir.z * this.lookSide,
       car.position.y + t.lookHeight,
       car.position.z + this.dir.z * ahead - this.dir.x * this.lookSide,
     );
+    // a long flight: the look leans toward where the car will come down, so the landing is seen (M8.9 R14)
+    const toLand = tm.airborne && !snap ? this.forecastLanding(car.position, carVel) : -1;
+    const leanTarget = toLand > 0 ? t.airLean * smooth01((toLand - AIR_LEAN.from) / (AIR_LEAN.to - AIR_LEAN.from)) : 0;
+    this.lean += (leanTarget - this.lean) * (snap ? 1 : 1 - Math.exp(-dt * 4));
+    if (this.lean > 0.001) this.look.lerp(this.landing, this.lean);
     // takedown focus: the look point blends toward the target and back (8/s), the view narrows a little
     if (this.focusLeft > 0) this.focusLeft = Math.max(0, this.focusLeft - dt);
     const focusTarget = this.focusLeft > 0 ? 1 : 0;

@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-28 — M8.9 slice 25: big air
+
+In the air the camera's lag stays between 0.8 and 4 m over the car (the mega-ramp's fall left it 12 m up); on a long
+flight the look leans up to 35 % toward where the car will come down (its fall sampled against `floorBelow`, the car's
+own gravity from the Renderer); the mega-ramp's apex slow motion a side shot (`sideShot`, the takedown's eye) held while
+it runs. Found on the way: the look-ahead halved in the air in one frame, throwing the car 25 px at every take-off and
+landing, kickers too; eased. The jolt takes 6 m/s at most. Island probe: the mega flight 0.8–4 m over the car, the shot
+0.6 s, handed back 26 m up; a landing moves the car 12 px (was 50). Pins 25.1–25.4. Stills calm, intro unchanged.
+
 ## 2026-09-28 — M8.9 slice 24: the jolt from the physics
 
 The shake was two sines on the world's x and y, so on an east–west road a hit's sideways half moved the camera along

@@ -6,12 +6,33 @@
 import type * as THREE from 'three';
 import { GARAGE, SWAP, bodySpec, type BodyId, type SimWorld } from '../../sim';
 import { sideCutEye, type ChaseCamera } from './ChaseCamera';
+
+/** The two sides of the travel a side shot looks from, the left first. */
+const SIDES = [1, -1] as const;
+
+/**
+ * A side shot's eye (`SIDE_CUT`) for a subject at (x, y, z) travelling (dx, dz), unit: on the travel's left, else on its
+ * right, whichever `clear` finds a clear line from to the subject; null when neither (M8.9 R14, the mega-ramp's apex).
+ */
+export function sideShot(
+  out: { x: number; y: number; z: number }, x: number, y: number, z: number, dx: number, dz: number,
+  clear: (ex: number, ey: number, ez: number) => boolean,
+): { x: number; y: number; z: number } | null {
+  for (const side of SIDES) {
+    sideCutEye(out, x, y, z, dx, dz, side);
+    if (clear(out.x, out.y, out.z)) return out;
+  }
+  return null;
+}
 import { newShot, showroomMix, showroomShot, type ShowroomShot, type ShowroomSite } from './showroom';
 
 export class CameraDirector {
   /** The takedown whose side cut is on screen, -1 when none; the cut's eye, reused. */
   private sideCut = -1;
   private readonly cutEye = { x: 0, y: 0, z: 0 };
+  /** The mega-ramp's apex shot on the screen, and its eye (M8.9 R14). */
+  private apexOn = false;
+  private readonly apexEye = { x: 0, y: 0, z: 0 };
   /** Seconds since the door shut (-1 while it is open), the showroom's shot, its garage, and the back corner's cut. */
   private shutFor = -1;
   readonly shot: ShowroomShot = newShot();
@@ -98,13 +119,40 @@ export class CameraDirector {
       const wz = lerp(tb.prevPos[p + 2] as number, tb.currPos[p + 2] as number, alpha);
       if (this.sideCut !== i && !this.chase.cutting && this.sim.run.state === 'running' && this.cutToSide(wx, wy, wz, car, vel)) this.sideCut = i;
       if (this.sideCut !== i) this.chase.focus(wx, wy, wz, 0.2);
+    } else if (life.slowMo > 0 && this.megaFlight()) {
+      this.apexShot(car, vel);
     } else {
       if (this.chase.focusing) this.chase.release();
       if (this.sideCut >= 0) {
         this.sideCut = -1;
         this.chase.releaseCut();
       }
+      if (this.apexOn) {
+        this.apexOn = false;
+        this.chase.releaseCut();
+      }
     }
+  }
+
+  /** On the mega-ramp's flight: its slow motion is the apex's alone. */
+  private megaFlight(): boolean {
+    const jumps = this.sim.jumps;
+    return jumps !== null && jumps.flying >= 0 && jumps.descs[jumps.flying]?.mega === true;
+  }
+
+  /**
+   * The mega-ramp's apex (M8.9 R14): while its slow motion runs, the car seen from beside its travel as a takedown's
+   * wreck is, the eye held and the look on the car; the chase back when the slow motion ends, the car still high up.
+   */
+  private apexShot(car: THREE.Vector3, vel: THREE.Vector3): void {
+    if (!this.apexOn) {
+      const n = Math.hypot(vel.x, vel.z);
+      if (this.chase.cutting || this.sim.run.state !== 'running' || n < 1) return;
+      const sim = this.sim, cx = car.x, cy = car.y + 0.5, cz = car.z;
+      if (!sideShot(this.apexEye, cx, car.y, cz, vel.x / n, vel.z / n, (x, y, z) => sim.clearFraction(x, y, z, cx, cy, cz) >= 0.99)) return;
+      this.apexOn = true;
+    }
+    this.chase.cut(this.apexEye.x, this.apexEye.y, this.apexEye.z, car.x, car.y + 0.5, car.z);
   }
 
   /** The side cut: the eye on the travel's left or right with a clear line to the wreck, looking past it at the car. */

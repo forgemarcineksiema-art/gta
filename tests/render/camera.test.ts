@@ -7,7 +7,8 @@ import * as THREE from 'three';
 import { describe, expect, test } from 'vitest';
 import { ChaseCamera, DEFAULT_CAMERA, SIDE_CUT, sideCutEye } from '../../src/render/camera/ChaseCamera';
 import { SHOWROOM, newShot, showroomMix, showroomShot, turntableYaw } from '../../src/render/camera/showroom';
-import { BODIES, type VehicleTelemetry } from '../../src/sim';
+import { BODIES, type SimWorld, type VehicleTelemetry } from '../../src/sim';
+import { CameraDirector, sideShot } from '../../src/render/camera/CameraDirector';
 
 function telemetry(over: Partial<VehicleTelemetry> = {}): VehicleTelemetry {
   return {
@@ -403,6 +404,103 @@ describe('the jolt from the physics (M8.9 slice 24)', () => {
 
   test('24.3 a calm drive does not shake the car on the screen', () => {
     for (const q of jolted(0.3, {}, 180)) expect(Math.hypot(q.x, q.y)).toBeLessThan(0.3);
+  });
+});
+
+/**
+ * Big air (M8.9 slice 25, R14): in the air the camera stays within bounds over the car, on a long flight the look leans
+ * toward where the car will come down, and the mega-ramp's apex is a side shot. A car written frame by frame off a
+ * plateau 16 m up, launched at 21 m/s and 8 m/s up, down onto the flat.
+ */
+describe('big air (M8.9 slice 25)', () => {
+  const HZ = 60;
+  const dt = 1 / HZ;
+  const G = 13.31;
+
+  function flight() {
+    const cam = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 1000);
+    const chase = new ChaseCamera(cam);
+    chase.floor = () => 0;
+    chase.gravity = G;
+    const car = new THREE.Object3D();
+    const vel = new THREE.Vector3(0, 0, 21);
+    car.position.set(0, 16, 0);
+    const p = new THREE.Vector3();
+    const frames: Array<{ over: number; x: number; y: number; air: boolean; vy: number }> = [];
+    let air = false, landed = -1, apexCam: THREE.PerspectiveCamera | null = null;
+    const landing = new THREE.Vector3();
+    for (let i = 0; i < 6 * HZ; i++) {
+      let impact = 0;
+      if (i === 2 * HZ) { air = true; vel.y = 8; }
+      if (air) vel.y -= G * dt;
+      car.position.addScaledVector(vel, dt);
+      if (air && car.position.y <= 0) {
+        car.position.y = 0;
+        impact = -vel.y;
+        vel.y = 0;
+        air = false;
+        landed = i;
+        landing.copy(car.position);
+      }
+      chase.update(car, vel, telemetry({ vx: vel.x, vy: vel.y, vz: vel.z, airborne: air, groundedWheels: air ? 0 : 4, landingImpact: impact }), dt, i === 0);
+      cam.updateMatrixWorld();
+      p.copy(car.position).project(cam);
+      frames.push({ over: cam.position.y - car.position.y, x: p.x * 640, y: p.y * 360, air, vy: vel.y });
+      if (air && vel.y <= 0 && !apexCam) apexCam = cam.clone();
+    }
+    return { frames, landed, landing, apexCam: apexCam as THREE.PerspectiveCamera };
+  }
+
+  test('25.1 a flight falling 16 m: the camera stays 0.8 to 4 m over the car throughout', () => {
+    const { frames } = flight();
+    const inAir = frames.filter((f) => f.air);
+    expect(inAir.length).toBeGreaterThan(2 * HZ);
+    for (const f of inAir) {
+      expect(f.over).toBeGreaterThan(0.8 - 1e-6);
+      expect(f.over).toBeLessThan(4 + 1e-6);
+    }
+  });
+
+  test('25.2 from the apex the landing and the car are on the screen', () => {
+    const { landing, apexCam } = flight();
+    apexCam.updateMatrixWorld();
+    const q = landing.clone().project(apexCam);
+    expect(Math.abs(q.x)).toBeLessThan(1);
+    expect(Math.abs(q.y)).toBeLessThan(1);
+    expect(q.z).toBeLessThan(1);
+  });
+
+  test('25.3 the landing moves the car on the screen by 20 px at most', () => {
+    const { frames, landed } = flight();
+    const before = frames[landed - 1] as { x: number; y: number };
+    let most = 0;
+    for (const f of frames.slice(landed, landed + 30)) most = Math.max(most, Math.hypot(f.x - before.x, f.y - before.y));
+    expect(most).toBeLessThan(20);
+  });
+
+  test("25.4 the apex's side shot looks from a side with a clear line, and holds only while the apex's slow motion runs", () => {
+    // travelling +Z: the left is +X; the left blocked, the right; both blocked, none
+    const eye = { x: 0, y: 0, z: 0 };
+    expect(sideShot(eye, 10, 16, 20, 0, 1, (x) => x < 10)).not.toBeNull();
+    expect(eye.x).toBeCloseTo(10 - SIDE_CUT.side, 9);
+    expect(sideShot(eye, 10, 16, 20, 0, 1, () => false)).toBeNull();
+    const cam = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 1000);
+    const chase = new ChaseCamera(cam);
+    const state = { slowMo: 0.6, slowMoTarget: -1 };
+    const jumps = { flying: 0, descs: [{ mega: true }] };
+    const sim = { life: { state }, traffic: null, run: { state: 'running' }, jumps, clearFraction: () => 1 } as unknown as SimWorld;
+    const director = new CameraDirector(chase, sim);
+    const at = new THREE.Vector3(0, 16, 0), vel = new THREE.Vector3(0, 0, 21);
+    director.syncFocus(at, vel);
+    expect(chase.cutting).toBe(true);
+    state.slowMo = 0;
+    director.syncFocus(at, vel);
+    expect(chase.cutting).toBe(false);
+    // a kicker's slow motion rides its whole flight: no shot
+    jumps.descs[0] = { mega: false };
+    state.slowMo = 0.6;
+    director.syncFocus(at, vel);
+    expect(chase.cutting).toBe(false);
   });
 });
 

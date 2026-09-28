@@ -1,12 +1,13 @@
 /**
- * The golden hour (docs/M8.9_PLAN.md R8, slice 2): the sun low and warm, the sky in three stops dark behind the HUD, the
- * fog and the background the horizon's colour.
+ * The golden hour (docs/M8.9_PLAN.md R8, slice 2): the sun low and warm, the fog and the background the horizon's colour.
+ * The sky per pixel (R13, slice 16): one function of a direction for the dome and the fog, dark behind the HUD, the
+ * evening's arch away from the sun.
  */
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { PALETTE } from '../../src/sim/palette';
 import { SUN_OFFSET } from '../../src/render/shadows';
-import { CLOUDS, SKY, SUN_DISC, Sky, cloudLayout, skyColorAt, sunBearing, sunDiscDirection } from '../../src/render/sky';
+import { CLOUDS, SKY, SUN_DISC, Sky, cloudLayout, domeFragment, skyAt, skyDirection, skyGlsl, sunBearing, sunDiscDirection } from '../../src/render/sky';
 
 /** Relative luminance of a linear colour (three's working space is linear sRGB). */
 const luminance = (c: THREE.Color): number => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
@@ -28,15 +29,6 @@ describe('the golden hour (M8.9 slice 2)', () => {
     expect(fromSun / (fromSun + fromFill)).toBeGreaterThanOrEqual(2 / 3);
     // warm: its red twice its blue
     expect(sun.r).toBeGreaterThan(sun.b * 2);
-  });
-
-  it('M8.9 2.2 the sky 20° up, behind the HUD, has a luminance of 0.18 or less; the horizon is the brightest', () => {
-    const c = new THREE.Color();
-    expect(luminance(skyColorAt(20, c))).toBeLessThanOrEqual(0.18);
-    expect(luminance(skyColorAt(90, c))).toBeLessThanOrEqual(0.18);
-    const horizon = luminance(skyColorAt(0, c));
-    for (const e of [5, 10, 15, 30, 60]) expect(luminance(skyColorAt(e, c))).toBeLessThan(horizon);
-    expect(skyColorAt(-10, new THREE.Color()).getHex()).toBe(skyColorAt(0, new THREE.Color()).getHex());
   });
 
   it('M8.9 2.3 the fog and the background are the horizon\'s colour', () => {
@@ -79,12 +71,62 @@ describe('the sun and the clouds (M8.9 slice 4)', () => {
     }
     expect(cloudLayout()).toEqual(clouds);
   });
+});
 
-  it('M8.9 4.3 the sky is three meshes: the dome, the clouds and the sun (two draws added)', () => {
+/** The sky at a bearing off the sun's (degrees) and an elevation (degrees). */
+const sky = (off: number, elevation: number, out = new THREE.Color()): THREE.Color =>
+  skyAt(skyDirection(sunBearing() + THREE.MathUtils.degToRad(off), elevation, new THREE.Vector3()), out);
+
+describe('the sky per pixel (M8.9 slice 16, R13)', () => {
+  it('M8.9 16.1 behind the HUD (13°–22° up) the frame turned to the sun averages 0.18 or less, and 45° or more from it every point does', () => {
+    // the chase camera's 62° at 16:9 spans ±47° of bearing
+    let sum = 0, n = 0;
+    for (let a = -47; a <= 47; a += 1) for (let e = 13; e <= 22; e += 0.5) { sum += luminance(sky(a, e)); n++; }
+    expect(sum / n).toBeLessThanOrEqual(0.18);
+    for (let a = 45; a <= 180; a += 5) for (let e = 13; e <= 90; e += 1) {
+      expect(luminance(sky(a, e))).toBeLessThanOrEqual(0.18);
+      expect(luminance(sky(-a, e))).toBeLessThanOrEqual(0.18);
+    }
+    // under the horizon the horizon's colour
+    expect(sky(90, -10).getHex()).toBe(sky(90, 0).getHex());
+  });
+
+  it('M8.9 16.2 away from the sun the horizon is cooler than toward it, under a rose band that peaks 3°–12° up', () => {
+    const toward = sky(0, 0), away = sky(180, 0);
+    expect(away.b / away.r).toBeGreaterThan(1.5 * (toward.b / toward.r));
+    let best = 0, at = -1;
+    for (let e = 0; e <= 30; e += 0.25) {
+      const l = luminance(sky(180, e));
+      if (l > best) { best = l; at = e; }
+    }
+    expect(at).toBeGreaterThanOrEqual(3);
+    expect(at).toBeLessThanOrEqual(12);
+    // the band is rose: red over green and blue at its peak
+    const peak = sky(180, at);
+    expect(peak.r).toBeGreaterThan(peak.b);
+    expect(peak.r).toBeGreaterThan(peak.g);
+    // toward the sun the sky brightens to the disc, without an edge: each degree nearer is brighter
+    for (let e = SUN_DISC.elevation + 30; e > SUN_DISC.elevation + SKY.disc.radius; e -= 1) {
+      expect(luminance(sky(0, e - 1))).toBeGreaterThan(luminance(sky(0, e)));
+    }
+  });
+
+  it("M8.9 16.3 the dome and the fog take one source of the sky's function; the fog calls it in place of its colour", () => {
+    new Sky(new THREE.Scene());
+    const chunk = THREE.ShaderChunk as Record<string, string>;
+    const glsl = skyGlsl();
+    expect(glsl).toContain('vec3 skyAt( vec3 d )');
+    expect(chunk['fog_pars_fragment']).toContain(glsl);
+    expect(domeFragment()).toContain(glsl);
+    // the dome ends in three's tone mapping, colour space and dither, as every lit material does
+    for (const inc of ['<tonemapping_fragment>', '<colorspace_fragment>', '<dithering_fragment>']) expect(domeFragment()).toContain(inc);
+  });
+
+  it('M8.9 16.4 the sky is two meshes, the dome and the clouds (the disc is in the dome: one draw fewer than slice 4)', () => {
     const scene = new THREE.Scene();
     new Sky(scene);
     let meshes = 0;
     scene.traverse((o) => { if (o instanceof THREE.Mesh) meshes++; });
-    expect(meshes).toBe(3);
+    expect(meshes).toBe(2);
   });
 });

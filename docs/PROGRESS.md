@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-28 — M8.9 slice 16: the sky per pixel
+
+The sky is one function of a direction, `skyAt`, one GLSL source spliced into the dome and the fog, mirrored in
+TypeScript for the pins: the stops on smooth curves; toward the sun a wide glow over the haze and a tight gold one round
+the disc (two Henyey–Greenstein lobes, no edge); away from it a slate band at the horizon under a rose one 6° up. The dome
+is a `ShaderMaterial` with the disc (a pale core, a faint limb) and three's dither; the disc's mesh is gone (one draw
+fewer). Pin 2.2's "the horizon the brightest" gives way to the arch; its HUD half is 16.1 (the frame toward the sun 0.159
+by the mirror). Stills: the top behind the HUD 0.198 → 0.165 sunward, 0.189 → 0.159 intro; S 0.29–0.39, strong 8–23 %.
+Pins 16.1–16.4. Verify green.
+
 ## 2026-09-28 — M8.9 gains the atmosphere (Marcin: "Tak, zapisz i zaczynaj")
 
 Marcin asked for the sun, the clouds and the atmosphere "at a really high level". Seen on the stills: the sun a sticker

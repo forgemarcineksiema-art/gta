@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-28 — M8.9 gains the camera (R14, slices 23–28; the gate is 29)
+
+Marcin asked how to make the camera better, then: "the main camera does not work well with the reverse camera". Scratch
+probes (`output/camprobe/`: the road bot on the island, frames at a browser's rhythm) found a calm drive already smooth
+(0.1–0.35 px) and the moments rough; research on other games found most never turn the camera round by themselves, the
+few that do drawing complaints about exactly our faults, and the practice: the reverse gear decides, one target, one
+smoother, the travel followed in a spin. R14 and Phase H: the reverse view in the one camera, the jolt from the physics,
+big air, the ground, BUSTED and the wreck, the first second. Out: a look-back key (the radar answers it), a bonnet
+camera, roll, the mouse.
+
 ## 2026-09-28 — M8.9 slice 22: the trees
 
 The kit's trees were stacked six-sided pucks and the palms two crossed planks. Now models (`trees.ts`), four variants

@@ -2,6 +2,14 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-28 — the fog in the sky's colour space (found on slice 18's stills)
+
+Three fogs after its tone curve and its output colour space and hands its own `fogColor` in that space; the sky's fog
+(the third bug hunt) mixed the linear colour raw, so the far sea and city were the linear value shown as sRGB: (255, 119,
+60) under the dome's horizon (243, 175, 129), a hard orange strip. `fogSky` now passes the curve and `linearToOutputTexel`
+first; the seam is gone (243, 174, 129) and the far city dissolves into the haze. A fragment short of the fog skips the
+sum. Pin 17.4; the full verify runs with slice 19.
+
 ## 2026-09-28 — M8.9 slice 18: clouds with a body
 
 The twelve flat ovals replaced (`clouds.ts`): fourteen seeded banks of three to six flattened icosahedra round the whole

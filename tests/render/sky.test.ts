@@ -162,6 +162,19 @@ describe('light with headroom (M8.9 slice 17, R13)', () => {
     for (const ch of [srgb.r, srgb.g, srgb.b]) expect(ch * 255).toBeLessThan(250);
   });
 
+  it("M8.9 17.4 the fog's sky passes the tone curve and the output colour space before its mix, as the dome's does (three fogs after both)", () => {
+    new Sky(new THREE.Scene());
+    const chunk = THREE.ShaderChunk as Record<string, string>;
+    const pars = chunk['fog_pars_fragment'] ?? '';
+    expect(pars).toContain('c = toneMapping( c );');
+    expect(pars).toContain('return linearToOutputTexel( vec4( c, 1.0 ) ).rgb;');
+    expect(chunk['fog_fragment']).toContain('if ( fogFactor > 0.0 ) gl_FragColor.rgb = mix( gl_FragColor.rgb, fogSky( normalize( vFogDir ) ), fogFactor );');
+    // three's own order in a lit material: the curve, the colour space, then the fog
+    const lambert = THREE.ShaderLib.lambert.fragmentShader;
+    expect(lambert.indexOf('#include <tonemapping_fragment>')).toBeLessThan(lambert.indexOf('#include <fog_fragment>'));
+    expect(lambert.indexOf('#include <colorspace_fragment>')).toBeLessThan(lambert.indexOf('#include <fog_fragment>'));
+  });
+
   it('M8.9 17.3 a wall in the sun comes out warmer than in shade and at least three times as bright', () => {
     const wall = new THREE.Vector3(SUN_OFFSET.x, 0, SUN_OFFSET.z).normalize();
     for (const hex of [CITY_COLORS.chalk, CITY_COLORS.stone, CITY_COLORS.peach]) {

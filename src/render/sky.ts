@@ -218,7 +218,10 @@ export class Sky {
 /**
  * The fog in the sky's colour where the fogged thing stands in the view (the third bug hunt; slice 16): every fogged
  * fragment takes `skyAt` of its direction from the eye, the glows and the arch included, the disc not; at the horizon
- * square to the sun that is the fog's own colour. Three's fog chunks are patched once, before a material compiles.
+ * square to the sun that is the fog's own colour. Three fogs after its tone curve and its output colour space (its own
+ * `fogColor` comes in that space), so the sky's linear colour goes through both first, as the dome's does: mixed raw it
+ * was the linear value shown as sRGB, the far sea (255, 119, 60) under the dome's horizon (243, 175, 129), a seam. A
+ * fragment short of the fog skips the sum. Three's fog chunks are patched once, before a material compiles.
  */
 function skyFog(): void {
   const chunk = THREE.ShaderChunk as Record<string, string>;
@@ -235,10 +238,16 @@ function skyFog(): void {
 #ifdef USE_FOG
   varying vec3 vFogDir;
   ${skyGlsl()}
-  vec3 fogSky( vec3 d ) { return skyAt( d ); }
+  vec3 fogSky( vec3 d ) {
+    vec3 c = skyAt( d );
+    #ifdef TONE_MAPPING
+      c = toneMapping( c );
+    #endif
+    return linearToOutputTexel( vec4( c, 1.0 ) ).rgb;
+  }
 #endif`;
   chunk['fog_fragment'] = (chunk['fog_fragment'] ?? '').replace('gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor );',
-    'gl_FragColor.rgb = mix( gl_FragColor.rgb, fogSky( normalize( vFogDir ) ), fogFactor );');
+    'if ( fogFactor > 0.0 ) gl_FragColor.rgb = mix( gl_FragColor.rgb, fogSky( normalize( vFogDir ) ), fogFactor );');
 }
 
 /** The dome's radius (m). */

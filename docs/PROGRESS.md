@@ -2,6 +2,17 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-28 — M8.9 slice 18: clouds with a body
+
+The twelve flat ovals replaced (`clouds.ts`): fourteen seeded banks of three to six flattened icosahedra round the whole
+horizon (eight on the sun's side), four long streaks higher in its half, 76 puffs, 2060 triangles; one `ShaderMaterial` lights each
+flat face by `skyAt` of its normal, the sun, a warm light from below and, toward the sun, the rims at a grazing angle;
+the haze takes them at the horizon. They write depth among themselves and clear it after their draw, so the world is
+never behind them. A swing of 12° each way over 20 minutes. The streaks take half the light (as planks they lit the HUD's
+band to 0.198); pin 4.2 (flat clouds 8°–25°) gives way to 18.1. Stills: gold banks away from the sun, dark bodies with
+warm undersides toward it; the top 0.177 sunward, 0.165 intro, 0.080 Gardens. Pins 18.1–18.4. Verify green (two
+island builds timed out under load at 60 s; alone they pass in 12 s; build and smoke run after: 58.5 fps, p95 16.7 ms).
+
 ## 2026-09-28 — M8.9 slice 17: light with headroom
 
 Tone mapping in three's custom slot: Khronos PBR Neutral's shoulder (a knee at 0.8, a roll-off into warm white) without

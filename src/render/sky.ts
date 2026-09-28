@@ -14,8 +14,8 @@
  * evening's arch, a cool slate band at the horizon under a rose one a few degrees up. The dome draws it with the sun's
  * disc (a hot core, a darker limb) and three's dither against banding; the fog takes it without the disc, so the far
  * city dissolves into the sky's colour where it stands. The sun is seen on the light's bearing but low in the warm band
- * (the light itself stands higher, so the streets are not all in shade). A dozen flat clouds lit orange from below in
- * the sun's half of the sky (slice 4). All ride with the camera; two draws.
+ * (the light itself stands higher, so the streets are not all in shade). The dome rides with the camera; one draw. The
+ * clouds are their own (clouds.ts, slice 18).
  *
  * Light with headroom (slice 17, R13): the renderer tone maps with Khronos PBR Neutral's shoulder and without its toe
  * (`toneCurve`): under the knee a colour passes unchanged, so the palette and the dark asphalt stay as they are (the toe
@@ -23,7 +23,7 @@
  * instead of cutting to it. The sun shines stronger, and its disc brighter than the screen can show.
  */
 import * as THREE from 'three';
-import { PALETTE, mulberry32 } from '../sim';
+import { PALETTE } from '../sim';
 import { SHADOW_HALF, SUN_OFFSET, stableShadowTarget } from './shadows';
 
 /** The light and the sky (colours sRGB hex; elevations and angles in degrees over the horizon). */
@@ -87,9 +87,6 @@ function toneCurve(): void {
 
 /** The sun as seen: on the light's bearing, `elevation`° up. */
 export const SUN_DISC = { elevation: 9 } as const;
-
-/** The clouds: how many, how far (m), how far each side of the sun's bearing (°), between which elevations (°). */
-export const CLOUDS = { count: 12, distance: 700, spread: 80, low: 8, high: 25, seed: 0x5c1d } as const;
 
 /** The light's bearing about the vertical (radians; 0 is +Z). */
 export function sunBearing(): number {
@@ -171,7 +168,6 @@ export function skyGlsl(): string {
 export class Sky {
   readonly sun: THREE.DirectionalLight;
   private readonly dome: THREE.Mesh;
-  private readonly clouds: THREE.Mesh;
   private readonly shadowTarget = new THREE.Object3D();
   private readonly tmp = new THREE.Vector3();
 
@@ -199,8 +195,7 @@ export class Sky {
     this.sun.target = this.shadowTarget;
     scene.add(this.sun, this.shadowTarget);
     this.dome = buildSkyDome();
-    this.clouds = buildClouds();
-    scene.add(this.dome, this.clouds);
+    scene.add(this.dome);
   }
 
   /** The fog's reach and the shadow map's size for a quality tier. */
@@ -215,9 +210,8 @@ export class Sky {
     stableShadowTarget(car, this.sun.shadow.mapSize.x, this.tmp);
     this.shadowTarget.position.copy(this.tmp);
     this.sun.position.copy(this.tmp).add(SUN_OFFSET);
-    // the sky rides with the camera so the horizon, the sun and the clouds never come closer
+    // the sky rides with the camera so the horizon and the sun never come closer (the clouds too, clouds.ts)
     this.dome.position.copy(eye);
-    this.clouds.position.copy(eye);
   }
 }
 
@@ -291,57 +285,5 @@ function buildSkyDome(): THREE.Mesh {
   const mesh = new THREE.Mesh(g, material);
   mesh.frustumCulled = false;
   mesh.renderOrder = -10;
-  return mesh;
-}
-
-export interface CloudPlace { bearing: number; elevation: number; width: number; height: number }
-
-/** The clouds' places: seeded, the same sky every time, in the sun's half and between `CLOUDS.low` and `CLOUDS.high`. */
-export function cloudLayout(): CloudPlace[] {
-  const rnd = mulberry32(CLOUDS.seed), out: CloudPlace[] = [];
-  const spread = THREE.MathUtils.degToRad(CLOUDS.spread);
-  for (let i = 0; i < CLOUDS.count; i++) {
-    // spread evenly across the arc, jittered, so they never pile up
-    const slot = (i + 0.2 + rnd() * 0.6) / CLOUDS.count;
-    out.push({
-      bearing: sunBearing() + (slot * 2 - 1) * spread,
-      elevation: CLOUDS.low + rnd() * (CLOUDS.high - CLOUDS.low),
-      width: 90 + rnd() * 110,
-      height: 12 + rnd() * 12,
-    });
-  }
-  return out;
-}
-
-/** The clouds: flat octagons facing the camera, warm on their underside, violet on top; one mesh. */
-function buildClouds(): THREE.Mesh {
-  const positions: number[] = [], colors: number[] = [];
-  const under = new THREE.Color(0xffa98a), top = new THREE.Color(0x6e5f9e), mid = new THREE.Color();
-  const d = new THREE.Vector3(), right = new THREE.Vector3(), up = new THREE.Vector3(), p = new THREE.Vector3(), c = new THREE.Vector3();
-  const sides = 8;
-  for (const cloud of cloudLayout()) {
-    skyDirection(cloud.bearing, cloud.elevation, d);
-    c.copy(d).multiplyScalar(CLOUDS.distance);
-    right.set(0, 1, 0).cross(d).normalize();
-    up.copy(d).cross(right).normalize();
-    mid.copy(under).lerp(top, 0.45);
-    const ring = (k: number): [THREE.Vector3, THREE.Color] => {
-      const t = (k / sides) * Math.PI * 2;
-      const sy = Math.sin(t);
-      p.copy(c).addScaledVector(right, Math.cos(t) * cloud.width / 2).addScaledVector(up, sy * cloud.height / 2);
-      return [p.clone(), under.clone().lerp(top, (sy + 1) / 2)];
-    };
-    for (let k = 0; k < sides; k++) {
-      const [pa, ca] = ring(k), [pb, cb] = ring(k + 1);
-      positions.push(c.x, c.y, c.z, pa.x, pa.y, pa.z, pb.x, pb.y, pb.z);
-      colors.push(mid.r, mid.g, mid.b, ca.r, ca.g, ca.b, cb.r, cb.g, cb.b);
-    }
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  const mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, depthWrite: false, side: THREE.DoubleSide }));
-  mesh.frustumCulled = false;
-  mesh.renderOrder = -9;
   return mesh;
 }

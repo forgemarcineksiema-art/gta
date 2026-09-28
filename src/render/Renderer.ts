@@ -36,6 +36,7 @@ import { showroomMix, turntableYaw } from './camera/showroom';
 import { SIGN_Y, signScale, signTopY } from './run/signs';
 import { ShapesView } from './shapes';
 import { SKY, Sky, TONE_MAPPING } from './sky';
+import { Clouds } from './clouds';
 import { PedView } from './traffic/PedView';
 import { TrafficView } from './traffic/TrafficView';
 
@@ -112,6 +113,7 @@ export class Renderer {
   private readonly sim: SimWorld;
   private readonly director: CameraDirector;
   private readonly sky: Sky;
+  private readonly clouds: Clouds;
   private readonly shapes: ShapesView;
   private readonly player: PlayerCar;
   private readonly ghost: GhostCar;
@@ -158,6 +160,7 @@ export class Renderer {
     this.chase.ceiling = (x, y, z, reach) => sim.roomAbove(x, y, z, reach);
     this.director = new CameraDirector(this.chase, sim);
     this.sky = new Sky(this.scene);
+    this.clouds = new Clouds(this.scene);
 
     this.cityView = sim.city ? new CityView(this.scene, sim.city, sim.props) : null;
     this.islandView = sim.island ? new IslandView(this.scene, sim.island) : null;
@@ -337,6 +340,7 @@ export class Renderer {
     this.player.update(tm, worldDt);
     this.ghost.update();
     this.sky.update(carPos, this.camera.position);
+    this.clouds.update(this.camera.position, worldDt);
     // the paint's fade by the camera's height over the ground under it (the island's hills; the grid's 0)
     if (sim.island) PAINT_GROUND.value = sim.island.ground.surfaceHeight(this.camera.position.x, this.camera.position.z);
     this.fx.drive(tm, this.carVel, this.camera.aspect, worldDt);

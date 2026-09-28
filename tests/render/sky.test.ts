@@ -7,7 +7,8 @@ import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { CITY_COLORS, PALETTE } from '../../src/sim/palette';
 import { SUN_OFFSET } from '../../src/render/shadows';
-import { CLOUDS, SKY, SUN_DISC, Sky, TONE_MAPPING, cloudLayout, domeFragment, skyAt, skyDirection, skyGlsl, sunBearing, sunDiscDirection, toneMap } from '../../src/render/sky';
+import { CLOUDS, Clouds, cloudDrift, cloudFragment, cloudGeometry, cloudLight, cloudPuffs } from '../../src/render/clouds';
+import { SKY, SUN_DISC, Sky, TONE_MAPPING, domeFragment, skyAt, skyDirection, skyGlsl, sunBearing, sunDiscDirection, toneMap } from '../../src/render/sky';
 
 /** Relative luminance of a linear colour (three's working space is linear sRGB). */
 const luminance = (c: THREE.Color): number => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
@@ -58,18 +59,6 @@ describe('the sun and the clouds (M8.9 slice 4)', () => {
     expect(elevation).toBeGreaterThan(3);
     expect(elevation).toBeLessThanOrEqual(12);
     expect(elevation).toBeCloseTo(SUN_DISC.elevation, 6);
-  });
-
-  it('M8.9 4.2 the clouds sit between 8° and 25° up, in the sun\'s half of the sky, the same every time', () => {
-    const clouds = cloudLayout();
-    expect(clouds.length).toBe(CLOUDS.count);
-    for (const c of clouds) {
-      expect(c.elevation).toBeGreaterThanOrEqual(8);
-      expect(c.elevation).toBeLessThanOrEqual(25);
-      const off = Math.atan2(Math.sin(c.bearing - sunBearing()), Math.cos(c.bearing - sunBearing()));
-      expect(Math.abs(off)).toBeLessThanOrEqual(Math.PI / 2);
-    }
-    expect(cloudLayout()).toEqual(clouds);
   });
 });
 
@@ -125,6 +114,7 @@ describe('the sky per pixel (M8.9 slice 16, R13)', () => {
   it('M8.9 16.4 the sky is two meshes, the dome and the clouds (the disc is in the dome: one draw fewer than slice 4)', () => {
     const scene = new THREE.Scene();
     new Sky(scene);
+    new Clouds(scene);
     let meshes = 0;
     scene.traverse((o) => { if (o instanceof THREE.Mesh) meshes++; });
     expect(meshes).toBe(2);
@@ -179,5 +169,84 @@ describe('light with headroom (M8.9 slice 17, R13)', () => {
       expect(sun.r / sun.b).toBeGreaterThan(shade.r / shade.b);
       expect(luminance(sun)).toBeGreaterThanOrEqual(3 * luminance(shade));
     }
+  });
+});
+
+/** A puff's elevation from the eye (°) and its bearing off the sun's (°, −180..180). */
+const elevationOf = (p: { x: number; y: number; z: number }): number => THREE.MathUtils.radToDeg(Math.atan2(p.y, Math.hypot(p.x, p.z)));
+const offSun = (p: { x: number; z: number }): number => {
+  const d = Math.atan2(p.x, p.z) - sunBearing();
+  return THREE.MathUtils.radToDeg(Math.atan2(Math.sin(d), Math.cos(d)));
+};
+
+describe('clouds with a body (M8.9 slice 18, R13)', () => {
+  it("M8.9 18.1 banks low round the whole horizon, more on the sun's side; streaks higher in its half; the same sky every time", () => {
+    const puffs = cloudPuffs(), banks = puffs.filter((p) => p.kind === 'bank'), streaks = puffs.filter((p) => p.kind === 'streak');
+    for (const p of banks) {
+      expect(elevationOf(p)).toBeGreaterThanOrEqual(CLOUDS.banks.low);
+      expect(elevationOf(p)).toBeLessThanOrEqual(CLOUDS.banks.top);
+    }
+    const quarters = [0, 0, 0, 0];
+    for (const p of banks) quarters[Math.min(3, Math.floor((offSun(p) + 180) / 90))]! += 1;
+    for (const q of quarters) expect(q).toBeGreaterThanOrEqual(2);
+    const sunSide = banks.filter((p) => Math.abs(offSun(p)) <= 90).length;
+    expect(sunSide).toBeGreaterThan(banks.length - sunSide);
+    expect(streaks.length).toBeGreaterThanOrEqual(CLOUDS.streaks.count * 2);
+    for (const p of streaks) {
+      expect(elevationOf(p)).toBeGreaterThanOrEqual(CLOUDS.streaks.low - 1);
+      expect(elevationOf(p)).toBeLessThanOrEqual(CLOUDS.streaks.high + 1);
+      expect(Math.abs(offSun(p))).toBeLessThanOrEqual(90);
+    }
+    expect(cloudPuffs()).toEqual(puffs);
+  });
+
+  it('M8.9 18.2 away from the sun a face turned to it is warmer and brighter than the sky beside it; toward it a rim outshines the body', () => {
+    const sun = sunDiscDirection(new THREE.Vector3()), c = new THREE.Color(), sky = new THREE.Color();
+    // opposite the sun, 6° up: the face we see looks back at the sun
+    const away = skyDirection(sunBearing() + Math.PI, 6, new THREE.Vector3());
+    const face = new THREE.Vector3(-away.x, 0.2, -away.z).normalize();
+    cloudLight(face, away, c); skyAt(away, sky);
+    expect(luminance(c)).toBeGreaterThan(luminance(sky));
+    expect(c.r / c.b).toBeGreaterThan(sky.r / sky.b);
+    // toward the sun, 4° off it: the body faces the eye, the rim is at a grazing angle to it
+    const toward = skyDirection(sunBearing() + THREE.MathUtils.degToRad(4), SUN_DISC.elevation + 2, new THREE.Vector3());
+    const body = toward.clone().negate(), rim = new THREE.Vector3().crossVectors(toward, new THREE.Vector3(0, 1, 0)).normalize().addScaledVector(toward, 0.1).normalize();
+    const lit = luminance(cloudLight(rim, toward, new THREE.Color())), dark = luminance(cloudLight(body, toward, new THREE.Color()));
+    expect(lit).toBeGreaterThan(1.5 * dark);
+    // and the body is darker than the sky round the sun behind it
+    expect(dark).toBeLessThan(luminance(skyAt(toward, new THREE.Color())));
+    expect(sun.y).toBeGreaterThan(0);
+  });
+
+  it("M8.9 18.3 one draw; the sky's triangles no more than before slice 16 (the dome 48×36, twelve octagons, the disc's fan and ring)", () => {
+    const scene = new THREE.Scene();
+    new Sky(scene);
+    const clouds = new Clouds(scene);
+    let meshes = 0, triangles = 0;
+    scene.traverse((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
+      meshes++;
+      const g = o.geometry as THREE.BufferGeometry;
+      triangles += (g.index ? g.index.count : g.getAttribute('position').count) / 3;
+    });
+    expect(meshes).toBe(2);
+    expect(triangles).toBeLessThanOrEqual(48 * 36 * 2 + 12 * 8 + 32 * 3);
+    expect(clouds.mesh.geometry.getAttribute('position').count).toBe(cloudGeometry().getAttribute('position').count);
+    // their depth among themselves only: cleared after their draw, before the world's
+    expect(clouds.mesh.renderOrder).toBeLessThan(0);
+    for (const inc of ['<tonemapping_fragment>', '<colorspace_fragment>', '<dithering_fragment>']) expect(cloudFragment()).toContain(inc);
+  });
+
+  it('M8.9 18.4 the swing stays within 12° each way and comes back in twenty minutes; the light follows the world normals', () => {
+    let widest = 0;
+    for (let t = 0; t <= CLOUDS.drift.period; t += 5) widest = Math.max(widest, Math.abs(cloudDrift(t)));
+    expect(THREE.MathUtils.radToDeg(widest)).toBeCloseTo(CLOUDS.drift.swing, 1);
+    expect(CLOUDS.drift.period).toBe(1200);
+    expect(cloudDrift(CLOUDS.drift.period)).toBeCloseTo(0, 9);
+    const clouds = new Clouds(new THREE.Scene());
+    clouds.update(new THREE.Vector3(1, 2, 3), 300);
+    expect(clouds.mesh.rotation.y).toBeCloseTo(cloudDrift(300), 9);
+    expect(clouds.mesh.position.toArray()).toEqual([1, 2, 3]);
+    expect(cloudFragment()).toContain('n = normalize( vCloudNormal )');
   });
 });

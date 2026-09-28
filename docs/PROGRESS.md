@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-28 — M8.9 slice 23: the reverse view in the one camera
+
+The chase's heading and its reverse orbit were two controllers summed, the orbit started by the sign of the speed.
+Now one view yaw with one spring (ω 10, 7.6 drifting; its turn capped at 150°/s and 600°/s², stepped at 240 Hz): the
+reverse view only in the reverse gear after 1.2 s of backing up, any forward gear ends it at once; a slide tail first
+followed along its travel and held when it stops, until the gas or the reverse. On the real car (the runway, scratch
+probe): a 1 s back-up off a wall 301° of view turn → 0°, a three-point turn 365° → 171° (the car's own), a 180° spin
+543° at 387°/s → 186° at 153°/s, the stop-and-reverse ping-pong gone. Pins 23.1–23.5; the comfort pins hold. Stills
+calm, intro unchanged (calm S 0.331, top 0.096).
+
 ## 2026-09-28 — M8.9 gains the camera (R14, slices 23–28; the gate is 29)
 
 Marcin asked how to make the camera better, then: "the main camera does not work well with the reverse camera". Scratch

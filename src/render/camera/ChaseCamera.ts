@@ -1,14 +1,18 @@
 /**
  * Third-person chase camera.
  *
- * The camera has a yaw (`heading`) that follows a blend of the car's nose and its
- * velocity direction with a rate limit, sits behind and above along that yaw, and
- * looks along it (so a drifting car stays centred while the view shows where it
- * is going). Reversing swings the camera around the car in a smooth orbit rather
- * than snapping. In flight the camera's height lags the car so the jump reads,
- * and a landing gives a short shake scaled by the impact. A small, bounded
- * look-ahead follows actual angular motion. Steering input alone must never
- * swivel the view: quick corrections should not move the road under the player.
+ * The view's yaw is one number with one smoother (M8.9 R14): a critically damped
+ * spring, its turn capped and eased, stepped finely enough to move alike at 30, 60
+ * and 120 Hz. Its target is a blend of the car's nose and its travel (so a drifting
+ * car stays centred while the view shows where it is going); the reverse view, the
+ * nose turned half round, is the player's: the reverse gear after a moment of
+ * backing up, ended by any forward gear at once; a slide tail first (a spin, a ram)
+ * is followed along its travel and held when it stops, until the gas or the reverse
+ * says which way. The camera sits behind and above along the view and looks along
+ * it. In flight the camera's height lags the car so the jump reads, and a landing
+ * gives a short shake scaled by the impact. A small, bounded look-ahead follows
+ * actual angular motion. Steering input alone must never swivel the view: quick
+ * corrections should not move the road under the player.
  */
 import * as THREE from 'three';
 import type { VehicleTelemetry } from '../../sim';
@@ -23,11 +27,12 @@ export interface CameraTuning {
   lookHeight: number;
   /** Position follow stiffness (1/s). */
   followRate: number;
-  /** Yaw follow stiffness (1/s), and while drifting. */
-  headingRate: number;
-  headingRateDrift: number;
-  /** Cap on how fast the view can yaw, degrees per second. */
+  /** The view's spring (rad/s; a steady turn lags by 2/omega s of it), and while drifting. */
+  yawOmega: number;
+  yawOmegaDrift: number;
+  /** Caps on how fast the view can yaw (degrees per second) and on how fast that changes (degrees per second²). */
   maxYawRateDeg: number;
+  maxYawAccelDeg: number;
   /** Share of the velocity direction in the heading (0 = nose, 1 = velocity), and while drifting. */
   velocityFollow: number;
   driftVelocityFollow: number;
@@ -49,15 +54,17 @@ export interface CameraTuning {
   /** Shake per m/s of a wall or prop hit, and at full scrape. */
   impactShake: number;
   scrapeShake: number;
-  /** Seconds of reversing before the camera swings round. */
+  /**
+   * Seconds of backing up in the reverse gear, faster than `reverseSpeed` m/s, before the view turns round: a back-up
+   * off a wall and a three-point turn are over before it.
+   */
   reverseDelay: number;
-  /** Seconds of forward driving, or of standing still, before it swings back. */
-  reverseReturnDelay: number;
-  reverseStillDelay: number;
-  /** Natural frequency of the critically damped swing (rad/s): 3.5 settles in about 1.3 s. */
-  reverseOrbitOmega: number;
+  reverseSpeed: number;
   /** Extra camera height while looking back, m. */
   reverseHeight: number;
+  /** A slide tail first starts over this speed (m/s); under `holdSpeed` the view holds until the player chooses. */
+  slideSpeed: number;
+  holdSpeed: number;
   /** Look-ahead: seconds of yaw rate added to the heading (not while drifting). */
   headingLead: number;
   /** Look-ahead: lateral look offset per rad/s of actual yaw rate, m. */
@@ -77,9 +84,10 @@ export const DEFAULT_CAMERA: CameraTuning = {
   lookAheadPerSpeed: 0.1,
   lookHeight: 0.9,
   followRate: 8,
-  headingRate: 5,
-  headingRateDrift: 3.8,
-  maxYawRateDeg: 110,
+  yawOmega: 10,
+  yawOmegaDrift: 7.6,
+  maxYawRateDeg: 150,
+  maxYawAccelDeg: 600,
   velocityFollow: 0.6,
   driftVelocityFollow: 0.9,
   driftDistanceBonus: 0.8,
@@ -97,11 +105,11 @@ export const DEFAULT_CAMERA: CameraTuning = {
   landingShake: 0.03,
   impactShake: 0.02,
   scrapeShake: 0.012,
-  reverseDelay: 0.7,
-  reverseReturnDelay: 0.3,
-  reverseStillDelay: 1.2,
-  reverseOrbitOmega: 3.5,
+  reverseDelay: 1.2,
+  reverseSpeed: 1,
   reverseHeight: 0.3,
+  slideSpeed: 4,
+  holdSpeed: 2.5,
   headingLead: 0.04,
   lookSideYaw: 0.4,
   lookSideMax: 0.65,
@@ -112,6 +120,12 @@ export const DEFAULT_CAMERA: CameraTuning = {
 export type CameraMode = 'chase' | 'far';
 
 const DEG = Math.PI / 180;
+/** The car-swap's whip: the view's spring and its cap (degrees per second), no cap on the change. */
+const WHIP = { omega: 20, rateDeg: 720 } as const;
+/** The view's spring is stepped at least this often a second: the same motion at 30, 60 and 120 Hz. */
+const YAW_STEPS = 240;
+/** A slide tail first ends when the nose is back within this of the travel (it starts past a right angle). */
+const FACING = 70 * DEG;
 /** The occlusion rule's gap kept to the static that blocks, and the shortest boom it pulls to, m. */
 const BOOM_MARGIN = 0.4;
 const BOOM_MIN = 1.6;
@@ -171,15 +185,16 @@ export class ChaseCamera {
   private readonly fwd = new THREE.Vector3();
   private readonly dir = new THREE.Vector3();
   private readonly up = new THREE.Vector3(0, 1, 0);
-  /** Camera yaw, radians: forward = (sin, 0, cos). */
-  private heading = 0;
-  /** Orbit parameter: 0 = forward view, 1 = reverse view. Driven by a critically damped spring. */
-  private reverseU = 0;
-  private reverseVel = 0;
-  private reverseTarget = 0;
-  private reverseTime = 0;
-  private forwardTime = 0;
-  private stillTime = 0;
+  /** The view's yaw, radians (forward = (sin, 0, cos)), and how fast it turns (rad/s). */
+  private yaw = 0;
+  private turnRate = 0;
+  /** Seconds backing up in the reverse gear; the reverse view on; a slide tail first followed; the view held after one. */
+  private backFor = 0;
+  private reversing = false;
+  private sliding = false;
+  private holding = false;
+  /** The angle between the nose and the travel the last time the car moved (rad). */
+  private lastSlip = 0;
   private carY = 0;
   /** Smoothed lateral look offset, metres to the car's left. */
   private lookSide = 0;
@@ -218,6 +233,15 @@ export class ChaseCamera {
   whip(seconds: number): void {
     this.whipLeft = seconds;
     this.fovPunch = 10;
+    // the new car is driven from here: whatever the last one was doing (backing up, a slide) is not its
+    this.clearIntent();
+  }
+
+  private clearIntent(): void {
+    this.backFor = 0;
+    this.reversing = false;
+    this.sliding = false;
+    this.holding = false;
   }
 
   /** Takedown camera: keep following the player but look at a point for `seconds`. Any later `release()` ends it early. */
@@ -268,73 +292,82 @@ export class ChaseCamera {
     const speed = Math.hypot(carVel.x, carVel.z);
     const modeMul = this.mode === 'far' ? 1.6 : 1;
 
-    // nose yaw and velocity yaw on the ground plane
+    // the nose's yaw and the travel's on the ground plane, and the angle between them
     this.fwd.set(0, 0, 1).applyQuaternion(car.quaternion);
     const yawNose = Math.atan2(this.fwd.x, this.fwd.z);
-    let yawTarget = yawNose;
-    if (speed > 2.5 && carVel.dot(this.fwd) > -0.5) {
-      const yawVel = Math.atan2(carVel.x, carVel.z);
-      const k = (tm.drifting ? t.driftVelocityFollow : t.velocityFollow) * Math.min(1, speed / 12);
-      yawTarget = yawNose + wrapAngle(yawVel - yawNose) * k;
+    const yawTravel = Math.atan2(carVel.x, carVel.z);
+    const slip = speed > 0.5 ? Math.abs(wrapAngle(yawTravel - yawNose)) : 0;
+    if (snap) this.clearIntent();
+    // the reverse view is the player's (M8.9 R14): the reverse gear with the car backing up for `reverseDelay`, not the
+    // way the car happens to move; any forward gear (the gas) ends it at once
+    if (tm.gear === -1 && tm.speed < -t.reverseSpeed) this.backFor += dt;
+    else this.backFor = 0;
+    if (tm.gear !== -1) this.reversing = false;
+    else if (this.backFor > t.reverseDelay || this.holding) {
+      this.reversing = true;
+      this.holding = false;
     }
-    // look-ahead: lead the heading into the turn, and slide the look point to the inside
-    const lookActive = Math.min(1, speed / t.lookSideSpeedRef) * (1 - this.reverseU);
+    // a slide tail first (the travel swung behind the nose at speed without the reverse gear: a spin, a ram) is followed
+    // along its travel; slowed down, the view holds until the player says which way: the gas turns it behind the nose,
+    // the reverse keeps it
+    if (!this.reversing && tm.gear !== -1 && speed > t.slideSpeed && slip > Math.PI / 2 && this.lastSlip <= Math.PI / 2) this.sliding = true;
+    if (speed > 0.5) this.lastSlip = slip;
+    if (this.sliding && slip < FACING) this.sliding = false;
+    if (this.sliding && speed < t.holdSpeed) {
+      this.sliding = false;
+      this.holding = true;
+    }
+    if (this.holding && (tm.throttle > 0 || (speed > t.holdSpeed && slip < FACING))) this.holding = false;
+
+    let yawTarget = yawNose;
+    if (this.reversing) {
+      yawTarget = yawNose + Math.PI;
+    } else if (this.sliding) {
+      yawTarget = yawTravel;
+    } else if (this.holding) {
+      yawTarget = this.yaw;
+    } else if (speed > 2.5 && carVel.dot(this.fwd) > -0.5) {
+      const k = (tm.drifting ? t.driftVelocityFollow : t.velocityFollow) * Math.min(1, speed / 12);
+      yawTarget = yawNose + wrapAngle(yawTravel - yawNose) * k;
+    }
+    // how far the view looks back at the car (0 behind it, 1 in front of it): the reverse view's height, and no lead
+    const back = Math.max(0, -Math.cos(wrapAngle(this.yaw - yawNose)));
+    // look-ahead: lead the view into the turn, and slide the look point to the inside (the chase only)
+    const chasing = !this.reversing && !this.sliding && !this.holding;
+    const lookActive = chasing ? Math.min(1, speed / t.lookSideSpeedRef) * (1 - back) : 0;
     if (!tm.drifting) yawTarget += tm.yawRate * t.headingLead * lookActive;
     const sideTarget = Math.max(-t.lookSideMax, Math.min(t.lookSideMax, tm.yawRate * t.lookSideYaw * lookActive));
     this.lookSide += (sideTarget - this.lookSide) * (snap ? 1 : 1 - Math.exp(-dt * t.lookSideRate));
 
-    // reverse view: after a moment of backing up the camera orbits round to the front of the car,
-    // and returns after a moment of driving forward or of standing still. The orbit parameter is a
-    // critically damped spring: no jerk at either end, and a change of mind mid-swing eases back.
-    if (tm.speed < -1.5) {
-      this.reverseTime += dt;
-      this.forwardTime = 0;
-      this.stillTime = 0;
-    } else if (tm.speed > 0.8) {
-      this.forwardTime += dt;
-      this.reverseTime = 0;
-      this.stillTime = 0;
-    } else {
-      this.stillTime += dt;
-    }
-    if (this.reverseTime > t.reverseDelay) this.reverseTarget = 1;
-    if (this.forwardTime > t.reverseReturnDelay || this.stillTime > t.reverseStillDelay) this.reverseTarget = 0;
-    const w = t.reverseOrbitOmega;
-    const acc = (this.reverseTarget - this.reverseU) * w * w - 2 * w * this.reverseVel;
-    this.reverseVel += acc * dt;
-    this.reverseU = Math.max(0, Math.min(1, this.reverseU + this.reverseVel * dt));
-
     if (!this.initialised || snap) {
-      this.heading = yawTarget;
+      this.yaw = wrapAngle(yawTarget);
+      this.turnRate = 0;
       this.carY = car.position.y;
       this.lookSide = 0;
-      this.reverseU = 0;
-      this.reverseVel = 0;
-      this.reverseTarget = 0;
-      this.reverseTime = 0;
-      this.forwardTime = 0;
-      this.stillTime = 0;
       this.initialised = true;
     } else {
       const whipping = this.whipLeft > 0;
       if (whipping) this.whipLeft = Math.max(0, this.whipLeft - dt);
-      const rate = 1 - Math.exp(-dt * (whipping ? 20 : tm.drifting ? t.headingRateDrift : t.headingRate));
-      let delta = wrapAngle(yawTarget - this.heading) * rate;
-      const cap = (whipping ? 720 : t.maxYawRateDeg) * DEG * dt;
-      delta = Math.max(-cap, Math.min(cap, delta));
-      this.heading = wrapAngle(this.heading + delta);
+      // one spring for every turn of the view: a corner's small errors as the old follow took them, a half turn eased in
+      // and out at the cap, a swap's whip stiffer and faster
+      const w = whipping ? WHIP.omega : tm.drifting ? t.yawOmegaDrift : t.yawOmega;
+      const maxRate = (whipping ? WHIP.rateDeg : t.maxYawRateDeg) * DEG;
+      const maxAcc = whipping ? Infinity : t.maxYawAccelDeg * DEG;
+      const n = Math.max(1, Math.ceil(dt * YAW_STEPS)), h = dt / n;
+      for (let i = 0; i < n; i++) {
+        const acc = Math.max(-maxAcc, Math.min(maxAcc, w * w * wrapAngle(yawTarget - this.yaw) - 2 * w * this.turnRate));
+        this.turnRate = Math.max(-maxRate, Math.min(maxRate, this.turnRate + acc * h));
+        this.yaw = wrapAngle(this.yaw + this.turnRate * h);
+      }
     }
-
-    // view yaw includes the reverse orbit
-    const viewYaw = this.heading + Math.PI * this.reverseU;
-    this.dir.set(Math.sin(viewYaw), 0, Math.cos(viewYaw));
+    this.dir.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
 
     // height follows the car with lag in the air so a jump reads as height
     const hRate = 1 - Math.exp(-dt * (tm.airborne ? t.heightRateAir : t.heightRateGround));
     this.carY += (car.position.y - this.carY) * (snap ? 1 : hRate);
 
     const dist = (t.distance + this.extraDistance + speed * t.distancePerSpeed + (tm.drifting ? t.driftDistanceBonus : 0)) * modeMul;
-    const height = Math.max(1.4, t.height + this.extraHeight - speed * t.heightDropPerSpeed - (tm.drifting ? t.driftHeightDrop : 0) + t.reverseHeight * this.reverseU) * modeMul;
+    const height = Math.max(1.4, t.height + this.extraHeight - speed * t.heightDropPerSpeed - (tm.drifting ? t.driftHeightDrop : 0) + t.reverseHeight * back) * modeMul;
     this.target.set(car.position.x - this.dir.x * dist, this.carY + height, car.position.z - this.dir.z * dist);
 
     if (snap || !this.initialised) {

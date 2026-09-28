@@ -175,6 +175,176 @@ describe('chase camera whip and focus', () => {
   });
 });
 
+/**
+ * The reverse view in the one camera (M8.9 slice 23, R14): the view's yaw is one number with one smoother; the
+ * reverse gear turns it round after a moment of backing up and the gas brings it back at once; a slide tail first is
+ * followed along its travel and held when it stops. A car written frame by frame: its nose, its travel and speed, its
+ * gear and its gas.
+ */
+describe('the reverse view in the one camera (M8.9 slice 23)', () => {
+  const HZ = 60;
+  const dt = 1 / HZ;
+  const wrap = (a: number): number => Math.atan2(Math.sin(a), Math.cos(a));
+  const deg = (r: number): number => (Math.abs(r) * 180) / Math.PI;
+
+  function rig() {
+    const cam = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 1000);
+    const chase = new ChaseCamera(cam);
+    chase.tuning.shakeAmount = 0;
+    const car = new THREE.Object3D();
+    const vel = new THREE.Vector3();
+    const up = new THREE.Vector3(0, 1, 0);
+    const dir = new THREE.Vector3();
+    /** The car now: `travel` the way it goes, `speed` how fast (m/s, never negative). */
+    const car_ = { nose: 0, travel: 0, speed: 0, gear: 1, throttle: 0, yawRate: 0, drifting: false };
+    const frames: Array<{ view: number; nose: number; travel: number; speed: number }> = [];
+    let first = true;
+    const frame = (): void => {
+      car.quaternion.setFromAxisAngle(up, car_.nose);
+      vel.set(Math.sin(car_.travel) * car_.speed, 0, Math.cos(car_.travel) * car_.speed);
+      car.position.addScaledVector(vel, dt);
+      chase.update(car, vel, telemetry({
+        speed: car_.speed * Math.cos(car_.travel - car_.nose), vx: vel.x, vz: vel.z, gear: car_.gear, throttle: car_.throttle,
+        yawRate: car_.yawRate, drifting: car_.drifting, steer: 0,
+      }), dt, first);
+      first = false;
+      cam.getWorldDirection(dir);
+      frames.push({ view: Math.atan2(dir.x, dir.z), nose: car_.nose, travel: car_.travel, speed: car_.speed });
+    };
+    /** `seconds` of frames, `script` setting the car at each from the seconds since it began. */
+    const run = (seconds: number, script: (s: number) => void): void => {
+      for (let i = 0; i < Math.round(seconds * HZ); i++) {
+        script(i * dt);
+        frame();
+      }
+    };
+    return { car: car_, run, frames };
+  }
+
+  /** The view's turn in all (degrees) and its fastest (degrees per second) over `from` onwards. */
+  function turning(frames: ReadonlyArray<{ view: number }>, from = 1): { total: number; peak: number } {
+    let total = 0, peak = 0;
+    for (let i = Math.max(1, from); i < frames.length; i++) {
+      const step = deg(wrap((frames[i] as { view: number }).view - (frames[i - 1] as { view: number }).view));
+      total += step;
+      peak = Math.max(peak, step * HZ);
+    }
+    return { total, peak };
+  }
+
+  /**
+   * Forward at 15 m/s, a stop, then the reverse gear backing up to `back` m/s over `ramp` s, held to `seconds`; the
+   * frame the reverse gear began at.
+   */
+  function reverse(r: ReturnType<typeof rig>, seconds: number, back = 5, ramp = 1): number {
+    r.run(2, () => { r.car.speed = 15; r.car.throttle = 1; });
+    r.run(0.4, (s) => { r.car.speed = Math.max(0, 15 - 40 * s); r.car.throttle = 0; });
+    r.car.gear = -1;
+    r.car.travel = r.car.nose + Math.PI;
+    const began = r.frames.length;
+    r.run(seconds, (s) => { r.car.speed = back * Math.min(1, s / ramp); });
+    return began;
+  }
+
+  test('23.1 a back-up of 1 s off a wall and a three-point turn leave the view behind the car', () => {
+    const r = rig();
+    reverse(r, 1, 4);
+    // the gas: the reverse gear goes, the car stops and drives off along its nose
+    r.car.gear = 1;
+    r.run(0.5, (s) => { r.car.throttle = 1; r.car.speed = 4 * (1 - s / 0.5); });
+    r.car.travel = r.car.nose;
+    r.run(2, (s) => { r.car.speed = 5 * s; });
+    const t = rig();
+    // a three-point turn: forward on full lock, back on the other lock for 1.1 s, forward again
+    t.run(1.5, () => { t.car.speed = 3; t.car.throttle = 1; t.car.yawRate = 0.8; t.car.nose += 0.8 * dt; t.car.travel = t.car.nose; });
+    t.run(0.3, (s) => { t.car.speed = 3 * (1 - s / 0.3); t.car.throttle = 0; t.car.yawRate = 0; });
+    t.car.gear = -1;
+    t.run(1.1, (s) => { t.car.speed = Math.min(3, 6 * s); t.car.yawRate = 0.6; t.car.nose += 0.6 * dt * Math.min(1, 2 * s); t.car.travel = t.car.nose + Math.PI; });
+    t.car.gear = 1;
+    t.run(0.3, (s) => { t.car.throttle = 1; t.car.speed = 3 * (1 - s / 0.3); t.car.yawRate = 0; });
+    t.run(1.5, (s) => { t.car.speed = Math.min(4, 6 * s); t.car.yawRate = 0.8; t.car.nose += 0.8 * dt; t.car.travel = t.car.nose; });
+    for (const f of [...r.frames, ...t.frames]) expect(deg(wrap(f.view - f.nose))).toBeLessThan(30);
+  });
+
+  test('23.2 a long reverse turns the view once to the travel, never faster than 155 deg/s, and the gas turns it back at once', () => {
+    const r = rig();
+    const start = reverse(r, 3.5, 7, 1.5);
+    const last = r.frames[r.frames.length - 1] as { view: number; travel: number };
+    expect(deg(wrap(last.view - last.travel))).toBeLessThan(10);
+    // the gas: the reverse gear goes at once, the car still rolling back
+    r.car.gear = 1;
+    const gas = r.frames.length;
+    r.run(1.2, (s) => { r.car.throttle = 1; r.car.speed = 7 * (1 - s / 1.2); });
+    r.car.travel = r.car.nose;
+    r.run(1.5, (s) => { r.car.speed = 6 * s; });
+    const at = (i: number) => r.frames[i] as { view: number; nose: number };
+    // a quarter of a second after the gas the view is on its way back behind the nose
+    expect(deg(wrap(at(gas - 1).view - at(gas - 1).nose)) - deg(wrap(at(gas + 15).view - at(gas + 15).nose))).toBeGreaterThan(5);
+    const end = r.frames[r.frames.length - 1] as { view: number; nose: number };
+    expect(deg(wrap(end.view - end.nose))).toBeLessThan(10);
+    // once round and once back: the view passes the car's side twice in all
+    let sides = 0;
+    for (let i = start; i < r.frames.length; i++) {
+      const a = at(i - 1), b = at(i);
+      if (Math.cos(wrap(a.view - a.nose)) * Math.cos(wrap(b.view - b.nose)) < 0) sides++;
+    }
+    expect(sides).toBe(2);
+    expect(turning(r.frames, start).peak).toBeLessThan(155);
+  });
+
+  /** At 20 m/s the car is turned half round in 0.8 s (a ram) and slides on tail first to a stop. */
+  function spin(r: ReturnType<typeof rig>): void {
+    r.run(1, () => { r.car.speed = 20; r.car.gear = 3; });
+    r.run(0.8, (s) => { r.car.speed = 20 - 7.5 * s; r.car.yawRate = 4; r.car.nose += 4 * dt; r.car.drifting = true; });
+    r.car.yawRate = 0;
+    r.car.drifting = false;
+    r.run(2.5, (s) => { r.car.speed = 14 * (1 - s / 2.5); });
+  }
+
+  test('23.3 a car spun half round at 20 m/s: the view follows its slide and turns once, never faster than 155 deg/s', () => {
+    const r = rig();
+    spin(r);
+    for (const f of r.frames.slice(60)) if (f.speed > 1) expect(deg(wrap(f.view - f.travel))).toBeLessThan(10);
+    // the gas: behind the nose, which now points back the way it came
+    r.car.travel = r.car.nose;
+    r.run(3, (s) => { r.car.throttle = 1; r.car.gear = 1; r.car.speed = 3.3 * s; });
+    const turned = turning(r.frames);
+    expect(turned.total).toBeLessThan(200);
+    expect(turned.peak).toBeLessThan(155);
+    const end = r.frames[r.frames.length - 1] as { view: number; nose: number };
+    expect(deg(wrap(end.view - end.nose))).toBeLessThan(10);
+  });
+
+  test('23.4 reverse, stop, stand 2 s and reverse again: the view turns round once', () => {
+    const r = rig();
+    reverse(r, 2);
+    r.run(0.5, (s) => { r.car.speed = 5 * (1 - s / 0.5); });
+    r.run(2, () => { r.car.speed = 0; });
+    r.run(1, (s) => { r.car.speed = 5 * Math.min(1, s); });
+    expect(turning(r.frames).total).toBeLessThan(190);
+    const last = r.frames[r.frames.length - 1] as { view: number; travel: number };
+    expect(deg(wrap(last.view - last.travel))).toBeLessThan(10);
+  });
+
+  test('23.5 a slide ended tail first: the gas turns the view behind the nose, the reverse keeps it', () => {
+    const gas = rig();
+    spin(gas);
+    gas.run(0.5, () => { gas.car.speed = 0; });
+    gas.car.travel = gas.car.nose;
+    gas.run(2, (s) => { gas.car.throttle = 1; gas.car.gear = 1; gas.car.speed = 3 * s; });
+    const g = gas.frames[gas.frames.length - 1] as { view: number; nose: number };
+    expect(deg(wrap(g.view - g.nose))).toBeLessThan(10);
+    const back = rig();
+    spin(back);
+    back.run(0.5, () => { back.car.speed = 0; });
+    const held = back.frames.length;
+    // the reverse gear: backing on the way the slide went, the view where it is
+    back.car.gear = -1;
+    back.run(2, (s) => { back.car.speed = 3 * Math.min(1, s); });
+    for (const f of back.frames.slice(held)) expect(deg(wrap(f.view - (f.nose + Math.PI)))).toBeLessThan(10);
+  });
+});
+
 describe('the takedown side cut (M5.5 slice 17)', () => {
   test('17.3 the eye stands to the side of the travel, a little behind the wreck and above it', () => {
     const out = { x: 0, y: 0, z: 0 };

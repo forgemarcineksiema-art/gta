@@ -31,6 +31,13 @@ export const AUTO_QUALITY = {
   growMean: 18,
   /** The resolution scale's floor. */
   minScale: 0.65,
+  /**
+   * A 30 Hz pace (a 30 Hz screen, a browser's battery saver): till a window has `fastShare` of its frames under
+   * `missed` (a 60 Hz screen's), a mean between these (ms) is the screen's pace, read as a 60 Hz one's at half, and a
+   * frame misses past two of the 60 Hz lines. Every frame on time went to low and the smallest picture.
+   */
+  fastShare: 0.2,
+  paceMean: [30, 36],
 } as const;
 
 /** What to change after a window with this mean frame (ms) and share of missed frames. */
@@ -61,6 +68,9 @@ export class AutoQuality {
   private cooldown = 3;
   /** Automatic tier switches this session (M7 slice 5: two and it settles). */
   private switches = 0;
+  /** Frames of the window at a 60 Hz pace; whether a window of them showed the screen keeps one this session. */
+  private quick = 0;
+  private fast = false;
 
   /** `fixed`: `?quality=` fixed the tier, and the settings row leaves it. */
   constructor(private readonly fixed: boolean) {
@@ -86,10 +96,15 @@ export class AutoQuality {
   frame(dt: number, tier: QualityTier): QualityStep | null {
     if (this.locked) return null;
     if (this.cooldown > 0) { this.cooldown -= dt; return null; }
+    const a = AUTO_QUALITY;
     this.elapsed += dt; this.frames++; this.total += dt;
-    if (dt > AUTO_QUALITY.missed) this.missed++;
-    if (this.elapsed < AUTO_QUALITY.window) return null;
-    const step = qualityStep(this.total * 1000 / this.frames, this.missed / this.frames, tier, this.switches >= 2, this.scale);
+    if (dt <= a.missed) this.quick++;
+    if (dt > (this.fast ? a.missed : a.missed * 2)) this.missed++;
+    if (this.elapsed < a.window) return null;
+    if (this.quick >= this.frames * a.fastShare) this.fast = true;
+    const mean = this.total * 1000 / this.frames;
+    const paced = !this.fast && mean >= (a.paceMean[0] as number) && mean <= (a.paceMean[1] as number);
+    const step = qualityStep(paced ? mean / 2 : mean, this.missed / this.frames, tier, this.switches >= 2, this.scale);
     if (step === 'low' || step === 'high') { this.cooldown = 15; this.switches++; }
     else if (step === 'down') this.scale = Math.max(AUTO_QUALITY.minScale, this.scale - 0.1);
     else if (step === 'up') this.scale = Math.min(1, this.scale + 0.05);
@@ -98,6 +113,6 @@ export class AutoQuality {
   }
 
   private reset(): void {
-    this.elapsed = 0; this.frames = 0; this.total = 0; this.missed = 0;
+    this.elapsed = 0; this.frames = 0; this.total = 0; this.missed = 0; this.quick = 0;
   }
 }

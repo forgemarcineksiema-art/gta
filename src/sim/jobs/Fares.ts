@@ -14,6 +14,7 @@ import type { EventLog, SimEvent } from '../events';
 import { mulberry32 } from '../random';
 import type { SimWorld } from '../SimWorld';
 import type { PlayerProbe } from '../traffic/Traffic';
+import type { LaneProjection } from '../traffic/lanes';
 import { PedPose } from '../traffic/Pedestrians';
 import { lanePathTo } from './place';
 import type { Lane } from '../city/roads';
@@ -34,6 +35,7 @@ export class Fares {
   /** Time left over from the last fare, carried into the next one's clock (0 once the chain breaks). */
   carry = 0;
   private hailLeft = 0;
+  private readonly proj: LaneProjection = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0 };
   private readonly rng = mulberry32(0xfa2e);
   private cursor: number;
 
@@ -90,11 +92,25 @@ export class Fares {
       const dx = (peds.x[i] as number) - probe.x, dz = (peds.z[i] as number) - probe.z;
       const along = dx * fx + dz * fz, d = Math.hypot(dx, dz);
       if (along < near || d > far || Math.abs(dx * -fz + dz * fx) > 25) continue;
-      if (d < bestD) { bestD = d; best = i; }
+      // on the taxi's level: a walker under the deck it drives (the highway has no footway) hailed a car that could not
+      // reach them, and the next hail waited till it was 220 m off
+      if (d >= bestD || !this.onLevel(peds.x[i] as number, peds.z[i] as number, probe)) continue;
+      bestD = d;
+      best = i;
     }
     if (best < 0) return;
     peds.hail(best, Math.atan2(probe.x - (peds.x[best] as number), probe.z - (peds.z[best] as number)));
     this.hailer = best;
+  }
+
+  /** Whether a pavement at (x, z) is on the level of the player's road there: its lane at the player's height, read at it. */
+  private onLevel(x: number, z: number, probe: PlayerProbe): boolean {
+    const traffic = this.sim.traffic;
+    if (!traffic) return true;
+    const streets = traffic.streets, lane = streets.nearestLane(x, z, probe.y - 0.5);
+    if (lane < 0) return true;
+    traffic.lanes.project(lane, x, z, this.proj);
+    return Math.abs(streets.footAt(x, z) - traffic.lanes.heightAt(lane, this.proj.s)) < OTHER_LEVEL;
   }
 
   private dropHailer(): void {

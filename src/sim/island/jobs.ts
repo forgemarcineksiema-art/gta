@@ -631,8 +631,9 @@ function islandRivals(island: Island, streets: StreetMap, lanes: LaneTables, def
   const markers = defs.map((d) => ({ x: d.x, z: d.z }));
   for (const g of island.garages) markers.push({ x: g.door.x, z: g.door.z });
   const taken: Array<{ x: number; z: number }> = [];
+  // never a bay under a deck (36 of the kerbside bays are): a duel set under the highway, its ring and its car in its shade
   const free = (b: { x: number; z: number }): boolean => markers.every((m) => Math.hypot(m.x - b.x, m.z - b.z) >= RIVAL_CLEAR)
-    && taken.every((t) => Math.hypot(t.x - b.x, t.z - b.z) >= RIVAL_APART);
+    && taken.every((t) => Math.hypot(t.x - b.x, t.z - b.z) >= RIVAL_APART) && !island.underDeck(b.x, b.z, 2);
   const crown = island.places.find((p) => p.id === 'crown') as CrownPlace | undefined;
   const scrapyard = island.garages.find((g) => g.name === 'scrapyard');
   const middles: IslandTarget[] = [];

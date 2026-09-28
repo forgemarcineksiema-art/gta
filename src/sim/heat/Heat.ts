@@ -30,6 +30,11 @@ export class Heat {
   private readonly hitCooldown: Float32Array;
   /** The ceiling the points may reach: 100, but under the cold open's cap while it runs (the world sets it each step). */
   cap = 100;
+  /**
+   * The crimes a unit saw, counted: from a police car any of them blows the disguise (the police read it). Its own list
+   * of four kinds let a civilian rammed, a thing smashed or a roadblock broken in a unit's sight go by.
+   */
+  seenCrimes = 0;
 
   constructor(private readonly events: EventLog, private readonly traffic: Traffic | null) {
     this.hitCooldown = new Float32Array(traffic ? traffic.capacity : 0);
@@ -105,16 +110,16 @@ export class Heat {
     const heat = BALANCE.heat;
     const kind = event.kind;
     if (kind === 'takedown' || kind === 'takedownTraffic') {
-      this.add(this.traffic?.police[event.target] ? heat.policeTakedown : heat.trafficTakedown, this.seen());
+      this.crime(this.traffic?.police[event.target] ? heat.policeTakedown : heat.trafficTakedown);
     } else if (kind === 'billboard') {
-      this.add(heat.billboard, this.seen());
+      this.crime(heat.billboard);
     } else if (kind === 'smash') {
       // breaking public property (M8 slice 6): the thing's points, doubled in a unit's sight; a chasing unit's is not a crime
-      if (event.value > 0) this.add(this.propHeat(event.target), this.seen());
+      if (event.value > 0) this.crime(this.propHeat(event.target));
     } else if (kind === 'camera') {
-      this.add(heat.camera, this.seen());
+      this.crime(heat.camera);
     } else if (kind === 'roadblock') {
-      this.add(heat.roadblock, this.seen());
+      this.crime(heat.roadblock);
     } else if (kind === 'hit') {
       // a civilian rammed hard enough to knock it off its lane, once per car per cooldown; the faster car
       // is at fault, so one that drives into a slower or stopped player pays nothing
@@ -126,7 +131,14 @@ export class Heat {
       const other = Math.max(traffic.speed[agent] as number, traffic.prevSpeed[agent] as number);
       if (other > this.playerSpeed() + heat.faultMargin) return;
       this.hitCooldown[agent] = heat.hitCooldown;
-      this.add(heat.hit, this.seen());
+      this.crime(heat.hit);
     }
   };
+
+  /** A crime's points, doubled in a unit's sight, and counted as seen there. */
+  private crime(points: number): void {
+    const seen = this.seen();
+    if (seen) this.seenCrimes++;
+    this.add(points, seen);
+  }
 }

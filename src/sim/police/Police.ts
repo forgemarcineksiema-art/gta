@@ -33,7 +33,6 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { QUERY_NOT_PROP, QUERY_WALLS } from '../collision';
 import { BALANCE } from '../balance';
 import { bodySpec } from '../traffic/bodies';
-import type { SimEvent } from '../events';
 import type { ParkedJunction } from '../city/cover';
 import type { RoadGraph, Lane, RoadNode } from '../city/roads';
 import type { SimWorld } from '../SimWorld';
@@ -47,6 +46,8 @@ import { DONUT_SHOP } from './Donuts';
 
 /** A car this far over or under the player's road is on another road (a deck, the tunnel; m, as Life's near misses). */
 const OTHER_ROAD = 3;
+/** What another level adds to a lane's cost as a route's target (m): taken only with no lane on the level that near. */
+const OTHER_LEVEL_COST = 100;
 /** A roadside ambush's lane this far over or under the player's road is out of sight on another road (m). */
 const AMBUSH_LEVEL = 4;
 
@@ -168,7 +169,8 @@ export class Police {
   private readonly leaveZ: Float64Array;
   /** The abandoned car's pose, in the shape the slot planner takes. */
   private readonly boxProbe: PlayerProbe = { x: 0, y: 0.5, z: 0, yaw: 0, vx: 0, vz: 0, speed: 0, halfWidth: 1, halfLength: 2.3 };
-  private cursor: number;
+  /** The heat's seen crimes counted so far (the disguise's reading). */
+  private crimes = 0;
   private readonly withdrawing: Uint8Array;
   private readonly rammed: Uint8Array;
   private readonly ramCooldown: Float32Array;
@@ -258,7 +260,7 @@ export class Police {
     this.leaving = new Float32Array(this.units.length);
     this.leaveX = new Float64Array(this.units.length);
     this.leaveZ = new Float64Array(this.units.length);
-    this.cursor = sim.events.sequence;
+    this.crimes = sim.heat.seenCrimes;
     this.withdrawing = new Uint8Array(this.units.length);
     this.rammed = new Uint8Array(this.units.length);
     this.ramCooldown = new Float32Array(this.units.length);
@@ -290,7 +292,7 @@ export class Police {
     this.radius = Math.hypot(extents.x, extents.z);
     // the donut shop's field, once: the units that stand down head there (the grid's shop or the island's)
     const donut = sim.island?.donutShop ?? DONUT_SHOP;
-    this.route(DONUT, donut.laneX, donut.laneZ, donut.laneYaw);
+    this.route(DONUT, donut.laneX, donut.laneZ, donut.laneYaw, this.traffic.streets.groundAt(donut.laneX, donut.laneZ));
   }
 
   /** Runs before Traffic.step; never steps traffic or physics itself. */
@@ -336,8 +338,11 @@ export class Police {
     }
     this.chiefWait = Math.max(0, this.chiefWait - dt);
     const assaulted = this.assaults(dt);
-    // last step's crimes, judged by who could see the car when they happened
-    this.cursor = this.sim.events.readFrom(this.cursor, this.onCrime);
+    // last step's crimes a unit saw, as the heat judged them: from a police car, any blows the disguise
+    if (this.sim.heat.seenCrimes !== this.crimes) {
+      this.crimes = this.sim.heat.seenCrimes;
+      if (this.sim.pursuit.disguised) this.sim.pursuit.markBlown(this.sim.probe.x, this.sim.probe.z);
+    }
     // The card is up (M8.6 D7): the chase is over and every unit stands where it is until it closes. Driving on through
     // the card, the units shoved the car out from under the officer at its window.
     if (this.sim.run.state === 'busted') {
@@ -439,7 +444,8 @@ export class Police {
     this.routeLeft -= dt;
     const refresh = this.routeLeft <= 0 || (this.targetLane[CHASE] as number) < 0 || before === 'idle' || before !== pursuit.state;
     if (chasing && refresh) {
-      this.route(CHASE, player.x + player.vx * t.projectSeconds, player.z + player.vz * t.projectSeconds, player.yaw);
+      const cx = player.x + player.vx * t.projectSeconds, cz = player.z + player.vz * t.projectSeconds;
+      this.route(CHASE, cx, cz, player.yaw, this.levelAhead(cx, cz, player));
       if (level >= t.cutoff.fromLevel) this.route(AHEAD, player.x + player.vx * t.cutoff.seconds, player.z + player.vz * t.cutoff.seconds, player.yaw);
       this.routeLeft = t.routeSeconds;
     } else if (searching && refresh) {
@@ -729,7 +735,7 @@ export class Police {
     const b = this.boxProbe;
     this.routeLeft -= dt;
     if (this.routeLeft <= 0) {
-      this.route(CHASE, b.x, b.z, b.yaw);
+      this.route(CHASE, b.x, b.z, b.yaw, b.y - 0.5);
       this.routeLeft = t.routeSeconds;
     }
     this.placeSlots(b);
@@ -783,13 +789,6 @@ export class Police {
     this.driveTo(agent, tx, tz, this.boxProbe, this.tuning.box.detourSpeed);
   }
 
-  /** A crime event from the ring: from a police car in a unit's sight it blows the disguise. */
-  private readonly onCrime = (e: SimEvent): void => {
-    const kind = e.kind;
-    if (kind !== 'takedown' && kind !== 'takedownTraffic' && kind !== 'billboard' && kind !== 'camera') return;
-    if (this.sim.pursuit.disguised && this.crimeSeen()) this.sim.pursuit.markBlown(this.sim.probe.x, this.sim.probe.z);
-  };
-
   /**
    * Live police cars (pursuit units, parked patrols, roadblock cars) within
    * `range` of a point: what boxes the player in. A wreck or a car the player
@@ -817,6 +816,11 @@ export class Police {
    * from heat 1, the car has seen who did it. During a chase the contacts are
    * the pursuit's own rams and cost nothing.
    */
+  /** A police car (or one the law takes for its own) in contact with the player was the faster: its ram, not the player's. */
+  rammedBy(agent: number): boolean {
+    return (this.copSpeedMax[agent] as number) > this.playerSpeedMax + BALANCE.heat.faultMargin;
+  }
+
   private assaults(dt: number): boolean {
     const traffic = this.traffic;
     const t = this.tuning;
@@ -1399,8 +1403,24 @@ export class Police {
     return this.traffic.spawnPoliceAt(bestLane, bestS, kind, player, t.viewNear, cosHalf, t.spawnClearance, -1, true);
   }
 
-  /** Reverse Dijkstra on the authored road graph toward the lane under a point, into one of the two fields. */
-  private route(field: number, x: number, z: number, heading: number): void {
+  /**
+   * The height of the player's own road at a point a moment ahead: its lane at its level, read there (at its end past
+   * it); NaN off every lane.
+   */
+  private levelAhead(x: number, z: number, player: PlayerProbe): number {
+    const own = this.traffic.streets.nearestLane(player.x, player.z, player.y - 0.5);
+    if (own < 0) return Number.NaN;
+    const lanes = this.traffic.lanes;
+    lanes.project(own, x, z, this.projection);
+    return lanes.heightAt(own, this.projection.s);
+  }
+
+  /**
+   * Reverse Dijkstra on the authored road graph toward the lane under a point, into one of the two fields; with `y`
+   * the road's height there, a lane on another level (a deck over it, the street under it) only when none on it is near:
+   * units chased a player on the highway's deck along the street under it.
+   */
+  private route(field: number, x: number, z: number, heading: number, y = Number.NaN): void {
     const lanes = this.traffic.lanes;
     const distance = this.fields[field] as Float64Array;
     let best = Infinity;
@@ -1410,7 +1430,8 @@ export class Police {
       if (Math.hypot((lanes.midX[i] as number) - x, (lanes.midZ[i] as number) - z) > (lanes.length[i] as number) / 2 + 40) continue;
       lanes.project(i, x, z, this.projection);
       const along = Math.cos(this.projection.yaw - heading);
-      const cost = this.projection.dist + (1 - along) * this.tuning.targetHeadingWeight;
+      let cost = this.projection.dist + (1 - along) * this.tuning.targetHeadingWeight;
+      if (Math.abs(lanes.heightAt(i, this.projection.s) - y) > OTHER_ROAD) cost += OTHER_LEVEL_COST;
       if (cost < best) {
         best = cost;
         targetLane = i;

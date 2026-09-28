@@ -87,6 +87,12 @@ export interface TrafficTuning {
   wreckTow: number;
   /** A wreck closer than this counts as seen whatever the heading, m. */
   wreckTowNear: number;
+  /**
+   * A car has stood this long stuck behind a wreck with no way round it (the oncoming lane full, a junction's box): the
+   * wreck is towed out of sight once `wreckLinger` old, not `wreckTow` (the third bug hunt: queues stood 90 s behind
+   * the police's wrecks in Crown's streets), s.
+   */
+  wreckBlocking: number;
   /** Half angle of the forward cone that counts as the player's view, deg. */
   wreckTowConeDeg: number;
   /**
@@ -150,6 +156,11 @@ export interface TrafficTuning {
   cloneDistance: number;
   mass: Record<CarId, number>;
   friction: number;
+  /**
+   * A dead car's (a wreck's, an abandoned car's): it rolls on its wheels as a pushed car does. At the drivers' the player's
+   * car could not push one up Crown's 18 % streets, nor faster than a walk on the flat (the third bug hunt).
+   */
+  wreckFriction: number;
   restitution: number;
   linearDamping: number;
   angularDamping: number;
@@ -229,6 +240,7 @@ export const TRAFFIC: TrafficTuning = {
   wreckLinger: 10,
   wreckTow: 60,
   wreckTowNear: 40,
+  wreckBlocking: 8,
   wreckTowConeDeg: 55,
   tipAfter: 0.5,
   tipSpin: 2.2,
@@ -277,6 +289,7 @@ export const TRAFFIC: TrafficTuning = {
   cloneDistance: 150,
   mass: { compact: 1050, muscle: 1300, heavy: 2400, sports: 1180, police: 1620, offroad: 1950, moto: 290 },
   friction: 0.4,
+  wreckFriction: 0.25,
   restitution: 0.3,
   linearDamping: 0.3,
   angularDamping: 1.5,

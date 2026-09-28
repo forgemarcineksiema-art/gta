@@ -77,6 +77,14 @@ const TAG_LANE: Readonly<Record<ExtraTag, number>> = { rings: -3, caches: -4, ro
 export const COIN_HEIGHT = 1.0;
 /** The ground's height at a point: the grid's flat 0, the island's hills. */
 export type GroundAt = (x: number, z: number) => number;
+/**
+ * Where a car coming down at `below` m lands at (x, z) (the island's: a pier's deck, a roof, the canal dug in the
+ * ground, the ground), and the speed a jump is flown at (m/s): an arc's landing and its launch.
+ */
+export interface ArcLanding {
+  land: (x: number, z: number, below: number) => number;
+  speed: (jd: JumpDesc) => number;
+}
 const FLAT: GroundAt = () => 0;
 /** A spill keeps to a lane at the wreck's own level: a lane more than this over or under the wreck is another road's (m). */
 const OTHER_LEVEL = 3;
@@ -114,7 +122,7 @@ function push(out: CoinPoint[], p: Pt, y: number, lane: number, value: number, p
  * height under a point (the grid's 0, the island's hills: M8.10 slice 15), the ramp standing on it, the flight from its
  * lip until it meets it.
  */
-function arc(jd: JumpDesc, out: CoinPoint[], ground: GroundAt): void {
+function arc(jd: JumpDesc, out: CoinPoint[], ground: GroundAt, landing: ArcLanding | null): void {
   const c = BALANCE.coin;
   const fx = Math.sin(jd.yaw), fz = Math.cos(jd.yaw);
   const floor = (a: number): number => ground(jd.x + fx * a, jd.z + fz * a);
@@ -129,16 +137,30 @@ function arc(jd: JumpDesc, out: CoinPoint[], ground: GroundAt): void {
     return 0;
   };
   const tan = jd.height / jd.length;
-  const v2 = c.arc.speed * c.arc.speed / (1 + tan * tan);
+  const speed = landing ? landing.speed(jd) : c.arc.speed;
+  const v2 = speed * speed / (1 + tan * tan);
   const flight = (a: number): number => jd.height + a * tan - c.arc.gravity * a * a / (2 * v2);
   const at = (a: number): Pt => ({ x: jd.x + fx * a, z: jd.z + fz * a });
-  const up = (a: number): boolean => lip + flight(a) > floor(a) + 0.3 && a < ARC_REACH;
+  // down onto what stands there (the island's: the arcs over the drawn ground alone put their caps on the sea floor under
+  // a pier, inside an office block under its roof, in the air over the dug canal: the third bug hunt)
+  const land = (a: number, below: number): number => {
+    const p = at(a);
+    return landing ? landing.land(p.x, p.z, below) : floor(a);
+  };
+  // a top the flight came down past between two samples is where it lands (a pier's deck 0.1 m over the next one's)
+  let landed = 0;
+  const up = (a: number): boolean => {
+    const f = lip + flight(a), was = lip + flight(Math.max(0, a - c.pitch));
+    landed = land(a, Math.max(f, was));
+    return f > landed + 0.3 && a < ARC_REACH;
+  };
   let phase = 0;
   let a = c.pitch;
   for (let laid = 0; up(a) && laid < c.arcCoins; a += c.pitch, laid++) push(out, at(a), Math.max(floor(a) + surface(a), lip + flight(a)) + COIN_HEIGHT, -1, c.value, phase++);
   while (up(a)) a += c.pitch;
   const cap = at(a + c.pitch);
-  push(out, cap, ground(cap.x, cap.z) + COIN_HEIGHT, -1, c.cap, phase);
+  // on what it came down on (a roof's top, not the floor inside), or what it rolled on to
+  push(out, cap, (landing ? land(a + c.pitch, landed + 0.5) : ground(cap.x, cap.z)) + COIN_HEIGHT, -1, c.cap, phase);
 }
 
 /** An arc's flight is followed this far past its lip at most (m). */
@@ -148,9 +170,9 @@ const ARC_REACH = 400;
  * The static layout from the seed: an arc over every ramp, over the ground under it (`ground`, the grid's 0). The gate
  * lines are placed per chunk with their billboards.
  */
-export function layoutCoins(jumps: readonly JumpDesc[], ground: GroundAt = FLAT): CoinPoint[] {
+export function layoutCoins(jumps: readonly JumpDesc[], ground: GroundAt = FLAT, landing: ArcLanding | null = null): CoinPoint[] {
   const out: CoinPoint[] = [];
-  for (const jd of jumps) arc(jd, out, ground);
+  for (const jd of jumps) arc(jd, out, ground, landing);
   return out;
 }
 

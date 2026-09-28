@@ -18,7 +18,8 @@ import { FADE, blocks, fadeTarget, stepFade } from '../camera/fade';
 
 export class TrafficView {
   private readonly meshes: Array<THREE.InstancedMesh | null>;
-  private readonly material: THREE.Material;
+  /** The cars' one material (the renderer adds the tunnel's shade on the island). */
+  readonly material: THREE.Material;
   private readonly packed: Int16Array[];
   private readonly counts: Int32Array;
   private readonly wrote: Uint8Array;

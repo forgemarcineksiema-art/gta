@@ -195,6 +195,35 @@ describe('traffic with character', () => {
   }, 60_000);
 });
 
+describe('the third bug hunt: a wreck that holds a queue', () => {
+  it("a car stuck behind a wreck with no way round it (the oncoming lane stopped) has it towed out of sight in seconds, not a minute", async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
+    try {
+      const traffic = sim.traffic as Traffic;
+      const lane = streetLane(sim, 170), rev = traffic.reverse[lane] as number;
+      const at = pose(sim, lane, 100);
+      // the player away to the side, facing away: the wreck out of sight
+      const x = at.x + Math.cos(at.yaw) * 60, z = at.z - Math.sin(at.yaw) * 60;
+      sim.city?.sync(x, z, true);
+      sim.vehicle.teleport({ x, y: 0.8, z }, at.yaw + Math.PI / 2);
+      sim.vehicle.setVelocity(0, 0, 0);
+      const wreck = traffic.spawnAtPoint(at.x, at.z, at.yaw, 'compact', AgentState.Wrecked);
+      const car = traffic.spawnAt(lane, 70, 'compact');
+      // a car standing in the oncoming lane beside it: no way round
+      const other = traffic.spawnAt(rev, (traffic.lanes.length[rev] as number) - 100, 'compact');
+      expect(Math.min(wreck, car, other)).toBeGreaterThanOrEqual(0);
+      traffic.pace[car] = 1;
+      traffic.bad[car] = 0;
+      traffic.pace[other] = 0;
+      traffic.speed[other] = 0;
+      // the handbrake on (a brake held at a standstill reverses the car toward it)
+      run(sim, 20, (_t, c) => { c.handbrake = 1; });
+      expect(traffic.state[wreck]).toBe(AgentState.Free);
+      expect(traffic.towedAway).toBe(1);
+    } finally { sim.dispose(); }
+  }, 60_000);
+});
+
 describe('M8.8 slice 6: the three with connections; the rival at its car\'s pace', () => {
   it('M8.8 6.1 the Fake Cruiser\'s disco bar 40 m behind a car on its lane: it pulls over; a muscle car there, it drives on', async () => {
     for (const body of ['fakecop', 'muscle'] as const) {

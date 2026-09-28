@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-28 — the third bug hunt's backlog (Marcin: "Lecisz z backlogiem")
+
+All fourteen, but a wreck in sight: a queue behind a wreck with no way round gets it towed out of sight in 10 s (drivers);
+a wreck rolls when pushed, up Crown's 18 % too (14b.21); units route to the player's level (14b.20); the arcs' caps where
+a car at the jump's speed lands, pier, roof, canal (15.6); the fog in the dome's colour by elevation, the cars out of the
+sun in the tunnel (text pins); TOTALS names a daily (3.3); the disguise blown by any seen crime (6.4); mayhem no unit's ram
+(8.1); rivals never under a deck; a 30 Hz screen keeps high (5.4); boot focus, the audio asleep away and faded on a stall;
+the car pictures in one kept material; the hail on the taxi's level (14b.15). The in-sight wreck in BACKLOG.
+
 ## 2026-09-28 — the third bug hunt (Marcin: "/bughunt")
 
 Five read-only agents by area, the chase probe, stills; fixed: on stacked roads a car given back to its lane was drawn up

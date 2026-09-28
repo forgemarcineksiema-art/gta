@@ -37,6 +37,9 @@ export class PlayerCar {
   mesh: CarMesh;
   /** The city's bodies the player has taken (or is next to): built on first need, kept (M5.5 slice 19). */
   private readonly bodies = new Map<BodyId, CarMesh>();
+  /** A patch each car material takes (the tunnel's shade on the island), and the materials that have it. */
+  private shade: ((material: THREE.Material) => void) | null = null;
+  private readonly shaded = new Set<THREE.Material>();
   private carId: CarId;
   private bodyId: BodyId;
   /** The paint last put on a taken body's mesh. */
@@ -113,7 +116,33 @@ export class PlayerCar {
     if (this.garageSerial >= 0) mesh.setPaint(this.sim.garage.paintOf(id));
     this.roofY[id] = roofOf(mesh);
     this.built[id] = mesh;
+    this.shadeMesh(mesh);
     return mesh;
+  }
+
+  /** The patch every car material takes: the built ones now, the rest as they are built. */
+  shadeWith(fn: (material: THREE.Material) => void): void {
+    this.shade = fn;
+    for (const id of CAR_IDS) {
+      const mesh = this.built[id];
+      if (mesh) this.shadeMesh(mesh);
+    }
+    for (const mesh of this.bodies.values()) this.shadeMesh(mesh);
+  }
+
+  private shadeMesh(mesh: CarMesh): void {
+    const fn = this.shade;
+    if (!fn) return;
+    for (const o of [mesh.root, ...mesh.wheels]) {
+      o.traverse((m) => {
+        if (!(m instanceof THREE.Mesh)) return;
+        for (const material of Array.isArray(m.material) ? m.material as THREE.Material[] : [m.material as THREE.Material]) {
+          if (!(material instanceof THREE.MeshLambertMaterial) || this.shaded.has(material)) continue;
+          this.shaded.add(material);
+          fn(material);
+        }
+      });
+    }
   }
 
   /** The showroom's look (M8.9 R10): what the car shows in the room; null, what it wears. A flame or smoke newly looked at puffs. */
@@ -272,6 +301,7 @@ export class PlayerCar {
       }
       this.roofY[body] = roofOf(mesh);
       this.bodies.set(body, mesh);
+      this.shadeMesh(mesh);
     }
     return mesh;
   }

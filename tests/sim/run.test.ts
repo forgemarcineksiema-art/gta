@@ -8,6 +8,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../src/sim/balance';
 import { GARAGE, toDropOff, type DropOff } from '../../src/sim/city/cover';
+import { DAILY_TEMPLATES } from '../../src/sim/dailies/Dailies';
 import { POLICE } from '../../src/sim/police/tuning';
 import type { SimWorld } from '../../src/sim';
 import { AgentState, type Traffic } from '../../src/sim/traffic/Traffic';
@@ -95,13 +96,20 @@ describe('the run', () => {
     } finally { sim.dispose(); }
   });
 
-  it('3.3 the door: rolling in under 8 m/s starts it, and 3 s later the bag banks at the multiplier', async () => {
+  it('3.3 the door: rolling in under 8 m/s starts it, and 3 s later the bag banks at the multiplier; a daily it finishes is named with it', async () => {
     for (const kmh of [25, 50]) {
       const sim = await cityWorld();
       try {
         const site = sim.run.dropOffs[0]!;
         sim.run.maxHeat = 3;
         sim.run.bag = 10_000;
+        // the second door finishes "bank 10,000 in one run": its cash in the bank with the bag's, and on the wall
+        const daily = kmh === 50 ? BALANCE.dailies.rewards[0] as number : 0;
+        if (daily > 0) {
+          sim.dailies.ids[0] = DAILY_TEMPLATES.findIndex((t) => t.kind === 'banked' && t.target === 10000);
+          sim.dailies.progress[0] = 0;
+          sim.dailies.done[0] = false;
+        }
         placeCar(sim, site, -GARAGE.depth / 2 - 12);
         run(sim, 0.6, (_t, c) => { c.brake = 1; });
         const v = kmh / 3.6;
@@ -129,8 +137,9 @@ describe('the run', () => {
         expect(Math.abs((shut - closing + 1) / 60 - BALANCE.door.closeSeconds)).toBeLessThan(0.05);
         // the bag at level 3's multiplier (×1.6 until M7 slice 10 fitted ×1.65)
         const banked = Math.round(10_000 * (BALANCE.multiplier[3] as number));
-        expect(sim.run.bank).toBe(banked);
+        expect(sim.run.bank).toBe(banked + daily);
         expect(sim.run.lastBanked).toBe(banked);
+        expect(sim.run.lastDaily).toBe(daily);
         expect(sim.run.bag).toBe(0);
         expect(sim.heat.points).toBe(0);
         expect(sim.pursuit.state).toBe('idle');

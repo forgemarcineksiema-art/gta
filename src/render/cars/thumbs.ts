@@ -192,8 +192,19 @@ export class Thumbs {
       // built for its picture and let go: the atlas keeps the picture, a respray builds it again; a bike is a bike
       const t = bodyTuning(id);
       const car = t.twoWheel > 0 ? buildBikeMesh(t, paint, bikeShapeOf(id)) : buildCarMesh(t, BODY_PROFILES[id], paint);
+      // shot in the pictures' own material: each car's own, freed after its one picture, took this light's shader with it
+      // (nothing else draws in it), and the next picture compiled it again: 35 at the first door, in the showroom's glide
+      const own = new Set<THREE.Material>();
+      for (const o of [car.root, ...car.wheels]) {
+        o.traverse((m) => {
+          if (!(m instanceof THREE.Mesh) || !(m.material instanceof THREE.MeshLambertMaterial) || !m.material.vertexColors) return;
+          own.add(m.material);
+          m.material = this.kitMaterial;
+        });
+      }
+      for (const m of own) m.dispose();
       this.shoot(car, id, x, y);
-      dispose(car);
+      dispose(car, this.kitMaterial);
       return;
     }
     const k = KIT.find((item) => `kit:${item.id}` === key);
@@ -268,9 +279,9 @@ export class Thumbs {
   }
 }
 
-/** A car mesh's geometries and materials freed (its wheels share one geometry and one material). */
-function dispose(car: CarMesh): void {
-  const seen = new Set<unknown>();
+/** A car mesh's geometries and materials freed (its wheels share one geometry and one material), `keep` kept. */
+function dispose(car: CarMesh, keep: THREE.Material | null = null): void {
+  const seen = new Set<unknown>([keep]);
   for (const o of [car.root, ...car.wheels]) {
     o.traverse((m) => {
       if (!(m instanceof THREE.Mesh)) return;

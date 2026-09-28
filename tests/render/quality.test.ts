@@ -2,7 +2,22 @@
  * The automatic quality reads the stutter, not only the mean (M8.6 slice 5, D10): the step from a window of frames.
  */
 import { describe, expect, it } from 'vitest';
-import { AUTO_QUALITY, qualityStep } from '../../src/render/quality';
+import { AUTO_QUALITY, AutoQuality, qualityStep, type QualityStep, type QualityTier } from '../../src/render/quality';
+
+/** The automatic quality fed `seconds` of frames from `next` (ms, by the frame's index): the steps it took, its tier and scale. */
+function drive(seconds: number, next: (i: number) => number): { steps: QualityStep[]; tier: QualityTier; scale: number } {
+  const auto = new AutoQuality(false), steps: QualityStep[] = [];
+  let tier: QualityTier = 'high';
+  for (let t = 0, i = 0; t < seconds; i++) {
+    const dt = next(i) / 1000;
+    t += dt;
+    const step = auto.frame(dt, tier);
+    if (step === null || step === 'hold') continue;
+    steps.push(step);
+    if (step === 'low' || step === 'high') tier = step;
+  }
+  return { steps, tier, scale: auto.scale };
+}
 
 /** `count` frames of `ms` each. */
 function frames(count: number, ms: number): number[] {
@@ -37,5 +52,17 @@ describe('the automatic quality', () => {
     // the mean's own rule stands: a steady 40 ms steps down
     const [mean3, missed3] = window(frames(75, 40));
     expect(qualityStep(mean3, missed3, 'high', false, 1)).toBe('low');
+  });
+
+  it("5.4 a 30 Hz pace (a 30 Hz screen, a browser's battery saver) keeps high and the full picture; a pile of cruisers at 60 Hz still steps down; a steady 25 fps too", () => {
+    // every frame on a 30 Hz screen's time: it went to low and the smallest picture
+    const paced = drive(90, () => 1000 / 30);
+    expect(paced.steps).toEqual([]);
+    expect([paced.tier, paced.scale]).toEqual(['high', 1]);
+    // the MX330's pile (5.2), again and again: down as before
+    const pile = [...frames(110, 16.7), ...frames(27, 33.4), 66.7, 66.7, 83.3];
+    expect(drive(30, (i) => pile[i % pile.length] as number).steps[0]).toBe('low');
+    // slower than any 30 Hz pace: down too
+    expect(drive(30, () => 40).steps[0]).toBe('low');
   });
 });

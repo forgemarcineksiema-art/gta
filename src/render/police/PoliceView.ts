@@ -114,7 +114,8 @@ interface LiveryKit {
 }
 
 export class PoliceView {
-  private readonly material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  /** The units' details (the renderer adds the tunnel's shade on the island). */
+  readonly material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
   private readonly lensMaterial = new THREE.MeshBasicMaterial({ vertexColors: true });
   private readonly kits: LiveryKit[] = [];
   private readonly kitOf: Partial<Record<CarId, LiveryKit>> = {};

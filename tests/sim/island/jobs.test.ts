@@ -16,7 +16,7 @@ import { JOBS, PLACES, RIVAL_RINGS, districtOf } from '../../../src/sim/island/p
 import { canalLength, inCanal, pointAt } from '../../../src/sim/island/shapes/works';
 import { DECK } from '../../../src/sim/island/structures';
 import type { P2 } from '../../../src/sim/island/geom';
-import type { Traffic } from '../../../src/sim/traffic/Traffic';
+import { AgentState, type Traffic } from '../../../src/sim/traffic/Traffic';
 import type { LanePose, LaneProjection } from '../../../src/sim/traffic/lanes';
 import { POLICE } from '../../../src/sim/police/tuning';
 import * as THREE from 'three';
@@ -210,6 +210,8 @@ describe('M8.10 slice 14: the jobs, the rivals and the way on the island', () =>
       // but Frank's: the Works' bay whose way home to the donut shop is nearest his band
       expect(traffic.streets.bays.some((b) => Math.hypot(b.x - d.x, b.z - d.z) < 1e-6), at).toBe(true);
       if (rival.turf !== 'highway') expect(districtOf(d.x, d.z), at).toBe(rival.turf);
+      // never under a deck (36 of the kerbside bays are)
+      expect(island.underDeck(d.x, d.z, 2), at).toBe(false);
       const shop = PLACES.donutShop;
       if (rival.target === 'donuts') expect(Math.hypot(d.targetX - (shop.x0 + shop.x1) / 2, d.targetZ - (shop.z0 + shop.z1) / 2), at).toBeLessThan(40);
       else expect(Math.hypot(plan.at[0] - d.x, plan.at[1] - d.z), at).toBeLessThan(250);
@@ -466,7 +468,7 @@ describe('M8.10 slice 14: the jobs, the rivals and the way on the island', () =>
     for (const a of [...filled, rival]) traffic.remove(a);
   });
 
-  it("14b.15 a hailer under the deck: the taxi stopped over them on the deck takes nobody; a few metres from them on their street it does", () => {
+  it("14b.15 a walker under the deck: the taxi on the deck gets no hail from them and, hailed, takes nobody; a few metres from them on their street it does", () => {
     const peds = sim.peds;
     if (!peds) throw new Error('no walkers');
     leave();
@@ -476,11 +478,15 @@ describe('M8.10 slice 14: the jobs, the rivals and the way on the island', () =>
     if (!spot) return;
     const h = peds.spawnAt(spot.streetX, spot.streetZ, 0, PedPose.Walk);
     expect(h).toBeGreaterThanOrEqual(0);
-    peds.hail(h, 0);
-    sim.fares.hailer = h;
     island.sync(spot.x, spot.z, true);
     sim.vehicle.teleport({ x: spot.x, y: spot.deckY + 0.9, z: spot.z }, spot.yaw);
     sim.vehicle.setVelocity(0, 0, 0);
+    for (let i = 0; i < 5; i++) { clearControls(sim.controls); sim.controls.brake = 1; sim.step(); }
+    // no hail from under the deck: the taxi could never reach them
+    (sim.fares as unknown as { hail(probe: typeof sim.probe, near: number, far: number): void }).hail(sim.probe, 0, 60);
+    expect(sim.fares.hailer).toBe(-1);
+    peds.hail(h, 0);
+    sim.fares.hailer = h;
     for (let i = 0; i < 10; i++) { clearControls(sim.controls); sim.controls.brake = 1; sim.step(); }
     expect(sim.fares.fare).toBe(-1);
     // down on their street, 4 m back from them
@@ -567,6 +573,50 @@ describe('M8.10 slice 14: the jobs, the rivals and the way on the island', () =>
     sim.vehicle.setVelocity(0, 0, 0);
     run(sim, 0.1, (_t, c) => { c.brake = 1; });
     expect(sim.jobs.race.place(sim.probe)).toBe(1);
+    leave();
+  });
+
+  it("14b.20 a unit's route to a player on a deck aims at the deck: the street under it, the way the car faced, went first", () => {
+    leave();
+    const spot = deckOverStreet(1);
+    expect(spot).not.toBeNull();
+    if (!spot) return;
+    island.sync(spot.x, spot.z, true);
+    sim.vehicle.teleport({ x: spot.x, y: spot.deckY + 0.9, z: spot.z }, spot.streetYaw);
+    sim.vehicle.setVelocity(0, 0, 0);
+    run(sim, 0.2, (_t, c) => { c.brake = 1; });
+    const police = sim.police as unknown as { targetLane: Int16Array; targetS: Float64Array; routeLeft: number };
+    sim.heat.add(40, true);
+    sim.pursuit.state = 'active';
+    police.routeLeft = 0;
+    run(sim, 2 / 60, (_t, c) => { c.brake = 1; });
+    const lane = police.targetLane[0] as number;
+    expect(lane).toBeGreaterThanOrEqual(0);
+    expect(Math.abs(traffic.lanes.heightAt(lane, police.targetS[0] as number) - spot.deckY)).toBeLessThan(3);
+    leave();
+  });
+
+  it("14b.21 a dead car rolls when pushed: a wreck's body at the wreck's friction, a driving car's at the drivers' (at theirs a wreck held the player's car on Crown's 18 % street)", () => {
+    leave();
+    const lane = traffic.streets.nearestLane(sim.probe.x, sim.probe.z, sim.probe.y - 0.5);
+    traffic.lanes.positionAt(lane, 20, 0, pose);
+    island.sync(pose.x, pose.z, true);
+    sim.vehicle.teleport({ x: pose.x, y: traffic.lanes.heightAt(lane, 20) + 0.9, z: pose.z }, pose.yaw);
+    sim.vehicle.setVelocity(0, 0, 0);
+    traffic.lanes.positionAt(lane, 30, 0, pose);
+    const wreck = traffic.spawnAtPoint(pose.x, pose.z, pose.yaw, 'compact', AgentState.Wrecked);
+    const driver = traffic.spawnAt(lane, 26, 'compact');
+    expect(Math.min(wreck, driver)).toBeGreaterThanOrEqual(0);
+    run(sim, 0.2, (_t, c) => { c.brake = 1; });
+    const bodies = traffic as unknown as { agentBody: Int16Array; bodyCollider: Array<{ friction(): number }> };
+    const mu = (a: number): number => bodies.bodyCollider[bodies.agentBody[a] as number]?.friction() ?? Number.NaN;
+    expect(mu(wreck)).toBeCloseTo(traffic.tuning.wreckFriction, 5);
+    expect(mu(driver)).toBeCloseTo(traffic.tuning.friction, 5);
+    // wrecked where it drives: its body rolls from then on
+    traffic.wreck(driver);
+    expect(mu(driver)).toBeCloseTo(traffic.tuning.wreckFriction, 5);
+    traffic.remove(wreck);
+    traffic.remove(driver);
     leave();
   });
 

@@ -44,6 +44,18 @@ describe('the golden hour (M8.9 slice 2)', () => {
     expect(SKY.stops[0]?.color).toBe(PALETTE.skyHorizon);
     expect(SKY.stops[0]?.at).toBe(0);
   });
+
+  it("2.4 the fog takes the dome's colour by its elevation from the eye (the third bug hunt: a tall thing far off fogged to peach against violet)", () => {
+    new Sky(new THREE.Scene());
+    const chunk = THREE.ShaderChunk as Record<string, string>;
+    expect(chunk['fog_fragment']).toContain('mix( gl_FragColor.rgb, fogSky( normalize( vFogDir ) ), fogFactor )');
+    expect(chunk['fog_fragment']).not.toContain('fogColor, fogFactor');
+    expect(chunk['fog_vertex']).toContain('vFogDir = transpose( mat3( viewMatrix ) ) * mvPosition.xyz;');
+    expect(chunk['fog_pars_fragment']).toContain('vec3 fogSky( vec3 d )');
+    // at the horizon, away from the sun, the fog's own colour as before
+    const h = new THREE.Color(PALETTE.skyHorizon);
+    expect(chunk['fog_pars_fragment']).toContain(`vec3( ${h.r.toFixed(5)}, ${h.g.toFixed(5)}, ${h.b.toFixed(5)} )`);
+  });
 });
 
 describe('the sun and the clouds (M8.9 slice 4)', () => {

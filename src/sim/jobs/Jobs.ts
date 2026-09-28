@@ -796,6 +796,9 @@ export class Jobs {
     if (d.kind === 'rage') {
       if (e.kind === 'takedown' || e.kind === 'takedownTraffic') this.zoneCount++;
     } else if (d.kind === 'mayhem') {
+      // a unit's own ram is no damage of the player's: the quota filled from the police's rams (the faster car is at fault)
+      const traffic = this.sim.traffic;
+      if (e.kind === 'hit' && e.target >= 0 && traffic && (traffic.police[e.target] === 1 || traffic.badge[e.target] === 1) && this.sim.police?.rammedBy(e.target)) return;
       this.zoneCount += damagePrice(e);
     }
   };

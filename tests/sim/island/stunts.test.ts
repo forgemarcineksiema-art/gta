@@ -1,7 +1,7 @@
 /** M8.10 slice 15: the jumps, the billboards and the breakers on the island (docs/M8.10_PLAN.md §1.4). */
 import RAPIER from '@dimforge/rapier3d-compat';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { BALANCE, BREAKER, BreakerState, PROP_TYPES, clearControls, type SimWorld } from '../../../src/sim';
+import { BALANCE, BREAKER, BreakerState, PROP_TYPES, SEA, clearControls, type SimWorld } from '../../../src/sim';
 import { COIN_HEIGHT } from '../../../src/sim/city/coins';
 import type { JumpDesc } from '../../../src/sim/city/jumps';
 import { QUERY_NOT_PROP } from '../../../src/sim/collision';
@@ -9,6 +9,7 @@ import { inLot } from '../../../src/sim/island/fill';
 import { CHUNKS_X, CHUNKS_Z, Island, PLUMB_TILT } from '../../../src/sim/island/Island';
 import { designKmh, runUp } from '../../../src/sim/island/jumps';
 import { inKeep } from '../../../src/sim/island/keep';
+import { canalBed, inCanal } from '../../../src/sim/island/shapes/works';
 import { BREAKERS, FIRST_MINUTE_STEPS, JUMPS } from '../../../src/sim/island/plan';
 import type { CrownPlace } from '../../../src/sim/island/places/crown';
 import { quayPlace } from '../../../src/sim/island/places/quay';
@@ -227,7 +228,8 @@ describe('M8.10 slice 15: jumps, billboards, breakers', () => {
     const coins = sim.coins, c = BALANCE.coin;
     expect(coins).not.toBeNull();
     if (!coins) return;
-    const all = [...coins.chunks.values()].flat(), ground = (x: number, z: number): number => island.ground.surfaceHeight(x, z);
+    // the ground with the canal dug in it: a cap on its floor is on the ground there
+    const all = [...coins.chunks.values()].flat(), ground = (x: number, z: number): number => Math.min(island.ground.surfaceHeight(x, z), canalBed(x, z));
     for (const [index, list] of coins.chunks) {
       for (const q of list) {
         expect(q.y - COIN_HEIGHT - ground(q.x, q.z), `a coin at ${q.x.toFixed(0)}, ${q.z.toFixed(0)}`).toBeGreaterThanOrEqual(-0.01);
@@ -237,10 +239,24 @@ describe('M8.10 slice 15: jumps, billboards, breakers', () => {
     // an arc on each jump's line past its lip, its coins in the air a car flies through
     for (const jd of island.jumps) {
       const fx = Math.sin(jd.yaw), fz = Math.cos(jd.yaw);
-      const arc = all.filter((q) => { const along = (q.x - jd.x) * fx + (q.z - jd.z) * fz; return along > 0 && along < 90 && Math.abs((q.x - jd.x) * fz - (q.z - jd.z) * fx) < 0.01; });
+      const arc = all.filter((q) => { const along = (q.x - jd.x) * fx + (q.z - jd.z) * fz; return along > 0 && along < 400 && Math.abs((q.x - jd.x) * fz - (q.z - jd.z) * fx) < 0.01; });
       expect(arc.length, `jump ${jd.id}`).toBeGreaterThanOrEqual(c.arcCoins + 1);
       expect(Math.max(...arc.map((q) => q.y - ground(q.x, q.z))), `jump ${jd.id}`).toBeGreaterThan(COIN_HEIGHT + 2);
     }
+    // each cap where a car flown at the jump's design speed lands (the third bug hunt: over the drawn ground alone, on the
+    // sea floor under the far pier and short of the islet, inside the office block under its roof, in the air over the
+    // dug canal, in the canal a car at 110 km/h clears)
+    const cap = (id: number): { y: number; along: number; x: number; z: number } => {
+      const jd = island.jumps.find((j) => j.id === id) as JumpDesc, fx = Math.sin(jd.yaw), fz = Math.cos(jd.yaw);
+      const q = all.find((p) => p.value === c.cap && Math.abs((p.x - jd.x) * fz - (p.z - jd.z) * fx) < 0.01 && (p.x - jd.x) * fx + (p.z - jd.z) * fz > 0) as { x: number; y: number; z: number };
+      return { y: q.y - COIN_HEIGHT, along: (q.x - jd.x) * fx + (q.z - jd.z) * fz, x: q.x, z: q.z };
+    };
+    const pier = cap(11), roof = cap(15), into = cap(8), over = cap(7), mega = cap(16);
+    expect(pier.y, 'the far pier').toBeGreaterThan(SEA.level + 2);
+    expect(roof.y, 'the office roof').toBeGreaterThan(22);
+    expect([inCanal(into.x, into.z), into.y < 1], 'the canal floor').toEqual([true, true]);
+    expect([inCanal(over.x, over.z), over.y > 5], 'the far bank of the canal').toEqual([false, true]);
+    expect(mega.along, 'the mega-ramp at 200 km/h').toBeGreaterThan(150);
     // a cap on every verge's and street's panel, its run before it along the way through it
     island.billboards.forEach((b, id) => {
       if (island.stuntSites.billboards[id]?.kind === 'landing') return;

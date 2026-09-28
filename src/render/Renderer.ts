@@ -7,6 +7,8 @@ import * as THREE from 'three';
 import { KIT, bodySpec, type CarId, type SimEvent, type SimWorld, type VehicleTelemetry } from '../sim';
 import type { CarLook, Preview } from '../sim/garage/look';
 import { CameraDirector } from './camera/CameraDirector';
+import { shadeTunnel } from './shadows';
+import { DECK } from '../sim/island/structures';
 import { ChaseCamera } from './camera/ChaseCamera';
 import { GhostCar } from './cars/GhostCar';
 import { PlayerCar } from './cars/PlayerCar';
@@ -196,6 +198,14 @@ export class Renderer {
     this.player = new PlayerCar(this.scene, sim);
     this.director.fit(sim.carBody, this.player.roof);
     this.policeView = new PoliceView(this.scene, sim, this.player.classes);
+    // the cars out of the sun in the tunnel as its road and walls are (the third bug hunt: they drove through it lit)
+    const tunnel = this.islandView?.tunnel ?? null;
+    if (tunnel) {
+      const shade = (m: THREE.Material): void => shadeTunnel(m, tunnel, DECK.half + 1, DECK.clear, true);
+      if (this.trafficView) shade(this.trafficView.material);
+      shade(this.policeView.material);
+      this.player.shadeWith(shade);
+    }
     this.heliView = sim.police ? new HeliView(this.scene, sim) : null;
     // the ghost's translucent programs compiled as it is made, off the frame it first shows in
     this.ghost = new GhostCar(this.scene, sim, (o) => {

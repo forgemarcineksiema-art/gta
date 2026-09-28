@@ -908,7 +908,7 @@ export class Island {
   }
 
   /** Whether (x, z) is under a deck (a viaduct's, a bridge's, an overpass's), with `r` m of room round it. */
-  private underDeck(x: number, z: number, r: number): boolean {
+  underDeck(x: number, z: number, r: number): boolean {
     for (const s of this.structures) {
       if (s.kind === 'tunnel') continue;
       for (const p of s.pieces) {

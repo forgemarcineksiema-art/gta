@@ -227,6 +227,8 @@ export class Traffic {
   readonly grade: Float32Array;
   readonly disturbedFor: Float32Array;
   readonly wreckedFor: Float32Array;
+  /** How long a car has stood stuck behind this dead car with no way round it (s): the tow's early reason. */
+  private readonly blockedFor: Float32Array;
   readonly lastPlayerContactTick: Int32Array;
   readonly honkCooldown: Float32Array;
   /** Speed change (m/s) the lent body took from contacts this step; 0 without a body. Diagnostics and tests. */
@@ -474,6 +476,7 @@ export class Traffic {
     this.grade = new Float32Array(n);
     this.disturbedFor = new Float32Array(n);
     this.wreckedFor = new Float32Array(n);
+    this.blockedFor = new Float32Array(n);
     this.lastPlayerContactTick = new Int32Array(n);
     this.honkCooldown = new Float32Array(n);
     this.wait = new Float32Array(n);
@@ -1269,6 +1272,7 @@ export class Traffic {
     this.honkCooldown[i] = 0;
     this.disturbedFor[i] = 0;
     this.wreckedFor[i] = 0;
+    this.blockedFor[i] = 0;
     this.damage[i] = 0;
     this.justWrecked[i] = 0;
     this.lastPlayerContactTick[i] = -100000;
@@ -1335,6 +1339,7 @@ export class Traffic {
     this.wobble[agent] = 0;
     this.turn[agent] = 0;
     this.wreckedFor[agent] = 0;
+    this.blockedFor[agent] = 0;
     this.damage[agent] = 0;
     this.justWrecked[agent] = 0;
     this.flat[agent] = 0;
@@ -2245,6 +2250,7 @@ export class Traffic {
     }
     this.colliderAgent.set(col.handle, i);
     body.userData = i;
+    col.setFriction(this.dead(i) ? this.tuning.wreckFriction : this.tuning.friction);
     const yaw = this.yaw[i] as number;
     const q = M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, yaw);
     const driving = this.state[i] === AgentState.Kinematic;
@@ -2508,6 +2514,10 @@ export class Traffic {
     this.loosen(i);
     this.state[i] = AgentState.Wrecked;
     this.wreckedFor[i] = 0;
+    this.blockedFor[i] = 0;
+    // a wreck rolls when pushed: the player's car could not shove one up a steep street
+    const slot = this.agentBody[i] as number;
+    if (slot >= 0) (this.bodyCollider[slot] as RAPIER.Collider).setFriction(this.tuning.wreckFriction);
     this.speed[i] = 0;
     this.releaseHolds(i);
     this.paintSerial++;
@@ -2685,6 +2695,7 @@ export class Traffic {
     this.honkCooldown[i] = 0;
     this.disturbedFor[i] = 0;
     this.wreckedFor[i] = 0;
+    this.blockedFor[i] = 0;
     this.damage[i] = 0;
     this.justWrecked[i] = 0;
     this.lastPlayerContactTick[i] = -100000;
@@ -2735,7 +2746,7 @@ export class Traffic {
       if (this.state[i] !== AgentState.Wrecked) continue;
       const age = (this.wreckedFor[i] as number) + dt;
       this.wreckedFor[i] = age;
-      if (age < t.wreckTow) continue;
+      if (age < t.wreckTow && ((this.blockedFor[i] as number) < t.wreckBlocking || age < t.wreckLinger)) continue;
       const dx = (this.x[i] as number) - player.x;
       const dz = (this.z[i] as number) - player.z;
       const d2 = dx * dx + dz * dz;
@@ -3237,6 +3248,9 @@ export class Traffic {
           this.passLeft[i] = Math.max(0, ahead) + 12;
           this.stuck[i] = 0;
           this.gawks++;
+        } else if ((this.stuck[i]) > (this.blockedFor[b] as number)) {
+          // no way round it yet: the wreck holds a queue, and the tow comes sooner
+          this.blockedFor[b] = this.stuck[i];
         }
       } else {
         this.stuck[i] = 0;

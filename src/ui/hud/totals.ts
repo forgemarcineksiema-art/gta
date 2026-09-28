@@ -23,6 +23,8 @@ export interface DoorResult {
   lastBanked: number;
   lastDoubled: boolean;
   lastFence: boolean;
+  /** The day's challenges finished at the door: their cash, in the bank with the bag's. */
+  lastDaily?: number;
 }
 
 /** The busted card's result. */
@@ -40,11 +42,13 @@ export interface CardResult {
  * ×1 (docs/M8.9_PLAN.md R4): as on the HUD, the × says something only when it multiplies.
  */
 export function doorLines(r: DoorResult): Line[] {
-  if (r.lastBag <= 0) return [];
+  // a daily the run finished here: the BANK rose past the bag's line by its cash, and nothing said why
+  const daily: Line[] = (r.lastDaily ?? 0) > 0 ? [{ label: t('DAILY CHALLENGE'), value: `+${money(r.lastDaily ?? 0)}`, strong: false }] : [];
+  if (r.lastBag <= 0) return daily;
   const doubled = r.lastDoubled ? ` ${t('DOUBLED')}` : '';
   const times = r.lastMultiplier > 1 ? ` ×${num(r.lastMultiplier)}` : '';
   const fence = r.lastFence ? ` (${t('BAG BONUS')} +${num(BALANCE.prep.fenceBonus)})` : '';
-  return [{ label: `${t('BAG {cash}', { cash: Math.round(r.lastBag) })}${doubled}${times}${fence}`, value: `+${money(r.lastBanked)}`, strong: true }];
+  return [{ label: `${t('BAG {cash}', { cash: Math.round(r.lastBag) })}${doubled}${times}${fence}`, value: `+${money(r.lastBanked)}`, strong: true }, ...daily];
 }
 
 /** The card: the bag, what is kept of it, and the bank (the card has no footer). */

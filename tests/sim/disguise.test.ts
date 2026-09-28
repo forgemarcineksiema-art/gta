@@ -69,4 +69,24 @@ describe('M8.8 slice 1: every police car is a disguise', () => {
       expect(sim.pursuit.disguised).toBe(false);
     } finally { sim.dispose(); }
   }, 60_000);
+
+  it("M8.8 6.4 any crime the heat counts as seen blows a police car's disguise: a roadblock broken in a unit's sight (it kept to four kinds)", async () => {
+    const sim = await createWorld({ map: 'city', seed: 42, traffic: 0, peds: 0, record: false });
+    try {
+      sim.police!.dispatching = false;
+      sim.garage.own('chiefcar');
+      sim.garage.select('chiefcar');
+      sim.garage.applyToVehicle();
+      run(sim, 0.5);
+      expect(sim.pursuit.disguised).toBe(true);
+      // unseen, nothing; in a unit's sight, blown
+      sim.events.push('roadblock', 0, sim.probe.x, 0, sim.probe.z, -1);
+      run(sim, 3 / 60);
+      expect(sim.pursuit.disguised).toBe(true);
+      sim.heat.seen = () => true;
+      sim.events.push('roadblock', 0, sim.probe.x, 0, sim.probe.z, -1);
+      run(sim, 3 / 60);
+      expect(sim.pursuit.disguised).toBe(false);
+    } finally { sim.dispose(); }
+  }, 60_000);
 });

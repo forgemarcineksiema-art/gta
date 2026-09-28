@@ -13,6 +13,10 @@ import { voiceOf, type EngineVoice } from './voices';
 
 const GESTURES = ['keydown', 'pointerdown', 'touchstart', 'touchend', 'click'] as const;
 
+/** No frame this long and the mix fades (ms); away this long and the context sleeps (ms, past the fade). */
+const STALL_MS = 500;
+const SLEEP_MS = 300;
+
 export class EngineAudio {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -47,8 +51,17 @@ export class EngineAudio {
   private userMuted = false;
   /** Paused by P: the effects fade, the music plays on. */
   private fxPaused = false;
-  /** The game left (another tab, a click outside the frame): the whole mix fades. */
+  /** The game left (another tab, a click outside the frame): the whole mix fades, then the context sleeps. */
   private away = false;
+  private sleepTimer = 0;
+  /**
+   * No frame for `STALL_MS` (a frame the host throttled, a stalled tab with no blur): the mix fades till the next one.
+   * Off where the frames are a test's to step (`?manual=1`).
+   */
+  watchFrames = true;
+  private stalled = false;
+  private lastFrame = 0;
+  private readonly watchdog: number;
   private volume = 0.5;
   private rpmSmooth = 900;
   private loadSmooth = 0;
@@ -58,6 +71,12 @@ export class EngineAudio {
     this.onGesture = () => void this.unlock();
     // keydown/pointerdown for desktop; touchend/click are what iOS needs to recover a suspended context
     for (const ev of GESTURES) window.addEventListener(ev, this.onGesture);
+    // the drone at its last pitch while no frame came: on a timer, since the frames are what stopped
+    this.watchdog = window.setInterval(() => {
+      if (!this.watchFrames || this.stalled || this.lastFrame === 0 || performance.now() - this.lastFrame < STALL_MS) return;
+      this.stalled = true;
+      this.applyVolume();
+    }, STALL_MS / 2);
   }
 
   get ready(): boolean {
@@ -208,6 +227,11 @@ export class EngineAudio {
   update(tm: VehicleTelemetry, dt: number, body: BodyId = this.body, impact = tm.impact): void {
     if (!this.ctx || !this.oscA || !this.oscB || !this.oscSub || !this.engineFilter || !this.engineGain || !this.windGain || !this.skidGain || !this.skidFilter || !this.crashGain || !this.scrapeGain || !this.scrapeFilter || !this.rattleGain) return;
     if (body !== this.body) this.setVoice(body);
+    this.lastFrame = performance.now();
+    if (this.stalled) {
+      this.stalled = false;
+      this.applyVolume();
+    }
     const k = 1 - Math.exp(-dt * 10);
     this.rpmSmooth += (tm.rpm - this.rpmSmooth) * k;
     this.loadSmooth += (tm.load - this.loadSmooth) * k;
@@ -276,6 +300,11 @@ export class EngineAudio {
     this.away = all;
     this.applyVolume();
     this.applyEffects();
+    // away, the context sleeps once the mix has faded (its oscillators ran on at no gain, the audio thread with them);
+    // back, it wakes (a context the player once started resumes without a gesture)
+    window.clearTimeout(this.sleepTimer);
+    if (all) this.sleepTimer = window.setTimeout(() => { if (this.away && this.ctx?.state === 'running') void this.ctx.suspend(); }, SLEEP_MS);
+    else if (this.ctx?.state === 'suspended') void this.ctx.resume();
   }
 
   /** Ad-mute hook (adStarted / adFinished). Independent from the player's own mute. */
@@ -295,7 +324,7 @@ export class EngineAudio {
   }
 
   private effectiveVolume(): number {
-    return this.muted || this.userMuted || this.away ? 0 : this.volume;
+    return this.muted || this.userMuted || this.away || this.stalled ? 0 : this.volume;
   }
 
   private applyEffects(): void {
@@ -308,6 +337,8 @@ export class EngineAudio {
 
   dispose(): void {
     for (const ev of GESTURES) window.removeEventListener(ev, this.onGesture);
+    window.clearInterval(this.watchdog);
+    window.clearTimeout(this.sleepTimer);
     void this.ctx?.close();
     this.ctx = null;
   }

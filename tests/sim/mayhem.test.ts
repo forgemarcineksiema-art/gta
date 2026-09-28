@@ -10,6 +10,7 @@ import { PROP_TYPES, propRadius, type PropDesc, type PropKind } from '../../src/
 import { BLOCK } from '../../src/sim/city/roads';
 import { carSpeedLoss } from '../../src/sim/props/Props';
 import { coldOpenRoute } from '../../src/sim/run/ColdOpen';
+import type { Traffic } from '../../src/sim/traffic/Traffic';
 import { createWorld, run } from './helpers';
 
 const KMH = 1 / 3.6;
@@ -57,6 +58,20 @@ describe('mayhem and the cold open (M8 slice 8)', () => {
       sim.props!.knock(crate.id, 1400, 40 * KMH, -Math.sin(crate.yaw), -Math.cos(crate.yaw), 0, 0, 3);
       run(sim, 2 / 60);
       expect(sim.jobs.zoneCount - before).toBe(PROP_TYPES.fruitStand.bill);
+      // a unit ramming the player at 20 m/s is no damage of the player's; the player ramming a stopped one is
+      const traffic = sim.traffic as Traffic;
+      const unit = traffic.spawnParkedPolice(d.x + 30, d.z, d.yaw, 'police');
+      const speeds = sim.police as unknown as { copSpeedMax: Float32Array };
+      speeds.copSpeedMax[unit] = 20;
+      const counted = sim.jobs.zoneCount;
+      sim.events.push('hit', 9, d.x, 0.5, d.z, unit);
+      run(sim, 1 / 60, (_t, c) => { c.brake = 1; });
+      expect(sim.jobs.zoneCount).toBe(counted);
+      speeds.copSpeedMax[unit] = 0;
+      run(sim, 0.3, (_t, c) => { c.brake = 1; });
+      sim.events.push('hit', 9, d.x, 0.5, d.z, unit);
+      run(sim, 1 / 60, (_t, c) => { c.brake = 1; });
+      expect(sim.jobs.zoneCount).toBeGreaterThan(counted);
     } finally { sim.dispose(); }
   }, 60_000);
 

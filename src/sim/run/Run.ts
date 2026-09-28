@@ -89,6 +89,8 @@ export class Run {
   lastFine = 0;
   /** The door's rewarded offer doubled this door's bag (at most once a door). */
   lastDoubled = false;
+  /** The day's challenges finished at this door: their cash, banked with the bag's (the wall named only the bag's). */
+  lastDaily = 0;
   /** This door banked more than any run before it (the wall's NEW BEST, M8.5); false on a card. */
   lastBest = false;
   /** The best run before this door's: the double can make a run the best after the door shut. */
@@ -311,7 +313,9 @@ export class Run {
     // the run's total as the chain's big step and the day's "bank n in one run" read it: the wall said 24,000 and the
     // step for 20,000 stayed open
     if (this.lastBanked >= BALANCE.chain.bankGoal) this.tickStep(STEP.big);
+    const bank = this.bank;
     this.sim.dailies.onBanked(this.lastBanked);
+    this.lastDaily += this.bank - bank;
     this.lastSerial++;
     return true;
   }
@@ -338,7 +342,9 @@ export class Run {
     this.lastBest = this.lastBanked > this.bestRun;
     this.bestRun = Math.max(this.bestRun, this.lastBanked);
     this.bag = 0;
+    const bank = this.bank;
     this.endRun(false);
+    this.lastDaily = this.bank - bank;
     this.state = 'door';
     this.doorProgress = 1;
     if (this.door) {

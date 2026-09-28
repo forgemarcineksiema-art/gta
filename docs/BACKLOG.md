@@ -90,17 +90,4 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 
 ## The island (the third bug hunt, 2026-09-28)
 
-- Traffic stands behind police wrecks in Crown's narrow streets: a wreck is towed only after 60 s, 40 m off and out of view, and the queue behind one stood 90 s at heat 30 (seed 123, nodes 58–60) — `src/sim/traffic/Traffic.ts`, the tow rule.
-- A civilian wreck in a Crown street the player's car could not push off (seed 7, street 15) — `src/sim/traffic/Traffic.ts`, a wreck's body.
-- A unit's route aims at the lane nearest the player's point in plan: on a deck it can be the street under it — `src/sim/police/Police.ts` `route()`.
-- The jump arcs are laid over the drawn ground (no piers, roofs or dug canal): some 100 caps hang where no car can take them; the mega-ramp's arc is flown at the generic 27 m/s, not its 200 km/h — `src/sim/island/jumps.ts`.
-- The fog is the sky's colour only at the horizon: tall things far off (the Crown Tower's top past 340 m on low) fog to it against the rose and violet dome — `src/render/sky.ts`, the fog by the dome's colour at the view's height.
-- Cars in the tunnel keep the sun: `shadeTunnel` shades only the road and the structures — `src/render/island/IslandView.ts`, the traffic's, the police's and the player's materials.
-- TOTALS lists only the bag: a daily finished at the door raises the BANK past the sum the card shows — `src/ui/hud/totals.ts`.
-- The police-car disguise survives crimes the heat counts as seen — `src/sim/police/Police.ts` against `src/sim/heat/Heat.ts`.
-- A mayhem job's quota fills from the police's own rams: a hit should count only with the player at fault, never a unit's — `src/sim/jobs/Jobs.ts` `damagePrice`.
-- 36 of the island's kerbside bays lie under a deck: a rival's bay among them would set its duel under the highway, and nothing keeps them out — `src/sim/island/Island.ts`, the bays.
-- The auto quality counts every frame over 1/60 s as missed: on a 30 Hz screen or a browser's 30 fps battery saver it drops to low and the smallest resolution with no frame late — `src/render/quality.ts`.
-- At boot nothing takes the focus: in a frame without it the keys go to the page round it until a click — `src/app/App.ts`, with the SDK's rules (M9).
-- The sound's context runs on while away (at no gain), and nothing fades it when the frames stop without a blur (a throttled frame) — `src/audio/EngineAudio.ts`: suspend when away, a watchdog.
-- The cars' thumbnails and the garage wall's pictures make materials that are never disposed — `src/render/cars/thumbs.ts`.
+- A wreck holding a queue that the player is looking at stays till they look away (the tow never takes a car in sight): one in a jam the player sits in, facing it, would want a tow that fades it out — `src/sim/traffic/Traffic.ts` `tow()` with the traffic view's fade.

@@ -80,6 +80,7 @@ export const PL: Readonly<Record<string, string>> = {
   'FLASHED {kmh} KM/H': 'FOTORADAR: {kmh} KM/H',
   'STUNT! {s} S': 'SKOK! {s} S',
   'DAILY DONE +{cash}': 'WYZWANIE DNIA +{cash}',
+  'DAILY CHALLENGE': 'WYZWANIE DNIA',
   'DAY {day} STREAK +{cash}': 'SERIA: DZIEŃ {day} +{cash}',
   'COVER BLOWN': 'PRZYKRYWKA SPALONA',
   'CACHE {n}/{of} +{cash}': 'SKRYTKA {n}/{of} +{cash}',

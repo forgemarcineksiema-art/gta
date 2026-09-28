@@ -208,6 +208,7 @@ export class App {
     this.keyboard = new KeyboardDevice();
     this.input.addDevice(this.keyboard);
     this.audio = new EngineAudio();
+    this.audio.watchFrames = !this.manual;
     this.sfx = new Sfx(this.audio);
     this.siren = new Siren(this.audio);
     this.rotor = new Rotor(this.audio);
@@ -570,13 +571,20 @@ export class App {
     const app = new App(platform, sim, canvas, params, store);
     watch.enter('firstFrame', performance.now() / 1000);
     platform.loadingStop();
-    app.start();
+    app.start(canvas);
     return app;
   }
 
-  private start(): void {
+  private start(canvas: HTMLCanvasElement): void {
     window.clearInterval(bootWatchTimer);
     document.getElementById('loading')?.classList.add('is-hidden');
+    // the keys to the game from its first frame: a page or a frame given no focus sent them to the page round it, and the
+    // intro ran on without the player; a frame takes it where its host lets it, else the game waits for the click
+    try {
+      window.focus();
+      canvas.focus({ preventScroll: true });
+    } catch { /* a host that forbids it: the click below */ }
+    if (!document.hasFocus() && !this.manual && !this.bot) this.setFocusPaused(true);
     this.lastTime = performance.now();
     if (this.manual) this.frame(this.lastTime + FIXED_DT * 1000);
     else this.raf = requestAnimationFrame(this.frame);

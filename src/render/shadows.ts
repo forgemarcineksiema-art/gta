@@ -39,13 +39,18 @@ export function inShadowBox(x0: number, y0: number, z0: number, x1: number, y1: 
 /** The tunnel's line as its shade reads it: this many points at most (the vertex shader's loop). */
 const TUNNEL_POINTS = 16;
 
+/** The tunnel's line: its points in plan and its floor's height at each. */
+export interface TunnelLine { pts: ReadonlyArray<readonly [number, number]>; floor: readonly number[] }
+
 /**
  * The tunnel's inside out of the sun (the M8.10 second bug hunt): the shadow map reaches ±140 m across the sun's bearing
  * and the tunnel runs along it, so from about 90 m ahead its road read as open air under the hill. A vertex inside, by
  * the tunnel's line (`pts`, `floor` its heights) within `half` m of it and `clear` m over its floor, takes the sun
- * off: the sky's light stays, as under the roof by the car. Chained after `fadeShadowEdges` (its return is patched).
+ * off: the sky's light stays, as under the roof by the car. Chained after `fadeShadowEdges` (its return is patched);
+ * `direct` for a material that takes no shadow (the cars: the third bug hunt's, they drove through it in the sun), its
+ * direct light itself; an instanced mesh's instances each by their own place.
  */
-export function shadeTunnel(material: THREE.Material, line: { pts: ReadonlyArray<readonly [number, number]>; floor: readonly number[] } | null, half: number, clear: number): void {
+export function shadeTunnel(material: THREE.Material, line: TunnelLine | null, half: number, clear: number, direct = false): void {
   if (!line || line.pts.length < 2) return;
   const n = Math.min(TUNNEL_POINTS, line.pts.length), pts: THREE.Vector3[] = [];
   let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
@@ -70,7 +75,11 @@ export function shadeTunnel(material: THREE.Material, line: { pts: ReadonlyArray
       ${shader.vertexShader}`.replace('#include <project_vertex>', `#include <project_vertex>
       vTunnel = 0.0;
       {
-        vec3 w = (modelMatrix * vec4(transformed, 1.0)).xyz;
+        vec4 tp = vec4(transformed, 1.0);
+        #ifdef USE_INSTANCING
+          tp = instanceMatrix * tp;
+        #endif
+        vec3 w = (modelMatrix * tp).xyz;
         if (w.x > tunnelBox.x && w.x < tunnelBox.z && w.z > tunnelBox.y && w.z < tunnelBox.w) {
           float best = 1e9, floorY = 0.0;
           bool past = false;
@@ -86,10 +95,14 @@ export function shadeTunnel(material: THREE.Material, line: { pts: ReadonlyArray
           if (!past) vTunnel = (1.0 - smoothstep(tunnelSize.x - 0.5, tunnelSize.x + 1.0, best)) * (1.0 - smoothstep(tunnelSize.y + 1.0, tunnelSize.y + 2.0, w.y - floorY));
         }
       }`);
-    shader.fragmentShader = `varying float vTunnel;
-      ${shader.fragmentShader}`.replace('return mix( 1.0, shadow, shadowIntensity * coverage );', 'return mix( 1.0, shadow, shadowIntensity * coverage ) * ( 1.0 - vTunnel );');
+    // through its shadow (the island's surfaces, which take the map), or its whole direct light (a car takes none)
+    const fragment = `varying float vTunnel;
+      ${shader.fragmentShader}`;
+    shader.fragmentShader = direct
+      ? fragment.replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n  reflectedLight.directDiffuse *= 1.0 - vTunnel;')
+      : fragment.replace('return mix( 1.0, shadow, shadowIntensity * coverage );', 'return mix( 1.0, shadow, shadowIntensity * coverage ) * ( 1.0 - vTunnel );');
   };
-  material.customProgramCacheKey = () => `${cacheKey}-tunnel-shade-v1`;
+  material.customProgramCacheKey = () => `${cacheKey}-tunnel-shade-v2${direct ? '-direct' : ''}`;
 }
 
 /** A single shadow map must fade out before its finite edge crosses visible buildings. */

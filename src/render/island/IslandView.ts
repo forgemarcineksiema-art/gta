@@ -14,7 +14,7 @@ import { PLACES } from '../../sim/island/plan';
 import { shoreOpen } from '../../sim/island/shapes';
 import { atSlipway } from '../../sim/island/slipways';
 import { BUILD_SLICE, DETAIL_FAR, DETAIL_NEAR, GeometryBuild, cityGeometry, type PropRanges } from '../city/CityView';
-import { fadeShadowEdges, inShadowBox, shadeTunnel } from '../shadows';
+import { fadeShadowEdges, inShadowBox, shadeTunnel, type TunnelLine } from '../shadows';
 import { propStatics } from '../props/propMesh';
 import { lightCity } from '../city/glow';
 import { fadeRoadPaint } from '../city/roadPaint';
@@ -128,6 +128,9 @@ export class IslandView {
   private readonly propMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
   private propSerial = -1;
 
+  /** The tunnel's line (the cars' materials take its shade too: the renderer's). */
+  readonly tunnel: TunnelLine | null;
+
   constructor(scene: THREE.Scene, private readonly island: Island) {
     scene.add(this.group);
     const sea = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.MeshLambertMaterial({ color: PALETTE.water }));
@@ -140,6 +143,7 @@ export class IslandView {
     for (const m of [this.buildingMaterial, this.surfaceMaterial, this.extraMaterial, this.propMaterial]) fadeShadowEdges(m);
     // the tunnel's floor, walls, roof and road out of the sun past the shadow map's reach
     const tunnel = island.ground.toData().tunnel;
+    this.tunnel = tunnel;
     for (const m of [this.surfaceMaterial, this.extraMaterial]) shadeTunnel(m, tunnel, DECK.half + 1, DECK.clear);
     fadeRoadPaint(this.buildingMaterial);
     lightCity(this.buildingMaterial);

@@ -94,6 +94,7 @@ export class Sky {
   private readonly tmp = new THREE.Vector3();
 
   constructor(private readonly scene: THREE.Scene) {
+    skyFog();
     scene.background = new THREE.Color(PALETTE.skyHorizon);
     scene.fog = new THREE.Fog(PALETTE.fog, 120, 700);
     const hemi = new THREE.HemisphereLight(SKY.fill.sky, SKY.fill.ground, SKY.fill.intensity);
@@ -137,6 +138,46 @@ export class Sky {
     this.disc.position.copy(eye);
     this.clouds.position.copy(eye);
   }
+}
+
+/**
+ * The fog in the dome's colour where the fogged thing stands in the view (the third bug hunt): in the horizon's alone, a
+ * tall thing far off (the Crown Tower's top past 340 m on low) faded to peach against the rose and violet over it. Every
+ * fogged fragment takes the dome's stops by its elevation from the eye, and its warmth toward the sun; at the horizon
+ * that is the fog's own colour, as before. Three's fog chunks are patched once, before a material compiles.
+ */
+function skyFog(): void {
+  const chunk = THREE.ShaderChunk as Record<string, string>;
+  if ((chunk['fog_pars_fragment'] ?? '').includes('fogSky(')) return;
+  const lin = (hex: number): string => {
+    const c = new THREE.Color(hex);
+    return `vec3( ${c.r.toFixed(5)}, ${c.g.toFixed(5)}, ${c.b.toFixed(5)} )`;
+  };
+  const sun = sunDiscDirection(new THREE.Vector3());
+  const [s0, s1, s2] = SKY.stops;
+  chunk['fog_pars_vertex'] = `#ifdef USE_FOG
+  varying float vFogDepth;
+  varying vec3 vFogDir;
+#endif`;
+  chunk['fog_vertex'] = `#ifdef USE_FOG
+  vFogDepth = - mvPosition.z;
+  vFogDir = transpose( mat3( viewMatrix ) ) * mvPosition.xyz;
+#endif`;
+  chunk['fog_pars_fragment'] = `${chunk['fog_pars_fragment'] ?? ''}
+#ifdef USE_FOG
+  varying vec3 vFogDir;
+  vec3 fogSky( vec3 d ) {
+    float e = degrees( asin( clamp( d.y, -1.0, 1.0 ) ) );
+    vec3 c = e <= ${s1.at.toFixed(1)}
+      ? mix( ${lin(s0.color)}, ${lin(s1.color)}, clamp( e / ${s1.at.toFixed(1)}, 0.0, 1.0 ) )
+      : mix( ${lin(s1.color)}, ${lin(s2.color)}, clamp( ( e - ${s1.at.toFixed(1)} ) / ${(s2.at - s1.at).toFixed(1)}, 0.0, 1.0 ) );
+    float toward = pow( max( 0.0, dot( d, vec3( ${sun.x.toFixed(5)}, ${sun.y.toFixed(5)}, ${sun.z.toFixed(5)} ) ) ), ${SKY.glow.power.toFixed(1)} );
+    float low = 1.0 - clamp( e / ${SKY.glow.fade.toFixed(1)}, 0.0, 1.0 );
+    return mix( c, ${lin(SKY.glow.color)}, ${SKY.glow.strength.toFixed(2)} * toward * low );
+  }
+#endif`;
+  chunk['fog_fragment'] = (chunk['fog_fragment'] ?? '').replace('gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor );',
+    'gl_FragColor.rgb = mix( gl_FragColor.rgb, fogSky( normalize( vFogDir ) ), fogFactor );');
 }
 
 /** The dome's radius (m) and its rings: 5° apart, so each stop sits on a ring. */

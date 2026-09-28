@@ -50,4 +50,14 @@ describe('the tunnel out of the sun (M8.10, the second bug hunt)', () => {
     expect(shader.uniforms['tunnelCount']).toEqual({ value: 3 });
     expect(material.customProgramCacheKey()).toContain('tunnel-shade');
   });
+
+  test("a car's material takes the tunnel's shade on its direct light, each instance by its own place (the third bug hunt)", () => {
+    const material = new THREE.MeshLambertMaterial({ vertexColors: true });
+    shadeTunnel(material, { pts: [[0, 0], [100, 20], [200, 0]], floor: [5, 4, 3] }, 21, 7, true);
+    const shader = { uniforms: {} as Record<string, unknown>, vertexShader: THREE.ShaderLib.lambert.vertexShader, fragmentShader: THREE.ShaderLib.lambert.fragmentShader };
+    material.onBeforeCompile(shader as never, null as never);
+    expect(shader.fragmentShader).toContain('#include <lights_fragment_end>\n  reflectedLight.directDiffuse *= 1.0 - vTunnel;');
+    expect(shader.vertexShader).toContain('tp = instanceMatrix * tp;');
+    expect(material.customProgramCacheKey()).toContain('tunnel-shade-v2-direct');
+  });
 });

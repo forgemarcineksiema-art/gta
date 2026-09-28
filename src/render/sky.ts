@@ -144,12 +144,15 @@ export function skyAt(d: THREE.Vector3, out: THREE.Color): THREE.Color {
 const v3 = (c: THREE.Color): string => `vec3( ${c.r.toFixed(5)}, ${c.g.toFixed(5)}, ${c.b.toFixed(5)} )`;
 const f1 = (x: number): string => x.toFixed(4);
 
-/** The GLSL of `skyAt( vec3 d )`, the one source the dome and the fog both splice in (slice 16, pin 16.3). */
-export function skyGlsl(): string {
+/**
+ * The GLSL of `skyAt( vec3 d )`, the one source the dome and the fog both splice in (slice 16, pin 16.3); under another
+ * `name` for a material that reflects the sky whether or not it takes the fog (reflect.ts, slice 19).
+ */
+export function skyGlsl(name = 'skyAt'): string {
   const [s0, s1, s2] = SKY.stops, a = SKY.arch;
   const lobeGlsl = (g: number): string => `pow( ${f1((1 - g) * (1 - g))} / ( ${f1(1 + g * g)} - ${f1(2 * g)} * mu ), 1.5 )`;
   return `
-  vec3 skyAt( vec3 d ) {
+  vec3 ${name}( vec3 d ) {
     float e = max( 0.0, degrees( asin( clamp( d.y, -1.0, 1.0 ) ) ) );
     vec3 c = mix( ${v3(STOP[0] as THREE.Color)}, ${v3(STOP[1] as THREE.Color)}, smoothstep( ${f1(s0.at)}, ${f1(s1.at)}, e ) );
     c = mix( c, ${v3(STOP[2] as THREE.Color)}, smoothstep( ${f1(s1.at)}, ${f1(s2.at)}, e ) );

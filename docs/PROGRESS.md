@@ -2,6 +2,17 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-28 — M8.9 slice 19: the world reflects the sky
+
+Hooks on the materials that are there (`reflect.ts`), each with its own copy of `skyGlsl`. The sea: equilateral facets
+(2.4 m) per pixel whose tilt rocks the reflected ray, Fresnel by the calm surface (per facet it flipped blue and pink, a
+checkerboard), a flash where a facet mirrors the sun and far off a twinkling band on its bearing: a path of light. The
+glass: `cityLook`'s third byte on the glazing, the cars' glass by their one colour (`vColor.rgb`: the player's is a vec4,
+the first build lost every car); sky by Fresnel, a lit pane less, a glint. The ground's and roads' sheen toward the sun;
+glints and sheen by `sunSeen`, the shadow caught from three's light loop. The look suite gains `sea` (the island's port;
+its districts are the grid's). Stills: the road into the sun warm grey, not navy (intro strong 8 → 5 %: the navy counted).
+Pins 19.1–19.5. Verify green.
+
 ## 2026-09-28 — the fog in the sky's colour space (found on slice 18's stills)
 
 Three fogs after its tone curve and its output colour space and hands its own `fogColor` in that space; the sky's fog

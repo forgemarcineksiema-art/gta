@@ -18,6 +18,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PALETTE, type VehicleTelemetry, type VehicleTuning } from '../../sim';
+import { CAR_GLASS, carGlass } from '../reflect';
 
 export interface CarMesh {
   root: THREE.Group;
@@ -355,7 +356,7 @@ export function buildCarMesh(t: VehicleTuning, profile: CarProfile, color: numbe
   const nose = S[0] as Section, tail = S[S.length - 1] as Section;
   const paint = color, paintDark = shade(color, 0.72), paintLight = shade(color, 1.13);
   const muscle = profile.name === 'muscle', compact = profile.name === 'compact', van = profile.name === 'heavy';
-  const glass = 0x294653, glassLight = 0x6394a2;
+  const glass = CAR_GLASS, glassLight = 0x6394a2;
   const bb = new BodyBuilder();
   const tailLightRanges: Array<[number, number]> = [], reverseRanges: Array<[number, number]> = [];
   const P = (x: number, y: number, z: number) => new THREE.Vector3(x, y - y0, z);
@@ -579,6 +580,8 @@ export function buildCarMesh(t: VehicleTuning, profile: CarProfile, color: numbe
   const geometry = mergeGeometries([bodyGeometry, ...extras], false);
   bodyGeometry.dispose(); for (const g of extras) g.dispose();
   const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  // the glass reflects the sky and glints in the sun (M8.9 slice 19)
+  carGlass(material);
   const body = new THREE.Mesh(geometry, material); body.name = 'body-and-trim'; body.castShadow = true;
   root.add(body);
   const spinners: THREE.Object3D[] = [], spinDir: number[] = [];

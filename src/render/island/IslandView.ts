@@ -17,6 +17,7 @@ import { BUILD_SLICE, DETAIL_FAR, DETAIL_NEAR, GeometryBuild, cityGeometry, type
 import { fadeShadowEdges, inShadowBox, shadeTunnel, type TunnelLine } from '../shadows';
 import { propStatics } from '../props/propMesh';
 import { lightCity } from '../city/glow';
+import { lookOfTheSea, sheen } from '../reflect';
 import { fadeRoadPaint } from '../city/roadPaint';
 import { QUALITY, type QualityTier } from '../quality';
 import { blockStatics, isEnvelope, ofBuilding, rise, spread } from './blocks';
@@ -133,7 +134,8 @@ export class IslandView {
 
   constructor(scene: THREE.Scene, private readonly island: Island) {
     scene.add(this.group);
-    const sea = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.MeshLambertMaterial({ color: PALETTE.water }));
+    // the sea in facets that reflect the sky and the sun's path (M8.9 slice 19)
+    const sea = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), lookOfTheSea(new THREE.MeshLambertMaterial({ color: PALETTE.water })));
     sea.rotation.x = -Math.PI / 2;
     sea.position.y = SEA.level;
     this.group.add(sea);
@@ -145,6 +147,8 @@ export class IslandView {
     const tunnel = island.ground.toData().tunnel;
     this.tunnel = tunnel;
     for (const m of [this.surfaceMaterial, this.extraMaterial]) shadeTunnel(m, tunnel, DECK.half + 1, DECK.clear);
+    // the roads shine toward the sun at a grazing angle (M8.9 slice 19)
+    sheen(this.surfaceMaterial);
     fadeRoadPaint(this.buildingMaterial);
     lightCity(this.buildingMaterial);
     // the props lit as the grid's (M8.9 R9: the lamps' heads glow at dusk)
@@ -563,6 +567,7 @@ export class IslandView {
     geometry.computeVertexNormals();
     const material = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -0.5, polygonOffsetUnits: -1 });
     fadeShadowEdges(material);
+    sheen(material);
     const mesh = new THREE.Mesh(geometry, material);
     mesh.receiveShadow = true;
     return mesh;

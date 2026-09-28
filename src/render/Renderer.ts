@@ -37,6 +37,7 @@ import { SIGN_Y, signScale, signTopY } from './run/signs';
 import { ShapesView } from './shapes';
 import { SKY, Sky, TONE_MAPPING } from './sky';
 import { Clouds } from './clouds';
+import { SEA_TIME } from './reflect';
 import { PedView } from './traffic/PedView';
 import { TrafficView } from './traffic/TrafficView';
 
@@ -341,6 +342,7 @@ export class Renderer {
     this.ghost.update();
     this.sky.update(carPos, this.camera.position);
     this.clouds.update(this.camera.position, worldDt);
+    SEA_TIME.value += worldDt;
     // the paint's fade by the camera's height over the ground under it (the island's hills; the grid's 0)
     if (sim.island) PAINT_GROUND.value = sim.island.ground.surfaceHeight(this.camera.position.x, this.camera.position.z);
     this.fx.drive(tm, this.carVel, this.camera.aspect, worldDt);

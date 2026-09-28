@@ -3,6 +3,7 @@ import { BLOCK, CITY_HALF, PALETTE, PROP_KINDS, PropState, propFootprint, type C
 import { SHADOW_HALF, fadeShadowEdges } from '../shadows';
 import { fadeRoadPaint } from './roadPaint';
 import { FACADE_TAGS, GLOW, lightCity, windowGlow } from './glow';
+import { lookOfTheSea } from '../reflect';
 import { gableGeometry, prismGeometry } from '../geometry';
 import { propStatics } from '../props/propMesh';
 import { QUALITY, type QualityTier } from '../quality';
@@ -158,7 +159,7 @@ export class GeometryBuild {
     }
     this.positions = new Float32Array(count * 3); this.normals = new Float32Array(count * 3); this.colors = new Float32Array(count * 3);
     this.paint = new Uint8Array(count * 4);
-    this.look = new Uint8Array(count * 2);
+    this.look = new Uint8Array(count * 3);
     this.base = this.order.some((st) => st.base !== undefined) ? new Uint16Array(count) : null;
   }
 
@@ -194,6 +195,7 @@ export class GeometryBuild {
       const glow = st.tag === 'glazing' ? windowGlow(st.position.x, st.position.y, st.position.z, st.base ?? 0) : st.tag === 'glow' ? GLOW.lamp : 0;
       const baseCm = Math.max(0, Math.min(65535, Math.round((st.base ?? 0) * 100)));
       const glowByte = Math.round(glow * 255), facadeByte = st.tag !== undefined && FACADE_TAGS.has(st.tag) ? 255 : 0;
+      const glassByte = st.tag === 'glazing' ? 255 : 0;
       sourcesOf(st);
       for (const src of sourceList) {
         const sp = src.p, sn = src.n, n = sp.length;
@@ -220,9 +222,10 @@ export class GeometryBuild {
           positions[index] = px + lx; positions[index + 1] = py + ly; positions[index + 2] = pz + lz;
           normals[index] = nx; normals[index + 1] = ny; normals[index + 2] = nz;
           colors[index] = r; colors[index + 1] = g; colors[index + 2] = b;
-          const li = index / 3 * 2;
+          const li = index;
           this.look[li] = glowByte;
           this.look[li + 1] = facadeByte;
+          this.look[li + 2] = glassByte;
           if (this.base) this.base[index / 3] = baseCm;
           if (underlay && st.paint) {
             const pi = index / 3 * 4;
@@ -246,7 +249,7 @@ export class GeometryBuild {
     out.setAttribute('normal', new THREE.BufferAttribute(this.normals, 3));
     out.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
     out.setAttribute('roadPaint', new THREE.BufferAttribute(this.paint, 4, true));
-    out.setAttribute('cityLook', new THREE.BufferAttribute(this.look, 2, true));
+    out.setAttribute('cityLook', new THREE.BufferAttribute(this.look, 3, true));
     if (this.base) out.setAttribute('cityBase', new THREE.BufferAttribute(this.base, 1, false));
     out.computeBoundingSphere();
     out.userData['shadowVertices'] = this.shadowVertices;
@@ -314,7 +317,7 @@ export class CityView {
     fadeRoadPaint(this.material);
     lightCity(this.material);
     for (let z = -3; z <= 3; z++) for (let x = -3; x <= 3; x++) this.tiles.push({ key: `${x},${z}`, x, z, parts: null, groups: null, queue: [], build: null });
-    const sea = new THREE.Mesh(new THREE.PlaneGeometry(5000, 5000), new THREE.MeshLambertMaterial({ color: 0x3fa7c9 }));
+    const sea = new THREE.Mesh(new THREE.PlaneGeometry(5000, 5000), lookOfTheSea(new THREE.MeshLambertMaterial({ color: 0x3fa7c9 })));
     sea.rotation.x = -Math.PI / 2; sea.position.y = -0.5; scene.add(sea);
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(CITY_HALF * 2, CITY_HALF * 2), new THREE.MeshLambertMaterial({ color: PALETTE.grass }));
     ground.rotation.x = -Math.PI / 2; ground.position.y = -0.12; ground.receiveShadow = true; scene.add(ground);

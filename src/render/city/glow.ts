@@ -5,9 +5,13 @@
  * 1 at 12 m, with a contact band in their lowest 0.4 m (0.7): the golden hour's light pools up on the buildings.
  *
  * Which window is lit is the window's place, so the same city lights the same windows every time. The geometry's
- * `cityLook` attribute (a byte of glow, a byte of "facade") is written by `CityView`; the material's hook is here.
+ * `cityLook` attribute (a byte of glow, a byte of "facade", a byte of glass) is written by `CityView`; the material's
+ * hook is here. The glass (slice 19, R13): every glazing panel takes the sky of its reflected ray by Fresnel, a lit
+ * one less, and a glint where it mirrors the sun and the sun reaches it (reflect.ts).
  */
 import * as THREE from 'three';
+import { catchSunSeen, glassBlock } from '../reflect';
+import { skyGlsl } from '../sky';
 
 export const GLOW = {
   /** The windows' and lamps' warm light (sRGB). */
@@ -69,19 +73,22 @@ export function lightCity(material: THREE.Material): void {
   material.onBeforeCompile = function (shader, renderer) {
     previous.call(this, shader, renderer);
     // the facade's height over the ground its building stands on (`cityBase`, cm: the island's; the grid's none, 0)
-    shader.vertexShader = `attribute vec2 cityLook;
+    shader.vertexShader = `attribute vec3 cityLook;
       attribute float cityBase;
-      varying vec2 vCityLook;
+      varying vec3 vCityLook;
       varying float vCityY;
       ${shader.vertexShader}`.replace('#include <project_vertex>', `#include <project_vertex>
       vCityLook = cityLook;
       vCityY = (modelMatrix * vec4(transformed, 1.0)).y - cityBase * 0.01;`);
-    shader.fragmentShader = `varying vec2 vCityLook;
+    catchSunSeen(shader);
+    shader.fragmentShader = `varying vec3 vCityLook;
       varying float vCityY;
+      ${skyGlsl('glassSky')}
       ${shader.fragmentShader}`.replace('#include <opaque_fragment>', `#include <opaque_fragment>
       float cityT = clamp(vCityY / ${f(DEPTH.full)}, 0.0, 1.0);
       float cityShade = (${f(DEPTH.foot)} + ${f(1 - DEPTH.foot)} * cityT) * mix(${f(DEPTH.band)}, 1.0, smoothstep(0.0, ${f(DEPTH.bandTop)}, vCityY));
-      gl_FragColor.rgb = gl_FragColor.rgb * mix(1.0, cityShade, vCityLook.y) + vec3(${f(glow.r)}, ${f(glow.g)}, ${f(glow.b)}) * vCityLook.x;`);
+      gl_FragColor.rgb = gl_FragColor.rgb * mix(1.0, cityShade, vCityLook.y) + vec3(${f(glow.r)}, ${f(glow.g)}, ${f(glow.b)}) * vCityLook.x;
+      ${glassBlock('vCityLook.z > 0.5', 'vCityLook.x')}`);
   };
-  material.customProgramCacheKey = () => `${cacheKey}-city-look-v2`;
+  material.customProgramCacheKey = () => `${cacheKey}-city-look-v3`;
 }

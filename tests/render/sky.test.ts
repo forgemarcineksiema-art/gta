@@ -8,6 +8,8 @@ import { describe, expect, it } from 'vitest';
 import { CITY_COLORS, PALETTE } from '../../src/sim/palette';
 import { SUN_OFFSET } from '../../src/render/shadows';
 import { CLOUDS, Clouds, cloudDrift, cloudFragment, cloudGeometry, cloudLight, cloudPuffs } from '../../src/render/clouds';
+import { SEA_LOOK, carGlass, groundSheen, lookOfTheSea, seaFresnel, seaGlint, sheen } from '../../src/render/reflect';
+import { fadeShadowEdges } from '../../src/render/shadows';
 import { SKY, SUN_DISC, Sky, TONE_MAPPING, domeFragment, skyAt, skyDirection, skyGlsl, sunBearing, sunDiscDirection, toneMap } from '../../src/render/sky';
 
 /** Relative luminance of a linear colour (three's working space is linear sRGB). */
@@ -263,3 +265,58 @@ describe('clouds with a body (M8.9 slice 18, R13)', () => {
     expect(cloudFragment()).toContain('n = normalize( vCloudNormal )');
   });
 });
+
+
+describe('the world reflects the sky (M8.9 slice 19, R13)', () => {
+  it("M8.9 19.1 the sea by Fresnel: straight down the water's own colour, at a grazing angle the sky's", () => {
+    expect(seaFresnel(1)).toBeCloseTo(SEA_LOOK.f0, 9);
+    expect(seaFresnel(0.3)).toBeLessThan(0.2);
+    expect(seaFresnel(0.02)).toBeGreaterThan(0.85);
+    for (let c = 0; c < 1; c += 0.05) expect(seaFresnel(c)).toBeGreaterThan(seaFresnel(c + 0.05));
+  });
+
+  it("M8.9 19.2 a facet flashes only within a few degrees of the sun's mirror direction; far off the band is on its bearing", () => {
+    expect(seaGlint(0)).toBe(1);
+    expect(seaGlint(1)).toBeGreaterThan(0.5);
+    expect(seaGlint(5)).toBeLessThan(0.01);
+    expect(seaGlint(20)).toBeLessThan(1e-9);
+    const material = lookOfTheSea(new THREE.MeshLambertMaterial());
+    const shader = { vertexShader: THREE.ShaderLib.lambert.vertexShader, fragmentShader: THREE.ShaderLib.lambert.fragmentShader, uniforms: {} as Record<string, unknown> };
+    material.onBeforeCompile(shader as never, null as never);
+    expect(shader.uniforms['seaTime']).toBeDefined();
+    expect(shader.fragmentShader).toContain('vec3 seaSky( vec3 d )');
+    expect(shader.fragmentShader).toContain('#include <opaque_fragment>');
+    expect(shader.fragmentShader.indexOf('seaGlint')).toBeGreaterThan(shader.fragmentShader.indexOf('#include <opaque_fragment>'));
+  });
+
+  it('M8.9 19.4 the ground shines only toward the sun and at a grazing angle, only where the sun reaches it; its other hooks kept', () => {
+    expect(groundSheen(0.1, 0)).toBeGreaterThan(0.1);
+    expect(groundSheen(0.1, 180)).toBe(0);
+    expect(groundSheen(1, 0)).toBe(0);
+    expect(groundSheen(0.1, 60)).toBeLessThan(groundSheen(0.1, 10));
+    const material = new THREE.MeshLambertMaterial();
+    fadeShadowEdges(material);
+    sheen(material);
+    const shader = { vertexShader: THREE.ShaderLib.lambert.vertexShader, fragmentShader: THREE.ShaderLib.lambert.fragmentShader, uniforms: {} };
+    material.onBeforeCompile(shader as never, null as never);
+    expect(shader.fragmentShader).toContain('float coverage = smoothstep');
+    expect(shader.fragmentShader).toContain('float sunSeen = 1.0;');
+    expect(shader.fragmentShader).toContain('sunSeen = ( directLight.visible && receiveShadow ) ? getShadow( directionalShadowMap');
+    expect(shader.fragmentShader).toContain('sunSeen * shGraze * shToward');
+  });
+
+  it('M8.9 19.5 no draw added: the hooks change the materials that are there, the sea is its one plane', () => {
+    const a = new THREE.MeshLambertMaterial({ vertexColors: true });
+    carGlass(a);
+    expect(a.customProgramCacheKey()).toContain('car-glass-v1');
+    const sea = new THREE.MeshLambertMaterial();
+    expect(lookOfTheSea(sea)).toBe(sea);
+    const scene = new THREE.Scene();
+    new Sky(scene);
+    new Clouds(scene);
+    let meshes = 0;
+    scene.traverse((o) => { if (o instanceof THREE.Mesh) meshes++; });
+    expect(meshes).toBe(2);
+  });
+});
+

@@ -14,13 +14,14 @@
 import * as THREE from 'three';
 import { PALETTE, type VehicleTuning } from '../../sim';
 import { BAYER4 } from '../camera/fade';
+import { CAR_GLASS, carGlass } from '../reflect';
 import type { CarProfile, Section } from './carMesh';
 
 type V3 = { x: number; y: number; z: number };
 /** The paint's tones as negative colours: the instance paint times 1, 0.72 or 1.13 (carMesh.ts's three). */
 const PAINT = -1, DARK = -2, LIGHT = -3;
 const TONES = [1, 0.72, 1.13];
-const GLASS = 0x294653, HEADLIGHT = 0xffefca, TAILLIGHT = 0xba2338, PLATE = 0xeee2bd;
+const GLASS = CAR_GLASS, HEADLIGHT = 0xffefca, TAILLIGHT = 0xba2338, PLATE = 0xeee2bd;
 const WHEEL_SEGMENTS = 10;
 const ARCH_SEGMENTS = 8;
 
@@ -39,6 +40,8 @@ export function paintMaskMaterial(): THREE.MeshLambertMaterial {
       .replace('void main() {', 'void main() {\n  if ( vFade < 0.999 && vFade <= screenDoor() ) discard;');
   };
   material.customProgramCacheKey = () => 'traffic-paint-mask-fade';
+  // the glass reflects the sky and glints in the sun (M8.9 slice 19)
+  carGlass(material);
   return material;
 }
 

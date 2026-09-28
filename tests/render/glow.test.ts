@@ -6,9 +6,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { cityGeometry } from '../../src/render/city/CityView';
 import { DEPTH, GLOW, facadeShade, windowGlow, windowHash } from '../../src/render/city/glow';
+import { GLASS_LOOK, glassBlock, glassFresnel } from '../../src/render/reflect';
 import { propStatics } from '../../src/render/props/propMesh';
 import { Architecture } from '../../src/sim/city/architecture';
-import { PALETTE } from '../../src/sim/palette';
+import { CITY_COLORS, PALETTE } from '../../src/sim/palette';
 import type { SimWorld, StaticDesc } from '../../src/sim';
 import { createWorld } from '../sim/helpers';
 
@@ -101,4 +102,25 @@ describe('the city lit at dusk (M8.9 slice 3)', () => {
     const flat = cityGeometry(grid);
     try { expect(flat.getAttribute('cityBase')).toBeUndefined(); } finally { flat.dispose(); }
   });
+
+  it('M8.9 19.3 the glass byte is on the glazing alone, lit or not; a lit pane keeps its glow and reflects less', () => {
+    const statics: StaticDesc[] = [], a = new Architecture(statics);
+    a.box(0, 5, 0, 4, 5, 0.2, PALETTE.concrete, 'wall');
+    const pane = a.box(0, 5, 0.25, 1, 1, 0.02, CITY_COLORS.window, 'glazing');
+    expect(pane.tag).toBe('glazing');
+    const geometry = cityGeometry(statics);
+    try {
+      const look = geometry.getAttribute('cityLook');
+      expect(look.itemSize).toBe(3);
+      let glass = 0;
+      for (let i = 0; i < look.count; i++) if (look.getZ(i) > 0.99) { glass++; expect(look.getY(i)).toBeGreaterThan(0.99); }
+      expect(glass).toBe(36);
+    } finally { geometry.dispose(); }
+    // the block mixes the sky by Fresnel times one less the pane's glow, and adds the glint where the sun reaches it
+    expect(glassBlock('vCityLook.z > 0.5', 'vCityLook.x')).toContain('glF * ( 1.0 - vCityLook.x )');
+    expect(glassBlock('x', 'y')).toContain('sunSeen * pow(');
+    expect(glassFresnel(1)).toBeCloseTo(GLASS_LOOK.f0, 9);
+    expect(glassFresnel(0.1)).toBeGreaterThan(0.6);
+  });
 });
+

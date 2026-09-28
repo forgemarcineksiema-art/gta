@@ -17,6 +17,7 @@ import { VIEW_GRID } from '../../sim/island/views';
 import { DECK } from '../../sim/island/structures';
 import { Rtin } from './rtin';
 import { fadeShadowEdges } from '../shadows';
+import { sheen } from '../reflect';
 
 /** Every box in sight: `sync`'s default, one function (a default `() => true` was a new one every frame). */
 const SEEN_ALL = (): boolean => true;
@@ -79,6 +80,8 @@ export function chunkSphere(k: number): THREE.Sphere {
 /** A material with the shadow map fading out before its edge. */
 function fadedEdges<M extends THREE.Material>(m: M): M {
   fadeShadowEdges(m);
+  // the ground shines toward the sun at a grazing angle (M8.9 slice 19)
+  sheen(m);
   return m;
 }
 

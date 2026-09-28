@@ -61,7 +61,26 @@ export interface StaticDesc {
   base?: number;
   /** A piece of a standing prop (M8): its id, so the chunk's mesh knows the prop's vertex range. */
   prop?: number;
+  /**
+   * The tree this static stands for (M8.9 slice 22): the render draws its model, the trunk's foot `TREE_MODELS[model]
+   * .crown` under this static's middle (the crown's first piece), and not the shape.
+   */
+  model?: TreeModel;
 }
+
+/** The trees the render draws as models (M8.9 slice 22): the kit's two and the street's young one. */
+export type TreeModel = 'broadleaf' | 'palm' | 'sapling';
+
+/**
+ * Each tree model's measures from its trunk's foot (m): `crown`, the height of the middle of the static that carries it
+ * (the kit's crown's first piece, where it has always stood, so every placement's reach is the pieces' as before);
+ * `radius` and `height`, how far the model reaches out and up.
+ */
+export const TREE_MODELS: Readonly<Record<TreeModel, { crown: number; radius: number; height: number }>> = {
+  broadleaf: { crown: 4.8, radius: 3.8, height: 7.8 },
+  palm: { crown: 5, radius: 5.4, height: 9.2 },
+  sapling: { crown: 3.15, radius: 1.5, height: 4.9 },
+};
 
 /** Moving object: the renderer reads `slot` from the TransformBuffer every frame. */
 export interface DynamicDesc {

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BLOCK, CITY_HALF, PALETTE, PROP_KINDS, PropState, propFootprint, type City, type CityChunk, type PropDesc, type PropKind, type Props, type StaticDesc } from '../../sim';
+import { BLOCK, CITY_HALF, PALETTE, PROP_KINDS, PropState, TREE_MODELS, propFootprint, type City, type CityChunk, type PropDesc, type PropKind, type Props, type StaticDesc } from '../../sim';
 import { SHADOW_HALF, fadeShadowEdges } from '../shadows';
 import { fadeRoadPaint } from './roadPaint';
 import { FACADE_TAGS, GLOW, lightCity, windowGlow } from './glow';
@@ -7,6 +7,7 @@ import { lookOfTheSea } from '../reflect';
 import { gableGeometry, prismGeometry } from '../geometry';
 import { propStatics } from '../props/propMesh';
 import { QUALITY, type QualityTier } from '../quality';
+import { treeRaw, treeVariant, treeYaw } from '../trees';
 
 /** Direct buffer filling avoids hundreds of temporary Three geometries per streamed chunk. */
 const box = new THREE.BoxGeometry(2, 2, 2).toNonIndexed();
@@ -81,7 +82,8 @@ const RAW = (() => {
     'x+': raw(faces['x+']), 'x-': raw(faces['x-']), 'z+': raw(faces['z+']), 'z-': raw(faces['z-']), top: raw(faces.top), bottom: raw(faces.bottom),
   };
 })();
-type Raw = { p: Float32Array; n: Float32Array };
+/** A source's corners and normals; a tree's model has its own colour a corner too (linear). */
+type Raw = { p: Float32Array; n: Float32Array; c?: Float32Array };
 const sourceList: Raw[] = [];
 /** Prisms are already in world space; their vertex arrays are built once per descriptor. */
 const prismRaw = new WeakMap<StaticDesc, Raw>();
@@ -89,7 +91,8 @@ const prismRaw = new WeakMap<StaticDesc, Raw>();
 /** Fill `sourceList` with the unit geometries a static needs; returns the vertex count. */
 function sourcesOf(st: StaticDesc): number {
   sourceList.length = 0;
-  if (st.shape.kind === 'prism') {
+  if (st.model) sourceList.push(treeRaw(st.model, treeVariant(st.position.x, st.position.z)));
+  else if (st.shape.kind === 'prism') {
     let raw = prismRaw.get(st);
     if (!raw) {
       const g = prismGeometry(st.shape.points, st.shape.y0, st.shape.y1);
@@ -174,13 +177,16 @@ export class GeometryBuild {
       if (shape.kind === 'wheel' || shape.kind === 'ball') continue;
       const absolute = shape.kind === 'prism';
       const rectangular = shape.kind === 'box' || shape.kind === 'gable';
-      const sx = absolute ? 1 : rectangular ? shape.hx : shape.radius;
-      const sy = absolute ? 1 : rectangular ? shape.hy : shape.halfHeight;
-      const sz = absolute ? 1 : rectangular ? shape.hz : shape.radius;
-      const px = absolute ? 0 : st.position.x, py = absolute ? 0 : st.position.y, pz = absolute ? 0 : st.position.z;
-      const yaw = absolute ? 0 : staticYaw(st), rotated = yaw !== 0, cos = Math.cos(yaw), sin = Math.sin(yaw);
+      // a tree's model is in metres from its trunk's foot (its crown's height under the static), turned by its place
+      const model = st.model !== undefined;
+      const sx = absolute || model ? 1 : rectangular ? shape.hx : shape.radius;
+      const sy = absolute || model ? 1 : rectangular ? shape.hy : shape.halfHeight;
+      const sz = absolute || model ? 1 : rectangular ? shape.hz : shape.radius;
+      const px = absolute ? 0 : st.position.x, pz = absolute ? 0 : st.position.z;
+      const py = absolute ? 0 : st.model ? st.position.y - TREE_MODELS[st.model].crown : st.position.y;
+      const yaw = absolute ? 0 : model ? treeYaw(px, pz) : staticYaw(st), rotated = yaw !== 0, cos = Math.cos(yaw), sin = Math.sin(yaw);
       // a pitched static takes its whole rotation, the matrix of its quaternion (the physics collider's own)
-      const pitched = !absolute && staticPitched(st);
+      const pitched = !absolute && !model && staticPitched(st);
       let m00 = 1, m01 = 0, m02 = 0, m10 = 0, m11 = 1, m12 = 0, m20 = 0, m21 = 0, m22 = 1;
       if (pitched) {
         const { x: qx, y: qy, z: qz, w: qw } = st.rotation;
@@ -198,7 +204,7 @@ export class GeometryBuild {
       const glassByte = st.tag === 'glazing' ? 255 : 0;
       sourcesOf(st);
       for (const src of sourceList) {
-        const sp = src.p, sn = src.n, n = sp.length;
+        const sp = src.p, sn = src.n, sc = src.c, n = sp.length;
         for (let i = 0; i < n; i += 3, index += 3) {
           let lx = (sp[i] as number) * sx, ly = (sp[i + 1] as number) * sy, lz = (sp[i + 2] as number) * sz;
           let nx = sn[i] as number, ny = sn[i + 1] as number, nz = sn[i + 2] as number;
@@ -221,7 +227,8 @@ export class GeometryBuild {
           }
           positions[index] = px + lx; positions[index + 1] = py + ly; positions[index + 2] = pz + lz;
           normals[index] = nx; normals[index + 1] = ny; normals[index + 2] = nz;
-          colors[index] = r; colors[index + 1] = g; colors[index + 2] = b;
+          if (sc) { colors[index] = sc[i] as number; colors[index + 1] = sc[i + 1] as number; colors[index + 2] = sc[i + 2] as number; }
+          else { colors[index] = r; colors[index + 1] = g; colors[index + 2] = b; }
           const li = index;
           this.look[li] = glowByte;
           this.look[li + 1] = facadeByte;

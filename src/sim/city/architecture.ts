@@ -1,6 +1,6 @@
 /** Metre-based street architecture. Render descriptors only; solids stay simple in Rapier. */
-import { IDENTITY_QUAT, quatFromYaw, type StaticDesc, type BoxFace } from '../scene';
-import { CITY_COLORS, PALETTE } from '../palette';
+import { IDENTITY_QUAT, TREE_MODELS, quatFromYaw, type StaticDesc, type BoxFace } from '../scene';
+import { CITY_COLORS, PALETTE, TREE_COLORS } from '../palette';
 export { CITY_COLORS } from '../palette';
 
 /** A building's variations (M7 slice 11). */
@@ -52,20 +52,25 @@ export class Architecture {
 
   /**
    * A thick tree (a park's, a front garden's, the promenade's palm): its trunk is solid (`trunk`, a wall, M8 D8), its
-   * crown six-sided (a quarter fewer triangles in the shadow pass than eight).
+   * crown's pieces the placements' reach (a panel keeps clear of them). The render draws the whole tree as its model
+   * from the crown's first piece (M8.9 slice 22); the trunk and the other pieces are not drawn.
    */
   tree(x: number, z: number, palm = false): void {
-    this.cylinder(x, 2.5, z, 0.24, 2.35, 0x8b7966, 6, 'trunk');
+    const start = this.statics.length;
+    this.cylinder(x, 2.5, z, 0.24, 2.35, TREE_COLORS.bark, 6, 'trunk');
     if (palm) {
-      // A narrow trunk and four broad fronds give the quay its own street silhouette.
-      this.box(x, 5, z, 3.2, 0.15, 0.7, CITY_COLORS.hedge);
+      this.box(x, TREE_MODELS.palm.crown, z, 3.2, 0.15, 0.7, CITY_COLORS.hedge);
       this.box(x, 5.2, z, 0.7, 0.15, 3.2, CITY_COLORS.leaves);
       this.cylinder(x, 5.4, z, 1.2, 0.45, CITY_COLORS.hedge, 6);
     } else {
-      this.cylinder(x, 4.8, z, 2.7, 1.2, CITY_COLORS.hedge, 6);
+      this.cylinder(x, TREE_MODELS.broadleaf.crown, z, 2.7, 1.2, CITY_COLORS.hedge, 6);
       this.cylinder(x + 0.5, 6.25, z, 2, 0.75, CITY_COLORS.leaves, 6);
       this.cylinder(x - 1.8, 4.3, z + 0.5, 1.4, 0.8, CITY_COLORS.leaves, 6);
     }
+    for (let i = start; i < this.statics.length; i++) (this.statics[i] as StaticDesc).collisionOnly = true;
+    const crown = this.statics[start + 1] as StaticDesc;
+    delete crown.collisionOnly;
+    crown.model = palm ? 'palm' : 'broadleaf';
   }
 
   /** Shipping container, 12 × 2.6 × 2.4 m, solid; `tier` stacks it. */

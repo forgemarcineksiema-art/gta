@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-28 — M8.9 slice 22: the trees
+
+The kit's trees were stacked six-sided pucks and the palms two crossed planks. Now models (`trees.ts`), four variants
+each, chosen and turned by the tree's place: a broadleaf's crown of three or four jittered icosahedra in three greens
+over a tapering trunk with two limbs into it (86–106 triangles); a palm's curved, ringed trunk, seven or eight arched
+fronds hanging from their midribs, both sides drawn, and three coconuts (136–148); the street's young tree the same
+kind of crown (68). The sim's statics stay where they stood (a first cut gave the model a static from the ground up:
+the grid's billboards and a park-tree pin moved), none drawn but the crown's first piece, which carries the model
+(`StaticDesc.model`, `TREE_MODELS`). Pins 22.1–22.4; pin 0.3 counts a model part by its model.
+
 ## 2026-09-28 — M8.9 slice 21: the water (Marcin: "Musisz zrobić lepiej wodę i drzewa")
 
 Seen on the stills: the sea a checkerboard of randomly tilted triangles, one blue from the beach to the horizon, a hard

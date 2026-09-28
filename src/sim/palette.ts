@@ -132,6 +132,15 @@ export const ISLAND_COLORS = {
 } as const;
 
 /**
+ * The trees (M8.9 slice 22): a broadleaf's bark and its three greens (the olive of the old crowns, a shade, a sunlit one);
+ * a palm's paler ringed bark, its fronds' two greens, its coconuts.
+ */
+export const TREE_COLORS = {
+  bark: 0x8b7966, leaves: 0x7d9b63, leavesDark: 0x5d7f5c, leavesLight: 0x98b36a,
+  palmBark: 0x9c8a6e, frond: 0x86a84c, frondDark: 0x5f8a3f, coconut: 0x6b4a2e,
+} as const;
+
+/**
  * Coral Quay's places (M8.10 slice 11): the giant duck's rubber yellow (a toy's, warmer than the coin's) and its beak;
  * the coral of the reef and the stands' seats, the reef's clear shallows over it; the Coral Hotel's pale coral; the
  * lighthouse's red; the decks' boards and piles; the stands' teal seats and the hulls' white.

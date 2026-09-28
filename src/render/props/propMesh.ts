@@ -4,20 +4,20 @@
  * A standing prop is drawn inside its chunk's mesh from these parts (`propStatics`); a knocked one by its kind's
  * instanced mesh built from the same parts, so both are one model.
  */
-import { CITY_COLORS, PALETTE, PROP_TYPES, quatFromYaw, type PropDesc, type PropKind, type StaticDesc } from '../../sim';
+import { CITY_COLORS, PALETTE, PROP_TYPES, TREE_COLORS, TREE_MODELS, quatFromYaw, type PropDesc, type PropKind, type StaticDesc, type TreeModel } from '../../sim';
 import { ACCENTS } from '../../sim/palette';
 
 /**
- * One part: a box (half extents) or a cylinder (`hx` its radius, `hy` its half height, six or eight sides); `glow` for a
- * part lit at dusk while it stands (a lamp's head, M8.9 R9).
+ * One part: a box (half extents), a cylinder (`hx` its radius, `hy` its half height, six or eight sides) or a tree's
+ * model (`model` at its crown's height, M8.9 slice 22); `glow` for a part lit at dusk while it stands (a lamp's
+ * head, M8.9 R9).
  */
-export interface PropPart { shape: 'box' | 'cylinder'; x: number; y: number; z: number; hx: number; hy: number; hz: number; color: number; sides?: number; glow?: boolean }
+export interface PropPart { shape: 'box' | 'cylinder'; x: number; y: number; z: number; hx: number; hy: number; hz: number; color: number; sides?: number; glow?: boolean; model?: TreeModel }
 
 const box = (x: number, y: number, z: number, hx: number, hy: number, hz: number, color: number): PropPart => ({ shape: 'box', x, y, z, hx, hy, hz, color });
 const cyl = (x: number, y: number, z: number, r: number, hh: number, color: number, sides = 6): PropPart => ({ shape: 'cylinder', x, y, z, hx: r, hy: hh, hz: r, color, sides });
 
 const POLE = 0x686678;
-const TRUNK = 0x8b7966;
 const STAKE = PALETTE.wafer;
 const WOOD = CITY_COLORS.brick;
 /** Crown Heights' accent: the terraces' umbrellas, the newsstand's awning; the Quay's, the fish stalls'. */
@@ -36,13 +36,11 @@ const MODELS: Partial<Record<PropKind, readonly PropPart[]>> = {
     box(0, 7.9, 0.6, 0.05, 0.05, 0.62, POLE),
     { ...box(0, 7.83, 1.3, 0.2, 0.09, 0.38, PALETTE.laneMark), glow: true },
   ],
-  // a young street tree: a thin trunk between two stakes, a six-sided crown
+  // a young street tree: its model (a thin trunk, a crown of leafy lumps) between two stakes
   sapling: [
-    box(0, 1.3, 0, 0.06, 1.3, 0.06, TRUNK),
+    { shape: 'cylinder', x: 0, y: TREE_MODELS.sapling.crown, z: 0, hx: TREE_MODELS.sapling.radius, hy: 0.85, hz: TREE_MODELS.sapling.radius, color: TREE_COLORS.leaves, model: 'sapling' },
     box(0.22, 0.75, 0, 0.025, 0.75, 0.025, STAKE),
     box(-0.22, 0.75, 0, 0.025, 0.75, 0.025, STAKE),
-    cyl(0, 3.15, 0, 1.0, 0.85, CITY_COLORS.leaves),
-    cyl(0.15, 4.25, 0, 0.6, 0.4, CITY_COLORS.hedge),
   ],
   // a green street bin and its lid
   bin: [
@@ -230,6 +228,6 @@ export function propStatics(p: PropDesc, out: StaticDesc[]): void {
     const shape = part.shape === 'box' ? { kind: 'box' as const, hx: part.hx, hy: part.hy, hz: part.hz }
       : { kind: 'cylinder' as const, radius: part.hx, halfHeight: part.hy, ...(part.sides ? { sides: part.sides } : {}) };
     // a lit part is tagged for the city's glow (a tall prop's part, so it casts as 'prop' does)
-    out.push({ shape, position, rotation, color: part.color, tag: part.glow ? 'glow' : tall ? 'prop' : 'prop-low', detailOnly: !tall, prop: p.id });
+    out.push({ shape, position, rotation, color: part.color, tag: part.glow ? 'glow' : tall ? 'prop' : 'prop-low', detailOnly: !tall, prop: p.id, ...(part.model ? { model: part.model } : {}) });
   }
 }

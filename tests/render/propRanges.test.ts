@@ -6,6 +6,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { GeometryBuild, partitionChunk, type PropRanges } from '../../src/render/city/CityView';
 import { propParts } from '../../src/render/props/propMesh';
+import { treeRaw } from '../../src/render/trees';
 import { PROP_TYPES, type PropDesc, type SimWorld } from '../../src/sim';
 import { createWorld } from '../sim/helpers';
 
@@ -37,7 +38,7 @@ describe('standing props in the chunk meshes (M8 slice 0)', () => {
             seen.set(id, (seen.get(id) ?? 0) + 1);
             // its pieces, all of them, and nothing else: the vertices its parts make, within its reach of where it stands
             const parts = propParts(p.kind);
-            const vertices = parts.reduce((n, part) => n + (part.shape === 'box' ? 36 : part.sides === 6 ? 72 : 96), 0);
+            const vertices = parts.reduce((n, part) => n + (part.model ? treeRaw(part.model, 0).p.length / 3 : part.shape === 'box' ? 36 : part.sides === 6 ? 72 : 96), 0);
             expect(count, `${p.kind} ${id}`).toBe(vertices);
             const reach = Math.max(...parts.map((part) => Math.hypot(Math.abs(part.x) + part.hx, Math.abs(part.z) + part.hz))) + 1e-3;
             for (let v = start; v < start + count; v++) {

@@ -195,11 +195,13 @@ export function cloudDrift(t: number): number {
 
 export class Clouds {
   readonly mesh: THREE.Mesh;
+  /** The puffs as laid (the glare tests the sun's ray against them, glare.ts). */
+  readonly puffs: readonly Puff[] = cloudPuffs();
   private t = 0;
 
   constructor(scene: THREE.Scene) {
     const material = new THREE.ShaderMaterial({ vertexShader: VERTEX, fragmentShader: cloudFragment(), dithering: true });
-    this.mesh = new THREE.Mesh(cloudGeometry(), material);
+    this.mesh = new THREE.Mesh(cloudGeometry(this.puffs), material);
     this.mesh.frustumCulled = false;
     // after the dome, before the world; their depth only among themselves (the world is never behind them)
     this.mesh.renderOrder = -9;

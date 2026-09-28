@@ -38,6 +38,7 @@ import { ShapesView } from './shapes';
 import { SKY, Sky, TONE_MAPPING } from './sky';
 import { Clouds } from './clouds';
 import { SEA_TIME } from './reflect';
+import { Glare } from './glare';
 import { PedView } from './traffic/PedView';
 import { TrafficView } from './traffic/TrafficView';
 
@@ -115,6 +116,7 @@ export class Renderer {
   private readonly director: CameraDirector;
   private readonly sky: Sky;
   private readonly clouds: Clouds;
+  private readonly glare: Glare;
   private readonly shapes: ShapesView;
   private readonly player: PlayerCar;
   private readonly ghost: GhostCar;
@@ -162,6 +164,8 @@ export class Renderer {
     this.director = new CameraDirector(this.chase, sim);
     this.sky = new Sky(this.scene);
     this.clouds = new Clouds(this.scene);
+    // the sun's glare, put out by what covers the disc (M8.9 slice 20: an occlusion query on WebGL2's context)
+    this.glare = new Glare(this.scene, this.renderer.getContext() as WebGL2RenderingContext, this.clouds.puffs);
 
     this.cityView = sim.city ? new CityView(this.scene, sim.city, sim.props) : null;
     this.islandView = sim.island ? new IslandView(this.scene, sim.island) : null;
@@ -343,6 +347,7 @@ export class Renderer {
     this.sky.update(carPos, this.camera.position);
     this.clouds.update(this.camera.position, worldDt);
     SEA_TIME.value += worldDt;
+    this.glare.update(this.camera, this.clouds.mesh.rotation.y);
     // the paint's fade by the camera's height over the ground under it (the island's hills; the grid's 0)
     if (sim.island) PAINT_GROUND.value = sim.island.ground.surfaceHeight(this.camera.position.x, this.camera.position.z);
     this.fx.drive(tm, this.carVel, this.camera.aspect, worldDt);

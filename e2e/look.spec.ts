@@ -124,6 +124,15 @@ async function adv(page: Page, ms: number): Promise<void> {
   await page.evaluate((m) => window.advanceTime!(m), ms);
 }
 
+/**
+ * The sun's glare reads its occlusion queries a task after it asks them (WebGL2 answers none in the task that asked, and
+ * `adv` runs its frames in one): single frames, each its own task, as the game's own loop runs, till every point of the
+ * disc has answered from where the camera is now (M8.9 slice 20).
+ */
+async function settle(page: Page): Promise<void> {
+  for (let k = 0; k < 10; k++) await adv(page, 17);
+}
+
 /** One state: a frame rendered, its world's numbers read in the same task, the HUD's, a screenshot. */
 async function snap(page: Page, state: string): Promise<void> {
   if (ONLY.length && !ONLY.includes(state)) return;
@@ -205,6 +214,7 @@ for (const [w, h] of SIZES) {
     test.skip(!wanted('intro'));
     await boot(page, 'coldopen=1&manual=1', w, h);
     await adv(page, 600);
+    await settle(page);
     await snap(page, 'intro');
   });
 
@@ -234,6 +244,7 @@ for (const [w, h] of SIZES) {
         sim.vehicle.teleport({ x: p.x, y: 0.9, z: p.z }, Math.atan2(-180, -120));
       });
       await adv(page, 1500);
+      await settle(page);
       await snap(page, 'sunward');
       await boot(page, `manual=1&spawn=crown&ad=off&fresh=1&${DATE}`, w, h);
       await adv(page, 13_000);
@@ -257,6 +268,57 @@ for (const [w, h] of SIZES) {
     await snap(page, 'card');
     await adv(page, 2600);
     await snap(page, 'step');
+  });
+
+  test(`stills: the sea toward the sun at ${w}x${h}`, async ({ page }) => {
+    test.skip(!wanted('sea'));
+    // M8.9 slice 19: on the island, a shore spot with open water toward the sun's bearing (render/shadows.ts SUN_OFFSET)
+    await boot(page, `manual=1&spawn=port&ad=off&fresh=1&${DATE}`, w, h);
+    await adv(page, 13_000);
+    const found = await page.evaluate((level) => {
+      const sim = window.__game!.sim, g = sim.island!.ground, yaw = Math.atan2(-180, -120);
+      const dx = Math.sin(yaw), dz = Math.cos(yaw);
+      for (let r = 0; r <= 900; r += 20) for (let a = 0; a < 360; a += 10) {
+        const x = Math.cos(a * Math.PI / 180) * r, z = Math.sin(a * Math.PI / 180) * r, hh = g.surfaceHeight(x, z);
+        if (hh < level + 0.4 || hh > level + 3) continue;
+        let open = true;
+        for (let d = 30; d <= 600 && open; d += 15) if (g.surfaceHeight(x + dx * d, z + dz * d) > level - 0.3) open = false;
+        if (!open) continue;
+        sim.vehicle.teleport({ x, y: hh + 1, z }, yaw);
+        return true;
+      }
+      return false;
+    }, -0.5);
+    expect(found, 'a shore facing the sun over open water').toBe(true);
+    await adv(page, 2000);
+    await settle(page);
+    await snap(page, 'sea');
+  });
+
+  test(`stills: the sun behind a block at ${w}x${h}`, async ({ page }) => {
+    test.skip(!wanted('glare'));
+    // M8.9 slice 20: the nearest spot to the Crown's spawn whose sight of the sun a building cuts within 120 m; facing it
+    await boot(page, `manual=1&spawn=crown&ad=off&fresh=1&${DATE}`, w, h);
+    await adv(page, 13_000);
+    const found = await page.evaluate(() => {
+      const sim = window.__game!.sim, at = sim.vehicle.body.translation(), yaw = Math.atan2(-180, -120);
+      const e = 9 * Math.PI / 180, dx = Math.sin(yaw) * Math.cos(e), dy = Math.sin(e), dz = Math.cos(yaw) * Math.cos(e);
+      for (let r = 0; r <= 200; r += 8) for (let a = 0; a < 360; a += 15) {
+        const x = at.x + Math.cos(a * Math.PI / 180) * r, z = at.z + Math.sin(a * Math.PI / 180) * r;
+        // the camera about 7 m behind and 3 m over the car: its ray toward the sun cut early, the car's own spot clear
+        const cx = x - Math.sin(yaw) * 7, cz = z - Math.cos(yaw) * 7;
+        if (sim.clearFraction(x, 1.5, z, x, 6, z) < 1) continue;
+        if (sim.clearFraction(cx, 4, cz, cx + dx * 120, 4 + dy * 120, cz + dz * 120) > 0.6) continue;
+        if (sim.clearFraction(cx, 4, cz, x, 1.5, z) < 1) continue;
+        sim.vehicle.teleport({ x, y: 0.9, z }, yaw);
+        return true;
+      }
+      return false;
+    });
+    expect(found, 'a spot behind a block').toBe(true);
+    await adv(page, 1500);
+    await settle(page);
+    await snap(page, 'glare');
   });
 
   test(`stills: a chase at three stars at ${w}x${h}`, async ({ page }) => {

@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-28 — M8.9 slice 20: the sun's glare
+
+`glare.ts`: a warm core and halo added over the frame round the sun's place (a quad drawn last, no rings, no bloom), by
+how directly the camera faces it times the disc's seen share: five points in turn, the world by a WebGL2 occlusion query
+round a probe 1600 m out (read only once available, one in flight a point), the clouds on the CPU (their puffs as
+ellipsoids, swung by the drift; they clear their depth). WebGL2 answers no query in the task that asked it: the look
+suite's `adv` runs its frames in one, so the sun's states `settle` in single-frame tasks as the game's loop runs. The
+suite gains `glare` (behind a Crown block: none) and keeps the `sea` from slice 19. Stills: the sun burns over the Crown,
+the intro and the sea; sunward's top 0.202 (not a calm state). Pins 20.1–20.4. Verify green (804 tests).
+
 ## 2026-09-28 — M8.9 slice 19: the world reflects the sky
 
 Hooks on the materials that are there (`reflect.ts`), each with its own copy of `skyGlsl`. The sea: equilateral facets

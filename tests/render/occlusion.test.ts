@@ -10,6 +10,8 @@ import { ChaseCamera } from '../../src/render/camera/ChaseCamera';
 import type { VehicleTelemetry } from '../../src/sim';
 import { COVER } from '../../src/sim/city/covers';
 import { createWorld } from '../sim/helpers';
+import RAPIER from '@dimforge/rapier3d-compat';
+import { GROUPS_SOLID } from '../../src/sim/collision';
 
 function telemetry(vz: number): VehicleTelemetry {
   return {
@@ -57,6 +59,20 @@ describe('the camera occlusion rule', () => {
     for (let i = 0; i < 120; i++) chase.update(car, vel, tm, 1 / 60, i === 0);
     // the frustum's top at the near plane: 0.6 m × tan(fov / 2) over the camera, under the slab
     expect(cam.position.y + 0.6 * Math.tan(cam.fov * Math.PI / 360)).toBeLessThan(slab);
+  });
+
+  it("M8.9 26.2 a post between the car and the camera does not pull it in, a wall still does", async () => {
+    const sim = await createWorld({ map: 'playground', traffic: 0, peds: 0, record: false });
+    try {
+      // out past the playground: a post 0.3 m square and a wall 4 m wide, both 3 m tall
+      sim.world.createCollider(RAPIER.ColliderDesc.cuboid(0.15, 1.5, 0.15).setTranslation(3000, 1.5, 3000).setCollisionGroups(GROUPS_SOLID));
+      sim.world.createCollider(RAPIER.ColliderDesc.cuboid(2, 1.5, 0.15).setTranslation(3020, 1.5, 3000).setCollisionGroups(GROUPS_SOLID));
+      sim.world.step();
+      // the camera's view passes the post, the world's sight (the side cuts', the police's) does not
+      expect(sim.viewFraction(3000, 1.5, 2995, 3000, 1.5, 3005)).toBe(1);
+      expect(sim.clearFraction(3000, 1.5, 2995, 3000, 1.5, 3005)).toBeLessThan(1);
+      expect(sim.viewFraction(3020, 1.5, 2995, 3020, 1.5, 3005)).toBeLessThan(0.6);
+    } finally { sim.dispose(); }
   });
 
   it('7.4 through each covered street the camera never sits behind a static', async () => {

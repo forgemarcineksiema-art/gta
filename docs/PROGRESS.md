@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-28 — M8.9 slice 26: the ground
+
+The rig pitches with 60 % of the road's slope along the view (eased, held in the air; the camera over the road behind,
+the look down the road ahead): on the island tour a 6 %+ downhill put the road 35 m ahead 28 px low, now 10 px high, the
+camera 2.2 m over the ground at the least (was 1.4). The whole slope lifted the intro's low sun behind the top line
+(its top band 0.17 → 0.27); at 60 % 0.23. `viewFraction`, the camera's sight, passes fixed things under 1 m across both
+ways (posts, poles, trunks); the world's `clearFraction` is unchanged. The camera kept 1.5 m over the floor under it.
+Correction: the runway's 9.2 → 2.0 m pull-in of slice 23's talk was a plane's 26 m wing over the car, not a post: the
+rule's own job. Pins 26.1–26.3 (on the old camera: 20 px, 0.55 m). Stills: calm unchanged, intro top 0.233.
+
 ## 2026-09-28 — M8.9 slice 25: big air
 
 In the air the camera's lag stays between 0.8 and 4 m over the car (the mega-ramp's fall left it 12 m up); on a long

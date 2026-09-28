@@ -151,6 +151,13 @@ const FACING = 70 * DEG;
 const LANDING = { step: 0.15, samples: 27, ride: 0.5 } as const;
 /** The lean toward the landing fades in as the time to it grows from `from` to `to` seconds. */
 const AIR_LEAN = { from: 0.3, to: 1 } as const;
+/**
+ * The road's slope the rig pitches with (M8.9 R14): this share of it (the whole of it put a low sun ahead of a downhill
+ * behind the HUD's top line), at most this steep (rad), eased at this rate (1/s), read while the car goes over 3 m/s
+ * along the view; the camera kept this far over the ground under it (m).
+ */
+const SLOPE = { share: 0.6, max: 20 * DEG, rate: 3, minAlong: 3 } as const;
+const GROUND_ROOM = 1.5;
 /** The occlusion rule's gap kept to the static that blocks, and the shortest boom it pulls to, m. */
 const BOOM_MARGIN = 0.4;
 const BOOM_MIN = 1.6;
@@ -210,6 +217,8 @@ export class ChaseCamera {
   floor: ((x: number, y: number, z: number) => number) | null = null;
   /** The car's fall in the air, m/s² (the world's gravity and the car's own extra). */
   gravity = 9.81 + 3.5;
+  /** The road's slope along the view (rad, + uphill), eased. */
+  private slope = 0;
   /** How far the look leans toward the landing, and the landing it leans to. */
   private lean = 0;
   /** The look-ahead's share, a half in the air. */
@@ -439,6 +448,16 @@ export class ChaseCamera {
     }
     this.dir.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
 
+    // the road's slope along the view (M8.9 R14): the travel's rise over its run along the view on the ground, eased,
+    // held in the air; the rig pitches with it, the camera over the road behind and the look down (or up) the road ahead
+    const along = carVel.x * this.dir.x + carVel.z * this.dir.z;
+    if (snap) this.slope = 0;
+    if (!tm.airborne && Math.abs(along) > SLOPE.minAlong) {
+      const want = Math.max(-SLOPE.max, Math.min(SLOPE.max, Math.atan(carVel.y / along)));
+      this.slope += (want - this.slope) * (snap ? 1 : 1 - Math.exp(-dt * SLOPE.rate));
+    }
+    const grade = Math.tan(this.slope) * SLOPE.share;
+
     // height follows the car with lag in the air so a jump reads as height
     const hRate = 1 - Math.exp(-dt * (tm.airborne ? t.heightRateAir : t.heightRateGround));
     this.carY += (car.position.y - this.carY) * (snap ? 1 : hRate);
@@ -449,7 +468,7 @@ export class ChaseCamera {
     // `airMinOver` (M8.9 R14)
     const airLow = car.position.y + t.airMinOver * modeMul, airHigh = car.position.y + t.airMaxOver * modeMul;
     if (tm.airborne) this.carY = Math.min(airHigh - height, Math.max(airLow - height, this.carY));
-    this.target.set(car.position.x - this.dir.x * dist, this.carY + height, car.position.z - this.dir.z * dist);
+    this.target.set(car.position.x - this.dir.x * dist, this.carY + height - dist * grade, car.position.z - this.dir.z * dist);
 
     if (snap || !this.initialised) {
       this.pos.copy(this.target);
@@ -508,6 +527,11 @@ export class ChaseCamera {
       this.boom = snap || want < this.boom ? want : this.boom + (want - this.boom) * (1 - Math.exp(-dt * t.heightRateGround));
       if (this.boom < 0.999) this.shown.set(ox + (this.pos.x - ox) * this.boom, oy + (this.pos.y - oy) * this.boom, oz + (this.pos.z - oz) * this.boom);
     }
+    // never under `GROUND_ROOM` over the ground under it (a dip's far slope rising behind the car; M8.9 R14)
+    if (this.floor) {
+      const under = this.floor(this.shown.x, this.shown.y + 1, this.shown.z);
+      if (this.shown.y < under + GROUND_ROOM) this.shown.y = under + GROUND_ROOM;
+    }
     // under a ceiling (pulled in to it, or at its own height under a low deck): down out of it, never under the car's
     // roof line
     if (this.ceiling) {
@@ -522,7 +546,7 @@ export class ChaseCamera {
     // left of the view direction is (cos yaw, 0, -sin yaw)
     this.look.set(
       car.position.x + this.dir.x * ahead + this.dir.z * this.lookSide,
-      car.position.y + t.lookHeight,
+      car.position.y + t.lookHeight + ahead * grade,
       car.position.z + this.dir.z * ahead - this.dir.x * this.lookSide,
     );
     // a long flight: the look leans toward where the car will come down, so the landing is seen (M8.9 R14)

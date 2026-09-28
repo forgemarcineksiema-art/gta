@@ -159,7 +159,7 @@ export class Renderer {
     this.camera = new THREE.PerspectiveCamera(62, 1, 0.6, 1700);
     this.chase = new ChaseCamera(this.camera);
     // the occlusion rule reads the world's solid statics (a query; the sim is not written)
-    this.chase.occluder = (ax, ay, az, bx, by, bz) => sim.clearFraction(ax, ay, az, bx, by, bz);
+    this.chase.occluder = (ax, ay, az, bx, by, bz) => sim.viewFraction(ax, ay, az, bx, by, bz);
     this.chase.ceiling = (x, y, z, reach) => sim.roomAbove(x, y, z, reach);
     this.chase.floor = (x, y, z) => sim.floorBelow(x, y, z);
     this.director = new CameraDirector(this.chase, sim);

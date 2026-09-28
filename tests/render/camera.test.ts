@@ -504,6 +504,48 @@ describe('big air (M8.9 slice 25)', () => {
   });
 });
 
+/**
+ * The ground (M8.9 slice 26, R14): the rig pitches with the road, and the camera keeps its room over the ground under
+ * it. A car at 20 m/s along +Z over a road laid out by the pin, its origin 0.5 m over it.
+ */
+describe('the ground (M8.9 slice 26)', () => {
+  const HZ = 60;
+  const dt = 1 / HZ;
+
+  function drive(road: (z: number) => number, seconds: number, each?: (cam: THREE.PerspectiveCamera) => void): { cam: THREE.PerspectiveCamera; z: number } {
+    const cam = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 1000);
+    const chase = new ChaseCamera(cam);
+    chase.floor = (_x, _y, z) => road(z);
+    const car = new THREE.Object3D();
+    const vel = new THREE.Vector3();
+    let z = 0;
+    for (let i = 0; i < seconds * HZ; i++) {
+      z = 20 * i * dt;
+      vel.set(0, 20 * (road(z + 0.5) - road(z - 0.5)), 20);
+      car.position.set(0, road(z) + 0.5, z);
+      chase.update(car, vel, telemetry({ vx: 0, vy: vel.y, vz: 20 }), dt, i === 0);
+      cam.updateMatrixWorld();
+      each?.(cam);
+    }
+    return { cam, z };
+  }
+
+  test('26.1 on a 6 % downhill the road 35 m ahead sits within 12 px of its place on the flat', () => {
+    const ahead = (road: (z: number) => number): number => {
+      const { cam, z } = drive(road, 4);
+      return new THREE.Vector3(0, road(z + 35), z + 35).project(cam).y * 360;
+    };
+    expect(Math.abs(ahead((z) => -0.06 * z) - ahead(() => 0))).toBeLessThan(12);
+  });
+
+  test('26.3 the camera never sits under 1.5 m over the ground under it (a steep hill down onto the flat)', () => {
+    const road = (z: number): number => (z < 60 ? 0.3 * (60 - z) : 0);
+    let least = Infinity;
+    drive(road, 6, (cam) => { least = Math.min(least, cam.position.y - road(cam.position.z)); });
+    expect(least).toBeGreaterThan(1.5 - 1e-6);
+  });
+});
+
 describe('the takedown side cut (M5.5 slice 17)', () => {
   test('17.3 the eye stands to the side of the travel, a little behind the wreck and above it', () => {
     const out = { x: 0, y: 0, z: 0 };

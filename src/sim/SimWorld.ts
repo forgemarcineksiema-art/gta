@@ -14,6 +14,8 @@ import { GROUP_DEFAULT, GROUP_TERRAIN, QUERY_NOT_PROP, interactionGroups } from 
 const SOLID_ONLY = interactionGroups(0xffff, GROUP_DEFAULT);
 /** The island's sight (M8.10 R4): the solids and the ground, a hill's slope or a crest between as much as a wall. */
 const SOLID_AND_GROUND = interactionGroups(0xffff, GROUP_DEFAULT | GROUP_TERRAIN);
+/** Narrower than this both ways (m), a fixed thing cannot hide a car from the camera (`viewFraction`). */
+const THIN_ACROSS = 1;
 import { City, type PropRing } from './city/City';
 import { Island, PLUMB_TILT, type IslandBake } from './island/Island';
 import { islandCoinLines } from './island/coinLines';
@@ -657,6 +659,34 @@ export class SimWorld {
     const hit = this.world.castRay(ray, length, true, RAPIER.QueryFilterFlags.ONLY_FIXED | RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, this.island ? SOLID_AND_GROUND : SOLID_ONLY);
     return hit ? hit.timeOfImpact / length : 1;
   }
+
+  /**
+   * The camera's clear share (M8.9 R14): as `clearFraction`, past whatever is too thin to hide a car (a post, a pole, a
+   * sign's leg, a trunk: under `THIN_ACROSS` m across both ways), so one crossing the line never pulls the camera in.
+   */
+  viewFraction(ax: number, ay: number, az: number, bx: number, by: number, bz: number): number {
+    const dx = bx - ax, dy = by - ay, dz = bz - az;
+    const length = Math.hypot(dx, dy, dz);
+    if (length < 1e-6) return 1;
+    const ray = this.sightRay;
+    ray.origin.x = ax; ray.origin.y = ay; ray.origin.z = az;
+    ray.dir.x = dx / length; ray.dir.y = dy / length; ray.dir.z = dz / length;
+    const hit = this.world.castRay(ray, length, true, RAPIER.QueryFilterFlags.ONLY_FIXED | RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, this.island ? SOLID_AND_GROUND : SOLID_ONLY, undefined, undefined, this.hides);
+    return hit ? hit.timeOfImpact / length : 1;
+  }
+
+  /** Whether a fixed collider can hide a car: a box or a round thing under `THIN_ACROSS` m across both ways cannot. */
+  private readonly hides = (c: RAPIER.Collider): boolean => {
+    const type = c.shapeType();
+    if (type === RAPIER.ShapeType.Cuboid) {
+      const h = c.halfExtents(this.thinHalf) ?? this.thinHalf;
+      return Math.max(h.x, h.z) * 2 >= THIN_ACROSS;
+    }
+    if (type === RAPIER.ShapeType.Ball || type === RAPIER.ShapeType.Cylinder || type === RAPIER.ShapeType.Capsule || type === RAPIER.ShapeType.Cone) return c.radius() * 2 >= THIN_ACROSS;
+    return true;
+  };
+
+  private readonly thinHalf = { x: 0, y: 0, z: 0 };
 
   /** The room over a point up to the first solid or deck over it (a slab's underside), at most `reach` m: the camera's. */
   roomAbove(x: number, y: number, z: number, reach: number): number {

@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-28 — M8.9 slice 24: the jolt from the physics
+
+The shake was two sines on the world's x and y, so on an east–west road a hit's sideways half moved the camera along
+its own view and vanished, and nothing had a direction. Now a spring in the camera's own axes (6 Hz, damping 0.35,
+stepped at 240 Hz) kicked by the sim: a hit along its contact's normal as the camera sees it by its speed change (the car
+thrown across the screen the way it goes, a frontal hit a nod), a landing lifting the car on the screen, a scrape's
+tremble, the road's rumble from the vertical load off its mean; `kick()` a nod. The speed's sine is gone (1 cm, never
+seen). Island probe: a calm drive still wobbles 0.1–0.3 px. Pins 24.1–24.3 (the two `shakeAmount = 0` lines in the
+comfort pins went with the sine). Stills calm, intro unchanged.
+
 ## 2026-09-28 — M8.9 slice 23: the reverse view in the one camera
 
 The chase's heading and its reverse orbit were two controllers summed, the orbit started by the sign of the speed.

@@ -85,7 +85,6 @@ describe('chase camera comfort', () => {
   test('a brief course correction stays smooth and recentres after release', () => {
     const cam = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 1000);
     const chase = new ChaseCamera(cam), car = new THREE.Object3D(), vel = new THREE.Vector3();
-    chase.tuning.shakeAmount = 0;
     let yaw = 0, previous = 0, peakRate = 0;
     const view = new THREE.Vector3();
     for (let i = 0; i < 240; i++) {
@@ -190,7 +189,6 @@ describe('the reverse view in the one camera (M8.9 slice 23)', () => {
   function rig() {
     const cam = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 1000);
     const chase = new ChaseCamera(cam);
-    chase.tuning.shakeAmount = 0;
     const car = new THREE.Object3D();
     const vel = new THREE.Vector3();
     const up = new THREE.Vector3(0, 1, 0);
@@ -342,6 +340,69 @@ describe('the reverse view in the one camera (M8.9 slice 23)', () => {
     back.car.gear = -1;
     back.run(2, (s) => { back.car.speed = 3 * Math.min(1, s); });
     for (const f of back.frames.slice(held)) expect(deg(wrap(f.view - (f.nose + Math.PI)))).toBeLessThan(10);
+  });
+});
+
+/**
+ * The jolt from the physics (M8.9 slice 24, R14): a spring in the camera's own axes kicked by the sim's hit (its
+ * contact's normal and speed) and landing, alike whichever way the car goes; the car thrown across the screen the way
+ * it goes in the world, then caught.
+ */
+describe('the jolt from the physics (M8.9 slice 24)', () => {
+  const HZ = 60;
+  const dt = 1 / HZ;
+
+  /**
+   * A car at 20 m/s heading `yaw`, `over` in its telemetry for the one frame after three seconds: the car's place on
+   * a 1280×720 screen each frame after it, in pixels right of and above the place it had before it.
+   */
+  function jolted(yaw: number, over: Partial<VehicleTelemetry>, frames = 30): Array<{ x: number; y: number }> {
+    const cam = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 1000);
+    const chase = new ChaseCamera(cam);
+    const car = new THREE.Object3D();
+    const vel = new THREE.Vector3(Math.sin(yaw) * 20, 0, Math.cos(yaw) * 20);
+    const p = new THREE.Vector3();
+    car.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+    const at = (): { x: number; y: number } => {
+      cam.updateMatrixWorld();
+      p.copy(car.position).project(cam);
+      return { x: p.x * 640, y: p.y * 360 };
+    };
+    for (let i = 0; i < 3 * HZ; i++) {
+      car.position.addScaledVector(vel, dt);
+      chase.update(car, vel, telemetry({ vx: vel.x, vz: vel.z }), dt, i === 0);
+    }
+    const before = at();
+    const out: Array<{ x: number; y: number }> = [];
+    for (let i = 0; i < frames; i++) {
+      car.position.addScaledVector(vel, dt);
+      chase.update(car, vel, telemetry({ vx: vel.x, vz: vel.z, ...(i === 0 ? over : {}) }), dt, false);
+      const now = at();
+      out.push({ x: now.x - before.x, y: now.y - before.y });
+    }
+    return out;
+  }
+
+  /** A hit from the car's left at 8 m/s: the normal from the wall into the car points to its right. */
+  const fromLeft = (yaw: number): Partial<VehicleTelemetry> => ({ impact: 8, contactNx: -Math.cos(yaw), contactNy: 0, contactNz: Math.sin(yaw) });
+
+  test('24.1 the same hit seen driving north and driving east moves the car on the screen alike', () => {
+    const peak = (yaw: number): number => Math.max(...jolted(yaw, fromLeft(yaw)).map((q) => Math.abs(q.x)));
+    const north = peak(0), east = peak(Math.PI / 2);
+    expect(north).toBeGreaterThan(5);
+    expect(Math.abs(east - north) / north).toBeLessThan(0.05);
+  });
+
+  test('24.2 a hit from the left throws the car to the right on the screen, a landing lifts it, both settled within 0.4 s', () => {
+    const hit = jolted(0.7, fromLeft(0.7));
+    expect((hit[3] as { x: number }).x).toBeGreaterThan(3);
+    const landing = jolted(0.7, { landingImpact: 6 });
+    expect((landing[3] as { y: number }).y).toBeGreaterThan(3);
+    for (const q of [hit[24], landing[24]] as Array<{ x: number; y: number }>) expect(Math.hypot(q.x, q.y)).toBeLessThan(0.5);
+  });
+
+  test('24.3 a calm drive does not shake the car on the screen', () => {
+    for (const q of jolted(0.3, {}, 180)) expect(Math.hypot(q.x, q.y)).toBeLessThan(0.3);
   });
 });
 

@@ -9,9 +9,10 @@
  * backing up, ended by any forward gear at once; a slide tail first (a spin, a ram)
  * is followed along its travel and held when it stops, until the gas or the reverse
  * says which way. The camera sits behind and above along the view and looks along
- * it. In flight the camera's height lags the car so the jump reads, and a landing
- * gives a short shake scaled by the impact. A small, bounded look-ahead follows
- * actual angular motion. Steering input alone must never swivel the view: quick
+ * it. In flight the camera's height lags the car so the jump reads. A hit, a
+ * landing or a scrape jolts the view in the camera's own axes, by the physics (the
+ * contact's normal and speed, the landing's speed), alike whichever way the car
+ * goes. A small, bounded look-ahead follows actual angular motion. Steering input alone must never swivel the view: quick
  * corrections should not move the road under the player.
  */
 import * as THREE from 'three';
@@ -44,16 +45,21 @@ export interface CameraTuning {
   fovDrift: number;
   fovMax: number;
   fovRate: number;
-  shakeAmount: number;
-  shakeSpeedRef: number;
   /** How fast the camera height follows the car on the ground and in the air (1/s). */
   heightRateGround: number;
   heightRateAir: number;
-  /** Shake per m/s of landing impact. */
-  landingShake: number;
-  /** Shake per m/s of a wall or prop hit, and at full scrape. */
-  impactShake: number;
-  scrapeShake: number;
+  /**
+   * The jolt (M8.9 R14): a spring in the camera's own axes (its natural frequency, rad/s, and damping ratio) kicked by
+   * the physics: degrees a second of turn per m/s of a hit's speed change and of a landing's, and per unit of `kick()`;
+   * the scrape's tremble at full scrape and the road's rumble per g of the chassis' vertical load off its mean, degrees.
+   */
+  joltOmega: number;
+  joltDamping: number;
+  joltHit: number;
+  joltLanding: number;
+  joltKick: number;
+  joltScrape: number;
+  joltRumble: number;
   /**
    * Seconds of backing up in the reverse gear, faster than `reverseSpeed` m/s, before the view turns round: a back-up
    * off a wall and a three-point turn are over before it.
@@ -98,13 +104,15 @@ export const DEFAULT_CAMERA: CameraTuning = {
   fovDrift: 1.5,
   fovMax: 80,
   fovRate: 2.5,
-  shakeAmount: 0.02,
-  shakeSpeedRef: 55,
   heightRateGround: 9,
   heightRateAir: 2.5,
-  landingShake: 0.03,
-  impactShake: 0.02,
-  scrapeShake: 0.012,
+  joltOmega: 38,
+  joltDamping: 0.35,
+  joltHit: 9,
+  joltLanding: 12,
+  joltKick: 300,
+  joltScrape: 0.25,
+  joltRumble: 0.4,
   reverseDelay: 1.2,
   reverseSpeed: 1,
   reverseHeight: 0.3,
@@ -122,7 +130,7 @@ export type CameraMode = 'chase' | 'far';
 const DEG = Math.PI / 180;
 /** The car-swap's whip: the view's spring and its cap (degrees per second), no cap on the change. */
 const WHIP = { omega: 20, rateDeg: 720 } as const;
-/** The view's spring is stepped at least this often a second: the same motion at 30, 60 and 120 Hz. */
+/** The view's spring and the jolt's are stepped at least this often a second: the same motion at 30, 60 and 120 Hz. */
 const YAW_STEPS = 240;
 /** A slide tail first ends when the nose is back within this of the travel (it starts past a right angle). */
 const FACING = 70 * DEG;
@@ -199,8 +207,15 @@ export class ChaseCamera {
   /** Smoothed lateral look offset, metres to the car's left. */
   private lookSide = 0;
   private fov: number;
-  private shakeT = 0;
-  private shakeEnergy = 0;
+  /** The jolt's pitch, yaw and roll in the camera's own axes (rad) and their rates; its tremble's clock; the load's mean (g). */
+  private joltPitch = 0;
+  private joltYaw = 0;
+  private joltRoll = 0;
+  private joltPitchV = 0;
+  private joltYawV = 0;
+  private joltRollV = 0;
+  private joltT = 0;
+  private loadMean = 0;
   private initialised = false;
   /** A held hard cut (the garage interior at the door): position and look, until `releaseCut()`. */
   private cutActive = false;
@@ -219,9 +234,9 @@ export class ChaseCamera {
   }
 
   /** Car-swap: for `seconds` the view swings to the new car at up to 720°/s and follows twice as fast, with a FOV punch. No cut. */
-  /** An external jolt (a billboard through the windscreen): adds bounded shake energy. */
+  /** An external jolt (a billboard through the windscreen, a tower coming down): the view nods, bounded. */
   kick(amount: number): void {
-    this.shakeEnergy = Math.min(0.7, this.shakeEnergy + amount);
+    this.joltPitchV -= Math.min(0.7, amount) * this.tuning.joltKick * DEG;
   }
 
   /** A longer or taller body than the classes (the bus): the camera sits this much further back and higher; a small one (the bike) closer and lower, negative. */
@@ -235,6 +250,11 @@ export class ChaseCamera {
     this.fovPunch = 10;
     // the new car is driven from here: whatever the last one was doing (backing up, a slide) is not its
     this.clearIntent();
+  }
+
+  private clearJolt(): void {
+    this.joltPitch = this.joltYaw = this.joltRoll = 0;
+    this.joltPitchV = this.joltYawV = this.joltRollV = 0;
   }
 
   private clearIntent(): void {
@@ -378,14 +398,42 @@ export class ChaseCamera {
       this.pos.y = Math.max(this.pos.y, car.position.y + 0.6);
     }
 
-    // shake: speed² plus a landing burst that decays
-    if (tm.landingImpact > 0) this.shakeEnergy = Math.min(0.6, this.shakeEnergy + tm.landingImpact * t.landingShake);
-    if (tm.impact > 0.5) this.shakeEnergy = Math.min(0.7, this.shakeEnergy + tm.impact * t.impactShake);
-    this.shakeEnergy *= Math.exp(-dt * 7);
-    this.shakeT += dt * 37;
-    const shake = t.shakeAmount * Math.pow(Math.min(1, speed / t.shakeSpeedRef), 2) * (tm.boosting ? 1.6 : 1) + this.shakeEnergy + tm.scrape * t.scrapeShake;
-    const sx = Math.sin(this.shakeT * 1.3) * shake;
-    const sy = Math.cos(this.shakeT * 1.7) * shake * 0.7;
+    // the jolt (M8.9 R14): the camera a loosely held body, so a hit throws the car across the screen the way it goes in
+    // the world, a landing or a push up lifts it, a frontal hit nods the view, and the view catches up: a spring in the
+    // camera's own axes, alike whichever way the car is going
+    if (snap) {
+      this.clearJolt();
+      this.loadMean = tm.gVert;
+    } else {
+      if (tm.impact > 0.5) {
+        // the contact's normal points from the wall into the car: the way the car is thrown; the screen's right is
+        // (-dir.z, 0, dir.x)
+        const nx = tm.contactNx, nz = tm.contactNz;
+        const side = -nx * this.dir.z + nz * this.dir.x;
+        const toward = -(nx * this.dir.x + nz * this.dir.z);
+        const kick = tm.impact * t.joltHit * DEG;
+        this.joltYawV += kick * side;
+        this.joltRollV += kick * side * 0.3;
+        this.joltPitchV -= kick * (Math.max(0, tm.contactNy) + 0.6 * Math.max(0, toward));
+      }
+      if (tm.landingImpact > 0) this.joltPitchV -= tm.landingImpact * t.joltLanding * DEG;
+      // the scrape's tremble and the road's rumble move the spring's rest
+      this.joltT += dt;
+      this.loadMean += (tm.gVert - this.loadMean) * (1 - Math.exp(-dt * 2));
+      const tremble = tm.scrape * t.joltScrape * DEG;
+      const restPitch = -(tm.gVert - this.loadMean) * t.joltRumble * DEG + tremble * Math.sin(this.joltT * 46);
+      const restYaw = tremble * Math.sin(this.joltT * 70 + 1.3);
+      const w = t.joltOmega, c = 2 * t.joltDamping * w;
+      const n = Math.max(1, Math.ceil(dt * YAW_STEPS)), h = dt / n;
+      for (let i = 0; i < n; i++) {
+        this.joltPitchV += (w * w * (restPitch - this.joltPitch) - c * this.joltPitchV) * h;
+        this.joltYawV += (w * w * (restYaw - this.joltYaw) - c * this.joltYawV) * h;
+        this.joltRollV += (-w * w * this.joltRoll - c * this.joltRollV) * h;
+        this.joltPitch += this.joltPitchV * h;
+        this.joltYaw += this.joltYawV * h;
+        this.joltRoll += this.joltRollV * h;
+      }
+    }
 
     // the occlusion rule: a wall, a roof or a building between the car and the camera pulls the camera in
     // along the boom at once; it lets out again at the height's ground pace when the way is clear
@@ -404,7 +452,7 @@ export class ChaseCamera {
       const room = this.ceiling(this.shown.x, this.shown.y, this.shown.z, CEILING_ROOM);
       if (room < CEILING_ROOM) this.shown.y = Math.max(car.position.y + 0.3, this.shown.y - (CEILING_ROOM - room));
     }
-    this.camera.position.set(this.shown.x + sx, this.shown.y + sy, this.shown.z);
+    this.camera.position.copy(this.shown);
     const ahead = (t.lookAhead + speed * t.lookAheadPerSpeed) * (tm.airborne ? 0.5 : 1);
     // left of the view direction is (cos yaw, 0, -sin yaw)
     this.look.set(
@@ -419,6 +467,12 @@ export class ChaseCamera {
     if (this.focusAmount > 0.001) this.look.lerp(this.focusPoint, this.focusAmount);
     this.camera.up.copy(this.up);
     this.camera.lookAt(this.look);
+    // the jolt on top, in the camera's own axes: yaw (a turn to the left moves the car right on the screen), pitch, roll
+    if (this.joltPitch !== 0 || this.joltYaw !== 0 || this.joltRoll !== 0) {
+      this.camera.rotateY(this.joltYaw);
+      this.camera.rotateX(this.joltPitch);
+      this.camera.rotateZ(this.joltRoll);
+    }
 
     this.fovPunch *= Math.exp(-dt * 6);
     const fovTarget = Math.min(t.fovMax, t.fovBase + speed * t.fovPerSpeed + (tm.boosting ? t.fovBoost : 0) + (tm.drifting ? t.fovDrift : 0) + this.fovPunch - 6 * this.focusAmount);

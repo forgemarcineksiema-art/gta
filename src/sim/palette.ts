@@ -16,7 +16,8 @@ export const PALETTE = {
   /** The ice-cream truck's scoop and cone (M5.5 slice 16). */
   iceCream: 0xf4a6c4, wafer: 0xd49a55,
   grass: 0x819b68,
-  water: 0x3fa7c9,
+  /** The water on the maps; the sea's deep blue, its shallows' turquoise, thin water over sand, foam (M8.9 slice 21). */
+  water: 0x3fa7c9, waterDeep: 0x2f8fbf, waterShallow: 0x38bfbd, waterShoal: 0x9ed3b4, foam: 0xf3f1e7,
   glass: 0x9fd8ff,
   ramp: 0xe5533d,
   cone: 0xff8a2b,

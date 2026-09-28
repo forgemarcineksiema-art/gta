@@ -18,6 +18,7 @@ import { DECK } from '../../sim/island/structures';
 import { Rtin } from './rtin';
 import { fadeShadowEdges } from '../shadows';
 import { sheen } from '../reflect';
+import { SeaDepth } from './seaDepth';
 
 /** Every box in sight: `sync`'s default, one function (a default `() => true` was a new one every frame). */
 const SEEN_ALL = (): boolean => true;
@@ -90,6 +91,8 @@ export class GroundView {
   private readonly chunks = new Map<number, THREE.Mesh>();
   /** The ground's one material, the shadow map faded out before its edge (the grid's). */
   private readonly material = fadedEdges(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+  /** The depth under the sea by the chunks' readings, each written as its mesh is made (M8.9 slice 21). */
+  readonly seaDepth = new SeaDepth();
   private readonly rtin = new Rtin(GRID);
   private readonly above = new Float32Array(GRID * GRID);
   private readonly below = new Float32Array(GRID * GRID);
@@ -157,6 +160,7 @@ export class GroundView {
     for (const k of [...this.chunks.keys()]) this.free(k);
     this.group.removeFromParent();
     this.material.dispose();
+    this.seaDepth.dispose();
   }
 
   private add(i: number, j: number, m: ChunkMesh): void {
@@ -170,6 +174,7 @@ export class GroundView {
     mesh.receiveShadow = true;
     mesh.matrixAutoUpdate = false;
     this.chunks.set(Island.chunkIndex(i, j), mesh);
+    this.seaDepth.write(i, j, this.island.viewReadings(Island.chunkIndex(i, j)));
     this.group.add(mesh);
   }
 
@@ -374,13 +379,14 @@ export class GroundView {
 }
 
 /**
- * A ground point's colour: the seabed under the water, the beaches' sand (wet at the water), the quarry's dirt, the
- * verges beside the roads and under them (the strip draws the road; the paved places draw themselves), else the grass
- * by height, blended from the lowland's green to the summit's dry gold.
+ * A ground point's colour: the seabed deep under the water, the beaches' sand and the sea floor's by the shore (wet at
+ * the water: a sand bar breaking the surface reads as one, M8.9 slice 21), the quarry's dirt, the verges beside the roads
+ * and under them (the strip draws the road; the paved places draw themselves), else the grass by height, blended from
+ * the lowland's green to the summit's dry gold.
  */
 export function cornerColour(surface: number, road: number, h: number): number {
-  if (h < SEA.level - 0.15) return ISLAND_COLORS.seabed;
-  if (surface === SAND) return h < SEA.level + 0.35 ? ISLAND_COLORS.wetSand : PALETTE.sand;
+  if (h < SEA.level - 0.8) return ISLAND_COLORS.seabed;
+  if (surface === SAND || h < SEA.level - 0.15) return h < SEA.level + 0.35 ? ISLAND_COLORS.wetSand : PALETTE.sand;
   if (surface === DIRT) return ISLAND_COLORS.dirt;
   if (road < SHOULDER + BLEND / 4) return ISLAND_COLORS.verge;
   return grassAt(h);

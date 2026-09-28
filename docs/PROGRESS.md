@@ -2,6 +2,15 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-09-28 — M8.9 slice 21: the water (Marcin: "Musisz zrobić lepiej wodę i drzewa")
+
+Seen on the stills: the sea a checkerboard of randomly tilted triangles, one blue from the beach to the horizon, a hard
+edge on the sand. Now the facets' corners ride one swell (three trains at deep water's speed) and light the facet, so
+neighbours tilt alike; the colour by the depth under it (`seaDepth.ts`: a byte a point of the view grid, written from a
+chunk's readings as its ground is made): pale over the sand, turquoise shallows, blue deep; foam in lines by the distance
+from the shore (depth over the bed's slope: the islet's sea-level flat was one white sheet by depth alone), the swash
+and a breaker running in. The sea takes shadows; sand bars are wet sand. Slices 21–22 added, the gate is 23. Pins 21.1–21.5.
+
 ## 2026-09-28 — M8.9 slice 20: the sun's glare
 
 `glare.ts`: a warm core and halo added over the frame round the sun's place (a quad drawn last, no rings, no bloom), by

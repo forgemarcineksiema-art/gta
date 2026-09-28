@@ -134,13 +134,17 @@ export class IslandView {
 
   constructor(scene: THREE.Scene, private readonly island: Island) {
     scene.add(this.group);
-    // the sea in facets that reflect the sky and the sun's path (M8.9 slice 19)
-    const sea = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), lookOfTheSea(new THREE.MeshLambertMaterial({ color: PALETTE.water })));
-    sea.rotation.x = -Math.PI / 2;
-    sea.position.y = SEA.level;
-    this.group.add(sea);
     this.ground = new GroundView(island);
     this.group.add(this.ground.group);
+    // the sea in facets on a swell that reflect the sky and the sun's path (M8.9 slices 19, 21), coloured by the depth
+    // under it, foam at the shore, the shadows on it
+    const seaMaterial = new THREE.MeshLambertMaterial({ color: PALETTE.waterDeep });
+    fadeShadowEdges(seaMaterial);
+    const sea = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), lookOfTheSea(seaMaterial, this.ground.seaDepth));
+    sea.rotation.x = -Math.PI / 2;
+    sea.position.y = SEA.level;
+    sea.receiveShadow = true;
+    this.group.add(sea);
     // the shadow map fades out before its edge on everything it falls on (the grid's), the buildings' hooks chained after
     for (const m of [this.buildingMaterial, this.surfaceMaterial, this.extraMaterial, this.propMaterial]) fadeShadowEdges(m);
     // the tunnel's floor, walls, roof and road out of the sun past the shadow map's reach

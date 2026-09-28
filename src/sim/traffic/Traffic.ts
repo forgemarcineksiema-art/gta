@@ -225,6 +225,8 @@ export class Traffic {
   /** The road's height under the record (the highway's overpasses; M5.5 slice 8) and its grade along, for the transform. */
   readonly y: Float32Array;
   readonly grade: Float32Array;
+  /** Its roll on the road's cross fall (rad, its left side up), for the transform (`seat`: the island's hills). */
+  readonly roll: Float32Array;
   readonly disturbedFor: Float32Array;
   readonly wreckedFor: Float32Array;
   /** How long a car has stood stuck behind this dead car with no way round it (s): the tow's early reason. */
@@ -364,8 +366,9 @@ export class Traffic {
   private readonly colliderAgent = new Map<number, number>();
   private readonly pose: LanePose = { x: 0, z: 0, yaw: 0 };
   private readonly proj: PathProjection = { x: 0, z: 0, yaw: 0, s: 0, lateral: 0, dist: 0, switched: false };
-  private readonly scratchQ2: Quat = { x: 0, y: 0, z: 0, w: 1 };
   private readonly scratchQ: Quat = { x: 0, y: 0, z: 0, w: 1 };
+  private readonly seatQ: Quat = { x: 0, y: 0, z: 0, w: 1 };
+  private readonly seatQ2: Quat = { x: 0, y: 0, z: 0, w: 1 };
   private readonly world: RAPIER.World;
   private readonly bodies: RAPIER.RigidBody[] = [];
   private readonly bodyCollider: RAPIER.Collider[] = [];
@@ -474,6 +477,7 @@ export class Traffic {
     this.yaw = new Float32Array(n);
     this.y = new Float32Array(n);
     this.grade = new Float32Array(n);
+    this.roll = new Float32Array(n);
     this.disturbedFor = new Float32Array(n);
     this.wreckedFor = new Float32Array(n);
     this.blockedFor = new Float32Array(n);
@@ -1239,7 +1243,7 @@ export class Traffic {
       return;
     }
     const body = this.bodies[slot] as RAPIER.RigidBody;
-    this.lockDriving(slot, this.yaw[agent] as number);
+    this.lockDriving(slot, this.yaw[agent] as number, agent);
     body.setAngvel(ZERO, true);
     this.state[agent] = AgentState.Physical;
   }
@@ -1282,9 +1286,12 @@ export class Traffic {
     const fx = Math.sin(yaw) * 2, fz = Math.cos(yaw) * 2;
     this.y[i] = Number.isNaN(y) ? this.streets.groundAt(x, z) : y;
     this.grade[i] = Number.isNaN(y) ? (this.streets.groundAt(x + fx, z + fz) - this.streets.groundAt(x - fx, z - fz)) / 4 : grade;
+    this.roll[i] = 0;
+    // (on the island's ground, on its wheels: a bay across a hill's fall rolls with it)
+    if (Number.isNaN(y)) this.seat(i, x, z, yaw, -1);
     this.posed[i] = 0;
     this.tipFor[i] = 0;
-    const q = M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, yaw);
+    const q = this.seatQuat(yaw, this.grade[i], this.roll[i]);
     this.transforms.writeBoth(this.slot[i] as number, x, (this.y[i]) + 0.03, z, q.x, q.y, q.z, q.w);
   }
 
@@ -1439,13 +1446,7 @@ export class Traffic {
       }
       let yaw = this.yaw[i] as number;
       if ((this.wobble[i] as number) > 0) yaw += Math.sin((this.wobble[i] as number) * 18) * WOBBLE_RAD;
-      const q = M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, yaw);
-      const grade = this.grade[i] as number;
-      if (grade !== 0) {
-        // nose up on a climb: a turn about the car's own left axis
-        M.quatSetAxisAngle(this.scratchQ2, 1, 0, 0, -Math.atan(grade));
-        M.quatMul(q, q, this.scratchQ2);
-      }
+      const q = this.seatQuat(yaw, this.grade[i] as number, this.roll[i] as number);
       tb.write(slot, this.x[i] as number, (this.y[i] as number) + 0.03, this.z[i] as number, q.x, q.y, q.z, q.w);
     }
   }
@@ -1720,15 +1721,59 @@ export class Traffic {
     body.setAngvel(this.ang, true);
   }
 
-  /** On an overpass's ramp the body rides at the road's height: its height is held, not simulated (across a junction too). */
+  /**
+   * On an overpass's ramp the body rides at the road's height: its height is held, not simulated (across a junction
+   * too); on the island's hills it sits on the road under its wheels, pitched and rolled with it (`seat`).
+   */
   private holdHeight(i: number, body: RAPIER.RigidBody, lane: number): void {
-    const h = this.lanes.heightOn(lane, this.s[i] as number, this.next[i] as number, this.laneOffset[i]);
-    this.y[i] = h;
     body.translation(this.pos);
+    if (this.streets.roadAt) {
+      const yaw = M.yawOf(body.rotation(this.rot));
+      this.seat(i, this.pos.x, this.pos.z, yaw, lane);
+      body.setRotation(this.seatQuat(yaw, this.grade[i] as number, this.roll[i] as number), true);
+    } else this.y[i] = this.lanes.heightOn(lane, this.s[i] as number, this.next[i] as number, this.laneOffset[i]);
+    const h = this.y[i] as number;
     if (Math.abs(this.pos.y - (h + 0.03)) > 0.001) {
       this.pos.y = h + 0.03;
       body.setTranslation(this.pos, true);
     }
+  }
+
+  /**
+   * The record seated on the road under its wheels (the island's hills): its height, grade and roll from the road's
+   * height at its four wheels. By the road under its middle alone a car stood level across a street's fall, and a lent
+   * one level along it too: a bus on Crown's 16 % stood a metre into the road at one end and a metre over it at the
+   * other, and at a crest a car's ends hung half a metre. On the highway (its decks, the tunnel) its lane's heights at
+   * its axles; on the grid (no road under it but its lanes') as its lane has it.
+   */
+  private seat(i: number, x: number, z: number, yaw: number, lane: number): void {
+    const roadAt = this.streets.roadAt;
+    if (!roadAt) return;
+    const spec = BODIES[this.body[i] as number] as (typeof BODIES)[number];
+    const hb = spec.wheelBase / 2, ht = spec.trackWidth / 2;
+    if (lane >= 0 && this.lanes.onHighway(lane)) {
+      const s = this.s[i] as number, next = this.next[i] as number, offset = this.laneOffset[i] as number;
+      const front = this.lanes.heightOn(lane, s + hb, next, offset), rear = this.lanes.heightOn(lane, Math.max(0, s - hb), next, offset);
+      this.y[i] = (front + rear) / 2;
+      this.grade[i] = (front - rear) / (2 * hb);
+      this.roll[i] = 0;
+      return;
+    }
+    // its wheels: along (sin, cos) of its heading, its left (cos, −sin) (a car's right facing +Z is −X)
+    const ax = Math.sin(yaw) * hb, az = Math.cos(yaw) * hb, lx = Math.cos(yaw) * ht, lz = -Math.sin(yaw) * ht;
+    const fl = roadAt(x + ax + lx, z + az + lz), fr = roadAt(x + ax - lx, z + az - lz);
+    const rl = roadAt(x - ax + lx, z - az + lz), rr = roadAt(x - ax - lx, z - az - lz);
+    this.y[i] = (fl + fr + rl + rr) / 4;
+    this.grade[i] = (fl + fr - rl - rr) / (4 * hb);
+    this.roll[i] = Math.atan((fl + rl - fr - rr) / (4 * ht));
+  }
+
+  /** A car's turn on the road: its heading, nose up by its grade (about its own left axis), its left side up by its roll. */
+  private seatQuat(yaw: number, grade: number, roll: number): Quat {
+    const q = M.quatSetAxisAngle(this.seatQ, 0, 1, 0, yaw);
+    if (grade !== 0) M.quatMul(q, q, M.quatSetAxisAngle(this.seatQ2, 1, 0, 0, -Math.atan(grade)));
+    if (roll !== 0) M.quatMul(q, q, M.quatSetAxisAngle(this.seatQ2, 0, 0, 1, roll));
+    return q;
   }
 
   // ---- gaps ---------------------------------------------------------------------
@@ -2252,7 +2297,8 @@ export class Traffic {
     body.userData = i;
     col.setFriction(this.dead(i) ? this.tuning.wreckFriction : this.tuning.friction);
     const yaw = this.yaw[i] as number;
-    const q = M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, yaw);
+    // (on the island's hills on its wheels, as it was drawn)
+    const q = this.streets.roadAt ? this.seatQuat(yaw, this.grade[i] as number, this.roll[i] as number) : M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, yaw);
     const driving = this.state[i] === AgentState.Kinematic;
     body.setEnabled(true);
     this.pos.x = this.x[i] as number;
@@ -2261,7 +2307,7 @@ export class Traffic {
     body.setTranslation(this.pos, true);
     body.setRotation(q, true);
     if (driving) {
-      this.lockDriving(slot, yaw);
+      this.lockDriving(slot, yaw, i);
       const speed = this.speed[i] as number;
       this.lin.x = Math.sin(yaw) * speed;
       this.lin.y = 0;
@@ -2388,12 +2434,13 @@ export class Traffic {
    * vertical only, upright on `yaw`. With roll and pitch free a push tipped a driving car and nothing righted it: 18 % of
    * the driving samples of a level-5 chase leant over 15°, ten cars sank into the road, two drove on their roofs.
    */
-  private lockDriving(slot: number, yaw: number): void {
+  private lockDriving(slot: number, yaw: number, agent: number): void {
     const body = this.bodies[slot] as RAPIER.RigidBody;
     (this.bodyCollider[slot] as RAPIER.Collider).setCollisionGroups(GROUPS_TRAFFIC);
     body.setEnabledTranslations(true, false, true, true);
     body.setEnabledRotations(false, true, false, true);
-    body.setRotation(M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, yaw), true);
+    // (on the island's hills on its wheels: `seat`)
+    body.setRotation(this.streets.roadAt ? this.seatQuat(yaw, this.grade[agent] as number, this.roll[agent] as number) : M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, yaw), true);
   }
 
   /** A lent body left to the physics: it meets the ground and every axis is free. */
@@ -2554,8 +2601,17 @@ export class Traffic {
       return;
     }
     const overdue = -this.disturbedFor[i] > t.disturbedMax - t.disturbedTime;
-    const level = up >= Math.cos(t.reattachLevel * Math.PI / 180);
     body.translation(this.pos);
+    // level on its road: on the island's hills against the road's own up under its wheels, not the vertical (at rest on
+    // Crown's 16 % a car leant 9° and never drove again, a wreck at `disturbedMax`)
+    let onRoad = up;
+    if (this.streets.roadAt && lane >= 0) {
+      const yaw = M.yawOf(r);
+      this.seat(i, this.pos.x, this.pos.z, yaw, lane);
+      const s = this.seatQuat(yaw, this.grade[i] as number, this.roll[i] as number);
+      onRoad = 4 * (r.x * r.y - r.w * r.z) * (s.x * s.y - s.w * s.z) + (1 - 2 * (r.x * r.x + r.z * r.z)) * (1 - 2 * (s.x * s.x + s.z * s.z)) + 4 * (r.y * r.z + r.w * r.x) * (s.y * s.z + s.w * s.x);
+    }
+    const level = onRoad >= Math.cos(t.reattachLevel * Math.PI / 180);
     const road = lane >= 0 ? this.lanes.heightOn(this.proj.switched ? this.next[i] as number : lane, this.proj.s, this.proj.switched ? -1 : this.next[i] as number, this.laneOffset[i]) + 0.03 : 0;
     if (lane >= 0 && level && rock < t.reattachSpin && Math.abs(this.pos.y - road) < t.reattachHeight && (spin <= t.settleSpin || overdue)) {
       this.state[i] = AgentState.Physical;
@@ -2565,7 +2621,8 @@ export class Traffic {
       this.pos.y = road;
       body.setTranslation(this.pos, true);
       // on four wheels: the heading kept, the last few degrees of lean and centimetres of drop dropped
-      this.lockDriving(slot, this.yaw[i] as number);
+      this.seat(i, this.pos.x, this.pos.z, this.yaw[i] as number, lane);
+      this.lockDriving(slot, this.yaw[i] as number, i);
       this.ang.x = 0;
       this.ang.z = 0;
       body.setAngvel(this.ang, true);
@@ -2703,11 +2760,13 @@ export class Traffic {
     this.x[i] = this.pose.x;
     this.z[i] = this.pose.z;
     this.yaw[i] = this.pose.yaw;
-    // at its lane's height from its first frame (the grid's 0)
+    // at its lane's height from its first frame (the grid's 0), on its wheels (the island's hills)
     this.y[i] = this.pose.y ?? 0;
     this.grade[i] = this.pose.grade ?? 0;
+    this.roll[i] = 0;
+    this.seat(i, this.pose.x, this.pose.z, this.pose.yaw, lane);
     this.paintSerial++;
-    const q = M.quatSetAxisAngle(this.scratchQ, 0, 1, 0, this.pose.yaw);
+    const q = this.seatQuat(this.pose.yaw, this.grade[i], this.roll[i]);
     this.transforms.writeBoth(this.slot[i] as number, this.pose.x, (this.y[i]) + 0.03, this.pose.z, q.x, q.y, q.z, q.w);
   }
 
@@ -3021,6 +3080,7 @@ export class Traffic {
     this.yaw[i] = this.pose.yaw;
     this.y[i] = this.pose.y ?? 0;
     this.grade[i] = this.pose.grade ?? 0;
+    this.seat(i, this.pose.x, this.pose.z, this.pose.yaw, lane);
     const blend = this.blendLeft[i] as number;
     if (blend > 0) {
       const f = blend / BLEND_BACK;

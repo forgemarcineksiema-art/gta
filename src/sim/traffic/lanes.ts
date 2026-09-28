@@ -384,6 +384,11 @@ export class LaneTables {
     return this.scratch.y ?? 0;
   }
 
+  /** On the highway (its decks, the tunnel): its heights its own points', not the island's road under them. */
+  onHighway(lane: number): boolean {
+    return (this.graph.lanes[lane] as Lane).highway === true;
+  }
+
   private sampleConnection(conn: Connection, s: number, out: LanePose): void {
     let seg = 0;
     for (let i = 0; i < SAMPLES; i++) {

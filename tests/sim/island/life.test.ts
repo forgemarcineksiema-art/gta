@@ -2,6 +2,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { clearControls, type SimWorld } from '../../../src/sim';
 import type { Island } from '../../../src/sim/island/Island';
+import { bodySpec } from '../../../src/sim/traffic/bodies';
 import { AgentState, type Traffic } from '../../../src/sim/traffic/Traffic';
 import { createWorld } from '../helpers';
 
@@ -103,5 +104,56 @@ describe('M8.10 slice 13: the island\'s streets', () => {
     expect(Math.hypot((traffic.x[a] as number) - bx, (traffic.z[a] as number) - bz)).toBeLessThan(0.5);
     expect(Math.abs((traffic.y[a] as number) - by)).toBeLessThan(0.3);
     traffic.remove(a);
+  });
+
+  it('13.7 a car sits on the road under its four wheels on a hill, near the player and far off', () => {
+    const island = sim.island as Island, traffic = sim.traffic as Traffic, lanes = traffic.lanes, graph = traffic.streets.graph;
+    const tb = sim.transforms;
+    // the steepest 12 m of any street's lane (Crown's): a bus held level along it stood a metre into the road at its
+    // front and a metre over it at its back (Marcin's still, 2026-09-28)
+    let lane = -1, at = 0, grade = 0;
+    graph.lanes.forEach((l, i) => {
+      if (l.highway) return;
+      for (let s = 0; s + 12 <= (lanes.length[i] as number); s += 4) {
+        const g = Math.abs(lanes.heightAt(i, s + 12) - lanes.heightAt(i, s)) / 12;
+        if (g > grade) { grade = g; lane = i; at = s; }
+      }
+    });
+    expect(grade).toBeGreaterThan(0.12);
+    const p = { x: 0, z: 0, yaw: 0, y: 0 };
+    lanes.positionAt(lane, at + 6, 0, p);
+    island.sync(p.x, p.z, true);
+    // the player stopped 20 m beside it: the bus lent its body (within 40 m); every car further off kinematic
+    sim.vehicle.teleport({ x: p.x + Math.cos(p.yaw) * 20, y: island.ground.surfaceHeight(p.x + Math.cos(p.yaw) * 20, p.z - Math.sin(p.yaw) * 20) + 0.8, z: p.z - Math.sin(p.yaw) * 20 }, p.yaw);
+    const bus = traffic.spawnAt(lane, Math.max(0, at - 12), 'bus');
+    expect(bus).toBeGreaterThanOrEqual(0);
+    // the drawn wheels' corners against the road under each (the body's origin rides 3 cm over it)
+    const worst = { lent: 0, kinematic: 0 };
+    let lentSteps = 0;
+    for (let n = 0; n < 60 * 4; n++) {
+      clearControls(sim.controls); sim.controls.brake = 1; sim.step();
+      if (traffic.state[bus] === AgentState.Physical) lentSteps++;
+      for (let i = 0; i < traffic.pool; i++) {
+        const st = traffic.state[i], l = traffic.lane[i] as number;
+        if ((st !== AgentState.Physical && st !== AgentState.Kinematic) || l < 0 || graph.lanes[l]?.highway || traffic.blending(i)) continue;
+        const slot = traffic.slot[i] as number, spec = bodySpec(traffic.bodyOf(i));
+        const x = tb.currPos[slot * 3] as number, y = tb.currPos[slot * 3 + 1] as number, z = tb.currPos[slot * 3 + 2] as number;
+        const qx = tb.currRot[slot * 4] as number, qy = tb.currRot[slot * 4 + 1] as number, qz = tb.currRot[slot * 4 + 2] as number, qw = tb.currRot[slot * 4 + 3] as number;
+        for (const [u, w] of [[1, 1], [1, -1], [-1, 1], [-1, -1]] as const) {
+          // (u across, left positive; w along, forward positive) turned by the drawn quaternion
+          const lx = u * spec.trackWidth / 2, lz = w * spec.wheelBase / 2;
+          const tx = 2 * (qy * lz), ty = 2 * (qz * lx - qx * lz), tz = 2 * (-qy * lx);
+          const cx = x + lx + qw * tx + (qy * tz - qz * ty), cy = y + qw * ty + (qz * tx - qx * tz), cz = z + lz + qw * tz + (qx * ty - qy * tx);
+          const miss = Math.abs(cy - 0.03 - island.ground.surfaceHeight(cx, cz));
+          if (st === AgentState.Physical) worst.lent = Math.max(worst.lent, miss);
+          else worst.kinematic = Math.max(worst.kinematic, miss);
+        }
+      }
+    }
+    expect(lentSteps).toBeGreaterThan(60);
+    // within 12 cm of the road at every wheel (held level: 0.97 m lent, 0.49 m at a crest far off)
+    expect(worst.lent).toBeLessThan(0.12);
+    expect(worst.kinematic).toBeLessThan(0.12);
+    traffic.remove(bus);
   });
 });

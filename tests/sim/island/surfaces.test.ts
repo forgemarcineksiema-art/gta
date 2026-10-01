@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { PALETTE, initPhysics } from '../../../src/sim';
 import { CHUNK, CHUNKS_X, CHUNKS_Z, CHUNK_X0, CHUNK_Z0, Island, PLUMB_TILT } from '../../../src/sim/island/Island';
 import { HALF_WIDTH } from '../../../src/sim/island/ground';
-import { KERB, PAINT_LIFT, PAVEMENT, ROAD_LIFT, fanFaces, heightOn, onStrip, surfaceChunk, surfaceIndex, type Strip } from '../../../src/sim/island/surfaces';
+import { KERB, PAINT_LIFT, PAVEMENT, ROAD_LIFT, fanFaces, heightOn, onStrip, surfaceChunk, surfaceIndex, type RimPoint, type Strip } from '../../../src/sim/island/surfaces';
 import { GroundView } from '../../../src/render/island/GroundView';
 
 describe('M8.10 slice 6b: the roads\' surfaces', () => {
@@ -43,7 +43,9 @@ describe('M8.10 slice 6b: the roads\' surfaces', () => {
     const { junctions, strips } = island.surfaces;
     console.log(`6.2 ${junctions.length} junctions of ${island.network.graph.nodes.length} nodes`);
     expect(junctions.length).toBeGreaterThan(100);
+    // (an arm's section's points; the kerbs' between them are the junction's own)
     for (const j of junctions) for (const r of j.rim) {
+      if (r.strip < 0) continue;
       const st = strips[r.strip] as Strip, k = st.s.indexOf(r.s);
       expect(k, `${st.id}`).toBeGreaterThanOrEqual(0);
       // a drawn segment starts or ends there
@@ -86,7 +88,7 @@ describe('M8.10 slice 6b: the roads\' surfaces', () => {
     expect(parking.length).toBeGreaterThan(150);
   });
 
-  it('6.4 a chunk\'s ground and roads\' surfaces together under 10,000 triangles', () => {
+  it('6.4 a chunk\'s ground and roads\' surfaces together under 12,000 triangles', () => {
     const view = new GroundView(island);
     let most = 0, surfaces = 0;
     for (const [k, c] of island.surfaceMeshes()) {
@@ -95,16 +97,20 @@ describe('M8.10 slice 6b: the roads\' surfaces', () => {
       surfaces = Math.max(surfaces, c.colors.length);
     }
     console.log(`6.4 the most a chunk ${most}, its surfaces' most ${surfaces}`);
-    expect(most).toBeLessThan(10000);
+    // (the junctions' corners, their kerbs and pavements and the paint laid on the road took Crown's densest chunk from
+    // 9.9k to 11k: "Pierdol te trójkąty", Marcin, 2026-09-28; the frame's budget is the gate's)
+    expect(most).toBeLessThan(12000);
   });
 
   it('6.5 a junction\'s box is its widest road\'s surface, and a pavement\'s kerb carries a wheel 14 cm over the road', () => {
     const g = island.ground, { junctions, strips } = island.surfaces;
     let checked = 0;
-    for (const j of junctions) {
+    for (const fan of junctions) {
+      // at its node (the fan's middle is where its fan folds least, a few metres off it)
+      const j = island.network.graph.nodes.reduce((a, b) => (Math.hypot(b.x - fan.x, b.z - fan.z) < Math.hypot(a.x - fan.x, a.z - fan.z) ? b : a));
       // (by the highway its surface holds sway past its own edge)
       if (g.highwayAt(j.x, j.z) !== null || g.roads.some((r) => r.cls === 'highway' && r.pts.some((q) => Math.hypot(q[0] - j.x, q[1] - j.z) < 40))) continue;
-      const arms = [...new Set(j.rim.map((r) => r.strip))].map((i) => strips[i] as Strip);
+      const arms = [...new Set(fan.rim.map((r) => r.strip))].filter((i) => i >= 0).map((i) => strips[i] as Strip);
       const widest = Math.max(...arms.map((s) => s.hw)), top = arms.filter((s) => s.hw === widest);
       if (top.length !== 1) continue;
       const road = g.roads[(top[0] as Strip).road];
@@ -210,5 +216,107 @@ describe('M8.10 slice 6b: the roads\' surfaces', () => {
     }
     expect(faces).toBeGreaterThan(5000);
     expect(worst, at).toBeLessThan(0.05);
+  });
+
+  it("6.8 a junction's box ends where its corners' curves do, and the pavements go round its corners (Marcin's stills, 2026-09-28: 15-50 m of bare asphalt, the corners cut across with the grass in them, the pavements stopped short)", () => {
+    const { junctions, strips } = island.surfaces;
+    const paved = new Set(['avenue', 'street', 'side']);
+    let square = 0, worst = 0, corners = 0, round = 0;
+    for (const j of junctions) {
+      const n = j.rim.length;
+      // the arms by their sections' middles, round the junction
+      const arms = j.rim.filter((r) => r.strip >= 0 && r.o === 0).map((r) => ({ r, a: Math.atan2(r.z - j.z, r.x - j.x), hw: (strips[r.strip] as Strip).hw, cls: (strips[r.strip] as Strip).cls }));
+      arms.sort((a, b) => a.a - b.a);
+      const gaps = arms.map((a, i) => { let g = (arms[(i + 1) % arms.length] as (typeof arms)[number]).a - a.a; if (g <= 0) g += 2 * Math.PI; return (g * 180) / Math.PI; });
+      // a crossing of four of the town's streets at right angles: each arm's strip starts within the widest other's half
+      // width, the curve's 6 m and two (its start past the curve, the middle a metre or two off the node)
+      if (arms.length === 4 && arms.every((a) => a.cls === 'street' || a.cls === 'side') && gaps.every((g) => g > 80 && g < 100)) {
+        for (const a of arms) {
+          const reach = Math.hypot(a.r.x - j.x, a.r.z - j.z) - Math.max(...arms.filter((b) => b !== a).map((b) => b.hw));
+          worst = Math.max(worst, reach);
+          square++;
+        }
+      }
+      // every corner of two of the town's roads at 60–120°: its pavement goes round it
+      for (const side of j.sides) {
+        const a = j.rim[side.from] as RimPoint, b = j.rim[side.to] as RimPoint;
+        if (a.strip < 0 || b.strip < 0 || !paved.has((strips[a.strip] as Strip).cls) || !paved.has((strips[b.strip] as Strip).cls)) continue;
+        const ma = j.rim[(side.from - 2 + n) % n] as RimPoint, mb = j.rim[(side.to + 2) % n] as RimPoint;
+        let gap = Math.atan2(mb.z - j.z, mb.x - j.x) - Math.atan2(ma.z - j.z, ma.x - j.x);
+        if (gap <= 0) gap += 2 * Math.PI;
+        if (gap < Math.PI / 3 || gap > (2 * Math.PI) / 3) continue;
+        corners++;
+        if (side.outer.length > 0 && side.q.length === 3) round++;
+      }
+    }
+    console.log(`6.8 ${square} square arms, the furthest start ${worst.toFixed(1)} m past the other's half width; ${round} of ${corners} corners paved round`);
+    expect(square).toBeGreaterThan(40);
+    expect(worst).toBeLessThan(9);
+    expect(corners).toBeGreaterThan(200);
+    expect(round / corners).toBeGreaterThan(0.9);
+  });
+
+  it("6.9 the paint lies on the road over a crest: no quad's middle nor its edges' under the strip (laid flat, a zebra's stripes sank under Crown's crests but for their ends)", () => {
+    const { paint, strips } = island.surfaces, p = { x: 0, y: 0, z: 0 };
+    let worst = Infinity, at = '';
+    for (const q of paint) {
+      const st = strips[q.strip] as Strip;
+      // the drawn quad is its triangles (a, b, c) and (a, c, d): the diagonal's middle and the edges' middles
+      for (const [i, k] of [[0, 2], [0, 1], [1, 2], [2, 3], [3, 0]] as const) {
+        const over = ((q.y[i] as number) + (q.y[k] as number)) / 2 - onStrip(st, ((q.s[i] as number) + (q.s[k] as number)) / 2, ((q.o[i] as number) + (q.o[k] as number)) / 2, p).y;
+        if (over < worst) { worst = over; at = `${q.kind} on ${st.id} at ${p.x.toFixed(0)}, ${p.z.toFixed(0)}`; }
+      }
+    }
+    console.log(`6.9 the paint ${(worst * 1000).toFixed(1)} mm over the road at the least (${at})`);
+    expect(worst, at).toBeGreaterThan(0);
+  });
+
+  it("6.10 the view's ground stays under a junction's asphalt (the grass drew through Crown's crossings: Marcin's still, 2026-09-28)", () => {
+    const view = new GroundView(island), cell = 2;
+    // the fans' faces' middles and their edges' middles by chunk, with the fan's height there
+    const samples = new Map<number, number[]>();
+    for (const j of island.surfaces.junctions) fanFaces(j, (ax, ay, az, bx, by, bz, cx, cy, cz) => {
+      for (const [x, y, z] of [[(ax + bx + cx) / 3, (ay + by + cy) / 3, (az + bz + cz) / 3], [(ax + bx) / 2, (ay + by) / 2, (az + bz) / 2], [(bx + cx) / 2, (by + cy) / 2, (bz + cz) / 2]] as const) {
+        const k = Island.chunkIndex(...Island.chunkOf(x, z));
+        let list = samples.get(k);
+        if (!list) { list = []; samples.set(k, list); }
+        list.push(x, y, z);
+      }
+    });
+    let checked = 0, worst = -Infinity, at = '';
+    for (const [k, list] of samples) {
+      const i = k % CHUNKS_X, jj = Math.floor(k / CHUNKS_X), x0 = CHUNK_X0 + i * CHUNK, z0 = CHUNK_Z0 + jj * CHUNK, side = Math.ceil(CHUNK / cell);
+      const mesh = view.build(i, jj), pos = mesh.positions, cells = new Map<number, number[]>();
+      for (let t = 0; t < mesh.triangles; t++) {
+        const o = t * 9;
+        const tx0 = Math.min(pos[o] as number, pos[o + 3] as number, pos[o + 6] as number), tx1 = Math.max(pos[o] as number, pos[o + 3] as number, pos[o + 6] as number);
+        const tz0 = Math.min(pos[o + 2] as number, pos[o + 5] as number, pos[o + 8] as number), tz1 = Math.max(pos[o + 2] as number, pos[o + 5] as number, pos[o + 8] as number);
+        for (let a = Math.max(0, Math.floor((tx0 - x0) / cell)); a <= Math.min(side - 1, Math.floor((tx1 - x0) / cell)); a++) {
+          for (let b = Math.max(0, Math.floor((tz0 - z0) / cell)); b <= Math.min(side - 1, Math.floor((tz1 - z0) / cell)); b++) {
+            let c = cells.get(b * side + a);
+            if (!c) { c = []; cells.set(b * side + a, c); }
+            c.push(o);
+          }
+        }
+      }
+      for (let n = 0; n < list.length; n += 3) {
+        const x = list[n] as number, y = list[n + 1] as number, z = list[n + 2] as number;
+        let top = -Infinity;
+        for (const o of cells.get(Math.floor((z - z0) / cell) * side + Math.floor((x - x0) / cell)) ?? []) {
+          const x1 = pos[o] as number, z1 = pos[o + 2] as number, x2 = pos[o + 3] as number, z2 = pos[o + 5] as number, x3 = pos[o + 6] as number, z3 = pos[o + 8] as number;
+          const d = (z2 - z3) * (x1 - x3) + (x3 - x2) * (z1 - z3);
+          if (Math.abs(d) < 1e-9) continue;
+          const l1 = ((z2 - z3) * (x - x3) + (x3 - x2) * (z - z3)) / d, l2 = ((z3 - z1) * (x - x3) + (x1 - x3) * (z - z3)) / d, l3 = 1 - l1 - l2;
+          if (l1 < -1e-6 || l2 < -1e-6 || l3 < -1e-6) continue;
+          top = Math.max(top, l1 * (pos[o + 1] as number) + l2 * (pos[o + 4] as number) + l3 * (pos[o + 7] as number));
+        }
+        if (!Number.isFinite(top)) continue;
+        checked++;
+        if (top - y > worst) { worst = top - y; at = `${x.toFixed(0)}, ${z.toFixed(0)}`; }
+      }
+    }
+    console.log(`6.10 ${checked} points of the fans, the ground ${worst.toFixed(3)} m over them at the most (${at})`);
+    expect(checked).toBeGreaterThan(20000);
+    expect(worst, at).toBeLessThan(0);
   });
 });

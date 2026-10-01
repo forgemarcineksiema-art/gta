@@ -6,7 +6,7 @@ Free-form session log: done, decided and why, next, open problems. Newest sessio
 
 A car near the player (lent its body) was held level whatever the road did, one further off pitched by the slope under
 its middle alone: on Crown's hills a bus stood a metre into the road at its front and a metre over it at its back (Marcin's
-still), at a crest a car's ends hung half a metre. Now every car sits on the road under its four wheels (: its
+still), at a crest a car's ends hung half a metre. Now every car sits on the road under its four wheels (`seat`: its
 height, grade and roll from the road at its wheels; on the highway its lane's heights at its axles), lent in that pose; a
 shaken car drives again once level on its road, not with the vertical (at rest on Crown's 16 % it leant past the 6° it
 takes and was a wreck when its time ran out). Pin 13.7: 0.92 m before, under 0.12 m now. Verify green (836 tests).

@@ -63,13 +63,13 @@ describe('M8.10 slice 13: the island\'s streets', () => {
     expect(a).toBeGreaterThanOrEqual(0);
     traffic.next[a] = to;
     // every car lent its body round the player (off the highway's decks), on its lane and across the junctions (the one put
-    // there queues in the junction behind the cars ahead and the player)
+    // there queues in the junction behind the cars ahead and the player); not a unit an AI car drives (its lent body gone)
     let worst = 0, across = 0;
     for (let i = 0; i < 60 * 20 && traffic.lane[a] === from; i++) {
       clearControls(sim.controls); sim.controls.brake = 1; sim.step();
       for (let k = 0; k < traffic.pool; k++) {
         const lane = traffic.lane[k] as number;
-        if (traffic.state[k] !== AgentState.Physical || lane < 0 || graph.lanes[lane]?.highway) continue;
+        if (traffic.state[k] !== AgentState.Physical || traffic.puppet[k] === 1 || lane < 0 || graph.lanes[lane]?.highway) continue;
         if ((traffic.s[k] as number) > (lanes.length[lane] as number)) across++;
         worst = Math.max(worst, Math.abs((traffic.y[k] as number) - island.ground.surfaceHeight(traffic.x[k] as number, traffic.z[k] as number)));
       }

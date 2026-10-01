@@ -47,7 +47,7 @@ import { kerbsideGates, type BillboardSite } from './billboards';
 import { buildStunts, inKeep, kerbsideBlocked, stuntSites, type StuntSites } from './stunts';
 import { atSlipway, islandSlipways, seaStatics, type IslandSlipway } from './slipways';
 import { marketSpots } from './market';
-import { readView, type ViewReadings } from './views';
+import { VIEW_GRID, readView, type ViewReadings } from './views';
 
 /** A chunk of the ground: its side (m) and the height field's cell (m). The chunks cover the plan's bounds. */
 export const CHUNK = 250;
@@ -71,6 +71,11 @@ const WALL = { height: 4, half: 0.5, piece: 24, shallows: 6 } as const;
 export const PLUMB_TILT = 1e-4;
 /** The side of a cell the pavements' kerb slabs are listed by (m): a pavement's width and a little. */
 const KERB_CELL = 8;
+/**
+ * The view's ground under a junction's asphalt and a grid step past its rim lies this much further under the fan's lowest
+ * round it (m): the view's triangles span 3.9 m, the fan's fold within them on a hill.
+ */
+const FAN_UNDER = 0.06;
 /** The heights of the chunks round the physics ring are worked out ahead, this many columns a step (126 heights each). */
 export const PREFETCH_COLUMNS = 4;
 /** The height field keeps its heights to this (m: its bake keeps them as whole steps, M8.10 slice 18). */
@@ -263,8 +268,8 @@ export class Island {
   private surfaceIndexed: SurfaceIndex | null = null;
   private readonly surfaceChunks = new Map<number, SurfaceChunk | null>();
   private readonly junctionReaches = new Map<object, number>();
-  /** The junctions' fans as their faces (nine numbers a face) inside their bounds, for `fanAt`, once asked for. */
-  private fans: Array<{ x0: number; x1: number; z0: number; z1: number; faces: number[] }> | null = null;
+  /** The junctions' fans' faces (nine numbers a face) by cell (`indexFans`), for `fanAt`, once asked for. */
+  private fans: { cols: number; rows: number; start: Int32Array; items: Int32Array; faces: Float64Array } | null = null;
   private readonly probeScratch: GroundProbe = { h: 0, steep: 0, steepKind: -1, road: Infinity, surface: GRASS };
   private readonly garageFrame = { along: 0, across: 0 };
   /** The pavements' kerb slabs by cell (`indexKerbs`), made the first time a height is read on them. */
@@ -433,11 +438,27 @@ export class Island {
         for (const r of j.rim) { bx0 = Math.min(bx0, r.x); bx1 = Math.max(bx1, r.x); bz0 = Math.min(bz0, r.z); bz1 = Math.max(bz1, r.z); }
         return { j, bx0, bx1, bz0, bz1 };
       });
+      const step = CHUNK / (VIEW_GRID - 1);
       v = readView(this.ground, x0, z0, CHUNK, {
-        floor: (x, z) => (near.some((n) => x > n.bx0 && x < n.bx1 && z > n.bz0 && z < n.bz1) ? this.fanAt(x, z) - ROAD_LIFT : NaN),
-        // the ground under the nearest rim within reach
+        // under a fan no higher than its lowest a grid step round (the view's triangles span a step: in the gore of two
+        // roads parting on a hill the asphalt folds 0.8 m within one)
+        floor: (x, z) => {
+          if (!near.some((n) => x > n.bx0 && x < n.bx1 && z > n.bz0 && z < n.bz1) || !Number.isFinite(this.fanAt(x, z))) return NaN;
+          let low = Infinity;
+          for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+            const f = this.fanAt(x + dx * step, z + dz * step);
+            if (f < low) low = f;
+          }
+          return low - ROAD_LIFT - FAN_UNDER;
+        },
+        // the ground under the nearest rim within reach, and under the fan's lowest a grid step round (past a rim the
+        // view's triangle reaches in over the asphalt: a serpentine's hairpin's 5 cm)
         rim: (x, z, reach) => {
-          let best = reach, h = NaN;
+          let best = reach, h = NaN, low = Infinity;
+          for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+            const f = this.fanAt(x + dx * step, z + dz * step);
+            if (f < low) low = f;
+          }
           for (const n of near) {
             if (x < n.bx0 - reach || x > n.bx1 + reach || z < n.bz0 - reach || z > n.bz1 + reach) continue;
             const rim = n.j.rim;
@@ -448,7 +469,7 @@ export class Island {
               if (d < best) { best = d; h = a.y + (b.y - a.y) * t - ROAD_LIFT; }
             }
           }
-          return h;
+          return Number.isFinite(low) ? Math.min(Number.isFinite(h) ? h : Infinity, low - ROAD_LIFT - FAN_UNDER) : h;
         },
       });
       this.views.set(index, v);
@@ -669,27 +690,53 @@ export class Island {
 
   /** The height of a junction's asphalt at (x, z) (its fan's faces'), NaN off every junction. */
   fanAt(x: number, z: number): number {
-    const fans = (this.fans ??= this.surfaces.junctions.map((j) => {
-      const faces: number[] = [];
-      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
-      fanFaces(j, (ax, ay, az, bx, by, bz, cx, cy, cz) => {
-        faces.push(ax, ay, az, bx, by, bz, cx, cy, cz);
-        x0 = Math.min(x0, ax, bx, cx); x1 = Math.max(x1, ax, bx, cx); z0 = Math.min(z0, az, bz, cz); z1 = Math.max(z1, az, bz, cz);
-      });
-      return { x0, x1, z0, z1, faces };
-    }));
-    for (const f of fans) {
-      if (x < f.x0 || x > f.x1 || z < f.z0 || z > f.z1) continue;
-      const t = f.faces;
-      for (let o = 0; o < t.length; o += 9) {
-        const ax = t[o] as number, az = t[o + 2] as number, bx = t[o + 3] as number, bz = t[o + 5] as number, cx = t[o + 6] as number, cz = t[o + 8] as number;
-        const d = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
-        if (Math.abs(d) < 1e-12) continue;
-        const l1 = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / d, l2 = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / d, l3 = 1 - l1 - l2;
-        if (l1 >= -1e-9 && l2 >= -1e-9 && l3 >= -1e-9) return l1 * (t[o + 1] as number) + l2 * (t[o + 4] as number) + l3 * (t[o + 7] as number);
-      }
+    const f = (this.fans ??= this.indexFans());
+    const ci = Math.floor((x - BOUNDS.x0) / KERB_CELL), cj = Math.floor((z - BOUNDS.z0) / KERB_CELL);
+    if (ci < 0 || ci >= f.cols || cj < 0 || cj >= f.rows) return NaN;
+    const t = f.faces, cell = cj * f.cols + ci;
+    for (let n = f.start[cell] as number, end = f.start[cell + 1] as number; n < end; n++) {
+      const o = 9 * (f.items[n] as number);
+      const ax = t[o] as number, az = t[o + 2] as number, bx = t[o + 3] as number, bz = t[o + 5] as number, cx = t[o + 6] as number, cz = t[o + 8] as number;
+      const d = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
+      if (Math.abs(d) < 1e-12) continue;
+      const l1 = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / d, l2 = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / d, l3 = 1 - l1 - l2;
+      if (l1 >= -1e-9 && l2 >= -1e-9 && l3 >= -1e-9) return l1 * (t[o + 1] as number) + l2 * (t[o + 4] as number) + l3 * (t[o + 7] as number);
     }
     return NaN;
+  }
+
+  /** The junctions' fans' faces by `KERB_CELL` m cell, in their order, each listed in every cell its bounds reach. */
+  private indexFans(): NonNullable<Island['fans']> {
+    const list: number[] = [];
+    for (const j of this.surfaces.junctions) fanFaces(j, (ax, ay, az, bx, by, bz, cx, cy, cz) => { list.push(ax, ay, az, bx, by, bz, cx, cy, cz); });
+    const faces = new Float64Array(list), count = faces.length / 9;
+    const cols = Math.ceil((BOUNDS.x1 - BOUNDS.x0) / KERB_CELL), rows = Math.ceil((BOUNDS.z1 - BOUNDS.z0) / KERB_CELL);
+    const start = new Int32Array(cols * rows + 1), span = new Int32Array(4 * count);
+    for (let q = 0; q < count; q++) {
+      const o = 9 * q;
+      const x0 = Math.min(faces[o] as number, faces[o + 3] as number, faces[o + 6] as number), x1 = Math.max(faces[o] as number, faces[o + 3] as number, faces[o + 6] as number);
+      const z0 = Math.min(faces[o + 2] as number, faces[o + 5] as number, faces[o + 8] as number), z1 = Math.max(faces[o + 2] as number, faces[o + 5] as number, faces[o + 8] as number);
+      const i0 = Math.max(0, Math.floor((x0 - BOUNDS.x0) / KERB_CELL)), i1 = Math.min(cols - 1, Math.floor((x1 - BOUNDS.x0) / KERB_CELL));
+      const j0 = Math.max(0, Math.floor((z0 - BOUNDS.z0) / KERB_CELL)), j1 = Math.min(rows - 1, Math.floor((z1 - BOUNDS.z0) / KERB_CELL));
+      span[4 * q] = i0; span[4 * q + 1] = i1; span[4 * q + 2] = j0; span[4 * q + 3] = j1;
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) start[j * cols + i + 1] = (start[j * cols + i + 1] as number) + 1;
+    }
+    for (let c = 0; c < cols * rows; c++) start[c + 1] = (start[c + 1] as number) + (start[c] as number);
+    const items = new Int32Array(start[cols * rows] as number), fill = start.slice(0, cols * rows);
+    for (let q = 0; q < count; q++) {
+      for (let j = span[4 * q + 2] as number; j <= (span[4 * q + 3] as number); j++) for (let i = span[4 * q] as number; i <= (span[4 * q + 1] as number); i++) {
+        const cell = j * cols + i;
+        items[fill[cell] as number] = q;
+        fill[cell] = (fill[cell] as number) + 1;
+      }
+    }
+    return { cols, rows, start, items, faces };
+  }
+
+  /** The height the physics' field takes at a point: the ground, under a junction's asphalt no higher than it (a corner's curve cuts off the bank beside it: the wheels ride its fan). */
+  private fieldHeight(x: number, z: number): number {
+    const fan = this.fanAt(x, z), y = this.ground.height(x, z);
+    return Number.isFinite(fan) ? Math.min(y, fan - ROAD_LIFT - 0.02) : y;
   }
 
   /** How far a junction's box reaches from its middle (its rim's farthest point). */
@@ -780,10 +827,7 @@ export class Island {
   private columns(index: number, h: Float32Array, from: number, to: number): void {
     const x0 = CHUNK_X0 + (index % CHUNKS_X) * CHUNK, z0 = CHUNK_Z0 + Math.floor(index / CHUNKS_X) * CHUNK, n = CELLS + 1;
     for (let col = from; col < to; col++) for (let row = 0; row < n; row++) {
-      const x = x0 + col * FIELD, z = z0 + row * FIELD, fan = this.fanAt(x, z);
-      // under a junction's asphalt no higher than it (a corner's curve cuts off the bank beside it: the wheels ride its fan)
-      const y = Number.isFinite(fan) ? Math.min(this.ground.height(x, z), fan - ROAD_LIFT - 0.02) : this.ground.height(x, z);
-      h[row + col * n] = Math.round(y / HEIGHT_STEP) * HEIGHT_STEP;
+      h[row + col * n] = Math.round(this.fieldHeight(x0 + col * FIELD, z0 + row * FIELD) / HEIGHT_STEP) * HEIGHT_STEP;
     }
     this.worked += Math.max(0, to - from) * n;
   }
@@ -848,9 +892,9 @@ export class Island {
     return this.world.createCollider(desc);
   }
 
-  /** The ground's height at a point. */
+  /** The ground's height at a point, as the physics' field has it. */
   heightAt(x: number, z: number): number {
-    return this.ground.height(x, z);
+    return this.fieldHeight(x, z);
   }
 
   /** Where a car put back on the road goes: the nearest graded road, its height, its heading (written into `out`). */

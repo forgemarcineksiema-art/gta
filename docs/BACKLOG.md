@@ -91,3 +91,4 @@ Ideas outside the current milestone, non-blocking bugs, refactors. One line of c
 ## The island (the third bug hunt, 2026-09-28)
 
 - A wreck holding a queue that the player is looking at stays till they look away (the tow never takes a car in sight): one in a jam the player sits in, facing it, would want a tow that fades it out — `src/sim/traffic/Traffic.ts` `tow()` with the traffic view's fade.
+- A patrol an AI car takes over (`AiCars` → `Traffic.puppetOn`) can steer straight across a block on Crown's hill and drop under the ground about 50 m on (pin 13.5's seed, 2026-10-01: from the hairpin of Crown Avenue into Crown Street 2 at (198, 211) to (142, 221), 4.5 m under): its path off the roads, and the physics' ground under it there, want a look — `src/sim/ai/AiCars.ts`.

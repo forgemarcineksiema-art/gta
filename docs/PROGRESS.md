@@ -2,6 +2,16 @@
 
 Free-form session log: done, decided and why, next, open problems. Newest session first. Dates are absolute.
 
+## 2026-10-01 — the junctions' corners, finished (Marcin: "dociągnij do zielonego verify")
+
+The 2026-09-28 work (corners on curves, pavements round them, paint on crests, the ground under the asphalt) was left red:
+8 pins. Fixed: a corner's asphalt reads its roads' kerbs on their own lines (a bending road's straight arm read a dip of
+0.8 m); a corner with no room for its curve keeps its kerbs' crossing (the chord left a gore bare); a straight kerb in 8 m
+pieces (a T's 31 m side under its road's crest); the view's ground and the physics' field under the fan's lowest a grid
+step round, `heightAt` as the field; `fanAt` by cell (it scanned every junction: the timeouts). Fans cut to 4 (5 where
+12 cm still miss), flat pairs in rings, corners' own cuts, curves in 30° pieces: Crown's densest chunk 15.7k → 11.9k.
+Pin 13.5 skips AI cars (no lent body: one drives off across a block, BACKLOG). Verify green.
+
 ## 2026-09-28 — the traffic on its wheels (Marcin: "fizyką pojazdów ruchu, no masakra jakaś")
 
 A car near the player (lent its body) was held level whatever the road did, one further off pitched by the slope under

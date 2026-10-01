@@ -46,7 +46,9 @@ const STRAIGHT = (10 * Math.PI) / 180;
 const ARM_PAST = 0.5;
 const ARM_LEAST = 2;
 /** A corner's curve in pieces of at most this (rad). */
-const ARC_STEP = (22.5 * Math.PI) / 180;
+const ARC_STEP = (30 * Math.PI) / 180;
+/** A junction's straight kerb between two arms (a T's straight side, a sharp corner's, a bend's outside) in pieces of at most this (m). */
+const KERB_RUN = 8;
 /** A pavement stops where it would come within this of another road's carriageway (m). */
 const CLEAR_OF_ROAD = 0.3;
 /** An arm's strip starts no further than this from its node (m): a merge's gore, a sharp fork of two avenues. */
@@ -72,11 +74,13 @@ const BAY_CLEAR = 20;
 /** A footway run goes on while the pavement's edge keeps within this of its straight line (m). */
 const RUN_BEND = 0.3;
 /**
- * A paint quad is halved where the strip under its middle or an edge's middle is further than this from its corners'
- * straight lines (m), up to `PAINT_SPLITS` times: laid flat across a crest a zebra's stripes sank under the asphalt but
- * for their ends (Crown's crossings, 2026-09-28).
+ * A paint quad is halved where the strip under its middle or an edge's middle rises more than `PAINT_SAG` over its
+ * corners' straight lines (m), or falls more than `PAINT_FLOAT` under them, up to `PAINT_SPLITS` times: laid flat across
+ * a crest a zebra's stripes sank under the asphalt but for their ends (Crown's crossings, 2026-09-28); over a dip it only
+ * stands a little proud.
  */
-const PAINT_SAG = 0.006;
+const PAINT_SAG = 0.009;
+const PAINT_FLOAT = 0.03;
 const PAINT_SPLITS = 6;
 
 /** A section's points across its strip, as fractions of the half width right of the middle: its right edge to its left. */
@@ -113,14 +117,14 @@ export interface JunctionSide { from: number; to: number; outer: number[]; q: nu
  * A junction: its middle; its rim round it (each arm's end section, its right edge to its left as it leaves, and between
  * two arms their side's kerb: straight on, round a corner's curve, or across a merge); its fan's rim (`core`: the rim
  * with each corner's curve cut off at its kerbs' crossing) and its fan from the middle to each of that rim's pairs, cut
- * `cut` times each way on the ground, the points of that grid past its corners (`fanOrder`) per core point; each
- * corner's curve fanned from its kerbs' crossing (`fillets`: that point's x, y, z, then the curve's first and last rim
- * index); its sides.
+ * `cut` times each way on the ground, the points of that grid past its corners (`fanOrder`) per core point, or where the
+ * ground under its pair lies flat across (`rings`: 1) its spokes' points only; each corner's curve fanned from its kerbs'
+ * crossing (`fillets`: that point's x, y, z, the curve's first and last rim index, its own cut, its points); its sides.
  */
-export interface Junction { x: number; y: number; z: number; rim: RimPoint[]; core: RimPoint[]; grid: number[]; cut: number; fillets: number[]; sides: JunctionSide[] }
+export interface Junction { x: number; y: number; z: number; rim: RimPoint[]; core: RimPoint[]; grid: number[]; cut: number; rings: number[]; fillets: number[]; sides: JunctionSide[] }
 
 /** A junction's fan is cut at most this many times each way (`layFan`). */
-const FAN_CUTS = 8;
+const FAN_CUTS = 5;
 
 /** A fan's triangle cut `n` times each way: its grid's points past the middle and the rim's two, (u toward the first rim point, v the next). */
 function fanOrder(n: number): Array<readonly [number, number]> {
@@ -160,28 +164,11 @@ function fanCells(n: number, thin: boolean): { points: Array<readonly [number, n
 export function fanFaces(j: Junction, face: (ax: number, ay: number, az: number, bx: number, by: number, bz: number, cx: number, cy: number, cz: number) => void): void {
   const rim = j.core, grid = j.grid, cut = j.cut, fl = j.fillets;
   const cells = [fanCells(cut, false), fanCells(cut, true)].map((c) => ({ ...c, index: new Map(c.points.map(([u, v], k) => [u * 64 + v, k])) }));
-  // each corner's curve from its kerbs' crossing, a spoke to each of its points in rings
-  for (let f = 0; f + 4 < fl.length;) {
-    const cx = fl[f] as number, cy = fl[f + 1] as number, cz = fl[f + 2] as number, from = fl[f + 3] as number, to = fl[f + 4] as number, base = f + 5;
-    const at = (i: number, k: number): readonly [number, number, number] => {
-      if (k === 0) return [cx, cy, cz];
-      if (k === cut) { const r = j.rim[i] as RimPoint; return [r.x, r.y, r.z]; }
-      const o = base + 3 * ((i - from) * (cut - 1) + k - 1);
-      return [fl[o] as number, fl[o + 1] as number, fl[o + 2] as number];
-    };
-    for (let i = from; i < to; i++) for (let k = 0; k < cut; k++) {
-      const p = at(i, k), q = at(i, k + 1), r = at(i + 1, k + 1);
-      if (k === 0) { face(p[0], p[1], p[2], q[0], q[1], q[2], r[0], r[1], r[2]); continue; }
-      const s = at(i + 1, k);
-      face(p[0], p[1], p[2], q[0], q[1], q[2], r[0], r[1], r[2]);
-      face(p[0], p[1], p[2], r[0], r[1], r[2], s[0], s[1], s[2]);
-    }
-    f = base + 3 * (to - from + 1) * (cut - 1);
-  }
+  for (let f = 0; f + 5 < fl.length;) f = filletFaces(fl, f, j.rim, face);
   let n = 0;
   for (let i = 0; i < rim.length; i++) {
     const a = rim[i] as RimPoint, b = rim[(i + 1) % rim.length] as RimPoint;
-    const c = cells[thinPair(a, b) ? 1 : 0] as (typeof cells)[number];
+    const c = cells[j.rings[i] === 1 ? 1 : 0] as (typeof cells)[number];
     const at = (u: number, v: number): readonly [number, number, number] => {
       if (u === 0 && v === 0) return [j.x, j.y, j.z];
       if (u === cut) return [a.x, a.y, a.z];
@@ -197,13 +184,38 @@ export function fanFaces(j: Junction, face: (ax: number, ay: number, az: number,
   }
 }
 
+/**
+ * A corner's curve's faces from its kerbs' crossing, a spoke to each of its points in rings (`fl` from `f`: the crossing's
+ * x, y, z, the curve's first and last rim index, its own cut, then its spokes' points); where the next one starts.
+ */
+function filletFaces(fl: ArrayLike<number>, f: number, rim: readonly RimPoint[], face: (ax: number, ay: number, az: number, bx: number, by: number, bz: number, cx: number, cy: number, cz: number) => void): number {
+  const cx = fl[f] as number, cy = fl[f + 1] as number, cz = fl[f + 2] as number, from = fl[f + 3] as number, to = fl[f + 4] as number, cut = fl[f + 5] as number, base = f + 6;
+  const at = (i: number, k: number): readonly [number, number, number] => {
+    if (k === 0) return [cx, cy, cz];
+    if (k === cut) { const r = rim[i] as RimPoint; return [r.x, r.y, r.z]; }
+    const o = base + 3 * ((i - from) * (cut - 1) + k - 1);
+    return [fl[o] as number, fl[o + 1] as number, fl[o + 2] as number];
+  };
+  for (let i = from; i < to; i++) for (let k = 0; k < cut; k++) {
+    const p = at(i, k), q = at(i, k + 1), r = at(i + 1, k + 1);
+    if (k === 0) { face(p[0], p[1], p[2], q[0], q[1], q[2], r[0], r[1], r[2]); continue; }
+    const s = at(i + 1, k);
+    face(p[0], p[1], p[2], q[0], q[1], q[2], r[0], r[1], r[2]);
+    face(p[0], p[1], p[2], r[0], r[1], r[2], s[0], s[1], s[2]);
+  }
+  return base + 3 * (to - from + 1) * (cut - 1);
+}
+
 /** A corner's kerbs' crossing on a fan's rim (its `strip`): inside the junction, its rim pairs' chords on the ground. */
 const CROSSING = -2;
 /**
- * A fan's faces lie at most this far under the ground and its lift at their middles (m): the view's ground is drawn
- * under a junction's asphalt at most as high as it lies.
+ * A fan's faces lie at most this far off the ground and its lift at their middles (m), either way: the view's ground
+ * and the physics' field are kept under a junction's asphalt wherever it lies (`Island.fieldHeight`, `readView`), so
+ * the fan need not follow every bump (cut 8 times to 3 cm it was half of Crown's densest chunk's triangles).
  */
-const FAN_MISS = 0.03;
+const FAN_MISS = 0.08;
+/** ... and past its next to last cut, this (m): its last only where a hairpin's bank or a crest bends it more. */
+const FAN_SLACK = 0.15;
 
 /** A fan's rim pair inside the junction (to a corner's kerbs' crossing): its chord on the ground, not straight. */
 function inner(a: RimPoint, b: RimPoint): boolean {
@@ -225,26 +237,57 @@ function layFan(j: Junction, height: (x: number, z: number) => number, corners: 
   const core = j.core, n = core.length;
   for (let cut = 1; ; cut++) {
     j.cut = cut;
-    const grid: number[] = [];
+    const grid: number[] = [], rings: number[] = [];
     for (let i = 0; i < n; i++) {
       const a = core[i] as RimPoint, b = core[(i + 1) % n] as RimPoint, straight = !inner(a, b);
-      for (const [u, v] of fanCells(cut, thinPair(a, b)).points) {
-        const x = j.x + ((a.x - j.x) * u + (b.x - j.x) * v) / cut, z = j.z + ((a.z - j.z) * u + (b.z - j.z) * v) / cut;
-        // on the rim's chord: straight between its points (an arm's section's edge, a kerb's), so the seams are exact
-        grid.push(x, u + v === cut && straight ? a.y + ((b.y - a.y) * v) / cut : height(x, z), z);
+      const lay = (ring: boolean): number[] => {
+        const pts: number[] = [];
+        for (const [u, v] of fanCells(cut, ring).points) {
+          const x = j.x + ((a.x - j.x) * u + (b.x - j.x) * v) / cut, z = j.z + ((a.z - j.z) * u + (b.z - j.z) * v) / cut;
+          // on the rim's chord: straight between its points (an arm's section's edge, a kerb's), so the seams are exact
+          pts.push(x, u + v === cut && straight ? a.y + ((b.y - a.y) * v) / cut : height(x, z), z);
+        }
+        return pts;
+      };
+      // in rings where they lie within `FAN_MISS` of the ground across (their spokes' points are the grid's: no seam)
+      let ring = thinPair(a, b);
+      if (!ring && straight && cut > 1) {
+        const pts = lay(true), at = (u: number, v: number): readonly [number, number, number] => {
+          if (u === 0 && v === 0) return [j.x, j.y, j.z];
+          if (u === cut) return [a.x, a.y, a.z];
+          if (v === cut) return [b.x, b.y, b.z];
+          const k = 3 * (u > 0 ? u - 1 : cut - 2 + v);
+          return [pts[k] as number, pts[k + 1] as number, pts[k + 2] as number];
+        };
+        ring = fanCells(cut, true).faces.every(([u0, v0, u1, v1, u2, v2]) => {
+          const p = at(u0, v0), q = at(u1, v1), r = at(u2, v2);
+          return [[p, q, r], [q, r], [r, p]].every((m) => {
+            const x = m.reduce((t, c) => t + c[0], 0) / m.length, y = m.reduce((t, c) => t + c[1], 0) / m.length, z = m.reduce((t, c) => t + c[2], 0) / m.length;
+            return Math.abs(height(x, z) - y) <= FAN_MISS;
+          });
+        });
       }
+      rings.push(ring ? 1 : 0);
+      grid.push(...lay(ring));
     }
     j.grid = grid;
+    j.rings = rings;
     const fillets: number[] = [];
+    // each corner's curve cut as few times as keep its faces within `FAN_MISS`, at most the fan's
     for (let f = 0; f + 4 < corners.length; f += 5) {
       const cx = corners[f] as number, cz = corners[f + 2] as number, from = corners[f + 3] as number, to = corners[f + 4] as number;
-      fillets.push(cx, corners[f + 1] as number, cz, from, to);
-      for (let i = from; i <= to; i++) {
-        const r = j.rim[i] as RimPoint;
-        for (let k = 1; k < cut; k++) {
-          const x = cx + ((r.x - cx) * k) / cut, z = cz + ((r.z - cz) * k) / cut;
-          fillets.push(x, height(x, z), z);
+      for (let own = 1; ; own++) {
+        const piece = [cx, corners[f + 1] as number, cz, from, to, own];
+        for (let i = from; i <= to; i++) {
+          const r = j.rim[i] as RimPoint;
+          for (let k = 1; k < own; k++) {
+            const x = cx + ((r.x - cx) * k) / own, z = cz + ((r.z - cz) * k) / own;
+            piece.push(x, height(x, z), z);
+          }
         }
+        let fits = true;
+        if (own < cut) filletFaces(piece, 0, j.rim, (ax, ay, az, bx, by, bz, qx, qy, qz) => { fits &&= Math.abs(height((ax + bx + qx) / 3, (az + bz + qz) / 3) - (ay + by + qy) / 3) <= FAN_MISS; });
+        if (own >= cut || fits) { fillets.push(...piece); break; }
       }
     }
     j.fillets = fillets;
@@ -252,9 +295,9 @@ function layFan(j: Junction, height: (x: number, z: number) => number, corners: 
     let worst = 0;
     fanFaces(j, (ax, ay, az, bx, by, bz, cx, cy, cz) => {
       const x = (ax + bx + cx) / 3, z = (az + bz + cz) / 3;
-      worst = Math.max(worst, height(x, z) - (ay + by + cy) / 3);
+      worst = Math.max(worst, Math.abs(height(x, z) - (ay + by + cy) / 3));
     });
-    if (worst <= FAN_MISS) return;
+    if (worst <= (cut >= FAN_CUTS - 1 ? FAN_SLACK : FAN_MISS)) return;
   }
 }
 
@@ -355,6 +398,28 @@ function lineNearest(line: Line, x: number, z: number): { d: number; s: number }
   return { d: bd, s: bs };
 }
 
+/** How far either way of a station `lineNear` looks (m): past a junction's reach. */
+const NEAR_WINDOW = 80;
+
+/** `lineNearest` among the line's pieces within `NEAR_WINDOW` of station `at` (a ring's taken round). */
+function lineNear(line: Line, x: number, z: number, at: number): { d: number; s: number } {
+  let bd = Infinity, bs = at;
+  for (let k = 0; k + 1 < line.x.length; k++) {
+    const s0 = line.s[k] as number, s1 = line.s[k + 1] as number;
+    let lo = at - NEAR_WINDOW - s1, hi = s0 - at - NEAR_WINDOW;
+    if (line.closed) {
+      const mid = (s0 + s1) / 2, d = Math.abs(((mid - at + line.total / 2) % line.total + line.total) % line.total - line.total / 2);
+      lo = hi = d - (s1 - s0) / 2 - NEAR_WINDOW;
+    }
+    if (lo > 0 || hi > 0) continue;
+    const ax = line.x[k] as number, az = line.z[k] as number, dx = (line.x[k + 1] as number) - ax, dz = (line.z[k + 1] as number) - az;
+    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1)));
+    const d = Math.hypot(x - ax - dx * t, z - az - dz * t);
+    if (d < bd) { bd = d; bs = s0 + t * (s1 - s0); }
+  }
+  return { d: bd, s: bs };
+}
+
 /** A strip's frame: its middle and its unit right. */
 interface Frame { x: number; z: number; rx: number; rz: number }
 
@@ -397,7 +462,7 @@ interface Arm {
  * curve's middle `o`, its radius and its tangents' reach from `c`, the pavement's back corner `q`), a merge, straight
  * on, or the outside of a bend; how much further out each arm's strip must start for it (≤ 0: none).
  */
-interface SideShape { kind: 'corner' | 'merge' | 'straight' | 'outer'; ta: number; tb: number; c: P2; o: P2; r: number; reach: number; q: P2; pave: boolean }
+interface SideShape { kind: 'corner' | 'sharp' | 'merge' | 'straight' | 'outer'; ta: number; tb: number; c: P2; o: P2; r: number; reach: number; q: P2; pave: boolean }
 
 /** Where two lines cross: `p + d·t` and `q + e·u`; the two stations (NaN when they run parallel). */
 function crossing(px: number, pz: number, dx: number, dz: number, qx: number, qz: number, ex: number, ez: number): { t: number; u: number } {
@@ -432,7 +497,9 @@ function sideShape(a: Arm, b: Arm, fit = false): SideShape {
   const half = gap / 2;
   let reach = Math.min(CORNER_RADIUS / Math.tan(half), CORNER_REACH);
   if (fit) reach = Math.min(reach, -ARM_PAST - kerb.t, -ARM_PAST - kerb.u);
-  if (reach < 0.5) return { ...none, kind: 'straight' };
+  // a corner with no room for its curve keeps its kerbs' crossing, sharp (a chord across it left the gore of two roads
+  // parting at 37° bare: Crown Avenue's carriageway by Crown Street, 2026-10-01)
+  if (reach < 0.5) return fit && Math.abs(kerb.t) < MERGE_REACH && Math.abs(kerb.u) < MERGE_REACH ? { ...none, kind: 'sharp', c: [cx, cz], pave: false } : { ...none, kind: 'straight' };
   const r = reach * Math.tan(half), bx = a.edx + b.edx, bz = a.edz + b.edz, bl = Math.hypot(bx, bz) || 1, off = r / Math.sin(half);
   // the pavements' outer lines' crossing: the back of the corner
   const back = crossing(a.ex + nax * (a.hw + PAVEMENT), a.ez + naz * (a.hw + PAVEMENT), a.edx, a.edz, b.ex - nbx * (b.hw + PAVEMENT), b.ez - nbz * (b.hw + PAVEMENT), b.edx, b.edz);
@@ -612,6 +679,7 @@ export function roadSurfaces(ground: Ground, graph: RoadGraph, chunkOf: (x: numb
   const shapes: Array<{ j: Junction; arms: Arm[]; shapes: SideShape[] }> = [];
   const probe: GroundProbe = { h: 0, steep: 0, steepKind: -1, road: 0, surface: 0 }, edge = { x: 0, y: 0, z: 0 };
   for (const { arms, sides } of nodes) {
+    const roadsOf = [...new Set(arms.map((a) => a.road))];
     // the junction's own surface: the ground on a carriageway, and past the carriageways (a corner's curve cuts off the
     // bank beside it) its arms' kerbs' heights, each by how near (a bank followed, Crown's corners stood 0.6 m over their
     // asphalt)
@@ -619,13 +687,12 @@ export function roadSurfaces(ground: Ground, graph: RoadGraph, chunkOf: (x: numb
       ground.probe(x, z, probe);
       if (probe.road <= 0) return probe.h + ROAD_LIFT;
       let sum = 0, weight = 0;
-      for (const a of arms) {
-        const st = strips[a.road] as Strip, total = st.s[st.s.length - 1] as number;
-        const dx = x - a.ex, dz = z - a.ez, t = dx * a.edx + dz * a.edz, l = -dx * a.edz + dz * a.edx;
-        let s = a.at + a.dir * (a.end + t);
-        if (st.closed) s = ((s % total) + total) % total;
-        const w = 1 / (Math.max(0, Math.abs(l) - a.hw) ** 2 + 0.25);
-        sum += onStrip(st, s, a.dir * (l < 0 ? -1 : 1) * st.hw, edge).y * w;
+      for (const r of roadsOf) {
+        // the point's nearest on the road's own line (a road bending through the junction leaves its arms' straight lines)
+        const line = lines[r] as Line, st = strips[r] as Strip, hit = lineNear(line, x, z, (arms.find((a) => a.road === r) as Arm).at);
+        const f = frameAt((ground.roads[r] as { pts: readonly P2[] }).pts, line, hit.s), o = (x - f.x) * f.rx + (z - f.z) * f.rz;
+        const w = 1 / (Math.max(0, Math.abs(o) - st.hw) ** 2 + 0.25);
+        sum += onStrip(st, hit.s, (o < 0 ? -1 : 1) * st.hw, edge).y * w;
         weight += w;
       }
       return sum / weight;
@@ -658,13 +725,27 @@ export function roadSurfaces(ground: Ground, graph: RoadGraph, chunkOf: (x: numb
         core.push(c);
         both(rimOf(tbx, tbz));
         fillets.push(c.x, c.y, c.z, first, rim.length - 1);
-      } else if (side.kind === 'outer') {
-        // round the outside of a bend: each kerb back to its foot across from the node
-        const nax = -a.edz, naz = a.edx, nbx = -b.edz, nbz = b.edx;
-        const pax = a.ex + nax * a.hw, paz = a.ez + naz * a.hw, pbx = b.ex - nbx * b.hw, pbz = b.ez - nbz * b.hw;
-        const ta = Math.min(0, (a.ox - pax) * a.edx + (a.oz - paz) * a.edz), tb = Math.min(0, (b.ox - pbx) * b.edx + (b.oz - pbz) * b.edz);
-        both(rimOf(pax + a.edx * ta, paz + a.edz * ta));
-        both(rimOf(pbx + b.edx * tb, pbz + b.edz * tb));
+      } else if (side.kind !== 'merge') {
+        // a sharp corner through its kerbs' crossing; round the outside of a bend each kerb back to its foot across from
+        // the node; straight on, none: each run on the ground every `KERB_RUN` m at most (a T's straight side ran 31 m
+        // straight under its road's crest, 0.4 m under the edge's asphalt)
+        const turn: P2[] = [];
+        if (side.kind === 'sharp') turn.push(side.c);
+        else if (side.kind === 'outer') {
+          const nax = -a.edz, naz = a.edx, nbx = -b.edz, nbz = b.edx;
+          const pax = a.ex + nax * a.hw, paz = a.ez + naz * a.hw, pbx = b.ex - nbx * b.hw, pbz = b.ez - nbz * b.hw;
+          const ta = Math.min(0, (a.ox - pax) * a.edx + (a.oz - paz) * a.edz), tb = Math.min(0, (b.ox - pbx) * b.edx + (b.oz - pbz) * b.edz);
+          turn.push([pax + a.edx * ta, paz + a.edz * ta], [pbx + b.edx * tb, pbz + b.edz * tb]);
+        }
+        const sb = strips[b.road] as Strip, ob = (ACROSS[b.dir > 0 ? 4 : 0] as number) * sb.hw;
+        const last = rim[rim.length - 1] as RimPoint, end: P2 = [(sb.x[b.k] as number) + (sb.rx[b.k] as number) * ob, (sb.z[b.k] as number) + (sb.rz[b.k] as number) * ob];
+        let px = last.x, pz = last.z;
+        for (const [k, q] of [...turn, end].entries()) {
+          const pieces = Math.ceil(Math.hypot(q[0] - px, q[1] - pz) / KERB_RUN);
+          for (let p = 1; p < pieces; p++) both(rimOf(px + ((q[0] - px) * p) / pieces, pz + ((q[1] - pz) * p) / pieces));
+          if (k < turn.length) both(rimOf(q[0], q[1]));
+          px = q[0]; pz = q[1];
+        }
       }
       ranges.push([from, rim.length]);
     });
@@ -688,7 +769,7 @@ export function roadSurfaces(ground: Ground, graph: RoadGraph, chunkOf: (x: numb
     };
     const middles: P2[] = [[ax, az], ...(Math.abs(area) > 1e-6 ? [[gx / (3 * area), gz / (3 * area)] as const] : []), [mx, mz]];
     const [jx, jz] = middles.reduce((best, m) => (folds(m[0], m[1]) < folds(best[0], best[1]) ? m : best));
-    const j: Junction = { x: jx, y: graded(jx, jz), z: jz, rim, core, grid: [], cut: 2, fillets, sides: jsides };
+    const j: Junction = { x: jx, y: graded(jx, jz), z: jz, rim, core, grid: [], cut: 2, rings: [], fillets, sides: jsides };
     // its fan on the ground, cut as fine as it bends
     layFan(j, graded, fillets);
     junctions.push(j);
@@ -797,13 +878,13 @@ export function roadSurfaces(ground: Ground, graph: RoadGraph, chunkOf: (x: numb
       y.push(corner.y + lift);
     }
     if (depth < PAINT_SPLITS) {
-      // its middle's and its edges' middles' misses from their corners' straight lines
-      let miss = Math.abs(onStrip(st, ((s[0] as number) + (s[2] as number)) / 2, ((o[0] as number) + (o[2] as number)) / 2, corner).y + lift - ((y[0] as number) + (y[2] as number)) / 2);
+      // its middle's and its edges' middles' heights under the strip's (and its lift) from their corners' straight lines
+      let sink = onStrip(st, ((s[0] as number) + (s[2] as number)) / 2, ((o[0] as number) + (o[2] as number)) / 2, corner).y + lift - ((y[0] as number) + (y[2] as number)) / 2, rise = sink;
       for (let i = 0; i < 4; i++) {
-        const k = (i + 1) % 4;
-        miss = Math.max(miss, Math.abs(onStrip(st, ((s[i] as number) + (s[k] as number)) / 2, ((o[i] as number) + (o[k] as number)) / 2, corner).y + lift - ((y[i] as number) + (y[k] as number)) / 2));
+        const k = (i + 1) % 4, d = onStrip(st, ((s[i] as number) + (s[k] as number)) / 2, ((o[i] as number) + (o[k] as number)) / 2, corner).y + lift - ((y[i] as number) + (y[k] as number)) / 2;
+        sink = Math.max(sink, d); rise = Math.min(rise, d);
       }
-      if (miss > PAINT_SAG) {
+      if (sink > PAINT_SAG || rise < -PAINT_FLOAT) {
         const len = Math.hypot((s[1] as number) - (s[0] as number), (o[1] as number) - (o[0] as number)), wide = Math.hypot((s[3] as number) - (s[0] as number), (o[3] as number) - (o[0] as number));
         const mid = (i: number, k: number, f: number): [number, number] => [(s[i] as number) + ((s[k] as number) - (s[i] as number)) * f, (o[i] as number) + ((o[k] as number) - (o[i] as number)) * f];
         if (len >= wide) {
